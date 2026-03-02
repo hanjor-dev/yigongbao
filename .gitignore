@@ -1,0 +1,49 @@
+### IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### Java ###
+*.class
+*.log
+*.war
+*.ear
+*.jar
+
+### Maven ###
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+
+### Gradle ###
+.gradle/
+build/
+
+### Logs ###
+logs/
+*.log
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### Node ###
+node_modules/
+
+### Temp ###
+*.swp
+*.tmp
+
+
+### Generated ###
+out/
+
+### Test ###
+/test-output/
+
+### Upload ###
+uploads/
