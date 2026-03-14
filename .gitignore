@@ -51,3 +51,7 @@ uploads/
 /git仓库管理
 
 /.cursor
+
+/yigongbao-parent/.idea/
+/yigongbao-parent/.mvn/
+/yigongbao-parent/logs/

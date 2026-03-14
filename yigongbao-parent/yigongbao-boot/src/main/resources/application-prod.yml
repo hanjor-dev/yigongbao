@@ -1,0 +1,102 @@
+server:
+  # 服务器端口
+  port: 8080
+  servlet:
+    # 项目 context-path
+    context-path: /api
+  # Tomcat 配置
+  tomcat:
+    # 最大工作线程数
+    max-threads: 200
+    # 最小工作线程数
+    min-spare-threads: 10
+
+spring:
+  # 数据源配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:yigongbao}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=true&allowPublicKeyRetrieval=false
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
+    hikari:
+      # 最小空闲连接数
+      minimum-idle: 10
+      # 最大连接池大小
+      maximum-pool-size: 50
+      # 连接超时时间（毫秒）
+      connection-timeout: 30000
+      # 空闲连接超时时间
+      idle-timeout: 600000
+      # 连接最大存活时间
+      max-lifetime: 1800000
+
+  # Redis 配置
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+      lettuce:
+        pool:
+          # 连接池最大连接数
+          max-active: 16
+          # 连接池最大空闲连接数
+          max-idle: 8
+          # 连接池最小空闲连接数
+          min-idle: 4
+          # 连接池最大阻塞等待时间（毫秒）
+          max-wait: -1ms
+
+  # Jackson 配置
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    serialization:
+      # 忽略 Map 中的 null 值
+      write-null-map-values: false
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  # 配置扫描通用枚举
+  type-enums-package: com.yigongbao.common.enums
+  global-config:
+    db-config:
+      # 主键策略
+      id-type: auto
+      # 逻辑删除字段（软删除）
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    # 驼峰命名映射
+    map-underscore-to-camel-case: true
+    # 生产环境不打印 SQL
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  # 配置扫描 XML
+  mapper-locations: classpath*:/mapper/**/*.xml
+
+# Sa-Token 配置
+sa-token:
+  # token 名称（同时也是 cookie 名称）
+  token-name: Authorization
+  # token 有效期（秒），默认 30 天
+  timeout: 2592000
+  # token 临时有效期（秒），指定时间后 token 失效
+  active-timeout: -1
+  # 是否允许同一账号多端同时在线
+  is-concurrent: true
+  # token 风格
+  token-style: uuid
+  # 是否输出操作日志
+  is-log: false
+
+# 医工宝系统配置
+yigongbao:
+  system:
+    # 默认密码（生产环境应使用更复杂的密码）
+    default-password: ${DEFAULT_PASSWORD:}
+    # 文件上传最大大小（字节）
+    max-upload-size: 20971520
+    # 图片上传最大大小（字节）
+    max-image-size: 10485760

@@ -1,0 +1,7 @@
+# 医工宝主配置文件
+# 默认使用 dev 开发环境
+# 可通过命令行参数 --spring.profiles.active=prod 切换到生产环境
+
+spring:
+  profiles:
+    active: dev
