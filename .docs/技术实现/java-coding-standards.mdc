@@ -130,6 +130,7 @@ public UserVO getUserById(Long id){
 ```java
 // 1. 先 import 非 * 的具体类
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.result.Result;
 
 // 2. 再 import * 的包
@@ -420,7 +421,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         UserEntity entity = userMapper.selectById(id);
         // 校验用户是否存在
         if (entity == null) {
-            throw new BusinessException(404, "用户不存在");
+            // ✅ 优先使用 ErrorCodeEnum
+            throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
         }
         // 转换为VO返回
         return ConvertUtils.toVO(entity);
@@ -437,7 +439,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     public void createUser(CreateUserDTO dto) {
         // 检查用户名是否已存在
         if (isUsernameExists(dto.getUsername())) {
-            throw new BusinessException(400, "用户名已存在");
+            // ✅ 优先使用 ErrorCodeEnum
+            throw new BusinessException(ErrorCodeEnum.USERNAME_EXISTS);
         }
         // DTO转换为实体对象
         UserEntity entity = ConvertUtils.toEntity(dto);
@@ -546,7 +549,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             // 校验用户是否存在
             if (entity == null) {
                 log.warn("用户不存在，id={}", id);
-                throw new BusinessException(404, "用户不存在");
+                // ✅ 优先使用 ErrorCodeEnum
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
             // 转换为VO对象
             UserVO vo = toVO(entity);
@@ -578,7 +582,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             // 检查用户名是否已存在
             if (isUsernameExists(dto.getUsername())) {
                 log.warn("用户名已存在，username={}", dto.getUsername());
-                throw new BusinessException(400, "用户名已存在");
+                // ✅ 优先使用 ErrorCodeEnum
+                throw new BusinessException(ErrorCodeEnum.USERNAME_EXISTS);
             }
             // DTO转换为实体对象
             UserEntity entity = ConvertUtils.toEntity(dto);
@@ -865,6 +870,103 @@ public Result<Void> create(@Validated @RequestBody CreateUserDTO dto) {
 | 404 | 资源不存在 |
 | 405 | 请求方法不支持 |
 | 500 | 服务器内部错误（兜底） |
+
+### 6.4 错误码枚举（ErrorCodeEnum）
+
+项目提供了全局统一错误码枚举 `ErrorCodeEnum`，位于 `com.yigongbao.common.enums` 包下。**抛出业务异常时，优先使用 ErrorCodeEnum**，如果现有枚举值不满足需求，允许新建对应的枚举值。
+
+#### 6.4.1 ErrorCodeEnum 使用规范
+
+```java
+// ✅ 优先使用：直接使用 ErrorCodeEnum 枚举值
+throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+throw new BusinessException(ErrorCodeEnum.USERNAME_EXISTS);
+
+// ✅ 支持格式化：带参数的错误描述
+throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "username");
+throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "email");
+
+// ⚠️ 备选方案：如果没有找到合适的 ErrorCodeEnum，允许新建枚举值或使用字符串
+throw new BusinessException(400, "自定义错误信息");
+throw new BusinessException("自定义错误信息");
+```
+
+#### 6.4.2 ErrorCodeEnum 枚举值范围
+
+| 枚举值前缀 | 错误码范围 | 说明 |
+|-----------|-----------|------|
+| SUCCESS | 200 | 成功 |
+| PARAM_* | 400 | 参数相关错误 |
+| DATA_* | 400/404 | 数据相关错误 |
+| UNAUTHORIZED | 401 | 未授权 |
+| FORBIDDEN | 403 | 禁止访问 |
+| METHOD_NOT_ALLOWED | 405 | 请求方法不支持 |
+| REQUEST_NOT_FOUND | 404 | 请求路径不存在 |
+| SERVER_ERROR | 500 | 服务器错误 |
+| SERVICE_UNAVAILABLE | 503 | 服务不可用 |
+| *_NOT_FOUND | 600+ | 业务自定义-不存在 |
+| *_DISABLED | 600+ | 业务自定义-已禁用 |
+| *_EXISTS | 600+ | 业务自定义-已存在 |
+| *_ERROR | 600+ | 业务自定义-错误 |
+
+#### 6.4.3 如何扩展 ErrorCodeEnum
+
+当需要新的错误码时，在 `ErrorCodeEnum` 枚举类中添加新值：
+
+```java
+// 在 ErrorCodeEnum 中添加新的枚举值
+// 格式：枚举名(错误码, "错误描述")
+ORDER_NOT_FOUND(605, "订单不存在"),
+ORDER_CANCELLED(606, "订单已取消"),
+ORDER_COMPLETED(607, "订单已完成，无法操作");
+```
+
+#### 6.4.4 完整示例
+
+```java
+// ServiceImpl 中的正确用法
+@Override
+public UserVO getUserById(Long id) {
+    log.info("根据ID查询用户信息，id={}", id);
+    try {
+        UserEntity entity = userMapper.selectById(id);
+        if (entity == null) {
+            log.warn("用户不存在，id={}", id);
+            // ✅ 优先使用 ErrorCodeEnum
+            throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+        }
+        return toVO(entity);
+    } catch (BusinessException e) {
+        throw e;
+    } catch (Exception e) {
+        log.error("查询用户信息异常，id={}", id, e);
+        throw e;
+    }
+}
+
+@Override
+@Transactional(rollbackFor = Exception.class)
+public void createUser(CreateUserDTO dto) {
+    log.info("创建用户，username={}", dto.getUsername());
+    try {
+        // 检查用户名是否存在
+        if (isUsernameExists(dto.getUsername())) {
+            log.warn("用户名已存在，username={}", dto.getUsername());
+            // ✅ 使用 ErrorCodeEnum
+            throw new BusinessException(ErrorCodeEnum.USERNAME_EXISTS);
+        }
+        // ... 其他逻辑
+    } catch (BusinessException e) {
+        throw e;
+    } catch (Exception e) {
+        log.error("创建用户异常，username={}", dto.getUsername(), e);
+        throw e;
+    }
+}
+```
+
+> **重要**：ErrorCodeEnum 是全局统一错误码，添加新枚举值时应遵循错误码规范，确保不与现有错误码冲突。业务模块特有的错误码使用 600+ 段位。
 
 ---
 
@@ -1168,7 +1270,322 @@ public class BaseEntity implements Serializable {
 
 ---
 
-**文档版本**：1.2
+## 十五、单元测试规范
+
+### 15.1 测试目录结构
+
+测试代码位于 `src/test/java` 目录下，与主代码保持相同的包结构。
+
+```
+yigongbao-module-xxx/
+├── src/main/java/com/yigongbao/module/xxx/     # 主代码
+│   └── ...
+└── src/test/java/com/yigongbao/module/xxx/    # 测试代码
+    └── service/
+        └── impl/
+            └── UserServiceImplTest.java        # ServiceImpl 单元测试
+```
+
+### 15.2 测试类命名
+
+| 类型 | 规范 | 示例 |
+|------|------|------|
+| 测试类 | 以 `Test` 结尾 | `UserServiceImplTest` |
+| 测试方法 | 以 `should` 开头，描述测试场景 | `create_shouldSuccess` |
+| 边界场景 | 使用 `when` 描述条件 | `getById_whenNotExists_shouldThrowException` |
+
+### 15.3 测试框架
+
+本项目使用 JUnit 5 + Mockito 进行单元测试：
+
+```java
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import lombok.extern.slf4j.Slf4j;
+```
+
+### 15.4 ServiceImpl 单元测试
+
+#### 15.4.1 基本结构
+
+```java
+/**
+ * 用户 Service 单元测试
+ *
+ * @author hanjor
+ * @date 2026-03-16
+ */
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+@Slf4j
+@DisplayName("UserService 单元测试")
+class UserServiceImplTest {
+
+    @Mock
+    private UserMapper userMapper;
+
+    @InjectMocks
+    private UserServiceImpl userService;
+
+    private UserEntity testEntity;
+    private CreateUserDTO createDTO;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        // 通过反射将 mock 的 userMapper 注入到 ServiceImpl 的 baseMapper 字段中
+        // 这是解决 MyBatis-Plus ServiceImpl 继承类单元测试的关键步骤
+        Field baseMapperField = ServiceImpl.class.getDeclaredField("baseMapper");
+        baseMapperField.setAccessible(true);
+        baseMapperField.set(userService, userMapper);
+
+        // 初始化测试数据
+        testEntity = new UserEntity();
+        testEntity.setId(1L);
+        testEntity.setUsername("testuser");
+        testEntity.setRealName("测试用户");
+    }
+}
+```
+
+#### 15.4.2 反射注入 baseMapper
+
+**关键点**：当 ServiceImpl 继承 MyBatis-Plus 的 `ServiceImpl` 时，需要通过反射将 Mock 的 Mapper 注入到 `baseMapper` 字段中：
+
+```java
+@BeforeEach
+void setUp() throws Exception {
+    Field baseMapperField = ServiceImpl.class.getDeclaredField("baseMapper");
+    baseMapperField.setAccessible(true);
+    baseMapperField.set(userService, userMapper);
+}
+```
+
+> **重要**：这一步是必须的，否则调用 `list()`、`getById()`、`save()` 等继承自 `ServiceImpl` 的方法时会抛出 `MybatisPlusException: baseMapper can not be null`。
+
+#### 15.4.3 Mock 参数匹配器
+
+**查询方法**：使用 `any()` 匹配任意参数
+
+```java
+// ✅ 正确：list() 在无查询条件时使用 EmptyWrapper，不是 LambdaQueryWrapper
+when(userMapper.selectList(any())).thenReturn(entities);
+
+// ❌ 错误：any(LambdaQueryWrapper.class) 无法匹配 EmptyWrapper
+when(userMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(entities);
+```
+
+**按 ID 查询**：使用具体参数值
+
+```java
+when(userMapper.selectById(1L)).thenReturn(testEntity);
+when(userMapper.deleteById(999L)).thenReturn(0);
+```
+
+**插入/更新/删除**：使用 `any()` 匹配实体对象
+
+```java
+when(userMapper.insert(any(UserEntity.class))).thenReturn(1);
+when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+```
+
+### 15.5 测试用例设计
+
+#### 15.5.1 成功场景 + 失败场景
+
+每个业务方法至少覆盖两个测试场景：
+
+```java
+// 查询 - 成功
+@Test
+@DisplayName("getById: 存在数据时返回VO")
+void getById_whenExists_shouldReturnData() {
+    when(userMapper.selectById(1L)).thenReturn(testEntity);
+    UserVO result = userService.getVoById(1L);
+    assertNotNull(result);
+    assertEquals(1L, result.getId());
+}
+
+// 查询 - 数据不存在
+@Test
+@DisplayName("getById: 数据不存在时抛出异常")
+void getById_whenNotExists_shouldThrowException() {
+    when(userMapper.selectById(999L)).thenReturn(null);
+    BusinessException exception = assertThrows(
+        BusinessException.class,
+        () -> userService.getVoById(999L)
+    );
+    assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+}
+```
+
+#### 15.5.2 测试分组
+
+使用注释或空行分隔不同方法的测试用例：
+
+```java
+// ==================== listVo 测试 ====================
+
+@Test
+void listVo_shouldReturnAllData() { ... }
+
+@Test
+void listVo_whenNoData_shouldReturnEmptyList() { ... }
+
+// ==================== getVoById 测试 ====================
+
+@Test
+void getVoById_whenExists_shouldReturnData() { ... }
+
+@Test
+void getVoById_whenNotExists_shouldThrowException() { ... }
+
+// ==================== create 测试 ====================
+```
+
+### 15.6 断言规范
+
+#### 15.6.1 基本断言
+
+```java
+// 断言不为空
+assertNotNull(result);
+
+// 断言相等
+assertEquals(1, result.size());
+assertEquals("test_key", result.get(0).getKey1());
+
+// 断言为真/为假
+assertTrue(result.isEmpty());
+assertFalse(user.getDeleted());
+```
+
+#### 15.6.2 异常断言
+
+```java
+BusinessException exception = assertThrows(
+    BusinessException.class,
+    () -> userService.getVoById(999L),
+    "应抛出BusinessException"
+);
+assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getMessage(), exception.getMessage());
+```
+
+#### 15.6.3 验证 Mock 调用
+
+```java
+// 验证方法被调用一次
+verify(userMapper, times(1)).selectById(1L);
+
+// 验证方法从未被调用
+verify(userMapper, never()).updateById(any(UserEntity.class));
+```
+
+### 15.7 测试数据准备
+
+#### 15.7.1 使用 @BeforeEach 初始化通用数据
+
+```java
+private UserEntity testEntity;
+private CreateUserDTO createDTO;
+
+@BeforeEach
+void setUp() {
+    LocalDateTime now = LocalDateTime.now();
+
+    // 准备实体
+    testEntity = new UserEntity();
+    testEntity.setId(1L);
+    testEntity.setUsername("testuser");
+    testEntity.setRealName("测试用户");
+    testEntity.setCreateTime(now);
+    testEntity.setUpdateTime(now);
+
+    // 准备 DTO
+    createDTO = new CreateUserDTO();
+    createDTO.setUsername("newuser");
+    createDTO.setPassword("123456");
+    createDTO.setRealName("新用户");
+}
+```
+
+#### 15.7.2 每个测试方法独立准备数据
+
+如果测试方法需要不同的数据，在方法内部单独准备：
+
+```java
+@Test
+void create_shouldSuccess() {
+    // 准备：当前测试需要的数据
+    when(userMapper.insert(any(UserEntity.class))).thenReturn(1);
+
+    // 执行
+    userService.create(createDTO);
+
+    // 断言
+    verify(userMapper, times(1)).insert(any(UserEntity.class));
+}
+```
+
+### 15.8 测试方法命名规范
+
+| 场景 | 命名模式 | 示例 |
+|------|----------|------|
+| 成功场景 | `{方法名}_should{预期结果}` | `create_shouldSuccess` |
+| 失败场景 | `{方法名}_when{条件}_should{预期结果}` | `getById_whenNotExists_shouldThrowException` |
+| 边界场景 | `{方法名}_when{边界条件}_should{预期结果}` | `listVo_whenNoData_shouldReturnEmptyList` |
+
+### 15.9 常见问题处理
+
+#### 15.9.1 MyBatis-Plus ServiceImpl 继承类测试
+
+**问题**：`baseMapper can not be null`
+
+**解决**：通过反射注入 baseMapper（参见 15.4.2）
+
+#### 15.9.2 EmptyWrapper 匹配问题
+
+**问题**：使用 `any(LambdaQueryWrapper.class)` 无法匹配无查询条件的 `list()` 调用
+
+**解决**：使用 `any()` 或 `any(Object.class)` 匹配任意参数
+
+#### 15.9.3 自定义 Mapper 方法测试
+
+**问题**：ServiceImpl 中调用了 Mapper 的自定义方法
+
+**解决**：同样使用 `@Mock` 创建 Mock 对象，测试时会被自动拦截
+
+```java
+@Mock
+private UserMapper userMapper;
+
+@InjectMocks
+private UserServiceImpl userService;
+
+// 测试自定义方法
+when(userMapper.selectCustomMethod(any())).thenReturn(customResult);
+```
+
+### 15.10 代码审查清单（单元测试）
+
+- [ ] 测试类命名符合规范
+- [ ] 测试方法命名清晰，描述测试场景
+- [ ] 已正确注入 baseMapper（继承 ServiceImpl 的情况）
+- [ ] 使用正确的参数匹配器（any() 而非 any(具体类)）
+- [ ] 每个业务方法覆盖成功和失败场景
+- [ ] 断言完整，包含异常断言
+- [ ] 已验证 Mock 方法调用次数
+- [ ] 测试数据准备完整
+- [ ] 测试之间相互独立，无依赖
+
+---
+
+**文档版本**：1.4
 **创建日期**：2026-03-14
 **作者**：hanjor
-**最后更新**：2026-03-14
+**最后更新**：2026-03-16
