@@ -1,5 +1,6 @@
 package com.yigongbao.common.exception;
 
+import com.yigongbao.common.enums.ErrorCodeEnum;
 import lombok.Getter;
 
 /**
@@ -70,6 +71,29 @@ public class BusinessException extends RuntimeException {
         super(message, cause);
         this.code = code;
         this.message = message;
+    }
+
+    /**
+     * 构造方法，使用错误码枚举
+     *
+     * @param errorCode 错误码枚举
+     */
+    public BusinessException(ErrorCodeEnum errorCode) {
+        super(errorCode.getMessage());
+        this.code = errorCode.getCode();
+        this.message = errorCode.getMessage();
+    }
+
+    /**
+     * 构造方法，使用错误码枚举（带格式化参数）
+     *
+     * @param errorCode 错误码枚举
+     * @param args      格式化参数
+     */
+    public BusinessException(ErrorCodeEnum errorCode, Object... args) {
+        super(errorCode.getMessage(args));
+        this.code = errorCode.getCode();
+        this.message = errorCode.getMessage(args);
     }
 
 }

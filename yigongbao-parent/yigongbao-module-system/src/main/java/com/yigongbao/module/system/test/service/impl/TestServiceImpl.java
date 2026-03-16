@@ -1,7 +1,9 @@
 package com.yigongbao.module.system.test.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.system.test.convert.TestConvert;
 import com.yigongbao.module.system.test.dto.CreateTestDTO;
 import com.yigongbao.module.system.test.dto.UpdateTestDTO;
 import com.yigongbao.module.system.test.entity.TestEntity;
@@ -39,7 +41,7 @@ public class TestServiceImpl extends ServiceImpl<TestMapper, TestEntity> impleme
         List<TestEntity> list = list();
         // 转换为VO列表
         return list.stream()
-                .map(this::toVO)
+                .map(TestConvert::toVO)
                 .collect(Collectors.toList());
     }
 
@@ -60,10 +62,10 @@ public class TestServiceImpl extends ServiceImpl<TestMapper, TestEntity> impleme
             // 校验数据是否存在
             if (entity == null) {
                 log.warn("测试数据不存在，id={}", id);
-                throw new BusinessException(404, "数据不存在");
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             // 转换为VO返回
-            TestVO vo = toVO(entity);
+            TestVO vo = TestConvert.toVO(entity);
             log.info("查询测试数据成功，id={}", id);
             return vo;
         } catch (BusinessException e) {
@@ -86,9 +88,7 @@ public class TestServiceImpl extends ServiceImpl<TestMapper, TestEntity> impleme
         log.info("创建测试数据，key={}", dto.getKey());
         try {
             // DTO转换为实体对象
-            TestEntity entity = new TestEntity();
-            entity.setKey1(dto.getKey());
-            entity.setValue1(dto.getValue());
+            TestEntity entity = TestConvert.toEntity(dto);
             // 插入数据库
             save(entity);
             // 记录创建成功
@@ -117,7 +117,7 @@ public class TestServiceImpl extends ServiceImpl<TestMapper, TestEntity> impleme
             // 校验数据是否存在
             if (entity == null) {
                 log.warn("测试数据不存在，id={}", id);
-                throw new BusinessException(404, "数据不存在");
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             // 更新数据
             entity.setKey1(dto.getKey());
@@ -149,7 +149,7 @@ public class TestServiceImpl extends ServiceImpl<TestMapper, TestEntity> impleme
             // 校验数据是否存在并删除
             if (!removeById(id)) {
                 log.warn("测试数据不存在，id={}", id);
-                throw new BusinessException(404, "数据不存在");
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             // 记录删除成功
             log.info("删除测试数据成功，id={}", id);
@@ -159,23 +159,5 @@ public class TestServiceImpl extends ServiceImpl<TestMapper, TestEntity> impleme
             log.error("删除测试数据异常，id={}", id, e);
             throw e;
         }
-    }
-
-    /**
-     * 实体转换为VO
-     *
-     * @param entity 测试实体
-     * @return 测试VO
-     */
-    private TestVO toVO(TestEntity entity) {
-        TestVO vo = new TestVO();
-        vo.setId(entity.getId());
-        vo.setKey1(entity.getKey1());
-        vo.setValue1(entity.getValue1());
-        vo.setCreateTime(entity.getCreateTime());
-        vo.setUpdateTime(entity.getUpdateTime());
-        vo.setCreateBy(entity.getCreateBy());
-        vo.setUpdateBy(entity.getUpdateBy());
-        return vo;
     }
 }

@@ -42,14 +42,6 @@ spring:
           # 连接池最大阻塞等待时间（毫秒）
           max-wait: -1ms
 
-  # Jackson 配置
-  jackson:
-    date-format: yyyy-MM-dd HH:mm:ss
-    time-zone: Asia/Shanghai
-    serialization:
-      # 忽略 Map 中的 null 值
-      write-null-map-values: false
-
 # MyBatis-Plus 配置
 mybatis-plus:
   # 配置扫描通用枚举
