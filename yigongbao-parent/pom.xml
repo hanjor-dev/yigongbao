@@ -157,6 +157,19 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <!-- 编译配置 -->
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <!-- 保留方法参数名，使 Spring 可以通过反射获取参数名 -->
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+        </plugins>
     </build>
 
 </project>

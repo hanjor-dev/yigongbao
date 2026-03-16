@@ -1,11 +1,10 @@
 -- ============================================================
--- 医工宝系统 DDL
--- 用于存储所有业务表的建表语句
+-- 医工宝系统测试 DDL
+-- H2 内存数据库建表语句
 -- ============================================================
 
 -- ------------------------------------------------------------
 -- 字典表（单表树形结构）
--- 采用父级/子级关系实现层级结构
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS sys_dict;
 CREATE TABLE sys_dict (
@@ -20,8 +19,8 @@ CREATE TABLE sys_dict (
     remark          VARCHAR(512)    DEFAULT NULL COMMENT '备注说明',
 
     -- 通用字段
-    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_time     TIMESTAMP       DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     create_by       BIGINT          DEFAULT NULL COMMENT '创建人ID',
     update_by       BIGINT          DEFAULT NULL COMMENT '更新人ID',
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
@@ -31,4 +30,13 @@ CREATE TABLE sys_dict (
     KEY idx_parent_id (parent_id),
     KEY idx_level (level),
     KEY idx_is_deleted (is_deleted)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='字典表';
+);
+
+-- 插入测试数据
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status, remark, create_time, update_time, create_by, update_by, is_deleted) VALUES
+(1, 0, '1', '机构类型', NULL, 1, 0, 1, '测试用的字典类型', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(2, 1, '1.1', '生产企业', 'production', 2, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(3, 1, '1.2', '经销商', 'distributor', 2, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(4, 0, '2', '性别', NULL, 1, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(5, 4, '2.1', '男', 'male', 2, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(6, 4, '2.2', '女', 'female', 2, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0);

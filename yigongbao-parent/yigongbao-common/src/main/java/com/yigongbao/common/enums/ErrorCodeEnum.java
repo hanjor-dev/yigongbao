@@ -37,7 +37,10 @@ public enum ErrorCodeEnum {
     USER_DISABLED(601, "用户已被禁用"),
     USERNAME_EXISTS(602, "用户名已存在"),
     PASSWORD_ERROR(603, "密码错误"),
-    TOKEN_INVALID(604, "Token无效或已过期");
+    TOKEN_INVALID(604, "Token无效或已过期"),
+    DATA_HAS_CHILDREN(605, "该数据存在子节点，无法删除"),
+    DICT_CODE_EXISTS(606, "字典编码已存在"),
+    DICT_NAME_EXISTS(607, "字典名称在同一父节点下已存在");
 
     /**
      * 错误码

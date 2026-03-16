@@ -972,31 +972,51 @@ public void createUser(CreateUserDTO dto) {
 
 ## 七、日志规范
 
-### 7.1 日志使用
+### 7.1 日志使用原则
+
+**【重要】Controller 层禁止输出日志**
+
+日志记录应遵循"谁调用谁记录"的原则：
+- **Controller 层**：禁止记录日志，仅负责接收请求、参数校验、调用 Service、返回结果
+- **ServiceImpl 层**：负责记录业务逻辑日志，包括方法入参、关键节点、异常信息
 
 ```java
+// ✅ 正确：Controller 不记录日志
 @Slf4j
 @RestController
 @RequiredArgsConstructor
 public class UserController {
 
-    /**
-     * 查询用户详情
-     */
+    private final UserService userService;
+
     @GetMapping("/{id}")
     public Result<UserVO> getById(@PathVariable Long id) {
-        log.info("查询用户详情，id={}", id);
-        try {
-            UserVO vo = userService.getUserById(id);
-            log.info("查询成功，id={}", id);
-            return Result.success(vo);
-        } catch (BusinessException e) {
-            log.warn("查询失败，id={}，原因={}", id, e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            log.error("查询异常，id={}", id, e);
-            throw e;
-        }
+        // 不记录日志，由 ServiceImpl 记录
+        return Result.success(userService.getUserById(id));
+    }
+}
+
+// ✅ 正确：ServiceImpl 记录日志
+@Slf4j
+@Service
+public class UserServiceImpl implements UserService {
+
+    @Override
+    public UserVO getUserById(Long id) {
+        log.info("根据ID查询用户信息，id={}", id);
+        // ... 业务逻辑
+    }
+}
+
+// ❌ 错误：Controller 记录日志
+@Slf4j
+@RestController
+public class UserController {
+
+    @GetMapping("/{id}")
+    public Result<UserVO> getById(@PathVariable Long id) {
+        log.info("查询用户详情，id={}", id);  // 禁止在 Controller 中记录日志
+        // ...
     }
 }
 ```
@@ -1012,6 +1032,7 @@ public class UserController {
 
 ### 7.3 日志原则
 
+- **【强制】Controller 层禁止输出日志**，日志记录由 ServiceImpl 负责
 - 关键业务节点记录 INFO 日志
 - 异常必须记录日志，包含堆栈信息
 - 禁止记录敏感信息（密码、身份证号、银行卡号等）
@@ -1583,9 +1604,340 @@ when(userMapper.selectCustomMethod(any())).thenReturn(customResult);
 - [ ] 测试数据准备完整
 - [ ] 测试之间相互独立，无依赖
 
+### 15.11 Controller 接口测试（MockMvc）
+
+当完成某一功能开发时，除 ServiceImpl 单元测试外，**必须补充 Controller 接口测试**，用于验证：
+
+- 请求路径、PathVariable/RequestParam/RequestBody 参数绑定是否正确
+- 参数校验（`@Validated`）是否生效
+- 统一响应格式 `Result` 是否符合预期（成功/失败的 code、message、data）
+- 全局异常处理是否按 ErrorCodeEnum 返回
+
+#### 15.11.1 推荐目录结构
+
+```
+yigongbao-module-xxx/
+└── src/test/java/com/yigongbao/module/xxx/
+    └── controller/
+        └── XxxControllerTest.java
+```
+
+#### 15.11.2 推荐测试方式
+
+使用 Spring Boot Test + MockMvc（不依赖真实端口）：
+
+```java
+/**
+ * 字典管理 Controller 接口测试
+ *
+ * @author hanjor
+ * @date 2026-03-16
+ */
+@SpringBootTest(classes = SystemTestApplication.class)
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Transactional
+@DisplayName("DictController 接口测试")
+class DictControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+}
+```
+
+**测试启动类说明**：
+
+- 建议在模块的 `src/test/java` 下创建专用的测试启动类（如 `SystemTestApplication`）
+- 排除 test 包，避免 TestController/TestService 的 Mapper 依赖问题
+- 示例：
+
+```java
+@SpringBootApplication(scanBasePackages = "com.yigongbao")
+@ComponentScan(
+    basePackages = "com.yigongbao",
+    excludeFilters = @ComponentScan.Filter(
+        type = FilterType.REGEX,
+        pattern = "com\\.yigongbao\\.module\\.system\\.test\\..*"
+    )
+)
+public class SystemTestApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(SystemTestApplication.class, args);
+    }
+}
+```
+
+#### 15.11.3 测试环境配置
+
+**【重要】为确保 Controller 接口测试正常运行，必须配置以下两项：**
+
+##### 15.11.3.1 测试配置文件（application-test.yml）
+
+在 `yigongbao-boot/src/test/resources/application-test.yml` 中配置：
+
+```yaml
+spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath*:schema.sql
+
+# 【关键】禁用 SaToken 拦截器，避免测试时需要登录认证
+satoken:
+  interceptor:
+    enable: false
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+```
+
+**配置说明**：
+- 使用 H2 内存库（`jdbc:h2:mem:`），避免依赖本地 MySQL/Redis
+- schema.sql 至少包含当前模块所需表结构
+- **禁用 SaToken 拦截器**：通过 `satoken.interceptor.enable: false` 控制，避免测试时返回 401 未登录错误
+
+##### 15.11.3.2 编译配置（pom.xml）
+
+在父 pom.xml 中添加 `-parameters` 编译参数，使 Spring 可以通过反射获取方法参数名：
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.13.0</version>
+            <configuration>
+                <!-- 保留方法参数名，使 Spring 可以通过反射获取参数名 -->
+                <parameters>true</parameters>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+```
+
+**配置说明**：
+- 添加 `<parameters>true</parameters>` 后，Java 编译器会保留方法参数名
+- 否则 Spring 无法通过反射获取 `@PathVariable String typeCode` 的参数名，导致 500 错误：
+  ```
+  Name for argument of type [java.lang.String] not specified, 
+  and parameter name information not available via reflection.
+  ```
+
+##### 15.11.3.3 Schema SQL 示例
+
+```sql
+-- 字典表
+CREATE TABLE sys_dict (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    parent_id BIGINT DEFAULT 0,
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(100),
+    value VARCHAR(500),
+    sort_order INT DEFAULT 0,
+    status INT DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_deleted INT DEFAULT 0
+);
+
+-- 初始化种子数据
+INSERT INTO sys_dict (id, parent_id, name, code, value, sort_order, status) VALUES
+(1, 0, '用户状态', 'user_status', NULL, 1, 1),
+(2, 1, '正常', 'user_status', '1', 1, 1),
+(3, 1, '禁用', 'user_status', '0', 2, 1);
+```
+
+#### 15.11.4 测试用例编写规范
+
+对每个 Controller 方法至少覆盖：
+
+- 成功场景（200）
+- 失败场景（参数校验失败/数据不存在/业务规则不满足等）
+- 边界场景（空列表、无子节点/有子节点、状态切换等）
+
+接口测试断言建议包含：
+
+- `status().isOk()`（项目统一响应通常返回 200 HTTP，业务码在 body 中）
+- `jsonPath("$.code")`、`jsonPath("$.message")`、`jsonPath("$.data")`
+- 需要时通过 Mapper 校验数据库落库/更新/删除结果（避免只断言返回值）
+
+##### 15.11.5.1 测试用例示例
+
+```java
+/**
+ * 字典管理 Controller 接口测试
+ *
+ * @author hanjor
+ * @date 2026-03-16
+ */
+@SpringBootTest(classes = SystemTestApplication.class)
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Transactional
+@DisplayName("DictController 接口测试")
+class DictControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    // ==================== listTreeByTypeCode 测试 ====================
+
+    /**
+     * 测试用例：根据类型编码获取树形结构 - 成功场景
+     */
+    @Test
+    @DisplayName("listTreeByTypeCode: 存在数据时返回树形结构")
+    void listTreeByTypeCode_shouldReturnTreeStructure() throws Exception {
+        // 执行 GET 请求
+        mockMvc.perform(get("/api/system/dict/tree/user_status"))
+                // 断言 HTTP 状态码为 200
+                .andExpect(status().isOk())
+                // 断言响应 code 为 200
+                .andExpect(jsonPath("$.code").value(200))
+                // 断言响应 message 为 success
+                .andExpect(jsonPath("$.message").value("success"))
+                // 断言 data 不为空
+                .andExpect(jsonPath("$.data").isArray())
+                // 断言第一条数据的 name
+                .andExpect(jsonPath("$.data[0].name").value("用户状态"));
+    }
+
+    /**
+     * 测试用例：根据类型编码获取树形结构 - 成功场景（带子节点）
+     */
+    @Test
+    @DisplayName("listTreeByTypeCode: 有子节点时正确返回层级结构")
+    void listTreeByTypeCode_withChildren_shouldReturnHierarchy() throws Exception {
+        mockMvc.perform(get("/api/system/dict/tree/user_status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                // 验证树形结构：父节点
+                .andExpect(jsonPath("$.data[0].name").value("用户状态"))
+                // 验证 children 字段存在且为数组
+                .andExpect(jsonPath("$.data[0].children").isArray())
+                // 验证子节点
+                .andExpect(jsonPath("$.data[0].children[0].name").exists());
+    }
+
+    /**
+     * 测试用例：根据类型编码获取树形结构 - 类型不存在
+     */
+    @Test
+    @DisplayName("listTreeByTypeCode: 类型不存在时返回空数组")
+    void listTreeByTypeCode_whenNotExists_shouldReturnEmptyArray() throws Exception {
+        mockMvc.perform(get("/api/system/dict/tree/not_exists_type"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    // ==================== getById 测试 ====================
+
+    /**
+     * 测试用例：根据ID查询字典 - 成功场景
+     */
+    @Test
+    @DisplayName("getById: 存在数据时返回字典详情")
+    void getById_whenExists_shouldReturnData() throws Exception {
+        mockMvc.perform(get("/api/system/dict/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.name").exists());
+    }
+
+    /**
+     * 测试用例：根据ID查询字典 - 数据不存在
+     */
+    @Test
+    @DisplayName("getById: 数据不存在时返回错误码")
+    void getById_whenNotExists_shouldReturnError() throws Exception {
+        mockMvc.perform(get("/api/system/dict/999999"))
+                .andExpect(status().isOk())
+                // 业务错误码在 body 中
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("数据不存在"));
+    }
+
+    // ==================== create 测试 ====================
+
+    /**
+     * 测试用例：创建字典 - 成功场景
+     */
+    @Test
+    @DisplayName("create: 创建成功返回success")
+    void create_shouldSuccess() throws Exception {
+        // 准备请求体
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("parentId", 0);
+        requestBody.put("name", "测试字典");
+        requestBody.put("code", "test_dict");
+        requestBody.put("value", "test_value");
+        requestBody.put("sortOrder", 1);
+
+        mockMvc.perform(post("/api/system/dict")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestBody)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("success"));
+    }
+
+    /**
+     * 测试用例：创建字典 - 参数校验失败
+     */
+    @Test
+    @DisplayName("create: 参数校验失败时返回错误码")
+    void create_whenValidationFailed_shouldReturnError() throws Exception {
+        // 缺少必填字段 name
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("parentId", 0);
+
+        mockMvc.perform(post("/api/system/dict")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestBody)))
+                .andExpect(status().isOk())
+                // 参数校验失败返回 400
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").exists());
+    }
+}
+```
+
+##### 15.11.5.2 常见问题处理
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| 返回 401 未登录 | SaToken 拦截器生效 | 在 `application-test.yml` 中添加 `satoken.interceptor.enable: false` |
+| 返回 500 参数名错误 | 编译器未保留参数名 | 在 pom.xml 中添加 `<parameters>true</parameters>` |
+| 测试数据相互影响 | 未使用事务回滚 | 添加 `@Transactional` 注解 |
+| H2 数据库未初始化 | schema.sql 路径或内容错误 | 检查 `spring.sql.init.schema-locations` 配置 |
+
+#### 15.11.6 代码审查清单（Controller 接口测试）
+
+- [ ] 每个 Controller 接口均有 MockMvc 测试覆盖
+- [ ] 覆盖成功/失败场景，且断言包含 `Result.code/message/data`
+- [ ] 失败场景覆盖参数校验与业务异常（ErrorCodeEnum）
+- [ ] 使用 test profile + H2 初始化，不依赖本地环境
+- [ ] 测试可重复执行、彼此独立（推荐 @Transactional 回滚）
+
 ---
 
-**文档版本**：1.4
+**文档版本**：1.5
 **创建日期**：2026-03-14
 **作者**：hanjor
 **最后更新**：2026-03-16
