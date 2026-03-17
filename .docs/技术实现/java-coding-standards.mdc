@@ -1807,8 +1807,8 @@ class DictControllerTest {
                 .andExpect(status().isOk())
                 // 断言响应 code 为 200
                 .andExpect(jsonPath("$.code").value(200))
-                // 断言响应 message 为 success
-                .andExpect(jsonPath("$.message").value("success"))
+                // 断言响应 message 为"操作成功"
+                .andExpect(jsonPath("$.message").value("操作成功"))
                 // 断言 data 不为空
                 .andExpect(jsonPath("$.data").isArray())
                 // 断言第一条数据的 name
@@ -1910,7 +1910,7 @@ class DictControllerTest {
         mockMvc.perform(post("/api/system/dict")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 // 参数校验失败返回 400
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").exists());
@@ -1926,6 +1926,88 @@ class DictControllerTest {
 | 返回 500 参数名错误 | 编译器未保留参数名 | 在 pom.xml 中添加 `<parameters>true</parameters>` |
 | 测试数据相互影响 | 未使用事务回滚 | 添加 `@Transactional` 注解 |
 | H2 数据库未初始化 | schema.sql 路径或内容错误 | 检查 `spring.sql.init.schema-locations` 配置 |
+| 参数校验返回 500 | GlobalExceptionHandler 未处理 `HandlerMethodValidationException` | 添加 Spring 6 新增的异常处理方法 |
+| H2 索引冲突 | 多个表使用相同索引名，或与 MyBatis-Plus @TableLogic 自动创建的索引冲突 | 移除 schema.sql 中 is_deleted 字段的索引定义 |
+| message 断言失败 | 接口实际返回"操作成功"而非"success" | 使用实际返回值进行断言 |
+
+##### 15.11.5.3 参数校验异常处理（Spring 6 新增）
+
+**问题描述**：当 Controller 方法参数使用 `@Min`、`@Max`、`@Size` 等校验注解（如 `@RequestParam @Min(0) @Max(1) Integer status`）校验失败时，Spring 6 会抛出 `HandlerMethodValidationException`，而非传统的 `ConstraintViolationException`。
+
+**解决**：在 `GlobalExceptionHandler` 中添加处理方法：
+
+```java
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+
+/**
+ * 处理方法参数校验异常（Spring 6 新增）
+ * 当 Controller 方法参数使用 @Min/@Max/@Size 等校验注解且校验失败时触发
+ *
+ * @param e 方法参数校验异常实例
+ * @return 统一返回结果
+ */
+@ExceptionHandler(HandlerMethodValidationException.class)
+@ResponseStatus(HttpStatus.BAD_REQUEST)
+public Result<Void> handleHandlerMethodValidationException(HandlerMethodValidationException e) {
+    String errorMessage = e.getAllErrors().stream()
+        .map(error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : error.toString())
+        .collect(Collectors.joining(", "));
+    log.warn("参数校验失败：{}", errorMessage);
+    return Result.error(400, errorMessage);
+}
+```
+
+##### 15.11.5.4 Schema SQL 索引规范
+
+**问题描述**：在 H2 测试数据库中，手动定义的索引可能与 MyBatis-Plus `@TableLogic` 注解自动创建的逻辑删除索引产生冲突，导致测试启动失败。
+
+**原因分析**：
+1. 多个表使用相同的索引名（如 `idx_is_deleted`）
+2. MyBatis-Plus 的 `@TableLogic` 注解会自动为 `is_deleted` 字段创建索引
+
+**解决**：
+1. **禁止在 schema.sql 中手动定义 `is_deleted` 字段的索引**
+2. 如需自定义索引名，使用表名前缀区分（如 `idx_sys_org_is_deleted`）
+
+```sql
+-- ✅ 正确：不定义 is_deleted 索引
+CREATE TABLE sys_org (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    org_name VARCHAR(128) NOT NULL,
+    -- ... 其他字段 ...
+    is_deleted TINYINT DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_org_type (org_type),
+    KEY idx_status (status)
+    -- 不需要定义 KEY idx_is_deleted
+);
+
+-- ❌ 错误：手动定义 is_deleted 索引（与 MyBatis-Plus 冲突）
+CREATE TABLE sys_org (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    -- ...
+    is_deleted TINYINT DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_is_deleted (is_deleted)  -- 不要这样做
+);
+```
+
+##### 15.11.5.5 统一响应 message 规范
+
+**问题描述**：测试用例中断言 message 时使用 `success`，但实际接口返回的是 `操作成功`，导致断言失败。
+
+**项目统一规范**：
+- 本项目统一响应格式中 message 字段返回**中文描述**，如 `"操作成功"`、`"参数校验失败"` 等
+- 测试用例中断言 message 时应使用实际返回的中文值，而非英文 `"success"`
+
+```java
+// ✅ 正确：使用实际返回值
+.andExpect(jsonPath("$.message").value("操作成功"))
+.andExpect(jsonPath("$.message").value("机构不存在"))
+
+// ❌ 错误：使用英文 success
+.andExpect(jsonPath("$.message").value("success"))
+```
 
 #### 15.11.6 代码审查清单（Controller 接口测试）
 
@@ -1934,10 +2016,13 @@ class DictControllerTest {
 - [ ] 失败场景覆盖参数校验与业务异常（ErrorCodeEnum）
 - [ ] 使用 test profile + H2 初始化，不依赖本地环境
 - [ ] 测试可重复执行、彼此独立（推荐 @Transactional 回滚）
+- [ ] message 断言使用中文实际返回值（如"操作成功"）
+- [ ] schema.sql 中未手动定义 is_deleted 字段索引
+- [ ] GlobalExceptionHandler 已处理 `HandlerMethodValidationException`（Spring 6 参数校验）
 
 ---
 
-**文档版本**：1.5
+**文档版本**：1.6
 **创建日期**：2026-03-14
 **作者**：hanjor
-**最后更新**：2026-03-16
+**最后更新**：2026-03-17

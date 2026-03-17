@@ -40,7 +40,12 @@ public enum ErrorCodeEnum {
     TOKEN_INVALID(604, "Token无效或已过期"),
     DATA_HAS_CHILDREN(605, "该数据存在子节点，无法删除"),
     DICT_CODE_EXISTS(606, "字典编码已存在"),
-    DICT_NAME_EXISTS(607, "字典名称在同一父节点下已存在");
+    DICT_NAME_EXISTS(607, "字典名称在同一父节点下已存在"),
+    ORG_NOT_FOUND(608, "机构不存在"),
+    ORG_EXISTS(609, "机构名称已存在"),
+    ORG_CODE_EXISTS(610, "机构编码已存在"),
+    ORG_HAS_USERS(611, "该机构下存在用户，无法删除"),
+    ORG_TYPE_NOT_FOUND(612, "机构类型不存在");
 
     /**
      * 错误码

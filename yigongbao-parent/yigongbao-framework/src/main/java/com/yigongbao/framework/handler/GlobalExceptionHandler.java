@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.util.stream.Collectors;
@@ -89,6 +90,23 @@ public class GlobalExceptionHandler {
     public Result<Void> handleConstraintViolationException(ConstraintViolationException e) {
         String errorMessage = e.getConstraintViolations().stream()
             .map(ConstraintViolation::getMessage)
+            .collect(Collectors.joining(", "));
+        log.warn("参数校验失败：{}", errorMessage);
+        return Result.error(400, errorMessage);
+    }
+
+    /**
+     * 处理方法参数校验异常（Spring 6 新增）
+     * 当 Controller 方法参数使用 @Min/@Max/@Size 等校验注解且校验失败时触发
+     *
+     * @param e 方法参数校验异常实例
+     * @return 统一返回结果
+     */
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleHandlerMethodValidationException(HandlerMethodValidationException e) {
+        String errorMessage = e.getAllErrors().stream()
+            .map(error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : error.toString())
             .collect(Collectors.joining(", "));
         log.warn("参数校验失败：{}", errorMessage);
         return Result.error(400, errorMessage);
