@@ -71,3 +71,16 @@ VALUES
 (22, 20, '5.2', '药品', 'drug', 2, 2, 1),
 (23, 20, '5.3', '耗材', 'consumable', 2, 3, 1),
 (24, 20, '5.4', '设备', 'equipment', 2, 4, 1);
+
+-- ============================================================
+-- 地区数据（sys_area）导入说明
+-- 表结构与 https://github.com/kakuilan/china_area_mysql 的 cnarea_2023 兼容
+-- 推荐步骤：
+-- 1. 在库中先执行 sql/ddl.sql 创建 sys_area 表
+-- 2. 下载并解压 cnarea_2023.sql.zip，将 cnarea_2023 表导入同一库（或另一库后同库再导）
+-- 3. 仅需省/市/区三级时，可从 cnarea_2023 导入到 sys_area（补全项目公共字段）：
+-- ============================================================
+-- INSERT INTO sys_area (level, parent_code, area_code, zip_code, city_code, name, short_name, merger_name, pinyin, lng, lat, status, create_time, update_time, create_by, update_by, is_deleted)
+-- SELECT level, parent_code, area_code, zip_code, city_code, name, short_name, merger_name, pinyin, lng, lat, 1, NOW(), NOW(), NULL, NULL, 0
+-- FROM cnarea_2023
+-- WHERE level IN (1, 2, 3);

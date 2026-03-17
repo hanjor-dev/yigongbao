@@ -2,6 +2,7 @@ package com.yigongbao.module.system.dict.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.dict.convert.DictConvert;
@@ -348,7 +349,7 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
         log.info("修改字典状态，id={}, status={}", id, status);
         try {
             // 校验状态值合法性
-            if (status == null || (status != 0 && status != 1)) {
+            if (status == null || (status != StatusConstants.DISABLED && status != StatusConstants.NORMAL)) {
                 log.warn("状态值不合法，status={}", status);
                 throw new BusinessException(ErrorCodeEnum.PARAM_ERROR);
             }

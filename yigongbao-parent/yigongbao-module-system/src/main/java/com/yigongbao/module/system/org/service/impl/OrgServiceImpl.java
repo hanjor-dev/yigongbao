@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.DictCodeConstants;
+import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.dict.service.DictService;
@@ -129,7 +130,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             // DTO转换为实体对象
             OrgEntity entity = OrgConvert.toEntity(dto);
             entity.setOrgCode(orgCode);
-            entity.setStatus(1);
+            entity.setStatus(StatusConstants.NORMAL);
             // 插入数据库
             save(entity);
             log.info("创建机构成功，id={}, orgCode={}", entity.getId(), orgCode);
@@ -258,7 +259,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
         }
         // 填充状态名称
         if (vo.getStatus() != null) {
-            vo.setStatusName(vo.getStatus() == 1 ? "正常" : "禁用");
+            vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
         // 填充医院等级名称
         if (vo.getHospitalLevel() != null) {

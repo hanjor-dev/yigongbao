@@ -28,9 +28,8 @@ CREATE TABLE sys_dict (
 
     PRIMARY KEY (id),
     UNIQUE KEY uk_dict_code (dict_code),
-    KEY idx_parent_id (parent_id),
-    KEY idx_level (level),
-    KEY idx_is_deleted (is_deleted)
+    KEY idx_dict_parent_id (parent_id),
+    KEY idx_dict_level (level)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='字典表';
 
 -- ------------------------------------------------------------
@@ -74,7 +73,59 @@ CREATE TABLE sys_org (
     UNIQUE KEY uk_org_code (org_code),
     UNIQUE KEY uk_org_name (org_name),
     KEY idx_org_type (org_type),
-    KEY idx_area_id (area_id),
-    KEY idx_status (status),
-    KEY idx_is_deleted (is_deleted)
+    KEY idx_org_area_id (area_id),
+    KEY idx_org_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='机构表';
+
+
+-- ==================== 地区表（省市区） ====================
+-- 说明：与 https://github.com/kakuilan/china_area_mysql 表结构完全一致
+-- 可直接导入 cnarea_2023 数据，无需额外处理
+DROP TABLE IF EXISTS sys_area;
+CREATE TABLE sys_area (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键',
+    level               TINYINT         NOT NULL COMMENT '层级（1=省/直辖市，2=市，3=区/县）',
+    parent_code         BIGINT          NOT NULL DEFAULT 0 COMMENT '父级行政代码',
+    area_code           BIGINT          NOT NULL DEFAULT 0 COMMENT '行政代码（国家标准）',
+    zip_code            INT             UNSIGNED ZEROFILL NOT NULL DEFAULT 0 COMMENT '邮政编码',
+    city_code           CHAR(6)         NOT NULL DEFAULT '' COMMENT '区号',
+    name                VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '名称',
+    short_name          VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '简称',
+    merger_name         VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '组合名',
+    pinyin              VARCHAR(30)     NOT NULL DEFAULT '' COMMENT '拼音',
+    lng                 DECIMAL(10,6)   NOT NULL DEFAULT 0 COMMENT '经度',
+    lat                 DECIMAL(10,6)   NOT NULL DEFAULT 0 COMMENT '纬度',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_area_code (area_code),
+    KEY idx_parent_code (parent_code),
+    KEY idx_area_level (level)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='地区表（省市区，与 cnarea_2023 结构一致）';
+
+
+-- ------------------------------------------------------------
+-- 部门表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_dept;
+CREATE TABLE sys_dept (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    dept_name           VARCHAR(128)    NOT NULL COMMENT '部门名称',
+    dept_code           VARCHAR(32)     NOT NULL COMMENT '部门编码',
+    org_id              BIGINT          NOT NULL COMMENT '所属机构ID（关联sys_org表）',
+    leader_user_id      BIGINT          COMMENT '部门负责人用户ID（关联sys_user表）',
+    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark              VARCHAR(512)    COMMENT '备注说明',
+
+    -- 通用字段
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_dept_code (dept_code),
+    UNIQUE KEY uk_dept_name_org (dept_name, org_id, is_deleted),
+    KEY idx_dept_org_id (org_id),
+    KEY idx_dept_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='部门表';

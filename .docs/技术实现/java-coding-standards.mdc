@@ -86,6 +86,45 @@ public enum StatusEnum {
 }
 ```
 
+### 1.6 状态值常量
+
+项目中所有状态字段（0和1）必须使用统一的状态常量，禁止直接使用魔法值。
+
+```java
+// ✅ 正确：使用 StatusConstants 常量
+import com.yigongbao.common.constant.StatusConstants;
+
+entity.setStatus(StatusConstants.NORMAL);  // 设置为正常状态
+if (user.getStatus() == StatusConstants.DISABLED) {  // 判断是否禁用
+    // ...
+}
+
+// ❌ 错误：直接使用魔法值
+entity.setStatus(1);  // 魔法值，可读性差
+if (user.getStatus() == 0) {  // 难以理解含义
+    // ...
+}
+```
+
+**提供的状态常量**：
+
+| 常量 | 值 | 说明 |
+|-----|---|---|
+| `StatusConstants.NORMAL` / `STATUS_ENABLED` | 1 | 正常/启用 |
+| `StatusConstants.DISABLED` / `STATUS_DISABLED` | 0 | 禁用/停用 |
+| `StatusConstants.NOT_DELETED` | 0 | 未删除 |
+| `StatusConstants.DELETED` | 1 | 已删除 |
+| `StatusConstants.YES` | 1 | 是 |
+| `StatusConstants.NO` | 0 | 否 |
+
+**推荐使用方法**：
+
+```java
+// 获取状态显示名称
+String statusName = StatusConstants.getStatusName(user.getStatus());
+// 返回 "正常" 或 "禁用"
+```
+
 ---
 
 ## 二、代码格式
@@ -1134,6 +1173,10 @@ public class SystemProperties {
 - 主键：`pk_xxx`
 - 唯一索引：`uk_xxx`
 - 普通索引：`idx_xxx`
+- **【重要】索引名必须使用表名前缀区分**，避免多表索引名重复，例如：
+  - `idx_sys_org_status` 而非 `idx_status`
+  - `idx_sys_dept_org_id` 而非 `idx_org_id`
+- **禁止在 schema.sql 中手动定义 `is_deleted` 字段的索引**（MyBatis-Plus 会自动创建）
 
 ---
 
@@ -1297,21 +1340,29 @@ public class BaseEntity implements Serializable {
 
 测试代码位于 `src/test/java` 目录下，与主代码保持相同的包结构。
 
+**【重要】每个功能模块必须包含两种单元测试：**
+
+1. **ServiceImpl 单元测试**：验证业务逻辑
+2. **Controller 接口测试**：验证接口参数绑定、参数校验、统一响应格式
+
 ```
 yigongbao-module-xxx/
 ├── src/main/java/com/yigongbao/module/xxx/     # 主代码
 │   └── ...
 └── src/test/java/com/yigongbao/module/xxx/    # 测试代码
-    └── service/
-        └── impl/
-            └── UserServiceImplTest.java        # ServiceImpl 单元测试
+    ├── service/
+    │   └── impl/
+    │       └── UserServiceImplTest.java        # ServiceImpl 单元测试（必须）
+    └── controller/
+        └── UserControllerTest.java            # Controller 接口测试（必须）
 ```
 
 ### 15.2 测试类命名
 
 | 类型 | 规范 | 示例 |
 |------|------|------|
-| 测试类 | 以 `Test` 结尾 | `UserServiceImplTest` |
+| ServiceImpl测试类 | 以 `Test` 结尾 | `UserServiceImplTest` |
+| Controller测试类 | 以 `Test` 结尾 | `UserControllerTest` |
 | 测试方法 | 以 `should` 开头，描述测试场景 | `create_shouldSuccess` |
 | 边界场景 | 使用 `when` 描述条件 | `getById_whenNotExists_shouldThrowException` |
 
@@ -1967,28 +2018,31 @@ public Result<Void> handleHandlerMethodValidationException(HandlerMethodValidati
 
 **解决**：
 1. **禁止在 schema.sql 中手动定义 `is_deleted` 字段的索引**
-2. 如需自定义索引名，使用表名前缀区分（如 `idx_sys_org_is_deleted`）
+2. **索引名必须使用表名前缀区分**，避免多表索引名重复，如：
+   - `idx_sys_org_status` 而非 `idx_status`
+   - `idx_sys_dept_org_id` 而非 `idx_org_id`
+3. 同一测试数据库中，索引名必须全局唯一
 
 ```sql
--- ✅ 正确：不定义 is_deleted 索引
-CREATE TABLE sys_org (
+-- ✅ 正确：使用表名前缀区分索引名
+CREATE TABLE sys_dept (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    org_name VARCHAR(128) NOT NULL,
-    -- ... 其他字段 ...
+    dept_name VARCHAR(128) NOT NULL,
+    org_id BIGINT NOT NULL,
+    status TINYINT DEFAULT 1,
     is_deleted TINYINT DEFAULT 0,
     PRIMARY KEY (id),
-    KEY idx_org_type (org_type),
-    KEY idx_status (status)
-    -- 不需要定义 KEY idx_is_deleted
+    UNIQUE KEY uk_dept_code (dept_code),
+    KEY idx_dept_org_id (org_id),        -- 使用表名前缀
+    KEY idx_dept_status (status)          -- 使用表名前缀
 );
 
--- ❌ 错误：手动定义 is_deleted 索引（与 MyBatis-Plus 冲突）
-CREATE TABLE sys_org (
+-- ❌ 错误：索引名与其他表重复
+CREATE TABLE sys_dept (
     id BIGINT NOT NULL AUTO_INCREMENT,
     -- ...
-    is_deleted TINYINT DEFAULT 0,
-    PRIMARY KEY (id),
-    KEY idx_is_deleted (is_deleted)  -- 不要这样做
+    status TINYINT DEFAULT 1,
+    KEY idx_status (status)  -- 与 sys_org 表的 idx_status 冲突
 );
 ```
 
