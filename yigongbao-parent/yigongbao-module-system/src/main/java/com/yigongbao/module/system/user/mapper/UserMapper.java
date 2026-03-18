@@ -3,6 +3,7 @@ package com.yigongbao.module.system.user.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Select;
 
 /**
  * 用户 Mapper
@@ -12,4 +13,22 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface UserMapper extends BaseMapper<UserEntity> {
+
+    /**
+     * 统计部门下的用户数量
+     *
+     * @param deptId 部门ID
+     * @return 用户数量
+     */
+    @Select("SELECT COUNT(*) FROM sys_user WHERE dept_id = #{deptId} AND is_deleted = 0")
+    Long countByDeptId(Long deptId);
+
+    /**
+     * 统计角色下的用户数量
+     *
+     * @param roleId 角色ID
+     * @return 用户数量
+     */
+    @Select("SELECT COUNT(*) FROM sys_user WHERE role_id = #{roleId} AND is_deleted = 0")
+    Long countByRoleId(Long roleId);
 }

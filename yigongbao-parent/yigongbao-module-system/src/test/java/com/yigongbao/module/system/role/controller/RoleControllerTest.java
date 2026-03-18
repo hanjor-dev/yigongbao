@@ -145,8 +145,8 @@ class RoleControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.code").value(622))
+                .andExpect(jsonPath("$.message").value("角色编码已存在"));
     }
 
     @Test
@@ -218,8 +218,8 @@ class RoleControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.code").value(622))
+                .andExpect(jsonPath("$.message").value("角色编码已存在"));
     }
 
     // ==================== delete 测试 ====================
@@ -246,8 +246,8 @@ class RoleControllerTest {
     void delete_whenHasUsers_shouldReturnError() throws Exception {
         mockMvc.perform(delete("/api/system/role/1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.code").value(623))
+                .andExpect(jsonPath("$.message").value("该角色下存在用户，无法删除"));
     }
 
     // ==================== updateStatus 测试 ====================

@@ -66,14 +66,34 @@ public class UserEntity extends BaseEntity implements Serializable {
     private Long orgId;
 
     /**
+     * 所属机构名称（冗余字段）
+     */
+    private String orgName;
+
+    /**
      * 所属部门ID
      */
     private Long deptId;
 
     /**
+     * 所属部门名称（冗余字段）
+     */
+    private String deptName;
+
+    /**
      * 关联角色ID
      */
     private Long roleId;
+
+    /**
+     * 关联角色名称（冗余字段）
+     */
+    private String roleName;
+
+    /**
+     * 关联角色编码（冗余字段）
+     */
+    private String roleCode;
 
     /**
      * 工号

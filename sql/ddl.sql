@@ -78,31 +78,6 @@ CREATE TABLE sys_org (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='机构表';
 
 
--- ==================== 地区表（省市区） ====================
--- 说明：与 https://github.com/kakuilan/china_area_mysql 表结构完全一致
--- 可直接导入 cnarea_2023 数据，无需额外处理
-DROP TABLE IF EXISTS sys_area;
-CREATE TABLE sys_area (
-    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键',
-    level               TINYINT         NOT NULL COMMENT '层级（1=省/直辖市，2=市，3=区/县）',
-    parent_code         BIGINT          NOT NULL DEFAULT 0 COMMENT '父级行政代码',
-    area_code           BIGINT          NOT NULL DEFAULT 0 COMMENT '行政代码（国家标准）',
-    zip_code            INT             UNSIGNED ZEROFILL NOT NULL DEFAULT 0 COMMENT '邮政编码',
-    city_code           CHAR(6)         NOT NULL DEFAULT '' COMMENT '区号',
-    name                VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '名称',
-    short_name          VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '简称',
-    merger_name         VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '组合名',
-    pinyin              VARCHAR(30)     NOT NULL DEFAULT '' COMMENT '拼音',
-    lng                 DECIMAL(10,6)   NOT NULL DEFAULT 0 COMMENT '经度',
-    lat                 DECIMAL(10,6)   NOT NULL DEFAULT 0 COMMENT '纬度',
-
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_area_code (area_code),
-    KEY idx_parent_code (parent_code),
-    KEY idx_area_level (level)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='地区表（省市区，与 cnarea_2023 结构一致）';
-
-
 -- ------------------------------------------------------------
 -- 部门表
 -- ------------------------------------------------------------
@@ -174,8 +149,12 @@ CREATE TABLE sys_user (
     avatar              VARCHAR(512)    COMMENT '头像路径',
     account_type        TINYINT         NOT NULL COMMENT '账户分类（关联字典编码=6）',
     org_id              BIGINT          NOT NULL COMMENT '所属机构ID（关联sys_org表）',
+    org_name            VARCHAR(128)    COMMENT '所属机构名称（冗余字段）',
     dept_id             BIGINT          COMMENT '所属部门ID（关联sys_dept表）',
+    dept_name           VARCHAR(128)    COMMENT '所属部门名称（冗余字段）',
     role_id             BIGINT          COMMENT '关联角色ID（关联sys_role表）',
+    role_name           VARCHAR(64)     COMMENT '关联角色名称（冗余字段）',
+    role_code           VARCHAR(32)     COMMENT '关联角色编码（冗余字段）',
 
     -- 扩展字段
     employee_no         VARCHAR(32)     COMMENT '工号',

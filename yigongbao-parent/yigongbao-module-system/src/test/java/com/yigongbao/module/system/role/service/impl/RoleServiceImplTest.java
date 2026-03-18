@@ -14,7 +14,7 @@ import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.mapper.RoleMapper;
 import com.yigongbao.module.system.role.vo.RoleVO;
 import com.yigongbao.module.system.user.entity.UserEntity;
-import com.yigongbao.module.system.user.service.UserService;
+import com.yigongbao.module.system.user.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,7 +51,7 @@ class RoleServiceImplTest {
     private RoleMapper roleMapper;
 
     @Mock
-    private UserService userService;
+    private UserMapper userMapper;
 
     @InjectMocks
     private RoleServiceImpl roleService;
@@ -273,7 +273,7 @@ class RoleServiceImplTest {
     void removeRole_shouldSuccess() {
         // 准备：没有关联用户
         when(roleMapper.selectById(1L)).thenReturn(testEntity);
-        when(userService.count(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(userMapper.countByRoleId(1L)).thenReturn(0L);
         when(roleMapper.deleteById(1L)).thenReturn(1);
 
         // 执行
@@ -302,7 +302,7 @@ class RoleServiceImplTest {
     void removeRole_whenHasUsers_shouldThrowException() {
         // 准备：有关联用户
         when(roleMapper.selectById(1L)).thenReturn(testEntity);
-        when(userService.count(any(LambdaQueryWrapper.class))).thenReturn(5L);
+        when(userMapper.countByRoleId(1L)).thenReturn(5L);
 
         // 执行 & 断言
         BusinessException exception = assertThrows(

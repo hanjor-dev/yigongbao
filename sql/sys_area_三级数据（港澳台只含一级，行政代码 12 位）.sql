@@ -1,3 +1,29 @@
+
+-- ==================== 地区表（省市区） ====================
+-- 说明：与 https://github.com/kakuilan/china_area_mysql 表结构完全一致
+-- 可直接导入 cnarea_2023 数据，无需额外处理
+DROP TABLE IF EXISTS sys_area;
+CREATE TABLE sys_area (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键',
+    level               TINYINT         NOT NULL COMMENT '层级（1=省/直辖市，2=市，3=区/县）',
+    parent_code         BIGINT          NOT NULL DEFAULT 0 COMMENT '父级行政代码',
+    area_code           BIGINT          NOT NULL DEFAULT 0 COMMENT '行政代码（国家标准）',
+    zip_code            INT             UNSIGNED ZEROFILL NOT NULL DEFAULT 0 COMMENT '邮政编码',
+    city_code           CHAR(6)         NOT NULL DEFAULT '' COMMENT '区号',
+    name                VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '名称',
+    short_name          VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '简称',
+    merger_name         VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '组合名',
+    pinyin              VARCHAR(30)     NOT NULL DEFAULT '' COMMENT '拼音',
+    lng                 DECIMAL(10,6)   NOT NULL DEFAULT 0 COMMENT '经度',
+    lat                 DECIMAL(10,6)   NOT NULL DEFAULT 0 COMMENT '纬度',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_area_code (area_code),
+    KEY idx_parent_code (parent_code),
+    KEY idx_area_level (level)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='地区表（省市区）';
+
+
 INSERT INTO `sys_area` (`level`, `parent_code`, `area_code`, `zip_code`, `city_code`, `name`, `short_name`, `merger_name`, `pinyin`, `lng`, `lat`) VALUES (1, 0, 110000000000, 000000, '', '北京市', '北京', '北京', 'BeiJing', 116.407526, 39.904030);
 INSERT INTO `sys_area` (`level`, `parent_code`, `area_code`, `zip_code`, `city_code`, `name`, `short_name`, `merger_name`, `pinyin`, `lng`, `lat`) VALUES (2, 110000000000, 110100000000, 100000, '010', '市辖区', '北京', '北京', 'BeiJing', 116.407526, 39.904030);
 INSERT INTO `sys_area` (`level`, `parent_code`, `area_code`, `zip_code`, `city_code`, `name`, `short_name`, `merger_name`, `pinyin`, `lng`, `lat`) VALUES (3, 110100000000, 110101000000, 100000, '010', '东城区', '东城', '北京,东城', 'DongCheng', 116.416357, 39.928353);

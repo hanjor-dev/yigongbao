@@ -119,7 +119,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 log.warn("手机号已存在，phone={}", dto.getPhone());
                 throw new BusinessException(ErrorCodeEnum.USER_PHONE_EXISTS);
             }
-            // 校验所属机构是否存在
+            // 校验所属机构是否存在，并获取名称设置到冗余字段
             if (dto.getOrgId() != null) {
                 OrgEntity orgEntity = orgService.getById(dto.getOrgId());
                 if (orgEntity == null) {
@@ -145,6 +145,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             }
             // DTO转换为实体对象
             UserEntity entity = UserConvert.toEntity(dto);
+            // 填充冗余字段（通过id查询获取名称）
+            fillRedundantFields(entity);
             // 密码加密存储（如果未提供密码则使用默认密码）
             String rawPassword = StringUtils.hasText(dto.getPassword()) ? dto.getPassword() : DEFAULT_PASSWORD;
             entity.setPassword(passwordEncoder.encode(rawPassword));
@@ -188,6 +190,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     log.warn("所属机构不存在，orgId={}", dto.getOrgId());
                     throw new BusinessException(ErrorCodeEnum.USER_ORG_NOT_FOUND);
                 }
+                // 更新机构名称冗余字段
+                entity.setOrgName(orgEntity.getOrgName());
             }
             // 校验所属部门是否存在
             if (dto.getDeptId() != null && !dto.getDeptId().equals(entity.getDeptId())) {
@@ -196,6 +200,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     log.warn("所属部门不存在，deptId={}", dto.getDeptId());
                     throw new BusinessException(ErrorCodeEnum.USER_DEPT_NOT_FOUND);
                 }
+                // 更新部门名称冗余字段
+                entity.setDeptName(deptEntity.getDeptName());
             }
             // 校验角色是否存在
             if (dto.getRoleId() != null && !dto.getRoleId().equals(entity.getRoleId())) {
@@ -204,6 +210,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     log.warn("角色不存在，roleId={}", dto.getRoleId());
                     throw new BusinessException(ErrorCodeEnum.USER_ROLE_NOT_FOUND);
                 }
+                // 更新角色名称和编码冗余字段
+                entity.setRoleName(roleEntity.getRoleName());
+                entity.setRoleCode(roleEntity.getRoleCode());
             }
             // 更新用户信息
             BeanUtils.copyProperties(dto, entity, "id", "username", "password", "createTime", "updateTime", "createBy", "updateBy");
@@ -359,6 +368,36 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     // ==================== 私有方法 ====================
 
     /**
+     * 填充冗余字段（通过ID查询获取名称）
+     *
+     * @param entity 用户实体
+     */
+    private void fillRedundantFields(UserEntity entity) {
+        // 填充机构名称
+        if (entity.getOrgId() != null) {
+            OrgEntity orgEntity = orgService.getById(entity.getOrgId());
+            if (orgEntity != null) {
+                entity.setOrgName(orgEntity.getOrgName());
+            }
+        }
+        // 填充部门名称
+        if (entity.getDeptId() != null) {
+            DeptEntity deptEntity = deptService.getById(entity.getDeptId());
+            if (deptEntity != null) {
+                entity.setDeptName(deptEntity.getDeptName());
+            }
+        }
+        // 填充角色名称和编码
+        if (entity.getRoleId() != null) {
+            RoleEntity roleEntity = roleService.getById(entity.getRoleId());
+            if (roleEntity != null) {
+                entity.setRoleName(roleEntity.getRoleName());
+                entity.setRoleCode(roleEntity.getRoleCode());
+            }
+        }
+    }
+
+    /**
      * 转换为VO并填充关联名称
      */
     private UserVO toVOWithNames(UserEntity entity) {
@@ -366,36 +405,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         if (vo == null) {
             return null;
         }
-        // 填充机构名称
-        if (vo.getOrgId() != null) {
-            OrgEntity orgEntity = orgService.getById(vo.getOrgId());
-            if (orgEntity != null) {
-                vo.setOrgName(orgEntity.getOrgName());
-            }
-        }
-        // 填充部门名称
-        if (vo.getDeptId() != null) {
-            DeptEntity deptEntity = deptService.getById(vo.getDeptId());
-            if (deptEntity != null) {
-                vo.setDeptName(deptEntity.getDeptName());
-            }
-        }
-        // 填充角色名称
-        if (vo.getRoleId() != null) {
-            RoleEntity roleEntity = roleService.getById(vo.getRoleId());
-            if (roleEntity != null) {
-                vo.setRoleName(roleEntity.getRoleName());
-            }
-        }
-        // 填充状态名称
+        // 状态名称（使用冗余字段，不再查询）
         if (vo.getStatus() != null) {
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
-        // 填充性别名称
+        // 性别名称
         if (vo.getSex() != null) {
             vo.setSexName(StatusConstants.getSexName(vo.getSex()));
         }
-        // 填充账户分类名称
+        // 账户分类名称
         if (vo.getAccountType() != null) {
             vo.setAccountTypeName(StatusConstants.getAccountTypeName(vo.getAccountType()));
         }

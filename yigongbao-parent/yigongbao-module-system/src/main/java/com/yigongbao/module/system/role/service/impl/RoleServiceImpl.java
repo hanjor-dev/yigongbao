@@ -15,8 +15,7 @@ import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.mapper.RoleMapper;
 import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.role.vo.RoleVO;
-import com.yigongbao.module.system.user.entity.UserEntity;
-import com.yigongbao.module.system.user.service.UserService;
+import com.yigongbao.module.system.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -38,7 +37,7 @@ import java.util.Objects;
 @Slf4j
 public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> implements RoleService {
 
-    private final UserService userService;
+    private final UserMapper userMapper;
 
     /**
      * 分页查询角色列表
@@ -311,7 +310,6 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
      * @return true-有用户，false-无用户
      */
     private boolean hasUsers(Long roleId) {
-        return userService.count(new LambdaQueryWrapper<UserEntity>()
-                .eq(UserEntity::getRoleId, roleId)) > 0;
+        return userMapper.countByRoleId(roleId) > 0;
     }
 }

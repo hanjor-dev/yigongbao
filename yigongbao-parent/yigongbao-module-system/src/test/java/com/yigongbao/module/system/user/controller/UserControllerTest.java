@@ -1,6 +1,8 @@
 package com.yigongbao.module.system.user.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
@@ -38,6 +41,20 @@ class UserControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    /**
+     * 生成模拟登录 Token 的后置处理器
+     */
+    private RequestPostProcessor mockLogin() {
+        return request -> {
+            // 先登录获取 token
+            StpUtil.login(1L);
+            String token = StpUtil.getTokenValue();
+            // 将 token 设置到请求头
+            request.addHeader("satoken", token);
+            return request;
+        };
+    }
 
     // ==================== list 测试 ====================
 
@@ -184,8 +201,8 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.code").value(617))
+                .andExpect(jsonPath("$.message").value("用户名已存在"));
     }
 
     @Test
@@ -203,8 +220,8 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.code").value(618))
+                .andExpect(jsonPath("$.message").value("手机号已存在"));
     }
 
     @Test
@@ -272,8 +289,8 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.code").value(619))
+                .andExpect(jsonPath("$.message").value("所属机构不存在"));
     }
 
     @Test
@@ -292,8 +309,8 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.code").value(620))
+                .andExpect(jsonPath("$.message").value("所属部门不存在"));
     }
 
     @Test
@@ -312,8 +329,8 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.code").value(621))
+                .andExpect(jsonPath("$.message").value("角色不存在"));
     }
 
     @Test
@@ -375,8 +392,8 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.code").value(618))
+                .andExpect(jsonPath("$.message").value("手机号已存在"));
     }
 
     // ==================== delete 测试 ====================
@@ -477,8 +494,8 @@ class UserControllerTest {
                         .param("oldPassword", "wrongpassword")
                         .param("newPassword", "654321"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.code").value(625))
+                .andExpect(jsonPath("$.message").value("旧密码错误"));
     }
 
     @Test
@@ -501,6 +518,7 @@ class UserControllerTest {
         requestBody.put("avatar", "/avatar/new.png");
 
         mockMvc.perform(put("/api/system/user/profile")
+                        .with(mockLogin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -516,10 +534,11 @@ class UserControllerTest {
         requestBody.put("avatar", "/avatar/new.png");
 
         mockMvc.perform(put("/api/system/user/profile")
+                        .with(mockLogin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.code").value(618))
+                .andExpect(jsonPath("$.message").value("手机号已存在"));
     }
 }

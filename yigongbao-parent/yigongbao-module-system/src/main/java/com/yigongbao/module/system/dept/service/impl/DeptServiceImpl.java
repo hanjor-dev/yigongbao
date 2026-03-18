@@ -17,7 +17,7 @@ import com.yigongbao.module.system.dept.vo.DeptVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.user.entity.UserEntity;
-import com.yigongbao.module.system.user.service.UserService;
+import com.yigongbao.module.system.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -40,7 +40,7 @@ import java.util.Objects;
 public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> implements DeptService {
 
     private final OrgService orgService;
-    private final UserService userService;
+    private final UserMapper userMapper;
 
     /**
      * 分页查询部门列表
@@ -265,7 +265,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
         }
         // 填充部门负责人姓名
         if (vo.getLeaderUserId() != null) {
-            UserEntity userEntity = userService.getById(vo.getLeaderUserId());
+            UserEntity userEntity = userMapper.selectById(vo.getLeaderUserId());
             if (userEntity != null) {
                 vo.setLeaderUserName(userEntity.getRealName());
             }
@@ -336,7 +336,6 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
      * @return true-有用户，false-无用户
      */
     private boolean hasUsers(Long deptId) {
-        return userService.count(new LambdaQueryWrapper<UserEntity>()
-                .eq(UserEntity::getDeptId, deptId)) > 0;
+        return userMapper.countByDeptId(deptId) > 0;
     }
 }

@@ -292,8 +292,12 @@ CREATE TABLE sys_user (
     avatar              VARCHAR(512)    COMMENT '头像路径',
     account_type        TINYINT         NOT NULL COMMENT '账户分类（1=内部用户，2=外部用户）',
     org_id              BIGINT          NOT NULL COMMENT '所属机构ID',
+    org_name            VARCHAR(128)    COMMENT '所属机构名称（冗余字段）',
     dept_id             BIGINT          COMMENT '所属部门ID',
+    dept_name           VARCHAR(128)    COMMENT '所属部门名称（冗余字段）',
     role_id             BIGINT          COMMENT '关联角色ID',
+    role_name           VARCHAR(64)     COMMENT '关联角色名称（冗余字段）',
+    role_code           VARCHAR(32)     COMMENT '关联角色编码（冗余字段）',
 
     -- 扩展字段
     employee_no         VARCHAR(32)     COMMENT '工号',
@@ -324,10 +328,10 @@ CREATE TABLE sys_user (
 
 -- 插入用户测试数据（密码均为 bcrypt 加密后的 "123456"）
 -- bcrypt 加密：$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi
-INSERT INTO sys_user (id, username, password, real_name, phone, email, sex, avatar, account_type, org_id, dept_id, role_id, employee_no, specialty, qualification, settlement_type, status, remark, create_time, update_time, is_deleted) VALUES
-(1, 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '系统管理员', '13800000001', 'admin@test.com', 1, NULL, 1, 1, NULL, 1, 'A001', '7.1.1', '高级工程师', 3, 1, '测试管理员', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, 'designer1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '设计师张三', '13800000002', 'designer@test.com', 1, NULL, 1, 1, 1, 2, 'D001', '7.1.2', '口腔修复专家', 1, 1, '设计师用户', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(3, 'sales1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '业务员李四', '13800000003', 'sales@test.com', 1, NULL, 1, 2, NULL, 4, 'S001', NULL, NULL, 2, 1, '经销商业务员', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(4, 'doctor1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '医生王五', '13800000004', 'doctor@test.com', 1, NULL, 1, 1, NULL, 5, 'DOC001', '7.1.3', '正畸主治医师', 3, 1, '医院医生', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(5, 'org_admin1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '机构管理员', '13800000005', 'orgadmin@test.com', 2, NULL, 2, 1, NULL, 6, NULL, NULL, NULL, NULL, 1, '外部机构管理员', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(6, 'disabled_user', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '已禁用用户', '13800000006', 'disabled@test.com', 1, NULL, 1, 1, NULL, 1, NULL, NULL, NULL, NULL, 0, '已禁用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO sys_user (id, username, password, real_name, phone, email, sex, avatar, account_type, org_id, org_name, dept_id, dept_name, role_id, role_name, role_code, employee_no, specialty, qualification, settlement_type, status, remark, create_time, update_time, is_deleted) VALUES
+(1, 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '系统管理员', '13800000001', 'admin@test.com', 1, NULL, 1, 1, '测试医疗机构', NULL, NULL, 1, '超级管理员', 'admin', 'A001', '7.1.1', '高级工程师', 3, 1, '测试管理员', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 'designer1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '设计师张三', '13800000002', 'designer@test.com', 1, NULL, 1, 1, '测试医疗机构', 1, '设计部', 2, '设计师', 'designer', 'D001', '7.1.2', '口腔修复专家', 1, 1, '设计师用户', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 'sales1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '业务员李四', '13800000003', 'sales@test.com', 1, NULL, 1, 2, '测试生产企业', NULL, NULL, 4, '销售员', 'sales', 'S001', NULL, NULL, 2, 1, '经销商业务员', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(4, 'doctor1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '医生王五', '13800000004', 'doctor@test.com', 1, NULL, 1, 1, '测试医疗机构', NULL, NULL, 5, '医生', 'doctor', 'DOC001', '7.1.3', '正畸主治医师', 3, 1, '医院医生', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(5, 'org_admin1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '机构管理员', '13800000005', 'orgadmin@test.com', 2, NULL, 2, 1, '测试医疗机构', NULL, NULL, 6, '外部管理员', 'org_admin', NULL, NULL, NULL, NULL, 1, '外部机构管理员', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(6, 'disabled_user', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '已禁用用户', '13800000006', 'disabled@test.com', 1, NULL, 1, 1, '测试医疗机构', NULL, NULL, 1, '超级管理员', 'admin', NULL, NULL, NULL, NULL, 0, '已禁用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
