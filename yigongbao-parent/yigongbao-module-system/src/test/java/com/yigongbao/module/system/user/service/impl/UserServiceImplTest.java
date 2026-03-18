@@ -1,0 +1,610 @@
+package com.yigongbao.module.system.user.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.yigongbao.common.constant.DataScopeConstants;
+import com.yigongbao.common.constant.StatusConstants;
+import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.system.dept.entity.DeptEntity;
+import com.yigongbao.module.system.dept.service.DeptService;
+import com.yigongbao.module.system.org.entity.OrgEntity;
+import com.yigongbao.module.system.org.service.OrgService;
+import com.yigongbao.module.system.role.entity.RoleEntity;
+import com.yigongbao.module.system.role.service.RoleService;
+import com.yigongbao.module.system.user.dto.CreateUserDTO;
+import com.yigongbao.module.system.user.dto.ResetPasswordDTO;
+import com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO;
+import com.yigongbao.module.system.user.dto.UpdateUserDTO;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.system.user.vo.UserVO;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.lang.reflect.Field;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+/**
+ * UserService 单元测试
+ *
+ * @author hanjor
+ * @date 2026-03-17
+ */
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+@Slf4j
+@DisplayName("UserService 单元测试")
+class UserServiceImplTest {
+
+    @Mock
+    private UserMapper userMapper;
+
+    @Mock
+    private OrgService orgService;
+
+    @Mock
+    private DeptService deptService;
+
+    @Mock
+    private RoleService roleService;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @InjectMocks
+    private UserServiceImpl userService;
+
+    private UserEntity testEntity;
+    private CreateUserDTO createDTO;
+    private UpdateUserDTO updateDTO;
+    private UpdateUserBySelfDTO updateSelfDTO;
+    private ResetPasswordDTO resetPasswordDTO;
+    private OrgEntity testOrg;
+    private DeptEntity testDept;
+    private RoleEntity testRole;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        // 通过反射将 mock 的 userMapper 注入到 ServiceImpl 的 baseMapper 字段中
+        Field baseMapperField = ServiceImpl.class.getDeclaredField("baseMapper");
+        baseMapperField.setAccessible(true);
+        baseMapperField.set(userService, userMapper);
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // 初始化测试机构实体
+        testOrg = new OrgEntity();
+        testOrg.setId(1L);
+        testOrg.setOrgName("测试机构");
+        testOrg.setOrgCode("ORG-P-001");
+        testOrg.setStatus(1);
+
+        // 初始化测试部门实体
+        testDept = new DeptEntity();
+        testDept.setId(1L);
+        testDept.setDeptName("研发部");
+        testDept.setDeptCode("DEPT-001");
+        testDept.setOrgId(1L);
+        testDept.setStatus(1);
+
+        // 初始化测试角色实体
+        testRole = new RoleEntity();
+        testRole.setId(1L);
+        testRole.setRoleName("管理员");
+        testRole.setRoleCode("ROLE_ADMIN");
+        testRole.setStatus(1);
+
+        // 初始化测试用户实体
+        testEntity = new UserEntity();
+        testEntity.setId(1L);
+        testEntity.setUsername("testuser");
+        testEntity.setPassword("$2a$10$xxx");
+        testEntity.setRealName("测试用户");
+        testEntity.setPhone("13800000001");
+        testEntity.setAccountType(1);
+        testEntity.setOrgId(1L);
+        testEntity.setDeptId(1L);
+        testEntity.setRoleId(1L);
+        testEntity.setStatus(1);
+        testEntity.setCreateTime(now);
+        testEntity.setUpdateTime(now);
+
+        // 初始化创建DTO
+        createDTO = new CreateUserDTO();
+        createDTO.setUsername("newuser");
+        createDTO.setPassword("123456");
+        createDTO.setRealName("新用户");
+        createDTO.setPhone("13900000000");
+        createDTO.setAccountType(1);
+        createDTO.setOrgId(1L);
+        createDTO.setDeptId(1L);
+        createDTO.setRoleId(1L);
+
+        // 初始化更新DTO
+        updateDTO = new UpdateUserDTO();
+        updateDTO.setRealName("更新后的姓名");
+        updateDTO.setEmail("update@test.com");
+
+        // 初始化自更新DTO
+        updateSelfDTO = new UpdateUserBySelfDTO();
+        updateSelfDTO.setPhone("13900000999");
+        updateSelfDTO.setAvatar("/avatar/new.png");
+
+        // 初始化重置密码DTO
+        resetPasswordDTO = new ResetPasswordDTO();
+        resetPasswordDTO.setNewPassword("123456");
+    }
+
+    // ==================== listUser 测试 ====================
+
+    @Test
+    @DisplayName("listUser: 分页查询成功")
+    void listUser_shouldReturnPageData() {
+        // 准备
+        Page<UserEntity> page = new Page<>(1, 10);
+        page.setTotal(1);
+        page.setRecords(List.of(testEntity));
+
+        when(userMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(deptService.getById(1L)).thenReturn(testDept);
+        when(roleService.getById(1L)).thenReturn(testRole);
+
+        // 执行
+        IPage<UserVO> result = userService.listUser(1, 10, null, null, null, null, null, null);
+
+        // 断言
+        assertNotNull(result);
+        assertEquals(1, result.getTotal());
+        verify(userMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
+    }
+
+    @Test
+    @DisplayName("listUser: 无数据时返回空列表")
+    void listUser_whenNoData_shouldReturnEmptyList() {
+        // 准备
+        Page<UserEntity> page = new Page<>(1, 10);
+        page.setTotal(0);
+        page.setRecords(Collections.emptyList());
+
+        when(userMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+
+        // 执行
+        IPage<UserVO> result = userService.listUser(1, 10, null, null, null, null, null, null);
+
+        // 断言
+        assertNotNull(result);
+        assertEquals(0, result.getTotal());
+        assertTrue(result.getRecords().isEmpty());
+    }
+
+    // ==================== getUserById 测试 ====================
+
+    @Test
+    @DisplayName("getUserById: 存在数据时返回VO")
+    void getUserById_whenExists_shouldReturnData() {
+        // 准备
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(deptService.getById(1L)).thenReturn(testDept);
+        when(roleService.getById(1L)).thenReturn(testRole);
+
+        // 执行
+        UserVO result = userService.getUserById(1L);
+
+        // 断言
+        assertNotNull(result);
+        assertEquals(1L, result.getId());
+        assertEquals("测试用户", result.getRealName());
+    }
+
+    @Test
+    @DisplayName("getUserById: 数据不存在时抛出异常")
+    void getUserById_whenNotExists_shouldThrowException() {
+        // 准备
+        when(userMapper.selectById(999L)).thenReturn(null);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.getUserById(999L)
+        );
+        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    // ==================== createUser 测试 ====================
+
+    @Test
+    @DisplayName("createUser: 创建成功")
+    void createUser_shouldSuccess() {
+        // 准备
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(deptService.getById(1L)).thenReturn(testDept);
+        when(roleService.getById(1L)).thenReturn(testRole);
+        when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("$2a$10$encrypted");
+        when(userMapper.insert(any(UserEntity.class))).thenReturn(1);
+
+        // 执行
+        userService.createUser(createDTO);
+
+        // 断言
+        verify(userMapper, times(1)).insert(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("createUser: 用户名已存在时抛出异常")
+    void createUser_whenUsernameExists_shouldThrowException() {
+        // 准备：用户名已存在
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.createUser(createDTO)
+        );
+        assertEquals(ErrorCodeEnum.USER_EXISTS.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("createUser: 手机号已存在时抛出异常")
+    void createUser_whenPhoneExists_shouldThrowException() {
+        // 准备：用户名不存在，手机号存在
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class)))
+                .thenReturn(0L)  // 用户名检查
+                .thenReturn(1L); // 手机号检查
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.createUser(createDTO)
+        );
+        assertEquals(ErrorCodeEnum.USER_PHONE_EXISTS.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("createUser: 所属机构不存在时抛出异常")
+    void createUser_whenOrgNotExists_shouldThrowException() {
+        // 准备：用户名和手机号不存在，但机构不存在
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(999L)).thenReturn(null);
+
+        CreateUserDTO dto = new CreateUserDTO();
+        dto.setUsername("newuser");
+        dto.setPhone("13900000000");
+        dto.setOrgId(999L);
+        dto.setAccountType(1);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.createUser(dto)
+        );
+        assertEquals(ErrorCodeEnum.USER_ORG_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("createUser: 所属部门不存在时抛出异常")
+    void createUser_whenDeptNotExists_shouldThrowException() {
+        // 准备
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(deptService.getById(999L)).thenReturn(null);
+
+        CreateUserDTO dto = new CreateUserDTO();
+        dto.setUsername("newuser");
+        dto.setPhone("13900000000");
+        dto.setOrgId(1L);
+        dto.setDeptId(999L);
+        dto.setAccountType(1);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.createUser(dto)
+        );
+        assertEquals(ErrorCodeEnum.USER_DEPT_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("createUser: 角色不存在时抛出异常")
+    void createUser_whenRoleNotExists_shouldThrowException() {
+        // 准备
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(deptService.getById(1L)).thenReturn(testDept);
+        when(roleService.getById(999L)).thenReturn(null);
+
+        CreateUserDTO dto = new CreateUserDTO();
+        dto.setUsername("newuser");
+        dto.setPhone("13900000000");
+        dto.setOrgId(1L);
+        dto.setDeptId(1L);
+        dto.setRoleId(999L);
+        dto.setAccountType(1);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.createUser(dto)
+        );
+        assertEquals(ErrorCodeEnum.USER_ROLE_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("createUser: 密码可选（不传密码）使用默认密码")
+    void createUser_whenPasswordOptional_shouldUseDefaultPassword() {
+        // 准备：不传密码
+        CreateUserDTO dtoNoPassword = new CreateUserDTO();
+        dtoNoPassword.setUsername("newuser");
+        dtoNoPassword.setRealName("新用户");
+        dtoNoPassword.setPhone("13900000000");
+        dtoNoPassword.setAccountType(1);
+        dtoNoPassword.setOrgId(1L);
+
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(passwordEncoder.encode("123456")).thenReturn("$2a$10$encrypted");
+        when(userMapper.insert(any(UserEntity.class))).thenReturn(1);
+
+        // 执行
+        userService.createUser(dtoNoPassword);
+
+        // 断言：验证使用了默认密码
+        verify(passwordEncoder, times(1)).encode("123456");
+        verify(userMapper, times(1)).insert(any(UserEntity.class));
+    }
+
+    // ==================== updateUser 测试 ====================
+
+    @Test
+    @DisplayName("updateUser: 更新成功")
+    void updateUser_shouldSuccess() {
+        // 准备
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        // 执行
+        userService.updateUser(1L, updateDTO);
+
+        // 断言
+        verify(userMapper, times(1)).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("updateUser: 用户不存在时抛出异常")
+    void updateUser_whenNotExists_shouldThrowException() {
+        // 准备
+        when(userMapper.selectById(999L)).thenReturn(null);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.updateUser(999L, updateDTO)
+        );
+        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("updateUser: 手机号与其他用户重复时抛出异常")
+    void updateUser_whenPhoneDuplicated_shouldThrowException() {
+        // 准备：更新后的手机号与其他用户重复
+        UpdateUserDTO dtoWithPhone = new UpdateUserDTO();
+        dtoWithPhone.setPhone("13800000002");
+
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        // 手机号检查：存在重复（排除自己后还有1条）
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.updateUser(1L, dtoWithPhone)
+        );
+        assertEquals(ErrorCodeEnum.USER_PHONE_EXISTS.getCode(), exception.getCode());
+    }
+
+    // ==================== removeUser 测试 ====================
+
+    @Test
+    @DisplayName("removeUser: 删除成功")
+    void removeUser_shouldSuccess() {
+        // 准备
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(userMapper.deleteById(1L)).thenReturn(1);
+
+        // 执行
+        userService.removeUser(1L);
+
+        // 断言
+        verify(userMapper, times(1)).deleteById(1L);
+    }
+
+    @Test
+    @DisplayName("removeUser: 用户不存在时抛出异常")
+    void removeUser_whenNotExists_shouldThrowException() {
+        // 准备
+        when(userMapper.selectById(999L)).thenReturn(null);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.removeUser(999L)
+        );
+        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    // ==================== updateStatus 测试 ====================
+
+    @Test
+    @DisplayName("updateStatus: 修改状态成功")
+    void updateStatus_shouldSuccess() {
+        // 准备
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        // 执行
+        userService.updateStatus(1L, StatusConstants.DISABLED);
+
+        // 断言
+        verify(userMapper, times(1)).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("updateStatus: 用户不存在时抛出异常")
+    void updateStatus_whenNotExists_shouldThrowException() {
+        // 准备
+        when(userMapper.selectById(999L)).thenReturn(null);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.updateStatus(999L, 0)
+        );
+        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    // ==================== resetPassword 测试 ====================
+
+    @Test
+    @DisplayName("resetPassword: 重置成功")
+    void resetPassword_shouldSuccess() {
+        // 准备
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("$2a$10$encrypted");
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        // 执行
+        userService.resetPassword(1L, resetPasswordDTO);
+
+        // 断言
+        verify(userMapper, times(1)).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("resetPassword: 用户不存在时抛出异常")
+    void resetPassword_whenNotExists_shouldThrowException() {
+        // 准备
+        when(userMapper.selectById(999L)).thenReturn(null);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.resetPassword(999L, resetPasswordDTO)
+        );
+        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    // ==================== changePassword 测试 ====================
+
+    @Test
+    @DisplayName("changePassword: 修改密码成功")
+    void changePassword_shouldSuccess() {
+        // 准备
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(passwordEncoder.matches("123456", "$2a$10$xxx")).thenReturn(true);
+        when(passwordEncoder.encode("654321")).thenReturn("$2a$10$newencrypted");
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        // 执行
+        userService.changePassword(1L, "123456", "654321");
+
+        // 断言
+        verify(userMapper, times(1)).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("changePassword: 旧密码错误时抛出异常")
+    void changePassword_whenOldPasswordWrong_shouldThrowException() {
+        // 准备
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(passwordEncoder.matches("wrongpassword", "$2a$10$xxx")).thenReturn(false);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.changePassword(1L, "wrongpassword", "654321")
+        );
+        assertEquals(ErrorCodeEnum.OLD_PASSWORD_ERROR.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("changePassword: 用户不存在时抛出异常")
+    void changePassword_whenNotExists_shouldThrowException() {
+        // 准备
+        when(userMapper.selectById(999L)).thenReturn(null);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.changePassword(999L, "123456", "654321")
+        );
+        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    // ==================== updateUserBySelf 测试 ====================
+
+    @Test
+    @DisplayName("updateUserBySelf: 自更新成功")
+    void updateUserBySelf_shouldSuccess() {
+        // 准备
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        // 执行
+        userService.updateUserBySelf(1L, updateSelfDTO);
+
+        // 断言
+        verify(userMapper, times(1)).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("updateUserBySelf: 用户不存在时抛出异常")
+    void updateUserBySelf_whenNotExists_shouldThrowException() {
+        // 准备
+        when(userMapper.selectById(999L)).thenReturn(null);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.updateUserBySelf(999L, updateSelfDTO)
+        );
+        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("updateUserBySelf: 手机号与其他用户重复时抛出异常")
+    void updateUserBySelf_whenPhoneDuplicated_shouldThrowException() {
+        // 准备：更新后的手机号与其他用户重复
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        // 手机号检查：存在重复（排除自己后还有1条）
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.updateUserBySelf(1L, updateSelfDTO)
+        );
+        assertEquals(ErrorCodeEnum.USER_PHONE_EXISTS.getCode(), exception.getCode());
+    }
+}

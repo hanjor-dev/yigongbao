@@ -1,0 +1,111 @@
+package com.yigongbao.module.system.role.controller;
+
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yigongbao.common.result.Result;
+import com.yigongbao.module.system.role.dto.CreateRoleDTO;
+import com.yigongbao.module.system.role.dto.UpdateRoleDTO;
+import com.yigongbao.module.system.role.service.RoleService;
+import com.yigongbao.module.system.role.vo.RoleVO;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * 角色管理 Controller
+ * 处理角色相关的 HTTP 请求
+ *
+ * @author hanjor
+ * @date 2026-03-17
+ */
+@RestController
+@RequestMapping("/api/system/role")
+@RequiredArgsConstructor
+public class RoleController {
+
+    private final RoleService roleService;
+
+    /**
+     * 分页查询角色列表
+     *
+     * @param pageNum     页码（默认1）
+     * @param pageSize   每页条数（默认10）
+     * @param roleName   角色名称（模糊查询）
+     * @param accountType 账户分类（1=内部用户，2=外部用户）
+     * @param status     状态
+     * @return 分页后的角色列表
+     */
+    @GetMapping("/list")
+    public Result<IPage<RoleVO>> list(
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(required = false) String roleName,
+            @RequestParam(required = false) Integer accountType,
+            @RequestParam(required = false) Integer status) {
+        return Result.success(roleService.listRole(pageNum, pageSize, roleName, accountType, status));
+    }
+
+    /**
+     * 根据ID查询角色详情
+     *
+     * @param id 角色ID
+     * @return 角色详情
+     */
+    @GetMapping("/{id}")
+    public Result<RoleVO> getById(@PathVariable Long id) {
+        return Result.success(roleService.getRoleById(id));
+    }
+
+    /**
+     * 创建角色
+     *
+     * @param dto 创建参数
+     * @return 创建结果
+     */
+    @PostMapping
+    public Result<Void> create(@Validated @RequestBody CreateRoleDTO dto) {
+        roleService.createRole(dto);
+        return Result.success();
+    }
+
+    /**
+     * 更新角色
+     *
+     * @param id  角色ID
+     * @param dto 更新参数
+     * @return 更新结果
+     */
+    @PutMapping("/{id}")
+    public Result<Void> update(@PathVariable Long id, @Validated @RequestBody UpdateRoleDTO dto) {
+        roleService.updateRole(id, dto);
+        return Result.success();
+    }
+
+    /**
+     * 删除角色
+     *
+     * @param id 角色ID
+     * @return 删除结果
+     */
+    @DeleteMapping("/{id}")
+    public Result<Void> remove(@PathVariable Long id) {
+        roleService.removeRole(id);
+        return Result.success();
+    }
+
+    /**
+     * 修改角色状态
+     *
+     * @param id     角色ID
+     * @param status 状态值（0=禁用，1=正常）
+     * @return 操作结果
+     */
+    @PutMapping("/{id}/status")
+    public Result<Void> updateStatus(
+            @PathVariable Long id,
+            @RequestParam @Min(0) @Max(1) Integer status) {
+        roleService.updateStatus(id, status);
+        return Result.success();
+    }
+}

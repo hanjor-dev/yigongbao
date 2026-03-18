@@ -1,0 +1,429 @@
+package com.yigongbao.module.system.user.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.yigongbao.common.constant.StatusConstants;
+import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.system.dept.entity.DeptEntity;
+import com.yigongbao.module.system.dept.service.DeptService;
+import com.yigongbao.module.system.org.entity.OrgEntity;
+import com.yigongbao.module.system.org.service.OrgService;
+import com.yigongbao.module.system.role.entity.RoleEntity;
+import com.yigongbao.module.system.role.service.RoleService;
+import com.yigongbao.module.system.user.convert.UserConvert;
+import com.yigongbao.module.system.user.dto.CreateUserDTO;
+import com.yigongbao.module.system.user.dto.ResetPasswordDTO;
+import com.yigongbao.module.system.user.dto.UpdateUserDTO;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.system.user.service.UserService;
+import com.yigongbao.module.system.user.vo.UserVO;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.util.Objects;
+
+/**
+ * 用户 Service 实现类
+ * 处理用户相关的业务逻辑，包括用户CRUD、密码管理等
+ *
+ * @author hanjor
+ * @date 2026-03-17
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> implements UserService {
+
+    private final OrgService orgService;
+    private final DeptService deptService;
+    private final RoleService roleService;
+    private final PasswordEncoder passwordEncoder;
+
+    /**
+     * 分页查询用户列表
+     */
+    @Override
+    public IPage<UserVO> listUser(Integer pageNum, Integer pageSize, String username, String realName,
+                                   Long orgId, Long deptId, Integer accountType, Integer status) {
+        log.info("分页查询用户列表，pageNum={}, pageSize={}, username={}, realName={}, orgId={}, deptId={}, accountType={}, status={}",
+                pageNum, pageSize, username, realName, orgId, deptId, accountType, status);
+        try {
+            Page<UserEntity> page = new Page<>(pageNum, pageSize);
+            LambdaQueryWrapper<UserEntity> wrapper = new LambdaQueryWrapper<>();
+            wrapper.like(StringUtils.hasText(username), UserEntity::getUsername, username)
+                    .like(StringUtils.hasText(realName), UserEntity::getRealName, realName)
+                    .eq(Objects.nonNull(orgId), UserEntity::getOrgId, orgId)
+                    .eq(Objects.nonNull(deptId), UserEntity::getDeptId, deptId)
+                    .eq(Objects.nonNull(accountType), UserEntity::getAccountType, accountType)
+                    .eq(Objects.nonNull(status), UserEntity::getStatus, status)
+                    .orderByDesc(UserEntity::getCreateTime);
+            IPage<UserEntity> pageResult = page(page, wrapper);
+            IPage<UserVO> voPage = pageResult.convert(this::toVOWithNames);
+            log.info("分页查询用户列表成功，总数={}", pageResult.getTotal());
+            return voPage;
+        } catch (Exception e) {
+            log.error("分页查询用户列表异常", e);
+            throw e;
+        }
+    }
+
+    /**
+     * 根据ID查询用户详情
+     */
+    @Override
+    public UserVO getUserById(Long id) {
+        log.info("根据ID查询用户详情，id={}", id);
+        try {
+            UserEntity entity = getById(id);
+            if (entity == null) {
+                log.warn("用户不存在，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+            }
+            UserVO vo = toVOWithNames(entity);
+            log.info("查询用户详情成功，id={}", id);
+            return vo;
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("查询用户详情异常，id={}", id, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 创建用户
+     */
+    private static final String DEFAULT_PASSWORD = "123456";
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void createUser(CreateUserDTO dto) {
+        log.info("创建用户，username={}, orgId={}", dto.getUsername(), dto.getOrgId());
+        try {
+            // 校验用户名是否已存在
+            if (isUsernameExists(dto.getUsername())) {
+                log.warn("用户名已存在，username={}", dto.getUsername());
+                throw new BusinessException(ErrorCodeEnum.USER_EXISTS);
+            }
+            // 校验手机号是否已存在
+            if (isPhoneExists(dto.getPhone())) {
+                log.warn("手机号已存在，phone={}", dto.getPhone());
+                throw new BusinessException(ErrorCodeEnum.USER_PHONE_EXISTS);
+            }
+            // 校验所属机构是否存在
+            if (dto.getOrgId() != null) {
+                OrgEntity orgEntity = orgService.getById(dto.getOrgId());
+                if (orgEntity == null) {
+                    log.warn("所属机构不存在，orgId={}", dto.getOrgId());
+                    throw new BusinessException(ErrorCodeEnum.USER_ORG_NOT_FOUND);
+                }
+            }
+            // 校验所属部门是否存在
+            if (dto.getDeptId() != null) {
+                DeptEntity deptEntity = deptService.getById(dto.getDeptId());
+                if (deptEntity == null) {
+                    log.warn("所属部门不存在，deptId={}", dto.getDeptId());
+                    throw new BusinessException(ErrorCodeEnum.USER_DEPT_NOT_FOUND);
+                }
+            }
+            // 校验角色是否存在
+            if (dto.getRoleId() != null) {
+                RoleEntity roleEntity = roleService.getById(dto.getRoleId());
+                if (roleEntity == null) {
+                    log.warn("角色不存在，roleId={}", dto.getRoleId());
+                    throw new BusinessException(ErrorCodeEnum.USER_ROLE_NOT_FOUND);
+                }
+            }
+            // DTO转换为实体对象
+            UserEntity entity = UserConvert.toEntity(dto);
+            // 密码加密存储（如果未提供密码则使用默认密码）
+            String rawPassword = StringUtils.hasText(dto.getPassword()) ? dto.getPassword() : DEFAULT_PASSWORD;
+            entity.setPassword(passwordEncoder.encode(rawPassword));
+            entity.setStatus(StatusConstants.NORMAL);
+            // 插入数据库
+            save(entity);
+            log.info("创建用户成功，id={}, username={}", entity.getId(), dto.getUsername());
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("创建用户异常，username={}", dto.getUsername(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * 更新用户
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateUser(Long id, UpdateUserDTO dto) {
+        log.info("更新用户，id={}", id);
+        try {
+            // 校验用户是否存在
+            UserEntity entity = getById(id);
+            if (entity == null) {
+                log.warn("用户不存在，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+            }
+            // 校验手机号是否与其他用户重复
+            if (StringUtils.hasText(dto.getPhone()) && !dto.getPhone().equals(entity.getPhone())) {
+                if (isPhoneExistsExcludingId(dto.getPhone(), id)) {
+                    log.warn("手机号已存在，phone={}", dto.getPhone());
+                    throw new BusinessException(ErrorCodeEnum.USER_PHONE_EXISTS);
+                }
+            }
+            // 校验所属机构是否存在
+            if (dto.getOrgId() != null && !dto.getOrgId().equals(entity.getOrgId())) {
+                OrgEntity orgEntity = orgService.getById(dto.getOrgId());
+                if (orgEntity == null) {
+                    log.warn("所属机构不存在，orgId={}", dto.getOrgId());
+                    throw new BusinessException(ErrorCodeEnum.USER_ORG_NOT_FOUND);
+                }
+            }
+            // 校验所属部门是否存在
+            if (dto.getDeptId() != null && !dto.getDeptId().equals(entity.getDeptId())) {
+                DeptEntity deptEntity = deptService.getById(dto.getDeptId());
+                if (deptEntity == null) {
+                    log.warn("所属部门不存在，deptId={}", dto.getDeptId());
+                    throw new BusinessException(ErrorCodeEnum.USER_DEPT_NOT_FOUND);
+                }
+            }
+            // 校验角色是否存在
+            if (dto.getRoleId() != null && !dto.getRoleId().equals(entity.getRoleId())) {
+                RoleEntity roleEntity = roleService.getById(dto.getRoleId());
+                if (roleEntity == null) {
+                    log.warn("角色不存在，roleId={}", dto.getRoleId());
+                    throw new BusinessException(ErrorCodeEnum.USER_ROLE_NOT_FOUND);
+                }
+            }
+            // 更新用户信息
+            BeanUtils.copyProperties(dto, entity, "id", "username", "password", "createTime", "updateTime", "createBy", "updateBy");
+            updateById(entity);
+            log.info("更新用户成功，id={}", id);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("更新用户异常，id={}", id, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 删除用户
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removeUser(Long id) {
+        log.info("删除用户，id={}", id);
+        try {
+            UserEntity entity = getById(id);
+            if (entity == null) {
+                log.warn("用户不存在，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+            }
+            removeById(id);
+            log.info("删除用户成功，id={}", id);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("删除用户异常，id={}", id, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 修改用户状态
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStatus(Long id, Integer status) {
+        log.info("修改用户状态，id={}, status={}", id, status);
+        try {
+            UserEntity entity = getById(id);
+            if (entity == null) {
+                log.warn("用户不存在，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+            }
+            entity.setStatus(status);
+            updateById(entity);
+            log.info("修改用户状态成功，id={}, status={}", id, status);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("修改用户状态异常，id={}, status={}", id, status, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 重置密码
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetPassword(Long id, ResetPasswordDTO dto) {
+        log.info("重置密码，id={}", id);
+        try {
+            UserEntity entity = getById(id);
+            if (entity == null) {
+                log.warn("用户不存在，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+            }
+            // 使用默认密码 "123456" 进行加密存储
+            entity.setPassword(passwordEncoder.encode("123456"));
+            updateById(entity);
+            log.info("重置密码成功，id={}", id);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("重置密码异常，id={}", id, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 修改密码
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void changePassword(Long id, String oldPassword, String newPassword) {
+        log.info("修改密码，id={}", id);
+        try {
+            UserEntity entity = getById(id);
+            if (entity == null) {
+                log.warn("用户不存在，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+            }
+            // 校验旧密码是否正确
+            if (!passwordEncoder.matches(oldPassword, entity.getPassword())) {
+                log.warn("旧密码不正确，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.OLD_PASSWORD_ERROR);
+            }
+            // 更新密码
+            entity.setPassword(passwordEncoder.encode(newPassword));
+            updateById(entity);
+            log.info("修改密码成功，id={}", id);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("修改密码异常，id={}", id, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 用户自更新（仅允许修改手机号和头像）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateUserBySelf(Long id, com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO dto) {
+        log.info("用户自更新信息，id={}", id);
+        try {
+            UserEntity entity = getById(id);
+            if (entity == null) {
+                log.warn("用户不存在，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+            }
+            // 校验手机号是否与其他用户重复
+            if (dto.getPhone() != null && !dto.getPhone().equals(entity.getPhone())) {
+                if (isPhoneExistsExcludingId(dto.getPhone(), id)) {
+                    log.warn("手机号已存在，phone={}", dto.getPhone());
+                    throw new BusinessException(ErrorCodeEnum.USER_PHONE_EXISTS);
+                }
+            }
+            // 只更新手机号和头像
+            if (dto.getPhone() != null) {
+                entity.setPhone(dto.getPhone());
+            }
+            if (dto.getAvatar() != null) {
+                entity.setAvatar(dto.getAvatar());
+            }
+            updateById(entity);
+            log.info("用户自更新成功，id={}", id);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("用户自更新异常，id={}", id, e);
+            throw e;
+        }
+    }
+
+    // ==================== 私有方法 ====================
+
+    /**
+     * 转换为VO并填充关联名称
+     */
+    private UserVO toVOWithNames(UserEntity entity) {
+        UserVO vo = UserConvert.toVO(entity);
+        if (vo == null) {
+            return null;
+        }
+        // 填充机构名称
+        if (vo.getOrgId() != null) {
+            OrgEntity orgEntity = orgService.getById(vo.getOrgId());
+            if (orgEntity != null) {
+                vo.setOrgName(orgEntity.getOrgName());
+            }
+        }
+        // 填充部门名称
+        if (vo.getDeptId() != null) {
+            DeptEntity deptEntity = deptService.getById(vo.getDeptId());
+            if (deptEntity != null) {
+                vo.setDeptName(deptEntity.getDeptName());
+            }
+        }
+        // 填充角色名称
+        if (vo.getRoleId() != null) {
+            RoleEntity roleEntity = roleService.getById(vo.getRoleId());
+            if (roleEntity != null) {
+                vo.setRoleName(roleEntity.getRoleName());
+            }
+        }
+        // 填充状态名称
+        if (vo.getStatus() != null) {
+            vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
+        }
+        // 填充性别名称
+        if (vo.getSex() != null) {
+            vo.setSexName(StatusConstants.getSexName(vo.getSex()));
+        }
+        // 填充账户分类名称
+        if (vo.getAccountType() != null) {
+            vo.setAccountTypeName(StatusConstants.getAccountTypeName(vo.getAccountType()));
+        }
+        return vo;
+    }
+
+    /**
+     * 校验用户名是否存在
+     */
+    private boolean isUsernameExists(String username) {
+        return count(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getUsername, username)) > 0;
+    }
+
+    /**
+     * 校验手机号是否存在
+     */
+    private boolean isPhoneExists(String phone) {
+        return count(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getPhone, phone)) > 0;
+    }
+
+    /**
+     * 校验手机号是否存在（排除指定ID）
+     */
+    private boolean isPhoneExistsExcludingId(String phone, Long excludeId) {
+        return count(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getPhone, phone)
+                .ne(UserEntity::getId, excludeId)) > 0;
+    }
+}

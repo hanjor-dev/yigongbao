@@ -64,7 +64,39 @@ INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, so
 (41, 40, '5.1', '医疗器械', '1', 2, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
 (42, 40, '5.2', '医用耗材', '2', 2, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
 (43, 40, '5.3', '药品', '3', 2, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
-(44, 40, '5.4', '设备维修', '4', 2, 4, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0);
+(44, 40, '5.4', '设备维修', '4', 2, 4, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+
+-- 账户分类（dict_code=6）
+(60, 0, '6', '账户分类', NULL, 1, 5, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(61, 60, '6.1', '内部用户', '1', 2, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(62, 60, '6.2', '外部用户', '2', 2, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+
+-- 专业方向（dict_code=7，按人体部位划分）
+(70, 0, '7', '专业方向', NULL, 1, 6, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+-- 头部方向
+(71, 70, '7.1', '头部方向', '1', 2, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(72, 71, '7.1.1', '口腔修复', '1_1', 3, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(73, 71, '7.1.2', '口腔种植', '1_2', 3, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(74, 71, '7.1.3', '正畸', '1_3', 3, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(75, 71, '7.1.4', '口腔综合', '1_4', 3, 4, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(76, 71, '7.1.5', '口腔颌面外科', '1_5', 3, 5, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+-- 四肢方向
+(77, 70, '7.2', '四肢方向', '2', 2, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(78, 77, '7.2.1', '骨科', '2_1', 3, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(79, 77, '7.2.2', '康复医学', '2_2', 3, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(80, 77, '7.2.3', '运动医学', '2_3', 3, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+-- 脊椎方向
+(81, 70, '7.3', '脊椎方向', '3', 2, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(82, 81, '7.3.1', '脊柱外科', '3_1', 3, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(83, 81, '7.3.2', '神经外科', '3_2', 3, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+-- 其他
+(89, 70, '7.99', '其他', '99', 2, 99, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+
+-- 结算类型（dict_code=8）
+(90, 0, '8', '结算类型', NULL, 1, 7, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(91, 90, '8.1', '预付费', '1', 2, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(92, 90, '8.2', '后付费', '2', 2, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(93, 90, '8.3', '月结', '3', 2, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0);
 
 -- ------------------------------------------------------------
 -- 测试表
@@ -206,3 +238,96 @@ INSERT INTO sys_dept (id, dept_name, dept_code, org_id, leader_user_id, status, 
 (2, '市场部', 'DEPT-002', 1, NULL, 1, '市场部门', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
 (3, '销售部', 'DEPT-003', 2, NULL, 1, '销售部门', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
 (4, '已禁用部门', 'DEPT-004', 1, NULL, 0, '已禁用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+
+-- ------------------------------------------------------------
+-- 角色表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_role;
+CREATE TABLE sys_role (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    role_name           VARCHAR(64)     NOT NULL COMMENT '角色名称',
+    role_code           VARCHAR(32)     NOT NULL COMMENT '角色编码',
+    role_desc           VARCHAR(256)    COMMENT '角色描述',
+    account_type        TINYINT         NOT NULL COMMENT '账户分类',
+    data_scope          TINYINT         DEFAULT 1 COMMENT '数据范围',
+    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark              VARCHAR(512)    COMMENT '备注说明',
+
+    -- 通用字段
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_role_code (role_code),
+    KEY idx_role_account_type (account_type),
+    KEY idx_role_status (status)
+);
+
+-- 插入角色测试数据
+INSERT INTO sys_role (id, role_name, role_code, role_desc, account_type, data_scope, status, remark, create_time, update_time, is_deleted) VALUES
+(1, '公司管理员', 'ROLE_ADMIN', '系统管理员，拥有全部系统功能', 1, 1, 1, '适用于生产企业', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, '设计师', 'ROLE_DESIGNER', '负责设计工作', 1, 2, 1, '适用于生产企业', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, '生产员', 'ROLE_PRODUCTION', '负责生产加工', 1, 2, 1, '适用于生产企业', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(4, '业务员', 'ROLE_SALES', '负责订单开拓、客户维护', 1, 3, 1, '适用于经销商', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(5, '医生', 'ROLE_DOCTOR', '医生、查看数据', 1, 3, 1, '适用于医疗机构', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(6, '机构管理员', 'ROLE_ORG_ADMIN', '外部机构的管理员', 2, 2, 1, '适用于外部用户', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(7, '机构用户', 'ROLE_ORG_USER', '外部机构普通用户', 2, 3, 1, '适用于外部用户', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(8, '已禁用角色', 'ROLE_DISABLED', '已禁用角色', 1, 1, 0, '测试用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+
+-- ------------------------------------------------------------
+-- 用户表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_user;
+CREATE TABLE sys_user (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    username            VARCHAR(32)     NOT NULL COMMENT '用户名（登录账号）',
+    password            VARCHAR(128)    NOT NULL COMMENT '登录密码（BCrypt加密）',
+    real_name           VARCHAR(32)     NOT NULL COMMENT '真实姓名',
+    phone               VARCHAR(20)     NOT NULL COMMENT '手机号',
+    email               VARCHAR(64)     COMMENT '邮箱',
+    sex                 TINYINT         COMMENT '性别',
+    avatar              VARCHAR(512)    COMMENT '头像路径',
+    account_type        TINYINT         NOT NULL COMMENT '账户分类（1=内部用户，2=外部用户）',
+    org_id              BIGINT          NOT NULL COMMENT '所属机构ID',
+    dept_id             BIGINT          COMMENT '所属部门ID',
+    role_id             BIGINT          COMMENT '关联角色ID',
+
+    -- 扩展字段
+    employee_no         VARCHAR(32)     COMMENT '工号',
+    specialty           VARCHAR(64)     COMMENT '专业方向',
+    qualification       VARCHAR(256)    COMMENT '资质证书信息',
+    settlement_type     TINYINT         COMMENT '结算类型',
+
+    -- 状态
+    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark              VARCHAR(512)    COMMENT '备注说明',
+
+    -- 通用字段
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_username (username),
+    UNIQUE KEY uk_phone (phone),
+    KEY idx_user_org_id (org_id),
+    KEY idx_user_dept_id (dept_id),
+    KEY idx_user_role_id (role_id),
+    KEY idx_user_account_type (account_type),
+    KEY idx_user_status (status)
+);
+
+-- 插入用户测试数据（密码均为 bcrypt 加密后的 "123456"）
+-- bcrypt 加密：$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi
+INSERT INTO sys_user (id, username, password, real_name, phone, email, sex, avatar, account_type, org_id, dept_id, role_id, employee_no, specialty, qualification, settlement_type, status, remark, create_time, update_time, is_deleted) VALUES
+(1, 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '系统管理员', '13800000001', 'admin@test.com', 1, NULL, 1, 1, NULL, 1, 'A001', '7.1.1', '高级工程师', 3, 1, '测试管理员', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 'designer1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '设计师张三', '13800000002', 'designer@test.com', 1, NULL, 1, 1, 1, 2, 'D001', '7.1.2', '口腔修复专家', 1, 1, '设计师用户', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 'sales1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '业务员李四', '13800000003', 'sales@test.com', 1, NULL, 1, 2, NULL, 4, 'S001', NULL, NULL, 2, 1, '经销商业务员', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(4, 'doctor1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '医生王五', '13800000004', 'doctor@test.com', 1, NULL, 1, 1, NULL, 5, 'DOC001', '7.1.3', '正畸主治医师', 3, 1, '医院医生', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(5, 'org_admin1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '机构管理员', '13800000005', 'orgadmin@test.com', 2, NULL, 2, 1, NULL, 6, NULL, NULL, NULL, NULL, 1, '外部机构管理员', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(6, 'disabled_user', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '已禁用用户', '13800000006', 'disabled@test.com', 1, NULL, 1, 1, NULL, 1, NULL, NULL, NULL, NULL, 0, '已禁用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);

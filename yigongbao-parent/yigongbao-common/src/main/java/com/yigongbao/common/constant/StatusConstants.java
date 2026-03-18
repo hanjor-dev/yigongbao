@@ -71,15 +71,79 @@ public final class StatusConstants {
     public static final String DISABLED_NAME = "禁用";
 
     /**
-     * 根据状态值获取状态名称
+     * 根据状态值获取显示名称
      *
-     * @param status 状态值
-     * @return 状态名称
+     * @param status 状态值（0-禁用，1-正常）
+     * @return 状态显示名称
      */
     public static String getStatusName(Integer status) {
         if (status == null) {
             return "";
         }
         return status == NORMAL ? NORMAL_NAME : DISABLED_NAME;
+    }
+
+    // ==================== 账户分类 ====================
+
+    /**
+     * 账户分类-内部用户
+     */
+    public static final int ACCOUNT_TYPE_INTERNAL = 1;
+
+    /**
+     * 账户分类-外部用户
+     */
+    public static final int ACCOUNT_TYPE_EXTERNAL = 2;
+
+    /**
+     * 账户分类-内部用户名称
+     */
+    public static final String ACCOUNT_TYPE_INTERNAL_NAME = "内部用户";
+
+    /**
+     * 账户分类-外部用户名称
+     */
+    public static final String ACCOUNT_TYPE_EXTERNAL_NAME = "外部用户";
+
+    /**
+     * 根据账户分类值获取名称
+     */
+    public static String getAccountTypeName(Integer accountType) {
+        if (accountType == null) {
+            return "";
+        }
+        return accountType == ACCOUNT_TYPE_INTERNAL ? ACCOUNT_TYPE_INTERNAL_NAME : ACCOUNT_TYPE_EXTERNAL_NAME;
+    }
+
+    // ==================== 性别 ====================
+
+    /**
+     * 性别-男
+     */
+    public static final int SEX_MALE = 1;
+
+    /**
+     * 性别-女
+     */
+    public static final int SEX_FEMALE = 0;
+
+    /**
+     * 性别-男名称
+     */
+    public static final String SEX_MALE_NAME = "男";
+
+    /**
+     * 性别-女名称
+     */
+    public static final String SEX_FEMALE_NAME = "女";
+
+    /**
+     * 根据性别值获取名称
+     */
+    public static String getSexName(Integer sex) {
+        if (sex == null) {
+            return "";
+        }
+        return sex == SEX_MALE ? SEX_MALE_NAME : SEX_FEMALE_NAME;
     }
 }

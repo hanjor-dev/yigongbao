@@ -16,6 +16,8 @@ import com.yigongbao.module.system.dept.service.DeptService;
 import com.yigongbao.module.system.dept.vo.DeptVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -38,6 +40,7 @@ import java.util.Objects;
 public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> implements DeptService {
 
     private final OrgService orgService;
+    private final UserService userService;
 
     /**
      * 分页查询部门列表
@@ -191,11 +194,11 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                 log.warn("部门不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DEPT_NOT_FOUND);
             }
-            // TODO: 校验该部门下是否有用户（待用户模块开发完成后实现）
-            // if (hasUsers(id)) {
-            //     log.warn("该部门下存在用户，无法删除，id={}", id);
-            //     throw new BusinessException(ErrorCodeEnum.DEPT_HAS_USERS);
-            // }
+            // 校验该部门下是否有用户
+            if (hasUsers(id)) {
+                log.warn("该部门下存在用户，无法删除，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.DEPT_HAS_USERS);
+            }
             // 逻辑删除
             removeById(id);
             log.info("删除部门成功，id={}", id);
@@ -260,13 +263,13 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
         if (vo.getStatus() != null) {
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
-        // TODO: 填充部门负责人姓名（待用户模块开发完成后实现）
-        // if (vo.getLeaderUserId() != null) {
-        //     UserEntity userEntity = userService.getById(vo.getLeaderUserId());
-        //     if (userEntity != null) {
-        //         vo.setLeaderUserName(userEntity.getRealName());
-        //     }
-        // }
+        // 填充部门负责人姓名
+        if (vo.getLeaderUserId() != null) {
+            UserEntity userEntity = userService.getById(vo.getLeaderUserId());
+            if (userEntity != null) {
+                vo.setLeaderUserName(userEntity.getRealName());
+            }
+        }
         return vo;
     }
 
@@ -324,5 +327,16 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
         }
         // 生成新编码
         return prefix + String.format("%03d", maxSeq + 1);
+    }
+
+    /**
+     * 校验该部门下是否有用户
+     *
+     * @param deptId 部门ID
+     * @return true-有用户，false-无用户
+     */
+    private boolean hasUsers(Long deptId) {
+        return userService.count(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getDeptId, deptId)) > 0;
     }
 }

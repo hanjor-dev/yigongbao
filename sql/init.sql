@@ -72,6 +72,60 @@ VALUES
 (23, 20, '5.3', '耗材', 'consumable', 2, 3, 1),
 (24, 20, '5.4', '设备', 'equipment', 2, 4, 1);
 
+-- ------------------------------------------------------------
+-- 账户分类（父节点）
+-- ------------------------------------------------------------
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
+VALUES (25, 0, '6', '账户分类', NULL, 1, 6, 1);
+
+-- 账户分类（子节点）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
+VALUES
+(26, 25, '6.1', '内部用户', '1', 2, 1, 1),
+(27, 25, '6.2', '外部用户', '2', 2, 2, 1);
+
+-- ------------------------------------------------------------
+-- 专业方向（父节点）
+-- ------------------------------------------------------------
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
+VALUES (28, 0, '7', '专业方向', NULL, 1, 7, 1);
+
+-- 专业方向（子节点）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
+VALUES
+(29, 28, '7.1', '头部方向', '1', 2, 1, 1),
+(30, 28, '7.2', '颈部方向', '2', 2, 2, 1),
+(31, 28, '7.3', '胸部方向', '3', 2, 3, 1),
+(32, 28, '7.4', '腹部方向', '4', 2, 4, 1),
+(33, 28, '7.5', '四肢方向', '5', 2, 5, 1),
+(34, 28, '7.6', '背部方向', '6', 2, 6, 1),
+(35, 28, '7.7', '其他', '7', 2, 7, 1);
+
+-- ------------------------------------------------------------
+-- 结算类型（父节点）
+-- ------------------------------------------------------------
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
+VALUES (36, 0, '8', '结算类型', NULL, 1, 8, 1);
+
+-- 结算类型（子节点）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
+VALUES
+(37, 36, '8.1', '月薪制', '1', 2, 1, 1),
+(38, 36, '8.2', '提成制', '2', 2, 2, 1),
+(39, 36, '8.3', '混合制', '3', 2, 3, 1);
+
+-- ------------------------------------------------------------
+-- 性别（父节点）
+-- ------------------------------------------------------------
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
+VALUES (40, 0, '9', '性别', NULL, 1, 9, 1);
+
+-- 性别（子节点）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
+VALUES
+(41, 40, '9.1', '男', '1', 2, 1, 1),
+(42, 40, '9.2', '女', '0', 2, 2, 1);
+
 -- ============================================================
 -- 地区数据（sys_area）导入说明
 -- 表结构与 https://github.com/kakuilan/china_area_mysql 的 cnarea_2023 兼容

@@ -129,3 +129,77 @@ CREATE TABLE sys_dept (
     KEY idx_dept_org_id (org_id),
     KEY idx_dept_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='部门表';
+
+
+-- ------------------------------------------------------------
+-- 角色表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_role;
+CREATE TABLE sys_role (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    role_name           VARCHAR(64)     NOT NULL COMMENT '角色名称',
+    role_code           VARCHAR(32)     NOT NULL COMMENT '角色编码',
+    role_desc           VARCHAR(256)    COMMENT '角色描述',
+    account_type        TINYINT         NOT NULL COMMENT '账户分类（关联字典编码=6）',
+    data_scope          TINYINT         DEFAULT 1 COMMENT '数据范围（1=全部数据，2=本机构，3=仅自己，4=医院范围，5=部门范围）',
+    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark              VARCHAR(512)    COMMENT '备注说明',
+
+    -- 通用字段
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_role_code (role_code),
+    KEY idx_role_account_type (account_type),
+    KEY idx_role_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表';
+
+
+-- ------------------------------------------------------------
+-- 用户表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_user;
+CREATE TABLE sys_user (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    username            VARCHAR(32)     NOT NULL COMMENT '用户名（登录账号）',
+    password            VARCHAR(128)    NOT NULL COMMENT '登录密码（BCrypt加密）',
+    real_name           VARCHAR(32)     NOT NULL COMMENT '真实姓名',
+    phone               VARCHAR(20)     NOT NULL COMMENT '手机号',
+    email               VARCHAR(64)     COMMENT '邮箱',
+    sex                 TINYINT         COMMENT '性别（关联字典编码=2）',
+    avatar              VARCHAR(512)    COMMENT '头像路径',
+    account_type        TINYINT         NOT NULL COMMENT '账户分类（关联字典编码=6）',
+    org_id              BIGINT          NOT NULL COMMENT '所属机构ID（关联sys_org表）',
+    dept_id             BIGINT          COMMENT '所属部门ID（关联sys_dept表）',
+    role_id             BIGINT          COMMENT '关联角色ID（关联sys_role表）',
+
+    -- 扩展字段
+    employee_no         VARCHAR(32)     COMMENT '工号',
+    specialty           VARCHAR(64)     COMMENT '专业方向（关联字典编码=7）',
+    qualification       VARCHAR(256)    COMMENT '资质证书信息',
+    settlement_type     TINYINT         COMMENT '结算类型（关联字典编码=8）',
+
+    -- 状态
+    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark              VARCHAR(512)    COMMENT '备注说明',
+
+    -- 通用字段
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_username (username),
+    UNIQUE KEY uk_phone (phone),
+    KEY idx_user_org_id (org_id),
+    KEY idx_user_dept_id (dept_id),
+    KEY idx_user_role_id (role_id),
+    KEY idx_user_account_type (account_type),
+    KEY idx_user_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
