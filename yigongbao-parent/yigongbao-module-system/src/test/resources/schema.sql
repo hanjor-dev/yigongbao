@@ -335,3 +335,42 @@ INSERT INTO sys_user (id, username, password, real_name, phone, email, sex, avat
 (4, 'doctor1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '医生王五', '13800000004', 'doctor@test.com', 1, NULL, 1, 1, '测试医疗机构', NULL, NULL, 5, '医生', 'doctor', 'DOC001', '7.1.3', '正畸主治医师', 3, 1, '医院医生', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
 (5, 'org_admin1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '机构管理员', '13800000005', 'orgadmin@test.com', 2, NULL, 2, 1, '测试医疗机构', NULL, NULL, 6, '外部管理员', 'org_admin', NULL, NULL, NULL, NULL, 1, '外部机构管理员', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
 (6, 'disabled_user', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '已禁用用户', '13800000006', 'disabled@test.com', 1, NULL, 1, 1, '测试医疗机构', NULL, NULL, 1, '超级管理员', 'admin', NULL, NULL, NULL, NULL, 0, '已禁用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+
+-- ------------------------------------------------------------
+-- 系统配置表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_config;
+CREATE TABLE sys_config (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    config_key      VARCHAR(64)     NOT NULL COMMENT '配置键',
+    config_name     VARCHAR(128)    NOT NULL COMMENT '配置名称',
+    config_value    TEXT            COMMENT '配置值',
+    config_type     VARCHAR(32)     DEFAULT 'string' COMMENT '配置类型（string/number/boolean/json）',
+    config_group    VARCHAR(32)     DEFAULT 'system' COMMENT '配置分组（system/security/other）',
+    config_desc     VARCHAR(256)    COMMENT '配置说明',
+    is_system       TINYINT         DEFAULT 0 COMMENT '是否系统内置（0=否，1=是）',
+    is_public       TINYINT         DEFAULT 1 COMMENT '是否公开（0=私密，1=公开）',
+    sort            INT             DEFAULT 0 COMMENT '排序',
+    status          TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+
+    -- 通用字段
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by       BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_config_key (config_key),
+    KEY idx_config_group (config_group),
+    KEY idx_config_type (config_type),
+    KEY idx_config_status (status)
+);
+
+-- 插入系统配置测试数据
+INSERT INTO sys_config (id, config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status, create_time, update_time, is_deleted) VALUES
+(1, 'default.password', '默认密码', '123456', 'string', 'security', '新用户初始密码', 1, 0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 'login.max.failures', '最大连续登录失败次数', '5', 'number', 'security', '连续失败后锁定账号', 1, 0, 2, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 'login.lock.duration', '登录锁定时长', '15', 'number', 'security', '自动解锁时间（分钟）', 1, 0, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(4, 'sms.send.interval', '短信发送间隔', '60', 'number', 'security', '同一手机号发送间隔（秒）', 1, 0, 4, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(5, 'test.config', '测试配置', 'testValue', 'string', 'system', '测试用配置', 0, 1, 5, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);

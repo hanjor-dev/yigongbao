@@ -4,6 +4,7 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.module.system.basedata.area.service.AreaService;
 import com.yigongbao.module.system.basedata.area.vo.AreaVO;
 import com.yigongbao.module.system.basedata.vo.SelectTreeVO;
+import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +20,25 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * 统一下拉查询 Controller
- * 提供统一的树形结构和下拉选项接口，整合字典和地区数据
+     * 统一下拉查询 Controller
+ * 提供统一的树形结构和下拉选项接口，整合字典、地区、配置分组等数据
+ * <p>
+ * type 类型说明：
+ * <ul>
+ *   <li>tree 接口支持的 type：
+ *     <ul>
+ *       <li>area - 地区树形结构（需传 parentId 参数）</li>
+ *       <li>dict - 字典树形结构（需传 code 参数）</li>
+ *     </ul>
+ *   </li>
+ *   <li>options 接口支持的 type：
+ *     <ul>
+ *       <li>area - 地区下拉选项（需传 parentId 参数）</li>
+ *       <li>dict - 字典下拉选项（需传 code 参数）</li>
+ *       <li>config_group - 配置分组下拉选项（无需额外参数）</li>
+ *     </ul>
+ *   </li>
+ * </ul>
  *
  * @author hanjor
  * @date 2026-03-17
@@ -32,11 +50,16 @@ public class SelectController {
 
     private final AreaService areaService;
     private final DictService dictService;
+    private final ConfigService configService;
 
     /**
      * 获取树形结构
-     * - 地区：/api/system/select/tree?type=area&parentId=0
-     * - 字典：/api/system/select/tree?type=dict&code=user_status
+     * <p>
+     * type 支持的类型：
+     * <ul>
+     *   <li>area - 地区树形结构（需传 parentId 参数，父级ID，默认0）</li>
+     *   <li>dict - 字典树形结构（需传 code 参数，字典编码，如：1、2、3 等）</li>
+     * </ul>
      *
      * @param type 数据类型（area=地区，dict=字典）
      * @param code 字典编码（type=dict时必填）
@@ -69,10 +92,15 @@ public class SelectController {
 
     /**
      * 获取下拉选项（叶子节点）
-     * - 地区：/api/system/select/options?type=area&parentId=1
-     * - 字典：/api/system/select/options?type=dict&code=hospital_level
+     * <p>
+     * type 支持的类型：
+     * <ul>
+     *   <li>area - 地区下拉选项（需传 parentId 参数，父级ID，默认0）</li>
+     *   <li>dict - 字典下拉选项（需传 code 参数，字典编码，如：1、2、3 等）</li>
+     *   <li>config_group - 配置分组下拉选项（预设分组：系统配置、安全配置、其他配置）</li>
+     * </ul>
      *
-     * @param type 数据类型（area=地区，dict=字典）
+     * @param type 数据类型（area=地区，dict=字典，config_group=配置分组）
      * @param code 字典编码（type=dict时必填）
      * @param parentId 父级ID（type=area时必填）
      * @return 下拉选项列表
@@ -97,6 +125,10 @@ public class SelectController {
             }
             List<DictVO> dictOptions = dictService.listOptions(code);
             return Result.success(convertDictToSelectTree(dictOptions));
+        } else if ("config_group".equals(type)) {
+            // 配置分组下拉选项
+            List<SelectTreeVO> configGroups = configService.listConfigGroups();
+            return Result.success(configGroups);
         }
         return Result.error(400, "不支持的数据类型：" + type);
     }

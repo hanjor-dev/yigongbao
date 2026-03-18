@@ -62,7 +62,13 @@ public enum ErrorCodeEnum {
     ROLE_EXISTS(622, "角色编码已存在"),
     ROLE_HAS_USERS(623, "该角色下存在用户，无法删除"),
     ORG_NOT_FOUND_FOR_USER(624, "所属机构不存在"),
-    OLD_PASSWORD_ERROR(625, "旧密码错误");
+    OLD_PASSWORD_ERROR(625, "旧密码错误"),
+
+    // 配置相关 626-629
+    CONFIG_NOT_FOUND(626, "配置不存在"),
+    CONFIG_KEY_EXISTS(627, "配置键已存在"),
+    CONFIG_SYSTEM_NOT_ALLOW_UPDATE(628, "系统内置配置不可修改"),
+    CONFIG_SYSTEM_NOT_ALLOW_DELETE(629, "系统内置配置不可删除");
 
     /**
      * 错误码

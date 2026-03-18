@@ -182,3 +182,34 @@ CREATE TABLE sys_user (
     KEY idx_user_account_type (account_type),
     KEY idx_user_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
+
+-- ------------------------------------------------------------
+-- 系统配置表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_config;
+CREATE TABLE sys_config (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    config_key      VARCHAR(64)     NOT NULL COMMENT '配置键',
+    config_name     VARCHAR(128)    NOT NULL COMMENT '配置名称',
+    config_value    TEXT            COMMENT '配置值',
+    config_type     VARCHAR(32)     DEFAULT 'string' COMMENT '配置类型（string/number/boolean/json）',
+    config_group    VARCHAR(32)     DEFAULT 'system' COMMENT '配置分组（system/security/other）',
+    config_desc     VARCHAR(256)    COMMENT '配置说明',
+    is_system       TINYINT         DEFAULT 0 COMMENT '是否系统内置（0=否，1=是）',
+    is_public       TINYINT         DEFAULT 1 COMMENT '是否公开（0=私密，1=公开）',
+    sort            INT             DEFAULT 0 COMMENT '排序',
+    status          TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+
+    -- 通用字段
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by       BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_config_key (config_key),
+    KEY idx_config_group (config_group),
+    KEY idx_config_type (config_type),
+    KEY idx_config_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表';
