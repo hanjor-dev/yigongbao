@@ -19,3 +19,13 @@ satoken:
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
+# 医工宝自定义配置（测试环境）
+yigongbao:
+  config:
+    default-values:
+      default-password: "123456"
+      login-max-failures: 5
+      login-lock-duration: 15
+      sms-send-interval: 60
+      max-upload-size: 10485760

@@ -76,3 +76,19 @@ sa-token:
   token-style: uuid
   # 是否输出操作日志
   is-log: false
+
+# 医工宝自定义配置
+yigongbao:
+  # 系统配置兜底默认值（当数据库配置不存在或已禁用时使用）
+  config:
+    default-values:
+      # 默认密码
+      default-password: "123456"
+      # 最大连续登录失败次数
+      login-max-failures: 5
+      # 登录锁定时长（分钟）
+      login-lock-duration: 15
+      # 短信发送间隔（秒）
+      sms-send-interval: 60
+      # 文件上传最大大小（字节），默认10MB
+      max-upload-size: 10485760

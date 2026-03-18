@@ -2076,7 +2076,208 @@ CREATE TABLE sys_dept (
 
 ---
 
-**文档版本**：1.6
+## 十六、系统配置使用规范
+
+### 16.1 系统配置概述
+
+项目提供了一套完整的系统配置管理机制，支持通过数据库动态配置业务参数，无需重启服务即可生效。
+
+**核心组件**：
+- `SystemConfigKeyEnum`：系统配置键名枚举，集中管理所有配置键，避免魔法值
+- `ConfigService.getConfigValue(configKey)`：获取配置值方法
+
+### 16.2 配置键定义（SystemConfigKeyEnum）
+
+所有系统配置键必须在 `SystemConfigKeyEnum` 枚举类中定义：
+
+```java
+package com.yigongbao.common.enums;
+
+/**
+ * 系统配置键枚举
+ * 集中管理系统配置键名，避免魔法值和键名不一致问题
+ *
+ * @author hanjor
+ * @date 2026-03-18
+ */
+@Getter
+@AllArgsConstructor
+public enum SystemConfigKeyEnum {
+
+    // ==================== 安全配置 ====================
+    /**
+     * 默认密码
+     * 新用户初始密码
+     */
+    DEFAULT_PASSWORD("default.password", "默认密码"),
+
+    /**
+     * 最大连续登录失败次数
+     * 连续失败后锁定账号
+     */
+    LOGIN_MAX_FAILURES("login.max.failures", "最大连续登录失败次数"),
+
+    // ==================== 系统配置 ====================
+    /**
+     * 系统名称
+     */
+    SYSTEM_NAME("system.name", "系统名称"),
+
+    /**
+     * 文件上传最大大小（字节）
+     */
+    MAX_UPLOAD_SIZE("max.upload.size", "文件上传最大大小");
+
+    /**
+     * 配置键
+     */
+    private final String key;
+
+    /**
+     * 配置名称（用于日志和错误提示）
+     */
+    private final String name;
+}
+```
+
+### 16.3 配置使用方式
+
+在业务代码中获取系统配置值：
+
+```java
+/**
+ * 用户 Service 实现类
+ *
+ * @author hanjor
+ * @date 2026-03-14
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> implements UserService {
+
+    private final ConfigService configService;
+    private final PasswordEncoder passwordEncoder;
+
+    /**
+     * 创建用户
+     *
+     * @param dto 创建参数
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void createUser(CreateUserDTO dto) {
+        // 从系统配置中获取默认密码
+        String configPassword = configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
+        // 如果未配置，则使用默认值
+        String rawPassword = StringUtils.isBlank(configPassword) ? "123456" : configPassword;
+        // 加密密码
+        entity.setPassword(passwordEncoder.encode(rawPassword));
+        // ... 其他逻辑
+    }
+}
+```
+
+### 16.4 配置层级说明
+
+项目中存在两套配置体系，适用于不同场景：
+
+| 配置类型 | 定义位置 | 适用场景 | 示例 |
+|---------|---------|---------|------|
+| 静态配置 | `application.yml` / `@ConfigurationProperties` | 几乎不会变更的配置 | 数据库连接、Redis连接 |
+| 动态配置 | `sys_config` 表 + `SystemConfigKeyEnum` | 需要动态调整的参数 | 默认密码、登录锁定次数、上传文件大小限制 |
+
+**选择原则**：
+- 大多数场景使用静态配置（启动时加载，性能好）
+- 只有需要运行时动态调整的参数才使用动态配置（数据库查询，有性能开销）
+
+---
+
+## 十七、工具类使用规范
+
+### 17.1 Hutool 优先原则
+
+**【强制】项目中默认使用 Hutool 工具库**，Hutool 是 Java 工具库中的首选，只有当 Hutool 无法满足需求时才考虑使用其他工具库。
+
+**为什么选择 Hutool**：
+- 国产开源，中文文档友好
+- 组件丰富，覆盖大多数常用场景
+- 兼容性好，API 设计简洁
+
+### 17.2 常用工具类一览
+
+以下是项目中常用的 Hutool 工具类：
+
+| 工具类 | 用途 | 示例 |
+|-------|------|------|
+| `StrUtil` | 字符串操作 | `StrUtil.isBlank()`, `StrUtil.isNotBlank()` |
+| `CollUtil` | 集合操作 | `CollUtil.isEmpty()`, `CollUtil.isNotEmpty()` |
+| `DateUtil` | 日期操作 | `DateUtil.format()`, `DateUtil.parse()` |
+| `SecureUtil` | 加密解密 | `SecureUtil.md5()`, `SecureUtil.aes()` |
+| `IdUtil` | ID生成 | `IdUtil.fastSimpleUUID()` |
+| `BeanUtil` | Bean转换 | `BeanUtil.copyProperties()` |
+| `Convert` | 类型转换 | `Convert.toInt()`, `Convert.toStr()` |
+| `JSONUtil` | JSON操作 | `JSONUtil.toJsonStr()`, `JSONUtil.parseObj()` |
+| `HttpUtil` | HTTP请求 | `HttpUtil.get()`, `HttpUtil.post()` |
+| `ReUtil` | 正则操作 | `ReUtil.isMatch()`, `ReUtil.get()` |
+
+### 17.3 正确使用示例
+
+```java
+// ✅ 正确：使用 Hutool 工具类
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.date.DateUtil;
+
+// 字符串判空
+if (StrUtil.isBlank(username)) {
+    throw new BusinessException("用户名不能为空");
+}
+
+// 生成UUID
+String uuid = IdUtil.fastSimpleUUID();
+
+// 日期格式化
+String dateStr = DateUtil.format(new Date(), "yyyy-MM-dd HH:mm:ss");
+
+// ❌ 错误：使用 Apache Commons 或其他工具类
+import org.apache.commons.lang3.StringUtils;
+if (StringUtils.isBlank(username)) {
+    // ...
+}
+```
+
+### 17.4 何时使用其他工具库
+
+只有当 Hutool 无法满足需求时，才考虑使用其他工具库：
+
+| 场景 | 推荐工具 | 说明 |
+|-----|---------|------|
+| JSON序列化（特殊场景） | Jackson / Fastjson2 | Hutool JSON 适用于简单场景，复杂序列化使用专用库 |
+| Excel操作 | EasyExcel | Hutool Excel 功能有限，复杂Excel使用 EasyExcel |
+| PDF生成 | iText / Apache PDFBox | 复杂PDF使用专用库 |
+| 模板引擎 | Freemarker / Thymeleaf | 页面渲染使用模板引擎 |
+
+### 17.5 禁止重复造轮子
+
+**【强制】禁止在项目中创建与 Hutool 功能重复的工具类**。
+
+```java
+// ❌ 错误：创建重复的工具类
+public class StringUtil {
+    public static boolean isBlank(String str) {
+        return str == null || str.trim().isEmpty();
+    }
+}
+
+// ✅ 正确：直接使用 Hutool
+import cn.hutool.core.util.StrUtil;
+// 使用 StrUtil.isBlank()
+```
+
+---
+
+**文档版本**：1.7
 **创建日期**：2026-03-14
 **作者**：hanjor
-**最后更新**：2026-03-17
+**最后更新**：2026-03-18

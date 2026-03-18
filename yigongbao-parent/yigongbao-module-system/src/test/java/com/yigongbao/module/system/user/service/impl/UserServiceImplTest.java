@@ -7,7 +7,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.DataScopeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.config.DefaultConfigProperties;
+import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.service.DeptService;
 import com.yigongbao.module.system.org.entity.OrgEntity;
@@ -68,6 +71,12 @@ class UserServiceImplTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private ConfigService configService;
+
+    @Mock
+    private DefaultConfigProperties defaultConfigProperties;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -362,13 +371,46 @@ class UserServiceImplTest {
 
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(orgService.getById(1L)).thenReturn(testOrg);
+        // Mock 配置服务返回默认密码
+        when(configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey())).thenReturn("123456");
         when(passwordEncoder.encode("123456")).thenReturn("$2a$10$encrypted");
         when(userMapper.insert(any(UserEntity.class))).thenReturn(1);
 
         // 执行
         userService.createUser(dtoNoPassword);
 
-        // 断言：验证使用了默认密码
+        // 断言：验证使用了数据库配置密码
+        verify(configService, times(1)).getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
+        verify(passwordEncoder, times(1)).encode("123456");
+        verify(userMapper, times(1)).insert(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("createUser: 密码可选（配置不存在）使用兜底默认值")
+    void createUser_whenConfigNotFound_shouldUseFallbackPassword() {
+        // 准备：不传密码，且配置服务返回 null
+        CreateUserDTO dtoNoPassword = new CreateUserDTO();
+        dtoNoPassword.setUsername("newuser");
+        dtoNoPassword.setRealName("新用户");
+        dtoNoPassword.setPhone("13900000000");
+        dtoNoPassword.setAccountType(1);
+        dtoNoPassword.setOrgId(1L);
+
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        // Mock 配置服务返回 null（配置不存在）
+        when(configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey())).thenReturn(null);
+        // Mock 兜底配置
+        when(defaultConfigProperties.getDefaultPassword()).thenReturn("123456");
+        when(passwordEncoder.encode("123456")).thenReturn("$2a$10$encrypted");
+        when(userMapper.insert(any(UserEntity.class))).thenReturn(1);
+
+        // 执行
+        userService.createUser(dtoNoPassword);
+
+        // 断言：验证使用了兜底默认值
+        verify(configService, times(1)).getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
+        verify(defaultConfigProperties, times(1)).getDefaultPassword();
         verify(passwordEncoder, times(1)).encode("123456");
         verify(userMapper, times(1)).insert(any(UserEntity.class));
     }
@@ -490,6 +532,8 @@ class UserServiceImplTest {
     void resetPassword_shouldSuccess() {
         // 准备
         when(userMapper.selectById(1L)).thenReturn(testEntity);
+        // Mock 配置服务返回默认密码
+        when(configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey())).thenReturn("123456");
         when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("$2a$10$encrypted");
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
@@ -497,6 +541,7 @@ class UserServiceImplTest {
         userService.resetPassword(1L, resetPasswordDTO);
 
         // 断言
+        verify(configService, times(1)).getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
         verify(userMapper, times(1)).updateById(any(UserEntity.class));
     }
 

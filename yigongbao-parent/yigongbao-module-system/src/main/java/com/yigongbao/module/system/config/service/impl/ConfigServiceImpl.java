@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.module.system.config.convert.ConfigConvert;
 import com.yigongbao.module.system.config.dto.CreateConfigDTO;
 import com.yigongbao.module.system.config.dto.UpdateConfigDTO;
@@ -352,5 +353,28 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
 
         // 返回分组列表
         return groups;
+    }
+
+    /**
+     * 根据键名获取配置值
+     * 只返回状态为启用（status=1）的配置值
+     * 如果配置不存在或已禁用，返回 null
+     *
+     * @param configKey 配置键
+     * @return 配置值，如果不存在或已禁用则返回 null
+     */
+    @Override
+    public String getConfigValue(String configKey) {
+        // 记录查询日志
+        log.info("根据键名获取配置值，configKey={}", configKey);
+        // 构建查询条件
+        LambdaQueryWrapper<ConfigEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ConfigEntity::getConfigKey, configKey)
+                // 只查询启用的配置
+                .eq(ConfigEntity::getStatus, StatusConstants.STATUS_ENABLED);
+        // 执行查询
+        ConfigEntity entity = baseMapper.selectOne(wrapper);
+        // 返回配置值（可能为 null）
+        return entity != null ? entity.getConfigValue() : null;
     }
 }

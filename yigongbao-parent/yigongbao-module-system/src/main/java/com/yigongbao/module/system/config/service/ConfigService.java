@@ -88,4 +88,13 @@ public interface ConfigService extends IService<ConfigEntity> {
      * @return 分组列表（label=分组名称，value=分组编码）
      */
     java.util.List<com.yigongbao.module.system.basedata.vo.SelectTreeVO> listConfigGroups();
+
+    /**
+     * 根据键名获取配置值
+     * 如果配置不存在或已禁用，返回 null
+     *
+     * @param configKey 配置键
+     * @return 配置值，如果不存在或已禁用则返回 null
+     */
+    String getConfigValue(String configKey);
 }

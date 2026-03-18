@@ -6,7 +6,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.config.DefaultConfigProperties;
+import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.service.DeptService;
 import com.yigongbao.module.system.org.entity.OrgEntity;
@@ -47,6 +50,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     private final DeptService deptService;
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
+    private final ConfigService configService;
+    private final DefaultConfigProperties defaultConfigProperties;
 
     /**
      * 分页查询用户列表
@@ -101,9 +106,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
     /**
      * 创建用户
+     * 配置键：default.password
      */
-    private static final String DEFAULT_PASSWORD = "123456";
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createUser(CreateUserDTO dto) {
@@ -147,8 +151,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             UserEntity entity = UserConvert.toEntity(dto);
             // 填充冗余字段（通过id查询获取名称）
             fillRedundantFields(entity);
-            // 密码加密存储（如果未提供密码则使用默认密码）
-            String rawPassword = StringUtils.hasText(dto.getPassword()) ? dto.getPassword() : DEFAULT_PASSWORD;
+            // 密码加密存储（如果未提供密码则从系统配置获取默认密码）
+            String rawPassword;
+            if (StringUtils.hasText(dto.getPassword())) {
+                rawPassword = dto.getPassword();
+            } else {
+                // 从系统配置获取默认密码
+                String configPassword = configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
+                rawPassword = StringUtils.hasText(configPassword) ? configPassword : defaultConfigProperties.getDefaultPassword();
+                log.info("使用系统配置默认密码，configKey={}, password={}", SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey(), rawPassword);
+            }
             entity.setPassword(passwordEncoder.encode(rawPassword));
             entity.setStatus(StatusConstants.NORMAL);
             // 插入数据库
@@ -275,6 +287,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
     /**
      * 重置密码
+     * 配置键：default.password
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -286,8 +299,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 log.warn("用户不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
-            // 使用默认密码 "123456" 进行加密存储
-            entity.setPassword(passwordEncoder.encode("123456"));
+            // 从系统配置获取默认密码
+            String configPassword = configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
+            String rawPassword = StringUtils.hasText(configPassword) ? configPassword : defaultConfigProperties.getDefaultPassword();
+            entity.setPassword(passwordEncoder.encode(rawPassword));
             updateById(entity);
             log.info("重置密码成功，id={}", id);
         } catch (BusinessException e) {
