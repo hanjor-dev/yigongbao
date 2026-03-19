@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 角色 VO（视图对象）
@@ -75,4 +76,9 @@ public class RoleVO implements Serializable {
      * 创建时间
      */
     private LocalDateTime createTime;
+
+    /**
+     * 已分配的资源ID列表
+     */
+    private List<Long> resourceIds;
 }

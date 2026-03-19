@@ -91,10 +91,10 @@ public interface ConfigService extends IService<ConfigEntity> {
 
     /**
      * 根据键名获取配置值
-     * 如果配置不存在或已禁用，返回 null
+     * 优先从数据库配置获取，如果不存在或已禁用则使用配置文件中的默认值兜底
      *
      * @param configKey 配置键
-     * @return 配置值，如果不存在或已禁用则返回 null
+     * @return 配置值，兜底值也不可能为 null（除非环境严重异常）
      */
     String getConfigValue(String configKey);
 }

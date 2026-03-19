@@ -148,3 +148,155 @@ INSERT INTO sys_config (config_key, config_name, config_value, config_type, conf
 ('login.max.failures', '最大连续登录失败次数', '5', 'number', 'security', '连续失败后锁定账号', 1, 0, 2, 1),
 ('login.lock.duration', '登录锁定时长', '15', 'number', 'security', '自动解锁时间（分钟）', 1, 0, 3, 1),
 ('sms.send.interval', '短信发送间隔', '60', 'number', 'security', '同一手机号发送间隔（秒）', 1, 0, 4, 1);
+
+
+-- ============================================================
+-- 资源数据初始化（sys_resource）
+-- resource_type: 1=一级菜单, 2=二级菜单, 3=按钮
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 一级菜单
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, redirect, sort, visible, status) VALUES
+(1, 0, '系统管理', 'system', 1, 'Setting', '/system', NULL, '/system/index', 100, 1, 1),
+(2, 0, '权限管理', 'permission', 1, 'Lock', '/permission', NULL, '/permission/index', 90, 1, 1),
+(3, 0, '基础数据', 'basedata', 1, 'Database', '/basedata', NULL, '/basedata/index', 80, 1, 1);
+
+-- ------------------------------------------------------------
+-- 二级菜单（系统管理）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status) VALUES
+(101, 1, '机构管理', 'system:org', 2, 'Office', '/system/org', 'system/org/index', 1, 1, 1),
+(102, 1, '部门管理', 'system:dept', 2, 'Dept', '/system/dept', 'system/dept/index', 2, 1, 1),
+(103, 1, '用户管理', 'system:user', 2, 'User', '/system/user', 'system/user/index', 3, 1, 1),
+(104, 1, '角色管理', 'system:role', 2, 'Role', '/system/role', 'system/role/index', 4, 1, 1);
+
+-- ------------------------------------------------------------
+-- 二级菜单（权限管理）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status) VALUES
+(201, 2, '资源管理', 'permission:resource', 2, 'Menu', '/permission/resource', 'permission/resource/index', 1, 1, 1),
+(202, 2, '登录日志', 'permission:loginlog', 2, 'Log', '/permission/loginlog', 'permission/loginlog/index', 2, 1, 1);
+
+-- ------------------------------------------------------------
+-- 二级菜单（基础数据）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status) VALUES
+(301, 3, '字典管理', 'basedata:dict', 2, 'Dict', '/basedata/dict', 'basedata/dict/index', 1, 1, 1),
+(302, 3, '系统配置', 'basedata:config', 2, 'Config', '/basedata/config', 'basedata/config/index', 2, 1, 1);
+
+-- ------------------------------------------------------------
+-- 按钮权限（机构管理）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
+(1001, 101, '查看机构列表', 'system:org:list', 3, 1, 1, 1),
+(1002, 101, '查看机构详情', 'system:org:detail', 3, 2, 1, 1),
+(1003, 101, '新增机构', 'system:org:add', 3, 3, 1, 1),
+(1004, 101, '编辑机构', 'system:org:edit', 3, 4, 1, 1),
+(1005, 101, '删除机构', 'system:org:delete', 3, 5, 1, 1),
+(1006, 101, '启用/停用机构', 'system:org:status', 3, 6, 1, 1);
+
+-- ------------------------------------------------------------
+-- 按钮权限（部门管理）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
+(1101, 102, '查看部门列表', 'system:dept:list', 3, 1, 1, 1),
+(1102, 102, '查看部门详情', 'system:dept:detail', 3, 2, 1, 1),
+(1103, 102, '新增部门', 'system:dept:add', 3, 3, 1, 1),
+(1104, 102, '编辑部门', 'system:dept:edit', 3, 4, 1, 1),
+(1105, 102, '删除部门', 'system:dept:delete', 3, 5, 1, 1),
+(1106, 102, '启用/停用部门', 'system:dept:status', 3, 6, 1, 1);
+
+-- ------------------------------------------------------------
+-- 按钮权限（用户管理）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
+(1201, 103, '查看用户列表', 'system:user:list', 3, 1, 1, 1),
+(1202, 103, '查看用户详情', 'system:user:detail', 3, 2, 1, 1),
+(1203, 103, '新增用户', 'system:user:add', 3, 3, 1, 1),
+(1204, 103, '编辑用户', 'system:user:edit', 3, 4, 1, 1),
+(1205, 103, '删除用户', 'system:user:delete', 3, 5, 1, 1),
+(1206, 103, '重置密码', 'system:user:reset-password', 3, 6, 1, 1),
+(1207, 103, '修改状态', 'system:user:status', 3, 7, 1, 1),
+(1208, 103, '修改密码', 'system:user:change-password', 3, 8, 1, 1);
+
+-- ------------------------------------------------------------
+-- 按钮权限（角色管理）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
+(1301, 104, '查看角色列表', 'system:role:list', 3, 1, 1, 1),
+(1302, 104, '查看角色详情', 'system:role:detail', 3, 2, 1, 1),
+(1303, 104, '新增角色', 'system:role:add', 3, 3, 1, 1),
+(1304, 104, '编辑角色', 'system:role:edit', 3, 4, 1, 1),
+(1305, 104, '删除角色', 'system:role:delete', 3, 5, 1, 1),
+(1306, 104, '修改状态', 'system:role:status', 3, 6, 1, 1),
+(1307, 104, '分配资源', 'system:role:assign-resource', 3, 7, 1, 1);
+
+-- ------------------------------------------------------------
+-- 按钮权限（资源管理）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
+(1401, 201, '查看资源列表', 'permission:resource:list', 3, 1, 1, 1),
+(1402, 201, '查看资源详情', 'permission:resource:detail', 3, 2, 1, 1),
+(1403, 201, '新增资源', 'permission:resource:add', 3, 3, 1, 1),
+(1404, 201, '编辑资源', 'permission:resource:edit', 3, 4, 1, 1),
+(1405, 201, '删除资源', 'permission:resource:delete', 3, 5, 1, 1);
+
+-- ------------------------------------------------------------
+-- 按钮权限（登录日志）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
+(1501, 202, '查看登录日志', 'permission:loginlog:list', 3, 1, 1, 1),
+(1502, 202, '查看登录详情', 'permission:loginlog:detail', 3, 2, 1, 1),
+(1503, 202, '导出登录日志', 'permission:loginlog:export', 3, 3, 1, 1);
+
+-- ------------------------------------------------------------
+-- 按钮权限（字典管理）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
+(1601, 301, '查看字典列表', 'basedata:dict:list', 3, 1, 1, 1),
+(1602, 301, '查看字典详情', 'basedata:dict:detail', 3, 2, 1, 1),
+(1603, 301, '新增字典', 'basedata:dict:add', 3, 3, 1, 1),
+(1604, 301, '编辑字典', 'basedata:dict:edit', 3, 4, 1, 1),
+(1605, 301, '删除字典', 'basedata:dict:delete', 3, 5, 1, 1);
+
+-- ------------------------------------------------------------
+-- 按钮权限（系统配置）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
+(1701, 302, '查看配置列表', 'basedata:config:list', 3, 1, 1, 1),
+(1702, 302, '查看配置详情', 'basedata:config:detail', 3, 2, 1, 1),
+(1703, 302, '新增配置', 'basedata:config:add', 3, 3, 1, 1),
+(1704, 302, '编辑配置', 'basedata:config:edit', 3, 4, 1, 1),
+(1705, 302, '删除配置', 'basedata:config:delete', 3, 5, 1, 1),
+(1706, 302, '刷新配置', 'basedata:config:refresh', 3, 6, 1, 1);
+
+
+-- ============================================================
+-- 机构基础数据初始化（sys_org）
+-- ------------------------------------------------------------
+INSERT INTO sys_org (id, org_name, org_code, org_type, contact, phone, status) VALUES
+(1, '系统默认机构', 'ORG-DEFAULT', 1, '管理员', '13800000000', 1);
+
+-- ============================================================
+-- 角色基础数据初始化（sys_role）
+-- ------------------------------------------------------------
+INSERT INTO sys_role (id, role_name, role_code, role_desc, account_type, data_scope, status) VALUES
+(1, '超级管理员', 'admin', '系统管理员，拥有全部权限', 1, 1, 1);
+
+-- ============================================================
+-- 用户基础数据初始化（sys_user）
+-- 初始密码为 BCrypt 加密后的 "123456"
+-- $2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi
+-- ------------------------------------------------------------
+INSERT INTO sys_user (id, username, password, real_name, phone, account_type, org_id, role_id, role_name, role_code, status) VALUES
+(1, 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '系统管理员', '13800000000', 1, 1, 1, '超级管理员', 'admin', 1);
+
+-- ============================================================
+-- 角色资源关联数据初始化（sys_role_resource）
+-- ------------------------------------------------------------
+
+-- 超级管理员角色（ROLE_ADMIN）关联所有资源
+INSERT INTO sys_role_resource (role_id, resource_id)
+SELECT 1, id FROM sys_resource;

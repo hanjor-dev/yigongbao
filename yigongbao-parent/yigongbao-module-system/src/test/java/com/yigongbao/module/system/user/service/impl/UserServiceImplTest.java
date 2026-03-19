@@ -9,7 +9,6 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.common.config.DefaultConfigProperties;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.service.DeptService;
@@ -74,9 +73,6 @@ class UserServiceImplTest {
 
     @Mock
     private ConfigService configService;
-
-    @Mock
-    private DefaultConfigProperties defaultConfigProperties;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -388,7 +384,7 @@ class UserServiceImplTest {
     @Test
     @DisplayName("createUser: 密码可选（配置不存在）使用兜底默认值")
     void createUser_whenConfigNotFound_shouldUseFallbackPassword() {
-        // 准备：不传密码，且配置服务返回 null
+        // 准备：不传密码，且配置服务返回兜底默认值（ConfigService 已内置兜底逻辑）
         CreateUserDTO dtoNoPassword = new CreateUserDTO();
         dtoNoPassword.setUsername("newuser");
         dtoNoPassword.setRealName("新用户");
@@ -398,10 +394,8 @@ class UserServiceImplTest {
 
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(orgService.getById(1L)).thenReturn(testOrg);
-        // Mock 配置服务返回 null（配置不存在）
-        when(configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey())).thenReturn(null);
-        // Mock 兜底配置
-        when(defaultConfigProperties.getDefaultPassword()).thenReturn("123456");
+        // ConfigService 在数据库无值时直接返回 DefaultConfigProperties 的兜底值
+        when(configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey())).thenReturn("123456");
         when(passwordEncoder.encode("123456")).thenReturn("$2a$10$encrypted");
         when(userMapper.insert(any(UserEntity.class))).thenReturn(1);
 
@@ -410,7 +404,6 @@ class UserServiceImplTest {
 
         // 断言：验证使用了兜底默认值
         verify(configService, times(1)).getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
-        verify(defaultConfigProperties, times(1)).getDefaultPassword();
         verify(passwordEncoder, times(1)).encode("123456");
         verify(userMapper, times(1)).insert(any(UserEntity.class));
     }

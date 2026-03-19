@@ -54,7 +54,6 @@ public class GlobalExceptionHandler {
      * @return 统一返回结果
      */
     @ExceptionHandler(NotLoginException.class)
-    @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public Result<Void> handleNotLoginException(NotLoginException e) {
         log.warn("未登录：{}", e.getMessage());
         return Result.error(401, "未登录或登录已过期，请重新登录");

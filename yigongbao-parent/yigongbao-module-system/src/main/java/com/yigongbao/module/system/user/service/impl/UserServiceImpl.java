@@ -8,7 +8,6 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.common.config.DefaultConfigProperties;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.service.DeptService;
@@ -51,7 +50,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
     private final ConfigService configService;
-    private final DefaultConfigProperties defaultConfigProperties;
 
     /**
      * 分页查询用户列表
@@ -91,7 +89,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             UserEntity entity = getById(id);
             if (entity == null) {
                 log.warn("用户不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
             UserVO vo = toVOWithNames(entity);
             log.info("查询用户详情成功，id={}", id);
@@ -156,9 +154,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             if (StringUtils.hasText(dto.getPassword())) {
                 rawPassword = dto.getPassword();
             } else {
-                // 从系统配置获取默认密码
-                String configPassword = configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
-                rawPassword = StringUtils.hasText(configPassword) ? configPassword : defaultConfigProperties.getDefaultPassword();
+                // 从系统配置获取默认密码（已内置兜底逻辑，不会返回 null）
+                rawPassword = configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
                 log.info("使用系统配置默认密码，configKey={}, password={}", SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey(), rawPassword);
             }
             entity.setPassword(passwordEncoder.encode(rawPassword));
@@ -186,7 +183,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             UserEntity entity = getById(id);
             if (entity == null) {
                 log.warn("用户不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
             // 校验手机号是否与其他用户重复
             if (StringUtils.hasText(dto.getPhone()) && !dto.getPhone().equals(entity.getPhone())) {
@@ -249,7 +246,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             UserEntity entity = getById(id);
             if (entity == null) {
                 log.warn("用户不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
             removeById(id);
             log.info("删除用户成功，id={}", id);
@@ -272,7 +269,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             UserEntity entity = getById(id);
             if (entity == null) {
                 log.warn("用户不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
             entity.setStatus(status);
             updateById(entity);
@@ -297,11 +294,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             UserEntity entity = getById(id);
             if (entity == null) {
                 log.warn("用户不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
-            // 从系统配置获取默认密码
-            String configPassword = configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
-            String rawPassword = StringUtils.hasText(configPassword) ? configPassword : defaultConfigProperties.getDefaultPassword();
+            // 从系统配置获取默认密码（已内置兜底逻辑，不会返回 null）
+            String rawPassword = configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
             entity.setPassword(passwordEncoder.encode(rawPassword));
             updateById(entity);
             log.info("重置密码成功，id={}", id);
@@ -324,7 +320,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             UserEntity entity = getById(id);
             if (entity == null) {
                 log.warn("用户不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
             // 校验旧密码是否正确
             if (!passwordEncoder.matches(oldPassword, entity.getPassword())) {
@@ -354,7 +350,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             UserEntity entity = getById(id);
             if (entity == null) {
                 log.warn("用户不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
             // 校验手机号是否与其他用户重复
             if (dto.getPhone() != null && !dto.getPhone().equals(entity.getPhone())) {

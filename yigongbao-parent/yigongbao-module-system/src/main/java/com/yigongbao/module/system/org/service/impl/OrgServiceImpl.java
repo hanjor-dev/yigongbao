@@ -17,6 +17,7 @@ import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.mapper.OrgMapper;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.org.vo.OrgVO;
+import com.yigongbao.module.system.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -41,6 +42,7 @@ import java.util.stream.Collectors;
 public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements OrgService {
 
     private final DictService dictService;
+    private final UserMapper userMapper;
 
     /**
      * 分页查询机构列表
@@ -195,11 +197,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                 log.warn("机构不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
             }
-            // TODO: 校验该机构下是否有用户（待用户模块开发完成后实现）
-            // if (hasUsers(id)) {
-            //     log.warn("该机构下存在用户，无法删除，id={}", id);
-            //     throw new BusinessException(ErrorCodeEnum.ORG_HAS_USERS);
-            // }
+            // 校验该机构下是否有用户
+            if (hasUsers(id)) {
+                log.warn("该机构下存在用户，无法删除，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.ORG_HAS_USERS);
+            }
             // 逻辑删除
             removeById(id);
             log.info("删除机构成功，id={}", id);
@@ -386,5 +388,15 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
         }
         // 生成新编码
         return prefix + String.format("%03d", maxSeq + 1);
+    }
+
+    /**
+     * 校验该机构下是否有用户
+     *
+     * @param orgId 机构ID
+     * @return true-有用户，false-无用户
+     */
+    private boolean hasUsers(Long orgId) {
+        return userMapper.countByOrgId(orgId) > 0;
     }
 }

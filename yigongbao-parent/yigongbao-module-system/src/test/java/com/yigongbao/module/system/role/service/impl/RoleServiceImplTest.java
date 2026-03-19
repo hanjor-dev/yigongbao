@@ -13,6 +13,8 @@ import com.yigongbao.module.system.role.dto.UpdateRoleDTO;
 import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.mapper.RoleMapper;
 import com.yigongbao.module.system.role.vo.RoleVO;
+import com.yigongbao.module.system.resource.mapper.RoleResourceMapper;
+import com.yigongbao.module.system.resource.service.ResourceService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +54,12 @@ class RoleServiceImplTest {
 
     @Mock
     private UserMapper userMapper;
+
+    @Mock
+    private ResourceService resourceService;
+
+    @Mock
+    private RoleResourceMapper roleResourceMapper;
 
     @InjectMocks
     private RoleServiceImpl roleService;
@@ -143,6 +151,7 @@ class RoleServiceImplTest {
     void getRoleById_whenExists_shouldReturnData() {
         // 准备
         when(roleMapper.selectById(1L)).thenReturn(testEntity);
+        when(resourceService.getResourceIdsByRoleId(1L)).thenReturn(List.of(101L, 102L));
 
         // 执行
         RoleVO result = roleService.getRoleById(1L);
@@ -151,6 +160,7 @@ class RoleServiceImplTest {
         assertNotNull(result);
         assertEquals(1L, result.getId());
         assertEquals("管理员", result.getRoleName());
+        assertEquals(List.of(101L, 102L), result.getResourceIds());
     }
 
     @Test
@@ -281,6 +291,7 @@ class RoleServiceImplTest {
 
         // 断言
         verify(roleMapper, times(1)).deleteById(1L);
+        verify(roleResourceMapper, times(1)).deleteByRoleId(1L);
     }
 
     @Test

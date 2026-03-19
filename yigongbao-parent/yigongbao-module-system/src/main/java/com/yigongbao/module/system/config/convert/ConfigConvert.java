@@ -5,7 +5,6 @@ import com.yigongbao.module.system.config.dto.UpdateConfigDTO;
 import com.yigongbao.module.system.config.entity.ConfigEntity;
 import com.yigongbao.module.system.config.vo.ConfigVO;
 import org.springframework.beans.BeanUtils;
-import org.springframework.stereotype.Component;
 
 /**
  * 配置 Convert
@@ -13,7 +12,6 @@ import org.springframework.stereotype.Component;
  * @author hanjor
  * @date 2026-03-18
  */
-@Component
 public class ConfigConvert {
 
     /**
@@ -22,7 +20,7 @@ public class ConfigConvert {
      * @param entity 实体
      * @return VO
      */
-    public ConfigVO toVO(ConfigEntity entity) {
+    public static ConfigVO toVO(ConfigEntity entity) {
         if (entity == null) {
             return null;
         }
@@ -37,7 +35,7 @@ public class ConfigConvert {
      * @param dto DTO
      * @return 实体
      */
-    public ConfigEntity toEntity(CreateConfigDTO dto) {
+    public static ConfigEntity toEntity(CreateConfigDTO dto) {
         if (dto == null) {
             return null;
         }
@@ -52,7 +50,7 @@ public class ConfigConvert {
      * @param dto DTO
      * @param entity 实体
      */
-    public void updateEntity(UpdateConfigDTO dto, ConfigEntity entity) {
+    public static void updateEntity(UpdateConfigDTO dto, ConfigEntity entity) {
         if (dto == null || entity == null) {
             return;
         }

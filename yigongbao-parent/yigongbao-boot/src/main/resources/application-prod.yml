@@ -93,10 +93,16 @@ sa-token:
 
 # 医工宝系统配置
 yigongbao:
-  system:
-    # 默认密码（生产环境应使用更复杂的密码）
-    default-password: ${DEFAULT_PASSWORD:}
-    # 文件上传最大大小（字节）
-    max-upload-size: 20971520
-    # 图片上传最大大小（字节）
-    max-image-size: 10485760
+  # 系统配置兜底默认值（当数据库配置不存在或已禁用时使用）
+  config:
+    default-values:
+      # 默认密码
+      default-password: "123456"
+      # 最大连续登录失败次数
+      login-max-failures: 5
+      # 登录锁定时长（分钟）
+      login-lock-duration: 15
+      # 短信发送间隔（秒）
+      sms-send-interval: 60
+      # 文件上传最大大小（字节），默认10MB
+      max-upload-size: 10485760

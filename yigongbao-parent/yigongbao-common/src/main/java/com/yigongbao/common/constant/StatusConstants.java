@@ -24,16 +24,6 @@ public final class StatusConstants {
      */
     public static final int DISABLED = 0;
 
-    /**
-     * 状态-正常（整数值）
-     */
-    public static final int STATUS_ENABLED = 1;
-
-    /**
-     * 状态-禁用（整数值）
-     */
-    public static final int STATUS_DISABLED = 0;
-
     // ==================== 逻辑删除 ====================
 
     /**

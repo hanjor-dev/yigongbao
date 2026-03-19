@@ -39,7 +39,16 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 "/common/**",
                 // 错误页面
                 "/error",
-                "/test/**"
+                "/test/**",
+                // 认证接口（登录、用户信息、登出）
+                "/api/system/auth/login",
+                "/api/system/auth/logout",
+                "/api/system/auth/info",
+                "/api/system/auth/password",
+                // Swagger文档
+                "/doc.html",
+                "/swagger-ui/**",
+                "/v3/api-docs/**"
         );
     }
 }

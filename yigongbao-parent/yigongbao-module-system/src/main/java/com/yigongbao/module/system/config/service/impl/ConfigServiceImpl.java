@@ -5,9 +5,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.yigongbao.common.config.DefaultConfigProperties;
 import com.yigongbao.common.enums.ErrorCodeEnum;
-import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.constant.StatusConstants;
+import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.config.convert.ConfigConvert;
 import com.yigongbao.module.system.config.dto.CreateConfigDTO;
 import com.yigongbao.module.system.config.dto.UpdateConfigDTO;
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> implements ConfigService {
 
-    private final ConfigConvert configConvert;
+    private final DefaultConfigProperties defaultConfigProperties;
 
     /**
      * 分页查询配置列表
@@ -72,7 +73,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
         // 执行分页查询
         IPage<ConfigEntity> pageResult = this.page(page, wrapper);
         // 转换为VO返回
-        return pageResult.convert(configConvert::toVO);
+        return pageResult.convert(ConfigConvert::toVO);
     }
 
     /**
@@ -95,7 +96,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
                 throw new BusinessException(ErrorCodeEnum.CONFIG_NOT_FOUND);
             }
             // 转换为VO对象
-            ConfigVO vo = configConvert.toVO(entity);
+            ConfigVO vo = ConfigConvert.toVO(entity);
             // 记录查询成功
             log.info("查询配置成功，id={}", id);
             return vo;
@@ -132,7 +133,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
                 throw new BusinessException(ErrorCodeEnum.CONFIG_NOT_FOUND);
             }
             // 转换为VO对象
-            ConfigVO vo = configConvert.toVO(entity);
+            ConfigVO vo = ConfigConvert.toVO(entity);
             // 记录查询成功
             log.info("查询配置成功，configKey={}", configKey);
             return vo;
@@ -164,7 +165,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
                 throw new BusinessException(ErrorCodeEnum.CONFIG_KEY_EXISTS);
             }
             // DTO转换为实体对象
-            ConfigEntity entity = configConvert.toEntity(dto);
+            ConfigEntity entity = ConfigConvert.toEntity(dto);
             // 插入数据库
             this.save(entity);
             // 记录创建成功
@@ -205,7 +206,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
                 throw new BusinessException(ErrorCodeEnum.CONFIG_SYSTEM_NOT_ALLOW_UPDATE);
             }
             // 更新配置实体
-            configConvert.updateEntity(dto, entity);
+            ConfigConvert.updateEntity(dto, entity);
             // 更新数据库
             this.updateById(entity);
             // 记录更新成功
@@ -274,7 +275,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
         // 执行查询
         List<ConfigEntity> list = this.list(wrapper);
         // 转换为VO列表返回
-        return list.stream().map(configConvert::toVO).collect(Collectors.toList());
+        return list.stream().map(ConfigConvert::toVO).collect(Collectors.toList());
     }
 
     /**
@@ -298,7 +299,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
         // 执行查询
         List<ConfigEntity> list = this.list(wrapper);
         // 转换为VO列表返回
-        return list.stream().map(configConvert::toVO).collect(Collectors.toList());
+        return list.stream().map(ConfigConvert::toVO).collect(Collectors.toList());
     }
 
     /**
@@ -357,24 +358,58 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
 
     /**
      * 根据键名获取配置值
-     * 只返回状态为启用（status=1）的配置值
-     * 如果配置不存在或已禁用，返回 null
+     * 优先从数据库配置获取，如果不存在或已禁用则使用配置文件中的默认值兜底
+     * 兜底值也不太可能为 null（除非 Spring 容器严重异常）
      *
      * @param configKey 配置键
-     * @return 配置值，如果不存在或已禁用则返回 null
+     * @return 配置值（数据库值或兜底默认值，不为 null）
      */
     @Override
     public String getConfigValue(String configKey) {
-        // 记录查询日志
-        log.info("根据键名获取配置值，configKey={}", configKey);
-        // 构建查询条件
+        log.debug("根据键名获取配置值，configKey={}", configKey);
+        // 1. 查询数据库
         LambdaQueryWrapper<ConfigEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ConfigEntity::getConfigKey, configKey)
-                // 只查询启用的配置
-                .eq(ConfigEntity::getStatus, StatusConstants.STATUS_ENABLED);
-        // 执行查询
+                .eq(ConfigEntity::getStatus, StatusConstants.NORMAL);
         ConfigEntity entity = baseMapper.selectOne(wrapper);
-        // 返回配置值（可能为 null）
-        return entity != null ? entity.getConfigValue() : null;
+
+        // 2. 数据库有值，直接返回
+        if (entity != null && StrUtil.isNotBlank(entity.getConfigValue())) {
+            log.debug("使用数据库配置，configKey={}, value={}", configKey, entity.getConfigValue());
+            return entity.getConfigValue();
+        }
+
+        // 3. 数据库无值，尝试使用兜底默认值
+        String fallbackValue = getFallbackValue(configKey);
+        if (fallbackValue != null) {
+            log.info("数据库配置为空，使用兜底默认值，configKey={}, fallbackValue={}", configKey, fallbackValue);
+            return fallbackValue;
+        }
+
+        // 4. 兜底值也没有，记录严重警告（理论上不应该发生）
+        log.error("配置键未找到且无兜底默认值，configKey={}", configKey);
+        return null;
+    }
+
+    /**
+     * 从 DefaultConfigProperties 中获取兜底默认值
+     * 通过直接调用 getter 方法读取配置值
+     *
+     * @param configKey 配置键
+     * @return 兜底默认值，如果无对应字段则返回 null
+     */
+    private String getFallbackValue(String configKey) {
+        // 映射配置键到对应的 getter 方法
+        return switch (configKey) {
+            case "default.password" -> defaultConfigProperties.getDefaultPassword();
+            case "login.max.failures" -> String.valueOf(defaultConfigProperties.getLoginMaxFailures());
+            case "login.lock.duration" -> String.valueOf(defaultConfigProperties.getLoginLockDuration());
+            case "sms.send.interval" -> String.valueOf(defaultConfigProperties.getSmsSendInterval());
+            case "max.upload.size" -> String.valueOf(defaultConfigProperties.getMaxUploadSize());
+            default -> {
+                log.warn("未找到对应的兜底配置，configKey={}", configKey);
+                yield null;
+            }
+        };
     }
 }

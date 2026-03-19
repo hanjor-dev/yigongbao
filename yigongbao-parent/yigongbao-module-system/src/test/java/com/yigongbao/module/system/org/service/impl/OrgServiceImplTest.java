@@ -15,6 +15,7 @@ import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.mapper.OrgMapper;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.org.vo.OrgVO;
+import com.yigongbao.module.system.user.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -52,6 +53,9 @@ class OrgServiceImplTest {
 
     @Mock
     private DictService dictService;
+
+    @Mock
+    private UserMapper userMapper;
 
     @InjectMocks
     private OrgServiceImpl orgService;
@@ -291,6 +295,7 @@ class OrgServiceImplTest {
     void removeOrg_shouldSuccess() {
         // 准备
         when(orgMapper.selectById(1L)).thenReturn(testEntity);
+        when(userMapper.countByOrgId(1L)).thenReturn(0L);
         when(orgMapper.deleteById(1L)).thenReturn(1);
 
         // 执行
@@ -298,6 +303,21 @@ class OrgServiceImplTest {
 
         // 断言
         verify(orgMapper, times(1)).deleteById(1L);
+    }
+
+    @Test
+    @DisplayName("removeOrg: 机构下有用户时抛出异常")
+    void removeOrg_whenHasUsers_shouldThrowException() {
+        // 准备
+        when(orgMapper.selectById(1L)).thenReturn(testEntity);
+        when(userMapper.countByOrgId(1L)).thenReturn(5L);
+
+        // 执行 & 断言
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> orgService.removeOrg(1L)
+        );
+        assertEquals(ErrorCodeEnum.ORG_HAS_USERS.getCode(), exception.getCode());
     }
 
     @Test

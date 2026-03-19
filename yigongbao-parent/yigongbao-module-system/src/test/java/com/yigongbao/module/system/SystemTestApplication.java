@@ -1,5 +1,6 @@
 package com.yigongbao.module.system;
 
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * @date 2026-03-16
  */
 @SpringBootApplication(scanBasePackages = "com.yigongbao")
+@MapperScan("com.yigongbao.**.mapper")
 @ComponentScan(
     basePackages = "com.yigongbao",
     excludeFilters = @ComponentScan.Filter(

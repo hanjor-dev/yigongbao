@@ -15,6 +15,8 @@ import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.mapper.RoleMapper;
 import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.role.vo.RoleVO;
+import com.yigongbao.module.system.resource.mapper.RoleResourceMapper;
+import com.yigongbao.module.system.resource.service.ResourceService;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +40,8 @@ import java.util.Objects;
 public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> implements RoleService {
 
     private final UserMapper userMapper;
+    private final ResourceService resourceService;
+    private final RoleResourceMapper roleResourceMapper;
 
     /**
      * 分页查询角色列表
@@ -90,6 +94,8 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             RoleVO vo = toVOWithNames(entity);
+            // 填充已分配的资源ID列表
+            vo.setResourceIds(resourceService.getResourceIdsByRoleId(id));
             log.info("查询角色详情成功，id={}", id);
             return vo;
         } catch (BusinessException e) {
@@ -193,6 +199,8 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             }
             // 逻辑删除
             removeById(id);
+            // 清理角色资源关联表
+            roleResourceMapper.deleteByRoleId(id);
             log.info("删除角色成功，id={}", id);
         } catch (BusinessException e) {
             throw e;

@@ -12,7 +12,8 @@ spring:
       schema-locations: classpath*:schema.sql
 
 # 禁用 SaToken 拦截器，避免测试时需要登录
-satoken:
+# 注意：sa-token 是 SaToken 官方的属性前缀
+sa-token:
   interceptor:
     enable: false
 

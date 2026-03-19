@@ -8,9 +8,7 @@ import com.yigongbao.module.system.config.dto.CreateConfigDTO;
 import com.yigongbao.module.system.config.dto.UpdateConfigDTO;
 import com.yigongbao.module.system.config.entity.ConfigEntity;
 import com.yigongbao.module.system.config.mapper.ConfigMapper;
-import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.config.vo.ConfigVO;
-import com.yigongbao.module.system.config.convert.ConfigConvert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,9 +40,6 @@ class ConfigServiceImplTest {
 
     @Mock
     private ConfigMapper configMapper;
-
-    @Mock
-    private ConfigConvert configConvert;
 
     @InjectMocks
     private ConfigServiceImpl configService;
@@ -94,12 +89,6 @@ class ConfigServiceImplTest {
 
         when(configMapper.selectPage(any(), any(LambdaQueryWrapper.class))).thenReturn(page);
 
-        // Mock convert 转换
-        ConfigVO mockVO = new ConfigVO();
-        mockVO.setId(1L);
-        mockVO.setConfigKey("test.config");
-        when(configConvert.toVO(any(ConfigEntity.class))).thenReturn(mockVO);
-
         IPage<ConfigVO> result = configService.pageConfig(1, 10, null, null, null, null, null);
 
         assertNotNull(result);
@@ -130,12 +119,6 @@ class ConfigServiceImplTest {
     void getConfigById_whenExists_shouldReturnData() {
         when(configMapper.selectById(1L)).thenReturn(testEntity);
 
-        // Mock convert 转换
-        ConfigVO mockVO = new ConfigVO();
-        mockVO.setId(1L);
-        mockVO.setConfigKey("test.config");
-        when(configConvert.toVO(any(ConfigEntity.class))).thenReturn(mockVO);
-
         ConfigVO result = configService.getConfigById(1L);
 
         assertNotNull(result);
@@ -164,11 +147,6 @@ class ConfigServiceImplTest {
         // 使用 any() 匹配任意参数，而不是 any(LambdaQueryWrapper.class)
         when(configMapper.selectOne(any())).thenReturn(testEntity);
 
-        // Mock convert 转换
-        ConfigVO mockVO = new ConfigVO();
-        mockVO.setConfigKey("test.config");
-        when(configConvert.toVO(any(ConfigEntity.class))).thenReturn(mockVO);
-
         ConfigVO result = configService.getConfigByKey("test.config");
 
         assertNotNull(result);
@@ -196,10 +174,6 @@ class ConfigServiceImplTest {
         // 需要 mock count 方法返回 0，模拟配置键不存在（isConfigKeyExists 调用的是 count）
         when(configMapper.selectCount(any())).thenReturn(0L);
         when(configMapper.insert(any(ConfigEntity.class))).thenReturn(1);
-        // Mock convert 转换
-        ConfigEntity mockEntity = new ConfigEntity();
-        mockEntity.setId(1L);
-        when(configConvert.toEntity(any(CreateConfigDTO.class))).thenReturn(mockEntity);
 
         assertDoesNotThrow(() -> configService.createConfig(createDTO));
         verify(configMapper, times(1)).insert(any(ConfigEntity.class));
@@ -210,10 +184,6 @@ class ConfigServiceImplTest {
     void createConfig_whenKeyExists_shouldThrowException() {
         // 需要 mock count 方法返回 > 0，模拟配置键已存在（isConfigKeyExists 调用的是 count）
         when(configMapper.selectCount(any())).thenReturn(1L);
-        // 也需要 mock toEntity，因为方法会先调用 toEntity 再检查重复
-        ConfigEntity mockEntity = new ConfigEntity();
-        mockEntity.setId(1L);
-        when(configConvert.toEntity(any(CreateConfigDTO.class))).thenReturn(mockEntity);
 
         BusinessException exception = assertThrows(
             BusinessException.class,
@@ -229,8 +199,6 @@ class ConfigServiceImplTest {
     void updateConfig_shouldSuccess() {
         when(configMapper.selectById(1L)).thenReturn(testEntity);
         when(configMapper.updateById(any(ConfigEntity.class))).thenReturn(1);
-        // Mock convert 转换（updateEntity 是 void 方法，不需要返回值）
-        doNothing().when(configConvert).updateEntity(any(UpdateConfigDTO.class), any(ConfigEntity.class));
 
         UpdateConfigDTO dto = new UpdateConfigDTO();
         dto.setConfigName("更新后的名称");
@@ -312,9 +280,6 @@ class ConfigServiceImplTest {
     @DisplayName("listPublicConfig: 返回公开配置")
     void listPublicConfig_shouldReturnPublicConfigs() {
         when(configMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(testEntity));
-        // Mock convert 转换
-        ConfigVO mockVO = new ConfigVO();
-        when(configConvert.toVO(any(ConfigEntity.class))).thenReturn(mockVO);
 
         List<ConfigVO> result = configService.listPublicConfig();
 
@@ -339,9 +304,6 @@ class ConfigServiceImplTest {
     @DisplayName("listAllConfig: 返回所有配置")
     void listAllConfig_shouldReturnAllConfigs() {
         when(configMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(testEntity));
-        // Mock convert 转换
-        ConfigVO mockVO = new ConfigVO();
-        when(configConvert.toVO(any(ConfigEntity.class))).thenReturn(mockVO);
 
         List<ConfigVO> result = configService.listAllConfig();
 

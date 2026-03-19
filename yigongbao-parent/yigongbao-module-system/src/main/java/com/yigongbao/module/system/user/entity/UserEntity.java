@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 /**
  * 用户 Entity
@@ -119,6 +120,16 @@ public class UserEntity extends BaseEntity implements Serializable {
      * 状态（0=禁用，1=正常）
      */
     private Integer status;
+
+    /**
+     * 连续登录失败次数
+     */
+    private Integer loginFailCount;
+
+    /**
+     * 账户锁定时间
+     */
+    private LocalDateTime lockTime;
 
     /**
      * 备注说明

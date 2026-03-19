@@ -117,7 +117,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             OrgEntity orgEntity = orgService.getById(dto.getOrgId());
             if (orgEntity == null) {
                 log.warn("所属机构不存在，orgId={}", dto.getOrgId());
-                throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND_FOR_DEPT);
+                throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
             }
             // 校验部门名称是否已存在（同一机构下唯一）
             if (isDeptNameExists(dto.getDeptName(), dto.getOrgId())) {
