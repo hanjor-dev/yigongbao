@@ -21,6 +21,14 @@ public interface UserHospitalService {
     List<HospitalVO> getHospitalsByUserId(Long userId);
 
     /**
+     * 查询用户的医院ID列表
+     *
+     * @param userId 用户ID
+     * @return 医院ID列表
+     */
+    List<Long> getHospitalIdsByUserId(Long userId);
+
+    /**
      * 分配用户医院范围（覆盖式）
      *
      * @param userId      用户ID

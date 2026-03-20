@@ -206,7 +206,7 @@ CREATE TABLE sys_role (
     role_code           VARCHAR(32)     NOT NULL COMMENT '角色编码',
     role_desc           VARCHAR(256)    COMMENT '角色描述',
     account_type        TINYINT         NOT NULL COMMENT '账户分类',
-    data_scope          TINYINT         DEFAULT 1 COMMENT '数据范围',
+    hospital_scope_enabled TINYINT       DEFAULT 0 COMMENT '是否启用医院范围权限（0=否，1=是）',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark              VARCHAR(512)    COMMENT '备注说明',
 
@@ -224,15 +224,15 @@ CREATE TABLE sys_role (
 );
 
 -- 插入角色测试数据
-INSERT INTO sys_role (id, role_name, role_code, role_desc, account_type, data_scope, status, remark, create_time, update_time, is_deleted) VALUES
-(1, '公司管理员', 'ROLE_ADMIN', '系统管理员，拥有全部系统功能', 1, 1, 1, '适用于生产企业', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, '设计师', 'ROLE_DESIGNER', '负责设计工作', 1, 2, 1, '适用于生产企业', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(3, '生产员', 'ROLE_PRODUCTION', '负责生产加工', 1, 2, 1, '适用于生产企业', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(4, '业务员', 'ROLE_SALES', '负责订单开拓、客户维护', 1, 3, 1, '适用于经销商', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(5, '医生', 'ROLE_DOCTOR', '医生、查看数据', 1, 3, 1, '适用于医疗机构', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(6, '机构管理员', 'ROLE_ORG_ADMIN', '外部机构的管理员', 2, 2, 1, '适用于外部用户', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(7, '机构用户', 'ROLE_ORG_USER', '外部机构普通用户', 2, 3, 1, '适用于外部用户', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(8, '已禁用角色', 'ROLE_DISABLED', '已禁用角色', 1, 1, 0, '测试用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO sys_role (id, role_name, role_code, role_desc, account_type, hospital_scope_enabled, status, remark, create_time, update_time, is_deleted) VALUES
+(1, '公司管理员', 'ROLE_ADMIN', '系统管理员，拥有全部系统功能', 1, 0, 1, '适用于生产企业', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, '设计师', 'ROLE_DESIGNER', '负责设计工作', 1, 0, 1, '适用于生产企业', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, '生产员', 'ROLE_PRODUCTION', '负责生产加工', 1, 0, 1, '适用于生产企业', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(4, '业务员', 'ROLE_SALES', '负责订单开拓、客户维护', 1, 1, 1, '适用于经销商，启用医院范围权限', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(5, '医生', 'ROLE_DOCTOR', '医生、查看数据', 1, 0, 1, '适用于医疗机构', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(6, '机构管理员', 'ROLE_ORG_ADMIN', '外部机构的管理员', 2, 0, 1, '适用于外部用户', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(7, '机构用户', 'ROLE_ORG_USER', '外部机构普通用户', 2, 0, 1, '适用于外部用户', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(8, '已禁用角色', 'ROLE_DISABLED', '已禁用角色', 1, 0, 0, '测试用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ------------------------------------------------------------
 -- 用户表

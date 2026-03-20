@@ -4,6 +4,7 @@ import lombok.Data;
 
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * 更新用户 DTO
@@ -65,6 +66,12 @@ public class UpdateUserDTO implements Serializable {
      * 关联角色ID
      */
     private Long roleId;
+
+    /**
+     * 医院ID列表（当角色 data_scope=4 时，用于分配医院范围权限）
+     * 管理员可以在模板展开后增删调整，最终提交医院ID列表
+     */
+    private List<Long> hospitalIds;
 
     /**
      * 工号

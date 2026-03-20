@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.yigongbao.common.constant.DataScopeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
@@ -22,6 +21,7 @@ import com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.vo.UserVO;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,6 +73,9 @@ class UserServiceImplTest {
 
     @Mock
     private ConfigService configService;
+
+    @Mock
+    private UserHospitalService userHospitalService;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -232,7 +235,7 @@ class UserServiceImplTest {
                 BusinessException.class,
                 () -> userService.getUserById(999L)
         );
-        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
     }
 
     // ==================== createUser 测试 ====================
@@ -436,7 +439,7 @@ class UserServiceImplTest {
                 BusinessException.class,
                 () -> userService.updateUser(999L, updateDTO)
         );
-        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
     }
 
     @Test
@@ -485,7 +488,7 @@ class UserServiceImplTest {
                 BusinessException.class,
                 () -> userService.removeUser(999L)
         );
-        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
     }
 
     // ==================== updateStatus 测试 ====================
@@ -515,7 +518,7 @@ class UserServiceImplTest {
                 BusinessException.class,
                 () -> userService.updateStatus(999L, 0)
         );
-        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
     }
 
     // ==================== resetPassword 测试 ====================
@@ -549,7 +552,7 @@ class UserServiceImplTest {
                 BusinessException.class,
                 () -> userService.resetPassword(999L, resetPasswordDTO)
         );
-        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
     }
 
     // ==================== changePassword 测试 ====================
@@ -596,7 +599,7 @@ class UserServiceImplTest {
                 BusinessException.class,
                 () -> userService.changePassword(999L, "123456", "654321")
         );
-        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
     }
 
     // ==================== updateUserBySelf 测试 ====================
@@ -627,7 +630,7 @@ class UserServiceImplTest {
                 BusinessException.class,
                 () -> userService.updateUserBySelf(999L, updateSelfDTO)
         );
-        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
     }
 
     @Test
@@ -644,5 +647,372 @@ class UserServiceImplTest {
                 () -> userService.updateUserBySelf(1L, updateSelfDTO)
         );
         assertEquals(ErrorCodeEnum.USER_PHONE_EXISTS.getCode(), exception.getCode());
+    }
+
+    // ==================== createUser 医院范围权限测试 ====================
+
+    /**
+     * 场景：角色 hospitalScopeEnabled=1，创建用户时传入 hospitalIds
+     * 期望：调用 userHospitalService.assignHospitals
+     */
+    @Test
+    @DisplayName("createUser: hospitalScopeEnabled=1时传入hospitalIds应分配医院权限")
+    void createUser_whenHospitalScopeEnabledAndHospitalIds_shouldAssignHospitals() {
+        // 准备：hospitalScopeEnabled=1 的角色 + 传入 hospitalIds
+        RoleEntity roleWithHospitalScope = new RoleEntity();
+        roleWithHospitalScope.setId(2L);
+        roleWithHospitalScope.setRoleName("医院管理员");
+        roleWithHospitalScope.setHospitalScopeEnabled(StatusConstants.YES);
+        roleWithHospitalScope.setStatus(1);
+
+        CreateUserDTO dtoWithHospitals = new CreateUserDTO();
+        dtoWithHospitals.setUsername("hospitaluser");
+        dtoWithHospitals.setRealName("医院用户");
+        dtoWithHospitals.setPhone("13900000002");
+        dtoWithHospitals.setAccountType(1);
+        dtoWithHospitals.setOrgId(1L);
+        dtoWithHospitals.setRoleId(2L);
+        dtoWithHospitals.setHospitalIds(List.of(10L, 20L, 30L));
+
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(roleService.getById(2L)).thenReturn(roleWithHospitalScope);
+        when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("$2a$10$encrypted");
+        when(userMapper.insert(any(UserEntity.class))).thenAnswer(invocation -> {
+            UserEntity entity = invocation.getArgument(0);
+            entity.setId(100L);
+            return 1;
+        });
+
+        // 执行
+        userService.createUser(dtoWithHospitals);
+
+        // 断言：验证分配了医院权限
+        verify(userHospitalService, times(1)).assignHospitals(eq(100L), eq(List.of(10L, 20L, 30L)));
+        verify(userMapper, times(1)).insert(any(UserEntity.class));
+    }
+
+    /**
+     * 场景：角色 hospitalScopeEnabled=0，创建用户时传入 hospitalIds
+     * 期望：不调用 userHospitalService.assignHospitals（角色不支持医院范围权限）
+     */
+    @Test
+    @DisplayName("createUser: hospitalScopeEnabled=0时传入hospitalIds不分配医院权限")
+    void createUser_whenHospitalScopeDisabled_shouldNotAssignHospitals() {
+        // 准备：hospitalScopeEnabled=0 的角色 + 传入 hospitalIds
+        RoleEntity roleWithoutHospitalScope = new RoleEntity();
+        roleWithoutHospitalScope.setId(3L);
+        roleWithoutHospitalScope.setRoleName("普通员工");
+        roleWithoutHospitalScope.setHospitalScopeEnabled(StatusConstants.DISABLED);
+        roleWithoutHospitalScope.setStatus(1);
+
+        CreateUserDTO dtoWithHospitals = new CreateUserDTO();
+        dtoWithHospitals.setUsername("normaluser");
+        dtoWithHospitals.setRealName("普通用户");
+        dtoWithHospitals.setPhone("13900000003");
+        dtoWithHospitals.setAccountType(1);
+        dtoWithHospitals.setOrgId(1L);
+        dtoWithHospitals.setRoleId(3L);
+        dtoWithHospitals.setHospitalIds(List.of(10L, 20L));
+
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(roleService.getById(3L)).thenReturn(roleWithoutHospitalScope);
+        when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("$2a$10$encrypted");
+        when(userMapper.insert(any(UserEntity.class))).thenAnswer(invocation -> {
+            UserEntity entity = invocation.getArgument(0);
+            entity.setId(101L);
+            return 1;
+        });
+
+        // 执行
+        userService.createUser(dtoWithHospitals);
+
+        // 断言：验证未分配医院权限
+        verify(userHospitalService, never()).assignHospitals(anyLong(), anyList());
+        verify(userMapper, times(1)).insert(any(UserEntity.class));
+    }
+
+    /**
+     * 场景：角色 hospitalScopeEnabled=1，但未传入 hospitalIds
+     * 期望：不调用 userHospitalService.assignHospitals
+     */
+    @Test
+    @DisplayName("createUser: hospitalScopeEnabled=1但未传hospitalIds不分配医院权限")
+    void createUser_whenHospitalScopeEnabledWithoutHospitalIds_shouldNotAssignHospitals() {
+        // 准备：hospitalScopeEnabled=1 的角色，但不传 hospitalIds
+        RoleEntity roleWithHospitalScope = new RoleEntity();
+        roleWithHospitalScope.setId(2L);
+        roleWithHospitalScope.setRoleName("医院管理员");
+        roleWithHospitalScope.setHospitalScopeEnabled(StatusConstants.YES);
+        roleWithHospitalScope.setStatus(1);
+
+        CreateUserDTO dtoWithoutHospitals = new CreateUserDTO();
+        dtoWithoutHospitals.setUsername("nohospitaluser");
+        dtoWithoutHospitals.setRealName("无医院用户");
+        dtoWithoutHospitals.setPhone("13900000004");
+        dtoWithoutHospitals.setAccountType(1);
+        dtoWithoutHospitals.setOrgId(1L);
+        dtoWithoutHospitals.setRoleId(2L);
+        // 不设置 hospitalIds
+
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(roleService.getById(2L)).thenReturn(roleWithHospitalScope);
+        when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("$2a$10$encrypted");
+        when(userMapper.insert(any(UserEntity.class))).thenAnswer(invocation -> {
+            UserEntity entity = invocation.getArgument(0);
+            entity.setId(102L);
+            return 1;
+        });
+
+        // 执行
+        userService.createUser(dtoWithoutHospitals);
+
+        // 断言：验证未分配医院权限
+        verify(userHospitalService, never()).assignHospitals(anyLong(), anyList());
+        verify(userMapper, times(1)).insert(any(UserEntity.class));
+    }
+
+    // ==================== updateUser 医院范围权限测试 ====================
+
+    /**
+     * 场景：变更角色为 hospitalScopeEnabled=1，且传入 hospitalIds
+     * 期望：调用 userHospitalService.assignHospitals
+     */
+    @Test
+    @DisplayName("updateUser: 变更角色为hospitalScopeEnabled=1时传入hospitalIds应分配医院权限")
+    void updateUser_whenRoleChangedToHospitalScopeEnabled_shouldAssignHospitals() {
+        // 准备：从 hospitalScopeEnabled=0 变更到 hospitalScopeEnabled=1
+        UserEntity existingUser = new UserEntity();
+        existingUser.setId(1L);
+        existingUser.setUsername("testuser");
+        existingUser.setPhone("13800000001");
+        existingUser.setOrgId(1L);
+        existingUser.setRoleId(3L);  // 原角色 hospitalScopeEnabled=0
+
+        RoleEntity newRoleWithHospitalScope = new RoleEntity();
+        newRoleWithHospitalScope.setId(2L);
+        newRoleWithHospitalScope.setRoleName("医院管理员");
+        newRoleWithHospitalScope.setHospitalScopeEnabled(StatusConstants.YES);
+        newRoleWithHospitalScope.setStatus(1);
+
+        UpdateUserDTO dtoWithNewRole = new UpdateUserDTO();
+        dtoWithNewRole.setRoleId(2L);
+        dtoWithNewRole.setHospitalIds(List.of(10L, 20L));
+
+        when(userMapper.selectById(1L)).thenReturn(existingUser);
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(roleService.getById(2L)).thenReturn(newRoleWithHospitalScope);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        // 执行
+        userService.updateUser(1L, dtoWithNewRole);
+
+        // 断言：验证分配了医院权限
+        verify(userHospitalService, times(1)).assignHospitals(eq(1L), eq(List.of(10L, 20L)));
+    }
+
+    /**
+     * 场景：角色未变更，但医院列表有变更（编辑页单独调整医院）
+     * 期望：调用 userHospitalService.assignHospitals
+     */
+    @Test
+    @DisplayName("updateUser: 角色未变更但hospitalIds变更应重新分配医院权限")
+    void updateUser_whenRoleUnchangedButHospitalIdsChanged_shouldReassignHospitals() {
+        // 准备：用户已有角色 hospitalScopeEnabled=1，仅变更医院列表
+        UserEntity existingUser = new UserEntity();
+        existingUser.setId(1L);
+        existingUser.setUsername("testuser");
+        existingUser.setPhone("13800000001");
+        existingUser.setOrgId(1L);
+        existingUser.setRoleId(2L);  // hospitalScopeEnabled=1
+
+        RoleEntity currentRole = new RoleEntity();
+        currentRole.setId(2L);
+        currentRole.setRoleName("医院管理员");
+        currentRole.setHospitalScopeEnabled(StatusConstants.YES);
+        currentRole.setStatus(1);
+
+        UpdateUserDTO dtoWithNewHospitals = new UpdateUserDTO();
+        dtoWithNewHospitals.setHospitalIds(List.of(99L, 88L));  // 新医院列表
+
+        when(userMapper.selectById(1L)).thenReturn(existingUser);
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(roleService.getById(2L)).thenReturn(currentRole);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        // 执行
+        userService.updateUser(1L, dtoWithNewHospitals);
+
+        // 断言：验证重新分配了医院权限
+        verify(userHospitalService, times(1)).assignHospitals(eq(1L), eq(List.of(99L, 88L)));
+    }
+
+    /**
+     * 场景：变更角色为 hospitalScopeEnabled=0，但传了 hospitalIds
+     * 期望：不调用 userHospitalService.assignHospitals（角色不支持医院范围权限）
+     */
+    @Test
+    @DisplayName("updateUser: 变更角色为hospitalScopeEnabled=0时传入hospitalIds应忽略不分配")
+    void updateUser_whenRoleChangedToHospitalScopeDisabled_shouldNotAssignHospitals() {
+        // 准备：从 hospitalScopeEnabled=1 变更到 hospitalScopeEnabled=0
+        UserEntity existingUser = new UserEntity();
+        existingUser.setId(1L);
+        existingUser.setUsername("testuser");
+        existingUser.setPhone("13800000001");
+        existingUser.setOrgId(1L);
+        existingUser.setRoleId(2L);  // 原角色 hospitalScopeEnabled=1
+
+        RoleEntity newRoleWithoutHospitalScope = new RoleEntity();
+        newRoleWithoutHospitalScope.setId(1L);
+        newRoleWithoutHospitalScope.setRoleName("公司管理员");
+        newRoleWithoutHospitalScope.setHospitalScopeEnabled(StatusConstants.DISABLED);
+        newRoleWithoutHospitalScope.setStatus(1);
+
+        UpdateUserDTO dtoWithNewRole = new UpdateUserDTO();
+        dtoWithNewRole.setRoleId(1L);
+        dtoWithNewRole.setHospitalIds(List.of(10L, 20L));  // 传了医院ID
+
+        when(userMapper.selectById(1L)).thenReturn(existingUser);
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(roleService.getById(1L)).thenReturn(newRoleWithoutHospitalScope);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        // 执行
+        userService.updateUser(1L, dtoWithNewRole);
+
+        // 断言：验证未分配医院权限
+        verify(userHospitalService, never()).assignHospitals(anyLong(), anyList());
+    }
+
+    /**
+     * 场景：新角色 hospitalScopeEnabled=1，但未传 hospitalIds
+     * 期望：不调用 userHospitalService.assignHospitals
+     */
+    @Test
+    @DisplayName("updateUser: 变更角色为hospitalScopeEnabled=1但未传hospitalIds不应分配医院")
+    void updateUser_whenHospitalScopeEnabledWithoutHospitalIds_shouldNotAssignHospitals() {
+        // 准备：变更到 hospitalScopeEnabled=1 的角色，但不传 hospitalIds
+        UserEntity existingUser = new UserEntity();
+        existingUser.setId(1L);
+        existingUser.setUsername("testuser");
+        existingUser.setPhone("13800000001");
+        existingUser.setOrgId(1L);
+        existingUser.setRoleId(3L);  // 原角色 hospitalScopeEnabled=0
+
+        RoleEntity newRoleWithHospitalScope = new RoleEntity();
+        newRoleWithHospitalScope.setId(2L);
+        newRoleWithHospitalScope.setRoleName("医院管理员");
+        newRoleWithHospitalScope.setHospitalScopeEnabled(StatusConstants.YES);
+        newRoleWithHospitalScope.setStatus(1);
+
+        UpdateUserDTO dtoWithoutHospitals = new UpdateUserDTO();
+        dtoWithoutHospitals.setRoleId(2L);
+        // 不设置 hospitalIds
+
+        when(userMapper.selectById(1L)).thenReturn(existingUser);
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(roleService.getById(2L)).thenReturn(newRoleWithHospitalScope);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        // 执行
+        userService.updateUser(1L, dtoWithoutHospitals);
+
+        // 断言：验证未分配医院权限
+        verify(userHospitalService, never()).assignHospitals(anyLong(), anyList());
+    }
+
+    /**
+     * 场景：用户原有医院，编辑时不传 hospitalIds（不清空）
+     * 期望：不调用 userHospitalService.assignHospitals（保持原有关联）
+     */
+    @Test
+    @DisplayName("updateUser: 医院Ids为null时应保持原有关联不调用assignHospitals")
+    void updateUser_whenHospitalIdsNull_shouldNotChangeHospitalScope() {
+        // 准备：用户已有角色 hospitalScopeEnabled=1，但编辑时未传 hospitalIds
+        UserEntity existingUser = new UserEntity();
+        existingUser.setId(1L);
+        existingUser.setUsername("testuser");
+        existingUser.setPhone("13800000001");
+        existingUser.setOrgId(1L);
+        existingUser.setRoleId(2L);  // hospitalScopeEnabled=1
+
+        UpdateUserDTO dtoWithoutHospitals = new UpdateUserDTO();  // hospitalIds=null
+
+        when(userMapper.selectById(1L)).thenReturn(existingUser);
+
+        // 执行
+        userService.updateUser(1L, dtoWithoutHospitals);
+
+        // 断言：验证未调用 assignHospitals（保持原有关联）
+        verify(userHospitalService, never()).assignHospitals(anyLong(), anyList());
+    }
+
+    // ==================== getUserById 医院范围字段测试 ====================
+
+    /**
+     * 场景：查询用户详情
+     * 期望：填充 hospitalScopeEnabled 和 hospitalIds
+     */
+    @Test
+    @DisplayName("getUserById: 应填充hospitalScopeEnabled和hospitalIds")
+    void getUserById_shouldFillHospitalScopeFields() {
+        // 准备
+        UserEntity userWithRole = new UserEntity();
+        userWithRole.setId(1L);
+        userWithRole.setUsername("testuser");
+        userWithRole.setRealName("测试用户");
+        userWithRole.setPhone("13800000001");
+        userWithRole.setStatus(1);
+        userWithRole.setRoleId(2L);
+
+        RoleEntity roleWithHospitalScope = new RoleEntity();
+        roleWithHospitalScope.setId(2L);
+        roleWithHospitalScope.setRoleName("医院管理员");
+        roleWithHospitalScope.setHospitalScopeEnabled(StatusConstants.YES);
+
+        when(userMapper.selectById(1L)).thenReturn(userWithRole);
+        when(roleService.getById(2L)).thenReturn(roleWithHospitalScope);
+        when(userHospitalService.getHospitalIdsByUserId(1L)).thenReturn(List.of(10L, 20L));
+
+        // 执行
+        UserVO result = userService.getUserById(1L);
+
+        // 断言
+        assertNotNull(result);
+        assertEquals(StatusConstants.YES, result.getHospitalScopeEnabled());
+        assertNotNull(result.getHospitalIds());
+        assertEquals(2, result.getHospitalIds().size());
+        assertTrue(result.getHospitalIds().contains(10L));
+        assertTrue(result.getHospitalIds().contains(20L));
+    }
+
+    /**
+     * 场景：用户无角色
+     * 期望：hospitalScopeEnabled 为 null
+     */
+    @Test
+    @DisplayName("getUserById: 用户无角色时hospitalScopeEnabled为null")
+    void getUserById_whenNoRole_shouldReturnNullHospitalScopeEnabled() {
+        // 准备：无角色用户
+        UserEntity userWithoutRole = new UserEntity();
+        userWithoutRole.setId(1L);
+        userWithoutRole.setUsername("noroleuser");
+        userWithoutRole.setRealName("无角色用户");
+        userWithoutRole.setPhone("13800000005");
+        userWithoutRole.setStatus(1);
+        userWithoutRole.setRoleId(null);
+
+        when(userMapper.selectById(1L)).thenReturn(userWithoutRole);
+        when(userHospitalService.getHospitalIdsByUserId(1L)).thenReturn(Collections.emptyList());
+
+        // 执行
+        UserVO result = userService.getUserById(1L);
+
+        // 断言
+        assertNotNull(result);
+        assertNull(result.getHospitalScopeEnabled());
+        assertTrue(result.getHospitalIds().isEmpty());
     }
 }

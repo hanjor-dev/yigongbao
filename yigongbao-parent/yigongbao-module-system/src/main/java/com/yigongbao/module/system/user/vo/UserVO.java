@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 用户 VO（视图对象）
@@ -97,6 +98,17 @@ public class UserVO implements Serializable {
     private String roleName;
 
     /**
+     * 关联角色编码
+     */
+    private String roleCode;
+
+    /**
+     * 是否启用医院范围权限（0=否，1=是）
+     * 用于前端判断是否显示医院选择区域
+     */
+    private Integer hospitalScopeEnabled;
+
+    /**
      * 工号
      */
     private String employeeNo;
@@ -145,4 +157,10 @@ public class UserVO implements Serializable {
      * 创建时间
      */
     private LocalDateTime createTime;
+
+    /**
+     * 已分配的医院ID列表
+     * 用于前端展示用户已分配的医院
+     */
+    private List<Long> hospitalIds;
 }

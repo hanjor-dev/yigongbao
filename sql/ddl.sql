@@ -116,7 +116,7 @@ CREATE TABLE sys_role (
     role_code           VARCHAR(32)     NOT NULL COMMENT '角色编码',
     role_desc           VARCHAR(256)    COMMENT '角色描述',
     account_type        TINYINT         NOT NULL COMMENT '账户分类（关联字典编码=6）',
-    data_scope          TINYINT         DEFAULT 1 COMMENT '数据范围（1=全部数据，2=本机构，3=仅自己，4=医院范围，5=部门范围）',
+    hospital_scope_enabled TINYINT       DEFAULT 0 COMMENT '是否启用医院范围权限（0=否，1=是，当启用时通过 sys_user_hospital 表分配具体医院范围）',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark              VARCHAR(512)    COMMENT '备注说明',
 

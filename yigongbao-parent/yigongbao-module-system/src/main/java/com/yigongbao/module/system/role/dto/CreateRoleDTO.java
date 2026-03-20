@@ -45,9 +45,10 @@ public class CreateRoleDTO implements Serializable {
     private Integer accountType;
 
     /**
-     * 数据范围（1=全部数据，2=本机构，3=仅自己，4=医院范围，5=部门范围）
+     * 是否启用医院范围权限（0=否，1=是）
      */
-    private Integer dataScope;
+    @NotNull(message = "是否启用医院范围权限不能为空")
+    private Integer hospitalScopeEnabled;
 
     /**
      * 备注说明

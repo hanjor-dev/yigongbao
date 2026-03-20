@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.yigongbao.common.constant.DataScopeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -120,10 +119,6 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             if (isRoleCodeExists(dto.getRoleCode())) {
                 log.warn("角色编码已存在，roleCode={}", dto.getRoleCode());
                 throw new BusinessException(ErrorCodeEnum.ROLE_EXISTS);
-            }
-            // 设置默认值
-            if (dto.getDataScope() == null) {
-                dto.setDataScope(DataScopeConstants.ORG); // 默认本机构
             }
             // DTO转换为实体对象
             RoleEntity entity = RoleConvert.toEntity(dto);
@@ -256,9 +251,9 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
         if (vo.getAccountType() != null) {
             vo.setAccountTypeName(getAccountTypeName(vo.getAccountType()));
         }
-        // 填充数据范围名称
-        if (vo.getDataScope() != null) {
-            vo.setDataScopeName(getDataScopeName(vo.getDataScope()));
+        // 填充是否启用医院范围权限名称
+        if (vo.getHospitalScopeEnabled() != null) {
+            vo.setHospitalScopeEnabledName(getHospitalScopeEnabledName(vo.getHospitalScopeEnabled()));
         }
         // 填充状态名称
         if (vo.getStatus() != null) {
@@ -278,13 +273,16 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
     }
 
     /**
-     * 获取数据范围名称
+     * 获取是否启用医院范围权限名称
      *
-     * @param dataScope 数据范围
-     * @return 数据范围名称
+     * @param enabled 是否启用
+     * @return 权限名称
      */
-    private String getDataScopeName(Integer dataScope) {
-        return DataScopeConstants.getDataScopeName(dataScope);
+    private String getHospitalScopeEnabledName(Integer enabled) {
+        if (enabled == null) {
+            return "";
+        }
+        return enabled == StatusConstants.YES ? "是" : "否";
     }
 
     /**

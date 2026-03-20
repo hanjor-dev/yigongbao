@@ -70,4 +70,13 @@ public interface HospitalService extends IService<HospitalEntity> {
      * @return 医院下拉列表
      */
     List<HospitalVO> listOptions(Integer status);
+
+    /**
+     * 获取当前用户可操作的医院下拉选项（根据用户权限过滤）
+     * 用于业务员创建订单等业务场景时的医院选择
+     *
+     * @param userId 用户ID
+     * @return 当前用户可操作的医院列表
+     */
+    List<HospitalVO> listMyOptions(Long userId);
 }

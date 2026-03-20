@@ -29,6 +29,7 @@ import com.yigongbao.module.system.user.dto.ResetPasswordDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.service.UserService;
 import com.yigongbao.module.system.user.vo.UserVO;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +59,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
     private final ConfigService configService;
+    private final UserHospitalService userHospitalService;
 
     /**
      * 分页查询用户列表
@@ -170,6 +172,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             entity.setStatus(StatusConstants.NORMAL);
             // 插入数据库
             save(entity);
+
+            // 处理医院范围权限分配（改为依赖角色的 hospitalScopeEnabled）
+            if (dto.getHospitalIds() != null && !dto.getHospitalIds().isEmpty()) {
+                if (dto.getRoleId() != null) {
+                    RoleEntity role = roleService.getById(dto.getRoleId());
+                    if (role != null && role.getHospitalScopeEnabled() != null && role.getHospitalScopeEnabled() == StatusConstants.YES) {
+                        userHospitalService.assignHospitals(entity.getId(), dto.getHospitalIds());
+                    }
+                }
+            }
+
             log.info("创建用户成功，id={}, username={}", entity.getId(), dto.getUsername());
         } catch (BusinessException e) {
             throw e;
@@ -230,7 +243,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 // 更新角色名称和编码冗余字段
                 entity.setRoleName(roleEntity.getRoleName());
                 entity.setRoleCode(roleEntity.getRoleCode());
+
+                // 处理医院范围权限变更（覆盖式，改为依赖角色的 hospitalScopeEnabled）
+                if (dto.getHospitalIds() != null && !dto.getHospitalIds().isEmpty()) {
+                    if (roleEntity.getHospitalScopeEnabled() != null && roleEntity.getHospitalScopeEnabled() == StatusConstants.YES) {
+                        userHospitalService.assignHospitals(id, dto.getHospitalIds());
+                    }
+                }
+            } else if (dto.getHospitalIds() != null && !dto.getHospitalIds().isEmpty()) {
+                // 角色未变更，但医院列表有变更（可能是编辑页单独调整医院）
+                if (entity.getRoleId() != null) {
+                    RoleEntity currentRole = roleService.getById(entity.getRoleId());
+                    if (currentRole != null && currentRole.getHospitalScopeEnabled() != null && currentRole.getHospitalScopeEnabled() == StatusConstants.YES) {
+                        userHospitalService.assignHospitals(id, dto.getHospitalIds());
+                    }
+                }
             }
+
             // 更新用户信息
             BeanUtils.copyProperties(dto, entity, "id", "username", "password", "createTime", "updateTime", "createBy", "updateBy");
             updateById(entity);
@@ -424,7 +453,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         if (vo == null) {
             return null;
         }
-        // 状态名称（使用冗余字段，不再查询）
+        // 状态名称
         if (vo.getStatus() != null) {
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
@@ -436,6 +465,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         if (vo.getAccountType() != null) {
             vo.setAccountTypeName(StatusConstants.getAccountTypeName(vo.getAccountType()));
         }
+        // 填充角色的 hospitalScopeEnabled
+        if (vo.getRoleId() != null) {
+            RoleEntity roleEntity = roleService.getById(vo.getRoleId());
+            if (roleEntity != null) {
+                vo.setHospitalScopeEnabled(roleEntity.getHospitalScopeEnabled());
+            }
+        }
+        // 填充用户已分配的医院ID列表
+        vo.setHospitalIds(userHospitalService.getHospitalIdsByUserId(vo.getId()));
         return vo;
     }
 

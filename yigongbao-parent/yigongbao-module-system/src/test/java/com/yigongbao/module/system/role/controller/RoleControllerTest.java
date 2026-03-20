@@ -123,7 +123,7 @@ class RoleControllerTest {
         requestBody.put("roleCode", "ROLE_TEST");
         requestBody.put("roleDesc", "测试角色描述");
         requestBody.put("accountType", 1);
-        requestBody.put("dataScope", 2);
+        requestBody.put("hospitalScopeEnabled", 0);
 
         mockMvc.perform(post("/api/system/role")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -140,6 +140,7 @@ class RoleControllerTest {
         requestBody.put("roleName", "测试角色");
         requestBody.put("roleCode", "ROLE_ADMIN");
         requestBody.put("accountType", 1);
+        requestBody.put("hospitalScopeEnabled", 0);
 
         mockMvc.perform(post("/api/system/role")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -160,22 +161,6 @@ class RoleControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("create: 无效数据范围值")
-    void create_whenInvalidDataScope_shouldReturnError() throws Exception {
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("roleName", "测试角色");
-        requestBody.put("roleCode", "ROLE_TEST3");
-        requestBody.put("accountType", 1);
-        requestBody.put("dataScope", 99);
-
-        mockMvc.perform(post("/api/system/role")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestBody)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200));
     }
 
     // ==================== update 测试 ====================

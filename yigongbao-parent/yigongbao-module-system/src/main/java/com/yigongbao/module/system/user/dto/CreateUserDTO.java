@@ -4,6 +4,7 @@ import lombok.Data;
 
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * 创建用户 DTO
@@ -82,6 +83,13 @@ public class CreateUserDTO implements Serializable {
      * 关联角色ID
      */
     private Long roleId;
+
+    /**
+     * 医院ID列表
+     * 当角色 hospitalScopeEnabled=1 时，用于分配医院范围权限
+     * 管理员可先选择模板（预览模板医院列表），再微调后提交
+     */
+    private List<Long> hospitalIds;
 
     /**
      * 工号

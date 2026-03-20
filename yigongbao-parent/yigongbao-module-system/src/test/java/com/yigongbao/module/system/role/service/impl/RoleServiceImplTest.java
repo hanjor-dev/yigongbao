@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.yigongbao.common.constant.DataScopeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -35,6 +34,9 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 /**
@@ -84,7 +86,7 @@ class RoleServiceImplTest {
         testEntity.setRoleCode("ROLE_ADMIN");
         testEntity.setRoleDesc("系统管理员");
         testEntity.setAccountType(1);
-        testEntity.setDataScope(1);
+        testEntity.setHospitalScopeEnabled(0);
         testEntity.setStatus(1);
         testEntity.setCreateTime(now);
         testEntity.setUpdateTime(now);
@@ -95,13 +97,13 @@ class RoleServiceImplTest {
         createDTO.setRoleCode("ROLE_TEST");
         createDTO.setRoleDesc("测试角色描述");
         createDTO.setAccountType(1);
-        createDTO.setDataScope(2);
+        createDTO.setHospitalScopeEnabled(0);
 
         // 初始化更新DTO
         updateDTO = new UpdateRoleDTO();
         updateDTO.setRoleName("更新后的角色名");
         updateDTO.setRoleDesc("更新后的描述");
-        updateDTO.setDataScope(3);
+        updateDTO.setHospitalScopeEnabled(1);
     }
 
     // ==================== listRole 测试 ====================
@@ -208,22 +210,30 @@ class RoleServiceImplTest {
     }
 
     @Test
-    @DisplayName("createRole: 未传数据范围时使用默认值（本机构）")
-    void createRole_whenDataScopeNotProvided_shouldUseDefault() {
-        // 准备：不传dataScope
-        CreateRoleDTO dtoNoDataScope = new CreateRoleDTO();
-        dtoNoDataScope.setRoleName("测试角色");
-        dtoNoDataScope.setRoleCode("ROLE_TEST2");
-        dtoNoDataScope.setAccountType(1);
+    @DisplayName("createRole: 创建角色时hospitalScopeEnabled=1应正确保存")
+    void createRole_whenHospitalScopeEnabled_shouldSaveCorrectly() {
+        // 准备：hospitalScopeEnabled=1 的角色
+        CreateRoleDTO dtoWithHospitalScope = new CreateRoleDTO();
+        dtoWithHospitalScope.setRoleName("医院管理员");
+        dtoWithHospitalScope.setRoleCode("ROLE_HOSPITAL_ADMIN");
+        dtoWithHospitalScope.setRoleDesc("医院范围管理员");
+        dtoWithHospitalScope.setAccountType(1);
+        dtoWithHospitalScope.setHospitalScopeEnabled(1);  // 启用医院范围权限
 
         when(roleMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
-        when(roleMapper.insert(any(RoleEntity.class))).thenReturn(1);
+        when(roleMapper.insert(any(RoleEntity.class))).thenAnswer(invocation -> {
+            RoleEntity entity = invocation.getArgument(0);
+            entity.setId(100L);
+            return 1;
+        });
 
         // 执行
-        roleService.createRole(dtoNoDataScope);
+        roleService.createRole(dtoWithHospitalScope);
 
-        // 断言
-        verify(roleMapper, times(1)).insert(any(RoleEntity.class));
+        // 断言：验证插入时 hospitalScopeEnabled=1
+        verify(roleMapper, times(1)).insert(argThat((RoleEntity entity) -> {
+            return entity.getHospitalScopeEnabled() == 1;
+        }));
     }
 
     // ==================== updateRole 测试 ====================
@@ -241,6 +251,28 @@ class RoleServiceImplTest {
 
         // 断言
         verify(roleMapper, times(1)).updateById(any(RoleEntity.class));
+    }
+
+    @Test
+    @DisplayName("updateRole: 更新hospitalScopeEnabled字段应正确保存")
+    void updateRole_whenHospitalScopeEnabledChanged_shouldSaveCorrectly() {
+        // 准备：将 hospitalScopeEnabled 从 0 更新为 1
+        testEntity.setHospitalScopeEnabled(0);
+
+        UpdateRoleDTO dtoWithHospitalScope = new UpdateRoleDTO();
+        dtoWithHospitalScope.setHospitalScopeEnabled(1);  // 启用医院范围权限
+
+        when(roleMapper.selectById(1L)).thenReturn(testEntity);
+        when(roleMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(roleMapper.updateById(any(RoleEntity.class))).thenReturn(1);
+
+        // 执行
+        roleService.updateRole(1L, dtoWithHospitalScope);
+
+        // 断言：验证更新后 hospitalScopeEnabled=1
+        verify(roleMapper, times(1)).updateById(argThat((RoleEntity entity) -> {
+            return entity.getHospitalScopeEnabled() == 1;
+        }));
     }
 
     @Test

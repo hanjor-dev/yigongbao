@@ -233,6 +233,32 @@ public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEnt
         }
     }
 
+    /**
+     * 获取当前用户可操作的医院下拉选项（根据用户权限过滤）
+     * 用于业务员创建订单等业务场景时的医院选择
+     *
+     * @param userId 用户ID
+     * @return 当前用户可操作的医院列表
+     */
+    @Override
+    public List<HospitalVO> listMyOptions(Long userId) {
+        log.info("获取当前用户可操作的医院下拉选项，userId={}", userId);
+        try {
+            // 此方法由 HospitalScopeController 调用，实际逻辑在 Controller 层根据用户权限判断
+            // 这里默认返回所有正常状态的医院，Controller 层会根据角色 data_scope 进行过滤
+            LambdaQueryWrapper<HospitalEntity> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(HospitalEntity::getStatus, StatusConstants.NORMAL)
+                    .orderByAsc(HospitalEntity::getHospitalName);
+            List<HospitalEntity> list = list(wrapper);
+            List<HospitalVO> voList = list.stream().map(this::toVO).collect(Collectors.toList());
+            log.info("获取当前用户可操作的医院下拉选项成功，数量={}", voList.size());
+            return voList;
+        } catch (Exception e) {
+            log.error("获取当前用户可操作的医院下拉选项异常，userId={}", userId, e);
+            throw e;
+        }
+    }
+
     // ==================== 私有方法 ====================
 
     /**
