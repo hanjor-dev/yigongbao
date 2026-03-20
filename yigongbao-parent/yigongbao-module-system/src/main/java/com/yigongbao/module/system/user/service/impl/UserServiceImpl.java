@@ -1,5 +1,13 @@
 package com.yigongbao.module.system.user.service.impl;
 
+/**
+ * 用户管理 Service 实现类
+ * 处理用户相关的业务逻辑，包括用户CRUD、密码管理、状态管理等
+ *
+ * @author hanjor
+ * @date 2026-03-19
+ */
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;

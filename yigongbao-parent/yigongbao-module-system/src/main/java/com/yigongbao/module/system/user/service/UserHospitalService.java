@@ -1,0 +1,38 @@
+package com.yigongbao.module.system.user.service;
+
+import com.yigongbao.module.basic.hospital.vo.HospitalVO;
+
+import java.util.List;
+
+/**
+ * 用户-医院关联 Service 接口
+ *
+ * @author hanjor
+ * @date 2026-03-19
+ */
+public interface UserHospitalService {
+
+    /**
+     * 查询用户的医院列表
+     *
+     * @param userId 用户ID
+     * @return 医院列表
+     */
+    List<HospitalVO> getHospitalsByUserId(Long userId);
+
+    /**
+     * 分配用户医院范围（覆盖式）
+     *
+     * @param userId      用户ID
+     * @param hospitalIds 医院ID列表
+     */
+    void assignHospitals(Long userId, List<Long> hospitalIds);
+
+    /**
+     * 获取当前用户可操作医院（下拉选项）
+     *
+     * @param userId 用户ID
+     * @return 医院列表
+     */
+    List<HospitalVO> getHospitalOptionsByUserId(Long userId);
+}

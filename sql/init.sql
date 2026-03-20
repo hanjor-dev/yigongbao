@@ -161,7 +161,8 @@ INSERT INTO sys_config (config_key, config_name, config_value, config_type, conf
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, redirect, sort, visible, status) VALUES
 (1, 0, '系统管理', 'system', 1, 'Setting', '/system', NULL, '/system/index', 100, 1, 1),
 (2, 0, '权限管理', 'permission', 1, 'Lock', '/permission', NULL, '/permission/index', 90, 1, 1),
-(3, 0, '基础数据', 'basedata', 1, 'Database', '/basedata', NULL, '/basedata/index', 80, 1, 1);
+(3, 0, '基础数据', 'basedata', 1, 'Database', '/basedata', NULL, '/basedata/index', 80, 1, 1),
+(4, 0, '客户管理', 'customer', 1, 'Hospital', '/customer', NULL, '/customer/index', 70, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单（系统管理）
@@ -184,7 +185,16 @@ INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status) VALUES
 (301, 3, '字典管理', 'basedata:dict', 2, 'Dict', '/basedata/dict', 'basedata/dict/index', 1, 1, 1),
-(302, 3, '系统配置', 'basedata:config', 2, 'Config', '/basedata/config', 'basedata/config/index', 2, 1, 1);
+(302, 3, '系统配置', 'basedata:config', 2, 'Config', '/basedata/config', 'basedata/config/index', 2, 1, 1),
+(303, 3, '地区管理', 'basedata:area', 2, 'Map', '/basedata/area', 'basedata/area/index', 3, 1, 1),
+(304, 3, '医院管理', 'basedata:hospital', 2, 'Hospital', '/basedata/hospital', 'basedata/hospital/index', 4, 1, 1),
+(305, 3, '医院组合模板', 'basedata:hospital-template', 2, 'Collection', '/basedata/hospital-template', 'basedata/hospital-template/index', 5, 1, 1);
+
+-- ------------------------------------------------------------
+-- 二级菜单（客户管理）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status) VALUES
+(401, 4, '用户医院分配', 'customer:user-hospital', 2, 'Link', '/customer/user-hospital', 'customer/user-hospital/index', 1, 1, 1);
 
 -- ------------------------------------------------------------
 -- 按钮权限（机构管理）
@@ -272,6 +282,39 @@ INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_
 (1705, 302, '删除配置', 'basedata:config:delete', 3, 5, 1, 1),
 (1706, 302, '刷新配置', 'basedata:config:refresh', 3, 6, 1, 1);
 
+-- ------------------------------------------------------------
+-- 按钮权限（地区管理）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
+(2101, 303, '查看地区列表', 'basedata:area:list', 3, 1, 1, 1);
+
+-- ------------------------------------------------------------
+-- 按钮权限（医院管理）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
+(1801, 304, '查看医院列表', 'basedata:hospital:list', 3, 1, 1, 1),
+(1802, 304, '查看医院详情', 'basedata:hospital:detail', 3, 2, 1, 1),
+(1803, 304, '新增医院', 'basedata:hospital:add', 3, 3, 1, 1),
+(1804, 304, '编辑医院', 'basedata:hospital:edit', 3, 4, 1, 1),
+(1805, 304, '修改状态', 'basedata:hospital:status', 3, 5, 1, 1);
+
+-- ------------------------------------------------------------
+-- 按钮权限（医院组合模板）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
+(1901, 305, '查看模板列表', 'basedata:hospital-template:list', 3, 1, 1, 1),
+(1902, 305, '查看模板详情', 'basedata:hospital-template:detail', 3, 2, 1, 1),
+(1903, 305, '新增模板', 'basedata:hospital-template:add', 3, 3, 1, 1),
+(1904, 305, '编辑模板', 'basedata:hospital-template:edit', 3, 4, 1, 1),
+(1905, 305, '修改状态', 'basedata:hospital-template:status', 3, 5, 1, 1);
+
+-- ------------------------------------------------------------
+-- 按钮权限（用户医院分配）
+-- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
+(2001, 401, '查看用户医院列表', 'customer:user-hospital:list', 3, 1, 1, 1),
+(2002, 401, '分配用户医院', 'customer:user-hospital:assign', 3, 2, 1, 1);
+
 
 -- ============================================================
 -- 机构基础数据初始化（sys_org）
@@ -300,3 +343,33 @@ INSERT INTO sys_user (id, username, password, real_name, phone, account_type, or
 -- 超级管理员角色（ROLE_ADMIN）关联所有资源
 INSERT INTO sys_role_resource (role_id, resource_id)
 SELECT 1, id FROM sys_resource;
+
+
+-- ============================================================
+-- 医院数据初始化（hospital）
+-- 初始化一些示例医院数据
+-- ============================================================
+INSERT INTO hospital (id, hospital_name, hospital_code, area_id, area_name, full_area_name, hospital_level, hospital_type, contact, phone, email, address, status) VALUES
+(1, '北京协和医院', 'HOS-001', 111, '东城区', '中国,北京,北京市,东城区', 1, 1, '张主任', '13800138001', 'info@pekingunion.com', '北京市东城区帅府园1号', 1),
+(2, '上海市第一人民医院', 'HOS-002', 21, '上海市', '中国,上海,上海市', 2, 1, '李医生', '13800138002', 'info@shfirsthospital.com', '上海市虹口区武进路85号', 1),
+(3, '浙江大学医学院附属第一医院', 'HOS-003', 311, '上城区', '中国,浙江,杭州市,上城区', 1, 1, '王医生', '13800138003', 'info@hzdu1hospital.com', '杭州市上城区庆春路79号', 1),
+(4, '广东省人民医院', 'HOS-004', 411, '荔湾区', '中国,广东,广州市,荔湾区', 1, 1, '陈医生', '13800138004', 'info@gdhospital.com', '广州市荔湾区岭南大道123号', 1);
+
+
+-- ============================================================
+-- 医院组合模板数据初始化（hospital_group_template）
+-- ============================================================
+INSERT INTO hospital_group_template (id, template_name, template_code, template_desc, status, remark) VALUES
+(1, '北京市医院联盟', 'TPL-HOS-001', '覆盖北京市主要三甲医院', 1, '用于北京地区业务拓展'),
+(2, '华东地区医院群', 'TPL-HOS-002', '覆盖华东地区重点医院', 1, '用于华东区域业务'),
+(3, '广东省医院联盟', 'TPL-HOS-003', '覆盖广东省主要医院', 1, '用于广东地区业务');
+
+
+-- ============================================================
+-- 医院组合模板明细数据初始化（hospital_group_template_detail）
+-- ============================================================
+INSERT INTO hospital_group_template_detail (id, template_id, hospital_id) VALUES
+(1, 1, 1),
+(2, 2, 2),
+(3, 2, 3),
+(4, 3, 4);

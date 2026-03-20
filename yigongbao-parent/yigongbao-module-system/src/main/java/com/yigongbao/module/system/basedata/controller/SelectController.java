@@ -1,8 +1,8 @@
 package com.yigongbao.module.system.basedata.controller;
 
 import com.yigongbao.common.result.Result;
-import com.yigongbao.module.system.basedata.area.service.AreaService;
-import com.yigongbao.module.system.basedata.area.vo.AreaVO;
+import com.yigongbao.module.basic.area.service.AreaService;
+import com.yigongbao.module.basic.area.vo.AreaVO;
 import com.yigongbao.module.system.basedata.vo.SelectTreeVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dict.service.DictService;

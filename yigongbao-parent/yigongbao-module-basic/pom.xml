@@ -9,19 +9,13 @@
         <artifactId>yigongbao-parent</artifactId>
         <version>1.0.0</version>
     </parent>
-    <artifactId>yigongbao-module-system</artifactId>
+    <artifactId>yigongbao-module-basic</artifactId>
 
     <dependencies>
         <!-- framework -->
         <dependency>
             <groupId>com.yigongbao</groupId>
             <artifactId>yigongbao-framework</artifactId>
-        </dependency>
-
-        <!-- basic：AreaService、HospitalService 等基础数据服务 -->
-        <dependency>
-            <groupId>com.yigongbao</groupId>
-            <artifactId>yigongbao-module-basic</artifactId>
         </dependency>
 
         <!-- 测试依赖 -->
@@ -36,5 +30,4 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
 </project>

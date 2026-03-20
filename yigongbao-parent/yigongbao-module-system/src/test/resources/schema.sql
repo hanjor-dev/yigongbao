@@ -163,49 +163,6 @@ INSERT INTO sys_org (id, org_name, org_code, org_type, area_id, area_name, addre
 (3, '测试经销商', 'ORG-D-001', 2, 3, '广州市', '天河区商业街88号', '王总', '13800138003', 'test@distributor.com', 0, '已禁用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ============================================================
--- 地区表（省市区，与 cnarea_2023 结构一致）
--- ============================================================
-DROP TABLE IF EXISTS sys_area;
-CREATE TABLE sys_area (
-    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键',
-    level               TINYINT         NOT NULL COMMENT '层级（1=省/直辖市，2=市，3=区/县）',
-    parent_code         BIGINT          NOT NULL DEFAULT 0 COMMENT '父级行政代码',
-    area_code           BIGINT          NOT NULL DEFAULT 0 COMMENT '行政代码',
-    zip_code            INT             UNSIGNED NOT NULL DEFAULT 0 COMMENT '邮政编码',
-    city_code           CHAR(6)         NOT NULL DEFAULT '' COMMENT '区号',
-    name                VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '名称',
-    short_name          VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '简称',
-    merger_name         VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '组合名',
-    pinyin              VARCHAR(30)     NOT NULL DEFAULT '' COMMENT '拼音',
-    lng                 DECIMAL(10,6)   NOT NULL DEFAULT 0 COMMENT '经度',
-    lat                 DECIMAL(10,6)   NOT NULL DEFAULT 0 COMMENT '纬度',
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_area_code (area_code),
-    KEY idx_parent_code (parent_code),
-    KEY idx_area_level (level)
-);
-
--- 插入地区测试数据（parent_code/area_code 与 kakuilan/china_area_mysql 一致）
-INSERT INTO sys_area (id, level, parent_code, area_code, zip_code, city_code, name, short_name, merger_name, pinyin, lng, lat) VALUES
--- 省份/直辖市（parent_code=0）
-(1, 1, 0, 110000, 100000, '010', '北京市', '北京', '中国,北京', 'beijing', 116.407526, 39.904030),
-(2, 1, 0, 310000, 200000, '021', '上海市', '上海', '中国,上海', 'shanghai', 121.473701, 31.230416),
-(3, 1, 0, 330000, 310000, '', '浙江省', '浙江', '中国,浙江', 'zhejiang', 120.153576, 30.287459),
-(4, 1, 0, 440000, 510000, '', '广东省', '广东', '中国,广东', 'guangdong', 113.280637, 23.125178),
--- 城市（parent_code=省 area_code）
-(11, 2, 110000, 110100, 100000, '010', '北京市', '北京', '中国,北京,北京市', 'beijing', 116.407526, 39.904030),
-(21, 2, 310000, 310100, 200000, '021', '上海市', '上海', '中国,上海,上海市', 'shanghai', 121.473701, 31.230416),
-(31, 2, 330000, 330100, 310000, '0571', '杭州市', '杭州', '中国,浙江,杭州市', 'hangzhou', 120.155070, 30.274084),
-(32, 2, 330000, 330200, 315000, '0574', '宁波市', '宁波', '中国,浙江,宁波市', 'ningbo', 121.544007, 29.868336),
-(41, 2, 440000, 440100, 510000, '020', '广州市', '广州', '中国,广东,广州市', 'guangzhou', 113.264385, 23.129112),
--- 区县（parent_code=市 area_code）
-(111, 3, 110100, 110101, 100010, '010', '东城区', '东城', '中国,北京,北京市,东城区', 'dongcheng', 116.416357, 39.928353),
-(112, 3, 110100, 110105, 100020, '010', '朝阳区', '朝阳', '中国,北京,北京市,朝阳区', 'chaoyang', 116.443108, 39.921470),
-(311, 3, 330100, 330102, 310002, '0571', '上城区', '上城', '中国,浙江,杭州市,上城区', 'shangcheng', 120.169219, 30.242312),
-(312, 3, 330100, 330105, 310011, '0571', '拱墅区', '拱墅', '中国,浙江,杭州市,拱墅区', 'gongshu', 120.142059, 30.319037),
-(411, 3, 440100, 440103, 510145, '020', '荔湾区', '荔湾', '中国,广东,广州市,荔湾区', 'liwan', 113.244261, 23.125981);
-
--- ------------------------------------------------------------
 -- 部门表
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS sys_dept;
@@ -558,3 +515,18 @@ INSERT INTO sys_login_log (user_id, username, ip, user_agent, login_time, login_
 (1, 'admin', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', CURRENT_TIMESTAMP, 1, NULL),
 (2, 'designer1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', DATEADD('DAY', -1, CURRENT_TIMESTAMP), 1, NULL),
 (3, 'sales1', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', DATEADD('DAY', -1, CURRENT_TIMESTAMP), 0, '密码错误');
+
+-- ------------------------------------------------------------
+-- 用户-医院关联表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_user_hospital;
+CREATE TABLE sys_user_hospital (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    user_id             BIGINT          NOT NULL COMMENT '用户ID',
+    hospital_id         BIGINT          NOT NULL COMMENT '医院ID',
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_hospital (user_id, hospital_id),
+    KEY idx_user_id (user_id),
+    KEY idx_hospital_id (hospital_id)
+);

@@ -210,7 +210,7 @@ class DeptServiceImplTest {
                 BusinessException.class,
                 () -> deptService.createDept(dto)
         );
-        assertEquals(ErrorCodeEnum.ORG_NOT_FOUND_FOR_DEPT.getCode(), exception.getCode());
+        assertEquals(ErrorCodeEnum.ORG_NOT_FOUND.getCode(), exception.getCode());
     }
 
     @Test

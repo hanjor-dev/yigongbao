@@ -293,3 +293,134 @@ CREATE TABLE sys_login_log (
     KEY idx_login_user_id (user_id),
     KEY idx_login_time (login_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='登录日志表';
+
+
+-- ============================================================
+-- 地区表（sys_area）
+-- 用于存储省/市/区三级行政区划数据
+-- 与 https://github.com/kakuilan/china_area_mysql 的 cnarea_2023 结构兼容
+-- ============================================================
+DROP TABLE IF EXISTS sys_area;
+CREATE TABLE sys_area (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键',
+    level           TINYINT         NOT NULL COMMENT '层级（1=省/直辖市，2=市，3=区/县）',
+    parent_code     BIGINT          NOT NULL DEFAULT 0 COMMENT '父级行政代码',
+    area_code       BIGINT          NOT NULL DEFAULT 0 COMMENT '行政代码',
+    zip_code        INT             UNSIGNED NOT NULL DEFAULT 0 COMMENT '邮政编码',
+    city_code       CHAR(6)         NOT NULL DEFAULT '' COMMENT '区号',
+    name            VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '名称',
+    short_name      VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '简称',
+    merger_name     VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '组合名（如：中国,北京,北京市,朝阳区）',
+    pinyin          VARCHAR(30)     NOT NULL DEFAULT '' COMMENT '拼音',
+    lng             DECIMAL(10,6)   NOT NULL DEFAULT 0 COMMENT '经度',
+    lat             DECIMAL(10,6)   NOT NULL DEFAULT 0 COMMENT '纬度',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_area_code (area_code),
+    KEY idx_parent_code (parent_code),
+    KEY idx_area_level (level)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='地区表（省/市/区三级行政区划）';
+
+
+-- ============================================================
+-- 医院表（hospital）
+-- 用于存储客户医院基础信息，作为订单等核心业务的客户数据来源
+-- ============================================================
+DROP TABLE IF EXISTS hospital;
+CREATE TABLE hospital (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    hospital_name       VARCHAR(128)    NOT NULL COMMENT '医院名称',
+    hospital_code       VARCHAR(32)     NOT NULL COMMENT '医院编码（HOS-XXX 格式）',
+    area_id             BIGINT          NOT NULL COMMENT '所属地区ID（关联sys_area表）',
+    area_name           VARCHAR(64)     COMMENT '地区名称（冗余存储）',
+    full_area_name     VARCHAR(256)    COMMENT '完整地区路径（冗余存储，如：中国,北京,北京市,朝阳区）',
+    hospital_level      TINYINT         COMMENT '医院等级（关联字典编码=3，子节点dict_code=3.1/3.2/3.3/3.4/3.5）',
+    hospital_type       TINYINT         COMMENT '医院类型（关联字典编码=4，子节点dict_code=4.1/4.2）',
+    contact             VARCHAR(32)     NOT NULL COMMENT '联系人',
+    phone               VARCHAR(32)     NOT NULL COMMENT '联系电话',
+    email               VARCHAR(64)     COMMENT '电子邮箱',
+    address             VARCHAR(256)    COMMENT '详细地址',
+    credit_code         VARCHAR(32)     COMMENT '统一社会信用代码',
+    business_license     VARCHAR(512)    COMMENT '营业执照（存储路径/URL）',
+    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark              VARCHAR(512)    COMMENT '备注说明',
+
+    -- 通用字段
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_hospital_code (hospital_code),
+    UNIQUE KEY uk_hospital_name (hospital_name),
+    KEY idx_hospital_area_id (area_id),
+    KEY idx_hospital_level (hospital_level),
+    KEY idx_hospital_type (hospital_type),
+    KEY idx_hospital_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院表';
+
+
+-- ============================================================
+-- 医院组合模板表（hospital_group_template）
+-- 用于预设医院分组方案，方便管理员批量分配用户的数据范围权限
+-- ============================================================
+DROP TABLE IF EXISTS hospital_group_template;
+CREATE TABLE hospital_group_template (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    template_name       VARCHAR(64)     NOT NULL COMMENT '模板名称',
+    template_code       VARCHAR(32)     NOT NULL COMMENT '模板编码（TPL-HOS-XXX 格式）',
+    template_desc       VARCHAR(256)    COMMENT '模板描述',
+    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark              VARCHAR(512)    COMMENT '备注说明',
+
+    -- 通用字段
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_template_code (template_code),
+    UNIQUE KEY uk_template_name (template_name),
+    KEY idx_template_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院组合模板表';
+
+
+-- ============================================================
+-- 医院组合模板明细表（hospital_group_template_detail）
+-- 存储医院组合模板与医院的多对多关联关系
+-- ============================================================
+DROP TABLE IF EXISTS hospital_group_template_detail;
+CREATE TABLE hospital_group_template_detail (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    template_id         BIGINT          NOT NULL COMMENT '模板ID（关联hospital_group_template表）',
+    hospital_id         BIGINT          NOT NULL COMMENT '医院ID（关联hospital表）',
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_template_hospital (template_id, hospital_id),
+    KEY idx_template_id (template_id),
+    KEY idx_hospital_id (hospital_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院组合模板明细表';
+
+
+-- ============================================================
+-- 用户-医院关联表（sys_user_hospital）
+-- 存储用户与医院的多对多关联关系，用于数据范围权限控制
+-- 当用户角色数据范围为医院范围（data_scope=4）时，关联此表限制可操作医院
+-- ============================================================
+DROP TABLE IF EXISTS sys_user_hospital;
+CREATE TABLE sys_user_hospital (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    user_id             BIGINT          NOT NULL COMMENT '用户ID（关联sys_user表）',
+    hospital_id         BIGINT          NOT NULL COMMENT '医院ID（关联hospital表）',
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_hospital (user_id, hospital_id),
+    KEY idx_user_id (user_id),
+    KEY idx_hospital_id (hospital_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户-医院关联表';

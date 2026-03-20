@@ -78,7 +78,21 @@ public enum ErrorCodeEnum {
     ACCOUNT_LOCKED(640, "账户已被锁定，请%d分钟后重试"),
     USERNAME_OR_PASSWORD_ERROR(641, "用户名或密码错误"),
     LOGIN_MAX_FAILURES(642, "登录失败次数过多，账户已被锁定"),
-    PERMISSION_DENIED(643, "没有权限执行该操作");
+    PERMISSION_DENIED(643, "没有权限执行该操作"),
+
+    // 医院相关 650-655
+    HOSPITAL_NOT_FOUND(650, "医院不存在"),
+    HOSPITAL_DISABLED(651, "医院已停用"),
+    HOSPITAL_EXISTS(652, "医院名称已存在"),
+
+    // 医院组合模板相关 656-660
+    TEMPLATE_NOT_FOUND(656, "医院组合模板不存在"),
+    TEMPLATE_DISABLED(657, "医院组合模板已停用"),
+    TEMPLATE_EXISTS(658, "医院组合模板名称已存在"),
+    TEMPLATE_HAS_USERS(659, "该模板已被用户使用，无法删除"),
+
+    // 用户-医院关联 661
+    USER_HOSPITAL_NOT_FOUND(661, "用户医院关联不存在");
 
     /**
      * 错误码
