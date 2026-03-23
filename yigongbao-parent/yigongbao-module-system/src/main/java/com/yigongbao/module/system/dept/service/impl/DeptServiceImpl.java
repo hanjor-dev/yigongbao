@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import cn.hutool.core.util.StrUtil;
 
 import java.util.Objects;
 
@@ -62,7 +62,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             // 构建查询条件
             LambdaQueryWrapper<DeptEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(Objects.nonNull(orgId), DeptEntity::getOrgId, orgId)
-                    .like(StringUtils.hasText(deptName), DeptEntity::getDeptName, deptName)
+                    .like(StrUtil.isNotBlank(deptName), DeptEntity::getDeptName, deptName)
                     .eq(Objects.nonNull(status), DeptEntity::getStatus, status)
                     .orderByDesc(DeptEntity::getCreateTime);
             // 执行分页查询
@@ -159,7 +159,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                 throw new BusinessException(ErrorCodeEnum.DEPT_NOT_FOUND);
             }
             // 校验部门名称是否与其他部门重复（同一机构下唯一）
-            if (StringUtils.hasText(dto.getDeptName()) && !dto.getDeptName().equals(entity.getDeptName())) {
+            if (StrUtil.isNotBlank(dto.getDeptName()) && !dto.getDeptName().equals(entity.getDeptName())) {
                 if (isDeptNameExistsExcludingId(dto.getDeptName(), entity.getOrgId(), id)) {
                     log.warn("部门名称已存在，deptName={}", dto.getDeptName());
                     throw new BusinessException(ErrorCodeEnum.DEPT_EXISTS);
@@ -316,7 +316,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                 .last("LIMIT 1");
         DeptEntity lastDept = getOne(wrapper);
         int maxSeq = 0;
-        if (lastDept != null && StringUtils.hasText(lastDept.getDeptCode())) {
+        if (lastDept != null && StrUtil.isNotBlank(lastDept.getDeptCode())) {
             String code = lastDept.getDeptCode();
             String seqStr = code.replace(prefix, "");
             try {

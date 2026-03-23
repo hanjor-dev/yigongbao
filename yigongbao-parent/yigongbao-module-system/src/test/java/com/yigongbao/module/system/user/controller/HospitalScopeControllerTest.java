@@ -1,5 +1,6 @@
 package com.yigongbao.module.system.user.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.module.basic.hospital.vo.HospitalVO;
 import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.service.RoleService;
@@ -15,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -31,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(classes = com.yigongbao.module.system.SystemTestApplication.class)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@Transactional
 @DisplayName("HospitalScopeController 接口测试")
 class HospitalScopeControllerTest {
 
@@ -65,7 +68,7 @@ class HospitalScopeControllerTest {
         testRole.setId(1L);
         testRole.setRoleName("业务员");
         testRole.setRoleCode("salesman");
-        testRole.setHospitalScopeEnabled(1); // HOSPITALS
+        testRole.setHospitalScopeEnabled(1); // 启用医院范围权限
 
         // 准备测试医院
         testHospital = new HospitalVO();
@@ -151,6 +154,22 @@ class HospitalScopeControllerTest {
         when(roleService.getById(1L)).thenReturn(testRole);
         when(userHospitalService.getHospitalsByUserId(1L))
                 .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/system/hospital-scope/my-hospitals/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    /**
+     * 测试用例：角色不存在时返回空列表
+     */
+    @Test
+    @DisplayName("getMyHospitals: 角色不存在时返回空列表")
+    void getMyHospitals_whenRoleNotExists_shouldReturnEmptyList() throws Exception {
+        when(userMapper.selectById(1L)).thenReturn(testUser);
+        when(roleService.getById(1L)).thenReturn(null);
 
         mockMvc.perform(get("/api/system/hospital-scope/my-hospitals/1"))
                 .andExpect(status().isOk())

@@ -3,6 +3,7 @@ package com.yigongbao.module.system.user.service;
 import com.yigongbao.module.basic.hospital.vo.HospitalVO;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 用户-医院关联 Service 接口
@@ -27,6 +28,14 @@ public interface UserHospitalService {
      * @return 医院ID列表
      */
     List<Long> getHospitalIdsByUserId(Long userId);
+
+    /**
+     * 批量查询用户的医院ID列表
+     *
+     * @param userIds 用户ID列表
+     * @return Map<用户ID, 医院ID列表>
+     */
+    Map<Long, List<Long>> listHospitalIdsByUserIds(List<Long> userIds);
 
     /**
      * 分配用户医院范围（覆盖式）

@@ -8,7 +8,7 @@ import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
 import lombok.RequiredArgsConstructor;
-import org.springframework.util.StringUtils;
+import cn.hutool.core.util.StrUtil;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -81,7 +81,7 @@ public class SelectController {
             return Result.success(convertAreaToSelectTree(areaTree));
         } else if ("dict".equals(type)) {
             // 字典树形结构
-            if (!StringUtils.hasText(code)) {
+            if (!StrUtil.isNotBlank(code)) {
                 return Result.error(400, "字典查询需要提供code参数");
             }
             List<DictVO> dictTree = dictService.listTreeByTypeCode(code);
@@ -120,7 +120,7 @@ public class SelectController {
             return Result.success(convertAreaToSelectTree(areaList));
         } else if ("dict".equals(type)) {
             // 字典下拉选项（叶子节点）
-            if (!StringUtils.hasText(code)) {
+            if (!StrUtil.isNotBlank(code)) {
                 return Result.error(400, "字典查询需要提供code参数");
             }
             List<DictVO> dictOptions = dictService.listOptions(code);

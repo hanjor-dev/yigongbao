@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import cn.hutool.core.util.StrUtil;
 
 import java.util.List;
 import java.util.Objects;
@@ -64,7 +64,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             Page<OrgEntity> page = new Page<>(pageNum, pageSize);
             // 构建查询条件
             LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StringUtils.hasText(orgName), OrgEntity::getOrgName, orgName)
+            wrapper.like(StrUtil.isNotBlank(orgName), OrgEntity::getOrgName, orgName)
                     .eq(Objects.nonNull(orgType), OrgEntity::getOrgType, orgType)
                     .eq(Objects.nonNull(areaId), OrgEntity::getAreaId, areaId)
                     .eq(Objects.nonNull(status), OrgEntity::getStatus, status)
@@ -162,7 +162,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                 throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
             }
             // 校验机构名称是否与其他机构重复
-            if (StringUtils.hasText(dto.getOrgName()) && !dto.getOrgName().equals(entity.getOrgName())) {
+            if (StrUtil.isNotBlank(dto.getOrgName()) && !dto.getOrgName().equals(entity.getOrgName())) {
                 if (isOrgNameExistsExcludingId(dto.getOrgName(), id)) {
                     log.warn("机构名称已存在，orgName={}", dto.getOrgName());
                     throw new BusinessException(ErrorCodeEnum.ORG_EXISTS);
@@ -272,7 +272,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             vo.setHospitalTypeName(getDictNameByTypeAndValue(DictCodeConstants.HOSPITAL_TYPE, vo.getHospitalType()));
         }
         // 填充代理产品线名称
-        if (StringUtils.hasText(vo.getAgentProductLine())) {
+        if (StrUtil.isNotBlank(vo.getAgentProductLine())) {
             vo.setAgentProductLineNames(getDictNamesByTypeAndValues(DictCodeConstants.AGENT_PRODUCT_LINE, vo.getAgentProductLine()));
         }
         return vo;
@@ -377,7 +377,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                 .last("LIMIT 1");
         OrgEntity lastOrg = getOne(wrapper);
         int maxSeq = 0;
-        if (lastOrg != null && StringUtils.hasText(lastOrg.getOrgCode())) {
+        if (lastOrg != null && StrUtil.isNotBlank(lastOrg.getOrgCode())) {
             String code = lastOrg.getOrgCode();
             String seqStr = code.replace(prefix, "");
             try {

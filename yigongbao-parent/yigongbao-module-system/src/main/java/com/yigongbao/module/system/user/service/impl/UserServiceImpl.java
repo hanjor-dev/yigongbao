@@ -38,9 +38,16 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import cn.hutool.core.util.StrUtil;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 用户 Service 实现类
@@ -72,15 +79,57 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         try {
             Page<UserEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<UserEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StringUtils.hasText(username), UserEntity::getUsername, username)
-                    .like(StringUtils.hasText(realName), UserEntity::getRealName, realName)
+            wrapper.like(StrUtil.isNotBlank(username), UserEntity::getUsername, username)
+                    .like(StrUtil.isNotBlank(realName), UserEntity::getRealName, realName)
                     .eq(Objects.nonNull(orgId), UserEntity::getOrgId, orgId)
                     .eq(Objects.nonNull(deptId), UserEntity::getDeptId, deptId)
                     .eq(Objects.nonNull(accountType), UserEntity::getAccountType, accountType)
                     .eq(Objects.nonNull(status), UserEntity::getStatus, status)
                     .orderByDesc(UserEntity::getCreateTime);
             IPage<UserEntity> pageResult = page(page, wrapper);
-            IPage<UserVO> voPage = pageResult.convert(this::toVOWithNames);
+
+            // 批量查询关联数据，避免 N+1 问题
+            Map<Long, List<Long>> userHospitalMap = Collections.emptyMap();
+            List<UserEntity> records = pageResult.getRecords();
+            if (!records.isEmpty()) {
+                // 收集所有需要查询的 ID
+                Set<Long> roleIds = records.stream()
+                        .map(UserEntity::getRoleId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+
+                // 批量查询角色信息
+                Map<Long, RoleEntity> roleMap = roleIds.isEmpty() ? Collections.emptyMap()
+                        : roleService.listByIds(roleIds).stream()
+                                .collect(Collectors.toMap(RoleEntity::getId, Function.identity()));
+
+                // 批量查询用户医院关联
+                userHospitalMap = userHospitalService.listHospitalIdsByUserIds(
+                        records.stream().map(UserEntity::getId).filter(Objects::nonNull).collect(Collectors.toList()));
+
+                // 填充关联数据到 VO
+                for (UserEntity entity : records) {
+                    fillEntityWithNames(entity, roleMap);
+                }
+            }
+
+            IPage<UserVO> voPage = pageResult.convert(UserConvert::toVO);
+            // 转换后再填充 VO 中需要名称的字段和医院ID列表
+            for (UserVO vo : voPage.getRecords()) {
+                if (vo.getStatus() != null) {
+                    vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
+                }
+                if (vo.getSex() != null) {
+                    vo.setSexName(StatusConstants.getSexName(vo.getSex()));
+                }
+                if (vo.getAccountType() != null) {
+                    vo.setAccountTypeName(StatusConstants.getAccountTypeName(vo.getAccountType()));
+                }
+                // 填充医院ID列表
+                if (vo.getId() != null) {
+                    vo.setHospitalIds(userHospitalMap.getOrDefault(vo.getId(), Collections.emptyList()));
+                }
+            }
             log.info("分页查询用户列表成功，总数={}", pageResult.getTotal());
             return voPage;
         } catch (Exception e) {
@@ -109,6 +158,40 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         } catch (Exception e) {
             log.error("查询用户详情异常，id={}", id, e);
             throw e;
+        }
+    }
+
+    /**
+     * 填充实体关联名称（使用批量查询的 Map 数据）
+     *
+     * @param entity 用户实体
+     * @param roleMap 角色Map
+     */
+    private void fillEntityWithNames(UserEntity entity, Map<Long, RoleEntity> roleMap) {
+        if (entity == null) {
+            return;
+        }
+        // 填充机构名称
+        if (entity.getOrgId() != null) {
+            OrgEntity orgEntity = orgService.getById(entity.getOrgId());
+            if (orgEntity != null) {
+                entity.setOrgName(orgEntity.getOrgName());
+            }
+        }
+        // 填充部门名称
+        if (entity.getDeptId() != null) {
+            DeptEntity deptEntity = deptService.getById(entity.getDeptId());
+            if (deptEntity != null) {
+                entity.setDeptName(deptEntity.getDeptName());
+            }
+        }
+        // 填充角色名称和编码，以及 hospitalScopeEnabled
+        if (entity.getRoleId() != null) {
+            RoleEntity roleEntity = roleMap.get(entity.getRoleId());
+            if (roleEntity != null) {
+                entity.setRoleName(roleEntity.getRoleName());
+                entity.setRoleCode(roleEntity.getRoleCode());
+            }
         }
     }
 
@@ -161,12 +244,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             fillRedundantFields(entity);
             // 密码加密存储（如果未提供密码则从系统配置获取默认密码）
             String rawPassword;
-            if (StringUtils.hasText(dto.getPassword())) {
+            if (StrUtil.isNotBlank(dto.getPassword())) {
                 rawPassword = dto.getPassword();
             } else {
                 // 从系统配置获取默认密码（已内置兜底逻辑，不会返回 null）
                 rawPassword = configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
-                log.info("使用系统配置默认密码，configKey={}, password={}", SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey(), rawPassword);
+                log.info("使用系统配置默认密码，configKey={}", SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
             }
             entity.setPassword(passwordEncoder.encode(rawPassword));
             entity.setStatus(StatusConstants.NORMAL);
@@ -207,7 +290,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
             // 校验手机号是否与其他用户重复
-            if (StringUtils.hasText(dto.getPhone()) && !dto.getPhone().equals(entity.getPhone())) {
+            if (StrUtil.isNotBlank(dto.getPhone()) && !dto.getPhone().equals(entity.getPhone())) {
                 if (isPhoneExistsExcludingId(dto.getPhone(), id)) {
                     log.warn("手机号已存在，phone={}", dto.getPhone());
                     throw new BusinessException(ErrorCodeEnum.USER_PHONE_EXISTS);
@@ -274,6 +357,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
     /**
      * 删除用户
+     *
+     * @param id 用户ID
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -285,6 +370,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 log.warn("用户不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
+            // 删除用户前先清理医院关联
+            userHospitalService.assignHospitals(id, List.of());
             removeById(id);
             log.info("删除用户成功，id={}", id);
         } catch (BusinessException e) {

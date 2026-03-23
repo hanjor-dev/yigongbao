@@ -18,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -53,6 +55,39 @@ public class UserHospitalServiceImpl implements UserHospitalService {
             return hospitalIds != null ? hospitalIds : new ArrayList<>();
         } catch (Exception e) {
             log.error("查询用户的医院ID列表异常，userId={}", userId, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 批量查询用户的医院ID列表
+     *
+     * @param userIds 用户ID列表
+     * @return Map<用户ID, 医院ID列表>
+     */
+    @Override
+    public Map<Long, List<Long>> listHospitalIdsByUserIds(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        log.info("批量查询用户的医院ID列表，userIds数量={}", userIds.size());
+        try {
+            // 批量查询所有用户-医院关联
+            LambdaQueryWrapper<UserHospitalEntity> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(UserHospitalEntity::getUserId, userIds);
+            List<UserHospitalEntity> userHospitalList = userHospitalMapper.selectList(wrapper);
+
+            // 按用户ID分组
+            Map<Long, List<Long>> result = userHospitalList.stream()
+                    .collect(Collectors.groupingBy(
+                            UserHospitalEntity::getUserId,
+                            Collectors.mapping(UserHospitalEntity::getHospitalId, Collectors.toList())
+                    ));
+
+            log.info("批量查询用户的医院ID列表成功，userIds数量={}", result.size());
+            return result;
+        } catch (Exception e) {
+            log.error("批量查询用户的医院ID列表异常，userIds数量={}", userIds.size(), e);
             throw e;
         }
     }

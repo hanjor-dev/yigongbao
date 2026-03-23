@@ -22,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import cn.hutool.core.util.StrUtil;
 
 import java.util.Objects;
 
@@ -61,7 +61,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             Page<RoleEntity> page = new Page<>(pageNum, pageSize);
             // 构建查询条件
             LambdaQueryWrapper<RoleEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StringUtils.hasText(roleName), RoleEntity::getRoleName, roleName)
+            wrapper.like(StrUtil.isNotBlank(roleName), RoleEntity::getRoleName, roleName)
                     .eq(Objects.nonNull(accountType), RoleEntity::getAccountType, accountType)
                     .eq(Objects.nonNull(status), RoleEntity::getStatus, status)
                     .orderByDesc(RoleEntity::getCreateTime);
@@ -152,7 +152,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             // 校验角色编码是否与其他角色重复
-            if (StringUtils.hasText(dto.getRoleCode()) && !dto.getRoleCode().equals(entity.getRoleCode())) {
+            if (StrUtil.isNotBlank(dto.getRoleCode()) && !dto.getRoleCode().equals(entity.getRoleCode())) {
                 if (isRoleCodeExistsExcludingId(dto.getRoleCode(), id)) {
                     log.warn("角色编码已存在，roleCode={}", dto.getRoleCode());
                     throw new BusinessException(ErrorCodeEnum.ROLE_EXISTS);

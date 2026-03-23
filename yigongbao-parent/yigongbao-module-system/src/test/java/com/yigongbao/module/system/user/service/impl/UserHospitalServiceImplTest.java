@@ -35,14 +35,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * ??-???? Service ????
+ * User-Hospital Association Service Unit Test
  *
  * @author hanjor
  * @date 2026-03-20
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-@DisplayName("??-???? Service ????")
+@DisplayName("UserHospitalService Unit Test")
 class UserHospitalServiceImplTest {
 
     @Mock
@@ -69,21 +69,21 @@ class UserHospitalServiceImplTest {
 
         enabledHospital = new HospitalEntity();
         enabledHospital.setId(1L);
-        enabledHospital.setHospitalName("????");
+        enabledHospital.setHospitalName("Test Hospital 1");
         enabledHospital.setHospitalCode("HOS-001");
         enabledHospital.setStatus(1);
 
         disabledHospital = new HospitalEntity();
         disabledHospital.setId(2L);
-        disabledHospital.setHospitalName("????");
+        disabledHospital.setHospitalName("Test Hospital 2");
         disabledHospital.setHospitalCode("HOS-002");
         disabledHospital.setStatus(0);
     }
 
-    // ==================== getHospitalIdsByUserId ?? ====================
+    // ==================== getHospitalIdsByUserId Tests ====================
 
     @Test
-    @DisplayName("getHospitalIdsByUserId: ????????ID??")
+    @DisplayName("getHospitalIdsByUserId: Returns IDs when user has hospitals")
     void getHospitalIdsByUserId_whenHasHospitals_shouldReturnIds() {
         List<Long> ids = List.of(1L, 2L, 3L);
         when(userHospitalMapper.selectHospitalIdsByUserId(1L)).thenReturn(ids);
@@ -98,7 +98,7 @@ class UserHospitalServiceImplTest {
     }
 
     @Test
-    @DisplayName("getHospitalIdsByUserId: ?????????")
+    @DisplayName("getHospitalIdsByUserId: Returns empty list when no hospitals")
     void getHospitalIdsByUserId_whenNoHospitals_shouldReturnEmptyList() {
         when(userHospitalMapper.selectHospitalIdsByUserId(1L)).thenReturn(List.of());
 
@@ -109,7 +109,7 @@ class UserHospitalServiceImplTest {
     }
 
     @Test
-    @DisplayName("getHospitalIdsByUserId: ???????????")
+    @DisplayName("getHospitalIdsByUserId: Returns empty list when user not exists")
     void getHospitalIdsByUserId_whenUserNotExists_shouldReturnEmptyList() {
         when(userHospitalMapper.selectHospitalIdsByUserId(999L)).thenReturn(null);
 
@@ -119,10 +119,10 @@ class UserHospitalServiceImplTest {
         assertTrue(result.isEmpty());
     }
 
-    // ==================== getHospitalsByUserId ?? ====================
+    // ==================== getHospitalsByUserId Tests ====================
 
     @Test
-    @DisplayName("getHospitalsByUserId: ??????????")
+    @DisplayName("getHospitalsByUserId: Returns list when user has hospitals")
     void getHospitalsByUserId_whenHasHospitals_shouldReturnList() {
         List<Long> ids = List.of(1L);
         when(userHospitalMapper.selectHospitalIdsByUserId(1L)).thenReturn(ids);
@@ -133,11 +133,11 @@ class UserHospitalServiceImplTest {
 
         assertNotNull(result);
         assertEquals(1, result.size());
-        assertEquals("????", result.get(0).getHospitalName());
+        assertEquals("Test Hospital 1", result.get(0).getHospitalName());
     }
 
     @Test
-    @DisplayName("getHospitalsByUserId: ?????????")
+    @DisplayName("getHospitalsByUserId: Returns empty list when no hospitals")
     void getHospitalsByUserId_whenNoHospitals_shouldReturnEmptyList() {
         when(userHospitalMapper.selectHospitalIdsByUserId(1L)).thenReturn(List.of());
 
@@ -148,7 +148,7 @@ class UserHospitalServiceImplTest {
     }
 
     @Test
-    @DisplayName("getHospitalsByUserId: ??ID?????????")
+    @DisplayName("getHospitalsByUserId: Returns empty list when user not exists")
     void getHospitalsByUserId_whenUserNotExists_shouldReturnEmptyList() {
         when(userHospitalMapper.selectHospitalIdsByUserId(999L)).thenReturn(null);
 
@@ -158,10 +158,10 @@ class UserHospitalServiceImplTest {
         assertTrue(result.isEmpty());
     }
 
-    // ==================== assignHospitals ?? ====================
+    // ==================== assignHospitals Tests ====================
 
     @Test
-    @DisplayName("assignHospitals: ??????")
+    @DisplayName("assignHospitals: Assigns hospitals successfully")
     void assignHospitals_shouldAssignHospitals() {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         List<Long> ids = List.of(1L);
@@ -177,7 +177,7 @@ class UserHospitalServiceImplTest {
     }
 
     @Test
-    @DisplayName("assignHospitals: ??????????")
+    @DisplayName("assignHospitals: Throws exception when user not exists")
     void assignHospitals_whenUserNotExists_shouldThrowException() {
         when(userMapper.selectById(999L)).thenReturn(null);
 
@@ -189,7 +189,7 @@ class UserHospitalServiceImplTest {
     }
 
     @Test
-    @DisplayName("assignHospitals: ????ID???????")
+    @DisplayName("assignHospitals: Throws exception when some hospital IDs are invalid")
     void assignHospitals_whenInvalidHospitalId_shouldThrowException() {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         List<Long> idsWithInvalid = List.of(1L, 2L);
@@ -203,7 +203,7 @@ class UserHospitalServiceImplTest {
     }
 
     @Test
-    @DisplayName("assignHospitals: ????????????")
+    @DisplayName("assignHospitals: Throws exception when hospital is disabled")
     void assignHospitals_whenHospitalDisabled_shouldThrowException() {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         List<Long> ids = List.of(2L);
@@ -213,11 +213,12 @@ class UserHospitalServiceImplTest {
                 () -> userHospitalService.assignHospitals(1L, ids));
 
         assertEquals(ErrorCodeEnum.PARAM_ERROR.getCode(), exception.getCode());
+        assertNotNull(exception.getMessage());
         verify(userHospitalMapper, never()).deleteByUserId(any());
     }
 
     @Test
-    @DisplayName("assignHospitals: hospitalIds???????????")
+    @DisplayName("assignHospitals: Only deletes old associations when hospitalIds is empty")
     void assignHospitals_whenEmpty_shouldOnlyDelete() {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         doNothing().when(userHospitalMapper).deleteByUserId(1L);
@@ -229,7 +230,7 @@ class UserHospitalServiceImplTest {
     }
 
     @Test
-    @DisplayName("assignHospitals: hospitalIds?null???????")
+    @DisplayName("assignHospitals: Only deletes old associations when hospitalIds is null")
     void assignHospitals_whenNull_shouldOnlyDelete() {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         doNothing().when(userHospitalMapper).deleteByUserId(1L);
@@ -240,14 +241,14 @@ class UserHospitalServiceImplTest {
         verify(userHospitalMapper, never()).insert(any(UserHospitalEntity.class));
     }
 
-    // ==================== getHospitalOptionsByUserId ?? ====================
+    // ==================== getHospitalOptionsByUserId Tests ====================
 
     @Test
-    @DisplayName("getHospitalOptionsByUserId: ???????????")
+    @DisplayName("getHospitalOptionsByUserId: Returns all enabled hospitals")
     void getHospitalOptionsByUserId_shouldReturnAllEnabledHospitals() {
         HospitalEntity hospital2 = new HospitalEntity();
         hospital2.setId(2L);
-        hospital2.setHospitalName("??2");
+        hospital2.setHospitalName("Test Hospital 2");
         hospital2.setHospitalCode("HOS-002");
         hospital2.setStatus(1);
 
@@ -258,5 +259,16 @@ class UserHospitalServiceImplTest {
 
         assertNotNull(result);
         assertEquals(2, result.size());
+    }
+
+    @Test
+    @DisplayName("getHospitalOptionsByUserId: Returns empty list when no enabled hospitals")
+    void getHospitalOptionsByUserId_whenNoEnabledHospitals_shouldReturnEmptyList() {
+        when(hospitalMapper.selectList(any())).thenReturn(List.of());
+
+        List<HospitalVO> result = userHospitalService.getHospitalOptionsByUserId(1L);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
     }
 }

@@ -35,10 +35,10 @@ CREATE TABLE sys_dict (
 -- 机构类型（dict_code=1）
 INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status, remark, create_time, update_time, create_by, update_by, is_deleted) VALUES
 (1, 0, '1', '机构类型', NULL, 1, 0, 1, '机构类型字典', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
-(2, 1, '1.1', '生产企业', '1', 2, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
-(3, 1, '1.2', '经销商', '2', 2, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
-(4, 1, '1.3', '医疗机构', '3', 2, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
-(5, 1, '1.4', '其他', '4', 2, 4, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(2, 1, '1.1', '生产企业', 'production', 2, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(3, 1, '1.2', '经销商', 'distributor', 2, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(4, 1, '1.3', '医疗机构', 'medical', 2, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(5, 1, '1.4', '其他', 'other', 2, 4, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
 
 -- 性别（dict_code=2）
 (10, 0, '2', '性别', NULL, 1, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
@@ -61,10 +61,10 @@ INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, so
 
 -- 代理产品线（dict_code=5）
 (40, 0, '5', '代理产品线', NULL, 1, 0, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
-(41, 40, '5.1', '医疗器械', '1', 2, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
-(42, 40, '5.2', '医用耗材', '2', 2, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
-(43, 40, '5.3', '药品', '3', 2, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
-(44, 40, '5.4', '设备维修', '4', 2, 4, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(41, 40, '5.1', '医疗器械', 'medical_device', 2, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(42, 40, '5.2', '药品', 'drug', 2, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(43, 40, '5.3', '耗材', 'consumable', 2, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+(44, 40, '5.4', '设备', 'equipment', 2, 4, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
 
 -- 账户分类（dict_code=6）
 (60, 0, '6', '账户分类', NULL, 1, 5, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),

@@ -34,7 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import cn.hutool.core.util.StrUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -74,7 +74,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
         try {
             Page<HospitalGroupTemplateEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<HospitalGroupTemplateEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StringUtils.hasText(templateName), HospitalGroupTemplateEntity::getTemplateName, templateName)
+            wrapper.like(StrUtil.isNotBlank(templateName), HospitalGroupTemplateEntity::getTemplateName, templateName)
                     .eq(Objects.nonNull(status), HospitalGroupTemplateEntity::getStatus, status)
                     .orderByDesc(HospitalGroupTemplateEntity::getCreateTime);
             IPage<HospitalGroupTemplateEntity> pageResult = page(page, wrapper);
@@ -164,7 +164,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                 log.warn("医院组合模板不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.TEMPLATE_NOT_FOUND);
             }
-            if (StringUtils.hasText(dto.getTemplateName()) && !dto.getTemplateName().equals(entity.getTemplateName())) {
+            if (StrUtil.isNotBlank(dto.getTemplateName()) && !dto.getTemplateName().equals(entity.getTemplateName())) {
                 if (isTemplateNameExistsExcludingId(dto.getTemplateName(), id)) {
                     log.warn("模板名称已存在，templateName={}", dto.getTemplateName());
                     throw new BusinessException(ErrorCodeEnum.TEMPLATE_EXISTS);
@@ -400,7 +400,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                 .last("LIMIT 1");
         HospitalGroupTemplateEntity lastEntity = getOne(wrapper);
         int nextSeq = 1;
-        if (lastEntity != null && StringUtils.hasText(lastEntity.getTemplateCode())) {
+        if (lastEntity != null && StrUtil.isNotBlank(lastEntity.getTemplateCode())) {
             String lastCode = lastEntity.getTemplateCode();
             String seqStr = lastCode.substring("TPL-HOS-".length());
             try {

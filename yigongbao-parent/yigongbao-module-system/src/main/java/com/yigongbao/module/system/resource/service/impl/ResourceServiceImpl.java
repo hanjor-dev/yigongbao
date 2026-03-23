@@ -26,7 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import cn.hutool.core.util.StrUtil;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -62,8 +62,8 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
         Page<ResourceEntity> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<ResourceEntity> wrapper = new LambdaQueryWrapper<>();
 
-        wrapper.like(StringUtils.hasText(dto.getResourceName()), ResourceEntity::getResourceName, dto.getResourceName())
-                .like(StringUtils.hasText(dto.getResourceCode()), ResourceEntity::getResourceCode, dto.getResourceCode())
+        wrapper.like(StrUtil.isNotBlank(dto.getResourceName()), ResourceEntity::getResourceName, dto.getResourceName())
+                .like(StrUtil.isNotBlank(dto.getResourceCode()), ResourceEntity::getResourceCode, dto.getResourceCode())
                 .eq(dto.getStatus() != null, ResourceEntity::getStatus, dto.getStatus());
 
         // queryScope 筛选

@@ -68,8 +68,8 @@ public class UpdateUserDTO implements Serializable {
     private Long roleId;
 
     /**
-     * 医院ID列表（当角色 data_scope=4 时，用于分配医院范围权限）
-     * 管理员可以在模板展开后增删调整，最终提交医院ID列表
+     * 医院ID列表（当角色 hospitalScopeEnabled=1 时，用于分配医院范围权限）
+     * 管理员可先选择模板（预览模板医院列表），再微调后提交
      */
     private List<Long> hospitalIds;
 

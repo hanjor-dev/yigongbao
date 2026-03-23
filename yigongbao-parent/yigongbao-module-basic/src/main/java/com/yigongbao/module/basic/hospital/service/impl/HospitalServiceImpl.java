@@ -29,7 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import cn.hutool.core.util.StrUtil;
 
 import java.util.List;
 import java.util.Objects;
@@ -69,7 +69,7 @@ public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEnt
         try {
             Page<HospitalEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<HospitalEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StringUtils.hasText(hospitalName), HospitalEntity::getHospitalName, hospitalName)
+            wrapper.like(StrUtil.isNotBlank(hospitalName), HospitalEntity::getHospitalName, hospitalName)
                     .eq(Objects.nonNull(areaId), HospitalEntity::getAreaId, areaId)
                     .eq(Objects.nonNull(hospitalLevel), HospitalEntity::getHospitalLevel, hospitalLevel)
                     .eq(Objects.nonNull(hospitalType), HospitalEntity::getHospitalType, hospitalType)
@@ -158,7 +158,7 @@ public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEnt
                 log.warn("医院不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
             }
-            if (StringUtils.hasText(dto.getHospitalName()) && !dto.getHospitalName().equals(entity.getHospitalName())) {
+            if (StrUtil.isNotBlank(dto.getHospitalName()) && !dto.getHospitalName().equals(entity.getHospitalName())) {
                 if (isHospitalNameExistsExcludingId(dto.getHospitalName(), id)) {
                     log.warn("医院名称已存在，hospitalName={}", dto.getHospitalName());
                     throw new BusinessException(ErrorCodeEnum.HOSPITAL_EXISTS);
@@ -245,7 +245,7 @@ public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEnt
         log.info("获取当前用户可操作的医院下拉选项，userId={}", userId);
         try {
             // 此方法由 HospitalScopeController 调用，实际逻辑在 Controller 层根据用户权限判断
-            // 这里默认返回所有正常状态的医院，Controller 层会根据角色 data_scope 进行过滤
+            // 这里默认返回所有正常状态的医院，Controller 层会根据角色的 hospitalScopeEnabled 进行过滤
             LambdaQueryWrapper<HospitalEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(HospitalEntity::getStatus, StatusConstants.NORMAL)
                     .orderByAsc(HospitalEntity::getHospitalName);
@@ -332,7 +332,7 @@ public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEnt
                 .last("LIMIT 1");
         HospitalEntity lastEntity = getOne(wrapper);
         int nextSeq = 1;
-        if (lastEntity != null && StringUtils.hasText(lastEntity.getHospitalCode())) {
+        if (lastEntity != null && StrUtil.isNotBlank(lastEntity.getHospitalCode())) {
             String lastCode = lastEntity.getHospitalCode();
             String seqStr = lastCode.substring("HOS-".length());
             try {

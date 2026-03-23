@@ -1,5 +1,6 @@
 package com.yigongbao.module.system.user.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.basic.hospital.vo.HospitalVO;
@@ -9,7 +10,6 @@ import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,7 +28,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/system/hospital-scope")
 @RequiredArgsConstructor
-@Slf4j
 public class HospitalScopeController {
 
     private final UserMapper userMapper;
@@ -50,53 +49,42 @@ public class HospitalScopeController {
      */
     @GetMapping("/my-hospitals/{userId}")
     public Result<List<HospitalVO>> getMyHospitals(@PathVariable Long userId) {
-        log.info("获取当前用户可操作的医院列表，userId={}", userId);
-        try {
-            // 1. 获取用户信息和角色
-            UserEntity user = userMapper.selectById(userId);
-            if (user == null) {
-                log.warn("用户不存在，userId={}", userId);
-                return Result.success(new ArrayList<>());
-            }
-
-            // 2. 检查角色的 hospitalScopeEnabled
-            boolean hospitalScopeEnabled = false;
-            if (user.getRoleId() != null) {
-                RoleEntity role = roleService.getById(user.getRoleId());
-                if (role != null && role.getHospitalScopeEnabled() != null && role.getHospitalScopeEnabled() == StatusConstants.YES) {
-                    hospitalScopeEnabled = true;
-                }
-            }
-
-            // 3. 根据 hospitalScopeEnabled 决定查询范围
-            List<HospitalVO> result;
-            if (hospitalScopeEnabled) {
-                // 启用医院范围权限：查询用户的医院关联表
-                result = userHospitalService.getHospitalsByUserId(userId);
-            } else {
-                // 未启用医院范围权限：返回空列表
-                result = new ArrayList<>();
-            }
-
-            log.info("获取当前用户可操作的医院列表成功，userId={}, hospitalScopeEnabled={}, 医院数量={}",
-                    userId, hospitalScopeEnabled, result.size());
-            return Result.success(result);
-        } catch (Exception e) {
-            log.error("获取当前用户可操作的医院列表异常，userId={}", userId, e);
-            throw e;
+        // 1. 获取用户信息和角色
+        UserEntity user = userMapper.selectById(userId);
+        if (user == null) {
+            return Result.success(new ArrayList<>());
         }
+
+        // 2. 检查角色的 hospitalScopeEnabled
+        boolean hospitalScopeEnabled = false;
+        if (user.getRoleId() != null) {
+            RoleEntity role = roleService.getById(user.getRoleId());
+            if (role != null && role.getHospitalScopeEnabled() != null
+                    && role.getHospitalScopeEnabled() == StatusConstants.YES) {
+                hospitalScopeEnabled = true;
+            }
+        }
+
+        // 3. 根据 hospitalScopeEnabled 决定查询范围
+        List<HospitalVO> result;
+        if (hospitalScopeEnabled) {
+            result = userHospitalService.getHospitalsByUserId(userId);
+        } else {
+            result = new ArrayList<>();
+        }
+
+        return Result.success(result);
     }
 
     /**
      * 获取当前登录用户可操作的医院列表（从请求上下文获取用户ID）
+     * 用于已登录用户直接获取自己的医院权限范围
      *
      * @return 当前用户可操作的医院列表
      */
     @GetMapping("/my-hospitals")
     public Result<List<HospitalVO>> getMyHospitalsByLogin() {
-        // TODO: 从 Sa-Token 获取当前登录用户ID
-        // Long currentUserId = StpUtil.getLoginIdAsLong();
-        // return getMyHospitals(currentUserId);
-        return Result.success(new ArrayList<>());
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        return getMyHospitals(currentUserId);
     }
 }

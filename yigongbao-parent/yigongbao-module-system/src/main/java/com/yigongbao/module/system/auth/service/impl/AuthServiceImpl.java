@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import cn.hutool.core.util.StrUtil;
 
 import java.time.LocalDateTime;
 
@@ -344,7 +344,7 @@ public class AuthServiceImpl implements AuthService {
      */
     private int getMaxLoginFailures() {
         String configValue = configService.getConfigValue(SystemConfigKeyEnum.LOGIN_MAX_FAILURES.getKey());
-        if (StringUtils.hasText(configValue)) {
+        if (StrUtil.isNotBlank(configValue)) {
             try {
                 return Integer.parseInt(configValue);
             } catch (NumberFormatException e) {
@@ -363,7 +363,7 @@ public class AuthServiceImpl implements AuthService {
      */
     private int getLockDurationMinutes() {
         String configValue = configService.getConfigValue(SystemConfigKeyEnum.LOGIN_LOCK_DURATION.getKey());
-        if (StringUtils.hasText(configValue)) {
+        if (StrUtil.isNotBlank(configValue)) {
             try {
                 return Integer.parseInt(configValue);
             } catch (NumberFormatException e) {
