@@ -92,7 +92,49 @@ public enum ErrorCodeEnum {
     TEMPLATE_HAS_USERS(659, "该模板已被用户使用，无法删除"),
 
     // 用户-医院关联 661
-    USER_HOSPITAL_NOT_FOUND(661, "用户医院关联不存在");
+    USER_HOSPITAL_NOT_FOUND(661, "用户医院关联不存在"),
+
+    // 部位相关 662-663
+    BODY_PART_NOT_FOUND(662, "部位不存在"),
+    BODY_PART_NAME_EXISTS(663, "部位名称已存在"),
+
+    // 重建项目相关 670-671
+    REBUILD_PROJECT_NOT_FOUND(670, "项目不存在"),
+    REBUILD_PROJECT_NAME_EXISTS(671, "项目名称已存在"),
+
+    // 操作日志相关 676-677
+    LOG_NOT_FOUND(676, "日志记录不存在"),
+    LOG_EXPORT_FAILED(677, "日志导出失败"),
+
+    // 编码规则相关 678-682
+    CODE_RULE_NOT_FOUND(678, "编码规则不存在"),
+    CODE_RULE_DISABLED(679, "编码规则已禁用"),
+    CODE_GENERATE_FAILED(680, "编码生成失败"),
+    CODE_RULE_EXISTS(686, "规则编码已存在"),
+
+    // 附件相关 681-685
+    ATTACHMENT_NOT_FOUND(681, "附件不存在"),
+    ATTACHMENT_UPLOAD_FAILED(682, "文件上传失败"),
+    ATTACHMENT_DELETE_FAILED(683, "附件删除失败"),
+    ATTACHMENT_TYPE_NOT_ALLOWED(684, "不支持的文件类型"),
+    ATTACHMENT_SIZE_EXCEEDED(685, "文件大小超出限制"),
+
+    // 医院科室相关 690-692
+    HOSPITAL_DEPT_NOT_FOUND(690, "科室不存在"),
+    HOSPITAL_DEPT_EXISTS(691, "科室名称已存在"),
+    HOSPITAL_DEPT_HAS_DOCTORS(692, "该科室下存在医生，无法删除"),
+
+    // 医生相关 700-701
+    DOCTOR_NOT_FOUND(700, "医生不存在"),
+    DOCTOR_EXISTS(701, "该医生已存在"),
+
+    // 产品型号相关 710-711
+    PRODUCT_NOT_FOUND(710, "产品型号不存在"),
+    PRODUCT_EXISTS(711, "产品编码已存在"),
+
+    // 注册证相关 720-721
+    CERT_NOT_FOUND(720, "注册证不存在"),
+    CERT_EXISTS(721, "注册证号已存在");
 
     /**
      * 错误码

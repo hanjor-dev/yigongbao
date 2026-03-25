@@ -113,6 +113,12 @@ Usage notes:
 </skill>
 
 <skill>
+<name>planning-with-files</name>
+<description>Implements Manus-style file-based planning to organize and track progress on complex tasks. Creates task_plan.md, findings.md, and progress.md. Use when asked to plan out, break down, or organize a multi-step project, research task, or any work requiring >5 tool calls. Supports automatic session recovery after /clear.</description>
+<location>global</location>
+</skill>
+
+<skill>
 <name>playwright-cli</name>
 <description>Automates browser interactions for web testing, form filling, screenshots, and data extraction. Use when the user needs to navigate websites, interact with web pages, fill forms, take screenshots, test web applications, or extract information from web pages.</description>
 <location>global</location>
@@ -205,6 +211,12 @@ Usage notes:
 <skill>
 <name>webapp-testing</name>
 <description>Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs.</description>
+<location>global</location>
+</skill>
+
+<skill>
+<name>write-a-prd</name>
+<description>Create a PRD through user interview, codebase exploration, and module design, then submit as a GitHub issue. Use when user wants to write a PRD, create a product requirements document, or plan a new feature.</description>
 <location>global</location>
 </skill>
 

@@ -36,12 +36,6 @@
             <artifactId>mysql-connector-j</artifactId>
         </dependency>
 
-        <!-- mybatis plus (Spring Boot 3.x) -->
-        <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-        </dependency>
-
         <!-- satoken -->
         <dependency>
             <groupId>cn.dev33</groupId>
@@ -60,10 +54,36 @@
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
+        <!-- spring-context（@Async 支持） -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+
+        <!-- Jackson（JSON序列化，替代 fastjson2） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
         <!-- Spring Security Crypto（仅引入 PasswordEncoder，不引入完整安全框架） -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
+        <!-- x-file-storage（统一文件存储，已迁移到 dromara/x-file-storage） -->
+        <dependency>
+            <groupId>org.dromara.x-file-storage</groupId>
+            <artifactId>x-file-storage-spring</artifactId>
+            <version>2.3.0</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Apache POI（Excel导出） -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
         </dependency>
 
     </dependencies>

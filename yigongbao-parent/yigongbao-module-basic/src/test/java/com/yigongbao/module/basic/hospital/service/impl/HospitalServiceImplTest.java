@@ -8,6 +8,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.area.entity.AreaEntity;
 import com.yigongbao.module.basic.area.service.AreaService;
+import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.hospital.dto.CreateHospitalDTO;
 import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
 import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
@@ -42,6 +43,9 @@ class HospitalServiceImplTest {
 
     @Mock
     private AreaService areaService;
+
+    @Mock
+    private CodeGeneratorService codeGeneratorService;
 
     @InjectMocks
     private HospitalServiceImpl hospitalService;
@@ -139,5 +143,30 @@ class HospitalServiceImplTest {
         var result = hospitalService.listHospital(1, 10, null, null, null, null, null);
         assertNotNull(result);
         assertEquals(1, result.getTotal());
+    }
+
+    // ==================== createHospital 测试 ====================
+
+    @Test
+    @DisplayName("createHospital: 创建成功")
+    void createHospital_shouldSuccess() {
+        when(hospitalMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(areaService.getById(1L)).thenReturn(areaEntity);
+        when(codeGeneratorService.generate("HOSPITAL_NO")).thenReturn("HOS-0001");
+        when(hospitalMapper.insert(any(HospitalEntity.class))).thenReturn(1);
+
+        hospitalService.createHospital(createDTO);
+
+        verify(hospitalMapper, times(1)).insert(any(HospitalEntity.class));
+    }
+
+    @Test
+    @DisplayName("createHospital: 医院名称已存在时抛出异常")
+    void createHospital_whenNameExists_shouldThrowException() {
+        when(hospitalMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> hospitalService.createHospital(createDTO));
+        assertEquals(ErrorCodeEnum.HOSPITAL_EXISTS.getCode(), ex.getCode());
     }
 }

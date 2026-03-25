@@ -373,3 +373,41 @@ INSERT INTO hospital_group_template_detail (id, template_id, hospital_id) VALUES
 (2, 2, 2),
 (3, 2, 3),
 (4, 3, 4);
+
+
+-- ============================================================
+-- 编码规则数据初始化（sys_code_rule）
+-- ============================================================
+INSERT INTO sys_code_rule (rule_code, rule_name, prefix, date_format, seq_length, reset_type, status) VALUES
+-- 订单相关编码
+('ORDER_NO', '订单编号', 'ORD-', '{yyyy}{MM}{dd}', 6, 'DAY', 1),
+('WORK_NO', '工单编号', 'WO-', '{yyyy}{MM}', 4, 'MONTH', 1),
+('INSTRUCTION_NO', '指令单编号', 'ZL-', NULL, 4, 'NEVER', 1),
+('DRAWING_NO', '图纸编号', 'TZ-', NULL, 4, 'NEVER', 1),
+('IMAGE_PACKAGE_NO', '影像数据包编号', 'SJB-', '{yyyy}{MM}{dd}', 4, 'DAY', 1),
+('UDI', 'UDI码', 'UDI-', NULL, 8, 'NEVER', 1),
+('ATTACHMENT_NO', '附件编号', 'ATT-', '{yyyy}{MM}{dd}', 6, 'DAY', 1),
+
+-- 基础数据编码
+('HOSPITAL_NO', '医院编码', 'HOS-', NULL, 4, 'NEVER', 1),
+('TEMPLATE_NO', '医院组合模板编码', 'TPL-', NULL, 4, 'NEVER', 1),
+('DEPT_NO', '部门编码', 'DEPT-', NULL, 4, 'NEVER', 1),
+('ORG_NO', '机构编码', NULL, NULL, 4, 'NEVER', 1),
+('BODYPART_NO', '重建部位编码', 'BP-', NULL, 4, 'NEVER', 1),
+('PROJECT_NO', '重建项目编码', 'RP-', NULL, 4, 'NEVER', 1),
+('PRODUCT_CODE', '产品型号编码', 'PROD-', NULL, 4, 'NEVER', 1),
+('HDEPT_NO', '医院科室编码', 'HDEPT-', NULL, 4, 'NEVER', 1);
+
+
+-- ============================================================
+-- 医院科室数据初始化（hospital_dept）
+-- ============================================================
+INSERT INTO hospital_dept (hospital_dept_code, hospital_dept_name, sort, status) VALUES
+('HDEPT-0001', '骨科', 1, 1),
+('HDEPT-0002', '口腔科', 2, 1),
+('HDEPT-0003', '神经外科', 3, 1),
+('HDEPT-0004', '心内科', 4, 1),
+('HDEPT-0005', '普外科', 5, 1),
+('HDEPT-0006', '整形科', 6, 1),
+('HDEPT-0007', '康复科', 7, 1),
+('HDEPT-0008', '影像科', 8, 1);

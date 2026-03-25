@@ -1,13 +1,5 @@
 package com.yigongbao.module.basic.area.service.impl;
 
-/**
- * 地区 Service 实现类
- * 提供省/市/区三级行政区划数据的查询能力
- *
- * @author hanjor
- * @date 2026-03-19
- */
-
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.module.basic.area.convert.AreaConvert;
@@ -18,7 +10,6 @@ import com.yigongbao.module.basic.area.vo.AreaVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
@@ -27,15 +18,14 @@ import java.util.stream.Collectors;
 
 /**
  * 地区 Service 实现类
- * 处理地区相关的业务逻辑，包括省市区三级联动查询等
+ * 提供省/市/区三级行政区划数据的查询能力
  *
  * @author hanjor
- * @date 2026-03-17
+ * @date 2026-03-19
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional(rollbackFor = Exception.class)
 public class AreaServiceImpl extends ServiceImpl<AreaMapper, AreaEntity> implements AreaService {
 
     /** 根节点父级行政代码（省/直辖市） */

@@ -1,5 +1,12 @@
 package com.yigongbao.module.basic.hospital.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.yigongbao.common.constant.CodeRuleConstants;
+import com.yigongbao.common.constant.StatusConstants;
+
 /**
  * 医院 Service 实现类
  * 处理医院相关的业务逻辑，包括医院CRUD、状态管理等
@@ -7,16 +14,11 @@ package com.yigongbao.module.basic.hospital.service.impl;
  * @author hanjor
  * @date 2026-03-19
  */
-
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.area.entity.AreaEntity;
 import com.yigongbao.module.basic.area.service.AreaService;
+import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.hospital.convert.HospitalConvert;
 import com.yigongbao.module.basic.hospital.dto.CreateHospitalDTO;
 import com.yigongbao.module.basic.hospital.dto.UpdateHospitalDTO;
@@ -48,6 +50,7 @@ import java.util.stream.Collectors;
 public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEntity> implements HospitalService {
 
     private final AreaService areaService;
+    private final CodeGeneratorService codeGeneratorService;
 
     /**
      * 分页查询医院列表
@@ -128,7 +131,7 @@ public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEnt
                 throw new BusinessException(ErrorCodeEnum.HOSPITAL_EXISTS);
             }
             HospitalEntity entity = HospitalConvert.toEntity(dto);
-            entity.setHospitalCode(generateHospitalCode());
+            entity.setHospitalCode(codeGeneratorService.generate(CodeRuleConstants.HOSPITAL_NO));
             entity.setStatus(StatusConstants.NORMAL);
             fillAreaInfo(entity);
             save(entity);
@@ -318,29 +321,5 @@ public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEnt
         return count(new LambdaQueryWrapper<HospitalEntity>()
                 .eq(HospitalEntity::getHospitalName, hospitalName)
                 .ne(HospitalEntity::getId, excludeId)) > 0;
-    }
-
-    /**
-     * 生成医院编码
-     *
-     * @return 医院编码（格式：HOS-XXX）
-     */
-    private String generateHospitalCode() {
-        LambdaQueryWrapper<HospitalEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(HospitalEntity::getHospitalCode, "HOS-")
-                .orderByDesc(HospitalEntity::getHospitalCode)
-                .last("LIMIT 1");
-        HospitalEntity lastEntity = getOne(wrapper);
-        int nextSeq = 1;
-        if (lastEntity != null && StrUtil.isNotBlank(lastEntity.getHospitalCode())) {
-            String lastCode = lastEntity.getHospitalCode();
-            String seqStr = lastCode.substring("HOS-".length());
-            try {
-                nextSeq = Integer.parseInt(seqStr) + 1;
-            } catch (NumberFormatException e) {
-                nextSeq = 1;
-            }
-        }
-        return String.format("HOS-%03d", nextSeq);
     }
 }

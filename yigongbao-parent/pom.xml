@@ -27,7 +27,10 @@
         <satoken.version>1.37.0</satoken.version>
         <lombok.version>1.18.30</lombok.version>
         <jackson.version>2.18.3</jackson.version>
-
+        <file.storage.version>2.3.0</file.storage.version>
+        <poi.version>5.2.5</poi.version>
+        <mysql-connector.version>8.3.0</mysql-connector.version>
+        <spring-security-crypto.version>6.2.4</spring-security-crypto.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -130,14 +133,28 @@
             <dependency>
                 <groupId>com.mysql</groupId>
                 <artifactId>mysql-connector-j</artifactId>
-                <version>8.3.0</version>
+                <version>${mysql-connector.version}</version>
             </dependency>
 
             <!-- Spring Security Crypto（仅引入密码加密能力，不引入完整安全框架） -->
             <dependency>
                 <groupId>org.springframework.security</groupId>
                 <artifactId>spring-security-crypto</artifactId>
-                <version>6.2.4</version>
+                <version>${spring-security-crypto.version}</version>
+            </dependency>
+
+            <!-- x-file-storage（统一文件存储） -->
+            <dependency>
+                <groupId>org.dromara.x-file-storage</groupId>
+                <artifactId>x-file-storage-spring</artifactId>
+                <version>${file.storage.version}</version>
+            </dependency>
+
+            <!-- Apache POI（Excel导出） -->
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi-ooxml</artifactId>
+                <version>${poi.version}</version>
             </dependency>
 
         </dependencies>

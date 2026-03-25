@@ -8,6 +8,7 @@ import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.system.org.convert.OrgConvert;
@@ -43,6 +44,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
 
     private final DictService dictService;
     private final UserMapper userMapper;
+    private final CodeGeneratorService codeGeneratorService;
 
     /**
      * 分页查询机构列表
@@ -128,7 +130,8 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                 throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_FOUND);
             }
             // 生成机构编码
-            String orgCode = generateOrgCode(dto.getOrgType());
+            String prefix = getOrgPrefixByType(dto.getOrgType());
+            String orgCode = codeGeneratorService.generateWithCustomPrefix("ORG_NO", prefix);
             // DTO转换为实体对象
             OrgEntity entity = OrgConvert.toEntity(dto);
             entity.setOrgCode(orgCode);
@@ -350,44 +353,18 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     }
 
     /**
-     * 生成机构编码
-     * 编码规则：前缀 + 序号（3位）
-     * - 生产企业 -> ORG-P-001
-     * - 经销商 -> ORG-D-001
-     * - 医疗机构 -> ORG-H-001
-     * - 其他 -> ORG-O-001
+     * 根据机构类型获取编码前缀
      *
      * @param orgType 机构类型
-     * @return 机构编码
+     * @return 编码前缀
      */
-    private String generateOrgCode(Integer orgType) {
-        // 获取机构类型对应的字典值
-        String typeValue = String.valueOf(orgType);
-        // 根据类型值确定前缀
-        String prefix = switch (typeValue) {
+    private String getOrgPrefixByType(Integer orgType) {
+        return switch (String.valueOf(orgType)) {
             case "1" -> "ORG-P-";  // 生产企业
             case "2" -> "ORG-D-";  // 经销商
             case "3" -> "ORG-H-";  // 医疗机构
             default -> "ORG-O-";   // 其他
         };
-        // 查询当前前缀下的最大序号
-        LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(OrgEntity::getOrgCode, prefix)
-                .orderByDesc(OrgEntity::getOrgCode)
-                .last("LIMIT 1");
-        OrgEntity lastOrg = getOne(wrapper);
-        int maxSeq = 0;
-        if (lastOrg != null && StrUtil.isNotBlank(lastOrg.getOrgCode())) {
-            String code = lastOrg.getOrgCode();
-            String seqStr = code.replace(prefix, "");
-            try {
-                maxSeq = Integer.parseInt(seqStr);
-            } catch (NumberFormatException e) {
-                maxSeq = 0;
-            }
-        }
-        // 生成新编码
-        return prefix + String.format("%03d", maxSeq + 1);
     }
 
     /**

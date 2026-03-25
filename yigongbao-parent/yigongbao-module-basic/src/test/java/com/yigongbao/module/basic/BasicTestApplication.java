@@ -14,14 +14,7 @@ import org.springframework.context.annotation.FilterType;
  * @date 2026-03-19
  */
 @SpringBootApplication(scanBasePackages = "com.yigongbao")
-@MapperScan("com.yigongbao.**.mapper")
-@ComponentScan(
-    basePackages = "com.yigongbao",
-    excludeFilters = @ComponentScan.Filter(
-        type = FilterType.REGEX,
-        pattern = "com\\.yigongbao\\.module\\.basic\\.test\\..*"
-    )
-)
+@MapperScan("com.yigongbao.module.basic.**.mapper")
 public class BasicTestApplication {
 
     public static void main(String[] args) {

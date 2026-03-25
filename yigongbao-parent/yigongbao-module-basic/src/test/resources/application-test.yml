@@ -1,9 +1,15 @@
 spring:
+  profiles:
+    active: test
   datasource:
     driver-class-name: org.h2.Driver
     url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false
     username: sa
     password:
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 1GB
   sql:
     init:
       mode: always
@@ -16,3 +22,44 @@ mybatis-plus:
 sa-token:
   interceptor:
     enable: false
+
+# dromara x-file-storage 测试配置
+dromara:
+  x-file-storage:
+    default-platform: local
+    local:
+      domain: http://localhost:8080/api/files
+      path-patterns: /api/files/**
+      path: ${java.io.tmpdir}/yigongbao-test-files
+
+# 医工宝自定义配置（测试环境）
+yigongbao:
+  config:
+    default-values:
+      default-password: "123456"
+      login-max-failures: 5
+      login-lock-duration: 15
+      sms-send-interval: 60
+      max-upload-size: 524288000
+  # 文件存储业务配置
+  file-storage:
+    max-file-size: 524288000
+    allowed-extensions:
+      - jpg
+      - jpeg
+      - png
+      - gif
+      - bmp
+      - pdf
+      - doc
+      - docx
+      - xls
+      - xlsx
+      - zip
+      - rar
+      - stl
+      - obj
+      - 3ds
+      - ply
+      - step
+      - dcm

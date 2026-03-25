@@ -125,6 +125,100 @@ String statusName = StatusConstants.getStatusName(user.getStatus());
 // 返回 "正常" 或 "禁用"
 ```
 
+### 1.6 编码规则常量（CodeRuleConstants）
+
+业务模块调用编码生成器时，**禁止直接使用硬编码字符串**，必须使用 `CodeRuleConstants` 常量类。
+
+**常量类位置**：`com.yigongbao.common.constant.CodeRuleConstants`
+
+```java
+// ✅ 正确：使用 CodeRuleConstants 常量
+import com.yigongbao.common.constant.CodeRuleConstants;
+
+String hospitalCode = codeGeneratorService.generate(CodeRuleConstants.HOSPITAL_NO);
+String productCode = codeGeneratorService.generate(CodeRuleConstants.PRODUCT_CODE);
+
+// ❌ 错误：直接使用硬编码字符串
+String hospitalCode = codeGeneratorService.generate("HOSPITAL_NO");
+String productCode = codeGeneratorService.generate("PRODUCT_CODE");
+```
+
+**提供的编码规则常量**：
+
+| 常量 | 值 | 说明 |
+|-----|---|------|
+| `HOSPITAL_NO` | `HOSPITAL_NO` | 医院编码 |
+| `HDEPT_NO` | `HDEPT_NO` | 机构部门编码 |
+| `PROJECT_NO` | `PROJECT_NO` | 重建项目编码 |
+| `PRODUCT_CODE` | `PRODUCT_CODE` | 产品型号编码 |
+| `BODYPART_NO` | `BODYPART_NO` | 部位编码 |
+| `TEMPLATE_NO` | `TEMPLATE_NO` | 模板编码 |
+| `DOCTOR_NO` | `DOCTOR_NO` | 医生编码 |
+| `ORDER_NO` | `ORDER_NO` | 订单编码 |
+| `ORDER_ITEM_NO` | `ORDER_ITEM_NO` | 订单明细编码 |
+| `DATA_PACKAGE_NO` | `DATA_PACKAGE_NO` | 数据包编码 |
+| `INSTRUCTION_NO` | `INSTRUCTION_NO` | 指令单编码 |
+| `FILE_NO` | `FILE_NO` | 文件编码 |
+
+**扩展方式**：当需要新增编码规则时，先在 `CodeRuleConstants` 中添加常量，再在数据库中插入对应规则数据。
+
+### 1.7 编码生成器使用规范
+
+项目中统一使用 `CodeGeneratorService` 生成各类编码，提供四种生成方式：
+
+| 方法 | 适用场景 | 示例 |
+|------|---------|------|
+| `generate(ruleCode)` | 通用编码生成 | `HOS-0001` |
+| `generateWithBizPrefix(ruleCode, bizPrefix)` | 带业务前缀的编码 | `ZL-ORD-000001-0001` |
+| `generateWithCustomPrefix(ruleCode, prefix)` | 带自定义前缀的编码 | `ORG-P-0001` |
+| `generateWithSeqSuffix(ruleCode, bizKey)` | 带序号后缀的编码（按业务标识隔离序号池） | `202603250001-1` |
+
+**典型使用场景**：
+
+```java
+// 场景1：创建医院时生成编码
+@Service
+@RequiredArgsConstructor
+public class HospitalServiceImpl {
+    private final CodeGeneratorService codeGeneratorService;
+
+    public void createHospital(CreateHospitalDTO dto) {
+        HospitalEntity entity = new HospitalEntity();
+        // 使用常量 + generate 生成
+        entity.setHospitalCode(codeGeneratorService.generate(CodeRuleConstants.HOSPITAL_NO));
+        // ... 其他逻辑
+    }
+}
+
+// 场景2：创建数据包时生成编码（同一订单下的多个数据包）
+@Service
+@RequiredArgsConstructor
+public class DataPackageServiceImpl {
+    private final CodeGeneratorService codeGeneratorService;
+
+    public void createDataPackage(CreateDataPackageDTO dto) {
+        // 第一个数据包
+        String code1 = codeGeneratorService.generateWithSeqSuffix(
+            CodeRuleConstants.DATA_PACKAGE_NO,
+            dto.getOrderCode()  // 传入订单编号作为 bizKey
+        );
+        // 结果：202603250001-1
+
+        // 第二个数据包（同一个订单）
+        String code2 = codeGeneratorService.generateWithSeqSuffix(
+            CodeRuleConstants.DATA_PACKAGE_NO,
+            dto.getOrderCode()
+        );
+        // 结果：202603250001-2
+    }
+}
+```
+
+> **注意**：
+> - `generateWithSeqSuffix` 的 `bizKey` 用于隔离序号池，相同 `bizKey` 共享序号，不同 `bizKey` 各自独立
+> - 如果不需要按业务隔离，直接使用 `generate(ruleCode)` 即可
+> - 前缀字段可置空（数据库中 prefix 为 NULL），系统会自动跳过前缀拼接
+
 ---
 
 ## 二、代码格式
@@ -2277,7 +2371,7 @@ import cn.hutool.core.util.StrUtil;
 
 ---
 
-**文档版本**：1.7
+**文档版本**：1.8
 **创建日期**：2026-03-14
 **作者**：hanjor
-**最后更新**：2026-03-18
+**最后更新**：2026-03-25

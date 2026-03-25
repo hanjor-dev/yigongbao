@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.system.dept.convert.DeptConvert;
 import com.yigongbao.module.system.dept.dto.CreateDeptDTO;
 import com.yigongbao.module.system.dept.dto.UpdateDeptDTO;
@@ -41,6 +42,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
 
     private final OrgService orgService;
     private final UserMapper userMapper;
+    private final CodeGeneratorService codeGeneratorService;
 
     /**
      * 分页查询部门列表
@@ -125,7 +127,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                 throw new BusinessException(ErrorCodeEnum.DEPT_EXISTS);
             }
             // 生成部门编码
-            String deptCode = generateDeptCode();
+            String deptCode = codeGeneratorService.generate("DEPT_NO");
             // DTO转换为实体对象
             DeptEntity entity = DeptConvert.toEntity(dto);
             entity.setDeptCode(deptCode);
@@ -299,34 +301,6 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                 .eq(DeptEntity::getDeptName, deptName)
                 .eq(DeptEntity::getOrgId, orgId)
                 .ne(DeptEntity::getId, excludeId)) > 0;
-    }
-
-    /**
-     * 生成部门编码
-     * 编码规则：DEPT-序号（3位）
-     *
-     * @return 部门编码
-     */
-    private String generateDeptCode() {
-        String prefix = "DEPT-";
-        // 查询当前前缀下的最大序号
-        LambdaQueryWrapper<DeptEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(DeptEntity::getDeptCode, prefix)
-                .orderByDesc(DeptEntity::getDeptCode)
-                .last("LIMIT 1");
-        DeptEntity lastDept = getOne(wrapper);
-        int maxSeq = 0;
-        if (lastDept != null && StrUtil.isNotBlank(lastDept.getDeptCode())) {
-            String code = lastDept.getDeptCode();
-            String seqStr = code.replace(prefix, "");
-            try {
-                maxSeq = Integer.parseInt(seqStr);
-            } catch (NumberFormatException e) {
-                maxSeq = 0;
-            }
-        }
-        // 生成新编码
-        return prefix + String.format("%03d", maxSeq + 1);
     }
 
     /**

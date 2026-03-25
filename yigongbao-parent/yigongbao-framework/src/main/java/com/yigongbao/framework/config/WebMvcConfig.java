@@ -6,6 +6,7 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 
 /**
  * Web MVC 配置类
@@ -18,6 +19,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final ResultInterceptor resultInterceptor;
+
+    private static final String LOCAL_FILE_PATH = "D:/yigongbao/files";
+    private static final String FILE_URL_PATTERN = "/files/**";
+    private static final String FILE_RESOURCE_LOCATION = "file:" + LOCAL_FILE_PATH + "/";
 
     public WebMvcConfig(ResultInterceptor resultInterceptor) {
         this.resultInterceptor = resultInterceptor;
@@ -75,6 +80,18 @@ public class WebMvcConfig implements WebMvcConfigurer {
             .allowCredentials(true)
             // 预检请求的缓存时间（秒）
             .maxAge(3600);
+    }
+
+    /**
+     * 配置静态资源映射
+     * 将本地文件存储路径映射为 HTTP 访问路径
+     *
+     * @param registry 资源处理器注册表
+     */
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler(FILE_URL_PATTERN)
+                .addResourceLocations(FILE_RESOURCE_LOCATION);
     }
 
 }

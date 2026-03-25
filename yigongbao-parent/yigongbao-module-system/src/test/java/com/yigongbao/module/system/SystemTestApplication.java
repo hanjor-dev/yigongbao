@@ -20,7 +20,7 @@ import org.springframework.context.annotation.FilterType;
     basePackages = "com.yigongbao",
     excludeFilters = @ComponentScan.Filter(
         type = FilterType.REGEX,
-        pattern = "com\\.yigongbao\\.module\\.system\\.test\\..*"
+        pattern = "com\\.yigongbao\\.module\\.system\\.test\\..*|com\\.yigongbao\\.module\\.basic\\.test\\..*"
     )
 )
 public class SystemTestApplication {

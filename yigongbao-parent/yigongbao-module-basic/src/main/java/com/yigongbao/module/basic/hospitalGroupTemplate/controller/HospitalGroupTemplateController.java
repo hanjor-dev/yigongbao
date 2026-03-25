@@ -10,7 +10,9 @@ import com.yigongbao.module.basic.hospitalGroupTemplate.vo.HospitalGroupTemplate
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,9 +25,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * 医院组合模板 Controller
+ * 处理医院组合模板相关的 HTTP 请求，包括 CRUD 和状态管理
+ *
+ * @author hanjor
+ * @date 2026-03-19
+ */
 @RestController
-@RequestMapping("/api/basic/hospitalGroupTemplate")
+@RequestMapping("/api/basic/hospital-group-template")
 @RequiredArgsConstructor
+@Validated
 public class HospitalGroupTemplateController {
 
     private final HospitalGroupTemplateService templateService;
@@ -65,7 +75,7 @@ public class HospitalGroupTemplateController {
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(
             @PathVariable Long id,
-            @RequestParam @Min(0) @Max(1) Integer status) {
+            @RequestParam @NotNull(message = "状态不能为空") @Min(0) @Max(1) Integer status) {
         templateService.updateStatus(id, status);
         return Result.success();
     }

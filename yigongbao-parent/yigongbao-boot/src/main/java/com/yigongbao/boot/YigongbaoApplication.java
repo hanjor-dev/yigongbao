@@ -1,6 +1,7 @@
 package com.yigongbao.boot;
 
 import com.yigongbao.common.config.DefaultConfigProperties;
+import org.dromara.x.file.storage.spring.EnableFileStorage;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -16,6 +17,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 @SpringBootApplication(scanBasePackages = "com.yigongbao")
 @MapperScan("com.yigongbao.**.mapper")
 @EnableConfigurationProperties(DefaultConfigProperties.class)
+@EnableFileStorage
 public class YigongbaoApplication {
 
     public static void main(String[] args) {

@@ -28,8 +28,7 @@ CREATE TABLE sys_dict (
     PRIMARY KEY (id),
     UNIQUE KEY uk_dict_code (dict_code),
     KEY idx_parent_id (parent_id),
-    KEY idx_level (level),
-    KEY idx_is_deleted (is_deleted)
+    KEY idx_level (level)
 );
 
 -- 插入测试数据
@@ -107,7 +106,7 @@ CREATE TABLE sys_area (
     level               TINYINT         NOT NULL COMMENT '层级（1=省/直辖市，2=市，3=区/县）',
     parent_code         BIGINT          NOT NULL DEFAULT 0 COMMENT '父级行政代码',
     area_code           BIGINT          NOT NULL DEFAULT 0 COMMENT '行政代码',
-    zip_code            INT             UNSIGNED NOT NULL DEFAULT 0 COMMENT '邮政编码',
+    zip_code            INT             NOT NULL DEFAULT 0 COMMENT '邮政编码',
     city_code           CHAR(6)         NOT NULL DEFAULT '' COMMENT '区号',
     name                VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '名称',
     short_name          VARCHAR(50)     NOT NULL DEFAULT '' COMMENT '简称',
@@ -150,3 +149,240 @@ INSERT INTO sys_area (id, level, parent_code, area_code, zip_code, city_code, na
 (411, 3, 440100, 440103, 510145, '020', '荔湾区', '荔湾', '中国,广东,广州市,荔湾区', 'liwan', 113.244261, 23.125981),
 (412, 3, 440100, 440104, 510030, '020', '越秀区', '越秀', '中国,广东,广州市,越秀区', 'yuexiu', 113.266841, 23.129162),
 (413, 3, 440100, 440105, 510220, '020', '海珠区', '海珠', '中国,广东,广州市,海珠区', 'haizhu', 113.317388, 23.083801);
+
+-- ============================================================
+-- 重建部位表（rebuild_body_part）
+-- ============================================================
+DROP TABLE IF EXISTS rebuild_body_part;
+CREATE TABLE rebuild_body_part (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    parent_id       BIGINT          NOT NULL DEFAULT 0 COMMENT '父级ID（0=顶级身体区域）',
+    name            VARCHAR(100)    NOT NULL COMMENT '部位名称',
+    code            VARCHAR(50)     NOT NULL COMMENT '部位编码',
+    level           INT             NOT NULL DEFAULT 1 COMMENT '层级（1=身体区域，2=具体部位）',
+    designer_code   VARCHAR(10)     DEFAULT NULL COMMENT '设计师编号（如A/B/C）',
+    sort            INT             NOT NULL DEFAULT 0 COMMENT '排序',
+    status          TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark          VARCHAR(512)    DEFAULT NULL COMMENT '备注说明',
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by       BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_body_part_code (code),
+    KEY idx_body_part_parent_id (parent_id),
+    KEY idx_body_part_level (level),
+    KEY idx_body_part_status (status)
+);
+
+INSERT INTO rebuild_body_part (id, parent_id, name, code, level, designer_code, sort, status, remark, create_time, update_time, is_deleted) VALUES
+(1, 0, '头部', 'BP_001', 1, 'A', 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 1, '前额', 'BP_001_001', 2, 'A', 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 1, '后脑', 'BP_001_002', 2, 'B', 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(4, 0, '躯干', 'BP_002', 1, 'B', 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+
+-- ============================================================
+-- 重建项目表（rebuild_project）
+-- ============================================================
+DROP TABLE IF EXISTS rebuild_project;
+CREATE TABLE rebuild_project (
+    id                    BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    body_part_id          BIGINT          NOT NULL COMMENT '关联部位ID',
+    parent_id             BIGINT          NOT NULL DEFAULT 0 COMMENT '父项目ID（0=顶级重建项目）',
+    name                  VARCHAR(100)    NOT NULL COMMENT '项目名称',
+    code                  VARCHAR(50)     NOT NULL COMMENT '项目编码',
+    level                 INT             NOT NULL DEFAULT 1 COMMENT '层级（1=重建项目，2=子重建项目）',
+    standard_price        DECIMAL(10,2)   DEFAULT NULL COMMENT '标准价格（元）',
+    urgent_price          DECIMAL(10,2)   DEFAULT NULL COMMENT '加急价格（元）',
+    category              VARCHAR(50)     DEFAULT NULL COMMENT '项目分类（如：模型、导板）',
+    estimated_hours       DECIMAL(8,2)    DEFAULT NULL COMMENT '预计耗时（小时，支持小数）',
+    description           TEXT            DEFAULT NULL COMMENT '项目说明模板',
+    forming_requirements  TEXT            DEFAULT NULL COMMENT '成形需求模板',
+    sort                  INT             NOT NULL DEFAULT 0 COMMENT '排序',
+    status                TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark                VARCHAR(500)    DEFAULT NULL COMMENT '备注说明',
+    create_time           DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time           DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by             BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by             BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted            TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_project_code (code),
+    KEY idx_project_body_part_id (body_part_id),
+    KEY idx_project_parent_id (parent_id),
+    KEY idx_project_level (level),
+    KEY idx_project_status (status)
+);
+
+INSERT INTO rebuild_project (id, body_part_id, parent_id, name, code, level, standard_price, urgent_price, category, estimated_hours, sort, status, create_time, update_time, is_deleted) VALUES
+(1, 1, 0, '颅骨重建', 'RP_1_001', 1, 5000.00, 7500.00, '模型', 8.5, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 1, 1, '颞骨重建', 'RP_1_001_001', 2, 3000.00, 4500.00, '导板', 5.0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 1, 0, '面部轮廓', 'RP_1_002', 1, 8000.00, 12000.00, '模型', 12.0, 2, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+
+-- ============================================================
+-- 医院科室表（hospital_dept）
+-- ============================================================
+DROP TABLE IF EXISTS hospital_dept;
+CREATE TABLE hospital_dept (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    hospital_dept_code  VARCHAR(50)     NOT NULL COMMENT '科室编码',
+    hospital_dept_name  VARCHAR(100)    NOT NULL COMMENT '科室名称',
+    sort                INT             DEFAULT 0 COMMENT '排序',
+    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark              VARCHAR(500)    DEFAULT NULL COMMENT '备注说明',
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+    PRIMARY KEY (id),
+    KEY idx_hdept_code (hospital_dept_code)
+);
+
+INSERT INTO hospital_dept (id, hospital_dept_code, hospital_dept_name, sort, status, remark, create_time, update_time, is_deleted) VALUES
+(1, 'HDEPT-0001', '骨科', 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 'HDEPT-0002', '口腔科', 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+
+-- ============================================================
+-- 医生表（doctor）
+-- ============================================================
+DROP TABLE IF EXISTS doctor;
+CREATE TABLE doctor (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    doctor_name         VARCHAR(50)     NOT NULL COMMENT '医生姓名',
+    doctor_phone       VARCHAR(20)     DEFAULT NULL COMMENT '医生电话',
+    hospital_id        BIGINT          NOT NULL COMMENT '所属医院ID',
+    hospital_dept_id    BIGINT          DEFAULT NULL COMMENT '所属科室ID',
+    creator_id          BIGINT          DEFAULT NULL COMMENT '创建该医生记录的业务员ID',
+    order_count         INT             DEFAULT 0 COMMENT '关联订单数量',
+    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark              VARCHAR(500)    DEFAULT NULL COMMENT '备注说明',
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+    PRIMARY KEY (id),
+    KEY idx_doctor_hospital (hospital_id),
+    KEY idx_doctor_dept (hospital_dept_id),
+    KEY idx_doctor_creator (creator_id)
+);
+
+INSERT INTO doctor (id, doctor_name, doctor_phone, hospital_id, hospital_dept_id, creator_id, order_count, status, remark, create_time, update_time, is_deleted) VALUES
+(1, '张三', '13800138001', 1, 1, 1, 5, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, '李四', '13800138002', 1, 2, 1, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+
+-- ============================================================
+-- 产品型号表（product）
+-- ============================================================
+DROP TABLE IF EXISTS product;
+CREATE TABLE product (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    product_code        VARCHAR(50)      NOT NULL COMMENT '产品型号编码',
+    product_name        VARCHAR(100)     NOT NULL COMMENT '产品名称',
+    category            VARCHAR(50)      DEFAULT NULL COMMENT '产品分类',
+    spec                VARCHAR(100)    DEFAULT NULL COMMENT '规格',
+    cert_id             BIGINT          DEFAULT NULL COMMENT '关联注册证ID',
+    material            VARCHAR(100)     DEFAULT NULL COMMENT '材质',
+    color_options       VARCHAR(500)    DEFAULT NULL COMMENT '可选颜色（JSON数组）',
+    price               DECIMAL(12,2)   DEFAULT NULL COMMENT '标准价格',
+    image_url           VARCHAR(500)     DEFAULT NULL COMMENT '产品图片URL',
+    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark              VARCHAR(500)    DEFAULT NULL COMMENT '备注说明',
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+    PRIMARY KEY (id),
+    KEY idx_product_code (product_code),
+    KEY idx_product_cert (cert_id),
+    KEY idx_product_category (category)
+);
+
+INSERT INTO product (id, product_code, product_name, category, spec, cert_id, material, price, status, create_time, update_time, is_deleted) VALUES
+(1, 'P-0001', '膝关节假体', '关节', '标准型', 1, '钛合金', 50000.00, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 'P-0002', '髋关节假体', '关节', '加厚型', 1, '钴铬合金', 65000.00, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+
+-- ============================================================
+-- 注册证表（registration_cert）
+-- ============================================================
+DROP TABLE IF EXISTS registration_cert;
+CREATE TABLE registration_cert (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    cert_code          VARCHAR(50)      NOT NULL COMMENT '注册证号',
+    cert_name          VARCHAR(100)    NOT NULL COMMENT '注册证名称',
+    valid_from          DATE            DEFAULT NULL COMMENT '有效期开始',
+    valid_to            DATE            DEFAULT NULL COMMENT '有效期截止',
+    cert_file_url      VARCHAR(500)    DEFAULT NULL COMMENT '注册证扫描件URL',
+    status              TINYINT         DEFAULT 1 COMMENT '状态（0=过期，1=有效）',
+    remark              VARCHAR(500)    DEFAULT NULL COMMENT '备注说明',
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+    PRIMARY KEY (id),
+    KEY idx_cert_code (cert_code),
+    KEY idx_cert_status (status)
+);
+
+INSERT INTO registration_cert (id, cert_code, cert_name, valid_from, valid_to, status, remark, create_time, update_time, is_deleted) VALUES
+(1, 'REG-20260001', '医疗器械注册证', '2026-01-01', '2028-12-31', 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 'REG-20230002', '过期的注册证', '2023-01-01', '2023-12-31', 0, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+
+-- ============================================================
+-- 编码规则表（sys_code_rule）
+-- ============================================================
+DROP TABLE IF EXISTS sys_code_rule;
+CREATE TABLE sys_code_rule (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    rule_code      VARCHAR(50)      NOT NULL COMMENT '规则编码',
+    rule_name      VARCHAR(100)    NOT NULL COMMENT '规则名称',
+    prefix         VARCHAR(50)      DEFAULT NULL COMMENT '前缀',
+    date_format    VARCHAR(50)      DEFAULT NULL COMMENT '日期格式',
+    seq_length     INT             DEFAULT 6 COMMENT '序号长度',
+    reset_type     VARCHAR(20)     DEFAULT 'NEVER' COMMENT '重置类型（DAY/MONTH/YEAR/NEVER）',
+    current_value  BIGINT          DEFAULT 0 COMMENT '当前序号值',
+    step           INT             DEFAULT 1 COMMENT '递增步长',
+    status         TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark         VARCHAR(500)    DEFAULT NULL COMMENT '备注说明',
+    create_time    DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time    DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by      BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by      BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted     TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_rule_code (rule_code),
+    KEY idx_rule_status (status)
+);
+
+INSERT INTO sys_code_rule (id, rule_code, rule_name, prefix, date_format, seq_length, reset_type, step, status, create_time, update_time, is_deleted) VALUES
+(1, 'BODY_PART_CODE', '部位编码', 'BP-', '{yyyy}{MM}', 4, 'NEVER', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 'REBUILD_PROJECT_CODE', '重建项目编码', 'RP-', '{yyyy}{MM}', 4, 'NEVER', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 'PRODUCT_CODE', '产品型号编码', 'P-', NULL, 4, 'NEVER', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+
+-- ============================================================
+-- 编码序号表（sys_code_sequence）
+-- ============================================================
+DROP TABLE IF EXISTS sys_code_sequence;
+CREATE TABLE sys_code_sequence (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    rule_code      VARCHAR(50)      NOT NULL COMMENT '规则编码',
+    biz_key        VARCHAR(64)     DEFAULT NULL COMMENT '业务标识（用于按业务维度隔离序号，如订单编号，为空表示全局序号）',
+    current_seq    BIGINT          DEFAULT 0 COMMENT '当前序号',
+    last_date      DATE            DEFAULT NULL COMMENT '上次重置日期',
+    version        INT             DEFAULT 0 COMMENT '乐观锁版本号',
+    create_time    DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time    DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_seq_rule_biz_key (rule_code, biz_key),
+    KEY idx_seq_rule_code (rule_code),
+    KEY idx_seq_last_date (last_date)
+);
+
+INSERT INTO sys_code_sequence (id, rule_code, biz_key, current_seq, last_date, version, create_time, update_time) VALUES
+(1, 'BODY_PART_CODE', NULL, 0, NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(2, 'REBUILD_PROJECT_CODE', NULL, 0, NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(3, 'PRODUCT_CODE', NULL, 0, NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

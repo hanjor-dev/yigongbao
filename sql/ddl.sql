@@ -424,3 +424,348 @@ CREATE TABLE sys_user_hospital (
     KEY idx_user_id (user_id),
     KEY idx_hospital_id (hospital_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户-医院关联表';
+
+
+-- ============================================================
+-- 重建部位表（rebuild_body_part）
+-- 用于管理身体部位树形结构（最多2级：身体区域 → 具体部位）
+-- 设计师编号用于自动匹配设计师
+-- ============================================================
+DROP TABLE IF EXISTS rebuild_body_part;
+CREATE TABLE rebuild_body_part (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    parent_id       BIGINT          NOT NULL DEFAULT 0 COMMENT '父级ID（0=顶级身体区域）',
+    name            VARCHAR(100)    NOT NULL COMMENT '部位名称',
+    code            VARCHAR(50)     NOT NULL COMMENT '部位编码',
+    level           INT             NOT NULL DEFAULT 1 COMMENT '层级（1=身体区域，2=具体部位）',
+    designer_code   VARCHAR(10)     DEFAULT NULL COMMENT '设计师编号（如A/B/C）',
+    sort            INT             NOT NULL DEFAULT 0 COMMENT '排序',
+    status          TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark          VARCHAR(512)    DEFAULT NULL COMMENT '备注说明',
+
+    -- 通用字段
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by       BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_body_part_code (code),
+    KEY idx_body_part_parent_id (parent_id),
+    KEY idx_body_part_level (level),
+    KEY idx_body_part_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='重建部位表';
+
+
+-- ============================================================
+-- 重建项目表（rebuild_project）
+-- 用于管理重建项目树形结构（部位 → 重建项目 → 子重建项目）
+-- 支持价格、耗时、成形需求等模板信息
+-- ============================================================
+DROP TABLE IF EXISTS rebuild_project;
+CREATE TABLE rebuild_project (
+    id                    BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    body_part_id          BIGINT          NOT NULL COMMENT '关联部位ID（关联rebuild_body_part表）',
+    parent_id             BIGINT          NOT NULL DEFAULT 0 COMMENT '父项目ID（0=顶级重建项目）',
+    name                  VARCHAR(100)    NOT NULL COMMENT '项目名称',
+    code                  VARCHAR(50)     NOT NULL COMMENT '项目编码',
+    level                 INT             NOT NULL DEFAULT 1 COMMENT '层级（1=重建项目，2=子重建项目）',
+    standard_price        DECIMAL(10,2)   DEFAULT NULL COMMENT '标准价格（元）',
+    urgent_price          DECIMAL(10,2)   DEFAULT NULL COMMENT '加急价格（元）',
+    category               VARCHAR(50)     DEFAULT NULL COMMENT '项目分类（如：模型、导板）',
+    estimated_hours       DECIMAL(8,2)    DEFAULT NULL COMMENT '预计耗时（小时，支持小数）',
+    description           TEXT            DEFAULT NULL COMMENT '项目说明模板',
+    forming_requirements  TEXT            DEFAULT NULL COMMENT '成形需求模板',
+    sort                  INT             NOT NULL DEFAULT 0 COMMENT '排序',
+    status                TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark                VARCHAR(500)    DEFAULT NULL COMMENT '备注说明',
+
+    -- 通用字段
+    create_time           DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time           DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by             BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by             BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted            TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_project_code (code),
+    KEY idx_project_body_part_id (body_part_id),
+    KEY idx_project_parent_id (parent_id),
+    KEY idx_project_level (level),
+    KEY idx_project_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='重建项目表';
+
+
+-- ============================================================
+-- 操作日志表（sys_operation_log）
+-- 用于记录用户的操作行为，支持审计追溯
+-- ============================================================
+DROP TABLE IF EXISTS sys_operation_log;
+CREATE TABLE sys_operation_log (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    module         VARCHAR(64)     COMMENT '请求模块',
+    business_type  INT             COMMENT '业务类型（关联 OperationTypeEnum 枚举）',
+    business_type_name VARCHAR(32) COMMENT '业务类型名称',
+    operation      VARCHAR(64)     COMMENT '操作描述',
+    description     VARCHAR(256)   COMMENT '业务描述',
+    request_method VARCHAR(10)     COMMENT '请求方法（GET/POST/PUT/DELETE）',
+    request_url    VARCHAR(512)   COMMENT '请求URL',
+    request_params TEXT            COMMENT '请求参数（JSON格式，已脱敏）',
+    ip             VARCHAR(64)    COMMENT '请求IP地址',
+    location       VARCHAR(128)   COMMENT '操作地点',
+    user_agent     VARCHAR(512)   COMMENT 'User-Agent',
+    user_id        BIGINT          COMMENT '操作用户ID',
+    username       VARCHAR(64)    COMMENT '操作用户名',
+    real_name      VARCHAR(64)   COMMENT '操作用户真实姓名',
+    status         INT             COMMENT '响应状态（0=失败，1=成功）',
+    error_message  VARCHAR(512)   COMMENT '错误信息',
+    duration       BIGINT          COMMENT '执行时长（毫秒）',
+    operation_time DATETIME       DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+
+    PRIMARY KEY (id),
+    KEY idx_log_module (module),
+    KEY idx_log_business_type (business_type),
+    KEY idx_log_user_id (user_id),
+    KEY idx_log_status (status),
+    KEY idx_log_operation_time (operation_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志表';
+
+
+-- ============================================================
+-- 编码规则表（sys_code_rule）
+-- 用于配置和管理系统中各类编码的生成规则
+-- ============================================================
+DROP TABLE IF EXISTS sys_code_rule;
+CREATE TABLE sys_code_rule (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    rule_code      VARCHAR(64)     NOT NULL COMMENT '规则编码（如：ORDER_NO）',
+    rule_name      VARCHAR(128)   NOT NULL COMMENT '规则名称',
+    prefix         VARCHAR(32)    COMMENT '前缀（如：ORD-）',
+    date_format    VARCHAR(64)    COMMENT '日期格式（支持 {yyyy}{MM}{dd} 等）',
+    seq_length     INT             DEFAULT 6 COMMENT '序号长度（不够补0）',
+    reset_type     VARCHAR(32)    DEFAULT 'NEVER' COMMENT '重置类型（DAY/MONTH/YEAR/NEVER）',
+    current_value  BIGINT          DEFAULT 0 COMMENT '当前序号值',
+    step           INT             DEFAULT 1 COMMENT '递增步长',
+    status         TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=启用）',
+    remark         VARCHAR(512)   COMMENT '备注',
+
+    -- 通用字段
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by       BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_rule_code (rule_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='编码规则表';
+
+
+-- ============================================================
+-- 编码序号表（sys_code_sequence）
+-- 用于记录各编码规则的当前序号，支持乐观锁更新
+-- 支持按业务标识（biz_key）隔离序号，用于同一规则下的不同业务分组
+-- ============================================================
+DROP TABLE IF EXISTS sys_code_sequence;
+CREATE TABLE sys_code_sequence (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    rule_code      VARCHAR(64)     NOT NULL COMMENT '规则编码',
+    biz_key        VARCHAR(64)     DEFAULT NULL COMMENT '业务标识（用于按业务维度隔离序号，如订单编号，为空表示全局序号）',
+    current_seq    BIGINT          DEFAULT 0 COMMENT '当前序号',
+    last_date      DATE            COMMENT '上次重置日期（用于判断是否需要重置）',
+    version        INT             DEFAULT 0 COMMENT '乐观锁版本号',
+
+    -- 通用字段
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_seq_rule_biz_key (rule_code, biz_key),
+    KEY idx_seq_rule_code (rule_code),
+    KEY idx_seq_last_date (last_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='编码序号表';
+
+
+-- ============================================================
+-- 文件记录表（file_detail）
+-- 基于 x-file-storage 框架 FileRecorder 接口标准实现
+-- 支持多存储平台、业务关联、缩略图、元数据、分片上传
+-- 注意：禁止在此表上定义 is_deleted 字段的索引，MyBatis-Plus @TableLogic 会自动创建
+-- ============================================================
+DROP TABLE IF EXISTS file_detail;
+CREATE TABLE file_detail (
+    id                  VARCHAR(32)  NOT NULL COMMENT '文件ID（雪花算法生成）',
+    url                 VARCHAR(512) NOT NULL COMMENT '文件访问地址',
+    size                BIGINT(20)   DEFAULT NULL COMMENT '文件大小，单位字节',
+    filename            VARCHAR(256) DEFAULT NULL COMMENT '保存的文件名',
+    original_filename   VARCHAR(256) DEFAULT NULL COMMENT '原始文件名',
+    base_path           VARCHAR(256) DEFAULT NULL COMMENT '基础存储路径',
+    path                VARCHAR(256) DEFAULT NULL COMMENT '存储路径',
+    ext                 VARCHAR(32)  DEFAULT NULL COMMENT '文件扩展名',
+    content_type        VARCHAR(128) DEFAULT NULL COMMENT 'MIME类型',
+    platform            VARCHAR(32)  DEFAULT NULL COMMENT '存储平台',
+    th_url              VARCHAR(512) DEFAULT NULL COMMENT '缩略图访问地址',
+    th_filename         VARCHAR(256) DEFAULT NULL COMMENT '缩略图文件名',
+    th_size             BIGINT(20)   DEFAULT NULL COMMENT '缩略图大小，单位字节',
+    th_content_type     VARCHAR(128) DEFAULT NULL COMMENT '缩略图MIME类型',
+    object_id           VARCHAR(32)  DEFAULT NULL COMMENT '关联业务ID',
+    object_type         VARCHAR(32)  DEFAULT NULL COMMENT '关联业务类型（如 registration_cert、doctor_cert）',
+    metadata            TEXT COMMENT '文件元数据',
+    user_metadata       TEXT COMMENT '用户元数据',
+    th_metadata         TEXT COMMENT '缩略图元数据',
+    th_user_metadata    TEXT COMMENT '缩略图用户元数据',
+    attr                TEXT COMMENT '附加属性',
+    file_acl            VARCHAR(32)  DEFAULT NULL COMMENT '文件ACL',
+    th_file_acl         VARCHAR(32)  DEFAULT NULL COMMENT '缩略图ACL',
+    hash_info           TEXT COMMENT '哈希信息（MD5/SHA256）',
+    upload_id           VARCHAR(128) DEFAULT NULL COMMENT '上传ID（手动分片上传时使用）',
+    upload_status       INT          DEFAULT NULL COMMENT '上传状态：1-初始化完成，2-上传完成',
+    create_time         DATETIME     DEFAULT NULL COMMENT '创建时间',
+    update_time         DATETIME     DEFAULT NULL COMMENT '更新时间',
+    create_by           BIGINT       DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT       DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT      DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+
+    PRIMARY KEY (id),
+    KEY idx_file_detail_object (object_type, object_id),
+    KEY idx_file_detail_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件记录表（x-file-storage FileRecorder）';
+
+
+-- ============================================================
+-- 文件分片信息表（file_part_detail）
+-- 仅在手动分片上传（大文件断点续传）时使用
+-- ============================================================
+DROP TABLE IF EXISTS file_part_detail;
+CREATE TABLE file_part_detail (
+    id          VARCHAR(32)  NOT NULL COMMENT '分片ID',
+    platform    VARCHAR(32)  DEFAULT NULL COMMENT '存储平台',
+    upload_id   VARCHAR(128) DEFAULT NULL COMMENT '上传ID',
+    e_tag       VARCHAR(255) DEFAULT NULL COMMENT '分片ETag',
+    part_number INT          DEFAULT NULL COMMENT '分片号',
+    part_size   BIGINT(20)  DEFAULT NULL COMMENT '分片大小',
+    hash_info   TEXT COMMENT '哈希信息',
+    create_time DATETIME     DEFAULT NULL COMMENT '创建时间',
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件分片信息表';
+
+
+-- ============================================================
+-- 医院科室表（hospital_dept）
+-- 独立科室表，与医院无关，作为通用字典供订单等业务模块使用
+-- ============================================================
+DROP TABLE IF EXISTS hospital_dept;
+CREATE TABLE hospital_dept (
+    id                   BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    hospital_dept_code   VARCHAR(32)     NOT NULL COMMENT '科室编码（系统唯一，如 HDEPT-0001）',
+    hospital_dept_name   VARCHAR(100)   NOT NULL COMMENT '科室名称',
+    sort                 INT             DEFAULT 0 COMMENT '排序',
+    status               TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark               VARCHAR(512)   COMMENT '备注',
+
+    -- 通用字段
+    create_time          DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time          DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by            BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by            BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted           TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_hospital_dept_code (hospital_dept_code),
+    KEY idx_hospital_dept_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院科室表';
+
+
+-- ============================================================
+-- 医生表（doctor）
+-- 用于管理医生基础信息，关联业务员（创建人）和医院
+-- ============================================================
+DROP TABLE IF EXISTS doctor;
+CREATE TABLE doctor (
+    id                BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    doctor_name       VARCHAR(64)     NOT NULL COMMENT '医生姓名',
+    doctor_phone      VARCHAR(32)    COMMENT '医生电话',
+    hospital_id       BIGINT          COMMENT '所属医院ID',
+    hospital_dept_id  BIGINT          COMMENT '所属医院科室ID（关联hospital_dept表）',
+    creator_id        BIGINT          COMMENT '创建该医生记录的业务员ID',
+    order_count       INT             DEFAULT 0 COMMENT '关联订单数量',
+    status            TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark            VARCHAR(512)   COMMENT '备注',
+
+    -- 通用字段
+    create_time       DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time       DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by         BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by         BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted        TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    KEY idx_doctor_hospital (hospital_id),
+    KEY idx_doctor_hospital_dept (hospital_dept_id),
+    KEY idx_doctor_creator (creator_id),
+    KEY idx_doctor_name (doctor_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医生表';
+
+
+-- ============================================================
+-- 产品型号表（product）
+-- 用于管理产品型号，关联注册证、材质等信息
+-- ============================================================
+DROP TABLE IF EXISTS product;
+CREATE TABLE product (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    product_code    VARCHAR(64)     NOT NULL COMMENT '产品型号编码',
+    product_name    VARCHAR(128)   NOT NULL COMMENT '产品名称',
+    category        VARCHAR(64)    COMMENT '产品分类（如：髋关节、膝关节、脊柱）',
+    spec            VARCHAR(128)   COMMENT '规格',
+    cert_id         BIGINT          COMMENT '关联注册证ID（关联registration_cert表）',
+    material        VARCHAR(128)   COMMENT '材质',
+    color_options   VARCHAR(512)   COMMENT '可选颜色（JSON数组）',
+    price           DECIMAL(10,2) COMMENT '标准价格',
+    image_url       VARCHAR(512)   COMMENT '产品图片URL',
+    status          TINYINT        DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark          VARCHAR(512)  COMMENT '备注',
+
+    -- 通用字段
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by       BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_product_code (product_code),
+    KEY idx_product_category (category),
+    KEY idx_product_cert (cert_id),
+    KEY idx_product_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='产品型号表';
+
+
+-- ============================================================
+-- 注册证表（registration_cert）
+-- 用于管理医疗器械注册证号，支持有效期管理
+-- ============================================================
+DROP TABLE IF EXISTS registration_cert;
+CREATE TABLE registration_cert (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    cert_code       VARCHAR(64)     NOT NULL COMMENT '注册证号',
+    cert_name       VARCHAR(256)  NOT NULL COMMENT '注册证名称',
+    valid_from      DATE            COMMENT '有效期开始',
+    valid_to         DATE            COMMENT '有效期截止',
+    cert_file_url   VARCHAR(512)   COMMENT '注册证扫描件URL',
+    status          TINYINT        DEFAULT 1 COMMENT '状态（0=过期，1=有效）',
+    remark          VARCHAR(512)  COMMENT '备注',
+
+    -- 通用字段
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by       BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_cert_code (cert_code),
+    KEY idx_cert_valid_to (valid_to),
+    KEY idx_cert_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='注册证表';

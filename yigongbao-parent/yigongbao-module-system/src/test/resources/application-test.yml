@@ -1,26 +1,25 @@
 spring:
+  profiles:
+    active: test
   datasource:
     driver-class-name: org.h2.Driver
     url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false
     username: sa
     password:
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 1GB
   sql:
     init:
       mode: always
-    schema-locations: classpath*:schema.sql
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
-      - org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration
-      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
-      - org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration
+      schema-locations: classpath*:schema.sql
 
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
 
 # 测试环境禁用 Sa-Token 登录拦截器
-# 注意：sa-token 是 SaToken 官方的属性前缀
 sa-token:
   interceptor:
     enable: false
@@ -33,4 +32,26 @@ yigongbao:
       login-max-failures: 5
       login-lock-duration: 15
       sms-send-interval: 60
-      max-upload-size: 10485760
+      max-upload-size: 524288000
+  # 文件存储业务配置
+  file-storage:
+    max-file-size: 524288000
+    allowed-extensions:
+      - jpg
+      - jpeg
+      - png
+      - gif
+      - bmp
+      - pdf
+      - doc
+      - docx
+      - xls
+      - xlsx
+      - zip
+      - rar
+      - stl
+      - obj
+      - 3ds
+      - ply
+      - step
+      - dcm

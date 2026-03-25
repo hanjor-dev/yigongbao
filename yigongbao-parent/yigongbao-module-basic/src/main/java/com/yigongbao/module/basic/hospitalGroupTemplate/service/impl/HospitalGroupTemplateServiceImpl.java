@@ -12,9 +12,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
 import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
 import com.yigongbao.module.basic.hospital.service.HospitalService;
@@ -57,6 +59,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     private final HospitalGroupTemplateDetailMapper detailMapper;
     private final HospitalMapper hospitalMapper;
     private final HospitalService hospitalService;
+    private final CodeGeneratorService codeGeneratorService;
 
     /**
      * 分页查询医院组合模板列表
@@ -132,7 +135,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                 throw new BusinessException(ErrorCodeEnum.TEMPLATE_EXISTS);
             }
             HospitalGroupTemplateEntity entity = HospitalGroupTemplateConvert.toEntity(dto);
-            entity.setTemplateCode(generateTemplateCode());
+            entity.setTemplateCode(codeGeneratorService.generate(CodeRuleConstants.TEMPLATE_NO));
             entity.setStatus(StatusConstants.NORMAL);
             save(entity);
             saveDetails(entity.getId(), dto.getHospitalIds());
@@ -358,10 +361,8 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
             detail.setHospitalId(hospitalId);
             details.add(detail);
         }
-        // 预收集后批量插入，减少方法调用开销
-        for (HospitalGroupTemplateDetailEntity detail : details) {
-            detailMapper.insert(detail);
-        }
+        // 使用批量插入替代逐条 insert，消除 N+1 查询
+        detailMapper.insertBatch(details);
     }
 
     /**
@@ -386,29 +387,5 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
         return count(new LambdaQueryWrapper<HospitalGroupTemplateEntity>()
                 .eq(HospitalGroupTemplateEntity::getTemplateName, templateName)
                 .ne(HospitalGroupTemplateEntity::getId, excludeId)) > 0;
-    }
-
-    /**
-     * 生成模板编码
-     *
-     * @return 模板编码（格式：TPL-HOS-XXX）
-     */
-    private String generateTemplateCode() {
-        LambdaQueryWrapper<HospitalGroupTemplateEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(HospitalGroupTemplateEntity::getTemplateCode, "TPL-HOS-")
-                .orderByDesc(HospitalGroupTemplateEntity::getTemplateCode)
-                .last("LIMIT 1");
-        HospitalGroupTemplateEntity lastEntity = getOne(wrapper);
-        int nextSeq = 1;
-        if (lastEntity != null && StrUtil.isNotBlank(lastEntity.getTemplateCode())) {
-            String lastCode = lastEntity.getTemplateCode();
-            String seqStr = lastCode.substring("TPL-HOS-".length());
-            try {
-                nextSeq = Integer.parseInt(seqStr) + 1;
-            } catch (NumberFormatException e) {
-                nextSeq = 1;
-            }
-        }
-        return String.format("TPL-HOS-%03d", nextSeq);
     }
 }

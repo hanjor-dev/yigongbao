@@ -1,0 +1,105 @@
+package com.yigongbao.module.basic.registrationCert.controller;
+
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yigongbao.common.result.Result;
+import com.yigongbao.module.basic.registrationCert.dto.CreateRegistrationCertDTO;
+import com.yigongbao.module.basic.registrationCert.dto.UpdateRegistrationCertDTO;
+import com.yigongbao.module.basic.registrationCert.service.RegistrationCertService;
+import com.yigongbao.module.basic.registrationCert.vo.RegistrationCertVO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * 注册证管理 Controller
+ *
+ * @author hanjor
+ * @date 2026-03-24
+ */
+@RestController
+@RequestMapping("/api/basic/registration-cert")
+@RequiredArgsConstructor
+public class RegistrationCertController {
+
+    private final RegistrationCertService registrationCertService;
+
+    /**
+     * 分页查询注册证列表
+     *
+     * @param pageNum 页码（默认1）
+     * @param pageSize 每页条数（默认10）
+     * @param certCode 注册证号（模糊查询）
+     * @param certName 注册证名称（模糊查询）
+     * @param status 状态（可选）
+     * @return 分页后的注册证列表
+     */
+    @GetMapping("/list")
+    public Result<IPage<RegistrationCertVO>> list(
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(required = false) String certCode,
+            @RequestParam(required = false) String certName,
+            @RequestParam(required = false) Integer status) {
+        return Result.success(registrationCertService.listCerts(pageNum, pageSize, certCode, certName, status));
+    }
+
+    /**
+     * 根据ID查询注册证详情
+     *
+     * @param id 注册证ID
+     * @return 注册证详情
+     */
+    @GetMapping("/{id}")
+    public Result<RegistrationCertVO> getById(@PathVariable Long id) {
+        return Result.success(registrationCertService.getById(id));
+    }
+
+    /**
+     * 创建注册证
+     *
+     * @param dto 创建参数
+     * @return 操作结果
+     */
+    @PostMapping
+    public Result<Void> create(@Validated @RequestBody CreateRegistrationCertDTO dto) {
+        registrationCertService.create(dto);
+        return Result.success();
+    }
+
+    /**
+     * 更新注册证信息
+     *
+     * @param id 注册证ID
+     * @param dto 更新参数
+     * @return 操作结果
+     */
+    @PutMapping("/{id}")
+    public Result<Void> update(@PathVariable Long id, @Validated @RequestBody UpdateRegistrationCertDTO dto) {
+        registrationCertService.update(id, dto);
+        return Result.success();
+    }
+
+    /**
+     * 删除注册证
+     *
+     * @param id 注册证ID
+     * @return 操作结果
+     */
+    @DeleteMapping("/{id}")
+    public Result<Void> remove(@PathVariable Long id) {
+        registrationCertService.remove(id);
+        return Result.success();
+    }
+
+    /**
+     * 查询有效注册证列表（有效期未过期的）
+     *
+     * @return 有效注册证列表
+     */
+    @GetMapping("/valid-list")
+    public Result<List<RegistrationCertVO>> validList() {
+        return Result.success(registrationCertService.listValidCerts());
+    }
+}
