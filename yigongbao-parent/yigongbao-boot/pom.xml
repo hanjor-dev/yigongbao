@@ -23,6 +23,10 @@
         </dependency>
         <dependency>
             <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-basic</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
             <artifactId>yigongbao-module-system</artifactId>
         </dependency>
 

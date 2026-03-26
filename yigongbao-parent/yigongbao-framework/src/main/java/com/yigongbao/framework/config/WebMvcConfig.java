@@ -53,11 +53,17 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // 注册统一响应拦截器
         registry.addInterceptor(resultInterceptor)
             .addPathPatterns("/**")
-            // 放行路径
+            // 放行路径（拦截器路径相对于 context-path，不需要加 /api 前缀）
             .excludePathPatterns(
                 "/static/**",
                 "/favicon.ico",
-                "/error"
+                "/error",
+                // Swagger / OpenAPI 文档（用于导入 Apifox）
+                "/doc.html",
+                "/swagger-ui/**",
+                "/swagger-ui.html",
+                "/v3/api-docs/**",
+                "/webjars/**"
             );
     }
 

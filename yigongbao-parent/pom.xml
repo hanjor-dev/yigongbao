@@ -31,6 +31,8 @@
         <poi.version>5.2.5</poi.version>
         <mysql-connector.version>8.3.0</mysql-connector.version>
         <spring-security-crypto.version>6.2.4</spring-security-crypto.version>
+        <openapi.version>2.3.0</openapi.version>
+
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -157,6 +159,12 @@
                 <version>${poi.version}</version>
             </dependency>
 
+            <!-- springdoc-openapi：生成 OpenAPI 3.0 文档，导入 Apifox 使用 -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${openapi.version}</version>
+            </dependency>
         </dependencies>
 
     </dependencyManagement>

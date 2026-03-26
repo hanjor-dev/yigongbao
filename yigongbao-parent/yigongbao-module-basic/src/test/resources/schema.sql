@@ -56,8 +56,8 @@ CREATE TABLE hospital (
     area_id             BIGINT          NOT NULL COMMENT '所属地区ID',
     area_name           VARCHAR(64)     COMMENT '地区名称',
     full_area_name      VARCHAR(256)    COMMENT '完整地区路径',
-    hospital_level      TINYINT         COMMENT '医院等级（字典：dict_code=3）',
-    hospital_type       TINYINT         COMMENT '医院类型（字典：dict_code=4）',
+    hospital_level      VARCHAR(16)      COMMENT '医院等级（字典：dict_code=3，值如3.1/3.2）',
+    hospital_type       VARCHAR(16)      COMMENT '医院类型（字典：dict_code=4，值如4.1/4.2）',
     contact             VARCHAR(32)     NOT NULL COMMENT '联系人',
     phone               VARCHAR(32)     NOT NULL COMMENT '联系电话',
     email               VARCHAR(64)     COMMENT '电子邮箱',
@@ -74,8 +74,8 @@ CREATE TABLE hospital (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_hospital_code (hospital_code),
-    UNIQUE KEY uk_hospital_name (hospital_name),
+    UNIQUE KEY uk_hospital_code (hospital_code, is_deleted),
+    UNIQUE KEY uk_hospital_name (hospital_name, is_deleted),
     KEY idx_hospital_area_id (area_id),
     KEY idx_hospital_level (hospital_level),
     KEY idx_hospital_type (hospital_type),
@@ -84,8 +84,8 @@ CREATE TABLE hospital (
 
 -- 插入医院测试数据
 INSERT INTO hospital (id, hospital_name, hospital_code, area_id, area_name, full_area_name, hospital_level, hospital_type, contact, phone, email, address, status, create_time, update_time, is_deleted) VALUES
-(1, '北京协和医院', 'HOS-001', 111, '东城区', '中国,北京,北京市,东城区', 1, 1, '张主任', '13800138001', 'info@pekingunion.com', '北京市东城区帅府园1号', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, '上海市第一人民医院', 'HOS-002', 21, '上海市', '中国,上海,上海市', 2, 1, '李医生', '13800138002', 'info@shfirsthospital.com', '上海市虹口区武进路85号', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(1, '北京协和医院', 'HOS-001', 111, '东城区', '中国,北京,北京市,东城区', '3.1', '4.1', '张主任', '13800138001', 'info@pekingunion.com', '北京市东城区帅府园1号', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, '上海市第一人民医院', 'HOS-002', 21, '上海市', '中国,上海,上海市', '3.2', '4.1', '李医生', '13800138002', 'info@shfirsthospital.com', '上海市虹口区武进路85号', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
 (3, '浙江大学医学院附属第一医院', 'HOS-003', 311, '上城区', '中国,浙江,杭州市,上城区', 1, 1, '王医生', '13800138003', 'info@hzdu1hospital.com', '杭州市上城区庆春路79号', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ------------------------------------------------------------
@@ -107,8 +107,8 @@ CREATE TABLE hospital_group_template (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_template_code (template_code),
-    UNIQUE KEY uk_template_name (template_name),
+    UNIQUE KEY uk_template_code (template_code, is_deleted),
+    UNIQUE KEY uk_template_name (template_name, is_deleted),
     KEY idx_template_status (status)
 );
 
@@ -244,7 +244,7 @@ CREATE TABLE product (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_product_code (product_code),
+    UNIQUE KEY uk_product_code (product_code, is_deleted),
     KEY idx_product_cert (cert_id),
     KEY idx_product_category (category),
     KEY idx_product_status (status)
@@ -349,7 +349,7 @@ CREATE TABLE registration_cert (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_cert_code (cert_code),
+    UNIQUE KEY uk_cert_code (cert_code, is_deleted),
     KEY idx_cert_status (status),
     KEY idx_cert_valid_to (valid_to)
 );
@@ -384,7 +384,7 @@ CREATE TABLE sys_code_rule (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_rule_code (rule_code),
+    UNIQUE KEY uk_rule_code (rule_code, is_deleted),
     KEY idx_rule_status (status)
 );
 

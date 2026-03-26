@@ -31,24 +31,27 @@ public class SaTokenConfig implements WebMvcConfigurer {
         registration.addPathPatterns("/**");
 
         // 放行路径：静态资源、登录接口、注册接口等
+        // 注意：拦截器 excludePathPatterns 相对于 context-path，不需要加 /api 前缀
         registration.excludePathPatterns(
                 // 静态资源
                 "/static/**",
                 "/favicon.ico",
-                // 公共接口（根据实际情况调整）
+                // 公共接口
                 "/common/**",
                 // 错误页面
                 "/error",
                 "/test/**",
-                // 认证接口（登录、用户信息、登出）
-                "/api/system/auth/login",
-                "/api/system/auth/logout",
-                "/api/system/auth/info",
-                "/api/system/auth/password",
-                // Swagger文档
+                // 认证接口
+                "/system/auth/login",
+                "/system/auth/logout",
+                "/system/auth/info",
+                "/system/auth/password",
+                // Swagger/OpenAPI 文档（用于导入 Apifox）
                 "/doc.html",
                 "/swagger-ui/**",
-                "/v3/api-docs/**"
+                "/swagger-ui.html",
+                "/v3/api-docs/**",
+                "/webjars/**"
         );
     }
 }

@@ -1,8 +1,12 @@
 package com.yigongbao.module.basic.file.controller;
 
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,8 +21,9 @@ import java.util.List;
  * @author hanjor
  * @date 2026-03-25 11:00:00
  */
+@Tag(name = "文件管理", description = "文件上传、下载、删除")
 @RestController
-@RequestMapping("/api/basic/file")
+@RequestMapping("/basic/file")
 @RequiredArgsConstructor
 public class FileController {
 
@@ -27,6 +32,12 @@ public class FileController {
     /**
      * 上传文件（不关联业务）
      */
+    @Operation(summary = "上传文件（不关联业务）")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.UPLOAD,
+            operation = "上传文件"
+    )
     @PostMapping("/upload")
     public Result<FileVO> upload(
             @RequestParam("file") MultipartFile file,
@@ -37,6 +48,12 @@ public class FileController {
     /**
      * 上传并关联业务
      */
+    @Operation(summary = "上传并关联业务")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.UPLOAD,
+            operation = "上传文件并关联业务"
+    )
     @PostMapping("/upload-and-link")
     public Result<FileVO> uploadAndLink(
             @RequestParam("file") MultipartFile file,
@@ -48,6 +65,12 @@ public class FileController {
     /**
      * 批量上传
      */
+    @Operation(summary = "批量上传")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.UPLOAD,
+            operation = "批量上传文件"
+    )
     @PostMapping("/upload-multiple")
     public Result<List<FileVO>> uploadMultiple(
             @RequestParam("files") MultipartFile[] files,
@@ -59,6 +82,7 @@ public class FileController {
     /**
      * 查询文件列表
      */
+    @Operation(summary = "查询文件列表")
     @GetMapping("/list/{bizType}/{bizId}")
     public Result<List<FileVO>> listByBiz(
             @PathVariable String bizType,
@@ -69,6 +93,7 @@ public class FileController {
     /**
      * 查询文件详情
      */
+    @Operation(summary = "查询文件详情")
     @GetMapping("/{id}")
     public Result<FileVO> getById(@PathVariable String id) {
         return Result.success(fileService.getById(id));
@@ -77,6 +102,7 @@ public class FileController {
     /**
      * 下载文件
      */
+    @Operation(summary = "下载文件")
     @GetMapping("/download/{id}")
     public void download(
             @PathVariable String id,
@@ -87,6 +113,12 @@ public class FileController {
     /**
      * 删除文件
      */
+    @Operation(summary = "删除文件")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.DELETE,
+            operation = "删除文件"
+    )
     @DeleteMapping("/{id}")
     public Result<Void> deleteById(@PathVariable String id) {
         fileService.deleteById(id);

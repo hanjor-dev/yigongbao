@@ -1,7 +1,11 @@
 package com.yigongbao.module.system.role.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.role.dto.CreateRoleDTO;
 import com.yigongbao.module.system.role.dto.UpdateRoleDTO;
 import com.yigongbao.module.system.role.service.RoleService;
@@ -19,8 +23,9 @@ import org.springframework.web.bind.annotation.*;
  * @author hanjor
  * @date 2026-03-17
  */
+@Tag(name = "角色管理", description = "角色 CRUD、状态管理、分配资源")
 @RestController
-@RequestMapping("/api/system/role")
+@RequestMapping("/system/role")
 @RequiredArgsConstructor
 public class RoleController {
 
@@ -37,6 +42,7 @@ public class RoleController {
      * @return 分页后的角色列表
      */
     @GetMapping("/list")
+    @Operation(summary = "分页查询角色列表")
     public Result<IPage<RoleVO>> list(
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "10") Integer pageSize,
@@ -53,6 +59,7 @@ public class RoleController {
      * @return 角色详情
      */
     @GetMapping("/{id}")
+    @Operation(summary = "根据ID查询角色详情")
     public Result<RoleVO> getById(@PathVariable Long id) {
         return Result.success(roleService.getRoleById(id));
     }
@@ -63,6 +70,12 @@ public class RoleController {
      * @param dto 创建参数
      * @return 创建结果
      */
+    @Operation(summary = "创建角色")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.CREATE,
+            operation = "创建角色"
+    )
     @PostMapping
     public Result<Void> create(@Validated @RequestBody CreateRoleDTO dto) {
         roleService.createRole(dto);
@@ -76,6 +89,12 @@ public class RoleController {
      * @param dto 更新参数
      * @return 更新结果
      */
+    @Operation(summary = "更新角色")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "更新角色"
+    )
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @Validated @RequestBody UpdateRoleDTO dto) {
         roleService.updateRole(id, dto);
@@ -88,6 +107,12 @@ public class RoleController {
      * @param id 角色ID
      * @return 删除结果
      */
+    @Operation(summary = "删除角色")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.DELETE,
+            operation = "删除角色"
+    )
     @DeleteMapping("/{id}")
     public Result<Void> remove(@PathVariable Long id) {
         roleService.removeRole(id);
@@ -101,6 +126,12 @@ public class RoleController {
      * @param status 状态值（0=禁用，1=正常）
      * @return 操作结果
      */
+    @Operation(summary = "修改角色状态")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "修改角色状态"
+    )
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(
             @PathVariable Long id,

@@ -48,9 +48,9 @@ public class HospitalVO implements Serializable {
     private String fullAreaName;
 
     /**
-     * 医院等级
+     * 医院等级（字典：dict_code=3，值如 3.1/3.2/3.3/3.4/3.5）
      */
-    private Integer hospitalLevel;
+    private String hospitalLevel;
 
     /**
      * 医院等级名称
@@ -58,9 +58,9 @@ public class HospitalVO implements Serializable {
     private String hospitalLevelName;
 
     /**
-     * 医院类型
+     * 医院类型（字典：dict_code=4，值如 4.1/4.2）
      */
-    private Integer hospitalType;
+    private String hospitalType;
 
     /**
      * 医院类型名称

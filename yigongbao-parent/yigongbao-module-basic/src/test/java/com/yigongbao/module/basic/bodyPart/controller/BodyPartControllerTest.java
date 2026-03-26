@@ -97,7 +97,7 @@ class BodyPartControllerTest {
             parent.setChildren(List.of(buildTestVO(2L, "前额", 1L)));
             when(bodyPartService.listTree()).thenReturn(List.of(parent));
 
-            mockMvc.perform(get("/api/basic/body-part/tree"))
+            mockMvc.perform(get("/basic/body-part/tree"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"))
@@ -111,7 +111,7 @@ class BodyPartControllerTest {
         void tree_whenEmpty_shouldReturnEmptyArray() throws Exception {
             when(bodyPartService.listTree()).thenReturn(new ArrayList<>());
 
-            mockMvc.perform(get("/api/basic/body-part/tree"))
+            mockMvc.perform(get("/basic/body-part/tree"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").isArray())
@@ -136,7 +136,7 @@ class BodyPartControllerTest {
             option.setChildren(new ArrayList<>());
             when(bodyPartService.listOptions()).thenReturn(List.of(option));
 
-            mockMvc.perform(get("/api/basic/body-part/options"))
+            mockMvc.perform(get("/basic/body-part/options"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data[0].name").value("头部"));
@@ -154,7 +154,7 @@ class BodyPartControllerTest {
         void getById_whenExists_shouldReturnData() throws Exception {
             when(bodyPartService.getDetailById(1L)).thenReturn(buildTestDetailVO(1L, "头部", 0L));
 
-            mockMvc.perform(get("/api/basic/body-part/1"))
+            mockMvc.perform(get("/basic/body-part/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.id").value(1))
@@ -168,7 +168,7 @@ class BodyPartControllerTest {
             when(bodyPartService.getDetailById(999L))
                     .thenThrow(new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND));
 
-            mockMvc.perform(get("/api/basic/body-part/999"))
+            mockMvc.perform(get("/basic/body-part/999"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(662))
                     .andExpect(jsonPath("$.message").value("部位不存在"));
@@ -191,7 +191,7 @@ class BodyPartControllerTest {
                     "sort", 1
             );
 
-            mockMvc.perform(post("/api/basic/body-part")
+            mockMvc.perform(post("/basic/body-part")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -207,7 +207,7 @@ class BodyPartControllerTest {
                     "name", ""
             );
 
-            mockMvc.perform(post("/api/basic/body-part")
+            mockMvc.perform(post("/basic/body-part")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isBadRequest())
@@ -221,7 +221,7 @@ class BodyPartControllerTest {
                     "name", "测试部位"
             );
 
-            mockMvc.perform(post("/api/basic/body-part")
+            mockMvc.perform(post("/basic/body-part")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isBadRequest())
@@ -238,7 +238,7 @@ class BodyPartControllerTest {
         @Test
         @DisplayName("delete: 删除成功返回200")
         void delete_shouldSuccess() throws Exception {
-            mockMvc.perform(delete("/api/basic/body-part/2"))
+            mockMvc.perform(delete("/basic/body-part/2"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"));
@@ -250,7 +250,7 @@ class BodyPartControllerTest {
             doThrow(new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND))
                     .when(bodyPartService).removeBodyPart(999L);
 
-            mockMvc.perform(delete("/api/basic/body-part/999"))
+            mockMvc.perform(delete("/basic/body-part/999"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(662));
         }
@@ -261,7 +261,7 @@ class BodyPartControllerTest {
             doThrow(new BusinessException(ErrorCodeEnum.DATA_HAS_CHILDREN))
                     .when(bodyPartService).removeBodyPart(1L);
 
-            mockMvc.perform(delete("/api/basic/body-part/1"))
+            mockMvc.perform(delete("/basic/body-part/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(605));
         }
@@ -276,7 +276,7 @@ class BodyPartControllerTest {
         @Test
         @DisplayName("updateStatus: 修改状态成功")
         void updateStatus_shouldSuccess() throws Exception {
-            mockMvc.perform(put("/api/basic/body-part/1/status")
+            mockMvc.perform(put("/basic/body-part/1/status")
                             .param("status", "0"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
@@ -286,7 +286,7 @@ class BodyPartControllerTest {
         @Test
         @DisplayName("updateStatus: 状态值不合法时返回400")
         void updateStatus_whenInvalidStatus_shouldReturnError() throws Exception {
-            mockMvc.perform(put("/api/basic/body-part/1/status")
+            mockMvc.perform(put("/basic/body-part/1/status")
                             .param("status", "99"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value(400))
@@ -308,7 +308,7 @@ class BodyPartControllerTest {
                     "sort", 2
             );
 
-            mockMvc.perform(put("/api/basic/body-part/1")
+            mockMvc.perform(put("/basic/body-part/1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -326,7 +326,7 @@ class BodyPartControllerTest {
                     "name", "测试部位"
             );
 
-            mockMvc.perform(put("/api/basic/body-part/999")
+            mockMvc.perform(put("/basic/body-part/999")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -344,7 +344,7 @@ class BodyPartControllerTest {
                     "name", "重复部位名称"
             );
 
-            mockMvc.perform(put("/api/basic/body-part/1")
+            mockMvc.perform(put("/basic/body-part/1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())

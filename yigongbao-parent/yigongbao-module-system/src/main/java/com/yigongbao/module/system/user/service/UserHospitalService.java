@@ -47,9 +47,22 @@ public interface UserHospitalService {
 
     /**
      * 获取当前用户可操作医院（下拉选项）
+     * 根据用户角色的 hospitalScopeEnabled 配置决定返回范围：
+     * - hospitalScopeEnabled == 1：返回用户关联的医院列表
+     * - hospitalScopeEnabled == 0 或无角色：返回空列表
      *
      * @param userId 用户ID
      * @return 医院列表
+     * @throws BusinessException 用户不存在
+     */
+    List<HospitalVO> getMyHospitalOptions(Long userId);
+
+    /**
+     * 获取可分配给用户的医院列表（管理员分配时使用）
+     * 返回所有状态正常的医院，供管理员选择分配
+     *
+     * @param userId 用户ID（预留参数，当前返回所有正常医院）
+     * @return 可分配的医院列表
      */
     List<HospitalVO> getHospitalOptionsByUserId(Long userId);
 }

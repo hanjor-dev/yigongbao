@@ -25,10 +25,9 @@ public class CreateOrgDTO {
     private String orgName;
 
     /**
-     * 机构类型
+     * 机构类型（字典编码，如：1.1=生产企业，1.2=经销商，1.3=医疗机构，1.4=其他）
      */
-    @NotNull(message = "机构类型不能为空")
-    private Integer orgType;
+    private String orgType;
 
     /**
      * 所属地区ID
@@ -49,14 +48,12 @@ public class CreateOrgDTO {
     /**
      * 联系人
      */
-    @NotBlank(message = "联系人不能为空")
     @Size(max = 32, message = "联系人长度不能超过32个字符")
     private String contact;
 
     /**
      * 联系电话
      */
-    @NotBlank(message = "联系电话不能为空")
     @Pattern(regexp = "^1[3-9]\\d{9}$", message = "联系电话格式不正确")
     private String phone;
 
@@ -69,7 +66,6 @@ public class CreateOrgDTO {
     /**
      * 统一社会信用代码
      */
-    @Pattern(regexp = "^[0-9A-Z]{18}$", message = "统一社会信用代码格式不正确")
     private String creditCode;
 
     /**
@@ -91,14 +87,14 @@ public class CreateOrgDTO {
     private String agentProductLine;
 
     /**
-     * 医院等级（医疗机构）
+     * 医院等级（医疗机构，关联字典编码=3，值如 3.1/3.2/3.3/3.4/3.5）
      */
-    private Integer hospitalLevel;
+    private String hospitalLevel;
 
     /**
-     * 医院类型（医疗机构）
+     * 医院类型（医疗机构，关联字典编码=4，值如 4.1/4.2）
      */
-    private Integer hospitalType;
+    private String hospitalType;
 
     /**
      * 备注说明

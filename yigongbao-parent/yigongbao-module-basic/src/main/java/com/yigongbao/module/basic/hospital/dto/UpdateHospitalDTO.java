@@ -47,14 +47,14 @@ public class UpdateHospitalDTO implements Serializable {
     private String email;
 
     /**
-     * 医院等级
+     * 医院等级（字典：dict_code=3，值如 3.1/3.2/3.3/3.4/3.5）
      */
-    private Integer hospitalLevel;
+    private String hospitalLevel;
 
     /**
-     * 医院类型
+     * 医院类型（字典：dict_code=4，值如 4.1/4.2）
      */
-    private Integer hospitalType;
+    private String hospitalType;
 
     /**
      * 详细地址

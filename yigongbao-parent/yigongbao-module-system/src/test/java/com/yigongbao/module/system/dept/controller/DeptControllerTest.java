@@ -53,7 +53,7 @@ class DeptControllerTest {
     @Test
     @DisplayName("list: 分页查询部门列表成功")
     void list_shouldReturnPageData() throws Exception {
-        mockMvc.perform(get("/api/system/dept/list")
+        mockMvc.perform(get("/system/dept/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10"))
                 .andExpect(status().isOk())
@@ -66,7 +66,7 @@ class DeptControllerTest {
     @Test
     @DisplayName("list: 按部门名称模糊查询")
     void list_withDeptName_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/dept/list")
+        mockMvc.perform(get("/system/dept/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("deptName", "研发"))
@@ -78,7 +78,7 @@ class DeptControllerTest {
     @Test
     @DisplayName("list: 按机构ID筛选")
     void list_withOrgId_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/dept/list")
+        mockMvc.perform(get("/system/dept/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("orgId", "1"))
@@ -90,7 +90,7 @@ class DeptControllerTest {
     @Test
     @DisplayName("list: 按状态筛选")
     void list_withStatus_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/dept/list")
+        mockMvc.perform(get("/system/dept/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("status", "1"))
@@ -104,7 +104,7 @@ class DeptControllerTest {
     @Test
     @DisplayName("getById: 存在数据时返回部门详情")
     void getById_whenExists_shouldReturnData() throws Exception {
-        mockMvc.perform(get("/api/system/dept/1"))
+        mockMvc.perform(get("/system/dept/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("操作成功"))
@@ -116,7 +116,7 @@ class DeptControllerTest {
     @Test
     @DisplayName("getById: 数据不存在时返回错误")
     void getById_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(get("/api/system/dept/999999"))
+        mockMvc.perform(get("/system/dept/999999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(613))
                 .andExpect(jsonPath("$.message").value("部门不存在"));
@@ -132,7 +132,7 @@ class DeptControllerTest {
         requestBody.put("orgId", 1);
         requestBody.put("remark", "测试备注");
 
-        mockMvc.perform(post("/api/system/dept")
+        mockMvc.perform(post("/system/dept")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -146,7 +146,7 @@ class DeptControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("orgId", 1);
 
-        mockMvc.perform(post("/api/system/dept")
+        mockMvc.perform(post("/system/dept")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isBadRequest())
@@ -160,7 +160,7 @@ class DeptControllerTest {
         requestBody.put("deptName", "测试部门");
         requestBody.put("orgId", 999999L);
 
-        mockMvc.perform(post("/api/system/dept")
+        mockMvc.perform(post("/system/dept")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -175,7 +175,7 @@ class DeptControllerTest {
         requestBody.put("deptName", "研发部");
         requestBody.put("orgId", 1);
 
-        mockMvc.perform(post("/api/system/dept")
+        mockMvc.perform(post("/system/dept")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -192,7 +192,7 @@ class DeptControllerTest {
         requestBody.put("deptName", "研发部更新");
         requestBody.put("remark", "更新后的备注");
 
-        mockMvc.perform(put("/api/system/dept/1")
+        mockMvc.perform(put("/system/dept/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -206,7 +206,7 @@ class DeptControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("deptName", "测试部门");
 
-        mockMvc.perform(put("/api/system/dept/999999")
+        mockMvc.perform(put("/system/dept/999999")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -219,7 +219,7 @@ class DeptControllerTest {
     @Test
     @DisplayName("remove: 删除成功")
     void remove_shouldSuccess() throws Exception {
-        mockMvc.perform(delete("/api/system/dept/1"))
+        mockMvc.perform(delete("/system/dept/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("操作成功"));
@@ -228,7 +228,7 @@ class DeptControllerTest {
     @Test
     @DisplayName("remove: 部门不存在时返回错误")
     void remove_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(delete("/api/system/dept/999999"))
+        mockMvc.perform(delete("/system/dept/999999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(613))
                 .andExpect(jsonPath("$.message").value("部门不存在"));
@@ -239,7 +239,7 @@ class DeptControllerTest {
     @Test
     @DisplayName("updateStatus: 修改状态成功")
     void updateStatus_shouldSuccess() throws Exception {
-        mockMvc.perform(put("/api/system/dept/1/status")
+        mockMvc.perform(put("/system/dept/1/status")
                         .param("status", "0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
@@ -249,7 +249,7 @@ class DeptControllerTest {
     @Test
     @DisplayName("updateStatus: 部门不存在时返回错误")
     void updateStatus_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(put("/api/system/dept/999999/status")
+        mockMvc.perform(put("/system/dept/999999/status")
                         .param("status", "0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(613))
@@ -259,7 +259,7 @@ class DeptControllerTest {
     @Test
     @DisplayName("updateStatus: 状态值无效时参数校验失败")
     void updateStatus_whenInvalidStatus_shouldReturnValidationError() throws Exception {
-        mockMvc.perform(put("/api/system/dept/1/status")
+        mockMvc.perform(put("/system/dept/1/status")
                         .param("status", "2"))
                 .andExpect(status().isBadRequest());
     }

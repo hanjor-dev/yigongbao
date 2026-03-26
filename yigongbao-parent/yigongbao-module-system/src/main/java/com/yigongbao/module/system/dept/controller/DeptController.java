@@ -1,7 +1,11 @@
 package com.yigongbao.module.system.dept.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.dept.dto.CreateDeptDTO;
 import com.yigongbao.module.system.dept.dto.UpdateDeptDTO;
 import com.yigongbao.module.system.dept.service.DeptService;
@@ -19,8 +23,9 @@ import org.springframework.web.bind.annotation.*;
  * @author hanjor
  * @date 2026-03-17
  */
+@Tag(name = "部门管理", description = "部门 CRUD、状态管理")
 @RestController
-@RequestMapping("/api/system/dept")
+@RequestMapping("/system/dept")
 @RequiredArgsConstructor
 public class DeptController {
 
@@ -37,6 +42,7 @@ public class DeptController {
      * @return 分页后的部门列表
      */
     @GetMapping("/list")
+    @Operation(summary = "分页查询部门列表")
     public Result<IPage<DeptVO>> list(
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "10") Integer pageSize,
@@ -53,6 +59,7 @@ public class DeptController {
      * @return 部门详情
      */
     @GetMapping("/{id}")
+    @Operation(summary = "根据ID查询部门详情")
     public Result<DeptVO> getById(@PathVariable Long id) {
         return Result.success(deptService.getDeptById(id));
     }
@@ -63,6 +70,12 @@ public class DeptController {
      * @param dto 创建参数
      * @return 创建结果
      */
+    @Operation(summary = "创建部门")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.CREATE,
+            operation = "创建部门"
+    )
     @PostMapping
     public Result<Void> create(@Validated @RequestBody CreateDeptDTO dto) {
         deptService.createDept(dto);
@@ -76,6 +89,12 @@ public class DeptController {
      * @param dto 更新参数
      * @return 更新结果
      */
+    @Operation(summary = "更新部门")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "更新部门"
+    )
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @Validated @RequestBody UpdateDeptDTO dto) {
         deptService.updateDept(id, dto);
@@ -88,6 +107,12 @@ public class DeptController {
      * @param id 部门ID
      * @return 删除结果
      */
+    @Operation(summary = "删除部门")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.DELETE,
+            operation = "删除部门"
+    )
     @DeleteMapping("/{id}")
     public Result<Void> remove(@PathVariable Long id) {
         deptService.removeDept(id);
@@ -101,6 +126,12 @@ public class DeptController {
      * @param status 状态值（0=禁用，1=正常）
      * @return 操作结果
      */
+    @Operation(summary = "修改部门状态")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "修改部门状态"
+    )
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(
             @PathVariable Long id,

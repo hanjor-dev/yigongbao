@@ -85,7 +85,7 @@ class HospitalScopeControllerTest {
     void getMyHospitals_whenUserNotExists_shouldReturnEmptyList() throws Exception {
         when(userMapper.selectById(999L)).thenReturn(null);
 
-        mockMvc.perform(get("/api/system/hospital-scope/my-hospitals/999"))
+        mockMvc.perform(get("/system/hospital-scope/my-hospitals/999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray())
@@ -101,7 +101,7 @@ class HospitalScopeControllerTest {
         testUser.setRoleId(null);
         when(userMapper.selectById(1L)).thenReturn(testUser);
 
-        mockMvc.perform(get("/api/system/hospital-scope/my-hospitals/1"))
+        mockMvc.perform(get("/system/hospital-scope/my-hospitals/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray())
@@ -119,7 +119,7 @@ class HospitalScopeControllerTest {
         when(userHospitalService.getHospitalsByUserId(1L))
                 .thenReturn(List.of(testHospital));
 
-        mockMvc.perform(get("/api/system/hospital-scope/my-hospitals/1"))
+        mockMvc.perform(get("/system/hospital-scope/my-hospitals/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray())
@@ -137,7 +137,7 @@ class HospitalScopeControllerTest {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         when(roleService.getById(1L)).thenReturn(testRole);
 
-        mockMvc.perform(get("/api/system/hospital-scope/my-hospitals/1"))
+        mockMvc.perform(get("/system/hospital-scope/my-hospitals/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray())
@@ -155,7 +155,7 @@ class HospitalScopeControllerTest {
         when(userHospitalService.getHospitalsByUserId(1L))
                 .thenReturn(List.of());
 
-        mockMvc.perform(get("/api/system/hospital-scope/my-hospitals/1"))
+        mockMvc.perform(get("/system/hospital-scope/my-hospitals/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray())
@@ -171,7 +171,7 @@ class HospitalScopeControllerTest {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         when(roleService.getById(1L)).thenReturn(null);
 
-        mockMvc.perform(get("/api/system/hospital-scope/my-hospitals/1"))
+        mockMvc.perform(get("/system/hospital-scope/my-hospitals/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray())

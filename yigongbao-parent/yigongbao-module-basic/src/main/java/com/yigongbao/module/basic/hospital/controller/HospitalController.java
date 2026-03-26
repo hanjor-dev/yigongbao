@@ -1,11 +1,15 @@
 package com.yigongbao.module.basic.hospital.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.hospital.dto.CreateHospitalDTO;
 import com.yigongbao.module.basic.hospital.dto.UpdateHospitalDTO;
 import com.yigongbao.module.basic.hospital.service.HospitalService;
 import com.yigongbao.module.basic.hospital.vo.HospitalVO;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -30,8 +34,9 @@ import java.util.List;
  * @author hanjor
  * @date 2026-03-19
  */
+@Tag(name = "医院管理", description = "医院信息 CRUD、状态管理、下拉选项")
 @RestController
-@RequestMapping("/api/basic/hospital")
+@RequestMapping("/basic/hospital")
 @RequiredArgsConstructor
 @Validated
 public class HospitalController {
@@ -41,14 +46,15 @@ public class HospitalController {
     /**
      * 分页查询医院列表
      */
+    @Operation(summary = "分页查询医院列表")
     @GetMapping("/list")
     public Result<IPage<HospitalVO>> list(
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "10") Integer pageSize,
             @RequestParam(required = false) String hospitalName,
             @RequestParam(required = false) Long areaId,
-            @RequestParam(required = false) Integer hospitalLevel,
-            @RequestParam(required = false) Integer hospitalType,
+            @RequestParam(required = false) String hospitalLevel,
+            @RequestParam(required = false) String hospitalType,
             @RequestParam(required = false) @Min(0) @Max(1) Integer status) {
         return Result.success(hospitalService.listHospital(pageNum, pageSize, hospitalName, areaId, hospitalLevel, hospitalType, status));
     }
@@ -56,6 +62,7 @@ public class HospitalController {
     /**
      * 根据ID查询医院详情
      */
+    @Operation(summary = "根据ID查询医院详情")
     @GetMapping("/{id}")
     public Result<HospitalVO> getById(@PathVariable Long id) {
         return Result.success(hospitalService.getHospitalById(id));
@@ -64,6 +71,12 @@ public class HospitalController {
     /**
      * 创建医院
      */
+    @Operation(summary = "创建医院")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.CREATE,
+            operation = "创建医院"
+    )
     @PostMapping
     public Result<Void> create(@Valid @RequestBody CreateHospitalDTO dto) {
         hospitalService.createHospital(dto);
@@ -73,6 +86,12 @@ public class HospitalController {
     /**
      * 更新医院
      */
+    @Operation(summary = "更新医院")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "更新医院"
+    )
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @Valid @RequestBody UpdateHospitalDTO dto) {
         hospitalService.updateHospital(id, dto);
@@ -82,6 +101,12 @@ public class HospitalController {
     /**
      * 修改医院状态
      */
+    @Operation(summary = "修改医院状态")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "修改医院状态"
+    )
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(
             @PathVariable Long id,
@@ -93,6 +118,7 @@ public class HospitalController {
     /**
      * 获取医院下拉选项
      */
+    @Operation(summary = "获取医院下拉选项")
     @GetMapping("/options")
     public Result<List<HospitalVO>> options(@RequestParam(required = false) @Min(0) @Max(1) Integer status) {
         return Result.success(hospitalService.listOptions(status));

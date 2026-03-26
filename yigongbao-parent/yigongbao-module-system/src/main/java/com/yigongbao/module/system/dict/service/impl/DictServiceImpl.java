@@ -221,6 +221,30 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
     }
 
     /**
+     * 根据字典编码查询字典
+     *
+     * @param dictCode 字典编码（叶子节点的 dictCode）
+     * @return 字典VO，不存在返回 null
+     */
+    @Override
+    public DictVO getByDictCode(String dictCode) {
+        log.info("根据字典编码查询字典，dictCode={}", dictCode);
+        try {
+            DictEntity entity = getOne(new LambdaQueryWrapper<DictEntity>()
+                    .eq(DictEntity::getDictCode, dictCode));
+            if (entity == null) {
+                log.warn("字典不存在，dictCode={}", dictCode);
+                return null;
+            }
+            log.info("查询字典成功，dictCode={}", dictCode);
+            return DictConvert.toVO(entity);
+        } catch (Exception e) {
+            log.error("根据字典编码查询字典异常，dictCode={}", dictCode, e);
+            throw e;
+        }
+    }
+
+    /**
      * 创建字典
      *
      * @param dto 创建参数

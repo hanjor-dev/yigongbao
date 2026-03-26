@@ -58,9 +58,9 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
      */
     @Override
     public void saveLog(OperationTypeEnum operationType, String module, String businessNo,
-                         String content, Long operatorId, String operatorName,
+                         String content, Long operatorId, String operatorName, String operatorUsername,
                          String ipAddress, String userAgent, String requestMethod,
-                         Long duration, boolean success, String errorMessage) {
+                         Long duration, boolean success, String errorMessage, String requestParams) {
         OperationLogEntity logEntity = new OperationLogEntity();
         logEntity.setModule(module);
         logEntity.setBusinessType(operationType != null ? operationType.getCode() : null);
@@ -68,10 +68,12 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
         logEntity.setOperation(operationType != null ? operationType.getDescription() : null);
         logEntity.setDescription(content);
         logEntity.setRequestUrl(businessNo);
-        logEntity.setRequestParams(userAgent);
+        logEntity.setRequestParams(requestParams);
         logEntity.setIp(ipAddress);
         logEntity.setUserId(operatorId);
         logEntity.setRealName(operatorName);
+        logEntity.setUsername(operatorUsername);
+        logEntity.setUserAgent(userAgent);
         logEntity.setRequestMethod(requestMethod);
         logEntity.setOperationTime(LocalDateTime.now());
         logEntity.setDuration(duration);
@@ -118,7 +120,7 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
             IPage<OperationLogVO> voPage = pageResult.convert(entity -> {
                 OperationLogVO vo = OperationLogConvert.toVO(entity);
                 if (vo.getStatus() != null) {
-                    vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
+                    vo.setStatusName(StatusConstants.getOperationResultName(vo.getStatus()));
                 }
                 return vo;
             });
@@ -201,7 +203,7 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
                 row.createCell(7).setCellValue(entity.getIp());
                 row.createCell(8).setCellValue(entity.getRealName());
                 row.createCell(9).setCellValue(entity.getStatus() != null
-                        ? StatusConstants.getStatusName(entity.getStatus()) : "");
+                        ? StatusConstants.getOperationResultName(entity.getStatus()) : "");
                 row.createCell(10).setCellValue(entity.getDuration() != null ? entity.getDuration() : 0);
                 row.createCell(11).setCellValue(entity.getOperationTime() != null
                         ? entity.getOperationTime().format(DATE_TIME_FORMATTER) : "");

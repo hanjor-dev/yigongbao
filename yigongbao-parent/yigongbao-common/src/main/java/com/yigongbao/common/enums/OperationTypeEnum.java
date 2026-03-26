@@ -27,7 +27,9 @@ public enum OperationTypeEnum {
     ENABLE(11, "启用"),
     DISABLE(12, "禁用"),
     UPLOAD(13, "上传"),
-    DOWNLOAD(14, "下载");
+    DOWNLOAD(14, "下载"),
+    LOGIN(15, "登录"),
+    LOGOUT(16, "登出");
 
     /**
      * 操作类型编码

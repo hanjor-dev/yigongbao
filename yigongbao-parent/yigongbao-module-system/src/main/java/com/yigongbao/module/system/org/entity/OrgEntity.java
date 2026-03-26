@@ -31,10 +31,9 @@ public class OrgEntity extends BaseEntity implements Serializable {
     private String orgCode;
 
     /**
-     * 机构类型（关联字典编码=1，子节点dict_code=1.1/1.2/1.3/1.4）
-     * 1.1=生产企业，1.2=经销商，1.3=医疗机构，1.4=其他
+     * 机构类型（字典编码，如：1.1=生产企业，1.2=经销商，1.3=医疗机构，1.4=其他）
      */
-    private Integer orgType;
+    private String orgType;
 
     /**
      * 所属地区ID
@@ -87,14 +86,14 @@ public class OrgEntity extends BaseEntity implements Serializable {
     private String agentProductLine;
 
     /**
-     * 医院等级（医疗机构，关联字典编码=3）
+     * 医院等级（医疗机构，关联字典编码=3，值如 3.1/3.2/3.3/3.4/3.5）
      */
-    private Integer hospitalLevel;
+    private String hospitalLevel;
 
     /**
-     * 医院类型（医疗机构，关联字典编码=4）
+     * 医院类型（医疗机构，关联字典编码=4，值如 4.1/4.2）
      */
-    private Integer hospitalType;
+    private String hospitalType;
 
     /**
      * 状态（0=禁用，1=正常）

@@ -45,7 +45,7 @@ class ConfigControllerTest {
     @Test
     @DisplayName("list: 分页查询成功")
     void list_shouldReturnPageData() throws Exception {
-        mockMvc.perform(get("/api/system/config/list"))
+        mockMvc.perform(get("/system/config/list"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("操作成功"))
@@ -58,7 +58,7 @@ class ConfigControllerTest {
     @Test
     @DisplayName("list: 带筛选条件查询成功")
     void list_withFilters_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/config/list")
+        mockMvc.perform(get("/system/config/list")
                         .param("configKey", "default.password")
                         .param("configGroup", "security"))
                 .andExpect(status().isOk())
@@ -73,7 +73,7 @@ class ConfigControllerTest {
     @Test
     @DisplayName("getById: 存在数据时返回配置详情")
     void getById_whenExists_shouldReturnData() throws Exception {
-        mockMvc.perform(get("/api/system/config/1"))
+        mockMvc.perform(get("/system/config/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(1))
@@ -86,7 +86,7 @@ class ConfigControllerTest {
     @Test
     @DisplayName("getById: 数据不存在时返回错误码")
     void getById_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(get("/api/system/config/999999"))
+        mockMvc.perform(get("/system/config/999999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(626))
                 .andExpect(jsonPath("$.message").value("配置不存在"));
@@ -112,7 +112,7 @@ class ConfigControllerTest {
         requestBody.put("sort", 0);
         requestBody.put("status", 1);
 
-        mockMvc.perform(post("/api/system/config")
+        mockMvc.perform(post("/system/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -130,7 +130,7 @@ class ConfigControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("configName", "测试配置");
 
-        mockMvc.perform(post("/api/system/config")
+        mockMvc.perform(post("/system/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isBadRequest())
@@ -149,7 +149,7 @@ class ConfigControllerTest {
         requestBody.put("configName", "测试配置");
         requestBody.put("configGroup", "security");
 
-        mockMvc.perform(post("/api/system/config")
+        mockMvc.perform(post("/system/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -170,7 +170,7 @@ class ConfigControllerTest {
         requestBody.put("configValue", "updatedValue");
 
         // 使用 id=2（系统配置，非系统内置）
-        mockMvc.perform(put("/api/system/config/5")
+        mockMvc.perform(put("/system/config/5")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -186,7 +186,7 @@ class ConfigControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("configName", "更新后的配置名称");
 
-        mockMvc.perform(put("/api/system/config/999999")
+        mockMvc.perform(put("/system/config/999999")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -203,7 +203,7 @@ class ConfigControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("configName", "尝试修改系统配置");
 
-        mockMvc.perform(put("/api/system/config/1")
+        mockMvc.perform(put("/system/config/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -220,7 +220,7 @@ class ConfigControllerTest {
     @DisplayName("delete: 删除成功返回success")
     void delete_shouldSuccess() throws Exception {
         // schema.sql 中 id=5 是非系统内置配置，可以删除
-        mockMvc.perform(delete("/api/system/config/5"))
+        mockMvc.perform(delete("/system/config/5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
     }
@@ -231,7 +231,7 @@ class ConfigControllerTest {
     @Test
     @DisplayName("delete: 数据不存在时返回错误码")
     void delete_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(delete("/api/system/config/999999"))
+        mockMvc.perform(delete("/system/config/999999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(626));
     }
@@ -242,7 +242,7 @@ class ConfigControllerTest {
     @Test
     @DisplayName("delete: 系统内置配置不可删除")
     void delete_whenSystemConfig_shouldReturnError() throws Exception {
-        mockMvc.perform(delete("/api/system/config/1"))
+        mockMvc.perform(delete("/system/config/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(629))
                 .andExpect(jsonPath("$.message").value("系统内置配置不可删除"));
@@ -256,7 +256,7 @@ class ConfigControllerTest {
     @Test
     @DisplayName("listPublic: 获取公开配置成功")
     void listPublic_shouldReturnPublicConfigs() throws Exception {
-        mockMvc.perform(get("/api/system/config/public"))
+        mockMvc.perform(get("/system/config/public"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray());

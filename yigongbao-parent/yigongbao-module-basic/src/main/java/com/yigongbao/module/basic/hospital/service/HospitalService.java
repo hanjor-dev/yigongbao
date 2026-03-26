@@ -24,13 +24,13 @@ public interface HospitalService extends IService<HospitalEntity> {
      * @param pageSize       每页条数
      * @param hospitalName   医院名称（模糊查询）
      * @param areaId         地区ID
-     * @param hospitalLevel  医院等级
-     * @param hospitalType   医院类型
+     * @param hospitalLevel  医院等级（字典：dict_code=3，值如 3.1/3.2）
+     * @param hospitalType   医院类型（字典：dict_code=4，值如 4.1/4.2）
      * @param status         状态
      * @return 分页后的医院列表
      */
     IPage<HospitalVO> listHospital(Integer pageNum, Integer pageSize, String hospitalName,
-                                   Long areaId, Integer hospitalLevel, Integer hospitalType, Integer status);
+                                  Long areaId, String hospitalLevel, String hospitalType, Integer status);
 
     /**
      * 根据ID查询医院详情

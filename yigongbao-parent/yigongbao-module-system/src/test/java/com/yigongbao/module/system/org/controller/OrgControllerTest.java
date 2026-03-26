@@ -54,7 +54,7 @@ class OrgControllerTest {
     @Test
     @DisplayName("list: 分页查询机构列表成功")
     void list_shouldReturnPageData() throws Exception {
-        mockMvc.perform(get("/api/system/org/list")
+        mockMvc.perform(get("/system/org/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10"))
                 .andExpect(status().isOk())
@@ -67,7 +67,7 @@ class OrgControllerTest {
     @Test
     @DisplayName("list: 按机构名称模糊查询")
     void list_withOrgName_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/org/list")
+        mockMvc.perform(get("/system/org/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("orgName", "测试"))
@@ -79,7 +79,7 @@ class OrgControllerTest {
     @Test
     @DisplayName("list: 按状态筛选")
     void list_withStatus_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/org/list")
+        mockMvc.perform(get("/system/org/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("status", "1"))
@@ -93,7 +93,7 @@ class OrgControllerTest {
     @Test
     @DisplayName("getById: 查询机构详情成功")
     void getById_shouldReturnOrg() throws Exception {
-        mockMvc.perform(get("/api/system/org/1"))
+        mockMvc.perform(get("/system/org/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("操作成功"))
@@ -104,7 +104,7 @@ class OrgControllerTest {
     @Test
     @DisplayName("getById: 机构不存在时返回错误码")
     void getById_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(get("/api/system/org/999999"))
+        mockMvc.perform(get("/system/org/999999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(608))
                 .andExpect(jsonPath("$.message").value("机构不存在"));
@@ -117,13 +117,13 @@ class OrgControllerTest {
     void create_shouldSuccess() throws Exception {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("orgName", "接口测试机构");
-        requestBody.put("orgType", 1);
+        requestBody.put("orgType", "1.1");
         requestBody.put("contact", "测试联系人");
         requestBody.put("phone", "13900000001");
         requestBody.put("areaName", "北京市");
         requestBody.put("address", "朝阳区测试路1号");
 
-        mockMvc.perform(post("/api/system/org")
+        mockMvc.perform(post("/system/org")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -141,11 +141,11 @@ class OrgControllerTest {
     void create_whenNameEmpty_shouldReturnValidationError() throws Exception {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("orgName", "");
-        requestBody.put("orgType", 1);
+        requestBody.put("orgType", "1.1");
         requestBody.put("contact", "测试联系人");
         requestBody.put("phone", "13900000001");
 
-        mockMvc.perform(post("/api/system/org")
+        mockMvc.perform(post("/system/org")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isBadRequest())
@@ -161,7 +161,7 @@ class OrgControllerTest {
         requestBody.put("contact", "测试联系人");
         requestBody.put("phone", "13900000001");
 
-        mockMvc.perform(post("/api/system/org")
+        mockMvc.perform(post("/system/org")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isBadRequest())
@@ -173,11 +173,11 @@ class OrgControllerTest {
     void create_whenPhoneInvalid_shouldReturnValidationError() throws Exception {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("orgName", "测试机构");
-        requestBody.put("orgType", 1);
+        requestBody.put("orgType", "1.1");
         requestBody.put("contact", "测试联系人");
         requestBody.put("phone", "12345678901");
 
-        mockMvc.perform(post("/api/system/org")
+        mockMvc.perform(post("/system/org")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isBadRequest())
@@ -189,11 +189,11 @@ class OrgControllerTest {
     void create_whenNameExists_shouldReturnBusinessError() throws Exception {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("orgName", "测试医疗机构");
-        requestBody.put("orgType", 1);
+        requestBody.put("orgType", "1.1");
         requestBody.put("contact", "测试联系人");
         requestBody.put("phone", "13900000001");
 
-        mockMvc.perform(post("/api/system/org")
+        mockMvc.perform(post("/system/org")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -211,7 +211,7 @@ class OrgControllerTest {
         requestBody.put("contact", "新联系人");
         requestBody.put("phone", "13900000002");
 
-        mockMvc.perform(put("/api/system/org/1")
+        mockMvc.perform(put("/system/org/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -230,7 +230,7 @@ class OrgControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("orgName", "不存在的机构");
 
-        mockMvc.perform(put("/api/system/org/999999")
+        mockMvc.perform(put("/system/org/999999")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -245,7 +245,7 @@ class OrgControllerTest {
         // 将 id=1 的机构名称改为 id=2 的机构名称，造成重复
         requestBody.put("orgName", "测试生产企业");
 
-        mockMvc.perform(put("/api/system/org/1")
+        mockMvc.perform(put("/system/org/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -258,7 +258,7 @@ class OrgControllerTest {
     @Test
     @DisplayName("remove: 删除机构成功")
     void remove_shouldSuccess() throws Exception {
-        mockMvc.perform(delete("/api/system/org/3"))
+        mockMvc.perform(delete("/system/org/3"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("操作成功"));
@@ -271,7 +271,7 @@ class OrgControllerTest {
     @Test
     @DisplayName("remove: 机构不存在时返回错误码")
     void remove_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(delete("/api/system/org/999999"))
+        mockMvc.perform(delete("/system/org/999999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(608))
                 .andExpect(jsonPath("$.message").value("机构不存在"));
@@ -282,7 +282,7 @@ class OrgControllerTest {
     @Test
     @DisplayName("updateStatus: 修改状态成功")
     void updateStatus_shouldSuccess() throws Exception {
-        mockMvc.perform(put("/api/system/org/1/status")
+        mockMvc.perform(put("/system/org/1/status")
                         .param("status", "0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
@@ -297,7 +297,7 @@ class OrgControllerTest {
     @Test
     @DisplayName("updateStatus: 机构不存在时返回错误码")
     void updateStatus_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(put("/api/system/org/999999/status")
+        mockMvc.perform(put("/system/org/999999/status")
                         .param("status", "0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(608))
@@ -307,7 +307,7 @@ class OrgControllerTest {
     @Test
     @DisplayName("updateStatus: 状态值超出范围时参数校验失败")
     void updateStatus_whenInvalidStatus_shouldReturnValidationError() throws Exception {
-        mockMvc.perform(put("/api/system/org/1/status")
+        mockMvc.perform(put("/system/org/1/status")
                         .param("status", "2"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
@@ -316,7 +316,7 @@ class OrgControllerTest {
     @Test
     @DisplayName("updateStatus: 状态值为负数时参数校验失败")
     void updateStatus_whenNegativeStatus_shouldReturnValidationError() throws Exception {
-        mockMvc.perform(put("/api/system/org/1/status")
+        mockMvc.perform(put("/system/org/1/status")
                         .param("status", "-1"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));

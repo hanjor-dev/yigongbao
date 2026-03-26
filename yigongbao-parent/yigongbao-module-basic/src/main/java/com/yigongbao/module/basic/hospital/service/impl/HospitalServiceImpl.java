@@ -6,14 +6,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.StatusConstants;
-
-/**
- * 医院 Service 实现类
- * 处理医院相关的业务逻辑，包括医院CRUD、状态管理等
- *
- * @author hanjor
- * @date 2026-03-19
- */
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.area.entity.AreaEntity;
@@ -59,14 +51,14 @@ public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEnt
      * @param pageSize 每页条数
      * @param hospitalName 医院名称（模糊查询）
      * @param areaId 地区ID
-     * @param hospitalLevel 医院等级
-     * @param hospitalType 医院类型
+     * @param hospitalLevel 医院等级（字典：dict_code=3，值如 3.1/3.2）
+     * @param hospitalType 医院类型（字典：dict_code=4，值如 4.1/4.2）
      * @param status 状态
      * @return 分页后的医院列表
      */
     @Override
     public IPage<HospitalVO> listHospital(Integer pageNum, Integer pageSize, String hospitalName,
-                                            Long areaId, Integer hospitalLevel, Integer hospitalType, Integer status) {
+                                          Long areaId, String hospitalLevel, String hospitalType, Integer status) {
         log.info("分页查询医院列表，pageNum={}, pageSize={}, hospitalName={}, areaId={}, hospitalLevel={}, hospitalType={}, status={}",
                 pageNum, pageSize, hospitalName, areaId, hospitalLevel, hospitalType, status);
         try {
@@ -74,8 +66,8 @@ public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEnt
             LambdaQueryWrapper<HospitalEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.like(StrUtil.isNotBlank(hospitalName), HospitalEntity::getHospitalName, hospitalName)
                     .eq(Objects.nonNull(areaId), HospitalEntity::getAreaId, areaId)
-                    .eq(Objects.nonNull(hospitalLevel), HospitalEntity::getHospitalLevel, hospitalLevel)
-                    .eq(Objects.nonNull(hospitalType), HospitalEntity::getHospitalType, hospitalType)
+                    .eq(StrUtil.isNotBlank(hospitalLevel), HospitalEntity::getHospitalLevel, hospitalLevel)
+                    .eq(StrUtil.isNotBlank(hospitalType), HospitalEntity::getHospitalType, hospitalType)
                     .eq(Objects.nonNull(status), HospitalEntity::getStatus, status)
                     .orderByDesc(HospitalEntity::getCreateTime);
             IPage<HospitalEntity> pageResult = page(page, wrapper);
@@ -295,7 +287,7 @@ public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEnt
             entity.setAreaName(area.getName());
             entity.setFullAreaName(area.getMergerName());
         } else {
-            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "地区信息无效，请检查地区ID");
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR.getCode(), "地区信息无效，请检查地区ID");
         }
     }
 

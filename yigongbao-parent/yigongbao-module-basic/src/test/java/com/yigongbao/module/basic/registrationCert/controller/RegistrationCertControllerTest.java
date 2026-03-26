@@ -76,7 +76,7 @@ class RegistrationCertControllerTest {
             when(registrationCertService.listCerts(eq(1), eq(10), any(), any(), any()))
                     .thenReturn(page);
 
-            mockMvc.perform(get("/api/basic/registration-cert/list"))
+            mockMvc.perform(get("/basic/registration-cert/list"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"))
@@ -92,7 +92,7 @@ class RegistrationCertControllerTest {
             when(registrationCertService.listCerts(eq(1), eq(10), any(), any(), any()))
                     .thenReturn(page);
 
-            mockMvc.perform(get("/api/basic/registration-cert/list"))
+            mockMvc.perform(get("/basic/registration-cert/list"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.records").isArray())
@@ -111,7 +111,7 @@ class RegistrationCertControllerTest {
         void getById_whenExists_shouldReturnData() throws Exception {
             when(registrationCertService.getById(1L)).thenReturn(buildTestVO(1L, "REG-001"));
 
-            mockMvc.perform(get("/api/basic/registration-cert/1"))
+            mockMvc.perform(get("/basic/registration-cert/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.id").value(1))
@@ -124,7 +124,7 @@ class RegistrationCertControllerTest {
             when(registrationCertService.getById(999L))
                     .thenThrow(new BusinessException(ErrorCodeEnum.CERT_NOT_FOUND));
 
-            mockMvc.perform(get("/api/basic/registration-cert/999"))
+            mockMvc.perform(get("/basic/registration-cert/999"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(720))
                     .andExpect(jsonPath("$.message").value("注册证不存在"));
@@ -147,7 +147,7 @@ class RegistrationCertControllerTest {
                     "validTo", "2030-12-31"
             );
 
-            mockMvc.perform(post("/api/basic/registration-cert")
+            mockMvc.perform(post("/basic/registration-cert")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -162,7 +162,7 @@ class RegistrationCertControllerTest {
                     "validFrom", "2026-01-01"
             );
 
-            mockMvc.perform(post("/api/basic/registration-cert")
+            mockMvc.perform(post("/basic/registration-cert")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isBadRequest())
@@ -181,7 +181,7 @@ class RegistrationCertControllerTest {
                     "certName", "新注册证"
             );
 
-            mockMvc.perform(post("/api/basic/registration-cert")
+            mockMvc.perform(post("/basic/registration-cert")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -202,7 +202,7 @@ class RegistrationCertControllerTest {
                     "certName", "更新后的注册证名称"
             );
 
-            mockMvc.perform(put("/api/basic/registration-cert/1")
+            mockMvc.perform(put("/basic/registration-cert/1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -220,7 +220,7 @@ class RegistrationCertControllerTest {
                     "certName", "更新后的注册证名称"
             );
 
-            mockMvc.perform(put("/api/basic/registration-cert/999")
+            mockMvc.perform(put("/basic/registration-cert/999")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -238,7 +238,7 @@ class RegistrationCertControllerTest {
         @Test
         @DisplayName("delete: 删除成功返回200")
         void delete_shouldSuccess() throws Exception {
-            mockMvc.perform(delete("/api/basic/registration-cert/2"))
+            mockMvc.perform(delete("/basic/registration-cert/2"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"));
@@ -250,7 +250,7 @@ class RegistrationCertControllerTest {
             doThrow(new BusinessException(ErrorCodeEnum.CERT_NOT_FOUND))
                     .when(registrationCertService).remove(999L);
 
-            mockMvc.perform(delete("/api/basic/registration-cert/999"))
+            mockMvc.perform(delete("/basic/registration-cert/999"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(720));
         }
@@ -268,7 +268,7 @@ class RegistrationCertControllerTest {
             when(registrationCertService.listValidCerts())
                     .thenReturn(List.of(buildTestVO(1L, "REG-001"), buildTestVO(2L, "REG-002")));
 
-            mockMvc.perform(get("/api/basic/registration-cert/valid-list"))
+            mockMvc.perform(get("/basic/registration-cert/valid-list"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").isArray())

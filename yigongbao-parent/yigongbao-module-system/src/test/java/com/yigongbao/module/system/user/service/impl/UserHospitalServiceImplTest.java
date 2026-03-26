@@ -1,10 +1,13 @@
 package com.yigongbao.module.system.user.service.impl;
 
+import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
 import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
 import com.yigongbao.module.basic.hospital.vo.HospitalVO;
+import com.yigongbao.module.system.role.entity.RoleEntity;
+import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.entity.UserHospitalEntity;
 import com.yigongbao.module.system.user.mapper.UserHospitalMapper;
@@ -54,18 +57,24 @@ class UserHospitalServiceImplTest {
     @Mock
     private UserMapper userMapper;
 
+    @Mock
+    private RoleService roleService;
+
     @InjectMocks
     private UserHospitalServiceImpl userHospitalService;
 
     private UserEntity testUser;
     private HospitalEntity enabledHospital;
     private HospitalEntity disabledHospital;
+    private RoleEntity enabledRole;
+    private RoleEntity disabledRole;
 
     @BeforeEach
     void setUp() {
         testUser = new UserEntity();
         testUser.setId(1L);
         testUser.setUsername("testuser");
+        testUser.setRoleId(1L);
 
         enabledHospital = new HospitalEntity();
         enabledHospital.setId(1L);
@@ -78,6 +87,14 @@ class UserHospitalServiceImplTest {
         disabledHospital.setHospitalName("Test Hospital 2");
         disabledHospital.setHospitalCode("HOS-002");
         disabledHospital.setStatus(0);
+
+        enabledRole = new RoleEntity();
+        enabledRole.setId(1L);
+        enabledRole.setHospitalScopeEnabled(StatusConstants.YES);
+
+        disabledRole = new RoleEntity();
+        disabledRole.setId(2L);
+        disabledRole.setHospitalScopeEnabled(StatusConstants.NO);
     }
 
     // ==================== getHospitalIdsByUserId Tests ====================
@@ -198,7 +215,7 @@ class UserHospitalServiceImplTest {
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> userHospitalService.assignHospitals(1L, idsWithInvalid));
 
-        assertEquals(ErrorCodeEnum.PARAM_ERROR.getCode(), exception.getCode());
+        assertEquals(ErrorCodeEnum.HOSPITAL_NOT_FOUND.getCode(), exception.getCode());
         verify(userHospitalMapper, never()).deleteByUserId(any());
     }
 
@@ -212,7 +229,7 @@ class UserHospitalServiceImplTest {
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> userHospitalService.assignHospitals(1L, ids));
 
-        assertEquals(ErrorCodeEnum.PARAM_ERROR.getCode(), exception.getCode());
+        assertEquals(ErrorCodeEnum.HOSPITAL_DISABLED.getCode(), exception.getCode());
         assertNotNull(exception.getMessage());
         verify(userHospitalMapper, never()).deleteByUserId(any());
     }
@@ -270,5 +287,60 @@ class UserHospitalServiceImplTest {
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
+    }
+
+    // ==================== getMyHospitalOptions Tests ====================
+
+    @Test
+    @DisplayName("getMyHospitalOptions: Returns hospitals when role hospitalScopeEnabled=1")
+    void getMyHospitalOptions_whenHospitalScopeEnabled_shouldReturnHospitals() {
+        List<Long> hospitalIds = List.of(1L);
+        when(userMapper.selectById(1L)).thenReturn(testUser);
+        when(roleService.getById(1L)).thenReturn(enabledRole);
+        when(userHospitalMapper.selectHospitalIdsByUserId(1L)).thenReturn(hospitalIds);
+        when(hospitalMapper.selectBatchIds(hospitalIds)).thenReturn(List.of(enabledHospital));
+
+        List<HospitalVO> result = userHospitalService.getMyHospitalOptions(1L);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals("Test Hospital 1", result.get(0).getHospitalName());
+    }
+
+    @Test
+    @DisplayName("getMyHospitalOptions: Returns empty list when role hospitalScopeEnabled=0")
+    void getMyHospitalOptions_whenHospitalScopeDisabled_shouldReturnEmptyList() {
+        testUser.setRoleId(2L);
+        when(userMapper.selectById(1L)).thenReturn(testUser);
+        when(roleService.getById(2L)).thenReturn(disabledRole);
+
+        List<HospitalVO> result = userHospitalService.getMyHospitalOptions(1L);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("getMyHospitalOptions: Returns empty list when user has no role")
+    void getMyHospitalOptions_whenNoRole_shouldReturnEmptyList() {
+        testUser.setRoleId(null);
+        when(userMapper.selectById(1L)).thenReturn(testUser);
+
+        List<HospitalVO> result = userHospitalService.getMyHospitalOptions(1L);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("getMyHospitalOptions: Throws exception when user not found")
+    void getMyHospitalOptions_whenUserNotFound_shouldThrowException() {
+        when(userMapper.selectById(999L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userHospitalService.getMyHospitalOptions(999L)
+        );
+        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
     }
 }

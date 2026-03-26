@@ -2,9 +2,12 @@ package com.yigongbao.module.system.user.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.user.dto.CreateUserDTO;
-import com.yigongbao.module.system.user.dto.ResetPasswordDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO;
 import com.yigongbao.module.system.user.service.UserService;
@@ -22,8 +25,9 @@ import org.springframework.web.bind.annotation.*;
  * @author hanjor
  * @date 2026-03-17
  */
+@Tag(name = "用户管理", description = "用户 CRUD、密码管理、状态管理")
 @RestController
-@RequestMapping("/api/system/user")
+@RequestMapping("/system/user")
 @RequiredArgsConstructor
 public class UserController {
 
@@ -33,6 +37,7 @@ public class UserController {
      * 分页查询用户列表
      */
     @GetMapping("/list")
+    @Operation(summary = "分页查询用户列表")
     public Result<IPage<UserVO>> list(
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "10") Integer pageSize,
@@ -49,6 +54,7 @@ public class UserController {
      * 根据ID查询用户详情
      */
     @GetMapping("/{id}")
+    @Operation(summary = "根据ID查询用户详情")
     public Result<UserVO> getById(@PathVariable Long id) {
         return Result.success(userService.getUserById(id));
     }
@@ -56,6 +62,12 @@ public class UserController {
     /**
      * 创建用户
      */
+    @Operation(summary = "创建用户")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.CREATE,
+            operation = "创建用户"
+    )
     @PostMapping
     public Result<Void> create(@Validated @RequestBody CreateUserDTO dto) {
         userService.createUser(dto);
@@ -65,6 +77,12 @@ public class UserController {
     /**
      * 更新用户
      */
+    @Operation(summary = "更新用户")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "更新用户"
+    )
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @Validated @RequestBody UpdateUserDTO dto) {
         userService.updateUser(id, dto);
@@ -74,6 +92,12 @@ public class UserController {
     /**
      * 删除用户
      */
+    @Operation(summary = "删除用户")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.DELETE,
+            operation = "删除用户"
+    )
     @DeleteMapping("/{id}")
     public Result<Void> remove(@PathVariable Long id) {
         userService.removeUser(id);
@@ -83,6 +107,12 @@ public class UserController {
     /**
      * 修改用户状态
      */
+    @Operation(summary = "修改用户状态")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "修改用户状态"
+    )
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(
             @PathVariable Long id,
@@ -94,15 +124,29 @@ public class UserController {
     /**
      * 重置密码
      */
-    @PutMapping("/{id}/reset-password")
-    public Result<Void> resetPassword(@PathVariable Long id, @Validated @RequestBody ResetPasswordDTO dto) {
-        userService.resetPassword(id, dto);
+    @Operation(summary = "重置密码")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "重置用户密码",
+            logParams = false
+    )
+    @PutMapping("/{userId}/reset-password")
+    public Result<Void> resetPassword(@PathVariable Long userId) {
+        userService.resetPassword(userId);
         return Result.success();
     }
 
     /**
      * 修改密码
      */
+    @Operation(summary = "修改密码")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "修改用户密码",
+            logParams = false
+    )
     @PutMapping("/{id}/change-password")
     public Result<Void> changePassword(
             @PathVariable Long id,
@@ -115,6 +159,12 @@ public class UserController {
     /**
      * 用户自更新（仅允许修改手机号和头像）
      */
+    @Operation(summary = "用户自更新（仅允许修改手机号和头像）")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "更新个人资料"
+    )
     @PutMapping("/profile")
     public Result<Void> updateProfile(@Validated @RequestBody UpdateUserBySelfDTO dto) {
         // 获取当前登录用户ID

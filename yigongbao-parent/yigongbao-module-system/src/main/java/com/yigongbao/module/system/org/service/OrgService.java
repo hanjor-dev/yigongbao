@@ -26,7 +26,7 @@ public interface OrgService extends IService<OrgEntity> {
      * @param status   状态
      * @return 分页后的机构列表
      */
-    IPage<OrgVO> listOrg(Integer pageNum, Integer pageSize, String orgName, Integer orgType, Long areaId, Integer status);
+    IPage<OrgVO> listOrg(Integer pageNum, Integer pageSize, String orgName, String orgType, Long areaId, Integer status);
 
     /**
      * 根据ID查询机构详情

@@ -5,6 +5,8 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.module.basic.operationlog.dto.OperationLogQueryDTO;
 import com.yigongbao.module.basic.operationlog.service.OperationLogService;
 import com.yigongbao.module.basic.operationlog.vo.OperationLogVO;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,8 +19,9 @@ import jakarta.servlet.http.HttpServletResponse;
  * @author hanjor
  * @date 2026-03-24
  */
+@Tag(name = "操作日志管理", description = "系统操作日志查询和导出")
 @RestController
-@RequestMapping("/api/basic/operation-log")
+@RequestMapping("/basic/operation-log")
 @RequiredArgsConstructor
 public class OperationLogController {
 
@@ -27,6 +30,7 @@ public class OperationLogController {
     /**
      * 分页查询操作日志
      */
+    @Operation(summary = "分页查询操作日志")
     @GetMapping("/page")
     public Result<IPage<OperationLogVO>> page(
             @RequestParam(defaultValue = "1") Integer pageNum,
@@ -56,6 +60,7 @@ public class OperationLogController {
     /**
      * 导出操作日志
      */
+    @Operation(summary = "导出操作日志")
     @GetMapping("/export")
     public void export(
             @RequestParam(required = false) String module,

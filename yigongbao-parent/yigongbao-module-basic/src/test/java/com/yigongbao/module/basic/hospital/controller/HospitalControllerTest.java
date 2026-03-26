@@ -59,9 +59,9 @@ class HospitalControllerTest {
         vo.setAreaId(111L);
         vo.setAreaName("东城区");
         vo.setFullAreaName("中国,北京,北京市,东城区");
-        vo.setHospitalLevel(1);
+        vo.setHospitalLevel("3.1");
         vo.setHospitalLevelName("三甲");
-        vo.setHospitalType(1);
+        vo.setHospitalType("4.1");
         vo.setHospitalTypeName("综合");
         vo.setContact("张医生");
         vo.setPhone("13800138001");
@@ -88,7 +88,7 @@ class HospitalControllerTest {
         when(hospitalService.listHospital(anyInt(), anyInt(), any(), any(), any(), any(), any()))
                 .thenReturn(page);
 
-        mockMvc.perform(get("/api/basic/hospital/list")
+        mockMvc.perform(get("/basic/hospital/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10"))
                 .andExpect(status().isOk())
@@ -111,7 +111,7 @@ class HospitalControllerTest {
         when(hospitalService.listHospital(eq(1), eq(10), eq("协和"), any(), any(), any(), any()))
                 .thenReturn(page);
 
-        mockMvc.perform(get("/api/basic/hospital/list")
+        mockMvc.perform(get("/basic/hospital/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("hospitalName", "协和"))
@@ -131,7 +131,7 @@ class HospitalControllerTest {
     void getById_whenExists_shouldReturnData() throws Exception {
         when(hospitalService.getHospitalById(1L)).thenReturn(buildTestVO(1L, "北京协和医院"));
 
-        mockMvc.perform(get("/api/basic/hospital/1"))
+        mockMvc.perform(get("/basic/hospital/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(1))
@@ -149,7 +149,7 @@ class HospitalControllerTest {
                 .thenThrow(new com.yigongbao.common.exception.BusinessException(
                         com.yigongbao.common.enums.ErrorCodeEnum.HOSPITAL_NOT_FOUND));
 
-        mockMvc.perform(get("/api/basic/hospital/999"))
+        mockMvc.perform(get("/basic/hospital/999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(650))
                 .andExpect(jsonPath("$.message").value("医院不存在"));
@@ -166,7 +166,7 @@ class HospitalControllerTest {
         when(hospitalService.listHospital(anyInt(), anyInt(), any(), any(), any(), any(), any()))
                 .thenReturn(new Page<>(1, 10));
 
-        mockMvc.perform(post("/api/basic/hospital")
+        mockMvc.perform(post("/basic/hospital")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "hospitalName", "测试医院",
@@ -185,7 +185,7 @@ class HospitalControllerTest {
     @Test
     @DisplayName("create: 医院名称为空时返回400")
     void create_whenNameBlank_shouldReturnBadRequest() throws Exception {
-        mockMvc.perform(post("/api/basic/hospital")
+        mockMvc.perform(post("/basic/hospital")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "areaId", 111L,
@@ -202,7 +202,7 @@ class HospitalControllerTest {
     @Test
     @DisplayName("create: 手机号格式错误时返回400")
     void create_whenInvalidPhone_shouldReturnBadRequest() throws Exception {
-        mockMvc.perform(post("/api/basic/hospital")
+        mockMvc.perform(post("/basic/hospital")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "hospitalName", "测试医院",
@@ -224,7 +224,7 @@ class HospitalControllerTest {
     void update_shouldSuccess() throws Exception {
         when(hospitalService.getHospitalById(1L)).thenReturn(buildTestVO(1L, "北京协和医院"));
 
-        mockMvc.perform(put("/api/basic/hospital/1")
+        mockMvc.perform(put("/basic/hospital/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "hospitalName", "北京协和医院-分院",
@@ -243,7 +243,7 @@ class HospitalControllerTest {
     @Test
     @DisplayName("updateStatus: 修改状态成功返回200")
     void updateStatus_shouldSuccess() throws Exception {
-        mockMvc.perform(put("/api/basic/hospital/1/status")
+        mockMvc.perform(put("/basic/hospital/1/status")
                         .param("status", "0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
@@ -256,7 +256,7 @@ class HospitalControllerTest {
     @Test
     @DisplayName("updateStatus: 状态值超范围时返回400")
     void updateStatus_whenInvalidStatus_shouldReturnBadRequest() throws Exception {
-        mockMvc.perform(put("/api/basic/hospital/1/status")
+        mockMvc.perform(put("/basic/hospital/1/status")
                         .param("status", "99"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
@@ -276,7 +276,7 @@ class HospitalControllerTest {
                         buildTestVO(2L, "上海市第一人民医院")
                 ));
 
-        mockMvc.perform(get("/api/basic/hospital/options"))
+        mockMvc.perform(get("/basic/hospital/options"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray())

@@ -105,6 +105,31 @@ public final class StatusConstants {
         return accountType == ACCOUNT_TYPE_INTERNAL ? ACCOUNT_TYPE_INTERNAL_NAME : ACCOUNT_TYPE_EXTERNAL_NAME;
     }
 
+    // ==================== 操作结果 ====================
+
+    /**
+     * 操作结果-成功
+     */
+    public static final String SUCCESS_NAME = "成功";
+
+    /**
+     * 操作结果-失败
+     */
+    public static final String FAILURE_NAME = "失败";
+
+    /**
+     * 根据操作结果状态值获取显示名称
+     *
+     * @param status 状态值（0-失败，1-成功）
+     * @return 操作结果显示名称
+     */
+    public static String getOperationResultName(Integer status) {
+        if (status == null) {
+            return "";
+        }
+        return status == NORMAL ? SUCCESS_NAME : FAILURE_NAME;
+    }
+
     // ==================== 性别 ====================
 
     /**

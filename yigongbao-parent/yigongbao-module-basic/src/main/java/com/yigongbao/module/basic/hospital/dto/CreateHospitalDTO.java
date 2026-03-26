@@ -36,13 +36,11 @@ public class CreateHospitalDTO implements Serializable {
     /**
      * 联系人
      */
-    @NotBlank(message = "联系人不能为空")
     private String contact;
 
     /**
      * 联系电话
      */
-    @NotBlank(message = "联系电话不能为空")
     @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
     private String phone;
 
@@ -53,14 +51,14 @@ public class CreateHospitalDTO implements Serializable {
     private String email;
 
     /**
-     * 医院等级
+     * 医院等级（字典：dict_code=3，值如 3.1/3.2/3.3/3.4/3.5）
      */
-    private Integer hospitalLevel;
+    private String hospitalLevel;
 
     /**
-     * 医院类型
+     * 医院类型（字典：dict_code=4，值如 4.1/4.2）
      */
-    private Integer hospitalType;
+    private String hospitalType;
 
     /**
      * 详细地址

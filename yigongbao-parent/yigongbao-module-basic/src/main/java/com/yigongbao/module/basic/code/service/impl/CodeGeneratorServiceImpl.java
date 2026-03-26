@@ -1,6 +1,7 @@
 package com.yigongbao.module.basic.code.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.CodeResetTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -58,13 +59,16 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             // 3. 检查是否需要重置
             checkAndReset(rule, sequence);
 
-            // 4. 递增序号
+            // 4. 递增序号（使用乐观锁版本控制，并发更新时重试）
             long newSeq = sequence.getCurrentSeq() + (rule.getStep() != null ? rule.getStep() : 1);
-            sequence.setCurrentSeq(newSeq);
-            // MyBatis-Plus @Version 乐观锁自动处理 version 递增，无需手动 +1
-
-            // 乐观锁更新（@Version 会自动在 WHERE 中追加 version 条件）
-            int rows = codeSequenceMapper.updateById(sequence);
+            int currentVersion = sequence.getVersion();
+            // 使用 LambdaUpdateWrapper 替代 updateById，避免 MyBatis-Plus OptimisticLockerInterceptor 参数注入问题
+            LambdaUpdateWrapper<CodeSequenceEntity> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(CodeSequenceEntity::getId, sequence.getId())
+                    .eq(CodeSequenceEntity::getVersion, currentVersion)
+                    .set(CodeSequenceEntity::getCurrentSeq, newSeq)
+                    .set(CodeSequenceEntity::getVersion, currentVersion + 1);
+            int rows = codeSequenceMapper.update(null, updateWrapper);
             if (rows == 0) {
                 log.warn("编码序号更新冲突，重试生成，ruleCode={}", ruleCode);
                 return generate(ruleCode);
@@ -156,12 +160,16 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             // 3. 检查是否需要重置
             checkAndReset(rule, sequence);
 
-            // 4. 递增序号
+            // 4. 递增序号（使用乐观锁版本控制，并发更新时重试）
             long newSeq = sequence.getCurrentSeq() + (rule.getStep() != null ? rule.getStep() : 1);
-            sequence.setCurrentSeq(newSeq);
-
-            // 乐观锁更新
-            int rows = codeSequenceMapper.updateById(sequence);
+            int currentVersion = sequence.getVersion();
+            // 使用 LambdaUpdateWrapper 替代 updateById，避免 MyBatis-Plus OptimisticLockerInterceptor 参数注入问题
+            LambdaUpdateWrapper<CodeSequenceEntity> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(CodeSequenceEntity::getId, sequence.getId())
+                    .eq(CodeSequenceEntity::getVersion, currentVersion)
+                    .set(CodeSequenceEntity::getCurrentSeq, newSeq)
+                    .set(CodeSequenceEntity::getVersion, currentVersion + 1);
+            int rows = codeSequenceMapper.update(null, updateWrapper);
             if (rows == 0) {
                 log.warn("编码序号更新冲突，重试生成，ruleCode={}, bizKey={}", ruleCode, bizKey);
                 return generateWithSeqSuffix(ruleCode, bizKey);
@@ -269,7 +277,12 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         if (needReset) {
             sequence.setCurrentSeq(0L);
             sequence.setLastDate(today);
-            codeSequenceMapper.updateById(sequence);
+            // 使用 LambdaUpdateWrapper 替代 updateById
+            LambdaUpdateWrapper<CodeSequenceEntity> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(CodeSequenceEntity::getId, sequence.getId())
+                    .set(CodeSequenceEntity::getCurrentSeq, 0L)
+                    .set(CodeSequenceEntity::getLastDate, today);
+            codeSequenceMapper.update(null, updateWrapper);
             log.info("编码序号已重置，ruleCode={}, lastDate={}", rule.getRuleCode(), today);
         }
     }

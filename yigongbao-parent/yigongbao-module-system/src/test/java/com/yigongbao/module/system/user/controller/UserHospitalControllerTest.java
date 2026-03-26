@@ -85,7 +85,7 @@ class UserHospitalControllerTest {
         when(userHospitalService.getHospitalsByUserId(1L))
                 .thenReturn(List.of(testHospital1, testHospital2));
 
-        mockMvc.perform(get("/api/system/user/1/hospitals"))
+        mockMvc.perform(get("/system/user/1/hospitals"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("操作成功"))
@@ -104,7 +104,7 @@ class UserHospitalControllerTest {
         when(userHospitalService.getHospitalsByUserId(1L))
                 .thenReturn(new ArrayList<>());
 
-        mockMvc.perform(get("/api/system/user/1/hospitals"))
+        mockMvc.perform(get("/system/user/1/hospitals"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray())
@@ -122,7 +122,7 @@ class UserHospitalControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("hospitalIds", List.of(1L, 2L));
 
-        mockMvc.perform(put("/api/system/user/1/hospitals")
+        mockMvc.perform(put("/system/user/1/hospitals")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -139,7 +139,7 @@ class UserHospitalControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("hospitalIds", List.of());
 
-        mockMvc.perform(put("/api/system/user/1/hospitals")
+        mockMvc.perform(put("/system/user/1/hospitals")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isBadRequest());
@@ -156,7 +156,7 @@ class UserHospitalControllerTest {
         when(userHospitalService.getHospitalOptionsByUserId(1L))
                 .thenReturn(List.of(testHospital1, testHospital2));
 
-        mockMvc.perform(get("/api/system/user/1/hospitals/options"))
+        mockMvc.perform(get("/system/user/1/hospitals/options"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray())
@@ -181,7 +181,7 @@ class UserHospitalControllerTest {
         when(hospitalGroupTemplateService.getTemplateById(1L))
                 .thenReturn(template);
 
-        mockMvc.perform(get("/api/system/user/1/hospitals/template/1"))
+        mockMvc.perform(get("/system/user/1/hospitals/template/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(1))

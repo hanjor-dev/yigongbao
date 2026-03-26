@@ -1,7 +1,11 @@
 package com.yigongbao.module.system.org.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.org.dto.CreateOrgDTO;
 import com.yigongbao.module.system.org.dto.UpdateOrgDTO;
 import com.yigongbao.module.system.org.service.OrgService;
@@ -19,8 +23,9 @@ import org.springframework.web.bind.annotation.*;
  * @author hanjor
  * @date 2026-03-16
  */
+@Tag(name = "机构管理", description = "机构 CRUD、状态管理")
 @RestController
-@RequestMapping("/api/system/org")
+@RequestMapping("/system/org")
 @RequiredArgsConstructor
 public class OrgController {
 
@@ -38,11 +43,12 @@ public class OrgController {
      * @return 分页后的机构列表
      */
     @GetMapping("/list")
+    @Operation(summary = "分页查询机构列表")
     public Result<IPage<OrgVO>> list(
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "10") Integer pageSize,
             @RequestParam(required = false) String orgName,
-            @RequestParam(required = false) Integer orgType,
+            @RequestParam(required = false) String orgType,
             @RequestParam(required = false) Long areaId,
             @RequestParam(required = false) Integer status) {
         return Result.success(orgService.listOrg(pageNum, pageSize, orgName, orgType, areaId, status));
@@ -55,6 +61,7 @@ public class OrgController {
      * @return 机构详情
      */
     @GetMapping("/{id}")
+    @Operation(summary = "根据ID查询机构详情")
     public Result<OrgVO> getById(@PathVariable Long id) {
         return Result.success(orgService.getOrgById(id));
     }
@@ -65,6 +72,12 @@ public class OrgController {
      * @param dto 创建参数
      * @return 创建结果
      */
+    @Operation(summary = "创建机构")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.CREATE,
+            operation = "创建机构"
+    )
     @PostMapping
     public Result<Void> create(@Validated @RequestBody CreateOrgDTO dto) {
         orgService.createOrg(dto);
@@ -78,6 +91,12 @@ public class OrgController {
      * @param dto 更新参数
      * @return 更新结果
      */
+    @Operation(summary = "更新机构")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "更新机构"
+    )
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @Validated @RequestBody UpdateOrgDTO dto) {
         orgService.updateOrg(id, dto);
@@ -90,6 +109,12 @@ public class OrgController {
      * @param id 机构ID
      * @return 删除结果
      */
+    @Operation(summary = "删除机构")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.DELETE,
+            operation = "删除机构"
+    )
     @DeleteMapping("/{id}")
     public Result<Void> remove(@PathVariable Long id) {
         orgService.removeOrg(id);
@@ -103,6 +128,12 @@ public class OrgController {
      * @param status 状态值（0=禁用，1=正常）
      * @return 操作结果
      */
+    @Operation(summary = "修改机构状态")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "修改机构状态"
+    )
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(
             @PathVariable Long id,

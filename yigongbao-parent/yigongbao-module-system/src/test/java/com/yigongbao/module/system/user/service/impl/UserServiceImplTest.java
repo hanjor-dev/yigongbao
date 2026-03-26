@@ -16,7 +16,6 @@ import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.user.dto.CreateUserDTO;
-import com.yigongbao.module.system.user.dto.ResetPasswordDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -84,7 +83,6 @@ class UserServiceImplTest {
     private CreateUserDTO createDTO;
     private UpdateUserDTO updateDTO;
     private UpdateUserBySelfDTO updateSelfDTO;
-    private ResetPasswordDTO resetPasswordDTO;
     private OrgEntity testOrg;
     private DeptEntity testDept;
     private RoleEntity testRole;
@@ -155,10 +153,6 @@ class UserServiceImplTest {
         updateSelfDTO = new UpdateUserBySelfDTO();
         updateSelfDTO.setPhone("13900000999");
         updateSelfDTO.setAvatar("/avatar/new.png");
-
-        // 初始化重置密码DTO
-        resetPasswordDTO = new ResetPasswordDTO();
-        resetPasswordDTO.setNewPassword("123456");
     }
 
     // ==================== listUser 测试 ====================
@@ -534,7 +528,7 @@ class UserServiceImplTest {
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
         // 执行
-        userService.resetPassword(1L, resetPasswordDTO);
+        userService.resetPassword(1L);
 
         // 断言
         verify(configService, times(1)).getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
@@ -550,7 +544,7 @@ class UserServiceImplTest {
         // 执行 & 断言
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> userService.resetPassword(999L, resetPasswordDTO)
+                () -> userService.resetPassword(999L)
         );
         assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
     }

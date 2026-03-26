@@ -61,7 +61,7 @@ class OperationLogServiceImplTest {
         testEntity.setOperation("CreateUser");
         testEntity.setDescription("Test description");
         testEntity.setRequestMethod("POST");
-        testEntity.setRequestUrl("/api/basic/user");
+        testEntity.setRequestUrl("/basic/user");
         testEntity.setIp("127.0.0.1");
         testEntity.setUserId(1L);
         testEntity.setUsername("admin");

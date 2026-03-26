@@ -15,12 +15,17 @@ public final class CodeRuleConstants {
     // ==================== 基础模块编码 ====================
 
     /**
+     * 机构编码
+     */
+    public static final String ORG_NO = "ORG_NO";
+
+    /**
      * 医院编码
      */
     public static final String HOSPITAL_NO = "HOSPITAL_NO";
 
     /**
-     * 机构部门编码
+     * 科室编码
      */
     public static final String HDEPT_NO = "HDEPT_NO";
 

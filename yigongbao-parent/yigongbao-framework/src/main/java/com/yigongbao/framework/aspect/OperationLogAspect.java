@@ -67,8 +67,8 @@ public class OperationLogAspect {
 
         // 获取当前用户
         Long userId = null;
-        String username = "系统";
-        String realName = "系统";
+        String username = "-";
+        String realName = "-";
         try {
             if (StpUtil.isLogin()) {
                 userId = StpUtil.getLoginIdAsLong();
@@ -78,6 +78,9 @@ public class OperationLogAspect {
         } catch (Exception e) {
             log.debug("获取登录用户信息失败", e);
         }
+
+        // 获取 User-Agent
+        String userAgent = getRequest() != null ? getRequest().getHeader("User-Agent") : null;
 
         // 获取请求参数（脱敏）
         String requestParams = null;
@@ -93,16 +96,20 @@ public class OperationLogAspect {
             return result;
         } catch (Exception e) {
             success = false;
-            // 异步保存日志（包含错误信息）
+            // 异常时无论 logParams 是否开启，都获取请求参数以便排查问题
+            String errorRequestParams = requestParams;
+            if (errorRequestParams == null) {
+                errorRequestParams = getRequestParams(point, annotation);
+            }
             long costTime = System.currentTimeMillis() - startTime;
             saveLogAsync(annotation, requestUrl, requestMethod, requestIp,
-                    userId, username, realName, requestParams, costTime, 0, e.getMessage());
+                    userId, username, realName, errorRequestParams, userAgent, costTime, 0, e.getMessage());
             throw e;
         } finally {
             if (success) {
                 long costTime = System.currentTimeMillis() - startTime;
                 saveLogAsync(annotation, requestUrl, requestMethod, requestIp,
-                        userId, username, realName, requestParams, costTime, 1, null);
+                        userId, username, realName, requestParams, userAgent, costTime, 1, null);
             }
         }
     }
@@ -113,21 +120,23 @@ public class OperationLogAspect {
     @Async
     public void saveLogAsync(OperationLog annotation, String requestUrl,
             String requestMethod, String requestIp, Long userId, String username, String realName,
-            String requestParams, long costTime, Integer status, String errorMessage) {
+            String requestParams, String userAgent, long costTime, Integer status, String errorMessage) {
         try {
             operationLogService.saveLog(
                     annotation.businessType(),
                     annotation.module(),
-                    annotation.operation(),
                     annotation.description() + " - " + requestUrl,
+                    annotation.operation(),
                     userId,
                     realName,
+                    username,
                     requestIp,
-                    null,
+                    userAgent,
                     requestMethod,
                     costTime,
                     status == 1,
-                    errorMessage
+                    errorMessage,
+                    requestParams
             );
         } catch (Exception e) {
             log.error("保存操作日志失败", e);

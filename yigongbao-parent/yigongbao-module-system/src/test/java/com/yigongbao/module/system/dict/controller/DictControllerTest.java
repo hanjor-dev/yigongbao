@@ -80,7 +80,7 @@ class DictControllerTest {
     @Test
     @DisplayName("listType: 查询字典类型列表")
     void listType_shouldReturnTypeList() throws Exception {
-        mockMvc.perform(get("/api/system/dict/type/list"))
+        mockMvc.perform(get("/system/dict/type/list"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray());
@@ -89,7 +89,7 @@ class DictControllerTest {
     @Test
     @DisplayName("listByTypeCode: 根据类型编码查询字典数据")
     void listByTypeCode_shouldReturnDataList() throws Exception {
-        mockMvc.perform(get("/api/system/dict/data/1"))
+        mockMvc.perform(get("/system/dict/data/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray());
@@ -98,7 +98,7 @@ class DictControllerTest {
     @Test
     @DisplayName("listByTypeCode: 类型不存在时返回错误码")
     void listByTypeCode_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(get("/api/system/dict/data/NOT_EXISTS"))
+        mockMvc.perform(get("/system/dict/data/NOT_EXISTS"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(404));
     }
@@ -106,7 +106,7 @@ class DictControllerTest {
     @Test
     @DisplayName("listTree: 查询完整树形结构")
     void listTree_shouldReturnTreeStructure() throws Exception {
-        mockMvc.perform(get("/api/system/dict/tree"))
+        mockMvc.perform(get("/system/dict/tree"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray());
@@ -115,7 +115,7 @@ class DictControllerTest {
     @Test
     @DisplayName("listTreeByTypeCode: 查询指定类型的树形结构")
     void listTreeByTypeCode_shouldReturnTreeStructure() throws Exception {
-        mockMvc.perform(get("/api/system/dict/tree/1"))
+        mockMvc.perform(get("/system/dict/tree/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray())
@@ -125,7 +125,7 @@ class DictControllerTest {
     @Test
     @DisplayName("listOptions: 查询下拉选项（叶子节点）")
     void listOptions_shouldReturnLeafNodes() throws Exception {
-        mockMvc.perform(get("/api/system/dict/options/1"))
+        mockMvc.perform(get("/system/dict/options/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray());
@@ -134,7 +134,7 @@ class DictControllerTest {
     @Test
     @DisplayName("getById: 查询字典详情")
     void getById_shouldReturnDict() throws Exception {
-        mockMvc.perform(get("/api/system/dict/" + tempRootId))
+        mockMvc.perform(get("/system/dict/" + tempRootId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(tempRootId));
@@ -143,7 +143,7 @@ class DictControllerTest {
     @Test
     @DisplayName("getById: 查询不存在的字典")
     void getById_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(get("/api/system/dict/999999"))
+        mockMvc.perform(get("/system/dict/999999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(404));
     }
@@ -158,7 +158,7 @@ class DictControllerTest {
         dto.setSort(0);
         dto.setStatus(1);
 
-        mockMvc.perform(post("/api/system/dict")
+        mockMvc.perform(post("/system/dict")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isOk())
@@ -179,7 +179,7 @@ class DictControllerTest {
         dto.setSort(5);
         dto.setStatus(1);
 
-        mockMvc.perform(put("/api/system/dict/" + tempChildId)
+        mockMvc.perform(put("/system/dict/" + tempChildId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isOk())
@@ -193,7 +193,7 @@ class DictControllerTest {
     @Test
     @DisplayName("updateStatus: 更新字典状态")
     void updateStatus_shouldSuccess() throws Exception {
-        mockMvc.perform(put("/api/system/dict/" + tempRootId + "/status")
+        mockMvc.perform(put("/system/dict/" + tempRootId + "/status")
                         .param("status", "0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
@@ -206,7 +206,7 @@ class DictControllerTest {
     @Test
     @DisplayName("remove: 删除字典（无子节点）")
     void remove_shouldSuccess() throws Exception {
-        mockMvc.perform(delete("/api/system/dict/" + tempChildId))
+        mockMvc.perform(delete("/system/dict/" + tempChildId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
 
@@ -217,7 +217,7 @@ class DictControllerTest {
     @Test
     @DisplayName("remove: 删除有子节点的字典")
     void remove_whenHasChildren_shouldReturnError() throws Exception {
-        mockMvc.perform(delete("/api/system/dict/" + tempRootId))
+        mockMvc.perform(delete("/system/dict/" + tempRootId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").isNumber())
                 .andExpect(jsonPath("$.code").value(org.hamcrest.Matchers.not(200)));

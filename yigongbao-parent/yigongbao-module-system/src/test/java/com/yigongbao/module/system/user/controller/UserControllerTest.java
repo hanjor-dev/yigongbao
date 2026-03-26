@@ -66,7 +66,7 @@ class UserControllerTest {
     @Test
     @DisplayName("list: 分页查询用户列表成功")
     void list_shouldReturnPageData() throws Exception {
-        mockMvc.perform(get("/api/system/user/list")
+        mockMvc.perform(get("/system/user/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10"))
                 .andExpect(status().isOk())
@@ -79,7 +79,7 @@ class UserControllerTest {
     @Test
     @DisplayName("list: 按用户名模糊查询")
     void list_withUsername_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/user/list")
+        mockMvc.perform(get("/system/user/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("username", "admin"))
@@ -91,7 +91,7 @@ class UserControllerTest {
     @Test
     @DisplayName("list: 按真实姓名模糊查询")
     void list_withRealName_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/user/list")
+        mockMvc.perform(get("/system/user/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("realName", "管理员"))
@@ -103,7 +103,7 @@ class UserControllerTest {
     @Test
     @DisplayName("list: 按机构ID筛选")
     void list_withOrgId_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/user/list")
+        mockMvc.perform(get("/system/user/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("orgId", "1"))
@@ -115,7 +115,7 @@ class UserControllerTest {
     @Test
     @DisplayName("list: 按部门ID筛选")
     void list_withDeptId_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/user/list")
+        mockMvc.perform(get("/system/user/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("deptId", "1"))
@@ -127,7 +127,7 @@ class UserControllerTest {
     @Test
     @DisplayName("list: 按账户分类筛选")
     void list_withAccountType_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/user/list")
+        mockMvc.perform(get("/system/user/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("accountType", "1"))
@@ -139,7 +139,7 @@ class UserControllerTest {
     @Test
     @DisplayName("list: 按状态筛选")
     void list_withStatus_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/user/list")
+        mockMvc.perform(get("/system/user/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("status", "1"))
@@ -153,7 +153,7 @@ class UserControllerTest {
     @Test
     @DisplayName("getById: 查询存在的用户")
     void getById_whenExists_shouldReturnData() throws Exception {
-        mockMvc.perform(get("/api/system/user/1"))
+        mockMvc.perform(get("/system/user/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(1))
@@ -163,7 +163,7 @@ class UserControllerTest {
     @Test
     @DisplayName("getById: 查询不存在的用户")
     void getById_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(get("/api/system/user/999999"))
+        mockMvc.perform(get("/system/user/999999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(600))
                 .andExpect(jsonPath("$.message").value("用户不存在"));
@@ -183,7 +183,7 @@ class UserControllerTest {
         requestBody.put("accountType", 1);
         requestBody.put("orgId", 1);
 
-        mockMvc.perform(post("/api/system/user")
+        mockMvc.perform(post("/system/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -202,7 +202,7 @@ class UserControllerTest {
         requestBody.put("accountType", 1);
         requestBody.put("orgId", 1);
 
-        mockMvc.perform(post("/api/system/user")
+        mockMvc.perform(post("/system/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -221,7 +221,7 @@ class UserControllerTest {
         requestBody.put("accountType", 1);
         requestBody.put("orgId", 1);
 
-        mockMvc.perform(post("/api/system/user")
+        mockMvc.perform(post("/system/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -239,7 +239,7 @@ class UserControllerTest {
         requestBody.put("accountType", 1);
         requestBody.put("orgId", 1);
 
-        mockMvc.perform(post("/api/system/user")
+        mockMvc.perform(post("/system/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isBadRequest());
@@ -256,7 +256,7 @@ class UserControllerTest {
         requestBody.put("accountType", 1);
         requestBody.put("orgId", 1);
 
-        mockMvc.perform(post("/api/system/user")
+        mockMvc.perform(post("/system/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isBadRequest());
@@ -273,7 +273,7 @@ class UserControllerTest {
         requestBody.put("accountType", 1);
         requestBody.put("orgId", 1);
 
-        mockMvc.perform(post("/api/system/user")
+        mockMvc.perform(post("/system/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isBadRequest());
@@ -290,7 +290,7 @@ class UserControllerTest {
         requestBody.put("accountType", 1);
         requestBody.put("orgId", 999999);
 
-        mockMvc.perform(post("/api/system/user")
+        mockMvc.perform(post("/system/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -310,7 +310,7 @@ class UserControllerTest {
         requestBody.put("orgId", 1);
         requestBody.put("deptId", 999999);
 
-        mockMvc.perform(post("/api/system/user")
+        mockMvc.perform(post("/system/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -330,7 +330,7 @@ class UserControllerTest {
         requestBody.put("orgId", 1);
         requestBody.put("roleId", 999999);  // 不存在的角色
 
-        mockMvc.perform(post("/api/system/user")
+        mockMvc.perform(post("/system/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -349,7 +349,7 @@ class UserControllerTest {
         requestBody.put("accountType", 1);
         requestBody.put("orgId", 1);
 
-        mockMvc.perform(post("/api/system/user")
+        mockMvc.perform(post("/system/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -366,7 +366,7 @@ class UserControllerTest {
         requestBody.put("realName", "更新后的姓名");
         requestBody.put("email", "update@test.com");
 
-        mockMvc.perform(put("/api/system/user/1")
+        mockMvc.perform(put("/system/user/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -380,7 +380,7 @@ class UserControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("realName", "测试用户");
 
-        mockMvc.perform(put("/api/system/user/999999")
+        mockMvc.perform(put("/system/user/999999")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -393,7 +393,7 @@ class UserControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("phone", "13800000002");
 
-        mockMvc.perform(put("/api/system/user/1")
+        mockMvc.perform(put("/system/user/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -406,7 +406,7 @@ class UserControllerTest {
     @Test
     @DisplayName("delete: 删除存在的用户")
     void delete_whenExists_shouldSuccess() throws Exception {
-        mockMvc.perform(delete("/api/system/user/6"))
+        mockMvc.perform(delete("/system/user/6"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("操作成功"));
@@ -415,7 +415,7 @@ class UserControllerTest {
     @Test
     @DisplayName("delete: 删除不存在的用户")
     void delete_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(delete("/api/system/user/999999"))
+        mockMvc.perform(delete("/system/user/999999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(600));
     }
@@ -425,7 +425,7 @@ class UserControllerTest {
     @Test
     @DisplayName("updateStatus: 启用用户")
     void updateStatus_enable_shouldSuccess() throws Exception {
-        mockMvc.perform(put("/api/system/user/6/status")
+        mockMvc.perform(put("/system/user/6/status")
                         .param("status", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
@@ -435,7 +435,7 @@ class UserControllerTest {
     @Test
     @DisplayName("updateStatus: 禁用用户")
     void updateStatus_disable_shouldSuccess() throws Exception {
-        mockMvc.perform(put("/api/system/user/1/status")
+        mockMvc.perform(put("/system/user/1/status")
                         .param("status", "0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
@@ -445,7 +445,7 @@ class UserControllerTest {
     @Test
     @DisplayName("updateStatus: 无效的状态值")
     void updateStatus_invalidStatus_shouldReturnError() throws Exception {
-        mockMvc.perform(put("/api/system/user/1/status")
+        mockMvc.perform(put("/system/user/1/status")
                         .param("status", "2"))
                 .andExpect(status().isBadRequest());
     }
@@ -458,7 +458,7 @@ class UserControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("newPassword", "123456");
 
-        mockMvc.perform(put("/api/system/user/1/reset-password")
+        mockMvc.perform(put("/system/user/1/reset-password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -472,7 +472,7 @@ class UserControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("newPassword", "123456");
 
-        mockMvc.perform(put("/api/system/user/999999/reset-password")
+        mockMvc.perform(put("/system/user/999999/reset-password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -484,7 +484,7 @@ class UserControllerTest {
     @Test
     @DisplayName("changePassword: 修改密码成功")
     void changePassword_shouldSuccess() throws Exception {
-        mockMvc.perform(put("/api/system/user/1/change-password")
+        mockMvc.perform(put("/system/user/1/change-password")
                         .param("oldPassword", "123456")
                         .param("newPassword", "654321"))
                 .andExpect(status().isOk())
@@ -495,7 +495,7 @@ class UserControllerTest {
     @Test
     @DisplayName("changePassword: 旧密码错误")
     void changePassword_whenOldPasswordWrong_shouldReturnError() throws Exception {
-        mockMvc.perform(put("/api/system/user/1/change-password")
+        mockMvc.perform(put("/system/user/1/change-password")
                         .param("oldPassword", "wrongpassword")
                         .param("newPassword", "654321"))
                 .andExpect(status().isOk())
@@ -506,7 +506,7 @@ class UserControllerTest {
     @Test
     @DisplayName("changePassword: 不存在的用户")
     void changePassword_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(put("/api/system/user/999999/change-password")
+        mockMvc.perform(put("/system/user/999999/change-password")
                         .param("oldPassword", "123456")
                         .param("newPassword", "654321"))
                 .andExpect(status().isOk())
@@ -522,7 +522,7 @@ class UserControllerTest {
         requestBody.put("phone", "13900000999");
         requestBody.put("avatar", "/avatar/new.png");
 
-        mockMvc.perform(put("/api/system/user/profile")
+        mockMvc.perform(put("/system/user/profile")
                         .with(mockLogin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
@@ -538,7 +538,7 @@ class UserControllerTest {
         requestBody.put("phone", "13800000002");
         requestBody.put("avatar", "/avatar/new.png");
 
-        mockMvc.perform(put("/api/system/user/profile")
+        mockMvc.perform(put("/system/user/profile")
                         .with(mockLogin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
@@ -570,7 +570,7 @@ class UserControllerTest {
         // 由于测试环境无 hospital 表，UserHospitalServiceImpl.assignHospitals 会抛出异常
         // 验证接口仍返回 200（用户基本信息创建成功，医院分配由 Service 层处理）
         // 注意：实际场景需要确保 hospitalIds 对应的医院均存在且启用
-        mockMvc.perform(post("/api/system/user")
+        mockMvc.perform(post("/system/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -595,7 +595,7 @@ class UserControllerTest {
         requestBody.put("roleId", 1);  // 公司管理员角色，hospitalScopeEnabled=0
         // 不传 hospitalIds
 
-        mockMvc.perform(post("/api/system/user")
+        mockMvc.perform(post("/system/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -615,7 +615,7 @@ class UserControllerTest {
         requestBody.put("email", "updatehospital@test.com");
         requestBody.put("hospitalIds", List.of(1L));
 
-        mockMvc.perform(put("/api/system/user/1")
+        mockMvc.perform(put("/system/user/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())

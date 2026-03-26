@@ -1,11 +1,15 @@
 package com.yigongbao.module.basic.product.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.product.dto.CreateProductDTO;
 import com.yigongbao.module.basic.product.dto.UpdateProductDTO;
 import com.yigongbao.module.basic.product.service.ProductService;
 import com.yigongbao.module.basic.product.vo.ProductVO;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -20,8 +24,9 @@ import java.util.List;
  * @author hanjor
  * @date 2026-03-24
  */
+@Tag(name = "产品型号管理", description = "产品型号信息管理")
 @RestController
-@RequestMapping("/api/basic/product")
+@RequestMapping("/basic/product")
 @RequiredArgsConstructor
 @Validated
 public class ProductController {
@@ -31,6 +36,7 @@ public class ProductController {
     /**
      * 分页查询产品列表
      */
+    @Operation(summary = "分页查询产品列表")
     @GetMapping("/page")
     public Result<IPage<ProductVO>> page(
             @RequestParam(defaultValue = "1") Integer pageNum,
@@ -45,6 +51,7 @@ public class ProductController {
     /**
      * 查询所有产品列表
      */
+    @Operation(summary = "查询所有产品列表")
     @GetMapping("/list")
     public Result<List<ProductVO>> list(
             @RequestParam(required = false) String productName,
@@ -56,6 +63,7 @@ public class ProductController {
     /**
      * 根据ID查询产品
      */
+    @Operation(summary = "根据ID查询产品")
     @GetMapping("/{id}")
     public Result<ProductVO> getById(@PathVariable Long id) {
         return Result.success(productService.getById(id));
@@ -64,6 +72,12 @@ public class ProductController {
     /**
      * 创建产品
      */
+    @Operation(summary = "创建产品")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.CREATE,
+            operation = "创建产品"
+    )
     @PostMapping
     public Result<Void> create(@Validated @RequestBody CreateProductDTO dto) {
         productService.create(dto);
@@ -73,6 +87,12 @@ public class ProductController {
     /**
      * 更新产品
      */
+    @Operation(summary = "更新产品")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "更新产品"
+    )
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @Validated @RequestBody UpdateProductDTO dto) {
         productService.update(id, dto);
@@ -82,6 +102,12 @@ public class ProductController {
     /**
      * 删除产品
      */
+    @Operation(summary = "删除产品")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.DELETE,
+            operation = "删除产品"
+    )
     @DeleteMapping("/{id}")
     public Result<Void> remove(@PathVariable Long id) {
         productService.remove(id);
@@ -91,6 +117,7 @@ public class ProductController {
     /**
      * 按注册证查询产品
      */
+    @Operation(summary = "按注册证查询产品")
     @GetMapping("/list-by-cert/{certId}")
     public Result<List<ProductVO>> listByCert(@PathVariable Long certId) {
         return Result.success(productService.listByCertId(certId));
@@ -99,6 +126,7 @@ public class ProductController {
     /**
      * 按分类查询产品
      */
+    @Operation(summary = "按分类查询产品")
     @GetMapping("/list-by-category")
     public Result<List<ProductVO>> listByCategory(@RequestParam String category) {
         return Result.success(productService.listByCategory(category));

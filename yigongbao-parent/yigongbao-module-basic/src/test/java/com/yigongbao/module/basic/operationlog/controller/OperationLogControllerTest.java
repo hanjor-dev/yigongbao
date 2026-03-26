@@ -52,7 +52,7 @@ class OperationLogControllerTest {
         page.setRecords(List.of(vo));
         when(operationLogService.pageLogs(any())).thenReturn(page);
 
-        mockMvc.perform(get("/api/basic/operation-log/page"))
+        mockMvc.perform(get("/basic/operation-log/page"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.records[0].id").value(1))
@@ -64,7 +64,7 @@ class OperationLogControllerTest {
     void export_shouldSuccess() throws Exception {
         doNothing().when(operationLogService).exportLogs(any(), any());
 
-        mockMvc.perform(get("/api/basic/operation-log/export"))
+        mockMvc.perform(get("/basic/operation-log/export"))
                 .andExpect(status().isOk());
     }
 }

@@ -92,7 +92,7 @@ class HospitalGroupTemplateControllerTest {
         page.setTotal(2);
         when(templateService.listTemplate(anyInt(), anyInt(), any(), any())).thenReturn(page);
 
-        mockMvc.perform(get("/api/basic/hospital-group-template/list")
+        mockMvc.perform(get("/basic/hospital-group-template/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10"))
                 .andExpect(status().isOk())
@@ -114,7 +114,7 @@ class HospitalGroupTemplateControllerTest {
         page.setTotal(1);
         when(templateService.listTemplate(eq(1), eq(10), eq("北京"), any())).thenReturn(page);
 
-        mockMvc.perform(get("/api/basic/hospital-group-template/list")
+        mockMvc.perform(get("/basic/hospital-group-template/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
                         .param("templateName", "北京"))
@@ -136,7 +136,7 @@ class HospitalGroupTemplateControllerTest {
         vo.setDetails(new ArrayList<>());
         when(templateService.getTemplateById(1L)).thenReturn(vo);
 
-        mockMvc.perform(get("/api/basic/hospital-group-template/1"))
+        mockMvc.perform(get("/basic/hospital-group-template/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(1))
@@ -153,7 +153,7 @@ class HospitalGroupTemplateControllerTest {
         when(templateService.getTemplateById(999L))
                 .thenThrow(new BusinessException(ErrorCodeEnum.TEMPLATE_NOT_FOUND));
 
-        mockMvc.perform(get("/api/basic/hospital-group-template/999"))
+        mockMvc.perform(get("/basic/hospital-group-template/999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(656))
                 .andExpect(jsonPath("$.message").value("医院组合模板不存在"));
@@ -167,7 +167,7 @@ class HospitalGroupTemplateControllerTest {
     @Test
     @DisplayName("create: 创建成功返回200")
     void create_shouldSuccess() throws Exception {
-        mockMvc.perform(post("/api/basic/hospital-group-template")
+        mockMvc.perform(post("/basic/hospital-group-template")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "templateName", "新模板",
@@ -186,7 +186,7 @@ class HospitalGroupTemplateControllerTest {
     @Test
     @DisplayName("create: 模板名称为空时返回400")
     void create_whenNameBlank_shouldReturnBadRequest() throws Exception {
-        mockMvc.perform(post("/api/basic/hospital-group-template")
+        mockMvc.perform(post("/basic/hospital-group-template")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "hospitalIds", List.of(1L, 2L)
@@ -201,7 +201,7 @@ class HospitalGroupTemplateControllerTest {
     @Test
     @DisplayName("create: 医院列表为空时返回400")
     void create_whenHospitalIdsEmpty_shouldReturnBadRequest() throws Exception {
-        mockMvc.perform(post("/api/basic/hospital-group-template")
+        mockMvc.perform(post("/basic/hospital-group-template")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "templateName", "新模板"
@@ -218,7 +218,7 @@ class HospitalGroupTemplateControllerTest {
     @Test
     @DisplayName("update: 更新成功返回200")
     void update_shouldSuccess() throws Exception {
-        mockMvc.perform(put("/api/basic/hospital-group-template/1")
+        mockMvc.perform(put("/basic/hospital-group-template/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "templateName", "更新后的模板名称",
@@ -237,7 +237,7 @@ class HospitalGroupTemplateControllerTest {
     @Test
     @DisplayName("remove: 删除成功返回200")
     void remove_shouldSuccess() throws Exception {
-        mockMvc.perform(delete("/api/basic/hospital-group-template/1"))
+        mockMvc.perform(delete("/basic/hospital-group-template/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("操作成功"));
@@ -251,7 +251,7 @@ class HospitalGroupTemplateControllerTest {
     @Test
     @DisplayName("updateStatus: 修改状态成功返回200")
     void updateStatus_shouldSuccess() throws Exception {
-        mockMvc.perform(put("/api/basic/hospital-group-template/1/status")
+        mockMvc.perform(put("/basic/hospital-group-template/1/status")
                         .param("status", "0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
@@ -264,7 +264,7 @@ class HospitalGroupTemplateControllerTest {
     @Test
     @DisplayName("updateStatus: 状态值超范围时返回400")
     void updateStatus_whenInvalidStatus_shouldReturnBadRequest() throws Exception {
-        mockMvc.perform(put("/api/basic/hospital-group-template/1/status")
+        mockMvc.perform(put("/basic/hospital-group-template/1/status")
                         .param("status", "99"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
@@ -284,7 +284,7 @@ class HospitalGroupTemplateControllerTest {
                         buildSimpleVO(2L, "华东地区医院群")
                 ));
 
-        mockMvc.perform(get("/api/basic/hospital-group-template/options"))
+        mockMvc.perform(get("/basic/hospital-group-template/options"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray())

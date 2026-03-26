@@ -3,7 +3,6 @@ package com.yigongbao.module.system.user.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.system.user.dto.CreateUserDTO;
-import com.yigongbao.module.system.user.dto.ResetPasswordDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.vo.UserVO;
@@ -72,11 +71,11 @@ public interface UserService extends IService<UserEntity> {
 
     /**
      * 重置密码
+     * 将用户密码重置为系统默认密码
      *
-     * @param id  用户ID
-     * @param dto 重置密码参数
+     * @param userId 用户ID
      */
-    void resetPassword(Long id, ResetPasswordDTO dto);
+    void resetPassword(Long userId);
 
     /**
      * 修改密码

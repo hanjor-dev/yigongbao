@@ -78,7 +78,7 @@ class FileControllerTest {
             MockMultipartFile file = new MockMultipartFile(
                     "file", "test.jpg", MediaType.IMAGE_JPEG_VALUE, "test image content".getBytes());
 
-            mockMvc.perform(multipart("/api/basic/file/upload")
+            mockMvc.perform(multipart("/basic/file/upload")
                             .file(file)
                             .param("bizType", "registration_cert"))
                     .andExpect(status().isOk())
@@ -106,7 +106,7 @@ class FileControllerTest {
             MockMultipartFile file = new MockMultipartFile(
                     "file", "cert.pdf", MediaType.APPLICATION_PDF_VALUE, "pdf content".getBytes());
 
-            mockMvc.perform(multipart("/api/basic/file/upload-and-link")
+            mockMvc.perform(multipart("/basic/file/upload-and-link")
                             .file(file)
                             .param("bizType", "registration_cert")
                             .param("bizId", "1"))
@@ -140,7 +140,7 @@ class FileControllerTest {
             MockMultipartFile file2 = new MockMultipartFile(
                     "files", "test2.jpg", MediaType.IMAGE_JPEG_VALUE, "content2".getBytes());
 
-            mockMvc.perform(multipart("/api/basic/file/upload-multiple")
+            mockMvc.perform(multipart("/basic/file/upload-multiple")
                             .file(file1)
                             .file(file2)
                             .param("bizType", "registration_cert")
@@ -169,7 +169,7 @@ class FileControllerTest {
                     buildTestVO("1926082412345678906", "registration_cert", 1L, "cert2.pdf"));
             when(fileService.listByBiz("registration_cert", 1L)).thenReturn(vos);
 
-            mockMvc.perform(get("/api/basic/file/list/registration_cert/1"))
+            mockMvc.perform(get("/basic/file/list/registration_cert/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"))
@@ -185,7 +185,7 @@ class FileControllerTest {
         void listByBiz_whenNotExists_shouldReturnEmptyList() throws Exception {
             when(fileService.listByBiz("registration_cert", 1L)).thenReturn(Collections.emptyList());
 
-            mockMvc.perform(get("/api/basic/file/list/registration_cert/1"))
+            mockMvc.perform(get("/basic/file/list/registration_cert/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").isArray())
@@ -207,7 +207,7 @@ class FileControllerTest {
             FileVO vo = buildTestVO("1926082412345678907", "registration_cert", 1L, "test.jpg");
             when(fileService.getById("1926082412345678907")).thenReturn(vo);
 
-            mockMvc.perform(get("/api/basic/file/1926082412345678907"))
+            mockMvc.perform(get("/basic/file/1926082412345678907"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.id").value("1926082412345678907"))
@@ -222,7 +222,7 @@ class FileControllerTest {
             when(fileService.getById("not-exists-id"))
                     .thenThrow(new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND));
 
-            mockMvc.perform(get("/api/basic/file/not-exists-id"))
+            mockMvc.perform(get("/basic/file/not-exists-id"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(ErrorCodeEnum.ATTACHMENT_NOT_FOUND.getCode()));
         }
@@ -239,7 +239,7 @@ class FileControllerTest {
         void deleteById_shouldSuccess() throws Exception {
             doNothing().when(fileService).deleteById("1926082412345678908");
 
-            mockMvc.perform(delete("/api/basic/file/1926082412345678908"))
+            mockMvc.perform(delete("/basic/file/1926082412345678908"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"));
@@ -253,7 +253,7 @@ class FileControllerTest {
             doThrow(new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND))
                     .when(fileService).deleteById("not-exists-id");
 
-            mockMvc.perform(delete("/api/basic/file/not-exists-id"))
+            mockMvc.perform(delete("/basic/file/not-exists-id"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(ErrorCodeEnum.ATTACHMENT_NOT_FOUND.getCode()));
         }

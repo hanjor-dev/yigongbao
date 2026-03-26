@@ -63,6 +63,14 @@ public interface DictService extends IService<DictEntity> {
     DictVO getById(Long id);
 
     /**
+     * 根据字典编码查询字典
+     *
+     * @param dictCode 字典编码（叶子节点的 dictCode）
+     * @return 字典VO，不存在返回 null
+     */
+    DictVO getByDictCode(String dictCode);
+
+    /**
      * 创建字典
      *
      * @param dto 创建参数

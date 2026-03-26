@@ -45,7 +45,7 @@ class ResourceControllerTest {
     @Test
     @DisplayName("getResourceTree: 返回资源树结构")
     void getResourceTree_shouldReturnTreeStructure() throws Exception {
-        mockMvc.perform(get("/api/system/resource/tree"))
+        mockMvc.perform(get("/system/resource/tree"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("操作成功"))
@@ -60,7 +60,7 @@ class ResourceControllerTest {
     @Test
     @DisplayName("list: 分页查询成功")
     void list_shouldReturnPageData() throws Exception {
-        mockMvc.perform(get("/api/system/resource/list"))
+        mockMvc.perform(get("/system/resource/list"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("操作成功"))
@@ -73,7 +73,7 @@ class ResourceControllerTest {
     @Test
     @DisplayName("list: 带筛选条件查询成功")
     void list_withFilters_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/api/system/resource/list")
+        mockMvc.perform(get("/system/resource/list")
                         .param("resourceType", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
@@ -87,7 +87,7 @@ class ResourceControllerTest {
     @Test
     @DisplayName("getById: 存在数据时返回资源详情")
     void getById_whenExists_shouldReturnData() throws Exception {
-        mockMvc.perform(get("/api/system/resource/1"))
+        mockMvc.perform(get("/system/resource/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(1))
@@ -100,7 +100,7 @@ class ResourceControllerTest {
     @Test
     @DisplayName("getById: 数据不存在时返回错误码")
     void getById_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(get("/api/system/resource/999999"))
+        mockMvc.perform(get("/system/resource/999999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(630))
                 .andExpect(jsonPath("$.message").value("资源不存在"));
@@ -123,7 +123,7 @@ class ResourceControllerTest {
         requestBody.put("visible", 1);
         requestBody.put("status", 1);
 
-        mockMvc.perform(post("/api/system/resource")
+        mockMvc.perform(post("/system/resource")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -143,7 +143,7 @@ class ResourceControllerTest {
         requestBody.put("resourceCode", "system"); // 已存在的编码
         requestBody.put("resourceType", 1);
 
-        mockMvc.perform(post("/api/system/resource")
+        mockMvc.perform(post("/system/resource")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -163,7 +163,7 @@ class ResourceControllerTest {
         requestBody.put("resourceName", "测试资源");
         // 缺少 resourceCode
 
-        mockMvc.perform(post("/api/system/resource")
+        mockMvc.perform(post("/system/resource")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isBadRequest())
@@ -187,7 +187,7 @@ class ResourceControllerTest {
         requestBody.put("visible", 1);
         requestBody.put("status", 1);
 
-        mockMvc.perform(put("/api/system/resource/1")
+        mockMvc.perform(put("/system/resource/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -207,7 +207,7 @@ class ResourceControllerTest {
         requestBody.put("resourceCode", "test");
         requestBody.put("resourceType", 1);
 
-        mockMvc.perform(put("/api/system/resource/999999")
+        mockMvc.perform(put("/system/resource/999999")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -223,7 +223,7 @@ class ResourceControllerTest {
     @DisplayName("delete: 存在子资源时返回错误码")
     void delete_whenHasChildren_shouldReturnError() throws Exception {
         // system 资源下有子资源
-        mockMvc.perform(delete("/api/system/resource/1"))
+        mockMvc.perform(delete("/system/resource/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(632))
                 .andExpect(jsonPath("$.message").value("该资源下存在子资源，无法删除"));
@@ -235,7 +235,7 @@ class ResourceControllerTest {
     @Test
     @DisplayName("delete: 数据不存在时返回错误码")
     void delete_whenNotExists_shouldReturnError() throws Exception {
-        mockMvc.perform(delete("/api/system/resource/999999"))
+        mockMvc.perform(delete("/system/resource/999999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(630));
     }
@@ -249,7 +249,7 @@ class ResourceControllerTest {
     @DisplayName("getRoleResources: 返回角色关联的资源ID列表")
     void getRoleResources_shouldReturnResourceIds() throws Exception {
         // 超级管理员角色关联所有资源
-        mockMvc.perform(get("/api/system/resource/role/1"))
+        mockMvc.perform(get("/system/resource/role/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray());
@@ -262,7 +262,7 @@ class ResourceControllerTest {
     @DisplayName("getRoleResources: 无资源关联时返回空数组")
     void getRoleResources_whenNoResources_shouldReturnEmptyArray() throws Exception {
         // 根据 schema.sql，roleId=99 不存在，关联表无数据
-        mockMvc.perform(get("/api/system/resource/role/99"))
+        mockMvc.perform(get("/system/resource/role/99"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").isArray())
@@ -277,7 +277,7 @@ class ResourceControllerTest {
     @Test
     @DisplayName("assignRoleResources: 分配成功返回success")
     void assignRoleResources_shouldSuccess() throws Exception {
-        mockMvc.perform(put("/api/system/resource/role/1")
+        mockMvc.perform(put("/system/resource/role/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("[101, 102]"))
                 .andExpect(status().isOk())
@@ -291,7 +291,7 @@ class ResourceControllerTest {
     @Test
     @DisplayName("assignRoleResources: 清空资源成功")
     void assignRoleResources_whenEmpty_shouldSuccess() throws Exception {
-        mockMvc.perform(put("/api/system/resource/role/1")
+        mockMvc.perform(put("/system/resource/role/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("[]"))
                 .andExpect(status().isOk())

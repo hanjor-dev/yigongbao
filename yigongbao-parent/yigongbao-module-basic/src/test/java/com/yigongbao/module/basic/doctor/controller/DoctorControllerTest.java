@@ -81,7 +81,7 @@ class DoctorControllerTest {
             when(doctorService.listDoctors(eq(1), eq(10), any(), any(), any(), any()))
                     .thenReturn(page);
 
-            mockMvc.perform(get("/api/basic/doctor/page"))
+            mockMvc.perform(get("/basic/doctor/page"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"))
@@ -97,7 +97,7 @@ class DoctorControllerTest {
             when(doctorService.listDoctors(eq(1), eq(10), any(), any(), any(), any()))
                     .thenReturn(page);
 
-            mockMvc.perform(get("/api/basic/doctor/page"))
+            mockMvc.perform(get("/basic/doctor/page"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.records").isArray())
@@ -117,7 +117,7 @@ class DoctorControllerTest {
             when(doctorService.listAll(any(), any(), any()))
                     .thenReturn(List.of(buildTestVO(1L, "张三"), buildTestVO(2L, "李四")));
 
-            mockMvc.perform(get("/api/basic/doctor/list"))
+            mockMvc.perform(get("/basic/doctor/list"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").isArray())
@@ -137,7 +137,7 @@ class DoctorControllerTest {
         void getById_whenExists_shouldReturnData() throws Exception {
             when(doctorService.getById(1L)).thenReturn(buildTestVO(1L, "张三"));
 
-            mockMvc.perform(get("/api/basic/doctor/1"))
+            mockMvc.perform(get("/basic/doctor/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.id").value(1))
@@ -150,7 +150,7 @@ class DoctorControllerTest {
             when(doctorService.getById(999L))
                     .thenThrow(new BusinessException(ErrorCodeEnum.DOCTOR_NOT_FOUND));
 
-            mockMvc.perform(get("/api/basic/doctor/999"))
+            mockMvc.perform(get("/basic/doctor/999"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(700))
                     .andExpect(jsonPath("$.message").value("医生不存在"));
@@ -172,7 +172,7 @@ class DoctorControllerTest {
                     "hospitalDeptId", 1
             );
 
-            mockMvc.perform(post("/api/basic/doctor")
+            mockMvc.perform(post("/basic/doctor")
                             .contentType(MediaType.APPLICATION_JSON)
                             .header("X-User-Id", "1")
                             .content(objectMapper.writeValueAsString(requestBody)))
@@ -188,7 +188,7 @@ class DoctorControllerTest {
                     "hospitalId", 1
             );
 
-            mockMvc.perform(post("/api/basic/doctor")
+            mockMvc.perform(post("/basic/doctor")
                             .contentType(MediaType.APPLICATION_JSON)
                             .header("X-User-Id", "1")
                             .content(objectMapper.writeValueAsString(requestBody)))
@@ -210,7 +210,7 @@ class DoctorControllerTest {
                     "doctorName", "更新后的医生"
             );
 
-            mockMvc.perform(put("/api/basic/doctor/1")
+            mockMvc.perform(put("/basic/doctor/1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -228,7 +228,7 @@ class DoctorControllerTest {
                     "doctorName", "更新后的医生"
             );
 
-            mockMvc.perform(put("/api/basic/doctor/999")
+            mockMvc.perform(put("/basic/doctor/999")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -246,7 +246,7 @@ class DoctorControllerTest {
         @Test
         @DisplayName("delete: 删除成功返回200")
         void delete_shouldSuccess() throws Exception {
-            mockMvc.perform(delete("/api/basic/doctor/2"))
+            mockMvc.perform(delete("/basic/doctor/2"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"));
@@ -258,7 +258,7 @@ class DoctorControllerTest {
             doThrow(new BusinessException(ErrorCodeEnum.DOCTOR_NOT_FOUND))
                     .when(doctorService).remove(999L);
 
-            mockMvc.perform(delete("/api/basic/doctor/999"))
+            mockMvc.perform(delete("/basic/doctor/999"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(700));
         }
@@ -273,7 +273,7 @@ class DoctorControllerTest {
         @Test
         @DisplayName("updateStatus: 修改状态成功")
         void updateStatus_shouldSuccess() throws Exception {
-            mockMvc.perform(put("/api/basic/doctor/1/status")
+            mockMvc.perform(put("/basic/doctor/1/status")
                             .param("status", "0"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
@@ -283,7 +283,7 @@ class DoctorControllerTest {
         @Test
         @DisplayName("updateStatus: 非法状态值时返回400")
         void updateStatus_whenInvalidStatus_shouldReturnError() throws Exception {
-            mockMvc.perform(put("/api/basic/doctor/1/status")
+            mockMvc.perform(put("/basic/doctor/1/status")
                             .param("status", "99"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value(400))
@@ -303,7 +303,7 @@ class DoctorControllerTest {
             when(doctorService.listByCreatorAndHospital(eq(1L), eq(1L), any()))
                     .thenReturn(List.of(buildTestVO(1L, "张三")));
 
-            mockMvc.perform(get("/api/basic/doctor/suggest")
+            mockMvc.perform(get("/basic/doctor/suggest")
                             .param("creatorId", "1")
                             .param("hospitalId", "1"))
                     .andExpect(status().isOk())
@@ -317,7 +317,7 @@ class DoctorControllerTest {
             when(doctorService.listByCreatorAndHospital(eq(1L), eq(1L), any()))
                     .thenReturn(new ArrayList<>());
 
-            mockMvc.perform(get("/api/basic/doctor/suggest")
+            mockMvc.perform(get("/basic/doctor/suggest")
                             .param("creatorId", "1")
                             .param("hospitalId", "1"))
                     .andExpect(status().isOk())
@@ -344,7 +344,7 @@ class DoctorControllerTest {
                     "hospitalId", 1
             );
 
-            mockMvc.perform(post("/api/basic/doctor/quick-add")
+            mockMvc.perform(post("/basic/doctor/quick-add")
                             .contentType(MediaType.APPLICATION_JSON)
                             .header("X-User-Id", "1")
                             .content(objectMapper.writeValueAsString(requestBody)))
@@ -364,7 +364,7 @@ class DoctorControllerTest {
                     "hospitalId", 1
             );
 
-            mockMvc.perform(post("/api/basic/doctor/quick-add")
+            mockMvc.perform(post("/basic/doctor/quick-add")
                             .contentType(MediaType.APPLICATION_JSON)
                             .header("X-User-Id", "1")
                             .content(objectMapper.writeValueAsString(requestBody)))

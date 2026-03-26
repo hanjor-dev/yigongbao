@@ -1,6 +1,8 @@
 package com.yigongbao.module.system.basedata.controller;
 
 import com.yigongbao.common.result.Result;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.basic.area.service.AreaService;
 import com.yigongbao.module.basic.area.vo.AreaVO;
 import com.yigongbao.module.system.basedata.vo.SelectTreeVO;
@@ -43,8 +45,9 @@ import java.util.stream.Collectors;
  * @author hanjor
  * @date 2026-03-17
  */
+@Tag(name = "基础数据下拉选项", description = "各模块下拉列表数据接口")
 @RestController
-@RequestMapping("/api/system/select")
+@RequestMapping("/system/select")
 @RequiredArgsConstructor
 public class SelectController {
 
@@ -66,6 +69,7 @@ public class SelectController {
      * @param parentId 父级ID（type=area时必填）
      * @return 树形结构列表
      */
+    @Operation(summary = "获取树形结构")
     @GetMapping("/tree")
     public Result<List<SelectTreeVO>> getTree(
             @RequestParam String type,
@@ -105,6 +109,7 @@ public class SelectController {
      * @param parentId 父级ID（type=area时必填）
      * @return 下拉选项列表
      */
+    @Operation(summary = "获取下拉选项（叶子节点）")
     @GetMapping("/options")
     public Result<List<SelectTreeVO>> getOptions(
             @RequestParam String type,

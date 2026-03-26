@@ -22,9 +22,9 @@ public class UpdateOrgDTO {
     private String orgName;
 
     /**
-     * 机构类型
+     * 机构类型（字典编码）
      */
-    private Integer orgType;
+    private String orgType;
 
     /**
      * 所属地区ID
@@ -85,14 +85,14 @@ public class UpdateOrgDTO {
     private String agentProductLine;
 
     /**
-     * 医院等级（医疗机构）
+     * 医院等级（医疗机构，关联字典编码=3，值如 3.1/3.2/3.3/3.4/3.5）
      */
-    private Integer hospitalLevel;
+    private String hospitalLevel;
 
     /**
-     * 医院类型（医疗机构）
+     * 医院类型（医疗机构，关联字典编码=4，值如 4.1/4.2）
      */
-    private Integer hospitalType;
+    private String hospitalType;
 
     /**
      * 备注说明

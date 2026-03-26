@@ -50,7 +50,7 @@ class AuthControllerTest {
         requestBody.put("username", "admin");
         requestBody.put("password", "123456");
 
-        mockMvc.perform(post("/api/system/auth/login")
+        mockMvc.perform(post("/system/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -70,7 +70,7 @@ class AuthControllerTest {
         requestBody.put("username", "not_exists_user");
         requestBody.put("password", "123456");
 
-        mockMvc.perform(post("/api/system/auth/login")
+        mockMvc.perform(post("/system/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -88,7 +88,7 @@ class AuthControllerTest {
         requestBody.put("username", "admin");
         requestBody.put("password", "wrong_password");
 
-        mockMvc.perform(post("/api/system/auth/login")
+        mockMvc.perform(post("/system/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -106,7 +106,7 @@ class AuthControllerTest {
         requestBody.put("username", "disabled_user");
         requestBody.put("password", "123456");
 
-        mockMvc.perform(post("/api/system/auth/login")
+        mockMvc.perform(post("/system/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -124,7 +124,7 @@ class AuthControllerTest {
         requestBody.put("username", "admin");
         // 缺少 password
 
-        mockMvc.perform(post("/api/system/auth/login")
+        mockMvc.perform(post("/system/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isBadRequest())
@@ -141,7 +141,7 @@ class AuthControllerTest {
         requestBody.put("username", "admin");
         requestBody.put("password", "123456");
 
-        mockMvc.perform(post("/api/system/auth/login")
+        mockMvc.perform(post("/system/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -165,7 +165,7 @@ class AuthControllerTest {
 
         // 连续5次密码错误，第5次达到锁定阈值
         for (int i = 1; i <= 5; i++) {
-            mockMvc.perform(post("/api/system/auth/login")
+            mockMvc.perform(post("/system/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -181,7 +181,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("logout: 未登录时返回401")
     void logout_whenNotLogin_shouldReturn401() throws Exception {
-        mockMvc.perform(post("/api/system/auth/logout"))
+        mockMvc.perform(post("/system/auth/logout"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(401));
     }
@@ -194,7 +194,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("getCurrentUserInfo: 未登录时返回401")
     void getCurrentUserInfo_whenNotLogin_shouldReturn401() throws Exception {
-        mockMvc.perform(get("/api/system/auth/info"))
+        mockMvc.perform(get("/system/auth/info"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(401));
     }
@@ -211,7 +211,7 @@ class AuthControllerTest {
         requestBody.put("oldPassword", "123456");
         requestBody.put("newPassword", "654321");
 
-        mockMvc.perform(put("/api/system/auth/password")
+        mockMvc.perform(put("/system/auth/password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
@@ -235,7 +235,7 @@ class AuthControllerTest {
         passwordRequestBody.put("oldPassword", "123456");
         passwordRequestBody.put("newPassword", "123"); // 过短
 
-        mockMvc.perform(put("/api/system/auth/password")
+        mockMvc.perform(put("/system/auth/password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(passwordRequestBody)))
                 .andExpect(status().isBadRequest())

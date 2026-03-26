@@ -74,7 +74,7 @@ class HospitalDeptControllerTest {
             when(hospitalDeptService.listDepts(eq(1), eq(10), any(), any()))
                     .thenReturn(page);
 
-            mockMvc.perform(get("/api/basic/hospital-dept/page"))
+            mockMvc.perform(get("/basic/hospital-dept/page"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"))
@@ -90,7 +90,7 @@ class HospitalDeptControllerTest {
             when(hospitalDeptService.listDepts(eq(1), eq(10), any(), any()))
                     .thenReturn(page);
 
-            mockMvc.perform(get("/api/basic/hospital-dept/page"))
+            mockMvc.perform(get("/basic/hospital-dept/page"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.records").isArray())
@@ -107,7 +107,7 @@ class HospitalDeptControllerTest {
             when(hospitalDeptService.listDepts(eq(1), eq(10), eq("骨科"), any()))
                     .thenReturn(page);
 
-            mockMvc.perform(get("/api/basic/hospital-dept/page")
+            mockMvc.perform(get("/basic/hospital-dept/page")
                             .param("hospitalDeptName", "骨科"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
@@ -123,7 +123,7 @@ class HospitalDeptControllerTest {
             when(hospitalDeptService.listDepts(eq(1), eq(10), any(), eq(0)))
                     .thenReturn(page);
 
-            mockMvc.perform(get("/api/basic/hospital-dept/page")
+            mockMvc.perform(get("/basic/hospital-dept/page")
                             .param("status", "0"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
@@ -142,7 +142,7 @@ class HospitalDeptControllerTest {
             when(hospitalDeptService.listAll(any(), any()))
                     .thenReturn(List.of(buildTestVO(1L, "骨科"), buildTestVO(2L, "口腔科")));
 
-            mockMvc.perform(get("/api/basic/hospital-dept/list"))
+            mockMvc.perform(get("/basic/hospital-dept/list"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").isArray())
@@ -162,7 +162,7 @@ class HospitalDeptControllerTest {
         void getById_whenExists_shouldReturnData() throws Exception {
             when(hospitalDeptService.getById(1L)).thenReturn(buildTestVO(1L, "骨科"));
 
-            mockMvc.perform(get("/api/basic/hospital-dept/1"))
+            mockMvc.perform(get("/basic/hospital-dept/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.id").value(1))
@@ -175,7 +175,7 @@ class HospitalDeptControllerTest {
             when(hospitalDeptService.getById(999L))
                     .thenThrow(new BusinessException(ErrorCodeEnum.HOSPITAL_DEPT_NOT_FOUND));
 
-            mockMvc.perform(get("/api/basic/hospital-dept/999"))
+            mockMvc.perform(get("/basic/hospital-dept/999"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(690))
                     .andExpect(jsonPath("$.message").value("科室不存在"));
@@ -196,7 +196,7 @@ class HospitalDeptControllerTest {
                     "sort", 1
             );
 
-            mockMvc.perform(post("/api/basic/hospital-dept")
+            mockMvc.perform(post("/basic/hospital-dept")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -216,7 +216,7 @@ class HospitalDeptControllerTest {
                     "hospitalDeptName", "骨科"
             );
 
-            mockMvc.perform(post("/api/basic/hospital-dept")
+            mockMvc.perform(post("/basic/hospital-dept")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -230,7 +230,7 @@ class HospitalDeptControllerTest {
                     "sort", 1
             );
 
-            mockMvc.perform(post("/api/basic/hospital-dept")
+            mockMvc.perform(post("/basic/hospital-dept")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isBadRequest())
@@ -251,7 +251,7 @@ class HospitalDeptControllerTest {
                     "hospitalDeptName", "神经外科"
             );
 
-            mockMvc.perform(put("/api/basic/hospital-dept/1")
+            mockMvc.perform(put("/basic/hospital-dept/1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -269,7 +269,7 @@ class HospitalDeptControllerTest {
                     "hospitalDeptName", "神经外科"
             );
 
-            mockMvc.perform(put("/api/basic/hospital-dept/999")
+            mockMvc.perform(put("/basic/hospital-dept/999")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -287,7 +287,7 @@ class HospitalDeptControllerTest {
         @Test
         @DisplayName("delete: 删除成功返回200")
         void delete_shouldSuccess() throws Exception {
-            mockMvc.perform(delete("/api/basic/hospital-dept/2"))
+            mockMvc.perform(delete("/basic/hospital-dept/2"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"));
@@ -299,7 +299,7 @@ class HospitalDeptControllerTest {
             doThrow(new BusinessException(ErrorCodeEnum.HOSPITAL_DEPT_NOT_FOUND))
                     .when(hospitalDeptService).remove(999L);
 
-            mockMvc.perform(delete("/api/basic/hospital-dept/999"))
+            mockMvc.perform(delete("/basic/hospital-dept/999"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(690));
         }
@@ -314,7 +314,7 @@ class HospitalDeptControllerTest {
         @Test
         @DisplayName("updateStatus: 修改状态成功")
         void updateStatus_shouldSuccess() throws Exception {
-            mockMvc.perform(put("/api/basic/hospital-dept/1/status")
+            mockMvc.perform(put("/basic/hospital-dept/1/status")
                             .param("status", "0"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
@@ -324,7 +324,7 @@ class HospitalDeptControllerTest {
         @Test
         @DisplayName("updateStatus: 非法状态值时返回400")
         void updateStatus_whenInvalidStatus_shouldReturnError() throws Exception {
-            mockMvc.perform(put("/api/basic/hospital-dept/1/status")
+            mockMvc.perform(put("/basic/hospital-dept/1/status")
                             .param("status", "99"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value(400))

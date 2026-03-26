@@ -173,7 +173,7 @@ public class AuthServiceImpl implements AuthService {
         // 校验新旧密码不能相同
         if (passwordEncoder.matches(dto.getNewPassword(), user.getPassword())) {
             log.warn("新旧密码不能相同，userId={}", userId);
-            throw new BusinessException(ErrorCodeEnum.OLD_PASSWORD_ERROR);
+            throw new BusinessException(ErrorCodeEnum.NEW_PASSWORD_SAME_AS_OLD);
         }
 
         // 更新密码

@@ -1,5 +1,6 @@
 package com.yigongbao.module.basic.file.service.impl;
 
+import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.file.config.FileStorageProperties;
 import com.yigongbao.module.basic.file.entity.FileDetail;
@@ -181,7 +182,7 @@ class FileServiceImplTest {
             BusinessException exception = assertThrows(
                     BusinessException.class,
                     () -> fileService.getById("not-exists"));
-            assertEquals(681, exception.getCode());
+            assertEquals(ErrorCodeEnum.ATTACHMENT_NOT_FOUND.getCode(), exception.getCode());
         }
     }
 
@@ -243,7 +244,7 @@ class FileServiceImplTest {
             BusinessException exception = assertThrows(
                     BusinessException.class,
                     () -> fileService.deleteById("not-exists"));
-            assertEquals(681, exception.getCode());
+            assertEquals(ErrorCodeEnum.ATTACHMENT_NOT_FOUND.getCode(), exception.getCode());
         }
     }
 

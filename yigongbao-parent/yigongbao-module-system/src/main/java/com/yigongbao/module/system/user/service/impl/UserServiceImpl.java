@@ -25,7 +25,6 @@ import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.user.convert.UserConvert;
 import com.yigongbao.module.system.user.dto.CreateUserDTO;
-import com.yigongbao.module.system.user.dto.ResetPasswordDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
@@ -97,11 +96,27 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                         .map(UserEntity::getRoleId)
                         .filter(Objects::nonNull)
                         .collect(Collectors.toSet());
+                Set<Long> orgIds = records.stream()
+                        .map(UserEntity::getOrgId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+                Set<Long> deptIds = records.stream()
+                        .map(UserEntity::getDeptId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
 
                 // 批量查询角色信息
                 Map<Long, RoleEntity> roleMap = roleIds.isEmpty() ? Collections.emptyMap()
                         : roleService.listByIds(roleIds).stream()
                                 .collect(Collectors.toMap(RoleEntity::getId, Function.identity()));
+                // 批量查询机构信息
+                Map<Long, OrgEntity> orgMap = orgIds.isEmpty() ? Collections.emptyMap()
+                        : orgService.listByIds(orgIds).stream()
+                                .collect(Collectors.toMap(OrgEntity::getId, Function.identity()));
+                // 批量查询部门信息
+                Map<Long, DeptEntity> deptMap = deptIds.isEmpty() ? Collections.emptyMap()
+                        : deptService.listByIds(deptIds).stream()
+                                .collect(Collectors.toMap(DeptEntity::getId, Function.identity()));
 
                 // 批量查询用户医院关联
                 userHospitalMap = userHospitalService.listHospitalIdsByUserIds(
@@ -109,7 +124,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
                 // 填充关联数据到 VO
                 for (UserEntity entity : records) {
-                    fillEntityWithNames(entity, roleMap);
+                    fillEntityWithNames(entity, roleMap, orgMap, deptMap);
                 }
             }
 
@@ -166,26 +181,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
      *
      * @param entity 用户实体
      * @param roleMap 角色Map
+     * @param orgMap 机构Map
+     * @param deptMap 部门Map
      */
-    private void fillEntityWithNames(UserEntity entity, Map<Long, RoleEntity> roleMap) {
+    private void fillEntityWithNames(UserEntity entity, Map<Long, RoleEntity> roleMap,
+                                    Map<Long, OrgEntity> orgMap, Map<Long, DeptEntity> deptMap) {
         if (entity == null) {
             return;
         }
         // 填充机构名称
         if (entity.getOrgId() != null) {
-            OrgEntity orgEntity = orgService.getById(entity.getOrgId());
+            OrgEntity orgEntity = orgMap.get(entity.getOrgId());
             if (orgEntity != null) {
                 entity.setOrgName(orgEntity.getOrgName());
             }
         }
         // 填充部门名称
         if (entity.getDeptId() != null) {
-            DeptEntity deptEntity = deptService.getById(entity.getDeptId());
+            DeptEntity deptEntity = deptMap.get(entity.getDeptId());
             if (deptEntity != null) {
                 entity.setDeptName(deptEntity.getDeptName());
             }
         }
-        // 填充角色名称和编码，以及 hospitalScopeEnabled
+        // 填充角色名称和编码
         if (entity.getRoleId() != null) {
             RoleEntity roleEntity = roleMap.get(entity.getRoleId());
             if (roleEntity != null) {
@@ -408,27 +426,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
     /**
      * 重置密码
-     * 配置键：default.password
+     * 将用户密码重置为系统默认密码
+     *
+     * @param userId 用户ID
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void resetPassword(Long id, ResetPasswordDTO dto) {
-        log.info("重置密码，id={}", id);
+    public void resetPassword(Long userId) {
+        log.info("重置密码，userId={}", userId);
         try {
-            UserEntity entity = getById(id);
+            UserEntity entity = getById(userId);
             if (entity == null) {
-                log.warn("用户不存在，id={}", id);
+                log.warn("用户不存在，userId={}", userId);
                 throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
             // 从系统配置获取默认密码（已内置兜底逻辑，不会返回 null）
             String rawPassword = configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
             entity.setPassword(passwordEncoder.encode(rawPassword));
             updateById(entity);
-            log.info("重置密码成功，id={}", id);
+            log.info("重置密码成功，userId={}", userId);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("重置密码异常，id={}", id, e);
+            log.error("重置密码异常，userId={}", userId, e);
             throw e;
         }
     }

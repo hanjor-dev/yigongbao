@@ -106,7 +106,7 @@ class RebuildProjectControllerTest {
             parent.setChildren(List.of(buildTestVO(2L, "颞骨重建", 1L)));
             when(rebuildProjectService.listTree(null)).thenReturn(List.of(parent));
 
-            mockMvc.perform(get("/api/basic/rebuild-project/tree"))
+            mockMvc.perform(get("/basic/rebuild-project/tree"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"))
@@ -119,7 +119,7 @@ class RebuildProjectControllerTest {
         void tree_whenEmpty_shouldReturnEmptyArray() throws Exception {
             when(rebuildProjectService.listTree(null)).thenReturn(new ArrayList<>());
 
-            mockMvc.perform(get("/api/basic/rebuild-project/tree"))
+            mockMvc.perform(get("/basic/rebuild-project/tree"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").isArray())
@@ -133,7 +133,7 @@ class RebuildProjectControllerTest {
             project.setCategory("模型");
             when(rebuildProjectService.listTree("模型")).thenReturn(List.of(project));
 
-            mockMvc.perform(get("/api/basic/rebuild-project/tree")
+            mockMvc.perform(get("/basic/rebuild-project/tree")
                             .param("category", "模型"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
@@ -152,7 +152,7 @@ class RebuildProjectControllerTest {
         void byBodyPart_shouldReturnProjects() throws Exception {
             when(rebuildProjectService.listByBodyPartId(1L, null)).thenReturn(List.of(buildTestVO(1L, "颅骨重建", 1L)));
 
-            mockMvc.perform(get("/api/basic/rebuild-project/by-body-part/1"))
+            mockMvc.perform(get("/basic/rebuild-project/by-body-part/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data[0].name").value("颅骨重建"));
@@ -164,7 +164,7 @@ class RebuildProjectControllerTest {
             when(rebuildProjectService.listByBodyPartId(999L, null))
                     .thenThrow(new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND));
 
-            mockMvc.perform(get("/api/basic/rebuild-project/by-body-part/999"))
+            mockMvc.perform(get("/basic/rebuild-project/by-body-part/999"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(662));
         }
@@ -176,7 +176,7 @@ class RebuildProjectControllerTest {
             project.setCategory("导板");
             when(rebuildProjectService.listByBodyPartId(1L, "导板")).thenReturn(List.of(project));
 
-            mockMvc.perform(get("/api/basic/rebuild-project/by-body-part/1")
+            mockMvc.perform(get("/basic/rebuild-project/by-body-part/1")
                             .param("category", "导板"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
@@ -199,7 +199,7 @@ class RebuildProjectControllerTest {
             option.setChildren(new ArrayList<>());
             when(rebuildProjectService.listOptions(null, null)).thenReturn(List.of(option));
 
-            mockMvc.perform(get("/api/basic/rebuild-project/options"))
+            mockMvc.perform(get("/basic/rebuild-project/options"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data[0].bodyPartName").value("头部"));
@@ -210,7 +210,7 @@ class RebuildProjectControllerTest {
         void options_withBodyPartId_shouldFilter() throws Exception {
             when(rebuildProjectService.listOptions(1L, null)).thenReturn(new ArrayList<>());
 
-            mockMvc.perform(get("/api/basic/rebuild-project/options")
+            mockMvc.perform(get("/basic/rebuild-project/options")
                             .param("bodyPartId", "1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
@@ -231,7 +231,7 @@ class RebuildProjectControllerTest {
             option.setChildren(List.of(item));
             when(rebuildProjectService.listOptions(null, "模型")).thenReturn(List.of(option));
 
-            mockMvc.perform(get("/api/basic/rebuild-project/options")
+            mockMvc.perform(get("/basic/rebuild-project/options")
                             .param("category", "模型"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
@@ -242,7 +242,7 @@ class RebuildProjectControllerTest {
         void options_withBodyPartIdAndCategory_shouldFilter() throws Exception {
             when(rebuildProjectService.listOptions(1L, "模型")).thenReturn(new ArrayList<>());
 
-            mockMvc.perform(get("/api/basic/rebuild-project/options")
+            mockMvc.perform(get("/basic/rebuild-project/options")
                             .param("bodyPartId", "1")
                             .param("category", "模型"))
                     .andExpect(status().isOk())
@@ -261,7 +261,7 @@ class RebuildProjectControllerTest {
         void getById_whenExists_shouldReturnData() throws Exception {
             when(rebuildProjectService.getDetailById(1L)).thenReturn(buildTestDetailVO(1L, "颅骨重建", 1L));
 
-            mockMvc.perform(get("/api/basic/rebuild-project/1"))
+            mockMvc.perform(get("/basic/rebuild-project/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.id").value(1))
@@ -274,7 +274,7 @@ class RebuildProjectControllerTest {
             when(rebuildProjectService.getDetailById(999L))
                     .thenThrow(new BusinessException(ErrorCodeEnum.REBUILD_PROJECT_NOT_FOUND));
 
-            mockMvc.perform(get("/api/basic/rebuild-project/999"))
+            mockMvc.perform(get("/basic/rebuild-project/999"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(670));
         }
@@ -297,7 +297,7 @@ class RebuildProjectControllerTest {
                     "category", "模型"
             );
 
-            mockMvc.perform(post("/api/basic/rebuild-project")
+            mockMvc.perform(post("/basic/rebuild-project")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -311,7 +311,7 @@ class RebuildProjectControllerTest {
                     "name", "测试项目"
             );
 
-            mockMvc.perform(post("/api/basic/rebuild-project")
+            mockMvc.perform(post("/basic/rebuild-project")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isBadRequest())
@@ -335,7 +335,7 @@ class RebuildProjectControllerTest {
                     "standardPrice", 6000.00
             );
 
-            mockMvc.perform(put("/api/basic/rebuild-project/1")
+            mockMvc.perform(put("/basic/rebuild-project/1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -354,7 +354,7 @@ class RebuildProjectControllerTest {
                     "name", "测试项目"
             );
 
-            mockMvc.perform(put("/api/basic/rebuild-project/999")
+            mockMvc.perform(put("/basic/rebuild-project/999")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
@@ -369,7 +369,7 @@ class RebuildProjectControllerTest {
                     "standardPrice", 5000.00
             );
 
-            mockMvc.perform(put("/api/basic/rebuild-project/1")
+            mockMvc.perform(put("/basic/rebuild-project/1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isBadRequest())
@@ -386,7 +386,7 @@ class RebuildProjectControllerTest {
         @Test
         @DisplayName("delete: 删除成功返回200")
         void delete_shouldSuccess() throws Exception {
-            mockMvc.perform(delete("/api/basic/rebuild-project/2"))
+            mockMvc.perform(delete("/basic/rebuild-project/2"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
         }
@@ -398,7 +398,7 @@ class RebuildProjectControllerTest {
             doThrow(new BusinessException(ErrorCodeEnum.DATA_HAS_CHILDREN))
                     .when(rebuildProjectService).removeProject(1L);
 
-            mockMvc.perform(delete("/api/basic/rebuild-project/1"))
+            mockMvc.perform(delete("/basic/rebuild-project/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(605));
         }
@@ -413,7 +413,7 @@ class RebuildProjectControllerTest {
         @Test
         @DisplayName("updateStatus: 修改状态成功")
         void updateStatus_shouldSuccess() throws Exception {
-            mockMvc.perform(put("/api/basic/rebuild-project/1/status")
+            mockMvc.perform(put("/basic/rebuild-project/1/status")
                             .param("status", "0"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
@@ -422,7 +422,7 @@ class RebuildProjectControllerTest {
         @Test
         @DisplayName("updateStatus: 状态值不合法时返回400")
         void updateStatus_whenInvalidStatus_shouldReturnError() throws Exception {
-            mockMvc.perform(put("/api/basic/rebuild-project/1/status")
+            mockMvc.perform(put("/basic/rebuild-project/1/status")
                             .param("status", "99"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value(400))
@@ -435,7 +435,7 @@ class RebuildProjectControllerTest {
             doThrow(new BusinessException(ErrorCodeEnum.REBUILD_PROJECT_NOT_FOUND))
                     .when(rebuildProjectService).updateStatus(eq(999L), any(Integer.class));
 
-            mockMvc.perform(put("/api/basic/rebuild-project/999/status")
+            mockMvc.perform(put("/basic/rebuild-project/999/status")
                             .param("status", "0"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(670))

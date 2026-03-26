@@ -46,14 +46,14 @@ public class HospitalEntity extends BaseEntity implements Serializable {
     private String fullAreaName;
 
     /**
-     * 医院等级（字典：dict_code=3）
+     * 医院等级（字典：dict_code=3，值如 3.1/3.2/3.3/3.4/3.5）
      */
-    private Integer hospitalLevel;
+    private String hospitalLevel;
 
     /**
-     * 医院类型（字典：dict_code=4）
+     * 医院类型（字典：dict_code=4，值如 4.1/4.2）
      */
-    private Integer hospitalType;
+    private String hospitalType;
 
     /**
      * 联系人

@@ -1,12 +1,16 @@
 package com.yigongbao.module.basic.rebuildProject.controller;
 
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.rebuildProject.dto.CreateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.UpdateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectOptionVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectVO;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -31,8 +35,9 @@ import java.util.List;
  * @author hanjor
  * @date 2026-03-23
  */
+@Tag(name = "重建项目管理", description = "3D 重建项目信息管理")
 @RestController
-@RequestMapping("/api/basic/rebuild-project")
+@RequestMapping("/basic/rebuild-project")
 @RequiredArgsConstructor
 public class RebuildProjectController {
 
@@ -41,6 +46,7 @@ public class RebuildProjectController {
     /**
      * 获取项目树形结构
      */
+    @Operation(summary = "获取项目树形结构")
     @GetMapping("/tree")
     public Result<List<RebuildProjectVO>> tree(@RequestParam(required = false) String category) {
         return Result.success(rebuildProjectService.listTree(category));
@@ -49,6 +55,7 @@ public class RebuildProjectController {
     /**
      * 根据部位ID获取项目列表
      */
+    @Operation(summary = "根据部位ID获取项目列表")
     @GetMapping("/by-body-part/{bodyPartId}")
     public Result<List<RebuildProjectVO>> byBodyPart(
             @PathVariable Long bodyPartId,
@@ -59,6 +66,7 @@ public class RebuildProjectController {
     /**
      * 获取项目下拉选项
      */
+    @Operation(summary = "获取项目下拉选项")
     @GetMapping("/options")
     public Result<List<RebuildProjectOptionVO>> options(
             @RequestParam(required = false) Long bodyPartId,
@@ -69,6 +77,7 @@ public class RebuildProjectController {
     /**
      * 查询项目详情
      */
+    @Operation(summary = "查询项目详情")
     @GetMapping("/{id}")
     public Result<RebuildProjectDetailVO> getById(@PathVariable Long id) {
         return Result.success(rebuildProjectService.getDetailById(id));
@@ -77,6 +86,12 @@ public class RebuildProjectController {
     /**
      * 创建项目
      */
+    @Operation(summary = "创建项目")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.CREATE,
+            operation = "创建重建项目"
+    )
     @PostMapping
     public Result<Void> create(@Valid @RequestBody CreateRebuildProjectDTO dto) {
         rebuildProjectService.createProject(dto);
@@ -86,6 +101,12 @@ public class RebuildProjectController {
     /**
      * 更新项目
      */
+    @Operation(summary = "更新项目")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "更新重建项目"
+    )
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @Valid @RequestBody UpdateRebuildProjectDTO dto) {
         rebuildProjectService.updateProject(id, dto);
@@ -95,6 +116,12 @@ public class RebuildProjectController {
     /**
      * 删除项目
      */
+    @Operation(summary = "删除项目")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.DELETE,
+            operation = "删除重建项目"
+    )
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         rebuildProjectService.removeProject(id);
@@ -104,6 +131,12 @@ public class RebuildProjectController {
     /**
      * 修改项目状态
      */
+    @Operation(summary = "修改项目状态")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "修改重建项目状态"
+    )
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(
             @PathVariable Long id,

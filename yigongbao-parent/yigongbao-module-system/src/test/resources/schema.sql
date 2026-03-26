@@ -26,7 +26,7 @@ CREATE TABLE sys_dict (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_dict_code (dict_code),
+    UNIQUE KEY uk_dict_code (dict_code, is_deleted),
     KEY idx_parent_id (parent_id),
     KEY idx_level (level)
 );
@@ -125,7 +125,7 @@ CREATE TABLE sys_org (
     id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     org_name            VARCHAR(128)    NOT NULL COMMENT '机构名称',
     org_code            VARCHAR(32)     NOT NULL COMMENT '机构编码',
-    org_type            TINYINT         NOT NULL COMMENT '机构类型',
+    org_type            VARCHAR(8)          NOT NULL COMMENT '机构类型（字典编码，如：1.1=生产企业，1.2=经销商，1.3=医疗机构，1.4=其他）',
     area_id             BIGINT          COMMENT '所属地区ID',
     area_name           VARCHAR(64)     COMMENT '所属地区名称',
     address             VARCHAR(256)    COMMENT '详细地址',
@@ -136,8 +136,8 @@ CREATE TABLE sys_org (
     business_license    VARCHAR(512)    COMMENT '营业执照',
     agent_area          VARCHAR(64)     COMMENT '代理区域',
     agent_product_line  VARCHAR(256)    COMMENT '代理产品线',
-    hospital_level      TINYINT         COMMENT '医院等级',
-    hospital_type       TINYINT         COMMENT '医院类型',
+    hospital_level      VARCHAR(16)      COMMENT '医院等级（字典：dict_code=3，值如 3.1/3.2）',
+    hospital_type       VARCHAR(16)      COMMENT '医院类型（字典：dict_code=4，值如 4.1/4.2）',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark              VARCHAR(512)    COMMENT '备注说明',
 
@@ -149,8 +149,8 @@ CREATE TABLE sys_org (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_org_code (org_code),
-    UNIQUE KEY uk_org_name (org_name),
+    UNIQUE KEY uk_org_code (org_code, is_deleted),
+    UNIQUE KEY uk_org_name (org_name, is_deleted),
     KEY idx_org_type (org_type),
     KEY idx_area_id (area_id),
     KEY idx_status (status)
@@ -158,9 +158,9 @@ CREATE TABLE sys_org (
 
 -- 插入机构测试数据
 INSERT INTO sys_org (id, org_name, org_code, org_type, area_id, area_name, address, contact, phone, email, status, remark, create_time, update_time, is_deleted) VALUES
-(1, '测试医疗机构', 'ORG-H-001', 3, 1, '北京市', '朝阳区测试路123号', '张医生', '13800138001', 'test@hospital.com', 1, '测试医院', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, '测试生产企业', 'ORG-P-001', 1, 2, '上海市', '浦东新区工业园1号', '李经理', '13800138002', 'test@factory.com', 1, '测试工厂', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(3, '测试经销商', 'ORG-D-001', 2, 3, '广州市', '天河区商业街88号', '王总', '13800138003', 'test@distributor.com', 0, '已禁用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+(1, '测试医疗机构', 'ORG-H-001', '1.3', 1, '北京市', '朝阳区测试路123号', '张医生', '13800138001', 'test@hospital.com', 1, '测试医院', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, '测试生产企业', 'ORG-P-001', '1.1', 2, '上海市', '浦东新区工业园1号', '李经理', '13800138002', 'test@factory.com', 1, '测试工厂', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, '测试经销商', 'ORG-D-001', '1.2', 3, '广州市', '天河区商业街88号', '王总', '13800138003', 'test@distributor.com', 0, '已禁用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ============================================================
 -- 部门表
@@ -183,7 +183,7 @@ CREATE TABLE sys_dept (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_dept_code (dept_code),
+    UNIQUE KEY uk_dept_code (dept_code, is_deleted),
     UNIQUE KEY uk_dept_name_org (dept_name, org_id, is_deleted),
     KEY idx_dept_org_id (org_id),
     KEY idx_dept_status (status)
@@ -218,7 +218,7 @@ CREATE TABLE sys_role (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_role_code (role_code),
+    UNIQUE KEY uk_role_code (role_code, is_deleted),
     KEY idx_role_account_type (account_type),
     KEY idx_role_status (status)
 );
@@ -279,8 +279,8 @@ CREATE TABLE sys_user (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_username (username),
-    UNIQUE KEY uk_phone (phone),
+    UNIQUE KEY uk_username (username, is_deleted),
+    UNIQUE KEY uk_phone (phone, is_deleted),
     KEY idx_user_org_id (org_id),
     KEY idx_user_dept_id (dept_id),
     KEY idx_user_role_id (role_id),
@@ -323,7 +323,7 @@ CREATE TABLE sys_config (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_config_key (config_key),
+    UNIQUE KEY uk_config_key (config_key, is_deleted),
     KEY idx_config_group (config_group),
     KEY idx_config_type (config_type),
     KEY idx_config_status (status)
@@ -370,7 +370,7 @@ CREATE TABLE sys_resource (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_resource_code (resource_code),
+    UNIQUE KEY uk_resource_code (resource_code, is_deleted),
     KEY idx_resource_parent_id (parent_id),
     KEY idx_resource_type (resource_type),
     KEY idx_resource_status (status)

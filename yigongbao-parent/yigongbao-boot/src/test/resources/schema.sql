@@ -26,7 +26,7 @@ CREATE TABLE sys_dict (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_dict_code (dict_code),
+    UNIQUE KEY uk_dict_code (dict_code, is_deleted),
     KEY idx_parent_id (parent_id),
     KEY idx_level (level)
 );
@@ -71,7 +71,7 @@ CREATE TABLE sys_org (
     id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     org_name            VARCHAR(128)    NOT NULL COMMENT '机构名称',
     org_code            VARCHAR(32)     NOT NULL COMMENT '机构编码',
-    org_type            TINYINT         NOT NULL COMMENT '机构类型',
+    org_type            VARCHAR(8)          NOT NULL COMMENT '机构类型（字典编码，如：1.1/1.2/1.3/1.4）',
     area_id            BIGINT          COMMENT '所属地区ID',
     area_name          VARCHAR(64)     COMMENT '所属地区名称',
     address            VARCHAR(256)    COMMENT '详细地址',
@@ -82,8 +82,8 @@ CREATE TABLE sys_org (
     business_license   VARCHAR(512)    COMMENT '营业执照',
     agent_area         VARCHAR(64)     COMMENT '代理区域',
     agent_product_line VARCHAR(256)    COMMENT '代理产品线',
-    hospital_level     TINYINT         COMMENT '医院等级',
-    hospital_type      TINYINT         COMMENT '医院类型',
+    hospital_level      VARCHAR(16)      COMMENT '医院等级（字典：dict_code=3，值如 3.1/3.2）',
+    hospital_type       VARCHAR(16)      COMMENT '医院类型（字典：dict_code=4，值如 4.1/4.2）',
     status             TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark            VARCHAR(512)    COMMENT '备注说明',
     create_time        TIMESTAMP       DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -92,8 +92,8 @@ CREATE TABLE sys_org (
     update_by          BIGINT          DEFAULT NULL COMMENT '更新人ID',
     is_deleted         TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_org_code (org_code),
-    UNIQUE KEY uk_org_name (org_name)
+    UNIQUE KEY uk_org_code (org_code, is_deleted),
+    UNIQUE KEY uk_org_name (org_name, is_deleted),
 );
 
 -- ============================================================
@@ -170,7 +170,7 @@ CREATE TABLE rebuild_body_part (
     update_by       BIGINT          DEFAULT NULL COMMENT '更新人ID',
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_body_part_code (code),
+    UNIQUE KEY uk_body_part_code (code, is_deleted),
     KEY idx_body_part_parent_id (parent_id),
     KEY idx_body_part_level (level),
     KEY idx_body_part_status (status)
@@ -208,7 +208,7 @@ CREATE TABLE rebuild_project (
     update_by             BIGINT          DEFAULT NULL COMMENT '更新人ID',
     is_deleted            TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_project_code (code),
+    UNIQUE KEY uk_project_code (code, is_deleted),
     KEY idx_project_body_part_id (body_part_id),
     KEY idx_project_parent_id (parent_id),
     KEY idx_project_level (level),
@@ -354,7 +354,7 @@ CREATE TABLE sys_code_rule (
     update_by      BIGINT          DEFAULT NULL COMMENT '更新人ID',
     is_deleted     TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_rule_code (rule_code),
+    UNIQUE KEY uk_rule_code (rule_code, is_deleted),
     KEY idx_rule_status (status)
 );
 

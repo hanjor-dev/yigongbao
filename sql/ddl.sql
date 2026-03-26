@@ -27,7 +27,7 @@ CREATE TABLE sys_dict (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_dict_code (dict_code),
+    UNIQUE KEY uk_dict_code (dict_code, is_deleted),
     KEY idx_dict_parent_id (parent_id),
     KEY idx_dict_level (level)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='字典表';
@@ -44,8 +44,8 @@ CREATE TABLE sys_org (
     area_id            BIGINT          COMMENT '所属地区ID（关联sys_area表）',
     area_name          VARCHAR(64)     COMMENT '所属地区名称（冗余存储）',
     address            VARCHAR(256)    COMMENT '详细地址',
-    contact            VARCHAR(32)     NOT NULL COMMENT '联系人',
-    phone              VARCHAR(32)     NOT NULL COMMENT '联系电话',
+    contact            VARCHAR(32)     COMMENT '联系人',
+    phone              VARCHAR(32)     COMMENT '联系电话',
     email              VARCHAR(64)     COMMENT '联系邮箱',
     credit_code        VARCHAR(32)     COMMENT '统一社会信用代码',
     business_license   VARCHAR(512)    COMMENT '营业执照（存储路径/URL）',
@@ -55,8 +55,8 @@ CREATE TABLE sys_org (
     agent_product_line VARCHAR(256)    COMMENT '代理产品线（多个用逗号分隔，关联字典编码=5，子节点dict_code=5.1/5.2/5.3/5.4）',
 
     -- 医疗机构额外字段
-    hospital_level     TINYINT         COMMENT '医院等级（关联字典编码=3，子节点dict_code=3.1/3.2/3.3/3.4/3.5）',
-    hospital_type      TINYINT         COMMENT '医院类型（关联字典编码=4，子节点dict_code=4.1/4.2）',
+    hospital_level      VARCHAR(16)      COMMENT '医院等级（关联字典编码=3，子节点dict_code=3.1/3.2/3.3/3.4/3.5）',
+    hospital_type       VARCHAR(16)      COMMENT '医院类型（关联字典编码=4，子节点dict_code=4.1/4.2）',
 
     -- 状态
     status             TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
@@ -70,8 +70,8 @@ CREATE TABLE sys_org (
     is_deleted         TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_org_code (org_code),
-    UNIQUE KEY uk_org_name (org_name),
+    UNIQUE KEY uk_org_code (org_code, is_deleted),
+    UNIQUE KEY uk_org_name (org_name, is_deleted),
     KEY idx_org_type (org_type),
     KEY idx_org_area_id (area_id),
     KEY idx_org_status (status)
@@ -99,7 +99,7 @@ CREATE TABLE sys_dept (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_dept_code (dept_code),
+    UNIQUE KEY uk_dept_code (dept_code, is_deleted),
     UNIQUE KEY uk_dept_name_org (dept_name, org_id, is_deleted),
     KEY idx_dept_org_id (org_id),
     KEY idx_dept_status (status)
@@ -128,7 +128,7 @@ CREATE TABLE sys_role (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_role_code (role_code),
+    UNIQUE KEY uk_role_code (role_code, is_deleted),
     KEY idx_role_account_type (account_type),
     KEY idx_role_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表';
@@ -179,8 +179,8 @@ CREATE TABLE sys_user (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_username (username),
-    UNIQUE KEY uk_phone (phone),
+    UNIQUE KEY uk_username (username, is_deleted),
+    UNIQUE KEY uk_phone (phone, is_deleted),
     KEY idx_user_org_id (org_id),
     KEY idx_user_dept_id (dept_id),
     KEY idx_user_role_id (role_id),
@@ -213,7 +213,7 @@ CREATE TABLE sys_config (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_config_key (config_key),
+    UNIQUE KEY uk_config_key (config_key, is_deleted),
     KEY idx_config_group (config_group),
     KEY idx_config_type (config_type),
     KEY idx_config_status (status)
@@ -252,7 +252,7 @@ CREATE TABLE sys_resource (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_resource_code (resource_code),
+    UNIQUE KEY uk_resource_code (resource_code, is_deleted),
     KEY idx_resource_parent_id (parent_id),
     KEY idx_resource_type (resource_type),
     KEY idx_resource_status (status)
@@ -334,10 +334,10 @@ CREATE TABLE hospital (
     area_id             BIGINT          NOT NULL COMMENT '所属地区ID（关联sys_area表）',
     area_name           VARCHAR(64)     COMMENT '地区名称（冗余存储）',
     full_area_name     VARCHAR(256)    COMMENT '完整地区路径（冗余存储，如：中国,北京,北京市,朝阳区）',
-    hospital_level      TINYINT         COMMENT '医院等级（关联字典编码=3，子节点dict_code=3.1/3.2/3.3/3.4/3.5）',
-    hospital_type       TINYINT         COMMENT '医院类型（关联字典编码=4，子节点dict_code=4.1/4.2）',
-    contact             VARCHAR(32)     NOT NULL COMMENT '联系人',
-    phone               VARCHAR(32)     NOT NULL COMMENT '联系电话',
+    hospital_level      VARCHAR(16)      COMMENT '医院等级（关联字典编码=3，子节点dict_code=3.1/3.2/3.3/3.4/3.5）',
+    hospital_type       VARCHAR(16)      COMMENT '医院类型（关联字典编码=4，子节点dict_code=4.1/4.2）',
+    contact             VARCHAR(32)      COMMENT '联系人',
+    phone               VARCHAR(32)     COMMENT '联系电话',
     email               VARCHAR(64)     COMMENT '电子邮箱',
     address             VARCHAR(256)    COMMENT '详细地址',
     credit_code         VARCHAR(32)     COMMENT '统一社会信用代码',
@@ -353,8 +353,8 @@ CREATE TABLE hospital (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_hospital_code (hospital_code),
-    UNIQUE KEY uk_hospital_name (hospital_name),
+    UNIQUE KEY uk_hospital_code (hospital_code, is_deleted),
+    UNIQUE KEY uk_hospital_name (hospital_name, is_deleted),
     KEY idx_hospital_area_id (area_id),
     KEY idx_hospital_level (hospital_level),
     KEY idx_hospital_type (hospital_type),
@@ -383,8 +383,8 @@ CREATE TABLE hospital_group_template (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_template_code (template_code),
-    UNIQUE KEY uk_template_name (template_name),
+    UNIQUE KEY uk_template_code (template_code, is_deleted),
+    UNIQUE KEY uk_template_name (template_name, is_deleted),
     KEY idx_template_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院组合模板表';
 
@@ -451,7 +451,7 @@ CREATE TABLE rebuild_body_part (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_body_part_code (code),
+    UNIQUE KEY uk_body_part_code (code, is_deleted),
     KEY idx_body_part_parent_id (parent_id),
     KEY idx_body_part_level (level),
     KEY idx_body_part_status (status)
@@ -489,7 +489,7 @@ CREATE TABLE rebuild_project (
     is_deleted            TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_project_code (code),
+    UNIQUE KEY uk_project_code (code, is_deleted),
     KEY idx_project_body_part_id (body_part_id),
     KEY idx_project_parent_id (parent_id),
     KEY idx_project_level (level),
@@ -507,17 +507,17 @@ CREATE TABLE sys_operation_log (
     module         VARCHAR(64)     COMMENT '请求模块',
     business_type  INT             COMMENT '业务类型（关联 OperationTypeEnum 枚举）',
     business_type_name VARCHAR(32) COMMENT '业务类型名称',
-    operation      VARCHAR(64)     COMMENT '操作描述',
-    description     VARCHAR(256)   COMMENT '业务描述',
+    operation      VARCHAR(64)     COMMENT '操作描述（操作动词，如：新增、编辑、删除）',
+    description     VARCHAR(256)   COMMENT '业务描述（操作的业务内容）',
     request_method VARCHAR(10)     COMMENT '请求方法（GET/POST/PUT/DELETE）',
     request_url    VARCHAR(512)   COMMENT '请求URL',
     request_params TEXT            COMMENT '请求参数（JSON格式，已脱敏）',
     ip             VARCHAR(64)    COMMENT '请求IP地址',
-    location       VARCHAR(128)   COMMENT '操作地点',
-    user_agent     VARCHAR(512)   COMMENT 'User-Agent',
+    location       VARCHAR(128)   COMMENT '操作地点（根据IP解析的地理位置）',
+    user_agent     VARCHAR(512)   COMMENT 'User-Agent（浏览器/设备信息）',
     user_id        BIGINT          COMMENT '操作用户ID',
     username       VARCHAR(64)    COMMENT '操作用户名',
-    real_name      VARCHAR(64)   COMMENT '操作用户真实姓名',
+    real_name      VARCHAR(64)    COMMENT '操作用户真实姓名',
     status         INT             COMMENT '响应状态（0=失败，1=成功）',
     error_message  VARCHAR(512)   COMMENT '错误信息',
     duration       BIGINT          COMMENT '执行时长（毫秒）',
@@ -558,7 +558,7 @@ CREATE TABLE sys_code_rule (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_rule_code (rule_code)
+    UNIQUE KEY uk_rule_code (rule_code, is_deleted)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='编码规则表';
 
 
@@ -672,7 +672,7 @@ CREATE TABLE hospital_dept (
     is_deleted           TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_hospital_dept_code (hospital_dept_code),
+    UNIQUE KEY uk_hospital_dept_code (hospital_dept_code, is_deleted),
     KEY idx_hospital_dept_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院科室表';
 
@@ -735,7 +735,7 @@ CREATE TABLE product (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_product_code (product_code),
+    UNIQUE KEY uk_product_code (product_code, is_deleted),
     KEY idx_product_category (category),
     KEY idx_product_cert (cert_id),
     KEY idx_product_status (status)
@@ -765,7 +765,7 @@ CREATE TABLE registration_cert (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_cert_code (cert_code),
+    UNIQUE KEY uk_cert_code (cert_code, is_deleted),
     KEY idx_cert_valid_to (valid_to),
     KEY idx_cert_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='注册证表';

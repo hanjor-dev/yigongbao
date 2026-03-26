@@ -79,7 +79,7 @@ class OrgServiceImplTest {
         testEntity.setId(1L);
         testEntity.setOrgName("测试机构");
         testEntity.setOrgCode("ORG-P-001");
-        testEntity.setOrgType(1);
+        testEntity.setOrgType("1.1");
         testEntity.setContact("张三");
         testEntity.setPhone("13800138000");
         testEntity.setStatus(1);
@@ -89,7 +89,7 @@ class OrgServiceImplTest {
         // 初始化创建DTO
         createDTO = new CreateOrgDTO();
         createDTO.setOrgName("新机构");
-        createDTO.setOrgType(1);
+        createDTO.setOrgType("1.1");
         createDTO.setContact("李四");
         createDTO.setPhone("13900139000");
         createDTO.setAreaName("北京市");
@@ -107,7 +107,6 @@ class OrgServiceImplTest {
         orgTypeVO.setId(2L);
         orgTypeVO.setDictCode("1.1");
         orgTypeVO.setDictName("生产企业");
-        orgTypeVO.setDictValue(DictCodeConstants.ORG_TYPE);
     }
 
     // ==================== listOrg 测试 ====================
@@ -226,7 +225,7 @@ class OrgServiceImplTest {
         // 创建DTO，设置一个不存在的类型
         CreateOrgDTO dto = new CreateOrgDTO();
         dto.setOrgName("测试");
-        dto.setOrgType(999);
+        dto.setOrgType("9.9");
         dto.setContact("联系人");
         dto.setPhone("13800138000");
 

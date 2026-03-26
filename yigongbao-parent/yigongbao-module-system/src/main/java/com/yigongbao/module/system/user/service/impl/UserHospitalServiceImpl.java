@@ -1,11 +1,14 @@
 package com.yigongbao.module.system.user.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
 import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
 import com.yigongbao.module.basic.hospital.vo.HospitalVO;
+import com.yigongbao.module.system.role.entity.RoleEntity;
+import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.entity.UserHospitalEntity;
 import com.yigongbao.module.system.user.mapper.UserHospitalMapper;
@@ -39,6 +42,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
     private final UserHospitalMapper userHospitalMapper;
     private final HospitalMapper hospitalMapper;
     private final UserMapper userMapper;
+    private final RoleService roleService;
 
     /**
      * 查询用户的医院ID列表
@@ -140,25 +144,28 @@ public class UserHospitalServiceImpl implements UserHospitalService {
 
             // 2. 校验医院ID是否有效（是否存在、是否启用）
             if (hospitalIds != null && !hospitalIds.isEmpty()) {
-                List<HospitalEntity> validHospitals = hospitalMapper.selectBatchIds(hospitalIds);
-                // 过滤掉不存在的医院
-                validHospitals = validHospitals.stream()
+                List<HospitalEntity> rawHospitals = hospitalMapper.selectBatchIds(hospitalIds);
+                // 过滤掉不存在的医院（仅保留非 null 的记录）
+                List<HospitalEntity> validHospitals = rawHospitals.stream()
                         .filter(Objects::nonNull)
                         .collect(Collectors.toList());
 
-                // 检查是否有无效的医院ID
+                // 检查是否有无效的医院ID（数据库中不存在的ID）
                 if (validHospitals.size() != hospitalIds.size()) {
-                    log.warn("部分医院ID无效，userId={}, 传入数量={}, 有效数量={}",
-                            userId, hospitalIds.size(), validHospitals.size());
-                    throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "部分医院ID无效，请检查");
+                    List<Long> invalidIds = hospitalIds.stream()
+                            .filter(id -> validHospitals.stream().noneMatch(h -> h.getId().equals(id)))
+                            .collect(Collectors.toList());
+                    log.warn("部分医院不存在，userId={}, 无效ID={}", userId, invalidIds);
+                    throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND.getCode(),
+                            "医院不存在，id=" + invalidIds);
                 }
 
                 // 检查是否有禁用的医院
                 for (HospitalEntity hospital : validHospitals) {
-                    if (hospital.getStatus() == 0) {
+                    if (hospital.getStatus() != null && hospital.getStatus() == StatusConstants.DISABLED) {
                         log.warn("医院已停用，hospitalId={}, hospitalName={}",
                                 hospital.getId(), hospital.getHospitalName());
-                        throw new BusinessException(ErrorCodeEnum.PARAM_ERROR,
+                        throw new BusinessException(ErrorCodeEnum.HOSPITAL_DISABLED.getCode(),
                                 "医院【" + hospital.getHospitalName() + "】已停用，请先启用");
                     }
                 }
@@ -187,6 +194,55 @@ public class UserHospitalServiceImpl implements UserHospitalService {
     }
 
     /**
+     * 获取当前用户可操作医院（下拉选项）
+     * 根据用户角色的 hospitalScopeEnabled 配置决定返回范围：
+     * - hospitalScopeEnabled == 1：返回用户关联的医院列表
+     * - hospitalScopeEnabled == 0 或无角色：返回空列表
+     *
+     * @param userId 用户ID
+     * @return 医院列表
+     * @throws BusinessException 用户不存在
+     */
+    @Override
+    public List<HospitalVO> getMyHospitalOptions(Long userId) {
+        log.info("获取当前用户可操作医院列表，userId={}", userId);
+        try {
+            // 1. 校验用户是否存在
+            UserEntity user = userMapper.selectById(userId);
+            if (user == null) {
+                log.warn("用户不存在，userId={}", userId);
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+            }
+
+            // 2. 检查角色的 hospitalScopeEnabled
+            boolean hospitalScopeEnabled = false;
+            if (user.getRoleId() != null) {
+                RoleEntity role = roleService.getById(user.getRoleId());
+                if (role != null && role.getHospitalScopeEnabled() != null
+                        && role.getHospitalScopeEnabled() == StatusConstants.YES) {
+                    hospitalScopeEnabled = true;
+                }
+            }
+
+            // 3. 根据 hospitalScopeEnabled 决定查询范围
+            List<HospitalVO> result;
+            if (hospitalScopeEnabled) {
+                result = getHospitalsByUserId(userId);
+            } else {
+                result = new ArrayList<>();
+            }
+
+            log.info("获取当前用户可操作医院列表成功，userId={}, 数量={}", userId, result.size());
+            return result;
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("获取当前用户可操作医院列表异常，userId={}", userId, e);
+            throw e;
+        }
+    }
+
+    /**
      * 获取可分配给用户的医院列表（管理员分配时使用）
      * 返回所有状态正常的医院，供管理员选择分配
      *
@@ -199,7 +255,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
         try {
             // 返回所有状态正常的医院，供管理员选择分配
             LambdaQueryWrapper<HospitalEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(HospitalEntity::getStatus, 1)
+            wrapper.eq(HospitalEntity::getStatus, StatusConstants.NORMAL)
                     .orderByAsc(HospitalEntity::getHospitalName);
             List<HospitalEntity> list = hospitalMapper.selectList(wrapper);
             List<HospitalVO> voList = list.stream()

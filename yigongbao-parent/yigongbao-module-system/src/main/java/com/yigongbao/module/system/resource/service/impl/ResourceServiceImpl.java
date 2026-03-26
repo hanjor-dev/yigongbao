@@ -18,6 +18,8 @@ import com.yigongbao.module.system.resource.entity.RoleResourceEntity;
 import com.yigongbao.module.system.resource.mapper.ResourceMapper;
 import com.yigongbao.module.system.resource.mapper.RoleResourceMapper;
 import com.yigongbao.module.system.resource.service.ResourceService;
+import com.yigongbao.module.system.role.entity.RoleEntity;
+import com.yigongbao.module.system.role.mapper.RoleMapper;
 import com.yigongbao.module.system.resource.vo.ResourceVO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
@@ -45,6 +47,7 @@ import java.util.stream.Collectors;
 public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEntity> implements ResourceService {
 
     private final RoleResourceMapper roleResourceMapper;
+    private final RoleMapper roleMapper;
     private final UserMapper userMapper;
 
     /**
@@ -244,28 +247,42 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
 
     /**
      * 分配角色资源
+     *
+     * @param roleId     角色ID
+     * @param resourceIds 资源ID列表
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void assignResources(Long roleId, List<Long> resourceIds) {
         log.info("分配角色资源，roleId={}, resourceIds={}", roleId, resourceIds);
+        try {
+            // 校验角色是否存在
+            RoleEntity role = roleMapper.selectById(roleId);
+            if (role == null) {
+                log.warn("角色不存在，roleId={}", roleId);
+                throw new BusinessException(ErrorCodeEnum.USER_ROLE_NOT_FOUND);
+            }
 
-        // 删除原有关联
-        roleResourceMapper.deleteByRoleId(roleId);
+            // 删除原有关联
+            roleResourceMapper.deleteByRoleId(roleId);
 
-        // 批量插入新关联（仅当非空时）
-        if (resourceIds != null && !resourceIds.isEmpty()) {
-            // 校验 resourceIds 有效性：只保留存在且未删除的资源
-            LambdaQueryWrapper<ResourceEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.in(ResourceEntity::getId, resourceIds)
-                    .eq(ResourceEntity::getStatus, StatusConstants.NORMAL);
-            List<ResourceEntity> validResources = baseMapper.selectList(wrapper);
-            List<Long> validIds = validResources.stream()
-                    .map(ResourceEntity::getId)
-                    .collect(Collectors.toList());
+            // 批量插入新关联（仅当非空时）
+            if (resourceIds != null && !resourceIds.isEmpty()) {
+                // 校验资源是否存在
+                List<ResourceEntity> validResources = baseMapper.selectBatchIds(resourceIds);
+                if (validResources.size() != resourceIds.size()) {
+                    // 计算不存在的资源ID
+                    List<Long> validIds = validResources.stream()
+                            .map(ResourceEntity::getId)
+                            .collect(Collectors.toList());
+                    List<Long> invalidIds = resourceIds.stream()
+                            .filter(id -> !validIds.contains(id))
+                            .collect(Collectors.toList());
+                    log.warn("部分资源不存在，invalidIds={}", invalidIds);
+                    throw new BusinessException(ErrorCodeEnum.RESOURCE_NOT_FOUND);
+                }
 
-            if (!validIds.isEmpty()) {
-                List<RoleResourceEntity> relations = validIds.stream()
+                List<RoleResourceEntity> relations = resourceIds.stream()
                         .map(resourceId -> {
                             RoleResourceEntity r = new RoleResourceEntity();
                             r.setRoleId(roleId);
@@ -276,13 +293,15 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
 
                 // 批量插入
                 roleResourceMapper.insertBatch(relations);
-                log.info("分配角色资源成功，roleId={}, 传入={}个, 有效={}个",
-                        roleId, resourceIds.size(), validIds.size());
+                log.info("分配角色资源成功，roleId={}, count={}", roleId, relations.size());
             } else {
-                log.info("分配角色资源成功，roleId={}, 传入的resourceIds均无效", roleId);
+                log.info("分配角色资源成功，roleId={}, 已清空资源", roleId);
             }
-        } else {
-            log.info("分配角色资源成功，roleId={}, 已清空资源", roleId);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("分配角色资源异常，roleId={}", roleId, e);
+            throw e;
         }
     }
 

@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.yigongbao.common.constant.DictCodeConstants;
+import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.hutool.core.util.StrUtil;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -58,7 +59,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      * @return 分页后的机构列表
      */
     @Override
-    public IPage<OrgVO> listOrg(Integer pageNum, Integer pageSize, String orgName, Integer orgType, Long areaId, Integer status) {
+    public IPage<OrgVO> listOrg(Integer pageNum, Integer pageSize, String orgName, String orgType, Long areaId, Integer status) {
         log.info("分页查询机构列表，pageNum={}, pageSize={}, orgName={}, orgType={}, areaId={}, status={}",
                 pageNum, pageSize, orgName, orgType, areaId, status);
         try {
@@ -67,7 +68,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             // 构建查询条件
             LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.like(StrUtil.isNotBlank(orgName), OrgEntity::getOrgName, orgName)
-                    .eq(Objects.nonNull(orgType), OrgEntity::getOrgType, orgType)
+                    .eq(StrUtil.isNotBlank(orgType), OrgEntity::getOrgType, orgType)
                     .eq(Objects.nonNull(areaId), OrgEntity::getAreaId, areaId)
                     .eq(Objects.nonNull(status), OrgEntity::getStatus, status)
                     .orderByDesc(OrgEntity::getCreateTime);
@@ -131,7 +132,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             }
             // 生成机构编码
             String prefix = getOrgPrefixByType(dto.getOrgType());
-            String orgCode = codeGeneratorService.generateWithCustomPrefix("ORG_NO", prefix);
+            String orgCode = codeGeneratorService.generateWithCustomPrefix(CodeRuleConstants.ORG_NO, prefix);
             // DTO转换为实体对象
             OrgEntity entity = OrgConvert.toEntity(dto);
             entity.setOrgCode(orgCode);
@@ -258,9 +259,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
         if (vo == null) {
             return null;
         }
-        // 填充机构类型名称
+        // 填充机构类型名称（基于 dictCode 关联）
         if (vo.getOrgType() != null) {
-            vo.setOrgTypeName(getDictNameByTypeAndValue(DictCodeConstants.ORG_TYPE, vo.getOrgType()));
+            DictVO dict = dictService.getByDictCode(vo.getOrgType());
+            vo.setOrgTypeName(dict != null ? dict.getDictName() : null);
         }
         // 填充状态名称
         if (vo.getStatus() != null) {
@@ -268,48 +270,37 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
         }
         // 填充医院等级名称
         if (vo.getHospitalLevel() != null) {
-            vo.setHospitalLevelName(getDictNameByTypeAndValue(DictCodeConstants.HOSPITAL_LEVEL, vo.getHospitalLevel()));
+            DictVO dict = dictService.getByDictCode(vo.getHospitalLevel());
+            vo.setHospitalLevelName(dict != null ? dict.getDictName() : null);
         }
         // 填充医院类型名称
         if (vo.getHospitalType() != null) {
-            vo.setHospitalTypeName(getDictNameByTypeAndValue(DictCodeConstants.HOSPITAL_TYPE, vo.getHospitalType()));
+            DictVO dict = dictService.getByDictCode(vo.getHospitalType());
+            vo.setHospitalTypeName(dict != null ? dict.getDictName() : null);
         }
         // 填充代理产品线名称
         if (StrUtil.isNotBlank(vo.getAgentProductLine())) {
-            vo.setAgentProductLineNames(getDictNamesByTypeAndValues(DictCodeConstants.AGENT_PRODUCT_LINE, vo.getAgentProductLine()));
+            vo.setAgentProductLineNames(getDictNamesByDictCodes(vo.getAgentProductLine()));
         }
         return vo;
     }
 
     /**
-     * 根据字典类型和值获取字典名称
+     * 根据字典编码列表获取字典名称列表
      *
-     * @param dictCode  字典类型编码
-     * @param dictValue 字典值
-     * @return 字典名称
-     */
-    private String getDictNameByTypeAndValue(String dictCode, Integer dictValue) {
-        List<DictVO> dictList = dictService.listByTypeCode(dictCode);
-        return dictList.stream()
-                .filter(d -> Objects.equals(d.getDictValue(), String.valueOf(dictValue)))
-                .map(DictVO::getDictName)
-                .findFirst()
-                .orElse(null);
-    }
-
-    /**
-     * 根据字典类型和值列表获取字典名称列表
-     *
-     * @param dictCode   字典类型编码
-     * @param dictValues 字典值（逗号分隔）
+     * @param dictCodes 字典编码（逗号分隔）
      * @return 字典名称（逗号分隔）
      */
-    private String getDictNamesByTypeAndValues(String dictCode, String dictValues) {
-        List<DictVO> dictList = dictService.listByTypeCode(dictCode);
-        List<String> valueList = List.of(dictValues.split(","));
-        return dictList.stream()
-                .filter(d -> valueList.contains(d.getDictValue()))
-                .map(DictVO::getDictName)
+    private String getDictNamesByDictCodes(String dictCodes) {
+        if (StrUtil.isBlank(dictCodes)) {
+            return null;
+        }
+        return Arrays.stream(dictCodes.split(","))
+                .map(code -> {
+                    DictVO dict = dictService.getByDictCode(code.trim());
+                    return dict != null ? dict.getDictName() : null;
+                })
+                .filter(Objects::nonNull)
                 .collect(Collectors.joining(","));
     }
 
@@ -340,30 +331,28 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     /**
      * 校验机构类型是否有效
      *
-     * @param orgType 机构类型
+     * @param orgType 机构类型（字典编码）
      * @return true-有效，false-无效
      */
-    private boolean isOrgTypeValid(Integer orgType) {
+    private boolean isOrgTypeValid(String orgType) {
         if (orgType == null) {
             return false;
         }
-        List<DictVO> dictList = dictService.listByTypeCode(DictCodeConstants.ORG_TYPE);
-        return dictList.stream()
-                .anyMatch(d -> Objects.equals(d.getDictValue(), String.valueOf(orgType)));
+        return dictService.getByDictCode(orgType) != null;
     }
 
     /**
      * 根据机构类型获取编码前缀
      *
-     * @param orgType 机构类型
+     * @param orgType 机构类型（字典编码）
      * @return 编码前缀
      */
-    private String getOrgPrefixByType(Integer orgType) {
-        return switch (String.valueOf(orgType)) {
-            case "1" -> "ORG-P-";  // 生产企业
-            case "2" -> "ORG-D-";  // 经销商
-            case "3" -> "ORG-H-";  // 医疗机构
-            default -> "ORG-O-";   // 其他
+    private String getOrgPrefixByType(String orgType) {
+        return switch (orgType) {
+            case "1.1" -> "ORG-P-";  // 生产企业
+            case "1.2" -> "ORG-D-";  // 经销商
+            case "1.3" -> "ORG-H-";  // 医疗机构
+            default -> "ORG-O-";       // 其他
         };
     }
 
