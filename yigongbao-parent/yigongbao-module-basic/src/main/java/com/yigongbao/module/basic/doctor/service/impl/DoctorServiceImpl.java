@@ -22,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 
 import java.util.List;
@@ -113,7 +114,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             DoctorEntity entity = super.getById(id);
             if (entity == null) {
                 log.warn("医生不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DOCTOR_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             DoctorVO vo = DoctorConvert.toVO(entity);
             fillExtraFields(vo, entity);
@@ -132,7 +133,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void create(CreateDoctorDTO dto, Long creatorId) {
+    public void create(CreateDoctorDTO dto) {
         log.info("创建医生，doctorName={}, hospitalId={}", dto.getDoctorName(), dto.getHospitalId());
         try {
             // 校验医院是否存在
@@ -145,6 +146,8 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             }
 
             DoctorEntity entity = DoctorConvert.toEntity(dto);
+            // 从 Sa-Token 会话获取当前登录用户ID
+            Long creatorId = StpUtil.isLogin() ? StpUtil.getLoginIdAsLong() : null;
             entity.setCreatorId(creatorId);
             if (entity.getStatus() == null) {
                 entity.setStatus(StatusConstants.NORMAL);
@@ -174,7 +177,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             DoctorEntity entity = super.getById(id);
             if (entity == null) {
                 log.warn("医生不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DOCTOR_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
 
             // 校验科室是否存在
@@ -205,7 +208,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             DoctorEntity entity = super.getById(id);
             if (entity == null) {
                 log.warn("医生不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DOCTOR_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             removeById(id);
             log.info("删除医生成功，id={}", id);
@@ -249,7 +252,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public DoctorVO quickAdd(QuickAddDoctorDTO dto, Long creatorId) {
+    public DoctorVO quickAdd(QuickAddDoctorDTO dto) {
         log.info("快速添加医生，doctorName={}, hospitalId={}", dto.getDoctorName(), dto.getHospitalId());
         try {
             // 校验医院是否存在
@@ -257,11 +260,13 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
                 hospitalService.getById(dto.getHospitalId());
             }
 
+            // 从 Sa-Token 会话获取当前登录用户ID
+            Long creatorId = StpUtil.isLogin() ? StpUtil.getLoginIdAsLong() : null;
             // 查询是否已存在同名医生
             LambdaQueryWrapper<DoctorEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(DoctorEntity::getDoctorName, dto.getDoctorName())
                     .eq(DoctorEntity::getHospitalId, dto.getHospitalId())
-                    .eq(DoctorEntity::getCreatorId, creatorId);
+                    .eq(creatorId != null, DoctorEntity::getCreatorId, creatorId);
             DoctorEntity existing = getOne(wrapper);
             if (existing != null) {
                 log.info("医生已存在，返回现有医生，id={}", existing.getId());
@@ -305,7 +310,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             DoctorEntity entity = super.getById(id);
             if (entity == null) {
                 log.warn("医生不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DOCTOR_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             entity.setStatus(status);
             updateById(entity);

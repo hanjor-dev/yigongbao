@@ -36,7 +36,7 @@ public interface DoctorService extends IService<DoctorEntity> {
     /**
      * 创建医生
      */
-    void create(CreateDoctorDTO dto, Long creatorId);
+    void create(CreateDoctorDTO dto);
 
     /**
      * 更新医生
@@ -57,7 +57,7 @@ public interface DoctorService extends IService<DoctorEntity> {
      * 快速添加医生
      * 如果医生已存在则返回现有医生，否则创建新医生记录
      */
-    DoctorVO quickAdd(QuickAddDoctorDTO dto, Long creatorId);
+    DoctorVO quickAdd(QuickAddDoctorDTO dto);
 
     /**
      * 修改状态

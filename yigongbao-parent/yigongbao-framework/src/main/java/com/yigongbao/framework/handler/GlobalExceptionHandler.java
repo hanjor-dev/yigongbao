@@ -7,6 +7,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -151,6 +152,20 @@ public class GlobalExceptionHandler {
     public Result<Void> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e) {
         log.warn("参数类型不匹配：{}", e.getName());
         return Result.error(400, "参数类型错误：" + e.getName());
+    }
+
+    /**
+     * 处理 JSON 解析异常（请求体格式错误）
+     * 当请求体 JSON 格式不正确时触发，如缺少逗号、引号不匹配等
+     *
+     * @param e JSON 解析异常实例
+     * @return 统一返回结果
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
+        log.warn("参数格式错误：{}", e.getMessage());
+        return Result.error(400, "参数错误，请检查参数格式");
     }
 
     /**

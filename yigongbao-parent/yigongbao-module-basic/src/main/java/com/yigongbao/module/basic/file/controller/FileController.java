@@ -7,7 +7,10 @@ import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,12 +28,15 @@ import java.util.List;
 @RestController
 @RequestMapping("/basic/file")
 @RequiredArgsConstructor
+@Validated
 public class FileController {
 
     private final FileService fileService;
 
     /**
      * 上传文件（不关联业务）
+     *
+     * @param bizType 业务类型（字典 dict_code，如 10.1、10.4），通过 GET /system/select/biz-type-list 获取可选值
      */
     @Operation(summary = "上传文件（不关联业务）")
     @OperationLog(
@@ -41,12 +47,15 @@ public class FileController {
     @PostMapping("/upload")
     public Result<FileVO> upload(
             @RequestParam("file") MultipartFile file,
-            @RequestParam String bizType) {
+            @RequestParam @NotBlank(message = "业务类型不能为空") String bizType) {
         return Result.success(fileService.uploadFile(file, bizType));
     }
 
     /**
      * 上传并关联业务
+     *
+     * @param bizType 业务类型（字典 dict_code，如 10.1、10.4）
+     * @param bizId 业务ID
      */
     @Operation(summary = "上传并关联业务")
     @OperationLog(
@@ -57,13 +66,16 @@ public class FileController {
     @PostMapping("/upload-and-link")
     public Result<FileVO> uploadAndLink(
             @RequestParam("file") MultipartFile file,
-            @RequestParam String bizType,
-            @RequestParam Long bizId) {
+            @RequestParam @NotBlank(message = "业务类型不能为空") String bizType,
+            @RequestParam @NotNull(message = "业务ID不能为空") Long bizId) {
         return Result.success(fileService.uploadAndLink(file, bizType, bizId));
     }
 
     /**
      * 批量上传
+     *
+     * @param bizType 业务类型（字典 dict_code）
+     * @param bizId 业务ID
      */
     @Operation(summary = "批量上传")
     @OperationLog(
@@ -74,13 +86,16 @@ public class FileController {
     @PostMapping("/upload-multiple")
     public Result<List<FileVO>> uploadMultiple(
             @RequestParam("files") MultipartFile[] files,
-            @RequestParam String bizType,
-            @RequestParam Long bizId) {
+            @RequestParam @NotBlank(message = "业务类型不能为空") String bizType,
+            @RequestParam @NotNull(message = "业务ID不能为空") Long bizId) {
         return Result.success(fileService.uploadMultiple(files, bizType, bizId));
     }
 
     /**
      * 查询文件列表
+     *
+     * @param bizType 业务类型（字典 dict_code）
+     * @param bizId 业务ID
      */
     @Operation(summary = "查询文件列表")
     @GetMapping("/list/{bizType}/{bizId}")

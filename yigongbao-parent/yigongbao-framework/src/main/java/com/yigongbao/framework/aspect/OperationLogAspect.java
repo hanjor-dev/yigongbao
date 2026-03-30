@@ -18,7 +18,6 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.lang.reflect.Method;
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -222,6 +221,10 @@ public class OperationLogAspect {
         if (ip != null && ip.contains(",")) {
             ip = ip.split(",")[0].trim();
         }
+        // IPv6 本地回环地址映射为 IPv4 格式（本地开发环境）
+        if ("0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) {
+            ip = "127.0.0.1";
+        }
         return ip;
     }
 
@@ -234,7 +237,7 @@ public class OperationLogAspect {
     }
 
     /**
-     * 获取用户名（从 SaToken 会话中获取）
+     * 获取用户名（从 Sa-Token 会话中获取，为空则返回"用户-id"）
      */
     private String getUsername(Long userId) {
         try {
@@ -246,7 +249,7 @@ public class OperationLogAspect {
     }
 
     /**
-     * 获取真实姓名
+     * 获取真实姓名（从 Sa-Token 会话中获取，为空则返回"用户-id"）
      */
     private String getRealName(Long userId) {
         try {

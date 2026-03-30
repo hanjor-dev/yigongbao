@@ -25,7 +25,7 @@ public class FileVO implements Serializable {
     private String id;
 
     /**
-     * 业务类型（如：registration_cert、doctor_cert）
+     * 业务类型（字典 dict_code，如 10.1、10.4），与 file_detail.object_type 对应
      */
     private String bizType;
 
@@ -45,7 +45,7 @@ public class FileVO implements Serializable {
     private String filePath;
 
     /**
-     * 访问URL
+     * 公开访问URL（无需登录即可访问，路径前缀为 /api/files/public/）
      */
     private String fileUrl;
 

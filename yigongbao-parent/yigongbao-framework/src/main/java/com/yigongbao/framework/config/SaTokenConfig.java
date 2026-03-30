@@ -1,15 +1,24 @@
 package com.yigongbao.framework.config;
 
+import cn.dev33.satoken.filter.SaServletFilter;
 import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.stp.StpUtil;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * Sa-Token 配置类
  * 配置认证拦截器，实现接口权限认证
+ * <p>
+ * 说明：
+ * Sa-Token 有两套认证机制：Servlet Filter 和 Spring MVC Interceptor
+ * - SaServletFilter：Servlet 过滤器，在请求进入 Spring MVC 之前拦截（@Order(-100)，最高优先级）
+ * - SaInterceptor：Spring MVC 拦截器，在 Controller 层面拦截
+ * 两套机制独立工作，必须同时配置排除路径，否则 Servlet Filter 会在 Interceptor 之前拦截请求
  *
  * @author hanjor
  * @date 2026-03-14 15:00:00
@@ -51,7 +60,9 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 "/swagger-ui/**",
                 "/swagger-ui.html",
                 "/v3/api-docs/**",
-                "/webjars/**"
+                "/webjars/**",
+                // 文件访问接口（静态资源，无需登录）
+                "/files/public/**"
         );
     }
 }

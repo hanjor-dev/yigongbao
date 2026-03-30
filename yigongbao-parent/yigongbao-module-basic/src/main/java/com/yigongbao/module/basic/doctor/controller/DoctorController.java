@@ -81,9 +81,8 @@ public class DoctorController {
             operation = "创建医生"
     )
     @PostMapping
-    public Result<Void> create(@Validated @RequestBody CreateDoctorDTO dto,
-            @RequestHeader(value = "X-User-Id", required = false) Long creatorId) {
-        doctorService.create(dto, creatorId);
+    public Result<Void> create(@Validated @RequestBody CreateDoctorDTO dto) {
+        doctorService.create(dto);
         return Result.success();
     }
 
@@ -156,8 +155,7 @@ public class DoctorController {
             operation = "快速添加医生"
     )
     @PostMapping("/quick-add")
-    public Result<DoctorVO> quickAdd(@Validated @RequestBody QuickAddDoctorDTO dto,
-            @RequestHeader(value = "X-User-Id", required = false) Long creatorId) {
-        return Result.success(doctorService.quickAdd(dto, creatorId));
+    public Result<DoctorVO> quickAdd(@Validated @RequestBody QuickAddDoctorDTO dto) {
+        return Result.success(doctorService.quickAdd(dto));
     }
 }

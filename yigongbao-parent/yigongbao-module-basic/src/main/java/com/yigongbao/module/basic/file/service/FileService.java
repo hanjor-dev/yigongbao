@@ -20,7 +20,7 @@ public interface FileService {
      * 上传文件（不关联业务）
      *
      * @param file 上传的文件
-     * @param bizType 业务类型（如：registration_cert、doctor_cert）
+     * @param bizType 业务类型（字典 dict_code，如：10.1、10.4）
      * @return 文件信息
      */
     FileVO uploadFile(MultipartFile file, String bizType);
@@ -29,7 +29,7 @@ public interface FileService {
      * 上传并关联业务
      *
      * @param file 上传的文件
-     * @param bizType 业务类型
+     * @param bizType 业务类型（字典 dict_code）
      * @param bizId 业务ID
      * @return 文件信息
      */
@@ -39,7 +39,7 @@ public interface FileService {
      * 批量上传
      *
      * @param files 文件列表
-     * @param bizType 业务类型
+     * @param bizType 业务类型（字典 dict_code）
      * @param bizId 业务ID
      * @return 文件列表
      */
@@ -56,7 +56,7 @@ public interface FileService {
     /**
      * 查询业务关联文件列表
      *
-     * @param bizType 业务类型
+     * @param bizType 业务类型（字典 dict_code）
      * @param bizId 业务ID
      * @return 文件列表
      */

@@ -99,4 +99,12 @@ public interface DictService extends IService<DictEntity> {
      * @param status 状态（0=禁用，1=正常）
      */
     void updateStatus(Long id, Integer status);
+
+    /**
+     * 获取文件业务类型下拉列表
+     * 查询字典 parentId=50 的所有子节点（status=1），用于前端文件上传 bizType 下拉选择
+     *
+     * @return 文件业务类型列表（dictName=name, dictCode=value）
+     */
+    List<DictVO> listFileBizTypeOptions();
 }

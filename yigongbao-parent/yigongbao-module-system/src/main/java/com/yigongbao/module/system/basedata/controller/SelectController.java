@@ -1,5 +1,7 @@
 package com.yigongbao.module.system.basedata.controller;
 
+import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -86,12 +88,12 @@ public class SelectController {
         } else if ("dict".equals(type)) {
             // 字典树形结构
             if (!StrUtil.isNotBlank(code)) {
-                return Result.error(400, "字典查询需要提供code参数");
+                throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "code");
             }
             List<DictVO> dictTree = dictService.listTreeByTypeCode(code);
             return Result.success(convertDictToSelectTree(dictTree));
         }
-        return Result.error(400, "不支持的数据类型：" + type);
+        throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "不支持的数据类型：" + type);
     }
 
     /**
@@ -126,7 +128,7 @@ public class SelectController {
         } else if ("dict".equals(type)) {
             // 字典下拉选项（叶子节点）
             if (!StrUtil.isNotBlank(code)) {
-                return Result.error(400, "字典查询需要提供code参数");
+                throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "code");
             }
             List<DictVO> dictOptions = dictService.listOptions(code);
             return Result.success(convertDictToSelectTree(dictOptions));
@@ -135,7 +137,21 @@ public class SelectController {
             List<SelectTreeVO> configGroups = configService.listConfigGroups();
             return Result.success(configGroups);
         }
-        return Result.error(400, "不支持的数据类型：" + type);
+        throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "不支持的数据类型：" + type);
+    }
+
+    /**
+     * 获取文件业务类型下拉列表
+     * <p>
+     * 返回所有启用的文件业务类型，供前端文件上传时 bizType 下拉选择
+     *
+     * @return 文件业务类型列表（name=字典名称, value=dictCode）
+     */
+    @Operation(summary = "获取文件业务类型下拉列表")
+    @GetMapping("/biz-type-list")
+    public Result<List<SelectTreeVO>> listBizTypes() {
+        List<DictVO> bizTypes = dictService.listFileBizTypeOptions();
+        return Result.success(convertDictToSelectTree(bizTypes));
     }
 
     /**

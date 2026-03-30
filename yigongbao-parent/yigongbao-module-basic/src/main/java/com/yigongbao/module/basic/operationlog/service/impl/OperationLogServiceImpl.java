@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.OperationTypeEnum;
+import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.service.OperationLogService;
 import com.yigongbao.module.basic.operationlog.convert.OperationLogConvert;
 import com.yigongbao.module.basic.operationlog.dto.OperationLogQueryDTO;
@@ -27,6 +28,25 @@ import java.util.List;
 
 /**
  * 操作日志 Service 实现类
+ * <p>
+ * 【架构设计说明】
+ * 本类实现了两个 Service 接口：
+ * <ul>
+ *   <li>basic.operationlog.service.OperationLogService：提供业务查询（pageLogs、exportLogs）
+ *       和 CRUD 操作，面向 Controller 层调用</li>
+ *   <li>common.service.OperationLogService：提供 AOP 切面回调方法（saveLog），
+ *       面向 OperationLogAspect 框架层调用</li>
+ * </ul>
+ * <p>
+ * 这种设计的 trade-off：
+ * - 优点：common 层通过接口依赖解耦了 basic 模块，framework 层不需要直接依赖 basic 模块；
+ *         避免了循环依赖（basic → common → framework，而 framework 的 AOP 需要调用日志保存）
+ * - 缺点：违反"一个类实现一个接口"的单一职责原则，业务层查询逻辑和框架层回调逻辑混杂
+ * <p>
+ * 替代方案（未来重构参考）：
+ * - 方案1：将 saveLog 拆分为 BasicOperationLogServiceImpl（basic 模块），提供 AOP 回调；
+ *          新建 CommonOperationLogServiceImpl（common 模块），通过 Spring 代理委托给 basic 实现
+ * - 方案2：将 OperationLogAspect 移入 basic 模块，消除 framework 层对日志保存的依赖
  *
  * @author hanjor
  * @date 2026-03-24
@@ -201,7 +221,9 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
                 row.createCell(5).setCellValue(entity.getRequestUrl());
                 row.createCell(6).setCellValue(entity.getRequestParams());
                 row.createCell(7).setCellValue(entity.getIp());
-                row.createCell(8).setCellValue(entity.getRealName());
+                row.createCell(8).setCellValue(
+                        cn.hutool.core.util.StrUtil.isNotBlank(entity.getRealName())
+                                ? entity.getRealName() : entity.getUsername());
                 row.createCell(9).setCellValue(entity.getStatus() != null
                         ? StatusConstants.getOperationResultName(entity.getStatus()) : "");
                 row.createCell(10).setCellValue(entity.getDuration() != null ? entity.getDuration() : 0);
@@ -222,7 +244,7 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
             log.info("导出操作日志成功，共{}条", list.size());
         } catch (IOException e) {
             log.error("导出操作日志异常", e);
-            throw new RuntimeException("导出操作日志失败", e);
+            throw new BusinessException(ErrorCodeEnum.LOG_EXPORT_FAILED);
         }
     }
 }

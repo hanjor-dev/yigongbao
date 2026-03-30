@@ -491,3 +491,58 @@ INSERT INTO rebuild_project (id, body_part_id, parent_id, name, code, level, sta
 -- 胫腓骨重建
 (18, 24, 0, '胫骨骨折复位导板', 'RP-LOWER-TIBIA-001', 1, 12000.00, 18000.00, '导板', 18.0, 15, 1),
 (19, 24, 0, '胫骨平台骨折复位导板', 'RP-LOWER-TIBIA-002', 1, 15000.00, 22500.00, '导板', 24.0, 16, 1);
+
+
+-- ============================================================
+-- 文件业务类型字典数据初始化（sys_dict）
+-- dict_code 层级编码用于存储到 file_detail.object_type 字段
+-- dict_value 即枚举 BizTypeEnum.dictCode 的值
+-- ============================================================
+
+-- 文件业务类型（父节点，dict_code=10）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
+VALUES (50, 0, '10', '文件业务类型', NULL, 1, 10, 1);
+
+-- 文件业务类型（子节点：影像资料）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+(51, 50, '10.1', '影像数据',       '10.1', 2, 1, 1),
+(52, 50, '10.2', '影像报告',       '10.2', 2, 2, 1),
+(53, 50, '10.3', '订单其他附件',   '10.3', 2, 3, 1);
+
+-- 文件业务类型（子节点：设计文件）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+(54, 50, '10.4', '打印文件包',     '10.4', 2, 4, 1),
+(55, 50, '10.5', '设计报告',       '10.5', 2, 5, 1),
+(56, 50, '10.6', '可视化模型',     '10.6', 2, 6, 1),
+(57, 50, '10.7', '图纸文件',       '10.7', 2, 7, 1),
+(58, 50, '10.8', '指令单文件',     '10.8', 2, 8, 1);
+
+-- 文件业务类型（子节点：电子签名）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+(59, 50, '10.9', '签名图片',       '10.9', 2, 9, 1);
+
+-- 文件业务类型（子节点：医生相关）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+(60, 50, '10.10', '医生资质证明',  '10.10', 2, 10, 1),
+(61, 50, '10.11', '医生头像',       '10.11', 2, 11, 1);
+
+-- 文件业务类型（子节点：医院/机构相关）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+(62, 50, '10.12', '医院资质文件',  '10.12', 2, 12, 1),
+(63, 50, '10.13', '医院图片',       '10.13', 2, 13, 1);
+
+-- 文件业务类型（子节点：产品相关）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+(64, 50, '10.14', '产品图片',       '10.14', 2, 14, 1);
+
+-- 文件业务类型（子节点：注册证相关）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+(65, 50, '10.15', '注册证扫描件',  '10.15', 2, 15, 1);
+
+-- 文件业务类型（子节点：模板相关）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+(66, 50, '10.16', '模板附件',       '10.16', 2, 16, 1);
+
+-- 文件业务类型（子节点：通用）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+(67, 50, '10.17', '通用文件',       '10.17', 2, 17, 1);

@@ -576,6 +576,36 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
     }
 
     /**
+     * 获取文件业务类型下拉列表
+     * 查询字典 parentId=50 的所有子节点（status=1），用于前端文件上传 bizType 下拉选择
+     *
+     * @return 文件业务类型列表（dictName=name, dictCode=value）
+     */
+    @Override
+    public List<DictVO> listFileBizTypeOptions() {
+        log.info("查询文件业务类型下拉列表");
+        try {
+            // 查找文件业务类型根节点（id=50）
+            DictEntity bizTypeRoot = super.getById(50L);
+            if (bizTypeRoot == null || bizTypeRoot.getIsDeleted() == StatusConstants.DELETED) {
+                log.warn("文件业务类型字典根节点不存在");
+                return List.of();
+            }
+            // 查询所有子节点（status=1），按 sort 排序
+            List<DictEntity> list = list(new LambdaQueryWrapper<DictEntity>()
+                    .eq(DictEntity::getParentId, bizTypeRoot.getId())
+                    .eq(DictEntity::getStatus, StatusConstants.NORMAL)
+                    .orderByAsc(DictEntity::getSort)
+                    .orderByAsc(DictEntity::getId));
+            log.info("查询文件业务类型下拉列表成功，数量={}", list.size());
+            return DictConvert.toVOList(list);
+        } catch (Exception e) {
+            log.error("查询文件业务类型下拉列表异常", e);
+            throw e;
+        }
+    }
+
+    /**
      * 递归获取所有子节点ID
      *
      * @param parentId 父节点ID

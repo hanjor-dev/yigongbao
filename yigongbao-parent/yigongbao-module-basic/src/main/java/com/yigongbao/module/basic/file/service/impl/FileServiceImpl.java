@@ -1,6 +1,7 @@
 package com.yigongbao.module.basic.file.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.file.config.FileStorageProperties;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.x.file.storage.core.FileInfo;
 import org.dromara.x.file.storage.core.FileStorageService;
+import org.dromara.x.file.storage.core.Downloader;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -118,18 +120,28 @@ public class FileServiceImpl implements FileService {
                 throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
             }
             FileInfo fileInfo = fileRecorderService.getById(id);
-            byte[] bytes = fileStorageService.download(fileInfo).bytes();
+            // 设置响应头
             response.setContentType("application/octet-stream");
             response.setHeader("Content-Disposition",
                     "attachment;filename=" + URLEncoder.encode(
                             detail.getOriginalFilename(), StandardCharsets.UTF_8));
-            response.getOutputStream().write(bytes);
-            response.getOutputStream().flush();
+            // 使用框架的 outputStream 方法直接将文件写入响应流
+            Downloader downloader = fileStorageService.download(fileInfo);
+            downloader.setProgressMonitor((progressSize, allSize) ->
+                    log.debug("文件下载进度，id={}, progress={}/{}",
+                            id, progressSize, allSize));
+            downloader.outputStream(response.getOutputStream());
             log.info("下载文件成功，id={}", id);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             log.error("下载文件异常，id={}", id, e);
+            // 区分文件不存在异常
+            String msg = e.getMessage();
+            if (msg != null && (msg.contains("not exist") || msg.contains("不存在")
+                    || msg.contains("No such") || msg.contains("404"))) {
+                throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
+            }
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
     }
@@ -143,10 +155,9 @@ public class FileServiceImpl implements FileService {
                 log.warn("文件不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
             }
-            // 先删存储平台文件
-            fileStorageService.delete(detail.getUrl());
-            // 再删数据库记录
+            // 先删数据库记录（可回滚），再删存储平台文件
             fileRecorderService.removeById(id);
+            fileStorageService.delete(detail.getUrl());
             log.info("删除文件成功，id={}", id);
         } catch (BusinessException e) {
             throw e;
@@ -158,18 +169,29 @@ public class FileServiceImpl implements FileService {
 
     /**
      * 上传核心逻辑
+     *
+     * @param bizType 业务类型（字典 dict_code，如：10.1）
      */
     private FileVO doUpload(MultipartFile file, String bizType, Long bizId) {
         log.info("上传文件，bizType={}, bizId={}, fileName={}",
                 bizType, bizId, file.getOriginalFilename());
         try {
             validateFile(file);
+            // 校验 bizType 是否为合法的字典编码
+            FileBizTypeEnum fileBizTypeEnum = FileBizTypeEnum.getByDictCode(bizType);
+            if (fileBizTypeEnum == null) {
+                log.warn("业务类型不合法，bizType={}", bizType);
+                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "bizType");
+            }
             String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-            String path = bizType + "/" + datePath + "/";
+            // 存储路径使用枚举 code（如 image_data）
+            String storagePath = fileBizTypeEnum.getCode() + "/" + datePath + "/";
+            // 数据库 object_type 字段存储 dict_code（如 10.1）
+            String objectType = fileBizTypeEnum.getDictCode();
             // 框架上传，上传成功后自动调用 FileRecorderService.save(FileInfo)
             FileInfo fileInfo = fileStorageService.of(file)
-                    .setPath(path)
-                    .setObjectType(bizType)
+                    .setPath(storagePath)
+                    .setObjectType(objectType)
                     .setObjectId(bizId != null ? bizId.toString() : null)
                     .upload();
             log.info("上传文件成功，id={}, url={}", fileInfo.getId(), fileInfo.getUrl());
@@ -185,7 +207,7 @@ public class FileServiceImpl implements FileService {
     }
 
     /**
-     * 校验文件大小和扩展名
+     * 校验文件大小、扩展名和文件名安全性
      */
     private void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -199,6 +221,11 @@ public class FileServiceImpl implements FileService {
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null) {
             throw new BusinessException(ErrorCodeEnum.ATTACHMENT_TYPE_NOT_ALLOWED);
+        }
+        // 校验文件名安全性，过滤路径遍历等非法字符
+        if (!isValidFilename(originalFilename)) {
+            log.warn("文件名包含非法字符，fileName={}", originalFilename);
+            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_FILENAME_ILLEGAL);
         }
         String ext = getFileExt(originalFilename).toLowerCase();
         boolean allowed = Arrays.stream(fileStorageProperties.getAllowedExtensions())
@@ -214,5 +241,31 @@ public class FileServiceImpl implements FileService {
             return "";
         }
         return filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
+    }
+
+    /**
+     * 校验文件名是否安全，过滤路径遍历等危险字符
+     */
+    private boolean isValidFilename(String filename) {
+        if (filename == null || filename.isEmpty()) {
+            return false;
+        }
+        // 禁止路径遍历字符
+        if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            return false;
+        }
+        // 禁止 Windows 非法字符
+        if (filename.contains("<") || filename.contains(">") || filename.contains(":")
+                || filename.contains("\"") || filename.contains("|") || filename.contains("?")
+                || filename.contains("*")) {
+            return false;
+        }
+        // 禁止控制字符
+        for (char c : filename.toCharArray()) {
+            if (c < 0x20 || c == 0x7F) {
+                return false;
+            }
+        }
+        return true;
     }
 }

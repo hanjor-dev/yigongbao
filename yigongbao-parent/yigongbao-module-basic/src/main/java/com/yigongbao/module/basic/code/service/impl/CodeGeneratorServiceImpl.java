@@ -31,15 +31,19 @@ import java.time.LocalDateTime;
 @Slf4j
 public class CodeGeneratorServiceImpl implements CodeGeneratorService {
 
+    private static final int MAX_RETRY_COUNT = 3;
+
     private final CodeRuleMapper codeRuleMapper;
     private final CodeSequenceMapper codeSequenceMapper;
 
     /**
-     * 生成编码
+     * 生成编码（内部方法，支持重试）
+     *
+     * @param ruleCode 规则编码
+     * @param retryCount 当前重试次数
+     * @return 生成的编码
      */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public String generate(String ruleCode) {
+    private String generateInternal(String ruleCode, int retryCount) {
         log.info("生成编码，ruleCode={}", ruleCode);
         try {
             // 1. 获取规则配置
@@ -48,7 +52,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
                 log.warn("编码规则不存在，ruleCode={}", ruleCode);
                 throw new BusinessException(ErrorCodeEnum.CODE_RULE_NOT_FOUND);
             }
-            if (rule.getStatus() != null && rule.getStatus().equals(StatusConstants.DISABLED)) {
+            if (Integer.valueOf(StatusConstants.DISABLED).equals(rule.getStatus())) {
                 log.warn("编码规则已禁用，ruleCode={}", ruleCode);
                 throw new BusinessException(ErrorCodeEnum.CODE_RULE_DISABLED);
             }
@@ -70,8 +74,12 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
                     .set(CodeSequenceEntity::getVersion, currentVersion + 1);
             int rows = codeSequenceMapper.update(null, updateWrapper);
             if (rows == 0) {
-                log.warn("编码序号更新冲突，重试生成，ruleCode={}", ruleCode);
-                return generate(ruleCode);
+                log.warn("编码序号更新冲突，尝试重新生成，ruleCode={}, retryCount={}", ruleCode, retryCount);
+                if (retryCount >= MAX_RETRY_COUNT) {
+                    log.error("编码序号重试次数超限，ruleCode={}, maxRetries={}", ruleCode, MAX_RETRY_COUNT);
+                    throw new BusinessException(ErrorCodeEnum.CODE_GENERATE_FAILED);
+                }
+                return generateInternal(ruleCode, retryCount + 1);
             }
 
             // 5. 组装编码
@@ -85,6 +93,118 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             log.error("生成编码异常，ruleCode={}", ruleCode, e);
             throw new BusinessException(ErrorCodeEnum.CODE_GENERATE_FAILED);
         }
+    }
+
+    /**
+     * 生成带序号后缀的编码（内部方法，支持重试）
+     *
+     * @param ruleCode 规则编码
+     * @param bizKey 业务标识（如订单编号，用于隔离序号池）
+     * @param retryCount 当前重试次数
+     * @return 生成的编码
+     */
+    private String generateWithSeqSuffixInternal(String ruleCode, String bizKey, int retryCount) {
+        log.info("生成带序号后缀的编码，ruleCode={}, bizKey={}", ruleCode, bizKey);
+        try {
+            // 1. 获取规则配置
+            CodeRuleEntity rule = codeRuleMapper.selectByRuleCode(ruleCode);
+            if (rule == null) {
+                log.warn("编码规则不存在，ruleCode={}", ruleCode);
+                throw new BusinessException(ErrorCodeEnum.CODE_RULE_NOT_FOUND);
+            }
+            if (Integer.valueOf(StatusConstants.DISABLED).equals(rule.getStatus())) {
+                log.warn("编码规则已禁用，ruleCode={}", ruleCode);
+                throw new BusinessException(ErrorCodeEnum.CODE_RULE_DISABLED);
+            }
+
+            // 2. 获取或创建序号记录（按 bizKey 隔离）
+            CodeSequenceEntity sequence = getOrCreateSequenceWithBizKey(ruleCode, bizKey);
+
+            // 3. 检查是否需要重置
+            checkAndReset(rule, sequence);
+
+            // 4. 递增序号（使用乐观锁版本控制，并发更新时重试）
+            long newSeq = sequence.getCurrentSeq() + (rule.getStep() != null ? rule.getStep() : 1);
+            int currentVersion = sequence.getVersion();
+            // 使用 LambdaUpdateWrapper 替代 updateById，避免 MyBatis-Plus OptimisticLockerInterceptor 参数注入问题
+            LambdaUpdateWrapper<CodeSequenceEntity> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(CodeSequenceEntity::getId, sequence.getId())
+                    .eq(CodeSequenceEntity::getVersion, currentVersion)
+                    .set(CodeSequenceEntity::getCurrentSeq, newSeq)
+                    .set(CodeSequenceEntity::getVersion, currentVersion + 1);
+            int rows = codeSequenceMapper.update(null, updateWrapper);
+            if (rows == 0) {
+                log.warn("编码序号更新冲突，尝试重新生成，ruleCode={}, bizKey={}, retryCount={}", ruleCode, bizKey, retryCount);
+                if (retryCount >= MAX_RETRY_COUNT) {
+                    log.error("编码序号重试次数超限，ruleCode={}, bizKey={}, maxRetries={}", ruleCode, bizKey, MAX_RETRY_COUNT);
+                    throw new BusinessException(ErrorCodeEnum.CODE_GENERATE_FAILED);
+                }
+                return generateWithSeqSuffixInternal(ruleCode, bizKey, retryCount + 1);
+            }
+
+            // 5. 组装编码：业务前缀 + "-" + 序号（序号不带补零）
+            String result = bizKey + "-" + newSeq;
+            log.info("生成带序号后缀的编码成功，ruleCode={}, bizKey={}, result={}", ruleCode, bizKey, result);
+            return result;
+
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("生成带序号后缀的编码异常，ruleCode={}, bizKey={}", ruleCode, bizKey, e);
+            throw new BusinessException(ErrorCodeEnum.CODE_GENERATE_FAILED);
+        }
+    }
+
+    /**
+     * 生成编码
+     * 将内部技术性异常（编码规则不存在/已禁用/生成失败）翻译为业务友好错误消息后抛出
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String generate(String ruleCode) {
+        try {
+            return generateInternal(ruleCode, 0);
+        } catch (BusinessException e) {
+            // 将内部技术性错误翻译为用户可理解的业务错误消息
+            throw translateToUserMessage(e, "业务编号", null);
+        }
+    }
+
+    /**
+     * 生成带序号后缀的编码
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String generateWithSeqSuffix(String ruleCode, String bizKey) {
+        try {
+            return generateWithSeqSuffixInternal(ruleCode, bizKey, 0);
+        } catch (BusinessException e) {
+            throw translateToUserMessage(e, "业务编号", bizKey);
+        }
+    }
+
+    /**
+     * 统一的业务友好错误消息转换
+     *
+     * @param e 内部抛出的业务异常
+     * @param businessName 业务对象名称（用于生成用户友好的错误消息）
+     * @param bizKey 业务标识（可选，用于日志上下文）
+     * @return 用户友好的业务异常
+     */
+    private BusinessException translateToUserMessage(BusinessException e, String businessName, String bizKey) {
+        int code = e.getCode();
+        String msg;
+        if (code == ErrorCodeEnum.CODE_RULE_NOT_FOUND.getCode()) {
+            msg = "系统编码配置异常，" + businessName + "生成失败，请联系管理员处理";
+        } else if (code == ErrorCodeEnum.CODE_RULE_DISABLED.getCode()) {
+            msg = "系统编码服务暂时不可用，" + businessName + "生成失败，请稍后重试";
+        } else if (code == ErrorCodeEnum.CODE_GENERATE_FAILED.getCode()) {
+            msg = businessName + "生成失败（系统繁忙），请稍后重试";
+        } else {
+            msg = e.getMessage();
+        }
+        log.debug("编码生成业务友好消息转换，原始code={} bizKey={} -> {}", code, bizKey, msg);
+        return new BusinessException(code, msg);
     }
 
     /**
@@ -130,65 +250,6 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     }
 
     /**
-     * 生成带序号后缀的编码
-     * 用于同一业务前缀下生成多个子编码，如数据包编码：202603250001-1、202603250001-2
-     * 每个 bizKey 有独立的序号池，互不影响
-     *
-     * @param ruleCode 规则编码
-     * @param bizKey 业务标识（如订单编号，用于隔离序号池）
-     * @return 带序号后缀的编码（如 202603250001-1）
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public String generateWithSeqSuffix(String ruleCode, String bizKey) {
-        log.info("生成带序号后缀的编码，ruleCode={}, bizKey={}", ruleCode, bizKey);
-        try {
-            // 1. 获取规则配置
-            CodeRuleEntity rule = codeRuleMapper.selectByRuleCode(ruleCode);
-            if (rule == null) {
-                log.warn("编码规则不存在，ruleCode={}", ruleCode);
-                throw new BusinessException(ErrorCodeEnum.CODE_RULE_NOT_FOUND);
-            }
-            if (rule.getStatus() != null && rule.getStatus().equals(StatusConstants.DISABLED)) {
-                log.warn("编码规则已禁用，ruleCode={}", ruleCode);
-                throw new BusinessException(ErrorCodeEnum.CODE_RULE_DISABLED);
-            }
-
-            // 2. 获取或创建序号记录（按 bizKey 隔离）
-            CodeSequenceEntity sequence = getOrCreateSequenceWithBizKey(ruleCode, bizKey);
-
-            // 3. 检查是否需要重置
-            checkAndReset(rule, sequence);
-
-            // 4. 递增序号（使用乐观锁版本控制，并发更新时重试）
-            long newSeq = sequence.getCurrentSeq() + (rule.getStep() != null ? rule.getStep() : 1);
-            int currentVersion = sequence.getVersion();
-            // 使用 LambdaUpdateWrapper 替代 updateById，避免 MyBatis-Plus OptimisticLockerInterceptor 参数注入问题
-            LambdaUpdateWrapper<CodeSequenceEntity> updateWrapper = new LambdaUpdateWrapper<>();
-            updateWrapper.eq(CodeSequenceEntity::getId, sequence.getId())
-                    .eq(CodeSequenceEntity::getVersion, currentVersion)
-                    .set(CodeSequenceEntity::getCurrentSeq, newSeq)
-                    .set(CodeSequenceEntity::getVersion, currentVersion + 1);
-            int rows = codeSequenceMapper.update(null, updateWrapper);
-            if (rows == 0) {
-                log.warn("编码序号更新冲突，重试生成，ruleCode={}, bizKey={}", ruleCode, bizKey);
-                return generateWithSeqSuffix(ruleCode, bizKey);
-            }
-
-            // 5. 组装编码：业务前缀 + "-" + 序号（序号不带补零）
-            String result = bizKey + "-" + newSeq;
-            log.info("生成带序号后缀的编码成功，ruleCode={}, bizKey={}, result={}", ruleCode, bizKey, result);
-            return result;
-
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("生成带序号后缀的编码异常，ruleCode={}, bizKey={}", ruleCode, bizKey, e);
-            throw new BusinessException(ErrorCodeEnum.CODE_GENERATE_FAILED);
-        }
-    }
-
-    /**
      * 预览编码格式
      *
      * @param ruleCode 规则编码
@@ -227,6 +288,10 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             sequence.setLastDate(LocalDate.now());
             sequence.setVersion(0);
             codeSequenceMapper.insert(sequence);
+            // 重新查询以确认 ID 已回写（解决并发插入场景下 ID 可能未回写的问题）
+            if (sequence.getId() == null) {
+                sequence = codeSequenceMapper.selectByRuleCode(ruleCode);
+            }
         }
         return sequence;
     }
@@ -248,6 +313,10 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             sequence.setLastDate(LocalDate.now());
             sequence.setVersion(0);
             codeSequenceMapper.insert(sequence);
+            // 重新查询以确认 ID 已回写（解决并发插入场景下 ID 可能未回写的问题）
+            if (sequence.getId() == null) {
+                sequence = codeSequenceMapper.selectByRuleCodeAndBizKey(ruleCode, bizKey);
+            }
         }
         return sequence;
     }

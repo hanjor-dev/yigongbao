@@ -91,19 +91,29 @@ sa-token:
   # 是否输出操作日志
   is-log: false
 
+
 # dromara x-file-storage 配置（文件存储框架）
 dromara:
   x-file-storage:
     # 默认存储平台
-    default-platform: local
-    # 本地存储
-    local:
-      # 文件访问基础路径（用于拼装 fileUrl）
-      domain: https://your-domain.com/api/files
-      # URL 路径匹配模式
-      path-patterns: /api/files/**
-      # 存储根路径
-      path: /data/yigongbao-files
+    default-platform: local-plus-1
+    #缩略图后缀
+    thumbnail-suffix: ".min.jpg"
+    # 本地存储（支持框架自动配置静态资源访问）
+    local-plus:
+      - platform: local-plus-1
+        # 启用本地存储
+        enable-storage: true
+        # 启用本地文件访问（生产环境建议使用 Nginx）
+        enable-access: true
+        # 文件访问基础路径（用于拼装 fileUrl）
+        domain: http://localhost:8080/api/files/public/
+        # 基础路径
+        base-path:
+        # URL 路径匹配模式（SaToken 中需放行此路径）
+        path-patterns: /files/public/**
+        # 存储根路径（映射到 URL /files/public/**）
+        storage-path: D:/yigongbao-files/
 
 # 医工宝系统配置
 yigongbao:

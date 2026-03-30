@@ -9,6 +9,8 @@ import com.yigongbao.module.system.dict.dto.CreateDictDTO;
 import com.yigongbao.module.system.dict.dto.UpdateDictDTO;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -169,7 +171,7 @@ public class DictController {
             operation = "修改字典状态"
     )
     @PutMapping("/{id}/status")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
+    public Result<Void> updateStatus(@PathVariable Long id, @RequestParam @Min(0) @Max(1) Integer status) {
         dictService.updateStatus(id, status);
         return Result.success();
     }

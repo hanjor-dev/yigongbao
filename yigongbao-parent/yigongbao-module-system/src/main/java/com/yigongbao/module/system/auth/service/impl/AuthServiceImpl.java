@@ -70,7 +70,7 @@ public class AuthServiceImpl implements AuthService {
             }
 
             // 校验用户状态
-            if (user.getStatus().equals(StatusConstants.DISABLED)) {
+            if (Integer.valueOf(StatusConstants.DISABLED).equals(user.getStatus())) {
                 log.warn("用户已禁用，username={}", dto.getUsername());
                 saveLoginLog(user.getId(), dto.getUsername(), ip, userAgent, 0, "用户已禁用");
                 throw new BusinessException(ErrorCodeEnum.USER_DISABLED);
@@ -96,6 +96,9 @@ public class AuthServiceImpl implements AuthService {
 
             // 执行登录（Sa-Token）
             StpUtil.login(user.getId());
+            // 将会话信息写入 Session，供操作日志等模块使用
+            StpUtil.getSession().set("username", user.getUsername());
+            StpUtil.getSession().set("realName", user.getRealName());
             String token = StpUtil.getTokenValue();
 
             // 记录登录成功日志

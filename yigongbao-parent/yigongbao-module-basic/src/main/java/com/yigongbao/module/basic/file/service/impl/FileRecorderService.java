@@ -78,12 +78,14 @@ public class FileRecorderService extends ServiceImpl<FileDetailMapper, FileDetai
             return;
         }
         FileDetail detail = toFileDetail(info);
+        if (detail.getId() == null) {
+            log.warn("更新文件记录失败，id 为空，url={}", detail.getUrl());
+            return;
+        }
         LambdaQueryWrapper<FileDetail> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(detail.getUrl() != null, FileDetail::getUrl, detail.getUrl())
-                .or()
-                .eq(detail.getId() != null, FileDetail::getId, detail.getId());
+        wrapper.eq(FileDetail::getId, detail.getId());
         update(detail, wrapper);
-        log.info("更新文件记录，id={}, url={}", detail.getId(), detail.getUrl());
+        log.info("更新文件记录，id={}", detail.getId());
     }
 
     /**

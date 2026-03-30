@@ -480,9 +480,11 @@ class UserControllerTest {
     }
 
     // ==================== changePassword 测试 ====================
+    // 注意：测试环境 satoken.interceptor.enable=false，以下测试验证的是接口参数处理逻辑
+    // 真实的认证拦截需要在生产环境或单独启用 SaToken 拦截器的集成测试中验证
 
     @Test
-    @DisplayName("changePassword: 修改密码成功")
+    @DisplayName("changePassword: 修改密码（测试环境 SaToken 禁用，验证参数处理）")
     void changePassword_shouldSuccess() throws Exception {
         mockMvc.perform(put("/system/user/1/change-password")
                         .param("oldPassword", "123456")
@@ -493,7 +495,7 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("changePassword: 旧密码错误")
+    @DisplayName("changePassword: 旧密码错误（测试环境 SaToken 禁用，验证业务逻辑）")
     void changePassword_whenOldPasswordWrong_shouldReturnError() throws Exception {
         mockMvc.perform(put("/system/user/1/change-password")
                         .param("oldPassword", "wrongpassword")
@@ -504,7 +506,7 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("changePassword: 不存在的用户")
+    @DisplayName("changePassword: 用户不存在（测试环境 SaToken 禁用，验证业务逻辑）")
     void changePassword_whenNotExists_shouldReturnError() throws Exception {
         mockMvc.perform(put("/system/user/999999/change-password")
                         .param("oldPassword", "123456")

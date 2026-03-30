@@ -8,6 +8,7 @@ spring:
     password:
   servlet:
     multipart:
+      enabled: true
       max-file-size: 500MB
       max-request-size: 1GB
   sql:
@@ -28,11 +29,14 @@ mybatis-plus:
 # dromara x-file-storage 测试配置
 dromara:
   x-file-storage:
-    default-platform: local
+    default-platform: local-1
     local:
-      domain: http://localhost:8080/api/files
-      path-patterns: /api/files/**
-      path: ${java.io.tmpdir}/yigongbao-test-files
+      - platform: local-1
+        enable-storage: true
+        enable-access: true
+        domain: http://localhost:8080/api/files/public/
+        path-patterns: /api/files/public/**
+        base-path: ${java.io.tmpdir}/yigongbao-test-files/
 
 # 医工宝自定义配置（测试环境）
 yigongbao:

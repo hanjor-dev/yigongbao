@@ -14,137 +14,139 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum ErrorCodeEnum {
 
-    // 成功
+    // ==================== 成功 ====================
     SUCCESS(200, "操作成功"),
 
-    // 客户端请求错误 4xx
+    // ==================== 客户端请求错误 4xx ====================
     PARAM_ERROR(400, "参数错误"),
     MISSING_PARAMETER(400, "缺少参数：%s"),
     INVALID_PARAMETER(400, "参数无效：%s"),
     DATA_EXISTS(400, "数据已存在"),
-    DATA_NOT_FOUND(404, "数据不存在"),
     UNAUTHORIZED(401, "未登录或登录已过期，请重新登录"),
     FORBIDDEN(403, "没有权限访问该资源"),
     METHOD_NOT_ALLOWED(405, "不支持的请求方法"),
+    DATA_NOT_FOUND(404, "数据不存在"),
     REQUEST_NOT_FOUND(404, "请求路径不存在"),
 
-    // 服务器错误 5xx
+    // ==================== 服务器错误 5xx ====================
     SERVER_ERROR(500, "系统繁忙，请稍后再试"),
     SERVICE_UNAVAILABLE(503, "服务暂时不可用"),
 
-    // 业务自定义错误 6xx
-    // 用户相关 600-601
-    USER_NOT_FOUND(600, "用户不存在"),
-    USER_DISABLED(601, "用户已被禁用"),
+    // ==================== 用户相关 601-604 ====================
+    USER_NOT_FOUND(601, "用户不存在"),
+    USER_DISABLED(602, "用户已被禁用"),
+    USER_EXISTS(603, "用户名已存在"),
+    USER_PHONE_EXISTS(604, "手机号已存在"),
 
-    // 认证相关 602-604
-    PASSWORD_ERROR(602, "密码错误"),
-    TOKEN_INVALID(603, "Token无效或已过期"),
-    ACCOUNT_LOCKED(604, "账户已被锁定，请%d分钟后重试"),
+    // ==================== 认证相关 605-612 ====================
+    PASSWORD_ERROR(605, "密码错误"),
+    OLD_PASSWORD_ERROR(606, "旧密码错误"),
+    NEW_PASSWORD_SAME_AS_OLD(607, "新密码不能与旧密码相同"),
+    USERNAME_OR_PASSWORD_ERROR(608, "用户名或密码错误"),
+    ACCOUNT_LOCKED(609, "账户已被锁定，请%d分钟后重试"),
+    LOGIN_MAX_FAILURES(610, "登录失败次数过多，账户已被锁定"),
+    TOKEN_INVALID(611, "Token无效或已过期"),
+    PERMISSION_DENIED(612, "没有权限执行该操作"),
 
-    // 公共业务相关 605-607
-    DATA_HAS_CHILDREN(605, "该数据存在子节点，无法删除"),
-    DICT_CODE_EXISTS(606, "字典编码已存在"),
-    DICT_NAME_EXISTS(607, "字典名称在同一父节点下已存在"),
+    // ==================== 机构相关 613-618 ====================
+    ORG_NOT_FOUND(613, "机构不存在"),
+    ORG_DISABLED(614, "机构已禁用"),
+    ORG_EXISTS(615, "机构名称已存在"),
+    ORG_CODE_EXISTS(616, "机构编码已存在"),
+    ORG_HAS_USERS(617, "该机构下存在用户，无法删除"),
+    ORG_TYPE_NOT_FOUND(618, "机构类型不存在"),
 
-    // 机构相关 608-612
-    ORG_NOT_FOUND(608, "机构不存在"),
-    ORG_EXISTS(609, "机构名称已存在"),
-    ORG_CODE_EXISTS(610, "机构编码已存在"),
-    ORG_HAS_USERS(611, "该机构下存在用户，无法删除"),
-    ORG_TYPE_NOT_FOUND(612, "机构类型不存在"),
+    // ==================== 部门相关 619-621 ====================
+    DEPT_NOT_FOUND(619, "部门不存在"),
+    DEPT_EXISTS(620, "部门名称已存在"),
+    DEPT_HAS_USERS(621, "该部门下存在用户，无法删除"),
 
-    // 部门相关 613-615
-    DEPT_NOT_FOUND(613, "部门不存在"),
-    DEPT_EXISTS(614, "部门名称已存在"),
-    DEPT_HAS_USERS(615, "该部门下存在用户，无法删除"),
+    // ==================== 角色相关 622-627 ====================
+    USER_ROLE_NOT_FOUND(622, "角色不存在"),
+    ROLE_EXISTS(623, "角色编码已存在"),
+    ROLE_HAS_USERS(624, "该角色下存在用户，无法删除"),
+    ROLE_HAS_RESOURCES(625, "该角色已分配资源，请先取消分配"),
+    ROLE_NOT_FOUND(626, "角色不存在"),
+    USER_ROLE_EXISTS(627, "用户已拥有该角色"),
 
-    // 用户管理相关 616-622
-    USER_EXISTS(616, "用户名已存在"),
-    USER_PHONE_EXISTS(617, "手机号已存在"),
-    USER_ORG_NOT_FOUND(618, "所属机构不存在"),
-    USER_DEPT_NOT_FOUND(619, "所属部门不存在"),
-    USER_ROLE_NOT_FOUND(620, "角色不存在"),
-    ROLE_EXISTS(621, "角色编码已存在"),
-    ROLE_HAS_USERS(622, "该角色下存在用户，无法删除"),
+    // ==================== 用户关联 628-630 ====================
+    USER_ORG_NOT_FOUND(628, "所属机构不存在"),
+    USER_DEPT_NOT_FOUND(629, "所属部门不存在"),
+    USER_HOSPITAL_NOT_FOUND(630, "用户医院关联不存在"),
 
-    // 密码相关 623
-    OLD_PASSWORD_ERROR(623, "旧密码错误"),
-    NEW_PASSWORD_SAME_AS_OLD(624, "新密码不能与旧密码相同"),
+    // ==================== 资源相关 631-634 ====================
+    RESOURCE_NOT_FOUND(631, "资源不存在"),
+    RESOURCE_EXISTS(632, "资源编码已存在"),
+    RESOURCE_HAS_CHILDREN(633, "该资源下存在子资源，无法删除"),
+    RESOURCE_HAS_ROLES(634, "该资源已分配给角色，请先取消分配"),
 
-    // 认证相关 625-627
-    USERNAME_OR_PASSWORD_ERROR(625, "用户名或密码错误"),
-    LOGIN_MAX_FAILURES(626, "登录失败次数过多，账户已被锁定"),
-    PERMISSION_DENIED(627, "没有权限执行该操作"),
+    // ==================== 配置相关 635-638 ====================
+    CONFIG_NOT_FOUND(635, "配置不存在"),
+    CONFIG_KEY_EXISTS(636, "配置键已存在"),
+    CONFIG_SYSTEM_NOT_ALLOW_UPDATE(637, "系统内置配置不可修改"),
+    CONFIG_SYSTEM_NOT_ALLOW_DELETE(638, "系统内置配置不可删除"),
 
-    // 资源相关 628-632
-    RESOURCE_NOT_FOUND(628, "资源不存在"),
-    RESOURCE_EXISTS(629, "资源编码已存在"),
-    RESOURCE_HAS_CHILDREN(630, "该资源下存在子资源，无法删除"),
-    RESOURCE_HAS_ROLES(631, "该资源已分配给角色，请先取消分配"),
-    ROLE_HAS_RESOURCES(632, "该角色已分配资源，请先取消分配"),
+    // ==================== 字典相关 639-640 ====================
+    DICT_CODE_EXISTS(639, "字典编码已存在"),
+    DICT_NAME_EXISTS(640, "字典名称在同一父节点下已存在"),
 
-    // 配置相关 633-636
-    CONFIG_NOT_FOUND(633, "配置不存在"),
-    CONFIG_KEY_EXISTS(634, "配置键已存在"),
-    CONFIG_SYSTEM_NOT_ALLOW_UPDATE(635, "系统内置配置不可修改"),
-    CONFIG_SYSTEM_NOT_ALLOW_DELETE(636, "系统内置配置不可删除"),
+    // ==================== 数据约束 641 ====================
+    DATA_HAS_CHILDREN(641, "该数据存在子节点，无法删除"),
 
-    // 医院相关 637-639
-    HOSPITAL_NOT_FOUND(637, "医院不存在"),
-    HOSPITAL_DISABLED(638, "医院已停用"),
-    HOSPITAL_EXISTS(639, "医院名称已存在"),
+    // ==================== 医院相关 642-645 ====================
+    HOSPITAL_NOT_FOUND(642, "医院不存在"),
+    HOSPITAL_DISABLED(643, "医院已停用"),
+    HOSPITAL_EXISTS(644, "医院名称已存在"),
+    HOSPITAL_CODE_EXISTS(645, "医院编码已存在"),
 
-    // 医院组合模板相关 640-643
-    TEMPLATE_NOT_FOUND(640, "医院组合模板不存在"),
-    TEMPLATE_DISABLED(641, "医院组合模板已停用"),
-    TEMPLATE_EXISTS(642, "医院组合模板名称已存在"),
-    TEMPLATE_HAS_USERS(643, "该模板已被用户使用，无法删除"),
+    // ==================== 医院科室 646-647 ====================
+    HOSPITAL_DEPT_NOT_FOUND(646, "科室不存在"),
+    HOSPITAL_DEPT_EXISTS(647, "科室已存在"),
 
-    // 用户-医院关联 644
-    USER_HOSPITAL_NOT_FOUND(644, "用户医院关联不存在"),
+    // ==================== 产品型号 648-649 ====================
+    PRODUCT_NOT_FOUND(648, "产品型号不存在"),
+    PRODUCT_EXISTS(649, "产品编码已存在"),
 
-    // 部位相关 645-646
-    BODY_PART_NOT_FOUND(645, "部位不存在"),
-    BODY_PART_NAME_EXISTS(646, "部位名称已存在"),
+    // ==================== 部位相关 650-651 ====================
+    BODY_PART_NOT_FOUND(650, "部位不存在"),
+    BODY_PART_NAME_EXISTS(651, "部位名称已存在"),
 
-    // 重建项目相关 647-648
-    REBUILD_PROJECT_NOT_FOUND(647, "项目不存在"),
-    REBUILD_PROJECT_NAME_EXISTS(648, "项目名称已存在"),
+    // ==================== 重建项目 652-653 ====================
+    REBUILD_PROJECT_NOT_FOUND(652, "项目不存在"),
+    REBUILD_PROJECT_NAME_EXISTS(653, "项目名称已存在"),
 
-    // 操作日志相关 649-650
-    LOG_NOT_FOUND(649, "日志记录不存在"),
-    LOG_EXPORT_FAILED(650, "日志导出失败"),
+    // ==================== 注册证 654-655 ====================
+    CERT_NOT_FOUND(654, "注册证不存在"),
+    CERT_EXISTS(655, "注册证号已存在"),
 
-    // 编码规则相关 651-655
-    CODE_RULE_NOT_FOUND(651, "编码规则不存在"),
-    CODE_RULE_DISABLED(652, "编码规则已禁用"),
-    CODE_GENERATE_FAILED(653, "编码生成失败"),
-    CODE_RULE_EXISTS(654, "规则编码已存在"),
+    // ==================== 模板相关 656-659 ====================
+    TEMPLATE_NOT_FOUND(656, "医院组合模板不存在"),
+    TEMPLATE_DISABLED(657, "医院组合模板已停用"),
+    TEMPLATE_EXISTS(658, "医院组合模板名称已存在"),
+    TEMPLATE_HAS_USERS(659, "该模板已被用户使用，无法删除"),
 
-    // 附件相关 655-660
-    ATTACHMENT_NOT_FOUND(655, "附件不存在"),
-    ATTACHMENT_UPLOAD_FAILED(656, "文件上传失败"),
-    ATTACHMENT_DELETE_FAILED(657, "附件删除失败"),
-    ATTACHMENT_TYPE_NOT_ALLOWED(658, "不支持的文件类型"),
-    ATTACHMENT_SIZE_EXCEEDED(659, "文件大小超出限制"),
+    // ==================== 附件相关 660-665 ====================
+    ATTACHMENT_NOT_FOUND(660, "附件不存在"),
+    ATTACHMENT_UPLOAD_FAILED(661, "文件上传失败"),
+    ATTACHMENT_DELETE_FAILED(662, "附件删除失败"),
+    ATTACHMENT_TYPE_NOT_ALLOWED(663, "不支持的文件类型"),
+    ATTACHMENT_SIZE_EXCEEDED(664, "文件大小超出限制"),
+    ATTACHMENT_FILENAME_ILLEGAL(665, "文件名包含非法字符"),
 
-    // 医院科室相关 660-662
-    HOSPITAL_DEPT_NOT_FOUND(660, "科室不存在"),
-    HOSPITAL_DEPT_EXISTS(661, "科室名称已存在"),
-    HOSPITAL_DEPT_HAS_DOCTORS(662, "该科室下存在医生，无法删除"),
+    // ==================== 操作日志 666-667 ====================
+    LOG_NOT_FOUND(666, "日志记录不存在"),
+    LOG_EXPORT_FAILED(667, "日志导出失败"),
 
-    // 医生相关 663-664
-    DOCTOR_NOT_FOUND(663, "医生不存在"),
-    DOCTOR_EXISTS(664, "该医生已存在"),
+    // ==================== 编码规则 668-671 ====================
+    CODE_RULE_NOT_FOUND(668, "编码规则不存在"),
+    CODE_RULE_DISABLED(669, "编码规则已禁用"),
+    CODE_GENERATE_FAILED(670, "编码生成失败"),
+    CODE_RULE_EXISTS(671, "规则编码已存在"),
 
-    // 产品型号相关 665-666
-    PRODUCT_NOT_FOUND(665, "产品型号不存在"),
-    PRODUCT_EXISTS(666, "产品编码已存在"),
-
-    // 注册证相关 667-668
-    CERT_NOT_FOUND(667, "注册证不存在"),
-    CERT_EXISTS(668, "注册证号已存在");
+    // ==================== 医生相关 672-674 ====================
+    DOCTOR_NOT_FOUND(672, "医生不存在"),
+    DOCTOR_DISABLED(673, "医生已被禁用"),
+    DOCTOR_EXISTS(674, "医生编码已存在");
 
     /**
      * 错误码

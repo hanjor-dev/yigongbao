@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.lang.reflect.Method;
@@ -65,25 +66,25 @@ class FileServiceImplTest {
 
         testDetail = new FileDetail();
         testDetail.setId("1926082412345678901");
-        testDetail.setUrl("http://localhost:8080/api/files/registration_cert/202603/test.jpg");
+        testDetail.setUrl("http://localhost:8080/api/files/public/image_data/202603/test.jpg");
         testDetail.setSize(1024L);
         testDetail.setFilename("1926082412345678901.jpg");
         testDetail.setOriginalFilename("test.jpg");
-        testDetail.setPath("registration_cert/202603/");
+        testDetail.setPath("image_data/202603/");
         testDetail.setExt("jpg");
         testDetail.setContentType("image/jpeg");
         testDetail.setPlatform("local");
-        testDetail.setObjectType("registration_cert");
+        testDetail.setObjectType("10.15");
         testDetail.setObjectId("1");
         testDetail.setCreateTime(now);
 
         testVO = new FileVO();
         testVO.setId("1926082412345678901");
-        testVO.setBizType("registration_cert");
+        testVO.setBizType("10.15");
         testVO.setBizId(1L);
         testVO.setFileName("test.jpg");
-        testVO.setFilePath("registration_cert/202603/");
-        testVO.setFileUrl("http://localhost:8080/api/files/registration_cert/202603/test.jpg");
+        testVO.setFilePath("image_data/202603/");
+        testVO.setFileUrl("http://localhost:8080/api/files/public/image_data/202603/test.jpg");
         testVO.setFileSize(1024L);
         testVO.setFileSizeText("1.00 KB");
         testVO.setFileType("image/jpeg");
@@ -105,7 +106,7 @@ class FileServiceImplTest {
         @Test
         @DisplayName("uploadFile: 上传文件成功")
         void uploadFile_shouldSuccess() {
-            FileInfo fileInfo = createFileInfo("1926082412345678901", "registration_cert", null);
+            FileInfo fileInfo = createFileInfo("1926082412345678901", "10.15", null);
 
             UploadPretreatment pretreatment = mock(UploadPretreatment.class);
             when(fileStorageService.of(any())).thenReturn(pretreatment);
@@ -120,7 +121,7 @@ class FileServiceImplTest {
                     new org.springframework.mock.web.MockMultipartFile(
                             "file", "test.jpg", "image/jpeg", "test content".getBytes());
 
-            FileVO result = fileService.uploadFile(file, "registration_cert");
+            FileVO result = fileService.uploadFile(file, "10.15");
 
             assertNotNull(result);
             assertEquals("1926082412345678901", result.getId());
@@ -133,7 +134,7 @@ class FileServiceImplTest {
         @Test
         @DisplayName("uploadAndLink: 业务关联时设置 objectId")
         void uploadAndLink_shouldSetObjectId() {
-            FileInfo fileInfo = createFileInfo("1926082412345678902", "registration_cert", "1");
+            FileInfo fileInfo = createFileInfo("1926082412345678902", "10.15", "1");
 
             UploadPretreatment pretreatment = mock(UploadPretreatment.class);
             when(fileStorageService.of(any())).thenReturn(pretreatment);
@@ -148,10 +149,62 @@ class FileServiceImplTest {
                     new org.springframework.mock.web.MockMultipartFile(
                             "file", "cert.pdf", "application/pdf", "pdf content".getBytes());
 
-            FileVO result = fileService.uploadAndLink(file, "registration_cert", 1L);
+            FileVO result = fileService.uploadAndLink(file, "10.15", 1L);
 
             assertNotNull(result);
             verify(pretreatment).setObjectId("1");
+        }
+    }
+
+    // ==================== uploadMultiple 测试 ====================
+
+    @Nested
+    @DisplayName("uploadMultiple 测试")
+    class UploadMultipleTests {
+
+        @Test
+        @DisplayName("uploadMultiple: 空数组返回空列表")
+        void uploadMultiple_whenEmptyArray_shouldReturnEmptyList() {
+            MultipartFile[] emptyFiles = new MultipartFile[0];
+            List<FileVO> result = fileService.uploadMultiple(emptyFiles, "10.15", 1L);
+            assertNotNull(result);
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("uploadMultiple: 多文件上传成功")
+        void uploadMultiple_shouldSuccess() {
+            FileInfo fileInfo1 = createFileInfo("1926082412345678903", "10.15", "1");
+            FileInfo fileInfo2 = createFileInfo("1926082412345678904", "10.15", "1");
+
+            UploadPretreatment pretreatment1 = mock(UploadPretreatment.class);
+            UploadPretreatment pretreatment2 = mock(UploadPretreatment.class);
+            when(fileStorageService.of(any())).thenReturn(pretreatment1).thenReturn(pretreatment2);
+            when(pretreatment1.setPath(anyString())).thenReturn(pretreatment1);
+            when(pretreatment1.setObjectType(anyString())).thenReturn(pretreatment1);
+            when(pretreatment1.setObjectId(any())).thenReturn(pretreatment1);
+            when(pretreatment1.upload()).thenReturn(fileInfo1);
+            when(pretreatment2.setPath(anyString())).thenReturn(pretreatment2);
+            when(pretreatment2.setObjectType(anyString())).thenReturn(pretreatment2);
+            when(pretreatment2.setObjectId(any())).thenReturn(pretreatment2);
+            when(pretreatment2.upload()).thenReturn(fileInfo2);
+            when(fileRecorderService.getDetailById("1926082412345678903")).thenReturn(testDetail);
+            when(fileRecorderService.getDetailById("1926082412345678904")).thenReturn(testDetail);
+            when(fileRecorderService.toFileVO(any())).thenReturn(testVO);
+
+            MockMultipartFile file1 = new MockMultipartFile(
+                    "files", "test1.jpg", MediaType.IMAGE_JPEG_VALUE, "content1".getBytes());
+            MockMultipartFile file2 = new MockMultipartFile(
+                    "files", "test2.jpg", MediaType.IMAGE_JPEG_VALUE, "content2".getBytes());
+            MultipartFile[] files = new MultipartFile[]{file1, file2};
+
+            List<FileVO> result = fileService.uploadMultiple(files, "10.15", 1L);
+
+            assertNotNull(result);
+            assertEquals(2, result.size());
+            verify(fileStorageService, times(2)).of(any());
+            verify(pretreatment1, times(1)).upload();
+            verify(pretreatment2, times(1)).upload();
         }
     }
 
@@ -198,7 +251,7 @@ class FileServiceImplTest {
             when(fileRecorderService.list(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(testDetail));
             when(fileRecorderService.toFileVO(testDetail)).thenReturn(testVO);
 
-            List<FileVO> result = fileService.listByBiz("registration_cert", 1L);
+            List<FileVO> result = fileService.listByBiz("10.15", 1L);
 
             assertNotNull(result);
             assertEquals(1, result.size());
@@ -210,7 +263,7 @@ class FileServiceImplTest {
         void listByBiz_whenNotExists_shouldReturnEmptyList() {
             when(fileRecorderService.list(any(LambdaQueryWrapper.class))).thenReturn(Collections.emptyList());
 
-            List<FileVO> result = fileService.listByBiz("registration_cert", 1L);
+            List<FileVO> result = fileService.listByBiz("10.15", 1L);
 
             assertNotNull(result);
             assertTrue(result.isEmpty());
@@ -244,6 +297,26 @@ class FileServiceImplTest {
             BusinessException exception = assertThrows(
                     BusinessException.class,
                     () -> fileService.deleteById("not-exists"));
+            assertEquals(ErrorCodeEnum.ATTACHMENT_NOT_FOUND.getCode(), exception.getCode());
+        }
+    }
+
+    // ==================== download 测试 ====================
+
+    @Nested
+    @DisplayName("download 测试")
+    class DownloadTests {
+
+        @Test
+        @DisplayName("download: 文件不存在时抛出异常")
+        void download_whenNotExists_shouldThrowException() {
+            when(fileRecorderService.getDetailById("not-exists")).thenReturn(null);
+
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> fileService.download("not-exists",
+                            new org.springframework.mock.web.MockHttpServletResponse()));
+
             assertEquals(ErrorCodeEnum.ATTACHMENT_NOT_FOUND.getCode(), exception.getCode());
         }
     }
@@ -331,12 +404,65 @@ class FileServiceImplTest {
         }
     }
 
+    // ==================== isValidFilename 私有方法测试 ====================
+
+    @Nested
+    @DisplayName("isValidFilename 私有方法测试")
+    class IsValidFilenameTests {
+
+        @Test
+        @DisplayName("isValidFilename: 正常文件名应返回 true")
+        void isValidFilename_shouldReturnTrue() throws Exception {
+            Method method = FileServiceImpl.class.getDeclaredMethod("isValidFilename", String.class);
+            method.setAccessible(true);
+
+            assertTrue((Boolean) method.invoke(fileService, "test.jpg"));
+            assertTrue((Boolean) method.invoke(fileService, "my_file.pdf"));
+            assertTrue((Boolean) method.invoke(fileService, "图片中文.png"));
+        }
+
+        @Test
+        @DisplayName("isValidFilename: 包含路径遍历应返回 false")
+        void isValidFilename_withPathTraversal_shouldReturnFalse() throws Exception {
+            Method method = FileServiceImpl.class.getDeclaredMethod("isValidFilename", String.class);
+            method.setAccessible(true);
+
+            assertFalse((Boolean) method.invoke(fileService, "../test.jpg"));
+            assertFalse((Boolean) method.invoke(fileService, "..\\test.jpg"));
+            assertFalse((Boolean) method.invoke(fileService, "test/../test.jpg"));
+            assertFalse((Boolean) method.invoke(fileService, "C:\\test.jpg"));
+        }
+
+        @Test
+        @DisplayName("isValidFilename: 包含非法字符应返回 false")
+        void isValidFilename_withIllegalChar_shouldReturnFalse() throws Exception {
+            Method method = FileServiceImpl.class.getDeclaredMethod("isValidFilename", String.class);
+            method.setAccessible(true);
+
+            assertFalse((Boolean) method.invoke(fileService, "test<file>.jpg"));
+            assertFalse((Boolean) method.invoke(fileService, "test:file.jpg"));
+            assertFalse((Boolean) method.invoke(fileService, "test|file.jpg"));
+            assertFalse((Boolean) method.invoke(fileService, "test?file.jpg"));
+            assertFalse((Boolean) method.invoke(fileService, "test*file.jpg"));
+        }
+
+        @Test
+        @DisplayName("isValidFilename: null 或空字符串应返回 false")
+        void isValidFilename_whenNullOrEmpty_shouldReturnFalse() throws Exception {
+            Method method = FileServiceImpl.class.getDeclaredMethod("isValidFilename", String.class);
+            method.setAccessible(true);
+
+            assertFalse((Boolean) method.invoke(fileService, (String) null));
+            assertFalse((Boolean) method.invoke(fileService, ""));
+        }
+    }
+
     // ==================== 工具方法 ====================
 
     private FileInfo createFileInfo(String id, String objectType, String objectId) {
         FileInfo info = new FileInfo();
         info.setId(id);
-        info.setUrl("http://localhost:8080/api/files/" + objectType + "/202603/" + id + ".jpg");
+        info.setUrl("http://localhost:8080/api/files/public/" + objectType + "/202603/" + id + ".jpg");
         info.setSize(1024L);
         info.setFilename(id + ".jpg");
         info.setOriginalFilename("test.jpg");

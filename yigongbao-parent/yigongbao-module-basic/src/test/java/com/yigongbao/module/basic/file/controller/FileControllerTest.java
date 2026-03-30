@@ -52,8 +52,9 @@ class FileControllerTest {
         vo.setBizType(bizType);
         vo.setBizId(bizId);
         vo.setFileName(fileName);
-        vo.setFilePath(bizType + "/202603/" + fileName);
-        vo.setFileUrl("http://localhost:8080/api/files/" + bizType + "/202603/" + fileName);
+        // fileUrl 路径前缀使用枚举 code，非 dictCode
+        vo.setFilePath("image_data/202603/" + fileName);
+        vo.setFileUrl("http://localhost:8080/api/files/public/image_data/202603/" + fileName);
         vo.setFileSize(1024L);
         vo.setFileType("image/jpeg");
         vo.setFileExt("jpg");
@@ -72,22 +73,33 @@ class FileControllerTest {
         @Test
         @DisplayName("upload: 上传文件成功")
         void upload_shouldSuccess() throws Exception {
-            FileVO vo = buildTestVO("1926082412345678901", "registration_cert", null, "test.jpg");
-            when(fileService.uploadFile(any(), eq("registration_cert"))).thenReturn(vo);
+            FileVO vo = buildTestVO("1926082412345678901", "10.15", null, "test.jpg");
+            when(fileService.uploadFile(any(), eq("10.15"))).thenReturn(vo);
 
             MockMultipartFile file = new MockMultipartFile(
                     "file", "test.jpg", MediaType.IMAGE_JPEG_VALUE, "test image content".getBytes());
 
             mockMvc.perform(multipart("/basic/file/upload")
                             .file(file)
-                            .param("bizType", "registration_cert"))
+                            .param("bizType", "10.15"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"))
                     .andExpect(jsonPath("$.data.id").value("1926082412345678901"))
                     .andExpect(jsonPath("$.data.fileName").value("test.jpg"));
 
-            verify(fileService, times(1)).uploadFile(any(), eq("registration_cert"));
+            verify(fileService, times(1)).uploadFile(any(), eq("10.15"));
+        }
+
+        @Test
+        @DisplayName("upload: bizType 为空时返回参数错误")
+        void upload_whenBizTypeBlank_shouldReturnBadRequest() throws Exception {
+            MockMultipartFile file = new MockMultipartFile(
+                    "file", "test.jpg", MediaType.IMAGE_JPEG_VALUE, "test image content".getBytes());
+
+            mockMvc.perform(multipart("/basic/file/upload")
+                            .file(file))
+                    .andExpect(status().isBadRequest());
         }
     }
 
@@ -100,24 +112,36 @@ class FileControllerTest {
         @Test
         @DisplayName("uploadAndLink: 上传并关联业务成功")
         void uploadAndLink_shouldSuccess() throws Exception {
-            FileVO vo = buildTestVO("1926082412345678902", "registration_cert", 1L, "cert.pdf");
-            when(fileService.uploadAndLink(any(), eq("registration_cert"), eq(1L))).thenReturn(vo);
+            FileVO vo = buildTestVO("1926082412345678902", "10.15", 1L, "cert.pdf");
+            when(fileService.uploadAndLink(any(), eq("10.15"), eq(1L))).thenReturn(vo);
 
             MockMultipartFile file = new MockMultipartFile(
                     "file", "cert.pdf", MediaType.APPLICATION_PDF_VALUE, "pdf content".getBytes());
 
             mockMvc.perform(multipart("/basic/file/upload-and-link")
                             .file(file)
-                            .param("bizType", "registration_cert")
+                            .param("bizType", "10.15")
                             .param("bizId", "1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"))
                     .andExpect(jsonPath("$.data.id").value("1926082412345678902"))
-                    .andExpect(jsonPath("$.data.bizType").value("registration_cert"))
+                    .andExpect(jsonPath("$.data.bizType").value("10.15"))
                     .andExpect(jsonPath("$.data.bizId").value(1));
 
-            verify(fileService, times(1)).uploadAndLink(any(), eq("registration_cert"), eq(1L));
+            verify(fileService, times(1)).uploadAndLink(any(), eq("10.15"), eq(1L));
+        }
+
+        @Test
+        @DisplayName("uploadAndLink: bizId 为空时返回参数错误")
+        void uploadAndLink_whenBizIdNull_shouldReturnBadRequest() throws Exception {
+            MockMultipartFile file = new MockMultipartFile(
+                    "file", "cert.pdf", MediaType.APPLICATION_PDF_VALUE, "pdf content".getBytes());
+
+            mockMvc.perform(multipart("/basic/file/upload-and-link")
+                            .file(file)
+                            .param("bizType", "10.15"))
+                    .andExpect(status().isBadRequest());
         }
     }
 
@@ -131,9 +155,9 @@ class FileControllerTest {
         @DisplayName("uploadMultiple: 批量上传成功")
         void uploadMultiple_shouldSuccess() throws Exception {
             List<FileVO> vos = Arrays.asList(
-                    buildTestVO("1926082412345678903", "registration_cert", 1L, "test1.jpg"),
-                    buildTestVO("1926082412345678904", "registration_cert", 1L, "test2.jpg"));
-            when(fileService.uploadMultiple(any(), eq("registration_cert"), eq(1L))).thenReturn(vos);
+                    buildTestVO("1926082412345678903", "10.15", 1L, "test1.jpg"),
+                    buildTestVO("1926082412345678904", "10.15", 1L, "test2.jpg"));
+            when(fileService.uploadMultiple(any(), eq("10.15"), eq(1L))).thenReturn(vos);
 
             MockMultipartFile file1 = new MockMultipartFile(
                     "files", "test1.jpg", MediaType.IMAGE_JPEG_VALUE, "content1".getBytes());
@@ -143,7 +167,7 @@ class FileControllerTest {
             mockMvc.perform(multipart("/basic/file/upload-multiple")
                             .file(file1)
                             .file(file2)
-                            .param("bizType", "registration_cert")
+                            .param("bizType", "10.15")
                             .param("bizId", "1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
@@ -151,7 +175,7 @@ class FileControllerTest {
                     .andExpect(jsonPath("$.data").isArray())
                     .andExpect(jsonPath("$.data.length()").value(2));
 
-            verify(fileService, times(1)).uploadMultiple(any(), eq("registration_cert"), eq(1L));
+            verify(fileService, times(1)).uploadMultiple(any(), eq("10.15"), eq(1L));
         }
     }
 
@@ -165,11 +189,11 @@ class FileControllerTest {
         @DisplayName("listByBiz: 存在文件时返回列表")
         void listByBiz_whenExists_shouldReturnList() throws Exception {
             List<FileVO> vos = Arrays.asList(
-                    buildTestVO("1926082412345678905", "registration_cert", 1L, "cert1.pdf"),
-                    buildTestVO("1926082412345678906", "registration_cert", 1L, "cert2.pdf"));
-            when(fileService.listByBiz("registration_cert", 1L)).thenReturn(vos);
+                    buildTestVO("1926082412345678905", "10.15", 1L, "cert1.pdf"),
+                    buildTestVO("1926082412345678906", "10.15", 1L, "cert2.pdf"));
+            when(fileService.listByBiz("10.15", 1L)).thenReturn(vos);
 
-            mockMvc.perform(get("/basic/file/list/registration_cert/1"))
+            mockMvc.perform(get("/basic/file/list/10.15/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"))
@@ -177,21 +201,21 @@ class FileControllerTest {
                     .andExpect(jsonPath("$.data.length()").value(2))
                     .andExpect(jsonPath("$.data[0].fileName").value("cert1.pdf"));
 
-            verify(fileService, times(1)).listByBiz("registration_cert", 1L);
+            verify(fileService, times(1)).listByBiz("10.15", 1L);
         }
 
         @Test
         @DisplayName("listByBiz: 无文件时返回空列表")
         void listByBiz_whenNotExists_shouldReturnEmptyList() throws Exception {
-            when(fileService.listByBiz("registration_cert", 1L)).thenReturn(Collections.emptyList());
+            when(fileService.listByBiz("10.15", 1L)).thenReturn(Collections.emptyList());
 
-            mockMvc.perform(get("/basic/file/list/registration_cert/1"))
+            mockMvc.perform(get("/basic/file/list/10.15/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").isArray())
                     .andExpect(jsonPath("$.data").isEmpty());
 
-            verify(fileService, times(1)).listByBiz("registration_cert", 1L);
+            verify(fileService, times(1)).listByBiz("10.15", 1L);
         }
     }
 
@@ -204,7 +228,7 @@ class FileControllerTest {
         @Test
         @DisplayName("getById: 文件存在时返回详情")
         void getById_whenExists_shouldReturnData() throws Exception {
-            FileVO vo = buildTestVO("1926082412345678907", "registration_cert", 1L, "test.jpg");
+            FileVO vo = buildTestVO("1926082412345678907", "10.15", 1L, "test.jpg");
             when(fileService.getById("1926082412345678907")).thenReturn(vo);
 
             mockMvc.perform(get("/basic/file/1926082412345678907"))

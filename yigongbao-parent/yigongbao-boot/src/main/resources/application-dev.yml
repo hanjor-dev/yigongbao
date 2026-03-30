@@ -56,6 +56,18 @@ spring:
       # 忽略 Map 中的 null 值
       write-null-map-values: false
 
+  # 文件上传配置
+  servlet:
+    multipart:
+      # 启用 multipart 上传
+      enabled: true
+      # 最大单个文件大小（默认 500MB）
+      max-file-size: 500MB
+      # 最大请求总大小（默认 500MB）
+      max-request-size: 500MB
+      # 文件写入磁盘的阈值
+      file-size-threshold: 512KB
+
 # MyBatis-Plus 配置
 mybatis-plus:
   # 配置扫描通用枚举
@@ -95,15 +107,24 @@ sa-token:
 dromara:
   x-file-storage:
     # 默认存储平台
-    default-platform: local
-    # 本地存储
-    local:
-      # 文件访问基础路径（用于拼装 fileUrl）
-      domain: http://localhost:8080/api/files
-      # URL 路径匹配模式
-      path-patterns: /api/files/**
-      # 存储根路径
-      path: D:/yigongbao-files
+    default-platform: local-plus-1
+    #缩略图后缀
+    thumbnail-suffix: ".min.jpg"
+    # 本地存储（支持框架自动配置静态资源访问）
+    local-plus:
+      - platform: local-plus-1
+        # 启用本地存储
+        enable-storage: true
+        # 启用本地文件访问（生产环境建议使用 Nginx）
+        enable-access: true
+        # 文件访问基础路径（用于拼装 fileUrl），/api 前缀与 context-path 保持一致
+        domain: http://localhost:8080/api/files/public/
+        # 基础路径
+        base-path:
+        # URL 路径匹配模式（SaToken 中需放行此路径）
+        path-patterns: /files/public/**
+        # 存储根路径（映射到 URL /files/public/**）
+        storage-path: D:/yigongbao-files/
 
 # 医工宝自定义配置
 yigongbao:
