@@ -137,17 +137,19 @@ CREATE TABLE order_file (
     is_deleted INT DEFAULT 0
 );
 
--- 订单状态历史表
-CREATE TABLE order_status_history (
+-- 订单流程状态历史表
+CREATE TABLE order_flow_status_history (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_id BIGINT COMMENT '订单ID',
     order_code VARCHAR(64) COMMENT '订单编号',
-    phase INT COMMENT '阶段',
-    status INT COMMENT '状态',
-    action VARCHAR(32) COMMENT '执行的动作',
+    phase INT COMMENT '变更时阶段',
+    from_status INT COMMENT '变更前状态',
+    to_status INT COMMENT '变更后状态',
+    action VARCHAR(50) COMMENT '触发动作（如 SUBMIT_ORDER、DATA_AUDIT_PASS）',
+    action_name VARCHAR(100) COMMENT '动作名称',
     operator_id BIGINT COMMENT '操作人ID',
     operator_name VARCHAR(64) COMMENT '操作人姓名',
-    remark VARCHAR(512) COMMENT '备注',
+    remark VARCHAR(512) COMMENT '备注（如驳回原因）',
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     create_by BIGINT,

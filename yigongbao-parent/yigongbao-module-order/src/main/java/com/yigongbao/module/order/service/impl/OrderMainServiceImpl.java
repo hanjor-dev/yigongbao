@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.order.OrderActionEnum;
 import com.yigongbao.common.enums.order.OrderPhaseEnum;
 import com.yigongbao.common.enums.order.OrderStatusEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -29,7 +30,7 @@ import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderFileMapper;
 import com.yigongbao.module.order.service.OrderMainService;
-import com.yigongbao.module.order.service.OrderStateMachineService;
+import com.yigongbao.module.order.service.orderFlow.OrderFlowStateMachineService;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
 import com.yigongbao.module.system.config.service.ConfigService;
@@ -63,7 +64,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderFileMapper orderFileMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
-    private final OrderStateMachineService orderStateMachineService;
+    private final OrderFlowStateMachineService orderFlowStateMachineService;
     private final ConfigService configService;
     private final UserService userService;
 
@@ -132,7 +133,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             vo.setItems(items.stream().map(this::toOrderItemVO).collect(Collectors.toList()));
             vo.setItemCount(items.size());
             // 查询可执行动作
-            vo.setAvailableActions(orderStateMachineService.getAvailableActions(entity));
+            vo.setAvailableActions(orderFlowStateMachineService.getAvailableActions(entity));
             log.info("查询订单详情成功，id={}", id);
             return vo;
         } catch (BusinessException e) {
@@ -143,6 +144,12 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
     }
 
+    /**
+     * 更新订单信息（公司管理员/10分钟内）
+     *
+     * @param id 订单ID
+     * @param dto 更新参数
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateOrder(Long id, UpdateOrderDTO dto) {
@@ -197,7 +204,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            Integer targetStatus = orderStateMachineService.executeTransition(entity, "SUBMIT", currentUserId, null, null);
+            Integer targetStatus = orderFlowStateMachineService.executeTransition(entity, OrderActionEnum.SUBMIT_ORDER, currentUserId, null, null);
             entity.setStatus(targetStatus);
             updateById(entity);
             log.info("提交订单成功，id={}, targetStatus={}", id, targetStatus);
@@ -220,7 +227,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            Integer targetStatus = orderStateMachineService.executeTransition(entity, "WITHDRAW", currentUserId, null, null);
+            Integer targetStatus = orderFlowStateMachineService.executeTransition(entity, OrderActionEnum.WITHDRAW, currentUserId, null, null);
             entity.setStatus(targetStatus);
             updateById(entity);
             log.info("撤回订单成功，id={}, targetStatus={}", id, targetStatus);
@@ -243,7 +250,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            Integer targetStatus = orderStateMachineService.executeTransition(entity, "AUDIT_PASS", currentUserId, null, dto.getRemark());
+            Integer targetStatus = orderFlowStateMachineService.executeTransition(entity, OrderActionEnum.DATA_AUDIT_PASS, currentUserId, null, dto.getRemark());
             entity.setStatus(targetStatus);
             entity.setCurrentHandlerId(currentUserId);
             updateById(entity);
@@ -271,7 +278,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("审核驳回时必须填写驳回原因");
                 throw new BusinessException(ErrorCodeEnum.ORDER_AUDIT_REMARK_REQUIRED);
             }
-            Integer targetStatus = orderStateMachineService.executeTransition(entity, "AUDIT_REJECT", currentUserId, null, dto.getRemark());
+            Integer targetStatus = orderFlowStateMachineService.executeTransition(entity, OrderActionEnum.DATA_AUDIT_REJECT, currentUserId, null, dto.getRemark());
             entity.setStatus(targetStatus);
             entity.setAuditRemark(dto.getRemark());
             updateById(entity);
@@ -293,7 +300,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            List<String> actions = orderStateMachineService.getAvailableActions(entity);
+            List<String> actions = orderFlowStateMachineService.getAvailableActions(entity);
             log.info("查询订单可执行动作成功，id={}, actions={}", id, actions);
             return actions;
         } catch (BusinessException e) {
@@ -318,7 +325,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             BeanUtils.copyProperties(draft, order, "id", "expiresAt", "status");
             order.setOrderCode(orderCode);
             order.setPhase(OrderPhaseEnum.ORDER.getValue());
-            order.setStatus(OrderStatusEnum.PENDING.getValue());
+            order.setStatus(OrderStatusEnum.PENDING_DATA_AUDIT.getValue());
             order.setVersion(0);
             save(order);
             Long orderId = order.getId();
@@ -359,7 +366,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     operatorName = user.getRealName();
                 }
             }
-            orderStateMachineService.executeTransition(order, "CREATE", draft.getOperatorId(), operatorName, "从草稿创建");
+            orderFlowStateMachineService.executeTransition(order, OrderActionEnum.CREATE, draft.getOperatorId(), operatorName, "从草稿创建");
 
             log.info("从草稿创建正式订单成功，orderId={}, orderCode={}", orderId, orderCode);
             return orderId;
@@ -391,7 +398,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             BeanUtils.copyProperties(dto, order);
             order.setOrderCode(orderCode);
             order.setPhase(OrderPhaseEnum.ORDER.getValue());
-            order.setStatus(OrderStatusEnum.PENDING.getValue());
+            order.setStatus(OrderStatusEnum.PENDING_DATA_AUDIT.getValue());
             order.setVersion(0);
             save(order);
             Long orderId = order.getId();
@@ -426,7 +433,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     operatorName = user.getRealName();
                 }
             }
-            orderStateMachineService.executeTransition(order, "CREATE", currentUserId, operatorName, "直提创建");
+            orderFlowStateMachineService.executeTransition(order, OrderActionEnum.CREATE, currentUserId, operatorName, "直提创建");
 
             log.info("直接创建正式订单成功，orderId={}, orderCode={}", orderId, orderCode);
             return orderId;

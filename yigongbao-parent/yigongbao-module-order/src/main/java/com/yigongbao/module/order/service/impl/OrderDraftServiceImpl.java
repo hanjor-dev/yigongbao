@@ -44,6 +44,11 @@ import java.util.stream.Collectors;
  * 订单草稿 Service 实现类
  * 处理订单草稿相关的业务逻辑，包括草稿CRUD、提交转正式订单等
  *
+ * 【重要】草稿状态与订单状态是两个完全独立的状态体系：
+ * - 草稿状态（order_draft.status）：1=有效，2=已提交，3=已过期（仅用于草稿生命周期管理）
+ * - 订单状态（order_main.status）：OrderStatusEnum 定义的 10-80 范围（用于订单阶段流转）
+ * 这两个字段没有关联，不能混淆使用
+ *
  * @author hanjor
  * @date 2026-03-31
  */
@@ -421,6 +426,12 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         return StrUtil.isNotBlank(value) ? value : defaultValue;
     }
 
+    /**
+     * 将草稿实体转换为 VO（列表展示用）
+     *
+     * @param entity 草稿实体
+     * @return 草稿 VO
+     */
     private OrderDraftVO toOrderDraftVO(OrderDraftEntity entity) {
         OrderDraftVO vo = new OrderDraftVO();
         vo.setId(entity.getId());
@@ -446,6 +457,12 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         return vo;
     }
 
+    /**
+     * 将草稿实体转换为详情 VO（包含完整字段）
+     *
+     * @param entity 草稿实体
+     * @return 草稿详情 VO
+     */
     private OrderDraftDetailVO toOrderDraftDetailVO(OrderDraftEntity entity) {
         OrderDraftDetailVO vo = new OrderDraftDetailVO();
         vo.setId(entity.getId());
@@ -481,6 +498,12 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         return vo;
     }
 
+    /**
+     * 将草稿明细实体转换为 VO
+     *
+     * @param entity 草稿明细实体
+     * @return 草稿明细 VO
+     */
     private OrderDraftDetailVO.OrderItemDraftVO toOrderItemDraftVO(OrderItemDraftEntity entity) {
         OrderDraftDetailVO.OrderItemDraftVO vo = new OrderDraftDetailVO.OrderItemDraftVO();
         vo.setId(entity.getId());
@@ -497,6 +520,13 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         return vo;
     }
 
+    /**
+     * 将草稿明细 DTO 转换为实体
+     *
+     * @param dto 草稿明细 DTO
+     * @param draftId 草稿ID
+     * @return 草稿明细实体
+     */
     private OrderItemDraftEntity toOrderItemDraftEntity(OrderItemDraftItemDTO dto, Long draftId) {
         OrderItemDraftEntity entity = new OrderItemDraftEntity();
         entity.setDraftId(draftId);

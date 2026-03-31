@@ -1042,11 +1042,11 @@ CREATE TABLE order_file (
 
 
 -- ============================================================
--- 订单状态历史表（order_status_history）
--- 设计说明：记录订单的状态变更历史，用于追溯和审计
+-- 订单流程状态历史表（order_flow_status_history）
+-- 设计说明：记录订单在各阶段的状态变更历史，用于追溯和审计
 -- ============================================================
-DROP TABLE IF EXISTS order_status_history;
-CREATE TABLE order_status_history (
+DROP TABLE IF EXISTS order_flow_status_history;
+CREATE TABLE order_flow_status_history (
     id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     order_id        BIGINT          NOT NULL COMMENT '订单ID',
     order_code     VARCHAR(50)     NOT NULL COMMENT '订单编号',
@@ -1055,7 +1055,7 @@ CREATE TABLE order_status_history (
     phase           TINYINT         COMMENT '变更时阶段',
     from_status     TINYINT         COMMENT '变更前状态',
     to_status       TINYINT         COMMENT '变更后状态',
-    action          VARCHAR(50)     COMMENT '触发动作（如 SUBMIT、AUDIT_PASS）',
+    action          VARCHAR(50)     COMMENT '触发动作（如 SUBMIT_ORDER、DATA_AUDIT_PASS）',
     action_name     VARCHAR(100)    COMMENT '动作名称',
 
     -- ==================== 操作人信息 ====================
@@ -1067,6 +1067,6 @@ CREATE TABLE order_status_history (
     create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
 
     PRIMARY KEY (id),
-    KEY idx_order_status_history_order_id (order_id),
-    KEY idx_order_status_history_create_time (create_time)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单状态历史表';
+    KEY idx_order_flow_order_id (order_id),
+    KEY idx_order_flow_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单流程状态历史表';

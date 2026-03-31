@@ -22,7 +22,7 @@ public enum OrderActionEnum {
     /**
      * 提交订单
      */
-    SUBMIT("SUBMIT", "提交订单"),
+    SUBMIT_ORDER("SUBMIT_ORDER", "提交订单"),
 
     /**
      * 撤回订单
@@ -35,14 +35,14 @@ public enum OrderActionEnum {
     RESUBMIT("RESUBMIT", "重新提交"),
 
     /**
-     * 审核通过
+     * 数据审核通过
      */
-    AUDIT_PASS("AUDIT_PASS", "审核通过"),
+    DATA_AUDIT_PASS("DATA_AUDIT_PASS", "数据审核通过"),
 
     /**
-     * 审核驳回
+     * 数据审核驳回
      */
-    AUDIT_REJECT("AUDIT_REJECT", "审核驳回"),
+    DATA_AUDIT_REJECT("DATA_AUDIT_REJECT", "数据审核驳回"),
 
     /**
      * 完成订单
@@ -54,10 +54,71 @@ public enum OrderActionEnum {
      */
     CANCEL("CANCEL", "取消订单"),
 
+    // ==================== 设计阶段动作 ====================
     /**
-     * 阶段流转
+     * 开始设计
      */
-    PHASE_TRANSFER("PHASE_TRANSFER", "阶段流转");
+    START_DESIGN("START_DESIGN", "开始设计"),
+
+    /**
+     * 提交设计
+     */
+    SUBMIT_DESIGN("SUBMIT_DESIGN", "提交设计"),
+
+    /**
+     * 设计审核通过
+     */
+    DESIGN_REVIEW_PASS("DESIGN_REVIEW_PASS", "设计审核通过"),
+
+    /**
+     * 设计审核驳回
+     */
+    DESIGN_REVIEW_REJECT("DESIGN_REVIEW_REJECT", "设计审核驳回"),
+
+    // ==================== 打印阶段动作 ====================
+    /**
+     * 开始打印
+     */
+    START_PRINT("START_PRINT", "开始打印"),
+
+    /**
+     * 完成打印
+     */
+    COMPLETE_PRINT("COMPLETE_PRINT", "完成打印"),
+
+    // ==================== 后处理动作 ====================
+    /**
+     * 完成后处理
+     */
+    COMPLETE_POST_PROCESSING("COMPLETE_POST_PROCESSING", "完成后处理"),
+
+    // ==================== 质检阶段动作 ====================
+    /**
+     * 质检合格
+     */
+    QC_PASS("QC_PASS", "质检合格"),
+
+    /**
+     * 质检不合格
+     */
+    QC_FAIL("QC_FAIL", "质检不合格"),
+
+    /**
+     * 返工
+     */
+    REWORK("REWORK", "返工"),
+
+    // ==================== 仓储阶段动作 ====================
+    /**
+     * 完成入库
+     */
+    COMPLETE_WAREHOUSE_IN("COMPLETE_WAREHOUSE_IN", "完成入库"),
+
+    // ==================== 确认阶段动作 ====================
+    /**
+     * 客户确认（服务订单）
+     */
+    USER_CONFIRM("USER_CONFIRM", "客户确认");
 
     /**
      * 动作编码
