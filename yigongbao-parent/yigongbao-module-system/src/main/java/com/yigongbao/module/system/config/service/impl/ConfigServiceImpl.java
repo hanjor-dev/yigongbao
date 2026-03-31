@@ -401,11 +401,16 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
     private String getFallbackValue(String configKey) {
         // 映射配置键到对应的 getter 方法
         return switch (configKey) {
+            // 安全配置
             case "default.password" -> defaultConfigProperties.getDefaultPassword();
             case "login.max.failures" -> String.valueOf(defaultConfigProperties.getLoginMaxFailures());
             case "login.lock.duration" -> String.valueOf(defaultConfigProperties.getLoginLockDuration());
             case "sms.send.interval" -> String.valueOf(defaultConfigProperties.getSmsSendInterval());
             case "max.upload.size" -> String.valueOf(defaultConfigProperties.getMaxUploadSize());
+            // 订单配置
+            case "order.image.required" -> String.valueOf(defaultConfigProperties.getOrderImageRequired());
+            case "order.draft.expire.days" -> String.valueOf(defaultConfigProperties.getOrderDraftExpireDays());
+            case "order.modify.window.minutes" -> String.valueOf(defaultConfigProperties.getOrderModifyWindowMinutes());
             default -> {
                 log.warn("未找到对应的兜底配置，configKey={}", configKey);
                 yield null;

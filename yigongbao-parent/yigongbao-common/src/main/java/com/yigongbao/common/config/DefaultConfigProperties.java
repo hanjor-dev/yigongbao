@@ -45,4 +45,24 @@ public class DefaultConfigProperties {
      * 默认10MB
      */
     private Long maxUploadSize = 10485760L;
+
+    // ==================== 订单配置 ====================
+    /**
+     * 提交订单是否必须上传影像文件
+     * true - 必须上传（默认）
+     * false - 非必填
+     */
+    private Boolean orderImageRequired = true;
+
+    /**
+     * 草稿自动过期天数
+     * 默认 30 天
+     */
+    private Integer orderDraftExpireDays = 30;
+
+    /**
+     * 订单提交后修改窗口期（分钟）
+     * 默认 10 分钟
+     */
+    private Integer orderModifyWindowMinutes = 10;
 }

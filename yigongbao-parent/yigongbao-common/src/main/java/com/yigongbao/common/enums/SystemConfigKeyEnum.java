@@ -48,7 +48,27 @@ public enum SystemConfigKeyEnum {
     /**
      * 文件上传最大大小（字节）
      */
-    MAX_UPLOAD_SIZE("max.upload.size", "文件上传最大大小");
+    MAX_UPLOAD_SIZE("max.upload.size", "文件上传最大大小"),
+
+    // ==================== 订单配置 ====================
+    /**
+     * 提交订单是否必须上传影像文件
+     * true - 必须上传（默认）
+     * false - 非必填
+     */
+    ORDER_IMAGE_REQUIRED("order.image.required", "提交订单是否必须上传影像文件"),
+
+    /**
+     * 草稿自动过期天数
+     * 默认 30 天
+     */
+    ORDER_DRAFT_EXPIRE_DAYS("order.draft.expire.days", "草稿自动过期天数"),
+
+    /**
+     * 订单提交后修改窗口期（分钟）
+     * 默认 10 分钟
+     */
+    ORDER_MODIFY_WINDOW_MINUTES("order.modify.window.minutes", "订单提交后修改窗口期（分钟）");
 
     /**
      * 配置键

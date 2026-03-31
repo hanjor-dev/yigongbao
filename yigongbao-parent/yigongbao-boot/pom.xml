@@ -29,6 +29,10 @@
             <groupId>com.yigongbao</groupId>
             <artifactId>yigongbao-module-system</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-order</artifactId>
+        </dependency>
 
         <!-- spring boot -->
         <dependency>

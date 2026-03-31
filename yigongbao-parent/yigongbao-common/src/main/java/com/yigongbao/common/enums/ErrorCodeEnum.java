@@ -146,7 +146,51 @@ public enum ErrorCodeEnum {
     // ==================== 医生相关 672-674 ====================
     DOCTOR_NOT_FOUND(672, "医生不存在"),
     DOCTOR_DISABLED(673, "医生已被禁用"),
-    DOCTOR_EXISTS(674, "医生编码已存在");
+    DOCTOR_EXISTS(674, "医生编码已存在"),
+
+    // ==================== 订单相关 675-701 ====================
+    // 基础错误
+    ORDER_NOT_FOUND(675, "订单不存在"),
+    ORDER_DRAFT_NOT_FOUND(676, "草稿不存在"),
+
+    // 状态错误
+    ORDER_STATUS_ERROR(677, "订单状态不合法"),
+    ORDER_STATUS_TRANSITION_ERROR(678, "订单状态转换不合法"),
+    ORDER_NOT_DRAFT(679, "只有草稿状态的订单才能操作"),
+    ORDER_CANNOT_DELETE(680, "只有草稿状态的订单才能删除"),
+    ORDER_WITHDRAW_NOT_ALLOWED(681, "当前状态不允许撤回"),
+    ORDER_RESUBMIT_NOT_ALLOWED(682, "当前状态不允许重新提交"),
+    ORDER_ALREADY_SUBMITTED(683, "订单已提交，不能重复提交"),
+    ORDER_ALREADY_AUDITED(684, "订单已审核，不能重复操作"),
+    ORDER_NOT_WITHIN_WINDOW(685, "订单已超过10分钟修改窗口期"),
+
+    // 草稿相关
+    ORDER_DRAFT_EXPIRED(686, "草稿已过期，请重新创建"),
+    ORDER_DRAFT_NOT_MINE(687, "只能查看自己的草稿"),
+    ORDER_DRAFT_ALREADY_SUBMITTED(688, "草稿已提交，不能重复提交"),
+
+    // 文件相关
+    ORDER_FILE_NOT_UPLOADED(689, "订单文件未上传"),
+    ORDER_FILE_REQUIRED(690, "请上传必需的文件：%s"),
+    ORDER_FILE_CATEGORY_ERROR(691, "文件类别不合法"),
+
+    // 明细相关
+    ORDER_ITEM_NOT_FOUND(692, "订单明细不存在"),
+    ORDER_ITEM_REQUIRED(693, "请至少添加一个重建项目"),
+    ORDER_ITEM_EMPTY(694, "重建项目明细不能为空"),
+
+    // 类型相关
+    ORDER_TYPE_INVALID(695, "订单类型不合法"),
+    ORDER_BUSINESS_TYPE_INVALID(696, "业务类型不合法"),
+    ORDER_PATIENT_GENDER_INVALID(697, "患者性别不合法"),
+
+    // 审核相关
+    ORDER_AUDIT_REMARK_REQUIRED(698, "审核驳回时必须填写驳回原因"),
+
+    // 修改申请相关
+    ORDER_MODIFY_APPLY_NOT_FOUND(699, "修改申请不存在"),
+    ORDER_MODIFY_APPLY_STATUS_ERROR(700, "修改申请状态不合法"),
+    ORDER_MODIFY_APPLY_ALREADY_PROCESSED(701, "该修改申请已处理");
 
     /**
      * 错误码

@@ -769,3 +769,304 @@ CREATE TABLE registration_cert (
     KEY idx_cert_valid_to (valid_to),
     KEY idx_cert_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='注册证表';
+
+
+-- ============================================================
+-- 订单模块 DDL（第一期核心表）
+-- 说明：
+-- - order_draft/order_item_draft：草稿阶段独立存储，提交后转入正式订单
+-- - order_main/order_item/order_file：正式订单存储
+-- - order_status_history：状态变更历史，用于追溯
+-- 索引规范：所有 order 相关表索引统一使用 idx_order_ 前缀
+-- ============================================================
+
+
+-- ============================================================
+-- 订单草稿表（order_draft）
+-- 设计说明：
+-- 1. 无订单编号字段：提交时由 CodeGeneratorService 生成
+-- 2. 无 phase/status 字段：草稿阶段不需要状态机，提交后转入正式订单
+-- 3. expires_at 字段：用于30天过期管理
+-- 4. operator_id 字段：索引字段，用于查询"我的草稿"
+-- 5. status 字段：区分有效/已提交/已过期，便于清理
+-- ============================================================
+DROP TABLE IF EXISTS order_draft;
+CREATE TABLE order_draft (
+    -- ==================== 主键与冗余字段 ====================
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    operator_id     BIGINT          NOT NULL COMMENT '操作员ID（创建人）',
+
+    -- ==================== 订单类型（固定不变） ====================
+    order_type      TINYINT         NOT NULL COMMENT '订单类型：1-医疗器械，2-非医疗器械，3-服务',
+    business_type   VARCHAR(20)     NOT NULL COMMENT '业务类型（字典 dict_code：11.1-业务，11.2-测试，11.3-试用，11.4-代理）',
+
+    -- ==================== 机构信息 ====================
+    org_id          BIGINT          NOT NULL COMMENT '提单机构ID',
+    org_name        VARCHAR(200)     COMMENT '提单机构名称',
+    operator_name   VARCHAR(100)    COMMENT '操作员姓名',
+    operator_phone  VARCHAR(20)     COMMENT '操作员电话',
+
+    -- ==================== 医院与科室 ====================
+    hospital_id     BIGINT          COMMENT '医院ID',
+    hospital_name   VARCHAR(200)     COMMENT '医院名称',
+    dept_id         BIGINT          COMMENT '科室ID',
+    dept_name       VARCHAR(100)     COMMENT '科室名称',
+
+    -- ==================== 医生/患者信息 ====================
+    doctor_id       BIGINT          COMMENT '医生ID',
+    doctor_name     VARCHAR(100)    COMMENT '医生姓名',
+    doctor_phone    VARCHAR(20)     COMMENT '医生电话',
+    patient_name    VARCHAR(100)    COMMENT '患者姓名',
+    patient_age     INT             COMMENT '患者年龄',
+    patient_gender  VARCHAR(20)     COMMENT '患者性别（字典 dict_code：12.1-男，12.2-女）',
+
+    -- ==================== 业务信息 ====================
+    is_urgent       TINYINT         DEFAULT 0 COMMENT '是否加急：0-否，1-是',
+    is_postal       TINYINT         DEFAULT 0 COMMENT '是否邮寄：0-否，1-是',
+    postal_address  TEXT            COMMENT '邮寄地址',
+
+    -- ==================== 时效信息 ====================
+    expected_delivery_date DATETIME    COMMENT '期望交付时间',
+
+    -- ==================== 有效期管理 ====================
+    expires_at      DATETIME        NOT NULL COMMENT '过期时间（创建时间+30天）',
+    status          TINYINT         DEFAULT 1 COMMENT '状态：1-有效，2-已提交，3-已过期',
+
+    -- ==================== 公共字段（BaseEntity） ====================
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          COMMENT '创建人ID',
+    update_by       BIGINT          COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+
+    PRIMARY KEY (id),
+    KEY idx_order_draft_operator_id (operator_id),
+    KEY idx_order_draft_status (status),
+    KEY idx_order_draft_expires_at (expires_at),
+    KEY idx_order_draft_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单草稿表';
+
+
+-- ============================================================
+-- 订单草稿明细表（order_item_draft）
+-- 设计说明：存储草稿中的重建项目明细，提交时复制到 order_item 表
+-- ============================================================
+DROP TABLE IF EXISTS order_item_draft;
+CREATE TABLE order_item_draft (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    draft_id        BIGINT          NOT NULL COMMENT '草稿ID',
+
+    -- ==================== 重建项目信息 ====================
+    body_part_id    BIGINT          COMMENT '部位ID',
+    body_part_name  VARCHAR(100)    COMMENT '部位名称',
+    project_id      BIGINT          COMMENT '重建项目ID',
+    project_name    VARCHAR(200)    COMMENT '重建项目名称',
+    project_estimated_hours DECIMAL(8,2) COMMENT '预计耗时（小时）',
+
+    -- ==================== 用户填写内容 ====================
+    project_desc    TEXT            COMMENT '项目说明',
+    forming_requirement TEXT        COMMENT '成形需求',
+    other_requirement TEXT          COMMENT '其他要求',
+
+    -- ==================== 序号 ====================
+    sort_order      INT             DEFAULT 1 COMMENT '排序序号',
+
+    -- ==================== 公共字段 ====================
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          COMMENT '创建人ID',
+    update_by       BIGINT          COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+
+    PRIMARY KEY (id),
+    KEY idx_order_item_draft_draft_id (draft_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单草稿明细表';
+
+
+-- ============================================================
+-- 订单主表（order_main）
+-- 设计说明：
+-- 1. 表名改为 order_main：与 order_draft 对应，更清晰
+-- 2. business_type 使用字典值：business/test/trial/agent
+-- 3. patient_gender 使用字典值：male/female（替代 TINYINT 0/1）
+-- 4. version 字段：乐观锁，处理并发更新
+-- ============================================================
+DROP TABLE IF EXISTS order_main;
+CREATE TABLE order_main (
+    -- ==================== 主键与编码 ====================
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    order_code     VARCHAR(50)     NOT NULL COMMENT '订单编号',
+
+    -- ==================== 订单类型 ====================
+    order_type      TINYINT         NOT NULL COMMENT '订单类型：1-医疗器械，2-非医疗器械，3-服务',
+    business_type   VARCHAR(20)     NOT NULL COMMENT '业务类型（字典 dict_code：11.1-业务，11.2-测试，11.3-试用，11.4-代理）',
+
+    -- ==================== 机构信息 ====================
+    org_id          BIGINT          NOT NULL COMMENT '提单机构ID',
+    org_name        VARCHAR(200)    COMMENT '提单机构名称（冗余）',
+    operator_id     BIGINT          COMMENT '操作员ID（创建人）',
+    operator_name   VARCHAR(100)    COMMENT '操作员姓名（冗余）',
+    operator_phone  VARCHAR(20)     COMMENT '操作员电话',
+
+    -- ==================== 医院与科室 ====================
+    hospital_id     BIGINT          COMMENT '医院ID',
+    hospital_name   VARCHAR(200)    COMMENT '医院名称（冗余）',
+    dept_id         BIGINT          COMMENT '科室ID',
+    dept_name       VARCHAR(100)    COMMENT '科室名称（冗余）',
+
+    -- ==================== 医生/患者信息 ====================
+    doctor_id       BIGINT          COMMENT '医生ID',
+    doctor_name     VARCHAR(100)    COMMENT '医生姓名',
+    doctor_phone    VARCHAR(20)     COMMENT '医生电话',
+    patient_name    VARCHAR(100)    COMMENT '患者姓名',
+    patient_age     INT             COMMENT '患者年龄',
+    patient_gender  VARCHAR(20)     COMMENT '患者性别（字典 dict_code：12.1-男，12.2-女）',
+
+    -- ==================== 业务信息 ====================
+    is_urgent       TINYINT         DEFAULT 0 COMMENT '是否加急：0-否，1-是',
+    is_postal       TINYINT         DEFAULT 0 COMMENT '是否邮寄：0-否，1-是',
+    postal_address  TEXT            COMMENT '邮寄地址',
+
+    -- ==================== 时效信息 ====================
+    expected_delivery_date DATETIME   COMMENT '期望交付时间',
+    design_start_time     DATETIME    COMMENT '设计开始时间',
+    design_submit_time     DATETIME    COMMENT '设计提交时间',
+    user_confirm_time     DATETIME    COMMENT '用户确认时间（服务订单）',
+    actual_complete_time  DATETIME    COMMENT '实际完成时间',
+
+    -- ==================== 【核心】阶段 + 状态 ====================
+    phase           TINYINT         NOT NULL DEFAULT 1 COMMENT '当前阶段：1-订单，2-设计，3-生产',
+    status          TINYINT         NOT NULL DEFAULT 10 COMMENT '当前状态',
+
+    -- ==================== 当前处理人 ====================
+    current_handler_id BIGINT        COMMENT '当前处理人ID',
+    current_handler_name VARCHAR(100) COMMENT '当前处理人姓名',
+    designer_id     BIGINT          COMMENT '设计师ID',
+    producer_id     BIGINT          COMMENT '生产员ID',
+
+    -- ==================== 审核信息 ====================
+    audit_remark    TEXT            COMMENT '审核备注（驳回原因等）',
+    design_review_remark TEXT        COMMENT '设计审核备注',
+
+    -- ==================== 乐观锁 ====================
+    version         INT             DEFAULT 0 COMMENT '版本号（乐观锁）',
+
+    -- ==================== 公共字段（BaseEntity） ====================
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          COMMENT '创建人ID',
+    update_by       BIGINT          COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_order_main_code (order_code, is_deleted),
+    KEY idx_order_main_org_id (org_id),
+    KEY idx_order_main_hospital_id (hospital_id),
+    KEY idx_order_main_operator_id (operator_id),
+    KEY idx_order_main_phase_status (phase, status),
+    KEY idx_order_main_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单主表';
+
+
+-- ============================================================
+-- 订单明细表（order_item）
+-- 设计说明：存储订单中的重建项目明细，与 order_main 一对多关系
+-- ============================================================
+DROP TABLE IF EXISTS order_item;
+CREATE TABLE order_item (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    order_id        BIGINT          NOT NULL COMMENT '订单ID',
+    order_code     VARCHAR(50)     NOT NULL COMMENT '订单编号',
+
+    -- ==================== 重建项目信息 ====================
+    body_part_id    BIGINT          COMMENT '部位ID',
+    body_part_name  VARCHAR(100)    COMMENT '部位名称',
+    project_id      BIGINT          COMMENT '重建项目ID',
+    project_name    VARCHAR(200)    COMMENT '重建项目名称',
+    project_estimated_hours DECIMAL(8,2) COMMENT '预计耗时（小时）',
+
+    -- ==================== 用户填写内容 ====================
+    project_desc    TEXT            COMMENT '项目说明',
+    forming_requirement TEXT         COMMENT '成形需求',
+    other_requirement TEXT         COMMENT '其他要求',
+
+    -- ==================== 序号 ====================
+    sort_order      INT             DEFAULT 1 COMMENT '排序序号',
+
+    -- ==================== 公共字段 ====================
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          COMMENT '创建人ID',
+    update_by       BIGINT          COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+
+    PRIMARY KEY (id),
+    KEY idx_order_item_order_id (order_id),
+    KEY idx_order_item_order_code (order_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单明细表';
+
+
+-- ============================================================
+-- 订单文件关联表（order_file）
+-- 设计说明：
+-- 1. file_detail：存储文件元数据（x-file-storage 框架标准），object_type 存储 dict_code
+-- 2. order_file：作为业务层索引表，关联 file_detail.id + 订单ID
+-- 3. 提供文件类别细分、数据包编号、订单明细关联能力
+-- ============================================================
+DROP TABLE IF EXISTS order_file;
+CREATE TABLE order_file (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    order_id        BIGINT          NOT NULL COMMENT '订单ID（order_main.id）',
+    order_code     VARCHAR(50)     NOT NULL COMMENT '订单编号',
+
+    -- ==================== 文件关联 ====================
+    file_id         VARCHAR(32)     NOT NULL COMMENT '文件ID（file_detail.id）',
+    file_category   VARCHAR(20)     NOT NULL COMMENT '文件类别（字典 dict_code：10.1-影像数据，10.2-影像报告，10.3-订单其他附件...）',
+    package_no      VARCHAR(50)     COMMENT '数据包编号（用于关联同一订单下的多个数据包）',
+
+    -- ==================== 关联明细 ====================
+    order_item_id   BIGINT          COMMENT '关联的订单明细ID',
+
+    -- ==================== 公共字段 ====================
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          COMMENT '创建人ID',
+    update_by       BIGINT          COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+
+    PRIMARY KEY (id),
+    KEY idx_order_file_order_id (order_id),
+    KEY idx_order_file_file_id (file_id),
+    KEY idx_order_file_category (file_category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单文件关联表';
+
+
+-- ============================================================
+-- 订单状态历史表（order_status_history）
+-- 设计说明：记录订单的状态变更历史，用于追溯和审计
+-- ============================================================
+DROP TABLE IF EXISTS order_status_history;
+CREATE TABLE order_status_history (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    order_id        BIGINT          NOT NULL COMMENT '订单ID',
+    order_code     VARCHAR(50)     NOT NULL COMMENT '订单编号',
+
+    -- ==================== 状态变更信息 ====================
+    phase           TINYINT         COMMENT '变更时阶段',
+    from_status     TINYINT         COMMENT '变更前状态',
+    to_status       TINYINT         COMMENT '变更后状态',
+    action          VARCHAR(50)     COMMENT '触发动作（如 SUBMIT、AUDIT_PASS）',
+    action_name     VARCHAR(100)    COMMENT '动作名称',
+
+    -- ==================== 操作人信息 ====================
+    operator_id     BIGINT          COMMENT '操作人ID',
+    operator_name   VARCHAR(100)    COMMENT '操作人姓名',
+    remark          TEXT            COMMENT '备注（如驳回原因）',
+
+    -- ==================== 公共字段 ====================
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+
+    PRIMARY KEY (id),
+    KEY idx_order_status_history_order_id (order_id),
+    KEY idx_order_status_history_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单状态历史表';

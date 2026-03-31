@@ -546,3 +546,31 @@ INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, so
 -- 文件业务类型（子节点：通用）
 INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
 (67, 50, '10.17', '通用文件',       '10.17', 2, 17, 1);
+
+
+-- ============================================================
+-- 订单业务类型字典数据初始化（dict_code=11）
+-- 设计说明：用于区分订单的业务类型（业务/测试/试用/代理）
+-- 存储时使用 dict_code 值（如 11.1）而非 dict_value
+-- ============================================================
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+-- 父节点
+(68, 0, '11', '订单业务类型', NULL, 1, 11, 1),
+-- 子节点
+(69, 68, '11.1', '业务', 'business', 2, 1, 1),
+(70, 68, '11.2', '测试', 'test', 2, 2, 1),
+(71, 68, '11.3', '试用', 'trial', 2, 3, 1),
+(72, 68, '11.4', '代理', 'agent', 2, 4, 1);
+
+
+-- ============================================================
+-- 患者性别字典数据初始化（dict_code=12）
+-- 设计说明：用于订单中患者性别字段，区别于 sys_user.sex 使用的 dict_code=9
+-- 存储时使用 dict_code 值（如 12.1）而非 dict_value
+-- ============================================================
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+-- 父节点
+(73, 0, '12', '患者性别', NULL, 1, 12, 1),
+-- 子节点
+(74, 73, '12.1', '男', 'male', 2, 1, 1),
+(75, 73, '12.2', '女', 'female', 2, 2, 1);

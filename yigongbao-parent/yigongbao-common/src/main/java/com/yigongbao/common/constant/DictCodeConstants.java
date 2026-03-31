@@ -26,4 +26,46 @@ public final class DictCodeConstants {
      * 字典值：逗号分隔的多选值
      */
     public static final String AGENT_PRODUCT_LINE = "5";
+
+    // ==================== 订单业务类型 ====================
+    /**
+     * 订单业务类型（父节点 dict_code）
+     */
+    public static final String ORDER_BUSINESS_TYPE = "11";
+
+    /**
+     * 业务
+     */
+    public static final String ORDER_BUSINESS_TYPE_BUSINESS = "11.1";
+
+    /**
+     * 测试
+     */
+    public static final String ORDER_BUSINESS_TYPE_TEST = "11.2";
+
+    /**
+     * 试用
+     */
+    public static final String ORDER_BUSINESS_TYPE_TRIAL = "11.3";
+
+    /**
+     * 代理
+     */
+    public static final String ORDER_BUSINESS_TYPE_AGENT = "11.4";
+
+    // ==================== 患者性别 ====================
+    /**
+     * 患者性别（父节点 dict_code）
+     */
+    public static final String PATIENT_GENDER = "12";
+
+    /**
+     * 男
+     */
+    public static final String PATIENT_GENDER_MALE = "12.1";
+
+    /**
+     * 女
+     */
+    public static final String PATIENT_GENDER_FEMALE = "12.2";
 }
