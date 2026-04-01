@@ -53,6 +53,12 @@ Usage notes:
 </skill>
 
 <skill>
+<name>code-review-expert</name>
+<description>"Expert code review of current git changes with a senior engineer lens. Detects SOLID violations, security risks, and proposes actionable improvements."</description>
+<location>global</location>
+</skill>
+
+<skill>
 <name>dispatching-parallel-agents</name>
 <description>Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies</description>
 <location>global</location>

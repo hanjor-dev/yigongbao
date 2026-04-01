@@ -10,8 +10,14 @@ import java.time.LocalDateTime;
  * 更新订单 DTO
  * 用于订单信息的修改操作
  *
+ * 【重要】needsPhysicalDelivery 变更规则：
+ * - 仅在订单阶段（phase=1）允许修改
+ * - 仅允许 0→1 的变更（不需要→需要实体交付）
+ * - 不允许 1→0 的变更（需要→不需要实体交付）
+ * 业务校验逻辑在 OrderMainServiceImpl.updateOrder 中实现
+ *
  * @author hanjor
- * @date 2026-03-31
+ * @date 2026-04-01
  */
 @Data
 public class UpdateOrderDTO implements Serializable {
@@ -72,4 +78,10 @@ public class UpdateOrderDTO implements Serializable {
      * 期望交付时间
      */
     private LocalDateTime expectedDeliveryDate;
+
+    /**
+     * 是否需要实体交付：0-不需要，1-需要
+     * 【变更规则】仅在订单阶段允许修改，仅允许 0→1，不允许 1→0
+     */
+    private Integer needsPhysicalDelivery;
 }

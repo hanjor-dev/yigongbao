@@ -184,13 +184,22 @@ public enum ErrorCodeEnum {
     ORDER_BUSINESS_TYPE_INVALID(696, "业务类型不合法"),
     ORDER_PATIENT_GENDER_INVALID(697, "患者性别不合法"),
 
+    // 是否需要实体交付相关
+    ORDER_NEEDS_PHYSICAL_DELIVERY_INVALID(698, "是否需要实体交付值不合法"),
+    ORDER_NEEDS_PHYSICAL_DELIVERY_CHANGE_FORBIDDEN(699, "需要实体交付的订单不允许修改为不需要实体交付"),
+
     // 审核相关
-    ORDER_AUDIT_REMARK_REQUIRED(698, "审核驳回时必须填写驳回原因"),
+    ORDER_AUDIT_REMARK_REQUIRED(700, "审核驳回时必须填写驳回原因"),
 
     // 修改申请相关
-    ORDER_MODIFY_APPLY_NOT_FOUND(699, "修改申请不存在"),
-    ORDER_MODIFY_APPLY_STATUS_ERROR(700, "修改申请状态不合法"),
-    ORDER_MODIFY_APPLY_ALREADY_PROCESSED(701, "该修改申请已处理");
+    ORDER_MODIFY_APPLY_NOT_FOUND(701, "修改申请不存在"),
+    ORDER_MODIFY_APPLY_STATUS_ERROR(702, "修改申请状态不合法"),
+    ORDER_MODIFY_APPLY_ALREADY_PROCESSED(703, "该修改申请已处理"),
+
+    // 状态机循环限制
+    ORDER_EXCESSIVE_AUDIT_REJECT(704, "审核驳回次数超过上限（%s次），请联系管理员处理"),
+    ORDER_EXCESSIVE_REWORK(705, "返工次数超过上限（%s次），请联系管理员处理"),
+    ORDER_EXCESSIVE_DESIGN_REJECT(706, "设计审核驳回次数超过上限（%s次），请联系管理员处理");
 
     /**
      * 错误码

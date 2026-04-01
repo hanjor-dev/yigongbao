@@ -196,7 +196,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
                     log.warn("草稿不存在，id={}", dto.getId());
                     throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_FOUND);
                 }
-                if (!currentUserId.equals(entity.getOperatorId())) {
+                if (!Objects.equals(currentUserId, entity.getOperatorId())) {
                     log.warn("只能修改自己的草稿，id={}, operatorId={}, currentUserId={}",
                             dto.getId(), entity.getOperatorId(), currentUserId);
                     throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_MINE);
@@ -439,6 +439,8 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         vo.setOperatorName(entity.getOperatorName());
         vo.setOrderType(entity.getOrderType());
         vo.setOrderTypeName(getOrderTypeName(entity.getOrderType()));
+        vo.setNeedsPhysicalDelivery(entity.getNeedsPhysicalDelivery());
+        vo.setNeedsPhysicalDeliveryName(getNeedsPhysicalDeliveryName(entity.getNeedsPhysicalDelivery()));
         vo.setBusinessType(entity.getBusinessType());
         vo.setBusinessTypeName(getBusinessTypeName(entity.getBusinessType()));
         vo.setOrgId(entity.getOrgId());
@@ -470,6 +472,8 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         vo.setOperatorName(entity.getOperatorName());
         vo.setOrderType(entity.getOrderType());
         vo.setOrderTypeName(getOrderTypeName(entity.getOrderType()));
+        vo.setNeedsPhysicalDelivery(entity.getNeedsPhysicalDelivery());
+        vo.setNeedsPhysicalDeliveryName(getNeedsPhysicalDeliveryName(entity.getNeedsPhysicalDelivery()));
         vo.setBusinessType(entity.getBusinessType());
         vo.setBusinessTypeName(getBusinessTypeName(entity.getBusinessType()));
         vo.setOrgId(entity.getOrgId());
@@ -547,7 +551,21 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         return switch (orderType) {
             case 1 -> "医疗器械";
             case 2 -> "非医疗器械";
-            case 3 -> "服务";
+            default -> null;
+        };
+    }
+
+    /**
+     * 获取是否需要实体交付名称
+     *
+     * @param needsPhysicalDelivery 是否需要实体交付
+     * @return 显示名称
+     */
+    private String getNeedsPhysicalDeliveryName(Integer needsPhysicalDelivery) {
+        if (needsPhysicalDelivery == null) return null;
+        return switch (needsPhysicalDelivery) {
+            case 0 -> "不需要实体交付";
+            case 1 -> "需要实体交付";
             default -> null;
         };
     }

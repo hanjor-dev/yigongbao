@@ -5,7 +5,8 @@
 CREATE TABLE order_draft (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     operator_id BIGINT COMMENT '操作员ID（创建人）',
-    order_type INT COMMENT '订单类型：1-医疗器械，2-非医疗器械，3-服务',
+    order_type INT COMMENT '订单类型：1-医疗器械，2-非医疗器械',
+    needs_physical_delivery INT NOT NULL DEFAULT 1 COMMENT '是否需要实体交付：0-不需要，1-需要',
     business_type VARCHAR(50) COMMENT '业务类型（字典 dict_code）',
     org_id BIGINT COMMENT '提单机构ID',
     org_name VARCHAR(128) COMMENT '提单机构名称',
@@ -58,7 +59,8 @@ CREATE TABLE order_item_draft (
 CREATE TABLE order_main (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_code VARCHAR(64) COMMENT '订单编号',
-    order_type INT COMMENT '订单类型：1-医疗器械，2-非医疗器械，3-服务',
+    order_type INT COMMENT '订单类型：1-医疗器械，2-非医疗器械',
+    needs_physical_delivery INT NOT NULL DEFAULT 1 COMMENT '是否需要实体交付：0-不需要，1-需要',
     business_type VARCHAR(50) COMMENT '业务类型（字典 dict_code）',
     org_id BIGINT COMMENT '提单机构ID',
     org_name VARCHAR(128) COMMENT '提单机构名称',
@@ -83,7 +85,7 @@ CREATE TABLE order_main (
     design_submit_time TIMESTAMP COMMENT '设计提交时间',
     user_confirm_time TIMESTAMP COMMENT '用户确认时间',
     actual_complete_time TIMESTAMP COMMENT '实际完成时间',
-    phase INT DEFAULT 1 COMMENT '当前阶段：1-订单，2-设计，3-生产',
+    phase INT DEFAULT 1 COMMENT '当前阶段：1-订单，2-设计，3-打印，4-后处理，5-质检，6-仓储，7-确认，8-完成',
     status INT DEFAULT 20 COMMENT '当前状态',
     current_handler_id BIGINT COMMENT '当前处理人ID',
     current_handler_name VARCHAR(64) COMMENT '当前处理人姓名',

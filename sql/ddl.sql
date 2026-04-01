@@ -797,7 +797,13 @@ CREATE TABLE order_draft (
     operator_id     BIGINT          NOT NULL COMMENT '操作员ID（创建人）',
 
     -- ==================== 订单类型（固定不变） ====================
-    order_type      TINYINT         NOT NULL COMMENT '订单类型：1-医疗器械，2-非医疗器械，3-服务',
+    order_type      TINYINT         NOT NULL COMMENT '订单类型：1-医疗器械，2-非医疗器械',
+
+    -- ==================== 是否需要实体交付 ====================
+    -- needsPhysicalDelivery = 1：走完整生产流程（打印→后处理→质检→仓储）
+    -- needsPhysicalDelivery = 0：跳过生产阶段，直接到确认阶段
+    needs_physical_delivery TINYINT DEFAULT 1 COMMENT '是否需要实体交付：0-不需要，1-需要',
+
     business_type   VARCHAR(20)     NOT NULL COMMENT '业务类型（字典 dict_code：11.1-业务，11.2-测试，11.3-试用，11.4-代理）',
 
     -- ==================== 机构信息 ====================
@@ -898,7 +904,13 @@ CREATE TABLE order_main (
     order_code     VARCHAR(50)     NOT NULL COMMENT '订单编号',
 
     -- ==================== 订单类型 ====================
-    order_type      TINYINT         NOT NULL COMMENT '订单类型：1-医疗器械，2-非医疗器械，3-服务',
+    order_type      TINYINT         NOT NULL COMMENT '订单类型：1-医疗器械，2-非医疗器械',
+
+    -- ==================== 是否需要实体交付 ====================
+    -- needsPhysicalDelivery = 1：走完整生产流程（打印→后处理→质检→仓储）
+    -- needsPhysicalDelivery = 0：跳过生产阶段，直接到确认阶段
+    needs_physical_delivery TINYINT DEFAULT 1 COMMENT '是否需要实体交付：0-不需要，1-需要',
+
     business_type   VARCHAR(20)     NOT NULL COMMENT '业务类型（字典 dict_code：11.1-业务，11.2-测试，11.3-试用，11.4-代理）',
 
     -- ==================== 机构信息 ====================
@@ -935,7 +947,7 @@ CREATE TABLE order_main (
     actual_complete_time  DATETIME    COMMENT '实际完成时间',
 
     -- ==================== 【核心】阶段 + 状态 ====================
-    phase           TINYINT         NOT NULL DEFAULT 1 COMMENT '当前阶段：1-订单，2-设计，3-生产',
+    phase           TINYINT         NOT NULL DEFAULT 1 COMMENT '当前阶段：1-订单，2-设计，3-打印，4-后处理，5-质检，6-仓储，7-确认，8-完成',
     status          TINYINT         NOT NULL DEFAULT 10 COMMENT '当前状态',
 
     -- ==================== 当前处理人 ====================

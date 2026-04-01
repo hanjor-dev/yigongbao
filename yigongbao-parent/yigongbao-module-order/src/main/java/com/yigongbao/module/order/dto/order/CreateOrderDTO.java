@@ -23,10 +23,18 @@ public class CreateOrderDTO implements Serializable {
 
     // ==================== 订单类型 ====================
     /**
-     * 订单类型：1-医疗器械，2-非医疗器械，3-服务
+     * 订单类型：1-医疗器械，2-非医疗器械
      */
     @NotNull(message = "订单类型不能为空")
     private Integer orderType;
+
+    /**
+     * 是否需要实体交付：0-不需要，1-需要
+     */
+    @NotNull(message = "是否需要实体交付不能为空")
+    @Min(value = 0, message = "是否需要实体交付值不合法")
+    @Max(value = 1, message = "是否需要实体交付值不合法")
+    private Integer needsPhysicalDelivery;
 
     /**
      * 业务类型（字典 dict_code：11.1-业务，11.2-测试，11.3-试用，11.4-代理）

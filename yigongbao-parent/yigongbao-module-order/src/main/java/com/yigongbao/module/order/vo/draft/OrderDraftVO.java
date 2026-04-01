@@ -37,7 +37,7 @@ public class OrderDraftVO implements Serializable {
 
     // ==================== 订单类型 ====================
     /**
-     * 订单类型：1-医疗器械，2-非医疗器械，3-服务
+     * 订单类型：1-医疗器械，2-非医疗器械
      */
     private Integer orderType;
 
@@ -45,6 +45,16 @@ public class OrderDraftVO implements Serializable {
      * 订单类型名称（补充显示）
      */
     private String orderTypeName;
+
+    /**
+     * 是否需要实体交付：0-不需要，1-需要
+     */
+    private Integer needsPhysicalDelivery;
+
+    /**
+     * 是否需要实体交付名称（补充显示）
+     */
+    private String needsPhysicalDeliveryName;
 
     /**
      * 业务类型（字典 dict_code：11.1-业务，11.2-测试，11.3-试用，11.4-代理）

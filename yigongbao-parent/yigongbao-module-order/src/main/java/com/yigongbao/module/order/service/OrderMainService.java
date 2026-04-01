@@ -6,7 +6,7 @@ import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
 import com.yigongbao.module.order.dto.order.UpdateOrderDTO;
 import com.yigongbao.module.order.entity.OrderDraftEntity;
-import com.yigongbao.module.order.entity.OrderMainEntity;
+import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
 

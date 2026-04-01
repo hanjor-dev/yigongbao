@@ -9,9 +9,13 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
-import com.yigongbao.common.enums.order.OrderActionEnum;
-import com.yigongbao.common.enums.order.OrderPhaseEnum;
-import com.yigongbao.common.enums.order.OrderStatusEnum;
+import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowPhaseEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
+import com.yigongbao.flow.result.TransitionResult;
+import com.yigongbao.flow.facade.FlowFacade;
+import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
@@ -22,7 +26,6 @@ import com.yigongbao.module.order.dto.order.UpdateOrderDTO;
 import com.yigongbao.module.order.entity.OrderDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
-import com.yigongbao.module.order.entity.OrderMainEntity;
 import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.mapper.OrderDraftMapper;
 import com.yigongbao.module.order.mapper.OrderItemDraftMapper;
@@ -30,7 +33,6 @@ import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderFileMapper;
 import com.yigongbao.module.order.service.OrderMainService;
-import com.yigongbao.module.order.service.orderFlow.OrderFlowStateMachineService;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
 import com.yigongbao.module.system.config.service.ConfigService;
@@ -50,8 +52,23 @@ import java.util.stream.Collectors;
  * 订单主表 Service 实现类
  * 处理订单相关的业务逻辑，包括订单CRUD、状态流转、审核流程等
  *
+ * 【流程引擎调用说明】
+ * 所有状态流转统一通过 FlowFacade 执行，包含以下操作：
+ * - 查询当前可执行动作：{@link #listAvailableActions(Long)}
+ * - 提交订单：SUBMIT_ORDER 动作
+ * - 撤回订单：WITHDRAW 动作
+ * - 审核通过：DATA_AUDIT_PASS 动作
+ * - 审核驳回：DATA_AUDIT_REJECT 动作
+ * - 创建记录：CREATE 动作（仅记录历史，不改变状态）
+ *
+ * 【needsPhysicalDelivery 变更规则】
+ * - 仅在订单阶段（phase=1）允许修改
+ * - 仅允许 0→1 的变更（不需要→需要实体交付）
+ * - 不允许 1→0 的变更（需要→不需要实体交付）
+ * 校验逻辑见 {@link #validateNeedsPhysicalDeliveryChange(OrderMainEntity, UpdateOrderDTO)}
+ *
  * @author hanjor
- * @date 2026-03-31
+ * @date 2026-04-01
  */
 @Service
 @RequiredArgsConstructor
@@ -64,9 +81,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderFileMapper orderFileMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
-    private final OrderFlowStateMachineService orderFlowStateMachineService;
+    private final FlowFacade flowFacade;
     private final ConfigService configService;
     private final UserService userService;
+
+    // ==================== 私有方法 ====================
 
     /**
      * 获取当前登录用户ID
@@ -82,8 +101,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
     }
 
+    // ==================== 查询操作 ====================
+
     /**
      * 分页查询订单列表
+     * 仅查询订单阶段（phase=1）的订单，按创建时间倒序排列
      *
      * @param pageNum 页码（默认1）
      * @param pageSize 每页条数（默认10）
@@ -97,13 +119,16 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         log.info("分页查询订单列表，pageNum={}, pageSize={}, orderCode={}, hospitalId={}, status={}",
                 pageNum, pageSize, orderCode, hospitalId, status);
         try {
+            // 构建分页对象
             Page<OrderMainEntity> page = new Page<>(pageNum, pageSize);
+            // 构建查询条件：限定订单阶段=1，支持订单编号模糊查询
             LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.like(StrUtil.isNotBlank(orderCode), OrderMainEntity::getOrderCode, orderCode)
                     .eq(Objects.nonNull(hospitalId), OrderMainEntity::getHospitalId, hospitalId)
                     .eq(Objects.nonNull(status), OrderMainEntity::getStatus, status)
                     .eq(OrderMainEntity::getPhase, 1)
                     .orderByDesc(OrderMainEntity::getCreateTime);
+            // 执行分页查询并转换为 VO
             IPage<OrderMainEntity> pageResult = page(page, wrapper);
             IPage<OrderListVO> voPage = pageResult.convert(this::toOrderListVO);
             log.info("分页查询订单列表成功，总数={}", pageResult.getTotal());
@@ -114,17 +139,27 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
     }
 
+    /**
+     * 查询订单详情
+     * 包含订单基本信息、明细列表、可执行动作列表
+     *
+     * @param id 订单ID
+     * @return 订单详情 VO
+     * @throws BusinessException 订单不存在
+     */
     @Override
     public OrderDetailVO getOrderDetail(Long id) {
         log.info("查询订单详情，id={}", id);
         try {
+            // 根据ID查询订单实体，校验存在性
             OrderMainEntity entity = getById(id);
             if (entity == null) {
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
+            // 转换为详情 VO，补充性别名称等显示字段
             OrderDetailVO vo = toOrderDetailVO(entity);
-            // 查询订单明细列表
+            // 查询订单明细列表，按排序字段升序
             List<OrderItemEntity> items = orderItemMapper.selectList(
                     new LambdaQueryWrapper<OrderItemEntity>()
                             .eq(OrderItemEntity::getOrderId, id)
@@ -132,8 +167,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                             .orderByAsc(OrderItemEntity::getSortOrder));
             vo.setItems(items.stream().map(this::toOrderItemVO).collect(Collectors.toList()));
             vo.setItemCount(items.size());
-            // 查询可执行动作
-            vo.setAvailableActions(orderFlowStateMachineService.getAvailableActions(entity));
+            // 查询当前可执行的动作列表，用于前端按钮展示
+            vo.setAvailableActions(flowFacade.getAvailableActions(entity.getId()));
             log.info("查询订单详情成功，id={}", id);
             return vo;
         } catch (BusinessException e) {
@@ -145,22 +180,65 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     }
 
     /**
-     * 更新订单信息（公司管理员/10分钟内）
+     * 查询订单可执行的动作列表
+     *
+     * @param id 订单ID
+     * @return 可执行的动作编码列表
+     * @throws BusinessException 订单不存在
+     */
+    @Override
+    public List<String> listAvailableActions(Long id) {
+        log.info("查询订单可执行动作，id={}", id);
+        try {
+            // 校验订单存在
+            OrderMainEntity entity = getById(id);
+            if (entity == null) {
+                log.warn("订单不存在，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+            }
+            // 通过 FlowFacade 获取当前状态可执行的动作
+            List<String> actions = flowFacade.getAvailableActions(id);
+            log.info("查询订单可执行动作成功，id={}, actions={}", id, actions);
+            return actions;
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("查询订单可执行动作异常，id={}", id, e);
+            throw e;
+        }
+    }
+
+    // ==================== 修改操作 ====================
+
+    /**
+     * 更新订单信息
+     * 仅公司管理员或提交后10分钟内的提单人/区域管理员可修改
+     *
+     * 【needsPhysicalDelivery 变更规则】
+     * - 仅在订单阶段（phase=1）允许修改
+     * - 仅允许 0→1 的变更（不需要→需要实体交付）
+     * - 不允许 1→0 的变更（需要→不需要实体交付）
      *
      * @param id 订单ID
      * @param dto 更新参数
+     * @throws BusinessException 订单不存在、变更规则不满足
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateOrder(Long id, UpdateOrderDTO dto) {
         log.info("更新订单，id={}", id);
         try {
+            // 校验订单存在
             OrderMainEntity entity = getById(id);
             if (entity == null) {
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
+            // 校验 needsPhysicalDelivery 变更规则（不在订单阶段不允许修改，不允许从需要改为不需要）
+            validateNeedsPhysicalDeliveryChange(entity, dto);
+            // 排除不可变更字段后复制属性
             BeanUtils.copyProperties(dto, entity, "id", "orderCode", "phase", "status", "createTime", "updateTime", "createBy", "updateBy", "version");
+            // 更新订单
             updateById(entity);
             log.info("更新订单成功，id={}", id);
         } catch (BusinessException e) {
@@ -171,16 +249,57 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
     }
 
+    /**
+     * 校验是否需要实体交付的变更规则
+     *
+     * @param entity 订单实体（变更前的值）
+     * @param dto 更新参数（变更后的值）
+     * @throws BusinessException 违反变更规则
+     */
+    private void validateNeedsPhysicalDeliveryChange(OrderMainEntity entity, UpdateOrderDTO dto) {
+        // 如果 DTO 中没有传入 needsPhysicalDelivery，跳过校验
+        if (dto.getNeedsPhysicalDelivery() == null) {
+            return;
+        }
+        Integer oldValue = entity.getNeedsPhysicalDelivery();
+        Integer newValue = dto.getNeedsPhysicalDelivery();
+        // 如果值未变化，跳过校验
+        if (Objects.equals(oldValue, newValue)) {
+            return;
+        }
+        // 仅在订单阶段允许修改
+        if (!Objects.equals(entity.getPhase(), FlowPhaseEnum.ORDER.getValue())) {
+            log.warn("needsPhysicalDelivery 仅在订单阶段允许修改，orderId={}, phase={}", entity.getId(), entity.getPhase());
+            throw new BusinessException(ErrorCodeEnum.ORDER_NEEDS_PHYSICAL_DELIVERY_CHANGE_FORBIDDEN);
+        }
+        // 不允许 1→0 的变更（需要→不需要实体交付）
+        if (Objects.equals(oldValue, 1) && Objects.equals(newValue, 0)) {
+            log.warn("需要实体交付的订单不允许修改为不需要实体交付，orderId={}", entity.getId());
+            throw new BusinessException(ErrorCodeEnum.ORDER_NEEDS_PHYSICAL_DELIVERY_CHANGE_FORBIDDEN);
+        }
+        // 0→1 是允许的变更，不做额外处理
+        log.info("needsPhysicalDelivery 变更校验通过，orderId={}, oldValue={}, newValue={}", entity.getId(), oldValue, newValue);
+    }
+
+    /**
+     * 删除订单
+     * 仅草稿状态的订单允许删除
+     *
+     * @param id 订单ID
+     * @throws BusinessException 订单不存在
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void removeOrder(Long id) {
         log.info("删除订单，id={}", id);
         try {
+            // 校验订单存在
             OrderMainEntity entity = getById(id);
             if (entity == null) {
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
+            // 删除订单主表（物理删除）
             removeById(id);
             // 清理关联明细
             orderItemMapper.delete(new LambdaQueryWrapper<OrderItemEntity>().eq(OrderItemEntity::getOrderId, id));
@@ -193,21 +312,39 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
     }
 
+    // ==================== 流程操作 ====================
+
+    /**
+     * 提交订单
+     * 将草稿状态的订单正式提交，进入数据审核流程
+     *
+     * 【流转逻辑】
+     * - 提交后 phase 推进到当前阶段，status 变为审核中状态
+     * - 由 FlowFacade 执行 SUBMIT_ORDER 动作，返回流转结果
+     *
+     * @param id 订单ID
+     * @throws BusinessException 订单不存在
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void submitOrder(Long id) {
         Long currentUserId = getCurrentUserId();
         log.info("提交订单，id={}, currentUserId={}", id, currentUserId);
         try {
+            // 校验订单存在
             OrderMainEntity entity = getById(id);
             if (entity == null) {
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            Integer targetStatus = orderFlowStateMachineService.executeTransition(entity, OrderActionEnum.SUBMIT_ORDER, currentUserId, null, null);
-            entity.setStatus(targetStatus);
+            // 通过 FlowFacade 执行提交动作，获取流转后的 phase 和 status
+            TransitionResult result = flowFacade.executeFlow(
+                    id, FlowActionEnum.SUBMIT_ORDER, FlowOperator.of(currentUserId, null));
+            // 更新订单的阶段和状态
+            entity.setPhase(result.getTargetPhase());
+            entity.setStatus(result.getFinalStatus());
             updateById(entity);
-            log.info("提交订单成功，id={}, targetStatus={}", id, targetStatus);
+            log.info("提交订单成功，id={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
@@ -216,21 +353,37 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
     }
 
+    /**
+     * 撤回订单
+     * 将提交后的订单撤回至草稿状态，仅允许在审核前操作
+     *
+     * 【流转逻辑】
+     * - 执行 WITHDRAW 动作，订单退回草稿状态
+     *
+     * @param id 订单ID
+     * @throws BusinessException 订单不存在
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void withdrawOrder(Long id) {
         Long currentUserId = getCurrentUserId();
         log.info("撤回订单，id={}, currentUserId={}", id, currentUserId);
         try {
+            // 校验订单存在
             OrderMainEntity entity = getById(id);
             if (entity == null) {
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            Integer targetStatus = orderFlowStateMachineService.executeTransition(entity, OrderActionEnum.WITHDRAW, currentUserId, null, null);
-            entity.setStatus(targetStatus);
+            // 通过 FlowFacade 执行撤回动作
+            TransitionResult result = flowFacade.executeFlow(
+                    id, FlowActionEnum.WITHDRAW, FlowOperator.of(currentUserId, null));
+            // 更新订单的阶段、状态和当前处理人
+            entity.setPhase(result.getTargetPhase());
+            entity.setStatus(result.getFinalStatus());
+            entity.setCurrentHandlerId(currentUserId);
             updateById(entity);
-            log.info("撤回订单成功，id={}, targetStatus={}", id, targetStatus);
+            log.info("撤回订单成功，id={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
@@ -239,22 +392,39 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
     }
 
+    /**
+     * 审核通过
+     * 审核人确认订单数据无误，流程推进至下一阶段
+     *
+     * 【流转逻辑】
+     * - 执行 DATA_AUDIT_PASS 动作，数据审核通过
+     * - 根据 needsPhysicalDelivery 决定后续流程分支
+     *
+     * @param id 订单ID
+     * @param dto 审核参数（含驳回原因remark）
+     * @throws BusinessException 订单不存在
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void auditPass(Long id, AuditOrderDTO dto) {
         Long currentUserId = getCurrentUserId();
         log.info("审核通过，id={}, currentUserId={}", id, currentUserId);
         try {
+            // 校验订单存在
             OrderMainEntity entity = getById(id);
             if (entity == null) {
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            Integer targetStatus = orderFlowStateMachineService.executeTransition(entity, OrderActionEnum.DATA_AUDIT_PASS, currentUserId, null, dto.getRemark());
-            entity.setStatus(targetStatus);
+            // 通过 FlowFacade 执行审核通过动作
+            TransitionResult result = flowFacade.executeFlow(
+                    id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, null, dto.getRemark()));
+            // 更新订单的阶段、状态和当前处理人
+            entity.setPhase(result.getTargetPhase());
+            entity.setStatus(result.getFinalStatus());
             entity.setCurrentHandlerId(currentUserId);
             updateById(entity);
-            log.info("审核通过成功，id={}, targetStatus={}", id, targetStatus);
+            log.info("审核通过成功，id={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
@@ -263,26 +433,47 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
     }
 
+    /**
+     * 审核驳回
+     * 审核人驳回订单，订单退回可编辑状态，申请人可修改后重新提交
+     *
+     * 【驳回规则】
+     * - 必须填写驳回原因（remark）
+     *
+     * 【流转逻辑】
+     * - 执行 DATA_AUDIT_REJECT 动作，订单退回草稿状态
+     *
+     * @param id 订单ID
+     * @param dto 审核参数（含驳回原因remark）
+     * @throws BusinessException 订单不存在、驳回原因未填写
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void auditReject(Long id, AuditOrderDTO dto) {
         Long currentUserId = getCurrentUserId();
         log.info("审核驳回，id={}, currentUserId={}, remark={}", id, currentUserId, dto.getRemark());
         try {
+            // 校验订单存在
             OrderMainEntity entity = getById(id);
             if (entity == null) {
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
+            // 驳回时必须填写驳回原因
             if (StrUtil.isBlank(dto.getRemark())) {
                 log.warn("审核驳回时必须填写驳回原因");
                 throw new BusinessException(ErrorCodeEnum.ORDER_AUDIT_REMARK_REQUIRED);
             }
-            Integer targetStatus = orderFlowStateMachineService.executeTransition(entity, OrderActionEnum.DATA_AUDIT_REJECT, currentUserId, null, dto.getRemark());
-            entity.setStatus(targetStatus);
+            // 通过 FlowFacade 执行审核驳回动作
+            TransitionResult result = flowFacade.executeFlow(
+                    id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, null, dto.getRemark()));
+            // 更新订单的阶段、状态、驳回原因和当前处理人
+            entity.setPhase(result.getTargetPhase());
+            entity.setStatus(result.getFinalStatus());
             entity.setAuditRemark(dto.getRemark());
+            entity.setCurrentHandlerId(currentUserId);
             updateById(entity);
-            log.info("审核驳回成功，id={}, targetStatus={}", id, targetStatus);
+            log.info("审核驳回成功，id={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
@@ -291,47 +482,43 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
     }
 
-    @Override
-    public List<String> listAvailableActions(Long id) {
-        log.info("查询订单可执行动作，id={}", id);
-        try {
-            OrderMainEntity entity = getById(id);
-            if (entity == null) {
-                log.warn("订单不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
-            }
-            List<String> actions = orderFlowStateMachineService.getAvailableActions(entity);
-            log.info("查询订单可执行动作成功，id={}, actions={}", id, actions);
-            return actions;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("查询订单可执行动作异常，id={}", id, e);
-            throw e;
-        }
-    }
+    // ==================== 创建操作 ====================
 
+    /**
+     * 从草稿创建正式订单
+     * 将草稿数据复制为正式订单，状态置为待数据审核
+     *
+     * 【执行步骤】
+     * 1. 生成订单编号
+     * 2. 从草稿复制主表数据，设置 phase=ORDER, status=PENDING_DATA_AUDIT
+     * 3. 批量复制草稿明细到订单明细
+     * 4. 复制文件关联关系
+     * 5. 通过 FlowFacade 记录 CREATE 动作（仅记录历史，不改变状态）
+     *
+     * @param draft 草稿实体
+     * @return 订单ID
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createFromDraft(OrderDraftEntity draft) {
         log.info("从草稿创建正式订单，draftId={}", draft.getId());
         try {
-            // 生成订单编号
+            // Step 1：生成订单编号
             String orderCode = codeGeneratorService.generate(CodeRuleConstants.ORDER_NO);
             log.info("生成订单编号，orderCode={}", orderCode);
 
-            // 构建订单主表
+            // Step 2：构建订单主表，从草稿复制字段，排除不可复用字段
             OrderMainEntity order = new OrderMainEntity();
             BeanUtils.copyProperties(draft, order, "id", "expiresAt", "status");
             order.setOrderCode(orderCode);
-            order.setPhase(OrderPhaseEnum.ORDER.getValue());
-            order.setStatus(OrderStatusEnum.PENDING_DATA_AUDIT.getValue());
+            order.setPhase(FlowPhaseEnum.ORDER.getValue());
+            order.setStatus(FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
             order.setVersion(0);
             save(order);
             Long orderId = order.getId();
             log.info("创建订单主表，orderId={}, orderCode={}", orderId, orderCode);
 
-            // 查询草稿明细并复制到订单明细
+            // Step 3：查询草稿明细并批量复制到订单明细
             List<OrderItemDraftEntity> draftItems = orderItemDraftMapper.selectList(
                     new LambdaQueryWrapper<OrderItemDraftEntity>()
                             .eq(OrderItemDraftEntity::getDraftId, draft.getId())
@@ -346,7 +533,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             }
             log.info("创建订单明细，orderId={}, itemCount={}", orderId, draftItems.size());
 
-            // 复制文件关联关系
+            // Step 4：复制文件关联关系（从草稿关联迁移至订单关联）
             List<FileVO> draftFiles = fileService.listByBiz("order_draft", draft.getId());
             for (FileVO file : draftFiles) {
                 OrderFileEntity orderFile = new OrderFileEntity();
@@ -358,7 +545,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             }
             log.info("复制文件关联，orderId={}, fileCount={}", orderId, draftFiles.size());
 
-            // 记录状态历史
+            // Step 5：记录状态历史（CREATE 动作仅记录历史，不改变 phase/status）
             String operatorName = null;
             if (draft.getOperatorId() != null) {
                 UserEntity user = userService.getById(draft.getOperatorId());
@@ -366,8 +553,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     operatorName = user.getRealName();
                 }
             }
-            orderFlowStateMachineService.executeTransition(order, OrderActionEnum.CREATE, draft.getOperatorId(), operatorName, "从草稿创建");
-
+            flowFacade.executeFlow(orderId, FlowActionEnum.CREATE, new FlowOperator(draft.getOperatorId(), operatorName, "从草稿创建"));
             log.info("从草稿创建正式订单成功，orderId={}, orderCode={}", orderId, orderCode);
             return orderId;
         } catch (Exception e) {
@@ -380,6 +566,12 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      * 直接创建正式订单（直提流程，不经过草稿）
      * 业务员直接填写完整信息后提交订单，跳过草稿保存步骤
      *
+     * 【执行步骤】
+     * 1. 生成订单编号
+     * 2. 构建订单主表，设置 phase=ORDER, status=PENDING_DATA_AUDIT
+     * 3. 批量保存重建项目明细
+     * 4. 通过 FlowFacade 记录 CREATE 动作（仅记录历史，不改变状态）
+     *
      * @param dto 创建订单参数
      * @return 订单ID
      */
@@ -389,22 +581,22 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         Long currentUserId = getCurrentUserId();
         log.info("直接创建正式订单，currentUserId={}", currentUserId);
         try {
-            // 1. 生成订单编号
+            // Step 1：生成订单编号
             String orderCode = codeGeneratorService.generate(CodeRuleConstants.ORDER_NO);
             log.info("生成订单编号，orderCode={}", orderCode);
 
-            // 2. 构建订单主表
+            // Step 2：构建订单主表
             OrderMainEntity order = new OrderMainEntity();
             BeanUtils.copyProperties(dto, order);
             order.setOrderCode(orderCode);
-            order.setPhase(OrderPhaseEnum.ORDER.getValue());
-            order.setStatus(OrderStatusEnum.PENDING_DATA_AUDIT.getValue());
+            order.setPhase(FlowPhaseEnum.ORDER.getValue());
+            order.setStatus(FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
             order.setVersion(0);
             save(order);
             Long orderId = order.getId();
             log.info("创建订单主表，orderId={}, orderCode={}", orderId, orderCode);
 
-            // 3. 保存重建项目列表
+            // Step 3：保存重建项目列表
             if (dto.getItems() != null && !dto.getItems().isEmpty()) {
                 for (int i = 0; i < dto.getItems().size(); i++) {
                     var itemDTO = dto.getItems().get(i);
@@ -419,13 +611,14 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     item.setProjectDesc(itemDTO.getProjectDesc());
                     item.setFormingRequirement(itemDTO.getFormingRequirement());
                     item.setOtherRequirement(itemDTO.getOtherRequirement());
+                    // 未指定排序时按数组索引+1作为排序值
                     item.setSortOrder(itemDTO.getSortOrder() != null ? itemDTO.getSortOrder() : i + 1);
                     orderItemMapper.insert(item);
                 }
                 log.info("创建订单明细，orderId={}, itemCount={}", orderId, dto.getItems().size());
             }
 
-            // 4. 记录状态历史
+            // Step 4：记录状态历史（CREATE 动作仅记录历史，不改变 phase/status）
             String operatorName = null;
             if (currentUserId != null) {
                 UserEntity user = userService.getById(currentUserId);
@@ -433,8 +626,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     operatorName = user.getRealName();
                 }
             }
-            orderFlowStateMachineService.executeTransition(order, OrderActionEnum.CREATE, currentUserId, operatorName, "直提创建");
-
+            flowFacade.executeFlow(orderId, FlowActionEnum.CREATE, new FlowOperator(currentUserId, operatorName, "直提创建"));
             log.info("直接创建正式订单成功，orderId={}, orderCode={}", orderId, orderCode);
             return orderId;
         } catch (Exception e) {
@@ -456,6 +648,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         vo.setId(entity.getId());
         vo.setOrderCode(entity.getOrderCode());
         vo.setOrderType(entity.getOrderType());
+        vo.setNeedsPhysicalDelivery(entity.getNeedsPhysicalDelivery());
         vo.setBusinessType(entity.getBusinessType());
         vo.setHospitalName(entity.getHospitalName());
         vo.setPatientName(entity.getPatientName());
@@ -474,7 +667,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private OrderDetailVO toOrderDetailVO(OrderMainEntity entity) {
         OrderDetailVO vo = new OrderDetailVO();
         BeanUtils.copyProperties(entity, vo);
-        // 补充显示名称
+        // 补充性别显示名称
         vo.setPatientGenderName(getGenderName(entity.getPatientGender()));
         return vo;
     }

@@ -9,13 +9,19 @@
         <artifactId>yigongbao-parent</artifactId>
         <version>1.0.0</version>
     </parent>
-    <artifactId>yigongbao-module-order</artifactId>
+    <artifactId>yigongbao-module-flow</artifactId>
 
     <dependencies>
-        <!-- flow：通用流转引擎 -->
+        <!-- system：ConfigService, UserService 等 -->
         <dependency>
             <groupId>com.yigongbao</groupId>
-            <artifactId>yigongbao-module-flow</artifactId>
+            <artifactId>yigongbao-module-system</artifactId>
+        </dependency>
+
+        <!-- MyBatis Plus -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
 
         <!-- 测试依赖 -->

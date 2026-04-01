@@ -29,9 +29,18 @@ public class OrderDraftEntity extends BaseEntity implements Serializable {
 
     // ==================== 订单类型 ====================
     /**
-     * 订单类型：1-医疗器械，2-非医疗器械，3-服务
+     * 订单类型：1-医疗器械，2-非医疗器械
+     * 【重要】此处仅定义一级分类，是否需要实体交付由 needsPhysicalDelivery 字段管理
      */
     private Integer orderType;
+
+    /**
+     * 是否需要实体交付：0-不需要，1-需要
+     * 【业务说明】
+     * - needsPhysicalDelivery = 1（需要实体交付）：走完整的生产流程（打印→后处理→质检→仓储）
+     * - needsPhysicalDelivery = 0（不需要实体交付）：跳过生产相关阶段，直接到确认阶段
+     */
+    private Integer needsPhysicalDelivery;
 
     /**
      * 业务类型（字典 dict_code：11.1-业务，11.2-测试，11.3-试用，11.4-代理）

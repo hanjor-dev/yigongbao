@@ -1,30 +1,27 @@
-package com.yigongbao.module.order.vo.order;
+package com.yigongbao.common.entity;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
- * 订单详情 VO
- * 用于订单详情查询返回的完整数据结构
+ * 订单主表 Entity
+ * 贯穿整个业务生命周期的核心业务实体
  *
  * @author hanjor
  * @date 2026-03-31
  */
 @Data
-public class OrderDetailVO implements Serializable {
+@TableName("order_main")
+@EqualsAndHashCode(callSuper = false)
+public class OrderMainEntity extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     // ==================== 主键与编码 ====================
-    /**
-     * 订单ID
-     */
-    private Long id;
-
     /**
      * 订单编号
      */
@@ -33,23 +30,20 @@ public class OrderDetailVO implements Serializable {
     // ==================== 订单类型 ====================
     /**
      * 订单类型：1-医疗器械，2-非医疗器械
+     * 【重要】此处仅定义一级分类，是否需要实体交付由 needsPhysicalDelivery 字段管理
      */
     private Integer orderType;
 
     /**
-     * 订单类型名称（补充显示）
-     */
-    private String orderTypeName;
-
-    /**
      * 是否需要实体交付：0-不需要，1-需要
+     * 【业务说明】
+     * - needsPhysicalDelivery = 1（需要实体交付）：走完整的生产流程（打印→后处理→质检→仓储）
+     * - needsPhysicalDelivery = 0（不需要实体交付）：跳过生产相关阶段，直接到确认阶段
+     * 【变更规则】
+     * - 仅在订单阶段允许修改
+     * - 仅允许 0→1 的变更（不需要→需要），不允许 1→0 的变更
      */
     private Integer needsPhysicalDelivery;
-
-    /**
-     * 是否需要实体交付名称（补充显示）
-     */
-    private String needsPhysicalDeliveryName;
 
     /**
      * 业务类型（字典 dict_code：11.1-业务，11.2-测试，11.3-试用，11.4-代理）
@@ -103,7 +97,7 @@ public class OrderDetailVO implements Serializable {
      */
     private String deptName;
 
-    // ==================== 医生信息 ====================
+    // ==================== 医生/患者信息 ====================
     /**
      * 医生ID
      */
@@ -119,7 +113,6 @@ public class OrderDetailVO implements Serializable {
      */
     private String doctorPhone;
 
-    // ==================== 患者信息 ====================
     /**
      * 患者姓名
      */
@@ -134,11 +127,6 @@ public class OrderDetailVO implements Serializable {
      * 患者性别（字典 dict_code：12.1-男，12.2-女）
      */
     private String patientGender;
-
-    /**
-     * 患者性别名称（补充显示）
-     */
-    private String patientGenderName;
 
     // ==================== 业务信息 ====================
     /**
@@ -171,6 +159,11 @@ public class OrderDetailVO implements Serializable {
      * 设计提交时间
      */
     private LocalDateTime designSubmitTime;
+
+    /**
+     * 用户确认时间
+     */
+    private LocalDateTime userConfirmTime;
 
     /**
      * 实际完成时间
@@ -220,93 +213,9 @@ public class OrderDetailVO implements Serializable {
      */
     private String designReviewRemark;
 
-    // ==================== 时间信息 ====================
+    // ==================== 乐观锁 ====================
     /**
-     * 创建时间
+     * 版本号（乐观锁）
      */
-    private LocalDateTime createTime;
-
-    /**
-     * 更新时间
-     */
-    private LocalDateTime updateTime;
-
-    // ==================== 订单明细 ====================
-    /**
-     * 订单明细列表
-     */
-    private List<OrderItemVO> items;
-
-    /**
-     * 订单明细数量
-     */
-    private Integer itemCount;
-
-    /**
-     * 可执行的动作列表
-     */
-    private List<String> availableActions;
-
-    /**
-     * 订单明细 VO
-     * 嵌套在 OrderDetailVO 中
-     *
-     * @author hanjor
-     * @date 2026-03-31
-     */
-    @Data
-    public static class OrderItemVO implements Serializable {
-
-        private static final long serialVersionUID = 1L;
-
-        /**
-         * 订单明细ID
-         */
-        private Long id;
-
-        /**
-         * 部位ID
-         */
-        private Long bodyPartId;
-
-        /**
-         * 部位名称
-         */
-        private String bodyPartName;
-
-        /**
-         * 重建项目ID
-         */
-        private Long projectId;
-
-        /**
-         * 重建项目名称
-         */
-        private String projectName;
-
-        /**
-         * 预计耗时（小时，支持小数）
-         */
-        private BigDecimal projectEstimatedHours;
-
-        /**
-         * 项目说明
-         */
-        private String projectDesc;
-
-        /**
-         * 成形需求
-         */
-        private String formingRequirement;
-
-        /**
-         * 其他要求
-         */
-        private String otherRequirement;
-
-        /**
-         * 排序序号
-         */
-        private Integer sortOrder;
-    }
+    private Integer version;
 }

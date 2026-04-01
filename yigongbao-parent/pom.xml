@@ -15,6 +15,7 @@
         <module>yigongbao-framework</module>
         <module>yigongbao-module-basic</module>
         <module>yigongbao-module-system</module>
+        <module>yigongbao-module-flow</module>
         <module>yigongbao-module-order</module>
         <module>yigongbao-boot</module>
     </modules>
@@ -68,6 +69,11 @@
             <dependency>
                 <groupId>com.yigongbao</groupId>
                 <artifactId>yigongbao-module-order</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-module-flow</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
