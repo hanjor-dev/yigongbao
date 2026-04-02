@@ -2,6 +2,8 @@ package com.yigongbao.module.system.resource.dto;
 
 import lombok.Data;
 
+import java.io.Serializable;
+
 /**
  * 资源分页查询 DTO
  *
@@ -9,7 +11,19 @@ import lombok.Data;
  * @date 2026-03-19
  */
 @Data
-public class ResourcePageDTO {
+public class ResourcePageDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 页码
+     */
+    private Integer pageNum = 1;
+
+    /**
+     * 每页条数
+     */
+    private Integer pageSize = 10;
 
     /**
      * 资源名称（模糊查询）

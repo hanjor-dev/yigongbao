@@ -18,12 +18,12 @@ public class OperationLogQueryDTO implements Serializable {
     /**
      * 页码
      */
-    private Integer pageNum;
+    private Integer pageNum = 1;
 
     /**
      * 每页大小
      */
-    private Integer pageSize;
+    private Integer pageSize = 10;
 
     /**
      * 模块名称（模糊查询）

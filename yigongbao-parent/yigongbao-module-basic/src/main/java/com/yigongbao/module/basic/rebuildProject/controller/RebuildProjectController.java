@@ -4,6 +4,9 @@ import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.rebuildProject.dto.CreateRebuildProjectDTO;
+import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectByBodyPartDTO;
+import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectOptionsDTO;
+import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectTreeDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.UpdateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
@@ -15,6 +18,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,31 +51,27 @@ public class RebuildProjectController {
      * 获取项目树形结构
      */
     @Operation(summary = "获取项目树形结构")
-    @GetMapping("/tree")
-    public Result<List<RebuildProjectVO>> tree(@RequestParam(required = false) String category) {
-        return Result.success(rebuildProjectService.listTree(category));
+    @PostMapping("/tree")
+    public Result<List<RebuildProjectVO>> tree(@RequestBody RebuildProjectTreeDTO dto) {
+        return Result.success(rebuildProjectService.listTree(dto.getCategory()));
     }
 
     /**
      * 根据部位ID获取项目列表
      */
     @Operation(summary = "根据部位ID获取项目列表")
-    @GetMapping("/by-body-part/{bodyPartId}")
-    public Result<List<RebuildProjectVO>> byBodyPart(
-            @PathVariable Long bodyPartId,
-            @RequestParam(required = false) String category) {
-        return Result.success(rebuildProjectService.listByBodyPartId(bodyPartId, category));
+    @PostMapping("/by-body-part")
+    public Result<List<RebuildProjectVO>> byBodyPart(@Validated @RequestBody RebuildProjectByBodyPartDTO dto) {
+        return Result.success(rebuildProjectService.listByBodyPartId(dto.getBodyPartId(), dto.getCategory()));
     }
 
     /**
      * 获取项目下拉选项
      */
     @Operation(summary = "获取项目下拉选项")
-    @GetMapping("/options")
-    public Result<List<RebuildProjectOptionVO>> options(
-            @RequestParam(required = false) Long bodyPartId,
-            @RequestParam(required = false) String category) {
-        return Result.success(rebuildProjectService.listOptions(bodyPartId, category));
+    @PostMapping("/options")
+    public Result<List<RebuildProjectOptionVO>> options(@RequestBody RebuildProjectOptionsDTO dto) {
+        return Result.success(rebuildProjectService.listOptions(dto.getBodyPartId(), dto.getCategory()));
     }
 
     /**

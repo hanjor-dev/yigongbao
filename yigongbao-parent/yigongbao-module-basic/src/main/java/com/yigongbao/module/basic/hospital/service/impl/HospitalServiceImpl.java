@@ -13,6 +13,7 @@ import com.yigongbao.module.basic.area.service.AreaService;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.hospital.convert.HospitalConvert;
 import com.yigongbao.module.basic.hospital.dto.CreateHospitalDTO;
+import com.yigongbao.module.basic.hospital.dto.HospitalPageDTO;
 import com.yigongbao.module.basic.hospital.dto.UpdateHospitalDTO;
 import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
 import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
@@ -47,28 +48,23 @@ public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEnt
     /**
      * 分页查询医院列表
      *
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param hospitalName 医院名称（模糊查询）
-     * @param areaId 地区ID
-     * @param hospitalLevel 医院等级（字典：dict_code=3，值如 3.1/3.2）
-     * @param hospitalType 医院类型（字典：dict_code=4，值如 4.1/4.2）
-     * @param status 状态
+     * @param dto 分页查询参数
      * @return 分页后的医院列表
      */
     @Override
-    public IPage<HospitalVO> listHospital(Integer pageNum, Integer pageSize, String hospitalName,
-                                          Long areaId, String hospitalLevel, String hospitalType, Integer status) {
-        log.info("分页查询医院列表，pageNum={}, pageSize={}, hospitalName={}, areaId={}, hospitalLevel={}, hospitalType={}, status={}",
-                pageNum, pageSize, hospitalName, areaId, hospitalLevel, hospitalType, status);
+    public IPage<HospitalVO> listHospital(HospitalPageDTO dto) {
+        log.info("分页查询医院列表，dto={}", dto);
         try {
+            // 处理分页参数默认值
+            int pageNum = dto.getPageNum() == null || dto.getPageNum() < 1 ? 1 : dto.getPageNum();
+            int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
             Page<HospitalEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<HospitalEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StrUtil.isNotBlank(hospitalName), HospitalEntity::getHospitalName, hospitalName)
-                    .eq(Objects.nonNull(areaId), HospitalEntity::getAreaId, areaId)
-                    .eq(StrUtil.isNotBlank(hospitalLevel), HospitalEntity::getHospitalLevel, hospitalLevel)
-                    .eq(StrUtil.isNotBlank(hospitalType), HospitalEntity::getHospitalType, hospitalType)
-                    .eq(Objects.nonNull(status), HospitalEntity::getStatus, status)
+            wrapper.like(StrUtil.isNotBlank(dto.getHospitalName()), HospitalEntity::getHospitalName, dto.getHospitalName())
+                    .eq(Objects.nonNull(dto.getAreaId()), HospitalEntity::getAreaId, dto.getAreaId())
+                    .eq(StrUtil.isNotBlank(dto.getHospitalLevel()), HospitalEntity::getHospitalLevel, dto.getHospitalLevel())
+                    .eq(StrUtil.isNotBlank(dto.getHospitalType()), HospitalEntity::getHospitalType, dto.getHospitalType())
+                    .eq(Objects.nonNull(dto.getStatus()), HospitalEntity::getStatus, dto.getStatus())
                     .orderByDesc(HospitalEntity::getCreateTime);
             IPage<HospitalEntity> pageResult = page(page, wrapper);
             IPage<HospitalVO> voPage = pageResult.convert(this::toVO);

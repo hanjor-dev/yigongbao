@@ -7,9 +7,11 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.yigongbao.module.system.user.dto.ChangePasswordDTO;
 import com.yigongbao.module.system.user.dto.CreateUserDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO;
+import com.yigongbao.module.system.user.dto.UserPageDTO;
 import com.yigongbao.module.system.user.service.UserService;
 import com.yigongbao.module.system.user.vo.UserVO;
 import jakarta.validation.constraints.Max;
@@ -36,18 +38,10 @@ public class UserController {
     /**
      * 分页查询用户列表
      */
-    @GetMapping("/list")
+    @PostMapping("/list")
     @Operation(summary = "分页查询用户列表")
-    public Result<IPage<UserVO>> list(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String username,
-            @RequestParam(required = false) String realName,
-            @RequestParam(required = false) Long orgId,
-            @RequestParam(required = false) Long deptId,
-            @RequestParam(required = false) Integer accountType,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(userService.listUser(pageNum, pageSize, username, realName, orgId, deptId, accountType, status));
+    public Result<IPage<UserVO>> list(@Validated @RequestBody UserPageDTO dto) {
+        return Result.success(userService.listUser(dto));
     }
 
     /**
@@ -147,12 +141,11 @@ public class UserController {
             operation = "修改用户密码",
             logParams = false
     )
-    @PutMapping("/{id}/change-password")
+    @PostMapping("/{id}/change-password")
     public Result<Void> changePassword(
             @PathVariable Long id,
-            @RequestParam String oldPassword,
-            @RequestParam String newPassword) {
-        userService.changePassword(id, oldPassword, newPassword);
+            @Validated @RequestBody ChangePasswordDTO dto) {
+        userService.changePassword(id, dto);
         return Result.success();
     }
 

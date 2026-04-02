@@ -21,12 +21,10 @@ public interface ResourceService extends IService<ResourceEntity> {
     /**
      * 分页查询资源列表
      *
-     * @param pageNum  页码
-     * @param pageSize 每页大小
-     * @param dto      查询条件
+     * @param dto 分页查询参数
      * @return 分页结果
      */
-    IPage<ResourceVO> pageResources(Integer pageNum, Integer pageSize, ResourcePageDTO dto);
+    IPage<ResourceVO> pageResources(ResourcePageDTO dto);
 
     /**
      * 根据ID查询资源详情

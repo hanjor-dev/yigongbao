@@ -10,6 +10,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.config.convert.ConfigConvert;
+import com.yigongbao.module.system.config.dto.ConfigPageDTO;
 import com.yigongbao.module.system.config.dto.CreateConfigDTO;
 import com.yigongbao.module.system.config.dto.UpdateConfigDTO;
 import com.yigongbao.module.system.config.entity.ConfigEntity;
@@ -41,39 +42,32 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
     /**
      * 分页查询配置列表
      *
-     * @param pageNum 分页参数-页码
-     * @param pageSize 分页参数-每页大小
-     * @param configKey 配置键（模糊查询）
-     * @param configName 配置名称（模糊查询）
-     * @param configGroup 配置分组（精确查询）
-     * @param configType 配置类型（精确查询）
-     * @param status 状态（精确查询）
+     * @param dto 分页查询参数
      * @return 分页后的配置列表
      */
     @Override
-    public IPage<ConfigVO> pageConfig(Integer pageNum, Integer pageSize, String configKey, String configName,
-                                       String configGroup, String configType, Integer status) {
-        // 构建分页对象
-        Page<ConfigEntity> page = new Page<>(pageNum, pageSize);
-        // 构建查询条件
-        LambdaQueryWrapper<ConfigEntity> wrapper = new LambdaQueryWrapper<>();
-        // 配置键模糊查询（非空时生效）
-        wrapper.like(StrUtil.isNotEmpty(configKey), ConfigEntity::getConfigKey, configKey)
-                // 配置名称模糊查询（非空时生效）
-                .like(StrUtil.isNotEmpty(configName), ConfigEntity::getConfigName, configName)
-                // 配置分组精确查询（非空时生效）
-                .eq(StrUtil.isNotEmpty(configGroup), ConfigEntity::getConfigGroup, configGroup)
-                // 配置类型精确查询（非空时生效）
-                .eq(StrUtil.isNotEmpty(configType), ConfigEntity::getConfigType, configType)
-                // 状态精确查询（非空时生效）
-                .eq(status != null, ConfigEntity::getStatus, status)
-                // 按排序字段正序，创建时间倒序
-                .orderByAsc(ConfigEntity::getSort)
-                .orderByDesc(ConfigEntity::getCreateTime);
-        // 执行分页查询
-        IPage<ConfigEntity> pageResult = this.page(page, wrapper);
-        // 转换为VO返回
-        return pageResult.convert(ConfigConvert::toVO);
+    public IPage<ConfigVO> pageConfig(ConfigPageDTO dto) {
+        log.info("分页查询配置列表，dto={}", dto);
+        try {
+            // 如果未传入分页参数，使用默认值
+            int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
+            int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
+            Page<ConfigEntity> page = new Page<>(pageNum, pageSize);
+            LambdaQueryWrapper<ConfigEntity> wrapper = new LambdaQueryWrapper<>();
+            wrapper.like(StrUtil.isNotBlank(dto.getConfigKey()), ConfigEntity::getConfigKey, dto.getConfigKey())
+                    .like(StrUtil.isNotBlank(dto.getConfigName()), ConfigEntity::getConfigName, dto.getConfigName())
+                    .eq(StrUtil.isNotBlank(dto.getConfigGroup()), ConfigEntity::getConfigGroup, dto.getConfigGroup())
+                    .eq(StrUtil.isNotBlank(dto.getConfigType()), ConfigEntity::getConfigType, dto.getConfigType())
+                    .eq(dto.getStatus() != null, ConfigEntity::getStatus, dto.getStatus())
+                    .orderByAsc(ConfigEntity::getSort)
+                    .orderByDesc(ConfigEntity::getCreateTime);
+            IPage<ConfigEntity> pageResult = this.page(page, wrapper);
+            log.info("分页查询配置列表成功，总数={}", pageResult.getTotal());
+            return pageResult.convert(ConfigConvert::toVO);
+        } catch (Exception e) {
+            log.error("分页查询配置列表异常", e);
+            throw e;
+        }
     }
 
     /**

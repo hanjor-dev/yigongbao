@@ -9,6 +9,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.role.convert.RoleConvert;
 import com.yigongbao.module.system.role.dto.CreateRoleDTO;
+import com.yigongbao.module.system.role.dto.RolePageDTO;
 import com.yigongbao.module.system.role.dto.UpdateRoleDTO;
 import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.mapper.RoleMapper;
@@ -45,29 +46,23 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
     /**
      * 分页查询角色列表
      *
-     * @param pageNum     页码
-     * @param pageSize   每页条数
-     * @param roleName   角色名称（模糊查询）
-     * @param accountType 账户分类（1=内部用户，2=外部用户）
-     * @param status     状态
+     * @param dto 分页查询参数
      * @return 分页后的角色列表
      */
     @Override
-    public IPage<RoleVO> listRole(Integer pageNum, Integer pageSize, String roleName, Integer accountType, Integer status) {
-        log.info("分页查询角色列表，pageNum={}, pageSize={}, roleName={}, accountType={}, status={}",
-                pageNum, pageSize, roleName, accountType, status);
+    public IPage<RoleVO> listRole(RolePageDTO dto) {
+        log.info("分页查询角色列表，dto={}", dto);
         try {
-            // 构建分页对象
+            // 如果未传入分页参数，使用默认值
+            int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
+            int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
             Page<RoleEntity> page = new Page<>(pageNum, pageSize);
-            // 构建查询条件
             LambdaQueryWrapper<RoleEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StrUtil.isNotBlank(roleName), RoleEntity::getRoleName, roleName)
-                    .eq(Objects.nonNull(accountType), RoleEntity::getAccountType, accountType)
-                    .eq(Objects.nonNull(status), RoleEntity::getStatus, status)
+            wrapper.like(StrUtil.isNotBlank(dto.getRoleName()), RoleEntity::getRoleName, dto.getRoleName())
+                    .eq(Objects.nonNull(dto.getAccountType()), RoleEntity::getAccountType, dto.getAccountType())
+                    .eq(Objects.nonNull(dto.getStatus()), RoleEntity::getStatus, dto.getStatus())
                     .orderByDesc(RoleEntity::getCreateTime);
-            // 执行分页查询
             IPage<RoleEntity> pageResult = page(page, wrapper);
-            // 转换为VO并填充关联名称
             IPage<RoleVO> voPage = pageResult.convert(this::toVOWithNames);
             log.info("分页查询角色列表成功，总数={}", pageResult.getTotal());
             return voPage;

@@ -5,6 +5,8 @@ import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.hospitalDept.dto.CreateHospitalDeptDTO;
+import com.yigongbao.module.basic.hospitalDept.dto.HospitalDeptListDTO;
+import com.yigongbao.module.basic.hospitalDept.dto.HospitalDeptPageDTO;
 import com.yigongbao.module.basic.hospitalDept.dto.UpdateHospitalDeptDTO;
 import com.yigongbao.module.basic.hospitalDept.service.HospitalDeptService;
 import com.yigongbao.module.basic.hospitalDept.vo.HospitalDeptVO;
@@ -38,24 +40,18 @@ public class HospitalDeptController {
      * 分页查询科室列表
      */
     @Operation(summary = "分页查询科室列表")
-    @GetMapping("/page")
-    public Result<IPage<HospitalDeptVO>> page(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String hospitalDeptName,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(hospitalDeptService.listDepts(pageNum, pageSize, hospitalDeptName, status));
+    @PostMapping("/page")
+    public Result<IPage<HospitalDeptVO>> page(@Validated @RequestBody HospitalDeptPageDTO dto) {
+        return Result.success(hospitalDeptService.listDepts(dto));
     }
 
     /**
      * 查询所有科室列表
      */
     @Operation(summary = "查询所有科室列表")
-    @GetMapping("/list")
-    public Result<List<HospitalDeptVO>> list(
-            @RequestParam(required = false) String hospitalDeptName,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(hospitalDeptService.listAll(hospitalDeptName, status));
+    @PostMapping("/list")
+    public Result<List<HospitalDeptVO>> list(@Validated @RequestBody HospitalDeptListDTO dto) {
+        return Result.success(hospitalDeptService.listAll(dto));
     }
 
     /**

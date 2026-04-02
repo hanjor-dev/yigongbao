@@ -3,6 +3,7 @@ package com.yigongbao.module.basic.file.controller;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.module.basic.file.dto.FileListDTO;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -94,15 +95,12 @@ public class FileController {
     /**
      * 查询文件列表
      *
-     * @param bizType 业务类型（字典 dict_code）
-     * @param bizId 业务ID
+     * @param dto 查询参数
      */
     @Operation(summary = "查询文件列表")
-    @GetMapping("/list/{bizType}/{bizId}")
-    public Result<List<FileVO>> listByBiz(
-            @PathVariable String bizType,
-            @PathVariable Long bizId) {
-        return Result.success(fileService.listByBiz(bizType, bizId));
+    @PostMapping("/list")
+    public Result<List<FileVO>> listByBiz(@RequestBody FileListDTO dto) {
+        return Result.success(fileService.listByBiz(dto.getBizType(), dto.getBizId()));
     }
 
     /**

@@ -5,6 +5,7 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.yigongbao.module.system.dict.dto.DictOptionsDTO;
 import com.yigongbao.module.system.dict.dto.CreateDictDTO;
 import com.yigongbao.module.system.dict.dto.UpdateDictDTO;
 import com.yigongbao.module.system.dict.service.DictService;
@@ -60,7 +61,7 @@ public class DictController {
      *
      * @return 树形结构列表
      */
-    @GetMapping("/tree")
+    @PostMapping("/tree")
     @Operation(summary = "获取完整树形结构")
     public Result<List<DictVO>> listTree() {
         return Result.success(dictService.listTree());
@@ -81,13 +82,13 @@ public class DictController {
     /**
      * 获取下拉选项（叶子节点）
      *
-     * @param typeCode 类型编码
+     * @param dto 查询参数
      * @return 叶子节点列表
      */
-    @GetMapping("/options/{typeCode}")
+    @PostMapping("/options")
     @Operation(summary = "获取下拉选项（叶子节点）")
-    public Result<List<DictVO>> listOptions(@PathVariable String typeCode) {
-        return Result.success(dictService.listOptions(typeCode));
+    public Result<List<DictVO>> listOptions(@RequestBody DictOptionsDTO dto) {
+        return Result.success(dictService.listOptions(dto.getTypeCode()));
     }
 
     /**

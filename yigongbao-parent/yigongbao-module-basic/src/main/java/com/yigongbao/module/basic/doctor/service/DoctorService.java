@@ -3,6 +3,9 @@ package com.yigongbao.module.basic.doctor.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.basic.doctor.dto.CreateDoctorDTO;
+import com.yigongbao.module.basic.doctor.dto.DoctorListDTO;
+import com.yigongbao.module.basic.doctor.dto.DoctorPageDTO;
+import com.yigongbao.module.basic.doctor.dto.DoctorSuggestDTO;
 import com.yigongbao.module.basic.doctor.dto.QuickAddDoctorDTO;
 import com.yigongbao.module.basic.doctor.dto.UpdateDoctorDTO;
 import com.yigongbao.module.basic.doctor.entity.DoctorEntity;
@@ -21,12 +24,12 @@ public interface DoctorService extends IService<DoctorEntity> {
     /**
      * 分页查询医生列表
      */
-    IPage<DoctorVO> listDoctors(Integer pageNum, Integer pageSize, String doctorName, Long hospitalId, Long hospitalDeptId, Integer status);
+    IPage<DoctorVO> listDoctors(DoctorPageDTO dto);
 
     /**
      * 查询所有医生列表
      */
-    List<DoctorVO> listAll(String doctorName, Long hospitalId, Integer status);
+    List<DoctorVO> listAll(DoctorListDTO dto);
 
     /**
      * 根据ID查询医生
@@ -51,7 +54,7 @@ public interface DoctorService extends IService<DoctorEntity> {
     /**
      * 查询业务员在医院下的历史医生列表（用于订单创建时医生联想）
      */
-    List<DoctorVO> listByCreatorAndHospital(Long creatorId, Long hospitalId, String keyword);
+    List<DoctorVO> listByCreatorAndHospital(DoctorSuggestDTO dto);
 
     /**
      * 快速添加医生

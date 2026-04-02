@@ -7,6 +7,7 @@ import com.yigongbao.framework.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.dept.dto.CreateDeptDTO;
+import com.yigongbao.module.system.dept.dto.DeptPageDTO;
 import com.yigongbao.module.system.dept.dto.UpdateDeptDTO;
 import com.yigongbao.module.system.dept.service.DeptService;
 import com.yigongbao.module.system.dept.vo.DeptVO;
@@ -33,23 +34,11 @@ public class DeptController {
 
     /**
      * 分页查询部门列表
-     *
-     * @param pageNum  页码（默认1）
-     * @param pageSize 每页条数（默认10）
-     * @param orgId   所属机构ID
-     * @param deptName 部门名称（模糊查询）
-     * @param status   状态
-     * @return 分页后的部门列表
      */
-    @GetMapping("/list")
+    @PostMapping("/list")
     @Operation(summary = "分页查询部门列表")
-    public Result<IPage<DeptVO>> list(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) Long orgId,
-            @RequestParam(required = false) String deptName,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(deptService.listDept(pageNum, pageSize, orgId, deptName, status));
+    public Result<IPage<DeptVO>> list(@Validated @RequestBody DeptPageDTO dto) {
+        return Result.success(deptService.listDept(dto));
     }
 
     /**

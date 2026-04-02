@@ -7,16 +7,19 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.basic.area.service.AreaService;
 import com.yigongbao.module.basic.area.vo.AreaVO;
+import com.yigongbao.module.system.basedata.dto.BizTypeListDTO;
+import com.yigongbao.module.system.basedata.dto.SelectOptionsDTO;
+import com.yigongbao.module.system.basedata.dto.SelectTreeDTO;
 import com.yigongbao.module.system.basedata.vo.SelectTreeVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
 import lombok.RequiredArgsConstructor;
 import cn.hutool.core.util.StrUtil;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -66,34 +69,27 @@ public class SelectController {
      *   <li>dict - 字典树形结构（需传 code 参数，字典编码，如：1、2、3 等）</li>
      * </ul>
      *
-     * @param type 数据类型（area=地区，dict=字典）
-     * @param code 字典编码（type=dict时必填）
-     * @param parentId 父级ID（type=area时必填）
+     * @param dto 查询参数
      * @return 树形结构列表
      */
     @Operation(summary = "获取树形结构")
-    @GetMapping("/tree")
-    public Result<List<SelectTreeVO>> getTree(
-            @RequestParam String type,
-            @RequestParam(required = false) String code,
-            @RequestParam(required = false) Long parentId) {
+    @PostMapping("/tree")
+    public Result<List<SelectTreeVO>> getTree(@RequestBody SelectTreeDTO dto) {
 
-        if ("area".equals(type)) {
+        if ("area".equals(dto.getType())) {
             // 地区树形结构
-            if (parentId == null) {
-                parentId = 0L;
-            }
+            Long parentId = dto.getParentId() == null ? 0L : dto.getParentId();
             List<AreaVO> areaTree = areaService.listTree(parentId);
             return Result.success(convertAreaToSelectTree(areaTree));
-        } else if ("dict".equals(type)) {
+        } else if ("dict".equals(dto.getType())) {
             // 字典树形结构
-            if (!StrUtil.isNotBlank(code)) {
+            if (!StrUtil.isNotBlank(dto.getCode())) {
                 throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "code");
             }
-            List<DictVO> dictTree = dictService.listTreeByTypeCode(code);
+            List<DictVO> dictTree = dictService.listTreeByTypeCode(dto.getCode());
             return Result.success(convertDictToSelectTree(dictTree));
         }
-        throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "不支持的数据类型：" + type);
+        throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "不支持的数据类型：" + dto.getType());
     }
 
     /**
@@ -106,38 +102,31 @@ public class SelectController {
      *   <li>config_group - 配置分组下拉选项（预设分组：系统配置、安全配置、其他配置）</li>
      * </ul>
      *
-     * @param type 数据类型（area=地区，dict=字典，config_group=配置分组）
-     * @param code 字典编码（type=dict时必填）
-     * @param parentId 父级ID（type=area时必填）
+     * @param dto 查询参数
      * @return 下拉选项列表
      */
     @Operation(summary = "获取下拉选项（叶子节点）")
-    @GetMapping("/options")
-    public Result<List<SelectTreeVO>> getOptions(
-            @RequestParam String type,
-            @RequestParam(required = false) String code,
-            @RequestParam(required = false) Long parentId) {
+    @PostMapping("/options")
+    public Result<List<SelectTreeVO>> getOptions(@RequestBody SelectOptionsDTO dto) {
 
-        if ("area".equals(type)) {
+        if ("area".equals(dto.getType())) {
             // 地区下拉选项
-            if (parentId == null) {
-                parentId = 0L;
-            }
+            Long parentId = dto.getParentId() == null ? 0L : dto.getParentId();
             List<AreaVO> areaList = areaService.listByParentId(parentId);
             return Result.success(convertAreaToSelectTree(areaList));
-        } else if ("dict".equals(type)) {
+        } else if ("dict".equals(dto.getType())) {
             // 字典下拉选项（叶子节点）
-            if (!StrUtil.isNotBlank(code)) {
+            if (!StrUtil.isNotBlank(dto.getCode())) {
                 throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "code");
             }
-            List<DictVO> dictOptions = dictService.listOptions(code);
+            List<DictVO> dictOptions = dictService.listOptions(dto.getCode());
             return Result.success(convertDictToSelectTree(dictOptions));
-        } else if ("config_group".equals(type)) {
+        } else if ("config_group".equals(dto.getType())) {
             // 配置分组下拉选项
             List<SelectTreeVO> configGroups = configService.listConfigGroups();
             return Result.success(configGroups);
         }
-        throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "不支持的数据类型：" + type);
+        throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "不支持的数据类型：" + dto.getType());
     }
 
     /**
@@ -148,8 +137,8 @@ public class SelectController {
      * @return 文件业务类型列表（name=字典名称, value=dictCode）
      */
     @Operation(summary = "获取文件业务类型下拉列表")
-    @GetMapping("/biz-type-list")
-    public Result<List<SelectTreeVO>> listBizTypes() {
+    @PostMapping("/biz-type-list")
+    public Result<List<SelectTreeVO>> listBizTypes(@RequestBody BizTypeListDTO dto) {
         List<DictVO> bizTypes = dictService.listFileBizTypeOptions();
         return Result.success(convertDictToSelectTree(bizTypes));
     }

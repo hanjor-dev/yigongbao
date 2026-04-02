@@ -10,6 +10,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.registrationCert.convert.RegistrationCertConvert;
 import com.yigongbao.module.basic.registrationCert.dto.CreateRegistrationCertDTO;
+import com.yigongbao.module.basic.registrationCert.dto.RegistrationCertPageDTO;
 import com.yigongbao.module.basic.registrationCert.dto.UpdateRegistrationCertDTO;
 import com.yigongbao.module.basic.registrationCert.entity.RegistrationCertEntity;
 import com.yigongbao.module.basic.registrationCert.mapper.RegistrationCertMapper;
@@ -40,23 +41,20 @@ import java.util.Objects;
     /**
      * 分页查询注册证列表
      *
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param certCode 注册证号（模糊查询）
-     * @param certName 注册证名称（模糊查询）
-     * @param status 状态
+     * @param dto 分页查询参数
      * @return 分页后的注册证列表
      */
     @Override
-    public IPage<RegistrationCertVO> listCerts(Integer pageNum, Integer pageSize, String certCode, String certName, Integer status) {
-        log.info("分页查询注册证，pageNum={}, pageSize={}, certCode={}, certName={}, status={}",
-                pageNum, pageSize, certCode, certName, status);
+    public IPage<RegistrationCertVO> listCerts(RegistrationCertPageDTO dto) {
+        log.info("分页查询注册证，dto={}", dto);
         try {
+            int pageNum = dto.getPageNum() == null || dto.getPageNum() < 1 ? 1 : dto.getPageNum();
+            int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
             Page<RegistrationCertEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<RegistrationCertEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StringUtils.hasText(certCode), RegistrationCertEntity::getCertCode, certCode)
-                    .like(StringUtils.hasText(certName), RegistrationCertEntity::getCertName, certName)
-                    .eq(Objects.nonNull(status), RegistrationCertEntity::getStatus, status)
+            wrapper.like(StringUtils.hasText(dto.getCertCode()), RegistrationCertEntity::getCertCode, dto.getCertCode())
+                    .like(StringUtils.hasText(dto.getCertName()), RegistrationCertEntity::getCertName, dto.getCertName())
+                    .eq(Objects.nonNull(dto.getStatus()), RegistrationCertEntity::getStatus, dto.getStatus())
                     .orderByDesc(RegistrationCertEntity::getCreateTime);
             IPage<RegistrationCertVO> result = page(page, wrapper).convert(entity -> {
                 RegistrationCertVO vo = RegistrationCertConvert.toVO(entity);
@@ -66,7 +64,7 @@ import java.util.Objects;
             log.info("分页查询注册证成功，共{}条", result.getRecords().size());
             return result;
         } catch (Exception e) {
-            log.error("分页查询注册证异常，pageNum={}, pageSize={}", pageNum, pageSize, e);
+            log.error("分页查询注册证异常，dto={}", dto, e);
             throw e;
         }
     }

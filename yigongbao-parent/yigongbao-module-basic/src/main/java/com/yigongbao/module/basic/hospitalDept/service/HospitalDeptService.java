@@ -3,6 +3,8 @@ package com.yigongbao.module.basic.hospitalDept.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.basic.hospitalDept.dto.CreateHospitalDeptDTO;
+import com.yigongbao.module.basic.hospitalDept.dto.HospitalDeptListDTO;
+import com.yigongbao.module.basic.hospitalDept.dto.HospitalDeptPageDTO;
 import com.yigongbao.module.basic.hospitalDept.dto.UpdateHospitalDeptDTO;
 import com.yigongbao.module.basic.hospitalDept.entity.HospitalDeptEntity;
 import com.yigongbao.module.basic.hospitalDept.vo.HospitalDeptVO;
@@ -20,12 +22,12 @@ public interface HospitalDeptService extends IService<HospitalDeptEntity> {
     /**
      * 分页查询科室列表
      */
-    IPage<HospitalDeptVO> listDepts(Integer pageNum, Integer pageSize, String hospitalDeptName, Integer status);
+    IPage<HospitalDeptVO> listDepts(HospitalDeptPageDTO dto);
 
     /**
      * 查询所有科室列表
      */
-    List<HospitalDeptVO> listAll(String hospitalDeptName, Integer status);
+    List<HospitalDeptVO> listAll(HospitalDeptListDTO dto);
 
     /**
      * 根据ID查询科室

@@ -10,6 +10,8 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.hospitalDept.convert.HospitalDeptConvert;
 import com.yigongbao.module.basic.hospitalDept.dto.CreateHospitalDeptDTO;
+import com.yigongbao.module.basic.hospitalDept.dto.HospitalDeptListDTO;
+import com.yigongbao.module.basic.hospitalDept.dto.HospitalDeptPageDTO;
 import com.yigongbao.module.basic.hospitalDept.dto.UpdateHospitalDeptDTO;
 import com.yigongbao.module.basic.hospitalDept.entity.HospitalDeptEntity;
 import com.yigongbao.module.basic.hospitalDept.mapper.HospitalDeptMapper;
@@ -42,21 +44,21 @@ public class HospitalDeptServiceImpl extends ServiceImpl<HospitalDeptMapper, Hos
      * 分页查询科室列表
      */
     @Override
-    public IPage<HospitalDeptVO> listDepts(Integer pageNum, Integer pageSize, String hospitalDeptName, Integer status) {
-        log.info("分页查询科室列表，pageNum={}, pageSize={}, hospitalDeptName={}, status={}",
-                pageNum, pageSize, hospitalDeptName, status);
+    public IPage<HospitalDeptVO> listDepts(HospitalDeptPageDTO dto) {
+        log.info("分页查询科室列表，dto={}", dto);
         try {
+            int pageNum = dto.getPageNum() == null || dto.getPageNum() < 1 ? 1 : dto.getPageNum();
+            int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
             Page<HospitalDeptEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<HospitalDeptEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(Objects.nonNull(hospitalDeptName) && !hospitalDeptName.isEmpty(),
-                            HospitalDeptEntity::getHospitalDeptName, hospitalDeptName)
-                    .eq(Objects.nonNull(status), HospitalDeptEntity::getStatus, status)
+            wrapper.like(Objects.nonNull(dto.getHospitalDeptName()) && !dto.getHospitalDeptName().isEmpty(),
+                            HospitalDeptEntity::getHospitalDeptName, dto.getHospitalDeptName())
+                    .eq(Objects.nonNull(dto.getStatus()), HospitalDeptEntity::getStatus, dto.getStatus())
                     .orderByAsc(HospitalDeptEntity::getSort)
                     .orderByDesc(HospitalDeptEntity::getCreateTime);
 
             IPage<HospitalDeptEntity> pageResult = page(page, wrapper);
 
-            // 转换为 VO
             IPage<HospitalDeptVO> voPage = pageResult.convert(entity -> {
                 HospitalDeptVO vo = HospitalDeptConvert.toVO(entity);
                 fillExtraFields(vo, entity);
@@ -75,13 +77,13 @@ public class HospitalDeptServiceImpl extends ServiceImpl<HospitalDeptMapper, Hos
      * 查询所有科室列表
      */
     @Override
-    public List<HospitalDeptVO> listAll(String hospitalDeptName, Integer status) {
-        log.info("查询所有科室列表，hospitalDeptName={}, status={}", hospitalDeptName, status);
+    public List<HospitalDeptVO> listAll(HospitalDeptListDTO dto) {
+        log.info("查询所有科室列表，dto={}", dto);
         try {
             LambdaQueryWrapper<HospitalDeptEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(Objects.nonNull(hospitalDeptName) && !hospitalDeptName.isEmpty(),
-                            HospitalDeptEntity::getHospitalDeptName, hospitalDeptName)
-                    .eq(Objects.nonNull(status), HospitalDeptEntity::getStatus, status)
+            wrapper.like(Objects.nonNull(dto.getHospitalDeptName()) && !dto.getHospitalDeptName().isEmpty(),
+                            HospitalDeptEntity::getHospitalDeptName, dto.getHospitalDeptName())
+                    .eq(Objects.nonNull(dto.getStatus()), HospitalDeptEntity::getStatus, dto.getStatus())
                     .orderByAsc(HospitalDeptEntity::getSort);
 
             List<HospitalDeptEntity> list = list(wrapper);

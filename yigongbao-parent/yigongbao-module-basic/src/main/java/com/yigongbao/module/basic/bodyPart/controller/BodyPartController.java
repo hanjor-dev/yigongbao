@@ -3,6 +3,8 @@ package com.yigongbao.module.basic.bodyPart.controller;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.module.basic.bodyPart.dto.BodyPartOptionsDTO;
+import com.yigongbao.module.basic.bodyPart.dto.BodyPartTreeDTO;
 import com.yigongbao.module.basic.bodyPart.dto.CreateBodyPartDTO;
 import com.yigongbao.module.basic.bodyPart.dto.UpdateBodyPartDTO;
 import com.yigongbao.module.basic.bodyPart.service.BodyPartService;
@@ -47,8 +49,8 @@ public class BodyPartController {
      * 获取部位树形结构
      */
     @Operation(summary = "获取部位树形结构")
-    @GetMapping("/tree")
-    public Result<List<BodyPartVO>> tree() {
+    @PostMapping("/tree")
+    public Result<List<BodyPartVO>> tree(@RequestBody BodyPartTreeDTO dto) {
         return Result.success(bodyPartService.listTree());
     }
 
@@ -56,8 +58,8 @@ public class BodyPartController {
      * 获取部位下拉选项
      */
     @Operation(summary = "获取部位下拉选项")
-    @GetMapping("/options")
-    public Result<List<BodyPartOptionVO>> options() {
+    @PostMapping("/options")
+    public Result<List<BodyPartOptionVO>> options(@RequestBody BodyPartOptionsDTO dto) {
         return Result.success(bodyPartService.listOptions());
     }
 

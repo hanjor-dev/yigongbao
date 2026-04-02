@@ -3,6 +3,9 @@ package com.yigongbao.module.basic.product.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.basic.product.dto.CreateProductDTO;
+import com.yigongbao.module.basic.product.dto.ProductCategoryDTO;
+import com.yigongbao.module.basic.product.dto.ProductListDTO;
+import com.yigongbao.module.basic.product.dto.ProductPageDTO;
 import com.yigongbao.module.basic.product.dto.UpdateProductDTO;
 import com.yigongbao.module.basic.product.entity.ProductEntity;
 import com.yigongbao.module.basic.product.vo.ProductVO;
@@ -20,12 +23,12 @@ public interface ProductService extends IService<ProductEntity> {
     /**
      * 分页查询产品列表
      */
-    IPage<ProductVO> listProducts(Integer pageNum, Integer pageSize, String productName, String category, Long certId, Integer status);
+    IPage<ProductVO> listProducts(ProductPageDTO dto);
 
     /**
      * 查询所有产品列表
      */
-    List<ProductVO> listAll(String productName, String category, Integer status);
+    List<ProductVO> listAll(ProductListDTO dto);
 
     /**
      * 根据ID查询产品

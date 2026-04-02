@@ -10,6 +10,9 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.product.convert.ProductConvert;
 import com.yigongbao.module.basic.product.dto.CreateProductDTO;
+import com.yigongbao.module.basic.product.dto.ProductCategoryDTO;
+import com.yigongbao.module.basic.product.dto.ProductListDTO;
+import com.yigongbao.module.basic.product.dto.ProductPageDTO;
 import com.yigongbao.module.basic.product.dto.UpdateProductDTO;
 import com.yigongbao.module.basic.product.entity.ProductEntity;
 import com.yigongbao.module.basic.product.mapper.ProductMapper;
@@ -51,28 +54,26 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, ProductEntity
      * 分页查询产品列表
      */
     @Override
-    public IPage<ProductVO> listProducts(Integer pageNum, Integer pageSize, String productName,
-            String category, Long certId, Integer status) {
-        log.info("分页查询产品列表，pageNum={}, pageSize={}, productName={}, category={}, status={}",
-                pageNum, pageSize, productName, category, status);
+    public IPage<ProductVO> listProducts(ProductPageDTO dto) {
+        log.info("分页查询产品列表，dto={}", dto);
         try {
+            int pageNum = dto.getPageNum() == null || dto.getPageNum() < 1 ? 1 : dto.getPageNum();
+            int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
             Page<ProductEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<ProductEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StringUtils.hasText(productName), ProductEntity::getProductName, productName)
-                    .eq(StringUtils.hasText(category), ProductEntity::getCategory, category)
-                    .eq(Objects.nonNull(certId), ProductEntity::getCertId, certId)
-                    .eq(Objects.nonNull(status), ProductEntity::getStatus, status)
+            wrapper.like(StringUtils.hasText(dto.getProductName()), ProductEntity::getProductName, dto.getProductName())
+                    .eq(StringUtils.hasText(dto.getCategory()), ProductEntity::getCategory, dto.getCategory())
+                    .eq(Objects.nonNull(dto.getCertId()), ProductEntity::getCertId, dto.getCertId())
+                    .eq(Objects.nonNull(dto.getStatus()), ProductEntity::getStatus, dto.getStatus())
                     .orderByDesc(ProductEntity::getCreateTime);
 
             IPage<ProductEntity> pageResult = baseMapper.selectPage(page, wrapper);
 
-            // 先将 Entity 转换为 VO（collect to list 避免 convert 就地修改）
             List<ProductVO> voList = pageResult.getRecords().stream()
                     .map(ProductConvert::toVO)
                     .toList();
             fillExtraFieldsBatch(voList);
 
-            // 手动构建 VO 分页（避免 convert 就地修改 records）
             IPage<ProductVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
             voPage.setRecords(voList);
 
@@ -88,13 +89,13 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, ProductEntity
      * 查询所有产品列表
      */
     @Override
-    public List<ProductVO> listAll(String productName, String category, Integer status) {
-        log.info("查询所有产品列表，productName={}, category={}, status={}", productName, category, status);
+    public List<ProductVO> listAll(ProductListDTO dto) {
+        log.info("查询所有产品列表，dto={}", dto);
         try {
             LambdaQueryWrapper<ProductEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StringUtils.hasText(productName), ProductEntity::getProductName, productName)
-                    .eq(StringUtils.hasText(category), ProductEntity::getCategory, category)
-                    .eq(Objects.nonNull(status), ProductEntity::getStatus, status)
+            wrapper.like(StringUtils.hasText(dto.getProductName()), ProductEntity::getProductName, dto.getProductName())
+                    .eq(StringUtils.hasText(dto.getCategory()), ProductEntity::getCategory, dto.getCategory())
+                    .eq(Objects.nonNull(dto.getStatus()), ProductEntity::getStatus, dto.getStatus())
                     .orderByDesc(ProductEntity::getCreateTime);
 
             List<ProductEntity> list = list(wrapper);

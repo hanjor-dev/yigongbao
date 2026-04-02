@@ -2,6 +2,7 @@ package com.yigongbao.module.system.config.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.yigongbao.module.system.config.dto.ConfigPageDTO;
 import com.yigongbao.module.system.config.dto.CreateConfigDTO;
 import com.yigongbao.module.system.config.dto.UpdateConfigDTO;
 import com.yigongbao.module.system.config.entity.ConfigEntity;
@@ -18,17 +19,10 @@ public interface ConfigService extends IService<ConfigEntity> {
     /**
      * 分页查询配置列表
      *
-     * @param pageNum 页码
-     * @param pageSize 每页大小
-     * @param configKey 配置键（模糊查询）
-     * @param configName 配置名称（模糊查询）
-     * @param configGroup 配置分组（精确查询）
-     * @param configType 配置类型（精确查询）
-     * @param status 状态（精确查询）
+     * @param dto 分页查询参数
      * @return 分页后的配置列表
      */
-    IPage<ConfigVO> pageConfig(Integer pageNum, Integer pageSize, String configKey, String configName,
-                                String configGroup, String configType, Integer status);
+    IPage<ConfigVO> pageConfig(ConfigPageDTO dto);
 
     /**
      * 根据ID查询配置

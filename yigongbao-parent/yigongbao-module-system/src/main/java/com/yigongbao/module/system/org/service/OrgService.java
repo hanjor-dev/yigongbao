@@ -3,6 +3,7 @@ package com.yigongbao.module.system.org.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.system.org.dto.CreateOrgDTO;
+import com.yigongbao.module.system.org.dto.OrgPageDTO;
 import com.yigongbao.module.system.org.dto.UpdateOrgDTO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.vo.OrgVO;
@@ -18,15 +19,10 @@ public interface OrgService extends IService<OrgEntity> {
     /**
      * 分页查询机构列表
      *
-     * @param pageNum  页码
-     * @param pageSize 每页条数
-     * @param orgName  机构名称（模糊查询）
-     * @param orgType  机构类型
-     * @param areaId   地区ID
-     * @param status   状态
+     * @param dto 分页查询参数
      * @return 分页后的机构列表
      */
-    IPage<OrgVO> listOrg(Integer pageNum, Integer pageSize, String orgName, String orgType, Long areaId, Integer status);
+    IPage<OrgVO> listOrg(OrgPageDTO dto);
 
     /**
      * 根据ID查询机构详情

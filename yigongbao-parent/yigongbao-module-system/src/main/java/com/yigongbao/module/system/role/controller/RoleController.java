@@ -7,6 +7,7 @@ import com.yigongbao.framework.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.role.dto.CreateRoleDTO;
+import com.yigongbao.module.system.role.dto.RolePageDTO;
 import com.yigongbao.module.system.role.dto.UpdateRoleDTO;
 import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.role.vo.RoleVO;
@@ -33,23 +34,11 @@ public class RoleController {
 
     /**
      * 分页查询角色列表
-     *
-     * @param pageNum     页码（默认1）
-     * @param pageSize   每页条数（默认10）
-     * @param roleName   角色名称（模糊查询）
-     * @param accountType 账户分类（1=内部用户，2=外部用户）
-     * @param status     状态
-     * @return 分页后的角色列表
      */
-    @GetMapping("/list")
+    @PostMapping("/list")
     @Operation(summary = "分页查询角色列表")
-    public Result<IPage<RoleVO>> list(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String roleName,
-            @RequestParam(required = false) Integer accountType,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(roleService.listRole(pageNum, pageSize, roleName, accountType, status));
+    public Result<IPage<RoleVO>> list(@Validated @RequestBody RolePageDTO dto) {
+        return Result.success(roleService.listRole(dto));
     }
 
     /**

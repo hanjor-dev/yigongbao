@@ -2,6 +2,7 @@ package com.yigongbao.module.basic.code.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.yigongbao.module.basic.code.dto.CodeRulePageDTO;
 import com.yigongbao.module.basic.code.dto.CreateCodeRuleDTO;
 import com.yigongbao.module.basic.code.dto.UpdateCodeRuleDTO;
 import com.yigongbao.module.basic.code.entity.CodeRuleEntity;
@@ -18,14 +19,10 @@ public interface CodeRuleService extends IService<CodeRuleEntity> {
     /**
      * 分页查询编码规则
      *
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param ruleCode 规则编码（模糊查询）
-     * @param ruleName 规则名称（模糊查询）
-     * @param status 状态
+     * @param dto 分页查询参数
      * @return 分页结果
      */
-    IPage<CodeRuleVO> listRules(Integer pageNum, Integer pageSize, String ruleCode, String ruleName, Integer status);
+    IPage<CodeRuleVO> listRules(CodeRulePageDTO dto);
 
     /**
      * 根据规则编码查询

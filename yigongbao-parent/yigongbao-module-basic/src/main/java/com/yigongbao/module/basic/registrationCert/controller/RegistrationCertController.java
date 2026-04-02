@@ -5,6 +5,7 @@ import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.registrationCert.dto.CreateRegistrationCertDTO;
+import com.yigongbao.module.basic.registrationCert.dto.RegistrationCertPageDTO;
 import com.yigongbao.module.basic.registrationCert.dto.UpdateRegistrationCertDTO;
 import com.yigongbao.module.basic.registrationCert.service.RegistrationCertService;
 import com.yigongbao.module.basic.registrationCert.vo.RegistrationCertVO;
@@ -32,23 +33,11 @@ public class RegistrationCertController {
 
     /**
      * 分页查询注册证列表
-     *
-     * @param pageNum 页码（默认1）
-     * @param pageSize 每页条数（默认10）
-     * @param certCode 注册证号（模糊查询）
-     * @param certName 注册证名称（模糊查询）
-     * @param status 状态（可选）
-     * @return 分页后的注册证列表
      */
     @Operation(summary = "分页查询注册证列表")
-    @GetMapping("/list")
-    public Result<IPage<RegistrationCertVO>> list(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String certCode,
-            @RequestParam(required = false) String certName,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(registrationCertService.listCerts(pageNum, pageSize, certCode, certName, status));
+    @PostMapping("/list")
+    public Result<IPage<RegistrationCertVO>> list(@Validated @RequestBody RegistrationCertPageDTO dto) {
+        return Result.success(registrationCertService.listCerts(dto));
     }
 
     /**

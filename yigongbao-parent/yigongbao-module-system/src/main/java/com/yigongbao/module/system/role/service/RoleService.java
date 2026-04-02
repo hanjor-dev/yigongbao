@@ -3,6 +3,7 @@ package com.yigongbao.module.system.role.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.system.role.dto.CreateRoleDTO;
+import com.yigongbao.module.system.role.dto.RolePageDTO;
 import com.yigongbao.module.system.role.dto.UpdateRoleDTO;
 import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.vo.RoleVO;
@@ -18,14 +19,10 @@ public interface RoleService extends IService<RoleEntity> {
     /**
      * 分页查询角色列表
      *
-     * @param pageNum     页码
-     * @param pageSize   每页条数
-     * @param roleName   角色名称（模糊查询）
-     * @param accountType 账户分类（1=内部用户，2=外部用户）
-     * @param status     状态
+     * @param dto 分页查询参数
      * @return 分页后的角色列表
      */
-    IPage<RoleVO> listRole(Integer pageNum, Integer pageSize, String roleName, Integer accountType, Integer status);
+    IPage<RoleVO> listRole(RolePageDTO dto);
 
     /**
      * 根据ID查询角色详情

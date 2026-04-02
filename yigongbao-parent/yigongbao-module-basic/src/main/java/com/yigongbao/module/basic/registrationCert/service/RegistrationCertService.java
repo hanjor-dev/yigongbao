@@ -3,6 +3,7 @@ package com.yigongbao.module.basic.registrationCert.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.basic.registrationCert.dto.CreateRegistrationCertDTO;
+import com.yigongbao.module.basic.registrationCert.dto.RegistrationCertPageDTO;
 import com.yigongbao.module.basic.registrationCert.dto.UpdateRegistrationCertDTO;
 import com.yigongbao.module.basic.registrationCert.entity.RegistrationCertEntity;
 import com.yigongbao.module.basic.registrationCert.vo.RegistrationCertVO;
@@ -17,7 +18,7 @@ import java.util.List;
  */
 public interface RegistrationCertService extends IService<RegistrationCertEntity> {
 
-    IPage<RegistrationCertVO> listCerts(Integer pageNum, Integer pageSize, String certCode, String certName, Integer status);
+    IPage<RegistrationCertVO> listCerts(RegistrationCertPageDTO dto);
 
     List<RegistrationCertVO> listValidCerts();
 

@@ -5,6 +5,7 @@ import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.hospitalGroupTemplate.dto.CreateHospitalGroupTemplateDTO;
+import com.yigongbao.module.basic.hospitalGroupTemplate.dto.HospitalGroupTemplatePageDTO;
 import com.yigongbao.module.basic.hospitalGroupTemplate.dto.UpdateHospitalGroupTemplateDTO;
 import com.yigongbao.module.basic.hospitalGroupTemplate.service.HospitalGroupTemplateService;
 import com.yigongbao.module.basic.hospitalGroupTemplate.vo.HospitalGroupTemplateSimpleVO;
@@ -46,13 +47,9 @@ public class HospitalGroupTemplateController {
     private final HospitalGroupTemplateService templateService;
 
     @Operation(summary = "分页查询医院组合模板列表")
-    @GetMapping("/list")
-    public Result<IPage<HospitalGroupTemplateVO>> list(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String templateName,
-            @RequestParam(required = false) @Min(0) @Max(1) Integer status) {
-        return Result.success(templateService.listTemplate(pageNum, pageSize, templateName, status));
+    @PostMapping("/list")
+    public Result<IPage<HospitalGroupTemplateVO>> list(@Validated @RequestBody HospitalGroupTemplatePageDTO dto) {
+        return Result.success(templateService.listTemplate(dto));
     }
 
     @Operation(summary = "根据ID查询医院组合模板")

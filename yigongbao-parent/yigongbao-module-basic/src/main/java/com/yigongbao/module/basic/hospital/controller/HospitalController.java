@@ -5,6 +5,7 @@ import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.hospital.dto.CreateHospitalDTO;
+import com.yigongbao.module.basic.hospital.dto.HospitalPageDTO;
 import com.yigongbao.module.basic.hospital.dto.UpdateHospitalDTO;
 import com.yigongbao.module.basic.hospital.service.HospitalService;
 import com.yigongbao.module.basic.hospital.vo.HospitalVO;
@@ -47,16 +48,9 @@ public class HospitalController {
      * 分页查询医院列表
      */
     @Operation(summary = "分页查询医院列表")
-    @GetMapping("/list")
-    public Result<IPage<HospitalVO>> list(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String hospitalName,
-            @RequestParam(required = false) Long areaId,
-            @RequestParam(required = false) String hospitalLevel,
-            @RequestParam(required = false) String hospitalType,
-            @RequestParam(required = false) @Min(0) @Max(1) Integer status) {
-        return Result.success(hospitalService.listHospital(pageNum, pageSize, hospitalName, areaId, hospitalLevel, hospitalType, status));
+    @PostMapping("/list")
+    public Result<IPage<HospitalVO>> list(@Validated @RequestBody HospitalPageDTO dto) {
+        return Result.success(hospitalService.listHospital(dto));
     }
 
     /**

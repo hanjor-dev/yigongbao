@@ -10,6 +10,7 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.system.dept.convert.DeptConvert;
 import com.yigongbao.module.system.dept.dto.CreateDeptDTO;
+import com.yigongbao.module.system.dept.dto.DeptPageDTO;
 import com.yigongbao.module.system.dept.dto.UpdateDeptDTO;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.mapper.DeptMapper;
@@ -47,29 +48,23 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
     /**
      * 分页查询部门列表
      *
-     * @param pageNum  页码
-     * @param pageSize 每页条数
-     * @param orgId    所属机构ID
-     * @param deptName 部门名称（模糊查询）
-     * @param status   状态
+     * @param dto 分页查询参数
      * @return 分页后的部门列表
      */
     @Override
-    public IPage<DeptVO> listDept(Integer pageNum, Integer pageSize, Long orgId, String deptName, Integer status) {
-        log.info("分页查询部门列表，pageNum={}, pageSize={}, orgId={}, deptName={}, status={}",
-                pageNum, pageSize, orgId, deptName, status);
+    public IPage<DeptVO> listDept(DeptPageDTO dto) {
+        log.info("分页查询部门列表，dto={}", dto);
         try {
-            // 构建分页对象
+            // 如果未传入分页参数，使用默认值
+            int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
+            int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
             Page<DeptEntity> page = new Page<>(pageNum, pageSize);
-            // 构建查询条件
             LambdaQueryWrapper<DeptEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(Objects.nonNull(orgId), DeptEntity::getOrgId, orgId)
-                    .like(StrUtil.isNotBlank(deptName), DeptEntity::getDeptName, deptName)
-                    .eq(Objects.nonNull(status), DeptEntity::getStatus, status)
+            wrapper.eq(Objects.nonNull(dto.getOrgId()), DeptEntity::getOrgId, dto.getOrgId())
+                    .like(StrUtil.isNotBlank(dto.getDeptName()), DeptEntity::getDeptName, dto.getDeptName())
+                    .eq(Objects.nonNull(dto.getStatus()), DeptEntity::getStatus, dto.getStatus())
                     .orderByDesc(DeptEntity::getCreateTime);
-            // 执行分页查询
             IPage<DeptEntity> pageResult = page(page, wrapper);
-            // 转换为VO并填充关联名称
             IPage<DeptVO> voPage = pageResult.convert(this::toVOWithNames);
             log.info("分页查询部门列表成功，总数={}", pageResult.getTotal());
             return voPage;

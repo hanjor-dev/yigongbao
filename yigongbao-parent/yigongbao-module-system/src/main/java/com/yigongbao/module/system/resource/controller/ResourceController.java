@@ -44,12 +44,9 @@ public class ResourceController {
      * 获取资源列表（分页）
      */
     @Operation(summary = "获取资源列表（分页）")
-    @GetMapping("/list")
-    public Result<IPage<ResourceVO>> list(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            ResourcePageDTO dto) {
-        return Result.success(resourceService.pageResources(pageNum, pageSize, dto));
+    @PostMapping("/list")
+    public Result<IPage<ResourceVO>> list(@Validated @RequestBody ResourcePageDTO dto) {
+        return Result.success(resourceService.pageResources(dto));
     }
 
     /**

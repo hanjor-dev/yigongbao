@@ -9,6 +9,9 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.doctor.convert.DoctorConvert;
 import com.yigongbao.module.basic.doctor.dto.CreateDoctorDTO;
+import com.yigongbao.module.basic.doctor.dto.DoctorListDTO;
+import com.yigongbao.module.basic.doctor.dto.DoctorPageDTO;
+import com.yigongbao.module.basic.doctor.dto.DoctorSuggestDTO;
 import com.yigongbao.module.basic.doctor.dto.QuickAddDoctorDTO;
 import com.yigongbao.module.basic.doctor.dto.UpdateDoctorDTO;
 import com.yigongbao.module.basic.doctor.entity.DoctorEntity;
@@ -46,22 +49,21 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
      * 分页查询医生列表
      */
     @Override
-    public IPage<DoctorVO> listDoctors(Integer pageNum, Integer pageSize, String doctorName,
-            Long hospitalId, Long hospitalDeptId, Integer status) {
-        log.info("分页查询医生列表，pageNum={}, pageSize={}, doctorName={}, hospitalId={}, status={}",
-                pageNum, pageSize, doctorName, hospitalId, status);
+    public IPage<DoctorVO> listDoctors(DoctorPageDTO dto) {
+        log.info("分页查询医生列表，dto={}", dto);
         try {
+            int pageNum = dto.getPageNum() == null || dto.getPageNum() < 1 ? 1 : dto.getPageNum();
+            int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
             Page<DoctorEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<DoctorEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StrUtil.isNotBlank(doctorName), DoctorEntity::getDoctorName, doctorName)
-                    .eq(Objects.nonNull(hospitalId), DoctorEntity::getHospitalId, hospitalId)
-                    .eq(Objects.nonNull(hospitalDeptId), DoctorEntity::getHospitalDeptId, hospitalDeptId)
-                    .eq(Objects.nonNull(status), DoctorEntity::getStatus, status)
+            wrapper.like(StrUtil.isNotBlank(dto.getDoctorName()), DoctorEntity::getDoctorName, dto.getDoctorName())
+                    .eq(Objects.nonNull(dto.getHospitalId()), DoctorEntity::getHospitalId, dto.getHospitalId())
+                    .eq(Objects.nonNull(dto.getHospitalDeptId()), DoctorEntity::getHospitalDeptId, dto.getHospitalDeptId())
+                    .eq(Objects.nonNull(dto.getStatus()), DoctorEntity::getStatus, dto.getStatus())
                     .orderByDesc(DoctorEntity::getCreateTime);
 
             IPage<DoctorEntity> pageResult = page(page, wrapper);
 
-            // 转换为 VO
             IPage<DoctorVO> voPage = pageResult.convert(entity -> {
                 DoctorVO vo = DoctorConvert.toVO(entity);
                 fillExtraFields(vo, entity);
@@ -80,13 +82,13 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
      * 查询所有医生列表
      */
     @Override
-    public List<DoctorVO> listAll(String doctorName, Long hospitalId, Integer status) {
-        log.info("查询所有医生列表，doctorName={}, hospitalId={}, status={}", doctorName, hospitalId, status);
+    public List<DoctorVO> listAll(DoctorListDTO dto) {
+        log.info("查询所有医生列表，dto={}", dto);
         try {
             LambdaQueryWrapper<DoctorEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StrUtil.isNotBlank(doctorName), DoctorEntity::getDoctorName, doctorName)
-                    .eq(Objects.nonNull(hospitalId), DoctorEntity::getHospitalId, hospitalId)
-                    .eq(Objects.nonNull(status), DoctorEntity::getStatus, status)
+            wrapper.like(StrUtil.isNotBlank(dto.getDoctorName()), DoctorEntity::getDoctorName, dto.getDoctorName())
+                    .eq(Objects.nonNull(dto.getHospitalId()), DoctorEntity::getHospitalId, dto.getHospitalId())
+                    .eq(Objects.nonNull(dto.getStatus()), DoctorEntity::getStatus, dto.getStatus())
                     .orderByDesc(DoctorEntity::getCreateTime);
 
             List<DoctorEntity> list = list(wrapper);
@@ -224,14 +226,13 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
      * 查询业务员在医院下的历史医生列表
      */
     @Override
-    public List<DoctorVO> listByCreatorAndHospital(Long creatorId, Long hospitalId, String keyword) {
-        log.info("查询业务员在医院下的历史医生列表，creatorId={}, hospitalId={}, keyword={}",
-                creatorId, hospitalId, keyword);
+    public List<DoctorVO> listByCreatorAndHospital(DoctorSuggestDTO dto) {
+        log.info("查询业务员在医院下的历史医生列表，dto={}", dto);
         try {
             LambdaQueryWrapper<DoctorEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(creatorId != null, DoctorEntity::getCreatorId, creatorId);
-            wrapper.eq(hospitalId != null, DoctorEntity::getHospitalId, hospitalId);
-            wrapper.like(StrUtil.isNotBlank(keyword), DoctorEntity::getDoctorName, keyword);
+            wrapper.eq(dto.getCreatorId() != null, DoctorEntity::getCreatorId, dto.getCreatorId());
+            wrapper.eq(dto.getHospitalId() != null, DoctorEntity::getHospitalId, dto.getHospitalId());
+            wrapper.like(StrUtil.isNotBlank(dto.getKeyword()), DoctorEntity::getDoctorName, dto.getKeyword());
             wrapper.orderByDesc(DoctorEntity::getCreateTime);
             List<DoctorEntity> list = baseMapper.selectList(wrapper);
             List<DoctorVO> voList = list.stream().map(entity -> {
@@ -242,7 +243,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             log.info("查询历史医生列表成功，数量={}", voList.size());
             return voList;
         } catch (Exception e) {
-            log.error("查询历史医生列表异常，creatorId={}, hospitalId={}", creatorId, hospitalId, e);
+            log.error("查询历史医生列表异常，dto={}", dto, e);
             throw e;
         }
     }

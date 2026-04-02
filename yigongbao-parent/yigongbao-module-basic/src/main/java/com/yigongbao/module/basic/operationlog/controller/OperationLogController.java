@@ -8,6 +8,8 @@ import com.yigongbao.module.basic.operationlog.vo.OperationLogVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,29 +33,8 @@ public class OperationLogController {
      * 分页查询操作日志
      */
     @Operation(summary = "分页查询操作日志")
-    @GetMapping("/page")
-    public Result<IPage<OperationLogVO>> page(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String module,
-            @RequestParam(required = false) Integer businessType,
-            @RequestParam(required = false) String operation,
-            @RequestParam(required = false) String username,
-            @RequestParam(required = false) String ip,
-            @RequestParam(required = false) Integer status,
-            @RequestParam(required = false) String startTime,
-            @RequestParam(required = false) String endTime) {
-        OperationLogQueryDTO dto = new OperationLogQueryDTO();
-        dto.setPageNum(pageNum);
-        dto.setPageSize(pageSize);
-        dto.setModule(module);
-        dto.setBusinessType(businessType);
-        dto.setOperation(operation);
-        dto.setUsername(username);
-        dto.setIp(ip);
-        dto.setStatus(status);
-        dto.setStartTime(startTime);
-        dto.setEndTime(endTime);
+    @PostMapping("/page")
+    public Result<IPage<OperationLogVO>> page(@RequestBody OperationLogQueryDTO dto) {
         return Result.success(operationLogService.pageLogs(dto));
     }
 
@@ -61,26 +42,8 @@ public class OperationLogController {
      * 导出操作日志
      */
     @Operation(summary = "导出操作日志")
-    @GetMapping("/export")
-    public void export(
-            @RequestParam(required = false) String module,
-            @RequestParam(required = false) Integer businessType,
-            @RequestParam(required = false) String operation,
-            @RequestParam(required = false) String username,
-            @RequestParam(required = false) String ip,
-            @RequestParam(required = false) Integer status,
-            @RequestParam(required = false) String startTime,
-            @RequestParam(required = false) String endTime,
-            HttpServletResponse response) {
-        OperationLogQueryDTO dto = new OperationLogQueryDTO();
-        dto.setModule(module);
-        dto.setBusinessType(businessType);
-        dto.setOperation(operation);
-        dto.setUsername(username);
-        dto.setIp(ip);
-        dto.setStatus(status);
-        dto.setStartTime(startTime);
-        dto.setEndTime(endTime);
+    @PostMapping("/export")
+    public void export(@RequestBody OperationLogQueryDTO dto, HttpServletResponse response) {
         operationLogService.exportLogs(dto, response);
     }
 }

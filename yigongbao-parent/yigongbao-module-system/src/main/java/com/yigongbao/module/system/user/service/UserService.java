@@ -2,8 +2,11 @@ package com.yigongbao.module.system.user.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.yigongbao.module.system.user.dto.ChangePasswordDTO;
 import com.yigongbao.module.system.user.dto.CreateUserDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserDTO;
+import com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO;
+import com.yigongbao.module.system.user.dto.UserPageDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.vo.UserVO;
 
@@ -18,18 +21,10 @@ public interface UserService extends IService<UserEntity> {
     /**
      * 分页查询用户列表
      *
-     * @param pageNum    页码
-     * @param pageSize  每页条数
-     * @param username  用户名（模糊查询）
-     * @param realName  真实姓名（模糊查询）
-     * @param orgId     所属机构ID
-     * @param deptId    所属部门ID
-     * @param accountType 账户分类
-     * @param status    状态
+     * @param dto 分页查询参数
      * @return 分页后的用户列表
      */
-    IPage<UserVO> listUser(Integer pageNum, Integer pageSize, String username, String realName,
-                            Long orgId, Long deptId, Integer accountType, Integer status);
+    IPage<UserVO> listUser(UserPageDTO dto);
 
     /**
      * 根据ID查询用户详情
@@ -80,11 +75,10 @@ public interface UserService extends IService<UserEntity> {
     /**
      * 修改密码
      *
-     * @param id          用户ID
-     * @param oldPassword 旧密码
-     * @param newPassword 新密码
+     * @param id  用户ID
+     * @param dto 密码修改参数（包含旧密码和新密码）
      */
-    void changePassword(Long id, String oldPassword, String newPassword);
+    void changePassword(Long id, ChangePasswordDTO dto);
 
     /**
      * 用户自更新（仅允许修改手机号和头像）

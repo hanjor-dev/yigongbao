@@ -3,6 +3,7 @@ package com.yigongbao.module.basic.hospital.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.basic.hospital.dto.CreateHospitalDTO;
+import com.yigongbao.module.basic.hospital.dto.HospitalPageDTO;
 import com.yigongbao.module.basic.hospital.dto.UpdateHospitalDTO;
 import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
 import com.yigongbao.module.basic.hospital.vo.HospitalVO;
@@ -20,17 +21,10 @@ public interface HospitalService extends IService<HospitalEntity> {
     /**
      * 分页查询医院列表
      *
-     * @param pageNum        页码
-     * @param pageSize       每页条数
-     * @param hospitalName   医院名称（模糊查询）
-     * @param areaId         地区ID
-     * @param hospitalLevel  医院等级（字典：dict_code=3，值如 3.1/3.2）
-     * @param hospitalType   医院类型（字典：dict_code=4，值如 4.1/4.2）
-     * @param status         状态
+     * @param dto 分页查询参数
      * @return 分页后的医院列表
      */
-    IPage<HospitalVO> listHospital(Integer pageNum, Integer pageSize, String hospitalName,
-                                  Long areaId, String hospitalLevel, String hospitalType, Integer status);
+    IPage<HospitalVO> listHospital(HospitalPageDTO dto);
 
     /**
      * 根据ID查询医院详情

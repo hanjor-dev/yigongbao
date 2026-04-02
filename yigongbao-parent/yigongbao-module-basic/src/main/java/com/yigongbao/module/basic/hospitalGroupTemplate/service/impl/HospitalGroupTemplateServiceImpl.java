@@ -22,6 +22,7 @@ import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
 import com.yigongbao.module.basic.hospital.service.HospitalService;
 import com.yigongbao.module.basic.hospitalGroupTemplate.convert.HospitalGroupTemplateConvert;
 import com.yigongbao.module.basic.hospitalGroupTemplate.dto.CreateHospitalGroupTemplateDTO;
+import com.yigongbao.module.basic.hospitalGroupTemplate.dto.HospitalGroupTemplatePageDTO;
 import com.yigongbao.module.basic.hospitalGroupTemplate.dto.UpdateHospitalGroupTemplateDTO;
 import com.yigongbao.module.basic.hospitalGroupTemplate.entity.HospitalGroupTemplateDetailEntity;
 import com.yigongbao.module.basic.hospitalGroupTemplate.entity.HospitalGroupTemplateEntity;
@@ -64,21 +65,19 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     /**
      * 分页查询医院组合模板列表
      *
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param templateName 模板名称（模糊查询）
-     * @param status 状态
+     * @param dto 分页查询参数
      * @return 分页后的模板列表
      */
     @Override
-    public IPage<HospitalGroupTemplateVO> listTemplate(Integer pageNum, Integer pageSize, String templateName, Integer status) {
-        log.info("分页查询医院组合模板列表，pageNum={}, pageSize={}, templateName={}, status={}",
-                pageNum, pageSize, templateName, status);
+    public IPage<HospitalGroupTemplateVO> listTemplate(HospitalGroupTemplatePageDTO dto) {
+        log.info("分页查询医院组合模板列表，dto={}", dto);
         try {
+            int pageNum = dto.getPageNum() == null || dto.getPageNum() < 1 ? 1 : dto.getPageNum();
+            int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
             Page<HospitalGroupTemplateEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<HospitalGroupTemplateEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StrUtil.isNotBlank(templateName), HospitalGroupTemplateEntity::getTemplateName, templateName)
-                    .eq(Objects.nonNull(status), HospitalGroupTemplateEntity::getStatus, status)
+            wrapper.like(StrUtil.isNotBlank(dto.getTemplateName()), HospitalGroupTemplateEntity::getTemplateName, dto.getTemplateName())
+                    .eq(Objects.nonNull(dto.getStatus()), HospitalGroupTemplateEntity::getStatus, dto.getStatus())
                     .orderByDesc(HospitalGroupTemplateEntity::getCreateTime);
             IPage<HospitalGroupTemplateEntity> pageResult = page(page, wrapper);
             IPage<HospitalGroupTemplateVO> voPage = pageResult.convert(this::toVOWithCount);

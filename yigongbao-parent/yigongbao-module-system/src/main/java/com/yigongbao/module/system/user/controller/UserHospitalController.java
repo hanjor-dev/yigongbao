@@ -12,12 +12,7 @@ import com.yigongbao.module.system.user.dto.AssignHospitalsDTO;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
 import java.util.List;
@@ -66,7 +61,7 @@ public class UserHospitalController {
      * 获取可分配给用户的医院列表（管理员分配时使用）
      */
     @Operation(summary = "获取可分配给用户的医院列表（管理员分配时使用）")
-    @GetMapping("/options")
+    @PostMapping("/options")
     public Result<List<HospitalVO>> getHospitalOptions(@PathVariable Long userId) {
         return Result.success(userHospitalService.getHospitalOptionsByUserId(userId));
     }

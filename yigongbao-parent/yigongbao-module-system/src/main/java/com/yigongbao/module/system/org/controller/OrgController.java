@@ -7,6 +7,7 @@ import com.yigongbao.framework.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.org.dto.CreateOrgDTO;
+import com.yigongbao.module.system.org.dto.OrgPageDTO;
 import com.yigongbao.module.system.org.dto.UpdateOrgDTO;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.org.vo.OrgVO;
@@ -33,25 +34,11 @@ public class OrgController {
 
     /**
      * 分页查询机构列表
-     *
-     * @param pageNum  页码（默认1）
-     * @param pageSize 每页条数（默认10）
-     * @param orgName 机构名称（模糊查询）
-     * @param orgType 机构类型
-     * @param areaId  地区ID
-     * @param status  状态
-     * @return 分页后的机构列表
      */
-    @GetMapping("/list")
+    @PostMapping("/list")
     @Operation(summary = "分页查询机构列表")
-    public Result<IPage<OrgVO>> list(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String orgName,
-            @RequestParam(required = false) String orgType,
-            @RequestParam(required = false) Long areaId,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(orgService.listOrg(pageNum, pageSize, orgName, orgType, areaId, status));
+    public Result<IPage<OrgVO>> list(@Validated @RequestBody OrgPageDTO dto) {
+        return Result.success(orgService.listOrg(dto));
     }
 
     /**

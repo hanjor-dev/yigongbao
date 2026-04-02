@@ -13,6 +13,7 @@ import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.system.org.convert.OrgConvert;
 import com.yigongbao.module.system.org.dto.CreateOrgDTO;
+import com.yigongbao.module.system.org.dto.OrgPageDTO;
 import com.yigongbao.module.system.org.dto.UpdateOrgDTO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.mapper.OrgMapper;
@@ -50,27 +51,22 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     /**
      * 分页查询机构列表
      *
-     * @param pageNum  页码
-     * @param pageSize 每页条数
-     * @param orgName  机构名称（模糊查询）
-     * @param orgType  机构类型
-     * @param areaId   地区ID
-     * @param status   状态
+     * @param dto 分页查询参数
      * @return 分页后的机构列表
      */
     @Override
-    public IPage<OrgVO> listOrg(Integer pageNum, Integer pageSize, String orgName, String orgType, Long areaId, Integer status) {
-        log.info("分页查询机构列表，pageNum={}, pageSize={}, orgName={}, orgType={}, areaId={}, status={}",
-                pageNum, pageSize, orgName, orgType, areaId, status);
+    public IPage<OrgVO> listOrg(OrgPageDTO dto) {
+        log.info("分页查询机构列表，dto={}", dto);
         try {
-            // 构建分页对象
+            // 如果未传入分页参数，使用默认值
+            int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
+            int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
             Page<OrgEntity> page = new Page<>(pageNum, pageSize);
-            // 构建查询条件
             LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StrUtil.isNotBlank(orgName), OrgEntity::getOrgName, orgName)
-                    .eq(StrUtil.isNotBlank(orgType), OrgEntity::getOrgType, orgType)
-                    .eq(Objects.nonNull(areaId), OrgEntity::getAreaId, areaId)
-                    .eq(Objects.nonNull(status), OrgEntity::getStatus, status)
+            wrapper.like(StrUtil.isNotBlank(dto.getOrgName()), OrgEntity::getOrgName, dto.getOrgName())
+                    .eq(StrUtil.isNotBlank(dto.getOrgType()), OrgEntity::getOrgType, dto.getOrgType())
+                    .eq(Objects.nonNull(dto.getAreaId()), OrgEntity::getAreaId, dto.getAreaId())
+                    .eq(Objects.nonNull(dto.getStatus()), OrgEntity::getStatus, dto.getStatus())
                     .orderByDesc(OrgEntity::getCreateTime);
             // 执行分页查询
             IPage<OrgEntity> pageResult = page(page, wrapper);

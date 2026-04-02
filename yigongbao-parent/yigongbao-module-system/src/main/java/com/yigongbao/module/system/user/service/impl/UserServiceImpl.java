@@ -24,8 +24,10 @@ import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.user.convert.UserConvert;
+import com.yigongbao.module.system.user.dto.ChangePasswordDTO;
 import com.yigongbao.module.system.user.dto.CreateUserDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserDTO;
+import com.yigongbao.module.system.user.dto.UserPageDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserHospitalService;
@@ -71,19 +73,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
      * 分页查询用户列表
      */
     @Override
-    public IPage<UserVO> listUser(Integer pageNum, Integer pageSize, String username, String realName,
-                                   Long orgId, Long deptId, Integer accountType, Integer status) {
-        log.info("分页查询用户列表，pageNum={}, pageSize={}, username={}, realName={}, orgId={}, deptId={}, accountType={}, status={}",
-                pageNum, pageSize, username, realName, orgId, deptId, accountType, status);
+    public IPage<UserVO> listUser(UserPageDTO dto) {
+        log.info("分页查询用户列表，dto={}", dto);
         try {
+            // 如果未传入分页参数，使用默认值
+            int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
+            int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
             Page<UserEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<UserEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StrUtil.isNotBlank(username), UserEntity::getUsername, username)
-                    .like(StrUtil.isNotBlank(realName), UserEntity::getRealName, realName)
-                    .eq(Objects.nonNull(orgId), UserEntity::getOrgId, orgId)
-                    .eq(Objects.nonNull(deptId), UserEntity::getDeptId, deptId)
-                    .eq(Objects.nonNull(accountType), UserEntity::getAccountType, accountType)
-                    .eq(Objects.nonNull(status), UserEntity::getStatus, status)
+            wrapper.like(StrUtil.isNotBlank(dto.getUsername()), UserEntity::getUsername, dto.getUsername())
+                    .like(StrUtil.isNotBlank(dto.getRealName()), UserEntity::getRealName, dto.getRealName())
+                    .eq(Objects.nonNull(dto.getOrgId()), UserEntity::getOrgId, dto.getOrgId())
+                    .eq(Objects.nonNull(dto.getDeptId()), UserEntity::getDeptId, dto.getDeptId())
+                    .eq(Objects.nonNull(dto.getAccountType()), UserEntity::getAccountType, dto.getAccountType())
+                    .eq(Objects.nonNull(dto.getStatus()), UserEntity::getStatus, dto.getStatus())
                     .orderByDesc(UserEntity::getCreateTime);
             IPage<UserEntity> pageResult = page(page, wrapper);
 
@@ -458,7 +461,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void changePassword(Long id, String oldPassword, String newPassword) {
+    public void changePassword(Long id, ChangePasswordDTO dto) {
         log.info("修改密码，id={}", id);
         try {
             UserEntity entity = getById(id);
@@ -467,12 +470,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
             // 校验旧密码是否正确
-            if (!passwordEncoder.matches(oldPassword, entity.getPassword())) {
+            if (!passwordEncoder.matches(dto.getOldPassword(), entity.getPassword())) {
                 log.warn("旧密码不正确，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.OLD_PASSWORD_ERROR);
             }
             // 更新密码
-            entity.setPassword(passwordEncoder.encode(newPassword));
+            entity.setPassword(passwordEncoder.encode(dto.getNewPassword()));
             updateById(entity);
             log.info("修改密码成功，id={}", id);
         } catch (BusinessException e) {

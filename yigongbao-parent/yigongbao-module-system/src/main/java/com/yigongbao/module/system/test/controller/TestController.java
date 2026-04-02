@@ -5,6 +5,7 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.yigongbao.module.system.test.dto.TestListDTO;
 import com.yigongbao.module.system.test.dto.CreateTestDTO;
 import com.yigongbao.module.system.test.dto.UpdateTestDTO;
 import com.yigongbao.module.system.test.service.TestService;
@@ -33,11 +34,12 @@ public class TestController {
     /**
      * 查询所有测试数据
      *
+     * @param dto 查询参数
      * @return 测试数据列表
      */
     @Operation(summary = "查询所有测试数据")
-    @GetMapping("/list")
-    public Result<List<TestVO>> list() {
+    @PostMapping("/list")
+    public Result<List<TestVO>> list(@RequestBody TestListDTO dto) {
         return Result.success(testService.listVo());
     }
 

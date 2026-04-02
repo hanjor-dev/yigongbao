@@ -5,6 +5,9 @@ import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.product.dto.CreateProductDTO;
+import com.yigongbao.module.basic.product.dto.ProductCategoryDTO;
+import com.yigongbao.module.basic.product.dto.ProductListDTO;
+import com.yigongbao.module.basic.product.dto.ProductPageDTO;
 import com.yigongbao.module.basic.product.dto.UpdateProductDTO;
 import com.yigongbao.module.basic.product.service.ProductService;
 import com.yigongbao.module.basic.product.vo.ProductVO;
@@ -37,27 +40,18 @@ public class ProductController {
      * 分页查询产品列表
      */
     @Operation(summary = "分页查询产品列表")
-    @GetMapping("/page")
-    public Result<IPage<ProductVO>> page(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String productName,
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) Long certId,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(productService.listProducts(pageNum, pageSize, productName, category, certId, status));
+    @PostMapping("/page")
+    public Result<IPage<ProductVO>> page(@Validated @RequestBody ProductPageDTO dto) {
+        return Result.success(productService.listProducts(dto));
     }
 
     /**
      * 查询所有产品列表
      */
     @Operation(summary = "查询所有产品列表")
-    @GetMapping("/list")
-    public Result<List<ProductVO>> list(
-            @RequestParam(required = false) String productName,
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(productService.listAll(productName, category, status));
+    @PostMapping("/list")
+    public Result<List<ProductVO>> list(@Validated @RequestBody ProductListDTO dto) {
+        return Result.success(productService.listAll(dto));
     }
 
     /**
@@ -127,8 +121,8 @@ public class ProductController {
      * 按分类查询产品
      */
     @Operation(summary = "按分类查询产品")
-    @GetMapping("/list-by-category")
-    public Result<List<ProductVO>> listByCategory(@RequestParam String category) {
-        return Result.success(productService.listByCategory(category));
+    @PostMapping("/list-by-category")
+    public Result<List<ProductVO>> listByCategory(@Validated @RequestBody ProductCategoryDTO dto) {
+        return Result.success(productService.listByCategory(dto.getCategory()));
     }
 }

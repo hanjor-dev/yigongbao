@@ -53,49 +53,54 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
     /**
      * 分页查询资源列表
      *
-     * @param pageNum  页码
-     * @param pageSize 每页大小
-     * @param dto      查询条件
+     * @param dto 分页查询参数
      * @return 分页后的资源列表
      */
     @Override
-    public IPage<ResourceVO> pageResources(Integer pageNum, Integer pageSize, ResourcePageDTO dto) {
-        log.info("分页查询资源列表，pageNum={}, pageSize={}, resourceName={}, resourceCode={}, resourceType={}, parentId={}, queryScope={}, status={}",
-                pageNum, pageSize, dto.getResourceName(), dto.getResourceCode(), dto.getResourceType(), dto.getParentId(), dto.getQueryScope(), dto.getStatus());
-        Page<ResourceEntity> page = new Page<>(pageNum, pageSize);
-        LambdaQueryWrapper<ResourceEntity> wrapper = new LambdaQueryWrapper<>();
+    public IPage<ResourceVO> pageResources(ResourcePageDTO dto) {
+        log.info("分页查询资源列表，dto={}", dto);
+        try {
+            // 如果未传入分页参数，使用默认值
+            int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
+            int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
+            Page<ResourceEntity> page = new Page<>(pageNum, pageSize);
+            LambdaQueryWrapper<ResourceEntity> wrapper = new LambdaQueryWrapper<>();
 
-        wrapper.like(StrUtil.isNotBlank(dto.getResourceName()), ResourceEntity::getResourceName, dto.getResourceName())
-                .like(StrUtil.isNotBlank(dto.getResourceCode()), ResourceEntity::getResourceCode, dto.getResourceCode())
-                .eq(dto.getStatus() != null, ResourceEntity::getStatus, dto.getStatus());
+            wrapper.like(StrUtil.isNotBlank(dto.getResourceName()), ResourceEntity::getResourceName, dto.getResourceName())
+                    .like(StrUtil.isNotBlank(dto.getResourceCode()), ResourceEntity::getResourceCode, dto.getResourceCode())
+                    .eq(dto.getStatus() != null, ResourceEntity::getStatus, dto.getStatus());
 
-        // queryScope 筛选
-        if (dto.getQueryScope() != null) {
-            if (dto.getQueryScope() == 2) {
-                // 只查菜单（一级+二级）
-                wrapper.in(ResourceEntity::getResourceType,
-                        ResourceTypeEnum.MENU_FIRST.getCode(),
-                        ResourceTypeEnum.MENU_SECOND.getCode());
-            } else if (dto.getQueryScope() == 3) {
-                // 只查按钮
-                wrapper.eq(ResourceEntity::getResourceType, ResourceTypeEnum.BUTTON.getCode());
+            // queryScope 筛选
+            if (dto.getQueryScope() != null) {
+                if (dto.getQueryScope() == 2) {
+                    // 只查菜单（一级+二级）
+                    wrapper.in(ResourceEntity::getResourceType,
+                            ResourceTypeEnum.MENU_FIRST.getCode(),
+                            ResourceTypeEnum.MENU_SECOND.getCode());
+                } else if (dto.getQueryScope() == 3) {
+                    // 只查按钮
+                    wrapper.eq(ResourceEntity::getResourceType, ResourceTypeEnum.BUTTON.getCode());
+                }
+                // queryScope=1 或未传：不做额外筛选
+            } else if (dto.getResourceType() != null) {
+                // resourceType 精确筛选（优先级低于 queryScope）
+                wrapper.eq(ResourceEntity::getResourceType, dto.getResourceType());
             }
-            // queryScope=1 或未传：不做额外筛选
-        } else if (dto.getResourceType() != null) {
-            // resourceType 精确筛选（优先级低于 queryScope）
-            wrapper.eq(ResourceEntity::getResourceType, dto.getResourceType());
+
+            // parentId 筛选
+            if (dto.getParentId() != null) {
+                wrapper.eq(ResourceEntity::getParentId, dto.getParentId());
+            }
+
+            wrapper.orderByAsc(ResourceEntity::getSort)
+                    .orderByDesc(BaseEntity::getCreateTime);
+
+            IPage<ResourceEntity> pageResult = baseMapper.selectPage(page, wrapper);
+            return pageResult.convert(ResourceConvert::toVO);
+        } catch (Exception e) {
+            log.error("分页查询资源列表异常", e);
+            throw e;
         }
-
-        // parentId 筛选
-        if (dto.getParentId() != null) {
-            wrapper.eq(ResourceEntity::getParentId, dto.getParentId());
-        }
-
-        wrapper.orderByAsc(ResourceEntity::getSort)
-                .orderByDesc(BaseEntity::getCreateTime);
-
-        IPage<ResourceEntity> pageResult = baseMapper.selectPage(page, wrapper);
-        return pageResult.convert(ResourceConvert::toVO);
     }
 
     /**

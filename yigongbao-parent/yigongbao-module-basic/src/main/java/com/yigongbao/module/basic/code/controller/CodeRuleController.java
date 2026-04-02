@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.module.basic.code.dto.CodeRulePageDTO;
 import com.yigongbao.module.basic.code.dto.CreateCodeRuleDTO;
 import com.yigongbao.module.basic.code.dto.UpdateCodeRuleDTO;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
@@ -56,14 +57,9 @@ public class CodeRuleController {
      * 分页查询编码规则
      */
     @Operation(summary = "分页查询编码规则")
-    @GetMapping("/rule/list")
-    public Result<IPage<CodeRuleVO>> listRules(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String ruleCode,
-            @RequestParam(required = false) String ruleName,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(codeRuleService.listRules(pageNum, pageSize, ruleCode, ruleName, status));
+    @PostMapping("/rule/list")
+    public Result<IPage<CodeRuleVO>> listRules(@Validated @RequestBody CodeRulePageDTO dto) {
+        return Result.success(codeRuleService.listRules(dto));
     }
 
     /**

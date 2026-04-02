@@ -3,6 +3,7 @@ package com.yigongbao.module.basic.hospitalGroupTemplate.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.basic.hospitalGroupTemplate.dto.CreateHospitalGroupTemplateDTO;
+import com.yigongbao.module.basic.hospitalGroupTemplate.dto.HospitalGroupTemplatePageDTO;
 import com.yigongbao.module.basic.hospitalGroupTemplate.dto.UpdateHospitalGroupTemplateDTO;
 import com.yigongbao.module.basic.hospitalGroupTemplate.entity.HospitalGroupTemplateEntity;
 import com.yigongbao.module.basic.hospitalGroupTemplate.vo.HospitalGroupTemplateSimpleVO;
@@ -21,7 +22,7 @@ public interface HospitalGroupTemplateService extends IService<HospitalGroupTemp
     /**
      * 分页查询模板列表
      */
-    IPage<HospitalGroupTemplateVO> listTemplate(Integer pageNum, Integer pageSize, String templateName, Integer status);
+    IPage<HospitalGroupTemplateVO> listTemplate(HospitalGroupTemplatePageDTO dto);
 
     /**
      * 根据ID查询模板详情（含明细）

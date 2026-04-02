@@ -9,6 +9,7 @@ import com.yigongbao.common.enums.CodeResetTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.code.convert.CodeRuleConvert;
+import com.yigongbao.module.basic.code.dto.CodeRulePageDTO;
 import com.yigongbao.module.basic.code.dto.CreateCodeRuleDTO;
 import com.yigongbao.module.basic.code.dto.UpdateCodeRuleDTO;
 import com.yigongbao.module.basic.code.entity.CodeRuleEntity;
@@ -38,17 +39,18 @@ public class CodeRuleServiceImpl extends ServiceImpl<CodeRuleMapper, CodeRuleEnt
      * 分页查询编码规则
      */
     @Override
-    public IPage<CodeRuleVO> listRules(Integer pageNum, Integer pageSize, String ruleCode, String ruleName, Integer status) {
-        log.info("分页查询编码规则，pageNum={}, pageSize={}, ruleCode={}, ruleName={}, status={}",
-                pageNum, pageSize, ruleCode, ruleName, status);
+    public IPage<CodeRuleVO> listRules(CodeRulePageDTO dto) {
+        log.info("分页查询编码规则，dto={}", dto);
         try {
+            int pageNum = dto.getPageNum() == null || dto.getPageNum() < 1 ? 1 : dto.getPageNum();
+            int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
             Page<CodeRuleEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<CodeRuleEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(Objects.nonNull(ruleCode) && !ruleCode.isEmpty(),
-                    CodeRuleEntity::getRuleCode, ruleCode)
-                    .like(Objects.nonNull(ruleName) && !ruleName.isEmpty(),
-                            CodeRuleEntity::getRuleName, ruleName)
-                    .eq(Objects.nonNull(status), CodeRuleEntity::getStatus, status)
+            wrapper.like(Objects.nonNull(dto.getRuleCode()) && !dto.getRuleCode().isEmpty(),
+                    CodeRuleEntity::getRuleCode, dto.getRuleCode())
+                    .like(Objects.nonNull(dto.getRuleName()) && !dto.getRuleName().isEmpty(),
+                            CodeRuleEntity::getRuleName, dto.getRuleName())
+                    .eq(Objects.nonNull(dto.getStatus()), CodeRuleEntity::getStatus, dto.getStatus())
                     .orderByDesc(CodeRuleEntity::getCreateTime);
 
             IPage<CodeRuleEntity> pageResult = page(page, wrapper);

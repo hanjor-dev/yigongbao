@@ -5,6 +5,9 @@ import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.doctor.dto.CreateDoctorDTO;
+import com.yigongbao.module.basic.doctor.dto.DoctorListDTO;
+import com.yigongbao.module.basic.doctor.dto.DoctorPageDTO;
+import com.yigongbao.module.basic.doctor.dto.DoctorSuggestDTO;
 import com.yigongbao.module.basic.doctor.dto.QuickAddDoctorDTO;
 import com.yigongbao.module.basic.doctor.dto.UpdateDoctorDTO;
 import com.yigongbao.module.basic.doctor.service.DoctorService;
@@ -39,27 +42,18 @@ public class DoctorController {
      * 分页查询医生列表
      */
     @Operation(summary = "分页查询医生列表")
-    @GetMapping("/page")
-    public Result<IPage<DoctorVO>> page(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String doctorName,
-            @RequestParam(required = false) Long hospitalId,
-            @RequestParam(required = false) Long hospitalDeptId,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(doctorService.listDoctors(pageNum, pageSize, doctorName, hospitalId, hospitalDeptId, status));
+    @PostMapping("/page")
+    public Result<IPage<DoctorVO>> page(@Validated @RequestBody DoctorPageDTO dto) {
+        return Result.success(doctorService.listDoctors(dto));
     }
 
     /**
      * 查询所有医生列表
      */
     @Operation(summary = "查询所有医生列表")
-    @GetMapping("/list")
-    public Result<List<DoctorVO>> list(
-            @RequestParam(required = false) String doctorName,
-            @RequestParam(required = false) Long hospitalId,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(doctorService.listAll(doctorName, hospitalId, status));
+    @PostMapping("/list")
+    public Result<List<DoctorVO>> list(@Validated @RequestBody DoctorListDTO dto) {
+        return Result.success(doctorService.listAll(dto));
     }
 
     /**
@@ -137,12 +131,9 @@ public class DoctorController {
      * 查询业务员在医院下的历史医生列表（用于医生联想）
      */
     @Operation(summary = "查询业务员在医院下的历史医生列表")
-    @GetMapping("/suggest")
-    public Result<List<DoctorVO>> suggest(
-            @RequestParam Long creatorId,
-            @RequestParam Long hospitalId,
-            @RequestParam(required = false) String keyword) {
-        return Result.success(doctorService.listByCreatorAndHospital(creatorId, hospitalId, keyword));
+    @PostMapping("/suggest")
+    public Result<List<DoctorVO>> suggest(@Validated @RequestBody DoctorSuggestDTO dto) {
+        return Result.success(doctorService.listByCreatorAndHospital(dto));
     }
 
     /**

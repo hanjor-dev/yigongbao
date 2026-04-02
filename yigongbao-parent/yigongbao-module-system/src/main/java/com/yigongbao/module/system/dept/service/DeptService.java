@@ -3,6 +3,7 @@ package com.yigongbao.module.system.dept.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.system.dept.dto.CreateDeptDTO;
+import com.yigongbao.module.system.dept.dto.DeptPageDTO;
 import com.yigongbao.module.system.dept.dto.UpdateDeptDTO;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.vo.DeptVO;
@@ -18,14 +19,10 @@ public interface DeptService extends IService<DeptEntity> {
     /**
      * 分页查询部门列表
      *
-     * @param pageNum  页码
-     * @param pageSize 每页条数
-     * @param orgId    所属机构ID
-     * @param deptName 部门名称（模糊查询）
-     * @param status   状态
+     * @param dto 分页查询参数
      * @return 分页后的部门列表
      */
-    IPage<DeptVO> listDept(Integer pageNum, Integer pageSize, Long orgId, String deptName, Integer status);
+    IPage<DeptVO> listDept(DeptPageDTO dto);
 
     /**
      * 根据ID查询部门详情

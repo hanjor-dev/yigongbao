@@ -6,12 +6,14 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.yigongbao.module.system.config.dto.ConfigPageDTO;
 import com.yigongbao.module.system.config.dto.CreateConfigDTO;
 import com.yigongbao.module.system.config.dto.UpdateConfigDTO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.config.vo.ConfigVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,28 +35,11 @@ public class ConfigController {
 
     /**
      * 分页查询配置列表
-     *
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param configKey 配置键
-     * @param configName 配置名称
-     * @param configGroup 配置分组
-     * @param configType 配置类型
-     * @param status 状态
-     * @return 分页后的配置列表
      */
     @Operation(summary = "分页查询配置列表")
-    @GetMapping("/list")
-    public Result<IPage<ConfigVO>> list(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String configKey,
-            @RequestParam(required = false) String configName,
-            @RequestParam(required = false) String configGroup,
-            @RequestParam(required = false) String configType,
-            @RequestParam(required = false) Integer status) {
-        IPage<ConfigVO> page = configService.pageConfig(pageNum, pageSize, configKey, configName, configGroup, configType, status);
-        return Result.success(page);
+    @PostMapping("/list")
+    public Result<IPage<ConfigVO>> list(@Validated @RequestBody ConfigPageDTO dto) {
+        return Result.success(configService.pageConfig(dto));
     }
 
     /**
