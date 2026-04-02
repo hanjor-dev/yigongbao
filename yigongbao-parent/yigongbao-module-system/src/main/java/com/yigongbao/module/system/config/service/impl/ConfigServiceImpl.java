@@ -17,11 +17,13 @@ import com.yigongbao.module.system.config.entity.ConfigEntity;
 import com.yigongbao.module.system.config.mapper.ConfigMapper;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.config.vo.ConfigVO;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -387,28 +389,61 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
 
     /**
      * 从 DefaultConfigProperties 中获取兜底默认值
-     * 通过直接调用 getter 方法读取配置值
+     * 通过 configKey 动态构建字段名，使用反射自动查找，无需手写 switch 映射
      *
      * @param configKey 配置键
      * @return 兜底默认值，如果无对应字段则返回 null
      */
     private String getFallbackValue(String configKey) {
-        // 映射配置键到对应的 getter 方法
-        return switch (configKey) {
-            // 安全配置
-            case "default.password" -> defaultConfigProperties.getDefaultPassword();
-            case "login.max.failures" -> String.valueOf(defaultConfigProperties.getLoginMaxFailures());
-            case "login.lock.duration" -> String.valueOf(defaultConfigProperties.getLoginLockDuration());
-            case "sms.send.interval" -> String.valueOf(defaultConfigProperties.getSmsSendInterval());
-            case "max.upload.size" -> String.valueOf(defaultConfigProperties.getMaxUploadSize());
-            // 订单配置
-            case "order.image.required" -> String.valueOf(defaultConfigProperties.getOrderImageRequired());
-            case "order.draft.expire.days" -> String.valueOf(defaultConfigProperties.getOrderDraftExpireDays());
-            case "order.modify.window.minutes" -> String.valueOf(defaultConfigProperties.getOrderModifyWindowMinutes());
-            default -> {
-                log.warn("未找到对应的兜底配置，configKey={}", configKey);
-                yield null;
-            }
-        };
+        // 1. 校验 configKey 是否在枚举定义中
+        SystemConfigKeyEnum configEnum = SystemConfigKeyEnum.getByKey(configKey);
+        if (configEnum == null) {
+            log.warn("configKey 未在 SystemConfigKeyEnum 中定义，configKey={}", configKey);
+            return null;
+        }
+        // 2. 动态构建字段名：configKey 转驼峰加 config 前缀
+        String fieldName = toFieldName(configKey);
+        // 3. 通过反射从 DefaultConfigProperties 获取字段值
+        try {
+            Field field = DefaultConfigProperties.class.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            Object value = field.get(defaultConfigProperties);
+            return value != null ? String.valueOf(value) : null;
+        } catch (NoSuchFieldException e) {
+            log.warn("DefaultConfigProperties 中未找到字段 fieldName={}, configKey={}", fieldName, configKey);
+            return null;
+        } catch (IllegalAccessException e) {
+            log.error("反射访问 DefaultConfigProperties 字段异常 fieldName={}", fieldName, e);
+            return null;
+        }
+    }
+
+    /**
+     * 将 configKey 转换为字段名
+     * 规则：去除点号后转驼峰，再加 config 前缀
+     * 例如：default.password → configDefaultPassword
+     *
+     * @param configKey 配置键
+     * @return 字段名
+     */
+    private String toFieldName(String configKey) {
+        StringBuilder sb = new StringBuilder("config");
+        for (String part : configKey.split("\\.")) {
+            sb.append(capitalize(part));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 首字母大写
+     *
+     * @param str 原始字符串
+     * @return 首字母大写后的字符串
+     */
+    private String capitalize(String str) {
+        if (StrUtil.isBlank(str) || str.length() == 1) {
+            return str != null ? str.toUpperCase() : "";
+        }
+        return Character.toUpperCase(str.charAt(0)) + str.substring(1);
     }
 }

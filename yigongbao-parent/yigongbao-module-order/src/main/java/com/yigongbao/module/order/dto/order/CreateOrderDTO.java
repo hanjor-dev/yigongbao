@@ -155,4 +155,17 @@ public class CreateOrderDTO implements Serializable {
     @NotEmpty(message = "重建项目明细不能为空")
     @Valid
     private List<OrderItemDraftItemDTO> items;
+
+    // ==================== 影像文件（直提流程） ====================
+    /**
+     * 影像数据文件ID列表（CT/MRI等）
+     * 字典 dict_code=10.1，前端先上传文件再传入fileId
+     */
+    private List<String> imageDataFileIds;
+
+    /**
+     * 影像报告文件ID列表
+     * 字典 dict_code=10.2，前端先上传文件再传入fileId
+     */
+    private List<String> imageReportFileIds;
 }

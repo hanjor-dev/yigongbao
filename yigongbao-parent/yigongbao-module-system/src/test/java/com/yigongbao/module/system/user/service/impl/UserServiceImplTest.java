@@ -391,7 +391,7 @@ class UserServiceImplTest {
 
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(orgService.getById(1L)).thenReturn(testOrg);
-        // ConfigService 在数据库无值时直接返回 DefaultConfigProperties 的兜底值
+        // ConfigService 在数据库无值时直接返回 yigongbao.config 的兜底值
         when(configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey())).thenReturn("123456");
         when(passwordEncoder.encode("123456")).thenReturn("$2a$10$encrypted");
         when(userMapper.insert(any(UserEntity.class))).thenReturn(1);

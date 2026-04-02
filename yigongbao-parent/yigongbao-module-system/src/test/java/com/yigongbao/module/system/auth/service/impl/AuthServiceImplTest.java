@@ -342,7 +342,7 @@ class AuthServiceImplTest {
         testUser.setLoginFailCount(4);
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(passwordEncoder.matches("wrong_password", testUser.getPassword())).thenReturn(false);
-        // ConfigService 在数据库无值时直接返回 DefaultConfigProperties 的兜底值
+        // ConfigService 在数据库无值时直接返回 yigongbao.config 的兜底值
         when(configService.getConfigValue("login.max.failures")).thenReturn("5");
         when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
@@ -356,7 +356,7 @@ class AuthServiceImplTest {
                 () -> authService.login(loginDTO)
         );
         assertEquals(ErrorCodeEnum.PASSWORD_ERROR.getCode(), exception.getCode());
-        // 验证 ConfigService 返回了兜底值（不再直接调用 DefaultConfigProperties）
+        // 验证 ConfigService 返回了兜底值
         // 注意：handleLoginFailure 和 login 异常处理中各调用一次，所以是 atLeast(1)
         verify(configService, atLeast(1)).getConfigValue("login.max.failures");
         verify(configService, atLeast(1)).getConfigValue("login.lock.duration");

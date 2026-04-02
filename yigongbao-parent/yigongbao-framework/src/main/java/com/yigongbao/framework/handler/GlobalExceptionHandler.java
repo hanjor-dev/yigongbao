@@ -13,6 +13,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -70,7 +71,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
-        // 获取第一个校验失败的错误信息
+        // 获取第一个校验失败的错误信息，避免暴露内部字段名
         String errorMessage = e.getBindingResult().getFieldErrors().stream()
             .map(FieldError::getDefaultMessage)
             .collect(Collectors.joining(", "));
@@ -138,11 +139,26 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleMissingServletRequestParameterException(MissingServletRequestParameterException e) {
         log.warn("缺少请求参数：{}", e.getParameterName());
-        return Result.error(400, "缺少参数：" + e.getParameterName());
+        return Result.error(400, "缺少必要的请求参数，请刷新页面后重试");
+    }
+
+    /**
+     * 处理路径变量缺失异常
+     * 当 URL 路径中的占位符（如 {id}）无法匹配时触发
+     *
+     * @param e 路径变量缺失异常实例
+     * @return 统一返回结果
+     */
+    @ExceptionHandler(MissingPathVariableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleMissingPathVariableException(MissingPathVariableException e) {
+        log.warn("路径变量缺失：参数名={}", e.getVariableName());
+        return Result.error(400, "请求的路径参数不完整，请检查URL是否正确");
     }
 
     /**
      * 处理参数类型不匹配异常
+     * 当 URL 参数值无法转换为目标类型时触发，如 id=abc 期望 Long 类型
      *
      * @param e 参数类型不匹配异常实例
      * @return 统一返回结果
@@ -150,8 +166,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e) {
-        log.warn("参数类型不匹配：{}", e.getName());
-        return Result.error(400, "参数类型错误：" + e.getName());
+        String paramName = e.getName();
+        String paramValue = e.getValue() != null ? e.getValue().toString() : "空";
+        log.warn("参数类型不匹配：参数名={}, 传入值={}, 期望类型={}", paramName, paramValue, e.getRequiredType());
+        return Result.error(400, "请求的参数格式有误，请刷新页面后重试");
     }
 
     /**
@@ -164,8 +182,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
-        log.warn("参数格式错误：{}", e.getMessage());
-        return Result.error(400, "参数错误，请检查参数格式");
+        String message = e.getMessage();
+        String userMessage;
+        if (message != null && message.contains("Required request body is missing")) {
+            userMessage = "请求参数缺失，请检查是否正确提交了数据";
+        } else {
+            userMessage = "请求参数格式错误，请检查数据格式后重试";
+        }
+        log.warn("参数格式错误：{}", message);
+        return Result.error(400, userMessage);
     }
 
     /**

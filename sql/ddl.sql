@@ -1077,6 +1077,10 @@ CREATE TABLE order_flow_status_history (
 
     -- ==================== 公共字段 ====================
     create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          COMMENT '创建人ID',
+    update_by       BIGINT          COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
     KEY idx_order_flow_order_id (order_id),

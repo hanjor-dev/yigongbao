@@ -247,6 +247,17 @@ public class OrderDetailVO implements Serializable {
      */
     private List<String> availableActions;
 
+    // ==================== 文件列表 ====================
+    /**
+     * 影像数据文件列表（dict_code=10.1，CT/MRI等）
+     */
+    private List<OrderFileVO> imageDataFiles;
+
+    /**
+     * 影像报告文件列表（dict_code=10.2）
+     */
+    private List<OrderFileVO> imageReportFiles;
+
     /**
      * 订单明细 VO
      * 嵌套在 OrderDetailVO 中
@@ -308,5 +319,63 @@ public class OrderDetailVO implements Serializable {
          * 排序序号
          */
         private Integer sortOrder;
+    }
+
+    /**
+     * 订单文件 VO
+     * 嵌套在 OrderDetailVO 中，用于展示订单关联的影像文件
+     *
+     * @author hanjor
+     * @date 2026-04-02
+     */
+    @Data
+    public static class OrderFileVO implements Serializable {
+
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * 文件ID
+         */
+        private String fileId;
+
+        /**
+         * 文件名称
+         */
+        private String fileName;
+
+        /**
+         * 文件类别（字典 dict_code：10.1-影像数据，10.2-影像报告）
+         */
+        private String fileCategory;
+
+        /**
+         * 文件类别名称
+         */
+        private String fileCategoryName;
+
+        /**
+         * 公开访问URL
+         */
+        private String fileUrl;
+
+        /**
+         * 缩略图访问URL
+         */
+        private String thUrl;
+
+        /**
+         * 文件大小（字节）
+         */
+        private Long fileSize;
+
+        /**
+         * 格式化文件大小（如 2.35 MB）
+         */
+        private String fileSizeText;
+
+        /**
+         * 文件扩展名
+         */
+        private String fileExt;
     }
 }

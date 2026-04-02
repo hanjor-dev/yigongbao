@@ -6,45 +6,56 @@ import org.springframework.stereotype.Component;
 
 /**
  * 系统配置兜底默认值属性类
- * 当数据库配置不存在或已禁用时，使用此处配置的默认值
+ * 从 application.yml 的 yigongbao.config 节点读取默认值
+ * 当数据库配置不存在或已禁用时，使用此处配置的值
+ *
+ * 字段命名规则：configKey 去除点号转驼峰后加 config 前缀
+ * 例如：default.password → configDefaultPassword
  *
  * @author hanjor
  * @date 2026-03-18
  */
 @Data
 @Component
-@ConfigurationProperties(prefix = "yigongbao.config.default-values")
+@ConfigurationProperties(prefix = "yigongbao.config")
 public class DefaultConfigProperties {
 
+    // ==================== 安全配置 ====================
     /**
      * 默认密码
      * 新用户初始密码
      */
-    private String defaultPassword = "123456";
+    private String configDefaultPassword = "123456";
 
     /**
      * 最大连续登录失败次数
      * 连续失败后锁定账号
      */
-    private Integer loginMaxFailures = 5;
+    private Integer configLoginMaxFailures = 5;
 
     /**
      * 登录锁定时长（分钟）
      * 自动解锁时间
      */
-    private Integer loginLockDuration = 15;
+    private Integer configLoginLockDuration = 15;
 
     /**
      * 短信发送间隔（秒）
      * 同一手机号发送间隔
      */
-    private Integer smsSendInterval = 60;
+    private Integer configSmsSendInterval = 60;
+
+    // ==================== 系统配置 ====================
+    /**
+     * 系统名称
+     */
+    private String configSystemName = "医工宝";
 
     /**
      * 文件上传最大大小（字节）
-     * 默认10MB
+     * 默认 500MB
      */
-    private Long maxUploadSize = 10485760L;
+    private Long configMaxUploadSize = 524288000L;
 
     // ==================== 订单配置 ====================
     /**
@@ -52,17 +63,17 @@ public class DefaultConfigProperties {
      * true - 必须上传（默认）
      * false - 非必填
      */
-    private Boolean orderImageRequired = true;
+    private Boolean configOrderImageRequired = true;
 
     /**
      * 草稿自动过期天数
      * 默认 30 天
      */
-    private Integer orderDraftExpireDays = 30;
+    private Integer configOrderDraftExpireDays = 30;
 
     /**
      * 订单提交后修改窗口期（分钟）
      * 默认 10 分钟
      */
-    private Integer orderModifyWindowMinutes = 10;
+    private Integer configOrderModifyWindowMinutes = 10;
 }

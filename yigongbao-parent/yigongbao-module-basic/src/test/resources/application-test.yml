@@ -39,12 +39,18 @@ dromara:
 # 医工宝自定义配置（测试环境）
 yigongbao:
   config:
-    default-values:
-      default-password: "123456"
-      login-max-failures: 5
-      login-lock-duration: 15
-      sms-send-interval: 60
-      max-upload-size: 524288000
+    # 安全配置
+    default-password: "123456"
+    login-max-failures: 5
+    login-lock-duration: 15
+    sms-send-interval: 60
+    # 系统配置
+    system-name: "医工宝测试"
+    max-upload-size: 524288000
+    # 订单配置
+    order-image-required: true
+    order-draft-expire-days: 30
+    order-modify-window-minutes: 10
   # 文件存储业务配置
   file-storage:
     max-file-size: 524288000

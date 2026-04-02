@@ -155,7 +155,8 @@ public class FlowStateMachineServiceImpl implements FlowStateMachineService {
                     currentPhase, targetStatus, action, order.getNeedsPhysicalDelivery());
             Integer nextPhase = phaseAndStatus != null && phaseAndStatus.phase() != null
                     ? phaseAndStatus.phase().getValue() : null;
-            Integer initialStatus = phaseAndStatus != null ? phaseAndStatus.initialStatus().getValue() : null;
+            Integer initialStatus = phaseAndStatus != null && phaseAndStatus.initialStatus() != null
+                    ? phaseAndStatus.initialStatus().getValue() : null;
 
             // ========== Step 7: 不可见状态处理 ==========
             // 不可见状态：历史记录不可见状态，落库初始可见状态

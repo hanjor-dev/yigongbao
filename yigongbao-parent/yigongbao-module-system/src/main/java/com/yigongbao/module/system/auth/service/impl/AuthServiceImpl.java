@@ -14,7 +14,6 @@ import com.yigongbao.module.system.auth.service.AuthService;
 import com.yigongbao.module.system.auth.vo.LoginVO;
 import com.yigongbao.module.system.auth.vo.LoginLogVO;
 import com.yigongbao.module.system.config.service.ConfigService;
-import com.yigongbao.common.config.DefaultConfigProperties;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.module.system.resource.service.ResourceService;
 import com.yigongbao.module.system.resource.vo.ResourceVO;
@@ -47,7 +46,6 @@ public class AuthServiceImpl implements AuthService {
     private final LoginLogMapper loginLogMapper;
     private final ResourceService resourceService;
     private final ConfigService configService;
-    private final DefaultConfigProperties defaultConfigProperties;
 
     private final PasswordEncoder passwordEncoder;
 
@@ -341,7 +339,6 @@ public class AuthServiceImpl implements AuthService {
 
     /**
      * 获取最大登录失败次数
-     * 优先从数据库配置获取，如果不存在或已禁用则使用配置文件中的默认值兜底
      *
      * @return 最大失败次数
      */
@@ -354,13 +351,13 @@ public class AuthServiceImpl implements AuthService {
                 log.warn("login.max.failures 配置值无效，configValue={}", configValue);
             }
         }
-        // 理论上 configService.getConfigValue 不会返回 null，此处兜底以防万一
-        return defaultConfigProperties.getLoginMaxFailures();
+        // ConfigService 已内置兜底逻辑，此处理论上不会到达
+        log.error("login.max.failures 配置获取异常，返回默认值 5");
+        return 5;
     }
 
     /**
      * 获取登录锁定时长（分钟）
-     * 优先从数据库配置获取，如果不存在或已禁用则使用配置文件中的默认值兜底
      *
      * @return 锁定时长（分钟）
      */
@@ -373,7 +370,8 @@ public class AuthServiceImpl implements AuthService {
                 log.warn("login.lock.duration 配置值无效，configValue={}", configValue);
             }
         }
-        // 理论上 configService.getConfigValue 不会返回 null，此处兜底以防万一
-        return defaultConfigProperties.getLoginLockDuration();
+        // ConfigService 已内置兜底逻辑，此处理论上不会到达
+        log.error("login.lock.duration 配置获取异常，返回默认值 15");
+        return 15;
     }
 }

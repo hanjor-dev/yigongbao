@@ -18,6 +18,13 @@ import java.util.Arrays;
 @AllArgsConstructor
 public enum FileBizTypeEnum {
 
+    // ==================== 订单草稿文件 ====================
+    /**
+     * 订单草稿文件
+     * 用于订单草稿阶段的文件关联，业务标识（存储到 file_detail.object_id）
+     */
+    ORDER_DRAFT("order_draft", "order_draft", "订单草稿文件"),
+
     // ==================== 影像资料（订单创建） ====================
     /**
      * 影像数据

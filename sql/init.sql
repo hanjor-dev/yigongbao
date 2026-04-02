@@ -144,176 +144,86 @@ VALUES
 -- ============================================================
 -- 初始化系统配置数据
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status) VALUES
+-- 安全配置
 ('default.password', '默认密码', '123456', 'string', 'security', '新用户初始密码', 1, 0, 1, 1),
 ('login.max.failures', '最大连续登录失败次数', '5', 'number', 'security', '连续失败后锁定账号', 1, 0, 2, 1),
 ('login.lock.duration', '登录锁定时长', '15', 'number', 'security', '自动解锁时间（分钟）', 1, 0, 3, 1),
-('sms.send.interval', '短信发送间隔', '60', 'number', 'security', '同一手机号发送间隔（秒）', 1, 0, 4, 1);
+('sms.send.interval', '短信发送间隔', '60', 'number', 'security', '同一手机号发送间隔（秒）', 1, 0, 4, 1),
+-- 系统配置
+('system.name', '系统名称', '医工宝', 'string', 'system', '系统显示名称', 1, 1, 5, 1),
+('max.upload.size', '文件上传最大大小', '524288000', 'number', 'system', '文件上传最大大小（字节），默认 500MB', 1, 0, 6, 1),
+-- 订单配置
+('order.image.required', '提交订单是否必须上传影像文件', 'true', 'boolean', 'order', 'true-必须上传，false-非必填', 1, 0, 7, 1),
+('order.draft.expire.days', '草稿自动过期天数', '30', 'number', 'order', '草稿超过此天数自动过期（天）', 1, 0, 8, 1),
+('order.modify.window.minutes', '订单提交后修改窗口期', '10', 'number', 'order', '订单提交后允许修改的时间窗口（分钟）', 1, 0, 9, 1);
 
 
 -- ============================================================
 -- 资源数据初始化（sys_resource）
 -- resource_type: 1=一级菜单, 2=二级菜单, 3=按钮
+-- 基于 .docs/temp.md 整理的菜单权限数据
 -- ============================================================
 
 -- ------------------------------------------------------------
--- 一级菜单
+-- 一级菜单（按 sort 排序）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, redirect, sort, visible, status) VALUES
-(1, 0, '系统管理', 'system', 1, 'Setting', '/system', NULL, '/system/index', 100, 1, 1),
-(2, 0, '权限管理', 'permission', 1, 'Lock', '/permission', NULL, '/permission/index', 90, 1, 1),
-(3, 0, '基础数据', 'basedata', 1, 'Database', '/basedata', NULL, '/basedata/index', 80, 1, 1),
-(4, 0, '客户管理', 'customer', 1, 'Hospital', '/customer', NULL, '/customer/index', 70, 1, 1);
+(1, 0, '数据概览', 'DataBoard', 1, '&#xe62e;', '/home', NULL, '/home/index.vue', 1, 1, 1),
+(2, 0, '业务运营', 'Business', 1, NULL, '/business', NULL, '/business/order', 2, 1, 1),
+(3, 0, '客户管理', 'Customer', 1, NULL, '/customer', NULL, '/customer/doctor', 3, 1, 1),
+(4, 0, '模块管理', 'Module', 1, NULL, '/module', NULL, '/module/org', 4, 1, 1),
+(5, 0, '用户和权限', 'Auth', 1, NULL, '/auth', NULL, '/auth/account', 5, 1, 1),
+(6, 0, '资料管理', 'Datum', 1, NULL, '/datum', NULL, '/datum/index.vue', 6, 1, 1),
+(7, 0, '系统配置', 'System', 1, NULL, '/system', NULL, '/system/dict', 7, 1, 1),
+(8, 0, '统计报表', 'Statistical', 1, '&#xe6d6;', '/statistical', NULL, '/statistical/index.vue', 8, 1, 1),
+(9, 0, '备份管理', 'Backup', 1, '&#xe7a0;', '/backup', NULL, '/backup/index.vue', 9, 1, 1),
+(10, 0, '个人中心', 'Personal', 1, '&#xe651;', '/personal', NULL, '/personal/index.vue', 10, 1, 1);
 
 -- ------------------------------------------------------------
--- 二级菜单（系统管理）
+-- 二级菜单：业务运营（parent_id=2）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status) VALUES
-(101, 1, '机构管理', 'system:org', 2, 'Office', '/system/org', 'system/org/index', 1, 1, 1),
-(102, 1, '部门管理', 'system:dept', 2, 'Dept', '/system/dept', 'system/dept/index', 2, 1, 1),
-(103, 1, '用户管理', 'system:user', 2, 'User', '/system/user', 'system/user/index', 3, 1, 1),
-(104, 1, '角色管理', 'system:role', 2, 'Role', '/system/role', 'system/role/index', 4, 1, 1);
+(101, 2, '订单管理', 'Order', 2, '&#xeb49;', '/order', 'business/order/index.vue', 1, 1, 1),
+(102, 2, '我的工单', 'Design', 2, '&#xe608;', '/design', 'business/design/index.vue', 2, 1, 1),
+(103, 2, '生产管理', 'Manufacture', 2, '&#xe662;', '/manufacture', 'business/manufacture/index.vue', 3, 1, 1),
+(104, 2, '质检管理', 'Quality', 2, NULL, '/quality', 'business/quality/index.vue', 4, 1, 1),
+(105, 2, '仓储管理', 'Storage', 2, NULL, '/storage', 'business/storage/index.vue', 5, 1, 1);
 
 -- ------------------------------------------------------------
--- 二级菜单（权限管理）
+-- 二级菜单：客户管理（parent_id=3）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status) VALUES
-(201, 2, '资源管理', 'permission:resource', 2, 'Menu', '/permission/resource', 'permission/resource/index', 1, 1, 1),
-(202, 2, '登录日志', 'permission:loginlog', 2, 'Log', '/permission/loginlog', 'permission/loginlog/index', 2, 1, 1);
+(201, 3, '医生管理', 'Doctor', 2, '&#xe813;', '/doctor', 'customer/doctor/index.vue', 1, 1, 1),
+(202, 3, '科室管理', 'Department', 2, '&#xe69f;', '/department', 'customer/department/index.vue', 2, 1, 1),
+(203, 3, '医院管理', 'Hospital', 2, '&#xe811;', '/hospital', 'customer/hospital/index.vue', 3, 1, 1);
 
 -- ------------------------------------------------------------
--- 二级菜单（基础数据）
+-- 二级菜单：模块管理（parent_id=4）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status) VALUES
-(301, 3, '字典管理', 'basedata:dict', 2, 'Dict', '/basedata/dict', 'basedata/dict/index', 1, 1, 1),
-(302, 3, '系统配置', 'basedata:config', 2, 'Config', '/basedata/config', 'basedata/config/index', 2, 1, 1),
-(303, 3, '地区管理', 'basedata:area', 2, 'Map', '/basedata/area', 'basedata/area/index', 3, 1, 1),
-(304, 3, '医院管理', 'basedata:hospital', 2, 'Hospital', '/basedata/hospital', 'basedata/hospital/index', 4, 1, 1),
-(305, 3, '医院组合模板', 'basedata:hospital-template', 2, 'Collection', '/basedata/hospital-template', 'basedata/hospital-template/index', 5, 1, 1);
+(301, 4, '机构管理', 'Org', 2, '&#xe61a;', '/org', 'module/org/index.vue', 1, 1, 1),
+(302, 4, '部门管理', 'Branch', 2, '&#xe62b;', '/branch', 'module/branch/index.vue', 2, 1, 1),
+(303, 4, '项目管理', 'Project', 2, '&#xe620;', '/project', 'module/project/index.vue', 3, 1, 1),
+(304, 4, '产品管理', 'Product', 2, '&#xe601;', '/product', 'module/product/index.vue', 4, 1, 1),
+(305, 4, '物料管理', 'Material', 2, '&#xe65c;', '/material', 'module/material/index.vue', 5, 1, 1),
+(306, 4, '医院范围模板管理', 'Template', 2, '&#xe605;', '/template', 'module/template/index.vue', 6, 1, 1);
 
 -- ------------------------------------------------------------
--- 二级菜单（客户管理）
+-- 二级菜单：用户和权限（parent_id=5）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status) VALUES
-(401, 4, '用户医院分配', 'customer:user-hospital', 2, 'Link', '/customer/user-hospital', 'customer/user-hospital/index', 1, 1, 1);
+(401, 5, '账户管理', 'Account', 2, '&#xe602;', '/account', 'auth/account/index.vue', 1, 1, 1),
+(402, 5, '角色管理', 'Role', 2, '&#xe6a0;', '/role', 'auth/role/index.vue', 2, 1, 1),
+(403, 5, '资源管理', 'Resource', 2, '&#xe607;', '/resource', 'auth/resource/index.vue', 3, 1, 1),
+(404, 5, '注册审核', 'RegReview', 2, '&#xe76a;', '/regReview', 'auth/regReview/index.vue', 4, 1, 1);
 
 -- ------------------------------------------------------------
--- 按钮权限（机构管理）
+-- 二级菜单：系统配置（parent_id=7）
 -- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
-(1001, 101, '查看机构列表', 'system:org:list', 3, 1, 1, 1),
-(1002, 101, '查看机构详情', 'system:org:detail', 3, 2, 1, 1),
-(1003, 101, '新增机构', 'system:org:add', 3, 3, 1, 1),
-(1004, 101, '编辑机构', 'system:org:edit', 3, 4, 1, 1),
-(1005, 101, '删除机构', 'system:org:delete', 3, 5, 1, 1),
-(1006, 101, '启用/停用机构', 'system:org:status', 3, 6, 1, 1);
-
--- ------------------------------------------------------------
--- 按钮权限（部门管理）
--- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
-(1101, 102, '查看部门列表', 'system:dept:list', 3, 1, 1, 1),
-(1102, 102, '查看部门详情', 'system:dept:detail', 3, 2, 1, 1),
-(1103, 102, '新增部门', 'system:dept:add', 3, 3, 1, 1),
-(1104, 102, '编辑部门', 'system:dept:edit', 3, 4, 1, 1),
-(1105, 102, '删除部门', 'system:dept:delete', 3, 5, 1, 1),
-(1106, 102, '启用/停用部门', 'system:dept:status', 3, 6, 1, 1);
-
--- ------------------------------------------------------------
--- 按钮权限（用户管理）
--- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
-(1201, 103, '查看用户列表', 'system:user:list', 3, 1, 1, 1),
-(1202, 103, '查看用户详情', 'system:user:detail', 3, 2, 1, 1),
-(1203, 103, '新增用户', 'system:user:add', 3, 3, 1, 1),
-(1204, 103, '编辑用户', 'system:user:edit', 3, 4, 1, 1),
-(1205, 103, '删除用户', 'system:user:delete', 3, 5, 1, 1),
-(1206, 103, '重置密码', 'system:user:reset-password', 3, 6, 1, 1),
-(1207, 103, '修改状态', 'system:user:status', 3, 7, 1, 1),
-(1208, 103, '修改密码', 'system:user:change-password', 3, 8, 1, 1);
-
--- ------------------------------------------------------------
--- 按钮权限（角色管理）
--- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
-(1301, 104, '查看角色列表', 'system:role:list', 3, 1, 1, 1),
-(1302, 104, '查看角色详情', 'system:role:detail', 3, 2, 1, 1),
-(1303, 104, '新增角色', 'system:role:add', 3, 3, 1, 1),
-(1304, 104, '编辑角色', 'system:role:edit', 3, 4, 1, 1),
-(1305, 104, '删除角色', 'system:role:delete', 3, 5, 1, 1),
-(1306, 104, '修改状态', 'system:role:status', 3, 6, 1, 1),
-(1307, 104, '分配资源', 'system:role:assign-resource', 3, 7, 1, 1);
-
--- ------------------------------------------------------------
--- 按钮权限（资源管理）
--- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
-(1401, 201, '查看资源列表', 'permission:resource:list', 3, 1, 1, 1),
-(1402, 201, '查看资源详情', 'permission:resource:detail', 3, 2, 1, 1),
-(1403, 201, '新增资源', 'permission:resource:add', 3, 3, 1, 1),
-(1404, 201, '编辑资源', 'permission:resource:edit', 3, 4, 1, 1),
-(1405, 201, '删除资源', 'permission:resource:delete', 3, 5, 1, 1);
-
--- ------------------------------------------------------------
--- 按钮权限（登录日志）
--- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
-(1501, 202, '查看登录日志', 'permission:loginlog:list', 3, 1, 1, 1),
-(1502, 202, '查看登录详情', 'permission:loginlog:detail', 3, 2, 1, 1),
-(1503, 202, '导出登录日志', 'permission:loginlog:export', 3, 3, 1, 1);
-
--- ------------------------------------------------------------
--- 按钮权限（字典管理）
--- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
-(1601, 301, '查看字典列表', 'basedata:dict:list', 3, 1, 1, 1),
-(1602, 301, '查看字典详情', 'basedata:dict:detail', 3, 2, 1, 1),
-(1603, 301, '新增字典', 'basedata:dict:add', 3, 3, 1, 1),
-(1604, 301, '编辑字典', 'basedata:dict:edit', 3, 4, 1, 1),
-(1605, 301, '删除字典', 'basedata:dict:delete', 3, 5, 1, 1);
-
--- ------------------------------------------------------------
--- 按钮权限（系统配置）
--- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
-(1701, 302, '查看配置列表', 'basedata:config:list', 3, 1, 1, 1),
-(1702, 302, '查看配置详情', 'basedata:config:detail', 3, 2, 1, 1),
-(1703, 302, '新增配置', 'basedata:config:add', 3, 3, 1, 1),
-(1704, 302, '编辑配置', 'basedata:config:edit', 3, 4, 1, 1),
-(1705, 302, '删除配置', 'basedata:config:delete', 3, 5, 1, 1),
-(1706, 302, '刷新配置', 'basedata:config:refresh', 3, 6, 1, 1);
-
--- ------------------------------------------------------------
--- 按钮权限（地区管理）
--- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
-(2101, 303, '查看地区列表', 'basedata:area:list', 3, 1, 1, 1);
-
--- ------------------------------------------------------------
--- 按钮权限（医院管理）
--- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
-(1801, 304, '查看医院列表', 'basedata:hospital:list', 3, 1, 1, 1),
-(1802, 304, '查看医院详情', 'basedata:hospital:detail', 3, 2, 1, 1),
-(1803, 304, '新增医院', 'basedata:hospital:add', 3, 3, 1, 1),
-(1804, 304, '编辑医院', 'basedata:hospital:edit', 3, 4, 1, 1),
-(1805, 304, '修改状态', 'basedata:hospital:status', 3, 5, 1, 1);
-
--- ------------------------------------------------------------
--- 按钮权限（医院组合模板）
--- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
-(1901, 305, '查看模板列表', 'basedata:hospital-template:list', 3, 1, 1, 1),
-(1902, 305, '查看模板详情', 'basedata:hospital-template:detail', 3, 2, 1, 1),
-(1903, 305, '新增模板', 'basedata:hospital-template:add', 3, 3, 1, 1),
-(1904, 305, '编辑模板', 'basedata:hospital-template:edit', 3, 4, 1, 1),
-(1905, 305, '修改状态', 'basedata:hospital-template:status', 3, 5, 1, 1);
-
--- ------------------------------------------------------------
--- 按钮权限（用户医院分配）
--- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, visible, status) VALUES
-(2001, 401, '查看用户医院列表', 'customer:user-hospital:list', 3, 1, 1, 1),
-(2002, 401, '分配用户医院', 'customer:user-hospital:assign', 3, 2, 1, 1);
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status) VALUES
+(501, 7, '字典管理', 'Dict', 2, '&#xe636;', '/dict', 'system/dict/index.vue', 1, 1, 1),
+(502, 7, '参数配置', 'Param', 2, '&#xe60e;', '/param', 'system/param/index.vue', 2, 1, 1),
+(503, 7, '操作日志', 'Log', 2, '&#xe668;', '/log', 'system/log/index.vue', 3, 1, 1);
 
 
 -- ============================================================

@@ -10,6 +10,7 @@ import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -20,6 +21,7 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
+import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
 import com.yigongbao.module.order.dto.order.UpdateOrderDTO;
@@ -169,6 +171,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             vo.setItemCount(items.size());
             // 查询当前可执行的动作列表，用于前端按钮展示
             vo.setAvailableActions(flowFacade.getAvailableActions(entity.getId()));
+            // 查询订单关联的影像文件列表
+            fillOrderFiles(vo, id);
             log.info("查询订单详情成功，id={}", id);
             return vo;
         } catch (BusinessException e) {
@@ -534,7 +538,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             log.info("创建订单明细，orderId={}, itemCount={}", orderId, draftItems.size());
 
             // Step 4：复制文件关联关系（从草稿关联迁移至订单关联）
-            List<FileVO> draftFiles = fileService.listByBiz("order_draft", draft.getId());
+            List<FileVO> draftFiles = fileService.listByBiz(FileBizTypeEnum.ORDER_DRAFT.getCode(), draft.getId());
             for (FileVO file : draftFiles) {
                 OrderFileEntity orderFile = new OrderFileEntity();
                 orderFile.setOrderId(orderId);
@@ -585,7 +589,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             String orderCode = codeGeneratorService.generate(CodeRuleConstants.ORDER_NO);
             log.info("生成订单编号，orderCode={}", orderCode);
 
-            // Step 2：构建订单主表
+            // Step 2：校验影像文件（根据系统配置判断是否必须上传）
+            validateOrderFiles(dto);
+
+            // Step 3：构建订单主表
             OrderMainEntity order = new OrderMainEntity();
             BeanUtils.copyProperties(dto, order);
             order.setOrderCode(orderCode);
@@ -596,7 +603,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             Long orderId = order.getId();
             log.info("创建订单主表，orderId={}, orderCode={}", orderId, orderCode);
 
-            // Step 3：保存重建项目列表
+            // Step 4：保存重建项目列表
             if (dto.getItems() != null && !dto.getItems().isEmpty()) {
                 for (int i = 0; i < dto.getItems().size(); i++) {
                     var itemDTO = dto.getItems().get(i);
@@ -618,7 +625,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.info("创建订单明细，orderId={}, itemCount={}", orderId, dto.getItems().size());
             }
 
-            // Step 4：记录状态历史（CREATE 动作仅记录历史，不改变 phase/status）
+            // Step 5：保存影像文件关联
+            saveOrderFiles(orderId, orderCode, dto.getImageDataFileIds(), FileBizTypeEnum.IMAGE_DATA.getDictCode());
+            saveOrderFiles(orderId, orderCode, dto.getImageReportFileIds(), FileBizTypeEnum.IMAGE_REPORT.getDictCode());
+
+            // Step 6：记录状态历史（CREATE 动作仅记录历史，不改变 phase/status）
             String operatorName = null;
             if (currentUserId != null) {
                 UserEntity user = userService.getById(currentUserId);
@@ -636,6 +647,153 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     }
 
     // ==================== 私有方法 ====================
+
+    /**
+     * 校验直提订单的影像文件
+     * 根据系统配置 order.image.required 判断影像文件是否必填，并校验文件是否真实存在
+     *
+     * @param dto 创建订单参数
+     * @throws BusinessException 配置要求必须上传但未上传，或文件不存在时抛出
+     */
+    private void validateOrderFiles(CreateOrderDTO dto) {
+        // 获取系统配置：是否必须上传影像文件
+        String imageRequired = configService.getConfigValue(SystemConfigKeyEnum.ORDER_IMAGE_REQUIRED.getKey());
+        if (!"true".equalsIgnoreCase(imageRequired)) {
+            // 配置关闭时，不校验
+            log.info("系统配置 order.image.required={}，跳过影像文件校验", imageRequired);
+            return;
+        }
+        // 校验影像数据（dict_code=10.1）
+        boolean hasImageData = dto.getImageDataFileIds() != null && !dto.getImageDataFileIds().isEmpty();
+        if (!hasImageData) {
+            log.warn("直提创建订单缺少影像数据，配置要求必须上传");
+            throw new BusinessException(ErrorCodeEnum.ORDER_FILE_REQUIRED, "影像数据");
+        }
+        // 校验影像数据文件是否真实存在
+        validateFileIdsExist(dto.getImageDataFileIds(), "影像数据");
+
+        // 校验影像报告（dict_code=10.2）
+        boolean hasImageReport = dto.getImageReportFileIds() != null && !dto.getImageReportFileIds().isEmpty();
+        if (!hasImageReport) {
+            log.warn("直提创建订单缺少影像报告，配置要求必须上传");
+            throw new BusinessException(ErrorCodeEnum.ORDER_FILE_REQUIRED, "影像报告");
+        }
+        // 校验影像报告文件是否真实存在
+        validateFileIdsExist(dto.getImageReportFileIds(), "影像报告");
+
+        log.info("直提创建订单影像文件校验通过，imageDataCount={}, imageReportCount={}",
+                dto.getImageDataFileIds().size(), dto.getImageReportFileIds().size());
+    }
+
+    /**
+     * 校验文件ID列表对应的文件是否全部真实存在
+     *
+     * @param fileIds 文件ID列表
+     * @param fileCategoryName 文件类别名称（用于错误提示）
+     * @throws BusinessException 存在文件不存在时抛出
+     */
+    private void validateFileIdsExist(List<String> fileIds, String fileCategoryName) {
+        for (String fileId : fileIds) {
+            FileVO file = fileService.getById(fileId);
+            if (file == null) {
+                log.warn("{} 文件不存在，fileId={}", fileCategoryName, fileId);
+                throw new BusinessException(ErrorCodeEnum.ORDER_FILE_NOT_FOUND, fileCategoryName);
+            }
+        }
+    }
+
+    /**
+     * 保存订单影像文件关联
+     *
+     * @param orderId 订单ID
+     * @param orderCode 订单编号
+     * @param fileIds 文件ID列表
+     * @param fileCategory 文件类别（字典 dict_code）
+     */
+    private void saveOrderFiles(Long orderId, String orderCode, List<String> fileIds, String fileCategory) {
+        if (fileIds == null || fileIds.isEmpty()) {
+            return;
+        }
+        for (String fileId : fileIds) {
+            OrderFileEntity orderFile = new OrderFileEntity();
+            orderFile.setOrderId(orderId);
+            orderFile.setOrderCode(orderCode);
+            orderFile.setFileId(fileId);
+            orderFile.setFileCategory(fileCategory);
+            orderFileMapper.insert(orderFile);
+        }
+        log.info("保存订单影像文件关联，orderId={}, fileCategory={}, count={}", orderId, fileCategory, fileIds.size());
+    }
+
+    /**
+     * 填充订单文件列表
+     * 根据订单ID查询 order_file 表关联文件，再通过 fileService 查询文件详情，分类填入 VO
+     *
+     * @param vo 订单详情 VO
+     * @param orderId 订单ID
+     */
+    private void fillOrderFiles(OrderDetailVO vo, Long orderId) {
+        // 查询订单关联的所有文件记录
+        List<OrderFileEntity> orderFiles = orderFileMapper.selectList(
+                new LambdaQueryWrapper<OrderFileEntity>()
+                        .eq(OrderFileEntity::getOrderId, orderId)
+                        .eq(OrderFileEntity::getIsDeleted, 0));
+        if (orderFiles.isEmpty()) {
+            return;
+        }
+        // 按文件类别分组
+        List<OrderDetailVO.OrderFileVO> imageDataFiles = new java.util.ArrayList<>();
+        List<OrderDetailVO.OrderFileVO> imageReportFiles = new java.util.ArrayList<>();
+        for (OrderFileEntity orderFile : orderFiles) {
+            FileVO fileVO = fileService.getById(orderFile.getFileId());
+            if (fileVO == null) {
+                continue;
+            }
+            OrderDetailVO.OrderFileVO file = toOrderFileVO(orderFile, fileVO);
+            if (FileBizTypeEnum.IMAGE_DATA.getDictCode().equals(orderFile.getFileCategory())) {
+                imageDataFiles.add(file);
+            } else if (FileBizTypeEnum.IMAGE_REPORT.getDictCode().equals(orderFile.getFileCategory())) {
+                imageReportFiles.add(file);
+            }
+        }
+        vo.setImageDataFiles(imageDataFiles);
+        vo.setImageReportFiles(imageReportFiles);
+    }
+
+    /**
+     * 订单文件关联 + 文件详情转换为 VO
+     *
+     * @param orderFile 订单文件关联实体
+     * @param fileVO 文件详情 VO
+     * @return 订单文件 VO
+     */
+    private OrderDetailVO.OrderFileVO toOrderFileVO(OrderFileEntity orderFile, FileVO fileVO) {
+        OrderDetailVO.OrderFileVO vo = new OrderDetailVO.OrderFileVO();
+        vo.setFileId(orderFile.getFileId());
+        vo.setFileName(fileVO.getFileName());
+        vo.setFileCategory(orderFile.getFileCategory());
+        vo.setFileCategoryName(getFileCategoryName(orderFile.getFileCategory()));
+        vo.setFileUrl(fileVO.getFileUrl());
+        vo.setThUrl(fileVO.getThUrl());
+        vo.setFileSize(fileVO.getFileSize());
+        vo.setFileSizeText(fileVO.getFileSizeText());
+        vo.setFileExt(fileVO.getFileExt());
+        return vo;
+    }
+
+    /**
+     * 获取文件类别名称
+     *
+     * @param fileCategory 文件类别（字典 dict_code）
+     * @return 文件类别名称
+     */
+    private String getFileCategoryName(String fileCategory) {
+        if (StrUtil.isBlank(fileCategory)) {
+            return null;
+        }
+        FileBizTypeEnum fileBizType = FileBizTypeEnum.getByDictCode(fileCategory);
+        return fileBizType != null ? fileBizType.getName() : null;
+    }
 
     /**
      * 实体转换为订单列表 VO

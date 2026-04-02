@@ -3,6 +3,8 @@ package com.yigongbao.common.enums;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import java.util.Arrays;
+
 /**
  * 系统配置键枚举
  * 集中管理系统配置键名，避免魔法值和键名不一致问题
@@ -79,4 +81,32 @@ public enum SystemConfigKeyEnum {
      * 配置名称（用于日志和错误提示）
      */
     private final String name;
+
+    /**
+     * 配置值类型
+     * 用于反射获取值后的类型转换
+     */
+    @Getter
+    public enum ConfigValueType {
+        STRING,
+        INTEGER,
+        LONG,
+        BOOLEAN
+    }
+
+    /**
+     * 根据配置键查找枚举
+     *
+     * @param key 配置键，如 "default.password"
+     * @return 对应的枚举值，未找到返回 null
+     */
+    public static SystemConfigKeyEnum getByKey(String key) {
+        if (key == null) {
+            return null;
+        }
+        return Arrays.stream(values())
+                .filter(e -> e.getKey().equals(key))
+                .findFirst()
+                .orElse(null);
+    }
 }

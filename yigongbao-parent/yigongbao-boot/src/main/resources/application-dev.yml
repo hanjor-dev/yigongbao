@@ -126,21 +126,31 @@ dromara:
         # 存储根路径（映射到 URL /files/public/**）
         storage-path: D:/yigongbao-files/
 
-# 医工宝自定义配置
+# 医工宝系统配置
 yigongbao:
   # 系统配置兜底默认值（当数据库配置不存在或已禁用时使用）
   config:
-    default-values:
-      # 默认密码
-      default-password: "123456"
-      # 最大连续登录失败次数
-      login-max-failures: 5
-      # 登录锁定时长（分钟）
-      login-lock-duration: 15
-      # 短信发送间隔（秒）
-      sms-send-interval: 60
-      # 文件上传最大大小（字节），默认500MB
-      max-upload-size: 524288000
+    # ==================== 安全配置 ====================
+    # 默认密码
+    default-password: "123456"
+    # 最大连续登录失败次数
+    login-max-failures: 5
+    # 登录锁定时长（分钟）
+    login-lock-duration: 15
+    # 短信发送间隔（秒）
+    sms-send-interval: 60
+    # ==================== 系统配置 ====================
+    # 系统名称
+    system-name: "医工宝"
+    # 文件上传最大大小（字节），默认 500MB
+    max-upload-size: 524288000
+    # ==================== 订单配置 ====================
+    # 提交订单是否必须上传影像文件（true-必须，false-非必填）
+    order-image-required: true
+    # 草稿自动过期天数，默认 30 天
+    order-draft-expire-days: 30
+    # 订单提交后修改窗口期（分钟），默认 10 分钟
+    order-modify-window-minutes: 10
   # 文件存储业务配置
   file-storage:
     # 最大文件大小（字节），默认 500MB

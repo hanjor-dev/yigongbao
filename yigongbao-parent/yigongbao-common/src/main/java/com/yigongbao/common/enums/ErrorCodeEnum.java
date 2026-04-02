@@ -171,6 +171,7 @@ public enum ErrorCodeEnum {
 
     // 文件相关
     ORDER_FILE_NOT_UPLOADED(689, "订单文件未上传"),
+    ORDER_FILE_NOT_FOUND(689, "文件不存在：%s"),
     ORDER_FILE_REQUIRED(690, "请上传必需的文件：%s"),
     ORDER_FILE_CATEGORY_ERROR(691, "文件类别不合法"),
 
