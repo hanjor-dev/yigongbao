@@ -26,7 +26,6 @@ CREATE TABLE sys_dict (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_dict_code (dict_code, is_deleted),
     KEY idx_parent_id (parent_id),
     KEY idx_level (level)
 );
@@ -149,8 +148,6 @@ CREATE TABLE sys_org (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_org_code (org_code, is_deleted),
-    UNIQUE KEY uk_org_name (org_name, is_deleted),
     KEY idx_org_type (org_type),
     KEY idx_area_id (area_id),
     KEY idx_status (status)
@@ -183,8 +180,6 @@ CREATE TABLE sys_dept (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_dept_code (dept_code, is_deleted),
-    UNIQUE KEY uk_dept_name_org (dept_name, org_id, is_deleted),
     KEY idx_dept_org_id (org_id),
     KEY idx_dept_status (status)
 );
@@ -218,7 +213,6 @@ CREATE TABLE sys_role (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_role_code (role_code, is_deleted),
     KEY idx_role_account_type (account_type),
     KEY idx_role_status (status)
 );
@@ -271,6 +265,9 @@ CREATE TABLE sys_user (
 
     remark              VARCHAR(512)    COMMENT '备注说明',
 
+    -- 订单列配置
+    column_settings     TEXT            COMMENT '订单列配置（JSON，用户个人自定义列显示设置）',
+
     -- 通用字段
     create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -279,8 +276,6 @@ CREATE TABLE sys_user (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_username (username, is_deleted),
-    UNIQUE KEY uk_phone (phone, is_deleted),
     KEY idx_user_org_id (org_id),
     KEY idx_user_dept_id (dept_id),
     KEY idx_user_role_id (role_id),
@@ -323,7 +318,6 @@ CREATE TABLE sys_config (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_config_key (config_key, is_deleted),
     KEY idx_config_group (config_group),
     KEY idx_config_type (config_type),
     KEY idx_config_status (status)
@@ -370,7 +364,6 @@ CREATE TABLE sys_resource (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_resource_code (resource_code, is_deleted),
     KEY idx_resource_parent_id (parent_id),
     KEY idx_resource_type (resource_type),
     KEY idx_resource_status (status)

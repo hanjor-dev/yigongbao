@@ -135,4 +135,9 @@ public class UserEntity extends BaseEntity implements Serializable {
      * 备注说明
      */
     private String remark;
+
+    /**
+     * 订单列配置（JSON，用户个人自定义列显示设置）
+     */
+    private String columnSettings;
 }

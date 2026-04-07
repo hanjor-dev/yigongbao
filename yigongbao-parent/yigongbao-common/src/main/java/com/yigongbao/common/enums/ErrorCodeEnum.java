@@ -60,6 +60,7 @@ public enum ErrorCodeEnum {
     DEPT_NOT_FOUND(619, "部门不存在"),
     DEPT_EXISTS(620, "部门名称已存在"),
     DEPT_HAS_USERS(621, "该部门下存在用户，无法删除"),
+    DEPT_DISABLED(6190, "部门已停用"),
 
     // ==================== 角色相关 622-627 ====================
     USER_ROLE_NOT_FOUND(622, "角色不存在"),
@@ -102,6 +103,7 @@ public enum ErrorCodeEnum {
     // ==================== 医院科室 646-647 ====================
     HOSPITAL_DEPT_NOT_FOUND(646, "科室不存在"),
     HOSPITAL_DEPT_EXISTS(647, "科室已存在"),
+    HOSPITAL_DEPT_DISABLED(6460, "科室已停用"),
 
     // ==================== 产品型号 648-649 ====================
     PRODUCT_NOT_FOUND(648, "产品型号不存在"),
@@ -200,7 +202,19 @@ public enum ErrorCodeEnum {
     // 状态机循环限制
     ORDER_EXCESSIVE_AUDIT_REJECT(704, "审核驳回次数超过上限（%s次），请联系管理员处理"),
     ORDER_EXCESSIVE_REWORK(705, "返工次数超过上限（%s次），请联系管理员处理"),
-    ORDER_EXCESSIVE_DESIGN_REJECT(706, "设计审核驳回次数超过上限（%s次），请联系管理员处理");
+    ORDER_EXCESSIVE_DESIGN_REJECT(706, "设计审核驳回次数超过上限（%s次），请联系管理员处理"),
+
+    // 订单项目/权限
+    ORDER_PROJECT_DISABLED(707, "重建项目已禁用，不可下单"),
+    HOSPITAL_SCOPE_DENIED(708, "无权操作该医院的订单"),
+
+    // 订单部位/项目必填
+    ORDER_BODY_PART_REQUIRED(709, "重建部位不能为空"),
+    ORDER_BODY_PART_DISABLED(710, "重建部位已禁用，不可下单"),
+    ORDER_PROJECT_REQUIRED(711, "重建项目不能为空"),
+
+    // 导出
+    ORDER_EXPORT_FAILED(712, "订单导出失败");
 
     /**
      * 错误码

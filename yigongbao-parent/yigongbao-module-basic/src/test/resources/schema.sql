@@ -74,8 +74,6 @@ CREATE TABLE hospital (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_hospital_code (hospital_code, is_deleted),
-    UNIQUE KEY uk_hospital_name (hospital_name, is_deleted),
     KEY idx_hospital_area_id (area_id),
     KEY idx_hospital_level (hospital_level),
     KEY idx_hospital_type (hospital_type),
@@ -107,8 +105,6 @@ CREATE TABLE hospital_group_template (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_template_code (template_code, is_deleted),
-    UNIQUE KEY uk_template_name (template_name, is_deleted),
     KEY idx_template_status (status)
 );
 
@@ -244,7 +240,6 @@ CREATE TABLE product (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_product_code (product_code, is_deleted),
     KEY idx_product_cert (cert_id),
     KEY idx_product_category (category),
     KEY idx_product_status (status)
@@ -349,7 +344,6 @@ CREATE TABLE registration_cert (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_cert_code (cert_code, is_deleted),
     KEY idx_cert_status (status),
     KEY idx_cert_valid_to (valid_to)
 );
@@ -384,7 +378,7 @@ CREATE TABLE sys_code_rule (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_rule_code (rule_code, is_deleted),
+    UNIQUE KEY uk_rule_code (rule_code),
     KEY idx_rule_status (status)
 );
 
@@ -453,7 +447,7 @@ CREATE TABLE file_detail (
     update_time         DATETIME     DEFAULT NULL COMMENT '更新时间',
     create_by           BIGINT       DEFAULT NULL COMMENT '创建人ID',
     update_by           BIGINT       DEFAULT NULL COMMENT '更新人ID',
-    is_deleted          TINYINT      DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
     KEY idx_file_detail_object (object_type, object_id),

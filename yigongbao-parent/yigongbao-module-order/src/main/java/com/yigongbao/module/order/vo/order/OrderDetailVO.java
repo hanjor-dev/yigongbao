@@ -94,6 +94,21 @@ public class OrderDetailVO implements Serializable {
     private String hospitalName;
 
     /**
+     * 地区ID（冗余自医院）
+     */
+    private Long areaId;
+
+    /**
+     * 地区名称（冗余自医院）
+     */
+    private String areaName;
+
+    /**
+     * 完整地区路径名称（冗余自医院，如"广东省/广州市/天河区"）
+     */
+    private String fullAreaName;
+
+    /**
      * 科室ID
      */
     private Long deptId;
@@ -205,6 +220,11 @@ public class OrderDetailVO implements Serializable {
     private Long designerId;
 
     /**
+     * 设计师姓名（冗余）
+     */
+    private String designerName;
+
+    /**
      * 生产员ID
      */
     private Long producerId;
@@ -219,6 +239,16 @@ public class OrderDetailVO implements Serializable {
      * 设计审核备注
      */
     private String designReviewRemark;
+
+    /**
+     * 预估费用
+     */
+    private BigDecimal estimatedCost;
+
+    /**
+     * 影像数据评估意见
+     */
+    private String dataEvaluationOpinion;
 
     // ==================== 时间信息 ====================
     /**

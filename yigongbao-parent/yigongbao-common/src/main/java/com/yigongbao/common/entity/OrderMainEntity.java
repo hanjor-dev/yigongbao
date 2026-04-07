@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -86,6 +87,21 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
      * 医院名称（冗余）
      */
     private String hospitalName;
+
+    /**
+     * 地区ID（冗余自医院）
+     */
+    private Long areaId;
+
+    /**
+     * 地区名称（冗余自医院）
+     */
+    private String areaName;
+
+    /**
+     * 完整地区路径名称（冗余自医院，如"广东省/广州市/天河区"）
+     */
+    private String fullAreaName;
 
     /**
      * 科室ID
@@ -198,6 +214,11 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
     private Long designerId;
 
     /**
+     * 设计师姓名（冗余）
+     */
+    private String designerName;
+
+    /**
      * 生产员ID
      */
     private Long producerId;
@@ -212,6 +233,16 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
      * 设计审核备注
      */
     private String designReviewRemark;
+
+    /**
+     * 预估费用
+     */
+    private BigDecimal estimatedCost;
+
+    /**
+     * 影像数据评估意见
+     */
+    private String dataEvaluationOpinion;
 
     // ==================== 乐观锁 ====================
     /**

@@ -3,7 +3,9 @@ package com.yigongbao.module.order.vo.order;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 订单列表项 VO
@@ -48,9 +50,43 @@ public class OrderListVO implements Serializable {
     private String needsPhysicalDeliveryName;
 
     /**
-     * 业务类型（字典 dict_code：11.1-业务，11.2-测试，11.3-试用，11.4-代理）
+     * 业务类型（字典 dict_code）
      */
     private String businessType;
+
+    /**
+     * 业务类型名称（翻译后展示）
+     */
+    private String businessTypeName;
+
+    // ==================== 机构信息 ====================
+
+    /**
+     * 提单机构ID
+     */
+    private Long orgId;
+
+    /**
+     * 提单机构名称
+     */
+    private String orgName;
+
+    /**
+     * 操作员ID
+     */
+    private Long operatorId;
+
+    /**
+     * 操作员姓名
+     */
+    private String operatorName;
+
+    /**
+     * 操作员电话
+     */
+    private String operatorPhone;
+
+    // ==================== 医院与地区 ====================
 
     /**
      * 医院ID
@@ -63,9 +99,114 @@ public class OrderListVO implements Serializable {
     private String hospitalName;
 
     /**
+     * 地区ID
+     */
+    private Long areaId;
+
+    /**
+     * 地区名称
+     */
+    private String areaName;
+
+    /**
+     * 完整地区路径名称
+     */
+    private String fullAreaName;
+
+    // ==================== 科室与医生 ====================
+
+    /**
+     * 科室ID
+     */
+    private Long deptId;
+
+    /**
+     * 科室名称
+     */
+    private String deptName;
+
+    /**
+     * 医生ID
+     */
+    private Long doctorId;
+
+    /**
+     * 医生姓名
+     */
+    private String doctorName;
+
+    /**
+     * 医生电话
+     */
+    private String doctorPhone;
+
+    // ==================== 患者信息 ====================
+
+    /**
      * 患者姓名
      */
     private String patientName;
+
+    /**
+     * 患者年龄
+     */
+    private Integer patientAge;
+
+    /**
+     * 患者性别（字典值）
+     */
+    private String patientGender;
+
+    /**
+     * 患者性别名称
+     */
+    private String patientGenderName;
+
+    // ==================== 业务标识 ====================
+
+    /**
+     * 是否加急：0-否，1-是
+     */
+    private Integer isUrgent;
+
+    /**
+     * 是否邮寄：0-否，1-是
+     */
+    private Integer isPostal;
+
+    /**
+     * 邮寄地址
+     */
+    private String postalAddress;
+
+    // ==================== 处理人与时效 ====================
+
+    /**
+     * 设计师ID
+     */
+    private Long designerId;
+
+    /**
+     * 设计师姓名
+     */
+    private String designerName;
+
+    /**
+     * 期望交付时间
+     */
+    private LocalDateTime expectedDeliveryDate;
+
+    /**
+     * 预估费用
+     */
+    private BigDecimal estimatedCost;
+
+    /**
+     * 影像数据评估意见
+     */
+    private String dataEvaluationOpinion;
+
+    // ==================== 阶段与状态 ====================
 
     /**
      * 当前阶段：1-订单，2-设计，3-打印，4-后处理，5-质检，6-仓储，7-确认，8-完成
@@ -73,12 +214,75 @@ public class OrderListVO implements Serializable {
     private Integer phase;
 
     /**
+     * 当前阶段名称
+     */
+    private String phaseName;
+
+    /**
      * 当前状态
      */
     private Integer status;
 
     /**
+     * 当前状态名称
+     */
+    private String statusName;
+
+    // ==================== 时间 ====================
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;
+
+    // ==================== 重建项目列表 ====================
+
+    /**
+     * 重建项目明细列表（按需填充，非列表查询默认字段）
+     */
+    private List<RebuildProjectItemVO> rebuildProjectList;
+
+    /**
+     * 重建项目明细 VO（内嵌类）
+     */
+    @Data
+    public static class RebuildProjectItemVO implements Serializable {
+
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * 重建部位名称
+         */
+        private String bodyPartName;
+
+        /**
+         * 重建项目名称
+         */
+        private String projectName;
+
+        /**
+         * 项目分类
+         */
+        private String category;
+
+        /**
+         * 数量（明细表粒度为每个部位一条，固定为 1）
+         */
+        private Integer count;
+
+        /**
+         * 项目说明
+         */
+        private String projectDesc;
+
+        /**
+         * 成形需求
+         */
+        private String formingRequirement;
+
+        /**
+         * 其他要求
+         */
+        private String otherRequirement;
+    }
 }

@@ -6,6 +6,7 @@ import com.yigongbao.common.result.Result;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
@@ -21,6 +22,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.stream.Collectors;
 
 /**
@@ -217,6 +219,28 @@ public class GlobalExceptionHandler {
     public Result<Void> handleNoHandlerFoundException(NoHandlerFoundException e) {
         log.warn("请求路径不存在：{}", e.getRequestURL());
         return Result.error(404, "请求路径不存在：" + e.getRequestURL());
+    }
+
+    /**
+     * 处理数据库唯一键冲突异常
+     * 当插入或更新的数据违反唯一约束时触发，如用户名、编码重复等
+     *
+     * @param e 数据完整性异常实例
+     * @return 统一返回结果
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.OK)
+    public Result<Void> handleDataIntegrityViolationException(DataIntegrityViolationException e) {
+        Throwable cause = e.getCause();
+        if (cause instanceof SQLIntegrityConstraintViolationException sqlEx) {
+            String message = sqlEx.getMessage();
+            if (message != null && message.contains("Duplicate entry")) {
+                log.warn("唯一键冲突：{}", message);
+                return Result.error(409, "数据已存在，请勿重复提交");
+            }
+        }
+        log.error("数据完整性异常：", e);
+        return Result.error(500, "数据操作失败，请稍后再试");
     }
 
     /**

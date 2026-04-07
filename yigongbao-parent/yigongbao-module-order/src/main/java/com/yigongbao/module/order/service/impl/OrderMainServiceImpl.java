@@ -21,6 +21,8 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
+import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
+import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
 import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
@@ -83,6 +85,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderFileMapper orderFileMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
+    private final HospitalMapper hospitalMapper;
     private final FlowFacade flowFacade;
     private final ConfigService configService;
     private final UserService userService;
@@ -242,6 +245,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             validateNeedsPhysicalDeliveryChange(entity, dto);
             // 排除不可变更字段后复制属性
             BeanUtils.copyProperties(dto, entity, "id", "orderCode", "phase", "status", "createTime", "updateTime", "createBy", "updateBy", "version");
+            // hospitalId 变更时同步更新地区冗余字段
+            if (dto.getHospitalId() != null) {
+                fillAreaFromHospital(entity, dto.getHospitalId());
+            }
             // 更新订单
             updateById(entity);
             log.info("更新订单成功，id={}", id);
@@ -423,10 +430,16 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             // 通过 FlowFacade 执行审核通过动作
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, null, dto.getRemark()));
-            // 更新订单的阶段、状态和当前处理人
+            // 更新订单的阶段、状态和当前处理人，同步写入审核时填写的预估费用和影像评估意见
             entity.setPhase(result.getTargetPhase());
             entity.setStatus(result.getFinalStatus());
             entity.setCurrentHandlerId(currentUserId);
+            if (dto.getEstimatedCost() != null) {
+                entity.setEstimatedCost(dto.getEstimatedCost());
+            }
+            if (StrUtil.isNotBlank(dto.getDataEvaluationOpinion())) {
+                entity.setDataEvaluationOpinion(dto.getDataEvaluationOpinion());
+            }
             updateById(entity);
             log.info("审核通过成功，id={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
         } catch (BusinessException e) {
@@ -518,6 +531,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             order.setPhase(FlowPhaseEnum.ORDER.getValue());
             order.setStatus(FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
             order.setVersion(0);
+            // 从医院表补充地区冗余字段（草稿中已复制 hospitalId，此处补充 area 字段）
+            fillAreaFromHospital(order, order.getHospitalId());
             save(order);
             Long orderId = order.getId();
             log.info("创建订单主表，orderId={}, orderCode={}", orderId, orderCode);
@@ -599,6 +614,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             order.setPhase(FlowPhaseEnum.ORDER.getValue());
             order.setStatus(FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
             order.setVersion(0);
+            // 从医院表补充地区冗余字段
+            fillAreaFromHospital(order, dto.getHospitalId());
             save(order);
             Long orderId = order.getId();
             log.info("创建订单主表，orderId={}, orderCode={}", orderId, orderCode);
@@ -647,6 +664,25 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     }
 
     // ==================== 私有方法 ====================
+
+    /**
+     * 从医院表读取地区信息，填充到订单实体的地区冗余字段
+     * 创建订单和更新订单时调用，确保 area_id/area_name/full_area_name 与医院保持一致
+     *
+     * @param order      订单实体
+     * @param hospitalId 医院ID，为 null 时跳过
+     */
+    private void fillAreaFromHospital(OrderMainEntity order, Long hospitalId) {
+        if (hospitalId == null) {
+            return;
+        }
+        HospitalEntity hospital = hospitalMapper.selectById(hospitalId);
+        if (hospital != null) {
+            order.setAreaId(hospital.getAreaId());
+            order.setAreaName(hospital.getAreaName());
+            order.setFullAreaName(hospital.getFullAreaName());
+        }
+    }
 
     /**
      * 校验直提订单的影像文件

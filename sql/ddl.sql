@@ -27,10 +27,10 @@ CREATE TABLE sys_dict (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_dict_code (dict_code, is_deleted),
     KEY idx_dict_parent_id (parent_id),
     KEY idx_dict_level (level)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='字典表';
+CREATE UNIQUE INDEX uk_dict_code ON sys_dict ((CASE WHEN is_deleted = 0 THEN dict_code ELSE NULL END));
 
 -- ------------------------------------------------------------
 -- 机构表
@@ -70,12 +70,12 @@ CREATE TABLE sys_org (
     is_deleted         TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_org_code (org_code, is_deleted),
-    UNIQUE KEY uk_org_name (org_name, is_deleted),
     KEY idx_org_type (org_type),
     KEY idx_org_area_id (area_id),
     KEY idx_org_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='机构表';
+CREATE UNIQUE INDEX uk_org_code ON sys_org ((CASE WHEN is_deleted = 0 THEN org_code ELSE NULL END));
+CREATE UNIQUE INDEX uk_org_name ON sys_org ((CASE WHEN is_deleted = 0 THEN org_name ELSE NULL END));
 
 
 -- ------------------------------------------------------------
@@ -99,11 +99,11 @@ CREATE TABLE sys_dept (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_dept_code (dept_code, is_deleted),
-    UNIQUE KEY uk_dept_name_org (dept_name, org_id, is_deleted),
     KEY idx_dept_org_id (org_id),
     KEY idx_dept_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='部门表';
+CREATE UNIQUE INDEX uk_dept_code ON sys_dept ((CASE WHEN is_deleted = 0 THEN dept_code ELSE NULL END));
+CREATE UNIQUE INDEX uk_dept_name_org ON sys_dept ((CASE WHEN is_deleted = 0 THEN dept_name ELSE NULL END), org_id);
 
 
 -- ------------------------------------------------------------
@@ -128,10 +128,10 @@ CREATE TABLE sys_role (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_role_code (role_code, is_deleted),
     KEY idx_role_account_type (account_type),
     KEY idx_role_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表';
+CREATE UNIQUE INDEX uk_role_code ON sys_role ((CASE WHEN is_deleted = 0 THEN role_code ELSE NULL END));
 
 
 -- ------------------------------------------------------------
@@ -171,6 +171,9 @@ CREATE TABLE sys_user (
 
     remark              VARCHAR(512)    COMMENT '备注说明',
 
+    -- 订单列配置
+    column_settings     TEXT            COMMENT '订单列配置（JSON，用户个人自定义列显示设置）',
+
     -- 通用字段
     create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -179,14 +182,14 @@ CREATE TABLE sys_user (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_username (username, is_deleted),
-    UNIQUE KEY uk_phone (phone, is_deleted),
     KEY idx_user_org_id (org_id),
     KEY idx_user_dept_id (dept_id),
     KEY idx_user_role_id (role_id),
     KEY idx_user_account_type (account_type),
     KEY idx_user_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
+CREATE UNIQUE INDEX uk_username ON sys_user ((CASE WHEN is_deleted = 0 THEN username ELSE NULL END));
+CREATE UNIQUE INDEX uk_phone ON sys_user ((CASE WHEN is_deleted = 0 THEN phone ELSE NULL END));
 
 -- ------------------------------------------------------------
 -- 系统配置表
@@ -213,11 +216,11 @@ CREATE TABLE sys_config (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_config_key (config_key, is_deleted),
     KEY idx_config_group (config_group),
     KEY idx_config_type (config_type),
     KEY idx_config_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表';
+CREATE UNIQUE INDEX uk_config_key ON sys_config ((CASE WHEN is_deleted = 0 THEN config_key ELSE NULL END));
 
 
 -- ------------------------------------------------------------
@@ -252,11 +255,11 @@ CREATE TABLE sys_resource (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_resource_code (resource_code, is_deleted),
     KEY idx_resource_parent_id (parent_id),
     KEY idx_resource_type (resource_type),
     KEY idx_resource_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='资源表';
+CREATE UNIQUE INDEX uk_resource_code ON sys_resource ((CASE WHEN is_deleted = 0 THEN resource_code ELSE NULL END));
 
 
 -- ------------------------------------------------------------
@@ -353,13 +356,13 @@ CREATE TABLE hospital (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_hospital_code (hospital_code, is_deleted),
-    UNIQUE KEY uk_hospital_name (hospital_name, is_deleted),
     KEY idx_hospital_area_id (area_id),
     KEY idx_hospital_level (hospital_level),
     KEY idx_hospital_type (hospital_type),
     KEY idx_hospital_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院表';
+CREATE UNIQUE INDEX uk_hospital_code ON hospital ((CASE WHEN is_deleted = 0 THEN hospital_code ELSE NULL END));
+CREATE UNIQUE INDEX uk_hospital_name ON hospital ((CASE WHEN is_deleted = 0 THEN hospital_name ELSE NULL END));
 
 
 -- ============================================================
@@ -383,10 +386,10 @@ CREATE TABLE hospital_group_template (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_template_code (template_code, is_deleted),
-    UNIQUE KEY uk_template_name (template_name, is_deleted),
     KEY idx_template_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院组合模板表';
+CREATE UNIQUE INDEX uk_template_code ON hospital_group_template ((CASE WHEN is_deleted = 0 THEN template_code ELSE NULL END));
+CREATE UNIQUE INDEX uk_template_name ON hospital_group_template ((CASE WHEN is_deleted = 0 THEN template_name ELSE NULL END));
 
 
 -- ============================================================
@@ -451,11 +454,11 @@ CREATE TABLE rebuild_body_part (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_body_part_code (code, is_deleted),
     KEY idx_body_part_parent_id (parent_id),
     KEY idx_body_part_level (level),
     KEY idx_body_part_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='重建部位表';
+CREATE UNIQUE INDEX uk_body_part_code ON rebuild_body_part ((CASE WHEN is_deleted = 0 THEN code ELSE NULL END));
 
 
 -- ============================================================
@@ -489,12 +492,12 @@ CREATE TABLE rebuild_project (
     is_deleted            TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_project_code (code, is_deleted),
     KEY idx_project_body_part_id (body_part_id),
     KEY idx_project_parent_id (parent_id),
     KEY idx_project_level (level),
     KEY idx_project_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='重建项目表';
+CREATE UNIQUE INDEX uk_project_code ON rebuild_project ((CASE WHEN is_deleted = 0 THEN code ELSE NULL END));
 
 
 -- ============================================================
@@ -558,9 +561,8 @@ CREATE TABLE sys_code_rule (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_rule_code (rule_code, is_deleted)
+    UNIQUE KEY uk_rule_code (rule_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='编码规则表';
-
 
 -- ============================================================
 -- 编码序号表（sys_code_sequence）
@@ -625,7 +627,7 @@ CREATE TABLE file_detail (
     update_time         DATETIME     DEFAULT NULL COMMENT '更新时间',
     create_by           BIGINT       DEFAULT NULL COMMENT '创建人ID',
     update_by           BIGINT       DEFAULT NULL COMMENT '更新人ID',
-    is_deleted          TINYINT      DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
     KEY idx_file_detail_object (object_type, object_id),
@@ -672,7 +674,7 @@ CREATE TABLE hospital_dept (
     is_deleted           TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_hospital_dept_code (hospital_dept_code, is_deleted),
+    UNIQUE KEY uk_hospital_dept_code (hospital_dept_code),
     KEY idx_hospital_dept_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院科室表';
 
@@ -735,11 +737,11 @@ CREATE TABLE product (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_product_code (product_code, is_deleted),
     KEY idx_product_category (category),
     KEY idx_product_cert (cert_id),
     KEY idx_product_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='产品型号表';
+CREATE UNIQUE INDEX uk_product_code ON product ((CASE WHEN is_deleted = 0 THEN product_code ELSE NULL END));
 
 
 -- ============================================================
@@ -765,10 +767,10 @@ CREATE TABLE registration_cert (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_cert_code (cert_code, is_deleted),
     KEY idx_cert_valid_to (valid_to),
     KEY idx_cert_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='注册证表';
+CREATE UNIQUE INDEX uk_cert_code ON registration_cert ((CASE WHEN is_deleted = 0 THEN cert_code ELSE NULL END));
 
 
 -- ============================================================
@@ -815,6 +817,9 @@ CREATE TABLE order_draft (
     -- ==================== 医院与科室 ====================
     hospital_id     BIGINT          COMMENT '医院ID',
     hospital_name   VARCHAR(200)     COMMENT '医院名称',
+    area_id         BIGINT          COMMENT '地区ID（冗余自医院）',
+    area_name       VARCHAR(64)     COMMENT '地区名称（冗余自医院）',
+    full_area_name  VARCHAR(256)    COMMENT '完整地区路径名称（冗余自医院）',
     dept_id         BIGINT          COMMENT '科室ID',
     dept_name       VARCHAR(100)     COMMENT '科室名称',
 
@@ -843,7 +848,7 @@ CREATE TABLE order_draft (
     update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     create_by       BIGINT          COMMENT '创建人ID',
     update_by       BIGINT          COMMENT '更新人ID',
-    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
     KEY idx_order_draft_operator_id (operator_id),
@@ -882,7 +887,7 @@ CREATE TABLE order_item_draft (
     update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     create_by       BIGINT          COMMENT '创建人ID',
     update_by       BIGINT          COMMENT '更新人ID',
-    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
     KEY idx_order_item_draft_draft_id (draft_id)
@@ -923,6 +928,9 @@ CREATE TABLE order_main (
     -- ==================== 医院与科室 ====================
     hospital_id     BIGINT          COMMENT '医院ID',
     hospital_name   VARCHAR(200)    COMMENT '医院名称（冗余）',
+    area_id         BIGINT          COMMENT '地区ID（冗余自医院）',
+    area_name       VARCHAR(64)     COMMENT '地区名称（冗余自医院）',
+    full_area_name  VARCHAR(256)    COMMENT '完整地区路径名称（冗余自医院，如"广东省/广州市/天河区"）',
     dept_id         BIGINT          COMMENT '科室ID',
     dept_name       VARCHAR(100)    COMMENT '科室名称（冗余）',
 
@@ -954,11 +962,14 @@ CREATE TABLE order_main (
     current_handler_id BIGINT        COMMENT '当前处理人ID',
     current_handler_name VARCHAR(100) COMMENT '当前处理人姓名',
     designer_id     BIGINT          COMMENT '设计师ID',
+    designer_name   VARCHAR(100)    COMMENT '设计师姓名（冗余）',
     producer_id     BIGINT          COMMENT '生产员ID',
 
     -- ==================== 审核信息 ====================
     audit_remark    TEXT            COMMENT '审核备注（驳回原因等）',
     design_review_remark TEXT        COMMENT '设计审核备注',
+    estimated_cost  DECIMAL(10,2)   COMMENT '预估费用',
+    data_evaluation_opinion TEXT     COMMENT '影像数据评估意见',
 
     -- ==================== 乐观锁 ====================
     version         INT             DEFAULT 0 COMMENT '版本号（乐观锁）',
@@ -968,16 +979,16 @@ CREATE TABLE order_main (
     update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     create_by       BIGINT          COMMENT '创建人ID',
     update_by       BIGINT          COMMENT '更新人ID',
-    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_order_main_code (order_code, is_deleted),
     KEY idx_order_main_org_id (org_id),
     KEY idx_order_main_hospital_id (hospital_id),
     KEY idx_order_main_operator_id (operator_id),
     KEY idx_order_main_phase_status (phase, status),
     KEY idx_order_main_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单主表';
+CREATE UNIQUE INDEX uk_order_main_code ON order_main ((CASE WHEN is_deleted = 0 THEN order_code ELSE NULL END));
 
 
 -- ============================================================
@@ -1010,7 +1021,7 @@ CREATE TABLE order_item (
     update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     create_by       BIGINT          COMMENT '创建人ID',
     update_by       BIGINT          COMMENT '更新人ID',
-    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
     KEY idx_order_item_order_id (order_id),
@@ -1044,7 +1055,7 @@ CREATE TABLE order_file (
     update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     create_by       BIGINT          COMMENT '创建人ID',
     update_by       BIGINT          COMMENT '更新人ID',
-    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
     KEY idx_order_file_order_id (order_id),

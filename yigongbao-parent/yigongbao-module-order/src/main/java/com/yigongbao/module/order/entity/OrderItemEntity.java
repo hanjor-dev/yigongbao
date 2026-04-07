@@ -54,6 +54,11 @@ public class OrderItemEntity extends BaseEntity implements Serializable {
     private String projectName;
 
     /**
+     * 项目分类（字典值，如"整形"、"肿瘤"等）
+     */
+    private String category;
+
+    /**
      * 预计耗时（小时，支持小数）
      */
     private BigDecimal projectEstimatedHours;

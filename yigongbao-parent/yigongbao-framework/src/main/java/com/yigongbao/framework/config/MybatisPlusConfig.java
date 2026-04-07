@@ -64,6 +64,7 @@ public class MybatisPlusConfig {
                 this.strictInsertFill(metaObject, "updateBy", Long.class, getUserId());
                 // 填充是否删除，默认0
                 this.strictInsertFill(metaObject, "isDeleted", Integer.class, 0);
+
             }
 
             /**

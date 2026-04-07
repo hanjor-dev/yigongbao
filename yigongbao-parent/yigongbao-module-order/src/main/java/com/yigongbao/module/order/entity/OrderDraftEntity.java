@@ -80,6 +80,21 @@ public class OrderDraftEntity extends BaseEntity implements Serializable {
     private String hospitalName;
 
     /**
+     * 地区ID（冗余自医院）
+     */
+    private Long areaId;
+
+    /**
+     * 地区名称（冗余自医院）
+     */
+    private String areaName;
+
+    /**
+     * 完整地区路径名称（冗余自医院，如"广东省/广州市/天河区"）
+     */
+    private String fullAreaName;
+
+    /**
      * 科室ID
      */
     private Long deptId;

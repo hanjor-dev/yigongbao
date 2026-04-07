@@ -154,6 +154,11 @@ public class UserVO implements Serializable {
     private String remark;
 
     /**
+     * 订单列配置（JSON，用户个人自定义列显示设置）
+     */
+    private String columnSettings;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

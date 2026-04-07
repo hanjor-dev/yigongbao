@@ -1,5 +1,6 @@
 package com.yigongbao.module.system.user.service;
 
+import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.module.basic.hospital.vo.HospitalVO;
 
 import java.util.List;
@@ -65,4 +66,27 @@ public interface UserHospitalService {
      * @return 可分配的医院列表
      */
     List<HospitalVO> getHospitalOptionsByUserId(Long userId);
+
+    /**
+     * 获取用户的数据范围类型
+     * - 角色 hospitalScopeEnabled=1 → HOSPITALS（仅关联医院范围）
+     * - 内部用户（accountType=1）且 hospitalScopeEnabled=0 → ALL
+     * - 外部用户（accountType=2）且 hospitalScopeEnabled=0 → SELF
+     *
+     * @param userId 用户ID
+     * @return 数据范围类型枚举
+     */
+    DataScopeTypeEnum getDataScopeType(Long userId);
+
+    /**
+     * 判断用户是否有权操作指定医院
+     * - ALL/ORG 范围：允许所有医院
+     * - HOSPITALS 范围：仅允许用户关联的医院
+     * - SELF 范围：拒绝（不以医院维度授权）
+     *
+     * @param userId     用户ID
+     * @param hospitalId 医院ID
+     * @return true 表示有权限
+     */
+    boolean hasPermissionOnHospital(Long userId, Long hospitalId);
 }

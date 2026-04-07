@@ -70,7 +70,28 @@ public enum SystemConfigKeyEnum {
      * 订单提交后修改窗口期（分钟）
      * 默认 10 分钟
      */
-    ORDER_MODIFY_WINDOW_MINUTES("order.modify.window.minutes", "订单提交后修改窗口期（分钟）");
+    ORDER_MODIFY_WINDOW_MINUTES("order.modify.window.minutes", "订单提交后修改窗口期（分钟）"),
+
+    /**
+     * 订单列表默认列配置（JSON 格式）
+     */
+    ORDER_COLUMN_CONFIG("order.column.config", "订单列表默认列配置"),
+
+    // ==================== 流程状态机配置 ====================
+    /**
+     * 最大允许的审核驳回次数
+     */
+    FLOW_MAX_AUDIT_REJECT("flow.max.audit.reject", "最大允许的审核驳回次数"),
+
+    /**
+     * 最大允许的返工次数
+     */
+    FLOW_MAX_REWORK("flow.max.rework", "最大允许的返工次数"),
+
+    /**
+     * 最大允许的设计审核驳回次数
+     */
+    FLOW_MAX_DESIGN_REJECT("flow.max.design.reject", "最大允许的设计审核驳回次数");
 
     /**
      * 配置键

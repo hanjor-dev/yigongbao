@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 public class OperationLogAspect {
 
     private final OperationLogService operationLogService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     /**
      * 敏感字段脱敏正则
@@ -79,7 +79,7 @@ public class OperationLogAspect {
         }
 
         // 获取 User-Agent
-        String userAgent = getRequest() != null ? getRequest().getHeader("User-Agent") : null;
+        String userAgent = request != null ? request.getHeader("User-Agent") : null;
 
         // 获取请求参数（脱敏）
         String requestParams = null;

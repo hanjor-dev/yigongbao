@@ -2,6 +2,7 @@ package com.yigongbao.module.system.user.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.constant.StatusConstants;
+import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
@@ -268,6 +269,60 @@ public class UserHospitalServiceImpl implements UserHospitalService {
             log.error("获取可分配医院列表异常，userId={}", userId, e);
             throw e;
         }
+    }
+
+    /**
+     * 获取用户的数据范围类型
+     * 高频调用场景（如订单列表查询），建议后续引入 Redis 缓存以降低 DB 压力。
+     *
+     * @param userId 用户ID
+     * @return 数据范围类型枚举
+     */
+    @Override
+    public DataScopeTypeEnum getDataScopeType(Long userId) {
+        if (userId == null) {
+            return DataScopeTypeEnum.SELF;
+        }
+        UserEntity user = userMapper.selectById(userId);
+        if (user == null) {
+            return DataScopeTypeEnum.SELF;
+        }
+        if (user.getRoleId() != null) {
+            RoleEntity role = roleService.getById(user.getRoleId());
+            if (role != null && role.getHospitalScopeEnabled() != null
+                    && role.getHospitalScopeEnabled() == StatusConstants.YES) {
+                return DataScopeTypeEnum.HOSPITALS;
+            }
+        }
+        // 内部用户（accountType=1）无医院范围限制时，享有全量权限
+        if (user.getAccountType() != null && user.getAccountType() == 1) {
+            return DataScopeTypeEnum.ALL;
+        }
+        // 外部用户（如医院侧）仅看自己创建的数据
+        return DataScopeTypeEnum.SELF;
+    }
+
+    /**
+     * 判断用户是否有权操作指定医院
+     *
+     * @param userId     用户ID
+     * @param hospitalId 医院ID
+     * @return true 表示有权限
+     */
+    @Override
+    public boolean hasPermissionOnHospital(Long userId, Long hospitalId) {
+        if (userId == null || hospitalId == null) {
+            return false;
+        }
+        DataScopeTypeEnum scopeType = getDataScopeType(userId);
+        if (scopeType == DataScopeTypeEnum.ALL || scopeType == DataScopeTypeEnum.ORG) {
+            return true;
+        }
+        if (scopeType == DataScopeTypeEnum.HOSPITALS) {
+            List<Long> hospitalIds = getHospitalIdsByUserId(userId);
+            return hospitalIds.contains(hospitalId);
+        }
+        return false;
     }
 
     /**
