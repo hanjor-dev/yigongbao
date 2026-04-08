@@ -325,11 +325,11 @@ public class OrderExportServiceImpl implements OrderExportService {
                         }
                         sb.append(item.getBodyPartName());
                     }
-                    if (StrUtil.isNotBlank(item.getCategory())) {
+                    if (StrUtil.isNotBlank(item.getCategoryName())) {
                         if (sb.length() > 0) {
-                            sb.append("(").append(item.getCategory()).append(")");
+                            sb.append("(").append(item.getCategoryName()).append(")");
                         } else {
-                            sb.append(item.getCategory());
+                            sb.append(item.getCategoryName());
                         }
                     }
                     if (item.getCount() != null && item.getCount() > 1) {

@@ -21,7 +21,7 @@ public class RebuildProjectOptionsDTO implements Serializable {
     private Long bodyPartId;
 
     /**
-     * 项目分类
+     * 项目分类编码（字典 dict_code=13，传入则精确匹配）
      */
-    private String category;
+    private String categoryCode;
 }

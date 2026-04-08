@@ -3,6 +3,7 @@ package com.yigongbao.module.order.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.order.dto.draft.CreateOrderDraftDTO;
+import com.yigongbao.module.order.dto.draft.OrderDraftPageQueryDTO;
 import com.yigongbao.module.order.entity.OrderDraftEntity;
 import com.yigongbao.module.order.vo.draft.OrderDraftDetailVO;
 import com.yigongbao.module.order.vo.draft.OrderDraftVO;
@@ -16,15 +17,12 @@ import com.yigongbao.module.order.vo.draft.OrderDraftVO;
 public interface OrderDraftService extends IService<OrderDraftEntity> {
 
     /**
-     * 分页查询我的草稿列表
+     * 分页查询我的草稿列表（仅分页参数，按创建时间倒序）
      *
-     * @param pageNum 页码
-     * @param pageSize 每页大小
-     * @param hospitalId 医院ID（可选）
-     * @param status 草稿状态（可选）
+     * @param dto 分页查询参数
      * @return 草稿列表
      */
-    IPage<OrderDraftVO> listDrafts(Integer pageNum, Integer pageSize, Long hospitalId, Integer status);
+    IPage<OrderDraftVO> listDrafts(OrderDraftPageQueryDTO dto);
 
     /**
      * 查询草稿详情

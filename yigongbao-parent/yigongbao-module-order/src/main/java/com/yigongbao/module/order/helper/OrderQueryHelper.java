@@ -303,7 +303,8 @@ public class OrderQueryHelper {
                             OrderListVO.RebuildProjectItemVO projectItem = new OrderListVO.RebuildProjectItemVO();
                             projectItem.setProjectName(item.getProjectName());
                             projectItem.setBodyPartName(item.getBodyPartName());
-                            projectItem.setCategory(item.getCategory());
+                            projectItem.setCategoryCode(item.getCategoryCode());
+                            projectItem.setCategoryName(item.getCategoryName());
                             // count 字段：明细表粒度为每个部位一条，明细数即为数量
                             projectItem.setCount(1);
                             projectItem.setProjectDesc(item.getProjectDesc());

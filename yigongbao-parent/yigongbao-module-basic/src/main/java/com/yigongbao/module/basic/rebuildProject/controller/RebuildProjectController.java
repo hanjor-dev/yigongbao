@@ -53,7 +53,7 @@ public class RebuildProjectController {
     @Operation(summary = "获取项目树形结构")
     @PostMapping("/tree")
     public Result<List<RebuildProjectVO>> tree(@RequestBody RebuildProjectTreeDTO dto) {
-        return Result.success(rebuildProjectService.listTree(dto.getCategory()));
+        return Result.success(rebuildProjectService.listTree(dto.getCategoryCode()));
     }
 
     /**
@@ -62,7 +62,7 @@ public class RebuildProjectController {
     @Operation(summary = "根据部位ID获取项目列表")
     @PostMapping("/by-body-part")
     public Result<List<RebuildProjectVO>> byBodyPart(@Validated @RequestBody RebuildProjectByBodyPartDTO dto) {
-        return Result.success(rebuildProjectService.listByBodyPartId(dto.getBodyPartId(), dto.getCategory()));
+        return Result.success(rebuildProjectService.listByBodyPartId(dto.getBodyPartId(), dto.getCategoryCode()));
     }
 
     /**
@@ -71,7 +71,7 @@ public class RebuildProjectController {
     @Operation(summary = "获取项目下拉选项")
     @PostMapping("/options")
     public Result<List<RebuildProjectOptionVO>> options(@RequestBody RebuildProjectOptionsDTO dto) {
-        return Result.success(rebuildProjectService.listOptions(dto.getBodyPartId(), dto.getCategory()));
+        return Result.success(rebuildProjectService.listOptions(dto.getBodyPartId(), dto.getCategoryCode()));
     }
 
     /**

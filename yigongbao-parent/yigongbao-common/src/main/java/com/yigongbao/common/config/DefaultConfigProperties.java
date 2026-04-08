@@ -76,4 +76,25 @@ public class DefaultConfigProperties {
      * 默认 10 分钟
      */
     private Integer configOrderModifyWindowMinutes = 10;
+
+    /**
+     * 订单列表默认列配置（JSON 格式）
+     */
+    private String configOrderColumnConfig = "{\"id\":true,\"orderNo\":true,\"hospitalName\":true,\"patientName\":true,\"statusName\":true,\"createTime\":true}";
+
+    // ==================== 流程状态机配置 ====================
+    /**
+     * 最大允许的审核驳回次数
+     */
+    private Integer configFlowMaxAuditReject = 3;
+
+    /**
+     * 最大允许的返工次数
+     */
+    private Integer configFlowMaxRework = 2;
+
+    /**
+     * 最大允许的设计审核驳回次数
+     */
+    private Integer configFlowMaxDesignReject = 3;
 }

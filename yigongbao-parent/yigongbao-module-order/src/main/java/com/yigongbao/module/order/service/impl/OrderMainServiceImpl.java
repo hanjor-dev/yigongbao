@@ -26,6 +26,7 @@ import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
 import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
+import com.yigongbao.module.order.validator.OrderDataValidator;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
 import com.yigongbao.module.order.dto.order.OrderPageDTO;
@@ -100,6 +101,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final UserHospitalService userHospitalService;
     private final OrderQueryHelper orderQueryHelper;
     private final ObjectMapper objectMapper;
+    private final OrderDataValidator orderDataValidator;
 
     // ==================== 私有方法 ====================
 
@@ -684,9 +686,16 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      *
      * 【执行步骤】
      * 1. 生成订单编号
-     * 2. 构建订单主表，设置 phase=ORDER, status=PENDING_DATA_AUDIT
-     * 3. 批量保存重建项目明细
-     * 4. 通过 FlowFacade 记录 CREATE 动作（仅记录历史，不改变状态）
+     * 2. 校验影像文件（根据系统配置判断是否必须上传）
+     * 3. 构建订单主表，通过 OrderDataValidator 校验并覆盖所有关联名称字段
+     *    - orgName: 从机构表查询覆盖
+     *    - operatorId/operatorName/operatorPhone: 从当前登录用户填充，不信任前端传入值
+     *    - hospitalName/areaId/areaName/fullAreaName: 从医院表查询覆盖
+     *    - deptName: 从医院科室表查询覆盖
+     *    - doctorId/doctorName/doctorPhone: 已有 doctorId 则查询覆盖；仅有 doctorName 则 quickAdd 后填充
+     *    - currentHandlerId/currentHandlerName: 设置为当前登录用户
+     * 4. 保存重建项目明细，通过 OrderDataValidator 校验并覆盖 bodyPartName/projectName 等
+     * 5. 通过 FlowFacade 记录 CREATE 动作（仅记录历史，不改变状态）
      *
      * @param dto 创建订单参数
      * @return 订单ID
@@ -711,32 +720,52 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             order.setPhase(FlowPhaseEnum.ORDER.getValue());
             order.setStatus(FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
             order.setVersion(0);
-            // 从医院表补充地区冗余字段
-            fillAreaFromHospital(order, dto.getHospitalId());
+
+            // 操作员信息强制从当前登录用户填充，不信任前端传入值
+            UserEntity currentUser = userService.getById(currentUserId);
+            if (currentUser == null) {
+                log.warn("当前登录用户不存在，userId={}", currentUserId);
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+            }
+            order.setOperatorId(currentUserId);
+            order.setOperatorName(currentUser.getRealName());
+            order.setOperatorPhone(currentUser.getPhone());
+            // 创单时当前处理人即为提单人
+            order.setCurrentHandlerId(currentUserId);
+            order.setCurrentHandlerName(currentUser.getRealName());
+
+            // 校验关联数据并覆盖所有冗余名称字段（orgName/hospitalName/area/deptName/doctorId+Name+Phone）
+            orderDataValidator.validateAndFillMasterForOrder(
+                    order,
+                    dto.getOrgId(), dto.getHospitalId(), dto.getDeptId(),
+                    dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone(),
+                    currentUserId, OrderDataValidator.ValidateMode.DIRECT);
+
             save(order);
             Long orderId = order.getId();
             log.info("创建订单主表，orderId={}, orderCode={}", orderId, orderCode);
 
-            // Step 4：保存重建项目列表
+            // Step 4：保存重建项目列表，校验并覆盖 bodyPartName/projectName/estimatedHours/projectDesc
             if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+                List<OrderItemEntity> items = new ArrayList<>();
                 for (int i = 0; i < dto.getItems().size(); i++) {
                     var itemDTO = dto.getItems().get(i);
                     OrderItemEntity item = new OrderItemEntity();
                     item.setOrderId(orderId);
                     item.setOrderCode(orderCode);
                     item.setBodyPartId(itemDTO.getBodyPartId());
-                    item.setBodyPartName(itemDTO.getBodyPartName());
                     item.setProjectId(itemDTO.getProjectId());
-                    item.setProjectName(itemDTO.getProjectName());
-                    item.setProjectEstimatedHours(itemDTO.getProjectEstimatedHours());
-                    item.setProjectDesc(itemDTO.getProjectDesc());
                     item.setFormingRequirement(itemDTO.getFormingRequirement());
                     item.setOtherRequirement(itemDTO.getOtherRequirement());
-                    // 未指定排序时按数组索引+1作为排序值
                     item.setSortOrder(itemDTO.getSortOrder() != null ? itemDTO.getSortOrder() : i + 1);
+                    items.add(item);
+                }
+                // 通过校验器覆盖 bodyPartName/projectName/projectEstimatedHours/projectDesc
+                orderDataValidator.validateAndFillItemsForOrder(items, OrderDataValidator.ValidateMode.DIRECT);
+                for (OrderItemEntity item : items) {
                     orderItemMapper.insert(item);
                 }
-                log.info("创建订单明细，orderId={}, itemCount={}", orderId, dto.getItems().size());
+                log.info("创建订单明细，orderId={}, itemCount={}", orderId, items.size());
             }
 
             // Step 5：保存影像文件关联
@@ -744,16 +773,12 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             saveOrderFiles(orderId, orderCode, dto.getImageReportFileIds(), FileBizTypeEnum.IMAGE_REPORT.getDictCode());
 
             // Step 6：记录状态历史（CREATE 动作仅记录历史，不改变 phase/status）
-            String operatorName = null;
-            if (currentUserId != null) {
-                UserEntity user = userService.getById(currentUserId);
-                if (user != null) {
-                    operatorName = user.getRealName();
-                }
-            }
-            flowFacade.executeFlow(orderId, FlowActionEnum.CREATE, new FlowOperator(currentUserId, operatorName, "直提创建"));
+            flowFacade.executeFlow(orderId, FlowActionEnum.CREATE,
+                    new FlowOperator(currentUserId, currentUser.getRealName(), "直提创建"));
             log.info("直接创建正式订单成功，orderId={}, orderCode={}", orderId, orderCode);
             return orderId;
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             log.error("直接创建正式订单异常", e);
             throw e;

@@ -107,13 +107,13 @@ class OrderQueryHelperTest {
         return e;
     }
 
-    private OrderItemEntity buildItem(Long orderId, Long id, String projectName, String bodyPartName, String category) {
+    private OrderItemEntity buildItem(Long orderId, Long id, String projectName, String bodyPartName, String categoryCode) {
         OrderItemEntity item = new OrderItemEntity();
         item.setId(id);
         item.setOrderId(orderId);
         item.setProjectName(projectName);
         item.setBodyPartName(bodyPartName);
-        item.setCategory(category);
+        item.setCategoryCode(categoryCode);
         item.setProjectDesc("项目说明" + id);
         item.setFormingRequirement("成型要求" + id);
         item.setOtherRequirement("其他要求" + id);

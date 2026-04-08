@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.order.dto.draft.CreateOrderDraftDTO;
+import com.yigongbao.module.order.dto.draft.OrderDraftPageQueryDTO;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
 import com.yigongbao.module.order.dto.order.OrderExportQueryDTO;
@@ -32,7 +33,7 @@ import java.util.List;
  * @date 2026-03-31
  */
 @RestController
-@RequestMapping("/api/order")
+@RequestMapping("/order")
 @RequiredArgsConstructor
 @Tag(name = "订单管理", description = "订单相关接口")
 public class OrderController {
@@ -44,13 +45,9 @@ public class OrderController {
     // ==================== 草稿接口 ====================
 
     @Operation(summary = "分页查询我的草稿列表")
-    @GetMapping("/draft/list")
-    public Result<IPage<OrderDraftVO>> listDrafts(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) Long hospitalId,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(orderDraftService.listDrafts(pageNum, pageSize, hospitalId, status));
+    @PostMapping("/draft/list")
+    public Result<IPage<OrderDraftVO>> listDrafts(@Valid @RequestBody OrderDraftPageQueryDTO dto) {
+        return Result.success(orderDraftService.listDrafts(dto));
     }
 
     @Operation(summary = "查询草稿详情")
@@ -133,7 +130,7 @@ public class OrderController {
         return Result.success(orderMainService.listAvailableActions(id));
     }
 
-    @Operation(summary = "删除订单（仅草稿状态）")
+    @Operation(summary = "删除订单（过期不可用）")
     @DeleteMapping("/{id}")
     public Result<Void> removeOrder(@PathVariable Long id) {
         orderMainService.removeOrder(id);

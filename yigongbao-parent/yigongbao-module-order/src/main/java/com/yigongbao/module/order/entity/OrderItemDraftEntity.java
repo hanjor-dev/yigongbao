@@ -49,6 +49,16 @@ public class OrderItemDraftEntity extends BaseEntity implements Serializable {
     private String projectName;
 
     /**
+     * 项目分类编码（字典 dict_code=13）
+     */
+    private String categoryCode;
+
+    /**
+     * 项目分类名称（冗余字段）
+     */
+    private String categoryName;
+
+    /**
      * 预计耗时（小时，支持小数）
      */
     private BigDecimal projectEstimatedHours;

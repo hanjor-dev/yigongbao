@@ -63,7 +63,8 @@ class RebuildProjectControllerTest {
         vo.setLevel(1);
         vo.setStandardPrice(new BigDecimal("5000.00"));
         vo.setUrgentPrice(new BigDecimal("7500.00"));
-        vo.setCategory("模型");
+        vo.setCategoryCode("13.1");
+        vo.setCategoryName("模型");
         vo.setEstimatedHours(new BigDecimal("8.5"));
         vo.setStatus(1);
         vo.setStatusName("正常");
@@ -84,7 +85,8 @@ class RebuildProjectControllerTest {
         vo.setLevel(1);
         vo.setStandardPrice(new BigDecimal("5000.00"));
         vo.setUrgentPrice(new BigDecimal("7500.00"));
-        vo.setCategory("模型");
+        vo.setCategoryCode("13.1");
+        vo.setCategoryName("模型");
         vo.setEstimatedHours(new BigDecimal("8.5"));
         vo.setStatus(1);
         vo.setStatusName("正常");
@@ -106,7 +108,9 @@ class RebuildProjectControllerTest {
             parent.setChildren(List.of(buildTestVO(2L, "颞骨重建", 1L)));
             when(rebuildProjectService.listTree(null)).thenReturn(List.of(parent));
 
-            mockMvc.perform(get("/basic/rebuild-project/tree"))
+            mockMvc.perform(post("/basic/rebuild-project/tree")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"))
@@ -119,7 +123,9 @@ class RebuildProjectControllerTest {
         void tree_whenEmpty_shouldReturnEmptyArray() throws Exception {
             when(rebuildProjectService.listTree(null)).thenReturn(new ArrayList<>());
 
-            mockMvc.perform(get("/basic/rebuild-project/tree"))
+            mockMvc.perform(post("/basic/rebuild-project/tree")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").isArray())
@@ -130,14 +136,16 @@ class RebuildProjectControllerTest {
         @DisplayName("tree: 按分类筛选")
         void tree_withCategory_shouldFilter() throws Exception {
             RebuildProjectVO project = buildTestVO(1L, "颅骨重建", 1L);
-            project.setCategory("模型");
-            when(rebuildProjectService.listTree("模型")).thenReturn(List.of(project));
+            project.setCategoryCode("13.1");
+            project.setCategoryName("模型");
+            when(rebuildProjectService.listTree("13.1")).thenReturn(List.of(project));
 
-            mockMvc.perform(get("/basic/rebuild-project/tree")
-                            .param("category", "模型"))
+            mockMvc.perform(post("/basic/rebuild-project/tree")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"categoryCode\":\"13.1\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
-                    .andExpect(jsonPath("$.data[0].category").value("模型"));
+                    .andExpect(jsonPath("$.data[0].categoryCode").value("13.1"));
         }
     }
 
@@ -152,7 +160,9 @@ class RebuildProjectControllerTest {
         void byBodyPart_shouldReturnProjects() throws Exception {
             when(rebuildProjectService.listByBodyPartId(1L, null)).thenReturn(List.of(buildTestVO(1L, "颅骨重建", 1L)));
 
-            mockMvc.perform(get("/basic/rebuild-project/by-body-part/1"))
+            mockMvc.perform(post("/basic/rebuild-project/by-body-part")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"bodyPartId\":1}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data[0].name").value("颅骨重建"));
@@ -164,7 +174,9 @@ class RebuildProjectControllerTest {
             when(rebuildProjectService.listByBodyPartId(999L, null))
                     .thenThrow(new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND));
 
-            mockMvc.perform(get("/basic/rebuild-project/by-body-part/999"))
+            mockMvc.perform(post("/basic/rebuild-project/by-body-part")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"bodyPartId\":999}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(662));
         }
@@ -173,14 +185,16 @@ class RebuildProjectControllerTest {
         @DisplayName("byBodyPart: 按分类筛选")
         void byBodyPart_withCategory_shouldFilter() throws Exception {
             RebuildProjectVO project = buildTestVO(1L, "颅骨重建", 1L);
-            project.setCategory("导板");
-            when(rebuildProjectService.listByBodyPartId(1L, "导板")).thenReturn(List.of(project));
+            project.setCategoryCode("13.2");
+            project.setCategoryName("导板");
+            when(rebuildProjectService.listByBodyPartId(1L, "13.2")).thenReturn(List.of(project));
 
-            mockMvc.perform(get("/basic/rebuild-project/by-body-part/1")
-                            .param("category", "导板"))
+            mockMvc.perform(post("/basic/rebuild-project/by-body-part")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"bodyPartId\":1,\"categoryCode\":\"13.2\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
-                    .andExpect(jsonPath("$.data[0].category").value("导板"));
+                    .andExpect(jsonPath("$.data[0].categoryCode").value("13.2"));
         }
     }
 
@@ -199,7 +213,9 @@ class RebuildProjectControllerTest {
             option.setChildren(new ArrayList<>());
             when(rebuildProjectService.listOptions(null, null)).thenReturn(List.of(option));
 
-            mockMvc.perform(get("/basic/rebuild-project/options"))
+            mockMvc.perform(post("/basic/rebuild-project/options")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data[0].bodyPartName").value("头部"));
@@ -210,8 +226,9 @@ class RebuildProjectControllerTest {
         void options_withBodyPartId_shouldFilter() throws Exception {
             when(rebuildProjectService.listOptions(1L, null)).thenReturn(new ArrayList<>());
 
-            mockMvc.perform(get("/basic/rebuild-project/options")
-                            .param("bodyPartId", "1"))
+            mockMvc.perform(post("/basic/rebuild-project/options")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"bodyPartId\":1}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
         }
@@ -229,10 +246,11 @@ class RebuildProjectControllerTest {
             item.setLevel(1);
             item.setChildren(new ArrayList<>());
             option.setChildren(List.of(item));
-            when(rebuildProjectService.listOptions(null, "模型")).thenReturn(List.of(option));
+            when(rebuildProjectService.listOptions(null, "13.1")).thenReturn(List.of(option));
 
-            mockMvc.perform(get("/basic/rebuild-project/options")
-                            .param("category", "模型"))
+            mockMvc.perform(post("/basic/rebuild-project/options")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"categoryCode\":\"13.1\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
         }
@@ -240,11 +258,11 @@ class RebuildProjectControllerTest {
         @Test
         @DisplayName("options: 按部位和分类联合筛选")
         void options_withBodyPartIdAndCategory_shouldFilter() throws Exception {
-            when(rebuildProjectService.listOptions(1L, "模型")).thenReturn(new ArrayList<>());
+            when(rebuildProjectService.listOptions(1L, "13.1")).thenReturn(new ArrayList<>());
 
-            mockMvc.perform(get("/basic/rebuild-project/options")
-                            .param("bodyPartId", "1")
-                            .param("category", "模型"))
+            mockMvc.perform(post("/basic/rebuild-project/options")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"bodyPartId\":1,\"categoryCode\":\"13.1\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
         }
@@ -294,7 +312,7 @@ class RebuildProjectControllerTest {
                     "parentId", 0,
                     "name", "测试项目",
                     "standardPrice", 5000.00,
-                    "category", "模型"
+                    "categoryCode", "13.1"
             );
 
             mockMvc.perform(post("/basic/rebuild-project")

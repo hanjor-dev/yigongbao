@@ -16,7 +16,7 @@ public class RebuildProjectTreeDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 项目分类
+     * 项目分类编码（字典 dict_code=13，传入则精确匹配）
      */
-    private String category;
+    private String categoryCode;
 }

@@ -49,9 +49,9 @@ public class UpdateRebuildProjectDTO implements Serializable {
     private BigDecimal urgentPrice;
 
     /**
-     * 项目分类
+     * 项目分类编码（字典 dict_code=13，如 13.1=模型，13.2=导板）
      */
-    private String category;
+    private String categoryCode;
 
     /**
      * 预计耗时（小时）

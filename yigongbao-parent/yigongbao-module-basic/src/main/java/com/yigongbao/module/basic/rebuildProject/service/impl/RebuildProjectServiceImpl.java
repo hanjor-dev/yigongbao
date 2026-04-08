@@ -3,6 +3,7 @@ package com.yigongbao.module.basic.rebuildProject.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.CodeRuleConstants;
+import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -57,15 +58,15 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
     /**
      * 获取项目树形结构（按部位分组）
      *
-     * @param category 项目分类（可选，不传则返回全部）
+     * @param categoryCode 项目分类编码（可选，传入则精确匹配，不传则返回全部）
      * @return 项目树形列表
      */
     @Override
-    public List<RebuildProjectVO> listTree(String category) {
-        log.info("获取项目树形结构，category={}", category);
+    public List<RebuildProjectVO> listTree(String categoryCode) {
+        log.info("获取项目树形结构，categoryCode={}", categoryCode);
         try {
             Map<Long, String> bodyPartNameMap = getBodyPartNameMap();
-            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(null, category);
+            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(null, categoryCode);
             List<RebuildProjectEntity> allList = list(wrapper
                     .orderByAsc(RebuildProjectEntity::getSort)
                     .orderByDesc(RebuildProjectEntity::getCreateTime));
@@ -89,8 +90,8 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
      * @return 该部位下的项目树
      */
     @Override
-    public List<RebuildProjectVO> listByBodyPartId(Long bodyPartId, String category) {
-        log.info("根据部位ID获取项目列表，bodyPartId={}, category={}", bodyPartId, category);
+    public List<RebuildProjectVO> listByBodyPartId(Long bodyPartId, String categoryCode) {
+        log.info("根据部位ID获取项目列表，bodyPartId={}, categoryCode={}", bodyPartId, categoryCode);
         try {
             BodyPartEntity bodyPart = bodyPartService.getById(bodyPartId);
             if (bodyPart == null) {
@@ -98,7 +99,7 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
                 throw new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND);
             }
             Map<Long, String> bodyPartNameMap = getBodyPartNameMap();
-            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(bodyPartId, category);
+            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(bodyPartId, categoryCode);
             List<RebuildProjectEntity> allList = list(wrapper
                     .orderByAsc(RebuildProjectEntity::getSort));
             List<RebuildProjectVO> voList = allList.stream()
@@ -123,11 +124,11 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
      * @return 项目下拉选项列表
      */
     @Override
-    public List<RebuildProjectOptionVO> listOptions(Long bodyPartId, String category) {
-        log.info("获取项目下拉选项，bodyPartId={}, category={}", bodyPartId, category);
+    public List<RebuildProjectOptionVO> listOptions(Long bodyPartId, String categoryCode) {
+        log.info("获取项目下拉选项，bodyPartId={}, categoryCode={}", bodyPartId, categoryCode);
         try {
             Map<Long, String> bodyPartNameMap = getBodyPartNameMap();
-            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(bodyPartId, category);
+            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(bodyPartId, categoryCode);
             wrapper.eq(RebuildProjectEntity::getStatus, StatusConstants.NORMAL)
                     .orderByAsc(RebuildProjectEntity::getBodyPartId)
                     .orderByAsc(RebuildProjectEntity::getSort);
@@ -202,6 +203,8 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
             entity.setLevel(dto.getParentId() == 0 ? 1 : 2);
             entity.setStatus(Objects.requireNonNullElse(dto.getStatus(), StatusConstants.NORMAL));
             entity.setSort(Objects.requireNonNullElse(dto.getSort(), 0));
+            entity.setCategoryCode(dto.getCategoryCode());
+            entity.setCategoryName(resolveCategoryName(dto.getCategoryCode()));
             save(entity);
             log.info("创建项目成功，id={}", entity.getId());
         } catch (BusinessException e) {
@@ -237,13 +240,14 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
             entity.setParentId(dto.getParentId());
             entity.setStandardPrice(dto.getStandardPrice());
             entity.setUrgentPrice(dto.getUrgentPrice());
-            entity.setCategory(dto.getCategory());
             entity.setEstimatedHours(dto.getEstimatedHours());
             entity.setDescription(dto.getDescription());
             entity.setFormingRequirements(dto.getFormingRequirements());
             entity.setSort(Objects.requireNonNullElse(dto.getSort(), 0));
             entity.setStatus(Objects.requireNonNullElse(dto.getStatus(), entity.getStatus()));
             entity.setRemark(dto.getRemark());
+            entity.setCategoryCode(dto.getCategoryCode());
+            entity.setCategoryName(resolveCategoryName(dto.getCategoryCode()));
             updateById(entity);
             log.info("更新项目成功，id={}", id);
         } catch (BusinessException e) {
@@ -323,10 +327,10 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
      * @param category   项目分类（可选）
      * @return 查询条件
      */
-    private LambdaQueryWrapper<RebuildProjectEntity> buildQueryWrapper(Long bodyPartId, String category) {
+    private LambdaQueryWrapper<RebuildProjectEntity> buildQueryWrapper(Long bodyPartId, String categoryCode) {
         LambdaQueryWrapper<RebuildProjectEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Objects.nonNull(bodyPartId), RebuildProjectEntity::getBodyPartId, bodyPartId)
-                .like(StrUtil.isNotBlank(category), RebuildProjectEntity::getCategory, category);
+                .eq(StrUtil.isNotBlank(categoryCode), RebuildProjectEntity::getCategoryCode, categoryCode);
         return wrapper;
     }
 
@@ -357,7 +361,6 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
         vo.setLevel(entity.getLevel());
         vo.setStandardPrice(entity.getStandardPrice());
         vo.setUrgentPrice(entity.getUrgentPrice());
-        vo.setCategory(entity.getCategory());
         vo.setEstimatedHours(entity.getEstimatedHours());
         vo.setDescription(entity.getDescription());
         vo.setFormingRequirements(entity.getFormingRequirements());
@@ -365,6 +368,8 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
         vo.setStatus(entity.getStatus());
         vo.setStatusName(StatusConstants.getStatusName(entity.getStatus()));
         vo.setRemark(entity.getRemark());
+        vo.setCategoryCode(entity.getCategoryCode());
+        vo.setCategoryName(entity.getCategoryName());
         vo.setCreateTime(entity.getCreateTime());
         vo.setUpdateTime(entity.getUpdateTime());
         return vo;
@@ -452,5 +457,24 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
                 .eq(RebuildProjectEntity::getName, name)
                 .eq(RebuildProjectEntity::getParentId, parentId)
                 .ne(RebuildProjectEntity::getId, excludeId)) > 0;
+    }
+
+    /**
+     * 根据分类编码解析分类名称（硬编码映射，避免查库）
+     *
+     * @param categoryCode 分类编码（字典 dict_code=13）
+     * @return 分类名称，未匹配则返回 null
+     */
+    private String resolveCategoryName(String categoryCode) {
+        if (StrUtil.isBlank(categoryCode)) {
+            return null;
+        }
+        return switch (categoryCode) {
+            case DictCodeConstants.PROJECT_CATEGORY_MODEL   -> "模型";
+            case DictCodeConstants.PROJECT_CATEGORY_GUIDE   -> "导板";
+            case DictCodeConstants.PROJECT_CATEGORY_IMPLANT -> "假体";
+            case DictCodeConstants.PROJECT_CATEGORY_OTHER   -> "其他";
+            default -> null;
+        };
     }
 }

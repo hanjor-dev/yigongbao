@@ -21,28 +21,28 @@ public interface RebuildProjectService extends IService<RebuildProjectEntity> {
     /**
      * 获取项目树形结构（按部位分组）
      *
-     * @param category 项目分类（可选，不传则返回全部）
+     * @param categoryCode 项目分类编码（字典 dict_code=13，可选，传入则精确匹配）
      * @return 项目树形列表
      */
-    List<RebuildProjectVO> listTree(String category);
+    List<RebuildProjectVO> listTree(String categoryCode);
 
     /**
      * 根据部位ID获取项目列表
      *
-     * @param bodyPartId 部位ID
-     * @param category   项目分类（可选，不传则返回全部）
+     * @param bodyPartId   部位ID
+     * @param categoryCode 项目分类编码（字典 dict_code=13，可选，不传则返回全部）
      * @return 该部位下的项目树
      */
-    List<RebuildProjectVO> listByBodyPartId(Long bodyPartId, String category);
+    List<RebuildProjectVO> listByBodyPartId(Long bodyPartId, String categoryCode);
 
     /**
      * 获取项目下拉选项
      *
-     * @param bodyPartId 部位ID（可选，不传则返回全部）
-     * @param category   项目分类（可选，不传则返回全部）
+     * @param bodyPartId   部位ID（可选，不传则返回全部）
+     * @param categoryCode 项目分类编码（字典 dict_code=13，可选，不传则返回全部）
      * @return 项目下拉选项列表
      */
-    List<RebuildProjectOptionVO> listOptions(Long bodyPartId, String category);
+    List<RebuildProjectOptionVO> listOptions(Long bodyPartId, String categoryCode);
 
     /**
      * 查询项目详情

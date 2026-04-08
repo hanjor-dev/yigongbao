@@ -484,7 +484,8 @@ CREATE TABLE rebuild_project (
     level                 INT             NOT NULL DEFAULT 1 COMMENT '层级（1=重建项目，2=子重建项目）',
     standard_price        DECIMAL(10,2)   DEFAULT NULL COMMENT '标准价格（元）',
     urgent_price          DECIMAL(10,2)   DEFAULT NULL COMMENT '加急价格（元）',
-    category               VARCHAR(50)     DEFAULT NULL COMMENT '项目分类（如：模型、导板）',
+    category_code          VARCHAR(20)     DEFAULT NULL COMMENT '项目分类编码（字典 dict_code=13，如 13.1=模型）',
+    category_name          VARCHAR(50)     DEFAULT NULL COMMENT '项目分类名称（冗余字段，与字典 dict_name 一致）',
     estimated_hours       DECIMAL(8,2)    DEFAULT NULL COMMENT '预计耗时（小时，支持小数）',
     description           TEXT            DEFAULT NULL COMMENT '项目说明模板',
     forming_requirements  TEXT            DEFAULT NULL COMMENT '成形需求模板',
@@ -880,6 +881,8 @@ CREATE TABLE order_item_draft (
     body_part_name  VARCHAR(100)    COMMENT '部位名称',
     project_id      BIGINT          COMMENT '重建项目ID',
     project_name    VARCHAR(200)    COMMENT '重建项目名称',
+    category_code   VARCHAR(20)     COMMENT '项目分类编码（字典 dict_code=13）',
+    category_name   VARCHAR(50)     COMMENT '项目分类名称',
     project_estimated_hours DECIMAL(8,2) COMMENT '预计耗时（小时）',
 
     -- ==================== 用户填写内容 ====================
@@ -1014,6 +1017,8 @@ CREATE TABLE order_item (
     body_part_name  VARCHAR(100)    COMMENT '部位名称',
     project_id      BIGINT          COMMENT '重建项目ID',
     project_name    VARCHAR(200)    COMMENT '重建项目名称',
+    category_code   VARCHAR(20)     COMMENT '项目分类编码（字典 dict_code=13）',
+    category_name   VARCHAR(50)     COMMENT '项目分类名称',
     project_estimated_hours DECIMAL(8,2) COMMENT '预计耗时（小时）',
 
     -- ==================== 用户填写内容 ====================

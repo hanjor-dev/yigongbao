@@ -6,18 +6,15 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
-import com.yigongbao.module.basic.hospital.service.HospitalService;
-import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
 import com.yigongbao.module.order.dto.draft.CreateOrderDraftDTO;
+import com.yigongbao.module.order.dto.draft.OrderDraftPageQueryDTO;
 import com.yigongbao.module.order.dto.draft.OrderItemDraftItemDTO;
 import com.yigongbao.module.order.entity.OrderDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
@@ -25,8 +22,11 @@ import com.yigongbao.module.order.mapper.OrderDraftMapper;
 import com.yigongbao.module.order.mapper.OrderItemDraftMapper;
 import com.yigongbao.module.order.service.OrderDraftService;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.order.validator.OrderDataValidator;
 import com.yigongbao.module.order.vo.draft.OrderDraftDetailVO;
 import com.yigongbao.module.order.vo.draft.OrderDraftVO;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -34,7 +34,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -58,12 +57,11 @@ import java.util.stream.Collectors;
 public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDraftEntity> implements OrderDraftService {
 
     private final OrderItemDraftMapper orderItemDraftMapper;
-    private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
-    private final HospitalService hospitalService;
-    private final RebuildProjectService rebuildProjectService;
     private final OrderMainService orderMainService;
     private final com.yigongbao.module.system.config.service.ConfigService configService;
+    private final OrderDataValidator orderDataValidator;
+    private final UserService userService;
 
     /**
      * 获取当前登录用户ID
@@ -80,28 +78,22 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
     }
 
     /**
-     * 分页查询我的草稿列表
+     * 分页查询我的草稿列表（仅分页参数，按创建时间倒序）
      *
-     * @param pageNum 页码（默认1）
-     * @param pageSize 每页条数（默认10）
-     * @param hospitalId 医院ID（可选，筛选条件）
-     * @param status 草稿状态（可选，筛选条件）
+     * @param dto 分页查询参数
      * @return 分页后的草稿列表
      */
     @Override
-    public IPage<OrderDraftVO> listDrafts(Integer pageNum, Integer pageSize, Long hospitalId, Integer status) {
+    public IPage<OrderDraftVO> listDrafts(OrderDraftPageQueryDTO dto) {
         Long currentUserId = getCurrentUserId();
-        log.info("分页查询我的草稿列表，pageNum={}, pageSize={}, currentUserId={}, hospitalId={}, status={}",
-                pageNum, pageSize, currentUserId, hospitalId, status);
+        log.info("分页查询我的草稿列表，pageNum={}, pageSize={}, currentUserId={}",
+                dto.getPageNum(), dto.getPageSize(), currentUserId);
         try {
-            Page<OrderDraftEntity> page = new Page<>(pageNum, pageSize);
+            Page<OrderDraftEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
             LambdaQueryWrapper<OrderDraftEntity> wrapper = new LambdaQueryWrapper<>();
-            // 仅查询当前用户的草稿
+            // 仅查询当前用户的草稿，排除已提交的草稿，按创建时间倒序
             wrapper.eq(currentUserId != null, OrderDraftEntity::getOperatorId, currentUserId)
-                    // 排除已提交的草稿
                     .ne(OrderDraftEntity::getStatus, 2)
-                    .eq(Objects.nonNull(hospitalId), OrderDraftEntity::getHospitalId, hospitalId)
-                    .eq(Objects.nonNull(status), OrderDraftEntity::getStatus, status)
                     .orderByDesc(OrderDraftEntity::getCreateTime);
             IPage<OrderDraftEntity> pageResult = page(page, wrapper);
 
@@ -175,6 +167,8 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
     /**
      * 保存草稿（新增或更新）
      * 新增时自动设置过期时间（默认30天），更新时保留原过期时间
+     * 所有关联名称字段（orgName/hospitalName/deptName/doctorName等）通过 OrderDataValidator 从数据库查询覆盖
+     * 操作员信息（operatorName/operatorPhone）强制从当前登录用户填充
      *
      * @param dto 创建或更新草稿的请求参数
      * @return 草稿ID
@@ -184,7 +178,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
     @Transactional(rollbackFor = Exception.class)
     public Long saveDraft(CreateOrderDraftDTO dto) {
         Long currentUserId = getCurrentUserId();
-        log.info("保存草稿，currentUserId={}, dto={}", currentUserId, dto.getId());
+        log.info("保存草稿，currentUserId={}, draftId={}", currentUserId, dto.getId());
         try {
             // 校验业务类型
             validateBusinessType(dto.getBusinessType());
@@ -210,29 +204,58 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             } else {
                 // 新增
                 entity = new OrderDraftEntity();
+                // 操作员ID固定为当前登录用户，不允许前端传入
+                entity.setOperatorId(currentUserId);
+                // 操作员姓名和电话强制从当前登录用户填充，不信任前端传入值
+                UserEntity currentUser = userService.getById(currentUserId);
+                if (currentUser != null) {
+                    entity.setOperatorName(currentUser.getRealName());
+                    entity.setOperatorPhone(currentUser.getPhone());
+                }
                 // 设置过期时间：从系统配置获取，默认30天
                 String expireDaysStr = configService.getConfigValue(SystemConfigKeyEnum.ORDER_DRAFT_EXPIRE_DAYS.getKey());
                 int expireDays = StrUtil.isNotBlank(expireDaysStr) ? Integer.parseInt(expireDaysStr) : 30;
                 entity.setExpiresAt(LocalDateTime.now().plusDays(expireDays));
                 entity.setStatus(1);
             }
-            // DTO 属性拷贝到实体
-            BeanUtils.copyProperties(dto, entity, "id", "items");
+            // 复制 DTO 中允许前端设置的纯业务字段（排除关联名称类字段和 id/items）
+            BeanUtils.copyProperties(dto, entity, "id", "items",
+                    "orgName", "operatorName", "operatorPhone",
+                    "hospitalName", "deptName",
+                    "doctorName", "doctorPhone");
+
+            // 校验关联数据并覆盖所有冗余名称字段（DRAFT 模式：仅校验已填写的字段）
+            orderDataValidator.validateAndFillMaster(
+                    entity,
+                    dto.getOrgId(), dto.getHospitalId(), dto.getDeptId(),
+                    dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone(),
+                    currentUserId, OrderDataValidator.ValidateMode.DRAFT);
+
             saveOrUpdate(entity);
             Long draftId = entity.getId();
-            // 保存重建项目列表
+
+            // 保存重建项目列表，校验并覆盖 bodyPartName/projectName 等
             if (dto.getItems() != null && !dto.getItems().isEmpty()) {
                 // 先删除旧明细
                 orderItemDraftMapper.delete(
                         new LambdaQueryWrapper<OrderItemDraftEntity>()
                                 .eq(OrderItemDraftEntity::getDraftId, draftId));
-                // 批量保存新明细
+                // 构建明细实体列表（仅设置 ID 类字段和业务字段，名称字段由 validator 覆盖）
+                List<OrderItemDraftEntity> itemEntities = new java.util.ArrayList<>();
                 for (int i = 0; i < dto.getItems().size(); i++) {
                     OrderItemDraftItemDTO itemDTO = dto.getItems().get(i);
-                    OrderItemDraftEntity itemEntity = toOrderItemDraftEntity(itemDTO, draftId);
-                    if (itemEntity.getSortOrder() == null) {
-                        itemEntity.setSortOrder(i + 1);
-                    }
+                    OrderItemDraftEntity itemEntity = new OrderItemDraftEntity();
+                    itemEntity.setDraftId(draftId);
+                    itemEntity.setBodyPartId(itemDTO.getBodyPartId());
+                    itemEntity.setProjectId(itemDTO.getProjectId());
+                    itemEntity.setFormingRequirement(itemDTO.getFormingRequirement());
+                    itemEntity.setOtherRequirement(itemDTO.getOtherRequirement());
+                    itemEntity.setSortOrder(itemDTO.getSortOrder() != null ? itemDTO.getSortOrder() : i + 1);
+                    itemEntities.add(itemEntity);
+                }
+                // 通过校验器覆盖 bodyPartName/projectName/projectEstimatedHours/projectDesc
+                orderDataValidator.validateAndFillItems(itemEntities, OrderDataValidator.ValidateMode.DRAFT);
+                for (OrderItemDraftEntity itemEntity : itemEntities) {
                     orderItemDraftMapper.insert(itemEntity);
                 }
             }
@@ -241,7 +264,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("保存草稿异常，dto={}", dto, e);
+            log.error("保存草稿异常，draftId={}", dto.getId(), e);
             throw e;
         }
     }
@@ -520,6 +543,8 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         vo.setBodyPartName(entity.getBodyPartName());
         vo.setProjectId(entity.getProjectId());
         vo.setProjectName(entity.getProjectName());
+        vo.setCategoryCode(entity.getCategoryCode());
+        vo.setCategoryName(entity.getCategoryName());
         vo.setProjectEstimatedHours(entity.getProjectEstimatedHours());
         vo.setProjectDesc(entity.getProjectDesc());
         vo.setFormingRequirement(entity.getFormingRequirement());
@@ -527,28 +552,6 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         vo.setSortOrder(entity.getSortOrder());
         vo.setCreateTime(entity.getCreateTime());
         return vo;
-    }
-
-    /**
-     * 将草稿明细 DTO 转换为实体
-     *
-     * @param dto 草稿明细 DTO
-     * @param draftId 草稿ID
-     * @return 草稿明细实体
-     */
-    private OrderItemDraftEntity toOrderItemDraftEntity(OrderItemDraftItemDTO dto, Long draftId) {
-        OrderItemDraftEntity entity = new OrderItemDraftEntity();
-        entity.setDraftId(draftId);
-        entity.setBodyPartId(dto.getBodyPartId());
-        entity.setBodyPartName(dto.getBodyPartName());
-        entity.setProjectId(dto.getProjectId());
-        entity.setProjectName(dto.getProjectName());
-        entity.setProjectEstimatedHours(dto.getProjectEstimatedHours());
-        entity.setProjectDesc(dto.getProjectDesc());
-        entity.setFormingRequirement(dto.getFormingRequirement());
-        entity.setOtherRequirement(dto.getOtherRequirement());
-        entity.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 1);
-        return entity;
     }
 
     private String getOrderTypeName(Integer orderType) {

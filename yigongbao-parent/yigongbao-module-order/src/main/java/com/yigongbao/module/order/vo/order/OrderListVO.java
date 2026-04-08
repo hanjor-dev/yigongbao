@@ -261,9 +261,14 @@ public class OrderListVO implements Serializable {
         private String projectName;
 
         /**
-         * 项目分类
+         * 项目分类编码（字典 dict_code=13）
          */
-        private String category;
+        private String categoryCode;
+
+        /**
+         * 项目分类名称
+         */
+        private String categoryName;
 
         /**
          * 数量（明细表粒度为每个部位一条，固定为 1）

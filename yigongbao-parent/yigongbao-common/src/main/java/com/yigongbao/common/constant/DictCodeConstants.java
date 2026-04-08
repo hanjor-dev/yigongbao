@@ -68,4 +68,30 @@ public final class DictCodeConstants {
      * 女
      */
     public static final String PATIENT_GENDER_FEMALE = "12.2";
+
+    // ==================== 重建项目分类 ====================
+    /**
+     * 重建项目分类（父节点 dict_code）
+     */
+    public static final String PROJECT_CATEGORY = "13";
+
+    /**
+     * 模型
+     */
+    public static final String PROJECT_CATEGORY_MODEL = "13.1";
+
+    /**
+     * 导板
+     */
+    public static final String PROJECT_CATEGORY_GUIDE = "13.2";
+
+    /**
+     * 假体
+     */
+    public static final String PROJECT_CATEGORY_IMPLANT = "13.3";
+
+    /**
+     * 其他
+     */
+    public static final String PROJECT_CATEGORY_OTHER = "13.4";
 }

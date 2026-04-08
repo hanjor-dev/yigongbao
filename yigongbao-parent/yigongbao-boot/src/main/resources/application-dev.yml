@@ -151,6 +151,13 @@ yigongbao:
     order-draft-expire-days: 30
     # 订单提交后修改窗口期（分钟），默认 10 分钟
     order-modify-window-minutes: 10
+    # ==================== 流程状态机配置 ====================
+    # 最大允许的审核驳回次数，默认 3 次
+    flow-max-audit-reject: 3
+    # 最大允许的返工次数，默认 2 次
+    flow-max-rework: 2
+    # 最大允许的设计审核驳回次数，默认 3 次
+    flow-max-design-reject: 3
   # 文件存储业务配置
   file-storage:
     # 最大文件大小（字节），默认 500MB
