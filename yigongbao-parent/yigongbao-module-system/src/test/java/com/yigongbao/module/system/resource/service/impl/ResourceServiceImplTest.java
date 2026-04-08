@@ -346,9 +346,11 @@ class ResourceServiceImplTest {
         com.yigongbao.module.system.resource.dto.ResourcePageDTO dto =
                 new com.yigongbao.module.system.resource.dto.ResourcePageDTO();
         dto.setQueryScope(2);
+        dto.setPageNum(1);
+        dto.setPageSize(10);
 
         // 执行
-        var result = resourceService.pageResources(1, 10, dto);
+        var result = resourceService.pageResources(dto);
 
         // 断言
         assertNotNull(result);
@@ -368,9 +370,11 @@ class ResourceServiceImplTest {
         com.yigongbao.module.system.resource.dto.ResourcePageDTO dto =
                 new com.yigongbao.module.system.resource.dto.ResourcePageDTO();
         dto.setQueryScope(3);
+        dto.setPageNum(1);
+        dto.setPageSize(10);
 
         // 执行
-        var result = resourceService.pageResources(1, 10, dto);
+        var result = resourceService.pageResources(dto);
 
         // 断言
         assertNotNull(result);
@@ -390,9 +394,11 @@ class ResourceServiceImplTest {
         com.yigongbao.module.system.resource.dto.ResourcePageDTO dto =
                 new com.yigongbao.module.system.resource.dto.ResourcePageDTO();
         dto.setParentId(1L);
+        dto.setPageNum(1);
+        dto.setPageSize(10);
 
         // 执行
-        var result = resourceService.pageResources(1, 10, dto);
+        var result = resourceService.pageResources(dto);
 
         // 断言
         assertNotNull(result);
@@ -412,9 +418,11 @@ class ResourceServiceImplTest {
         // 默认 dto，queryScope=null，resourceType=null，应返回全部类型混合数据
         com.yigongbao.module.system.resource.dto.ResourcePageDTO dto =
                 new com.yigongbao.module.system.resource.dto.ResourcePageDTO();
+        dto.setPageNum(1);
+        dto.setPageSize(10);
 
         // 执行
-        var result = resourceService.pageResources(1, 10, dto);
+        var result = resourceService.pageResources(dto);
 
         // 断言
         assertNotNull(result);

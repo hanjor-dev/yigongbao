@@ -2,6 +2,7 @@ package com.yigongbao.module.system.role.dto;
 
 import lombok.Data;
 
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.io.Serializable;
 
@@ -40,9 +41,10 @@ public class UpdateRoleDTO implements Serializable {
     private Integer accountType;
 
     /**
-     * 是否启用医院范围权限（0=否，1=是）
+     * 数据权限范围（self/hospitals/org/all），不传则不更新
      */
-    private Integer hospitalScopeEnabled;
+    @Pattern(regexp = "^(self|hospitals|org|all)$", message = "数据权限范围只允许：self/hospitals/org/all")
+    private String dataScopeType;
 
     /**
      * 状态（0=禁用，1=正常）

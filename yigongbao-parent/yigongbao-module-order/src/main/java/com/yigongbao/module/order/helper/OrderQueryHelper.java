@@ -149,6 +149,10 @@ public class OrderQueryHelper {
                 Long orgId = getCurrentUserOrgId();
                 if (orgId != null) {
                     wrapper.eq(OrderMainEntity::getOrgId, orgId);
+                } else {
+                    // 用户无所属机构，兜底返回空列表，避免泄露全量数据
+                    log.warn("用户无所属机构，ORG 数据范围返回空列表，userId={}", currentUserId);
+                    wrapper.apply("1 = 0");
                 }
                 break;
             case ALL:

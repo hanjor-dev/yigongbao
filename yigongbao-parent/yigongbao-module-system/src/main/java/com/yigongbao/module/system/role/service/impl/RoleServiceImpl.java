@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.StatusConstants;
+import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.role.convert.RoleConvert;
@@ -246,9 +247,9 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
         if (vo.getAccountType() != null) {
             vo.setAccountTypeName(getAccountTypeName(vo.getAccountType()));
         }
-        // 填充是否启用医院范围权限名称
-        if (vo.getHospitalScopeEnabled() != null) {
-            vo.setHospitalScopeEnabledName(getHospitalScopeEnabledName(vo.getHospitalScopeEnabled()));
+        // 填充数据权限范围名称
+        if (vo.getDataScopeType() != null) {
+            vo.setDataScopeTypeName(DataScopeTypeEnum.getDescByCode(vo.getDataScopeType()));
         }
         // 填充状态名称
         if (vo.getStatus() != null) {
@@ -265,19 +266,6 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
      */
     private String getAccountTypeName(Integer accountType) {
         return StatusConstants.getAccountTypeName(accountType);
-    }
-
-    /**
-     * 获取是否启用医院范围权限名称
-     *
-     * @param enabled 是否启用
-     * @return 权限名称
-     */
-    private String getHospitalScopeEnabledName(Integer enabled) {
-        if (enabled == null) {
-            return "";
-        }
-        return enabled == StatusConstants.YES ? "是" : "否";
     }
 
     /**

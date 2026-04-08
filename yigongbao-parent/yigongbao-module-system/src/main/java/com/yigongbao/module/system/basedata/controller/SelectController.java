@@ -1,5 +1,6 @@
 package com.yigongbao.module.system.basedata.controller;
 
+import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.result.Result;
@@ -141,6 +142,26 @@ public class SelectController {
     public Result<List<SelectTreeVO>> listBizTypes(@RequestBody BizTypeListDTO dto) {
         List<DictVO> bizTypes = dictService.listFileBizTypeOptions();
         return Result.success(convertDictToSelectTree(bizTypes));
+    }
+
+    /**
+     * 获取数据权限范围类型下拉列表
+     * <p>
+     * 直接返回 DataScopeTypeEnum 所有枚举值，供创建/编辑角色时选择数据权限范围
+     *
+     * @return 数据权限范围类型列表（name=中文名称, value=code 字符串）
+     */
+    @Operation(summary = "获取数据权限范围类型下拉列表")
+    @PostMapping("/data-scope-types")
+    public Result<List<SelectTreeVO>> listDataScopeTypes() {
+        List<SelectTreeVO> result = new ArrayList<>();
+        for (DataScopeTypeEnum type : DataScopeTypeEnum.values()) {
+            SelectTreeVO vo = new SelectTreeVO();
+            vo.setName(type.getDesc());
+            vo.setValue(type.getCode());
+            result.add(vo);
+        }
+        return Result.success(result);
     }
 
     /**

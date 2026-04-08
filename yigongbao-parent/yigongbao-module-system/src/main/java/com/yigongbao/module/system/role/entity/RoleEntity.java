@@ -41,10 +41,10 @@ public class RoleEntity extends BaseEntity implements Serializable {
     private Integer accountType;
 
     /**
-     * 是否启用医院范围权限（0=否，1=是）
-     * 当启用时，关联的用户可以通过 sys_user_hospital 表分配具体的医院范围
+     * 数据权限范围（self=仅自己，hospitals=医院范围，org=本机构，all=全部）
+     * 对应 DataScopeTypeEnum.code
      */
-    private Integer hospitalScopeEnabled;
+    private String dataScopeType;
 
     /**
      * 状态（0=禁用，1=正常）

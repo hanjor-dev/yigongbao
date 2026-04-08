@@ -552,12 +552,12 @@ class UserControllerTest {
     // ==================== 医院范围权限相关测试 ====================
 
     /**
-     * 测试用例：创建用户时传入角色（hospitalScopeEnabled=1）和 hospitalIds，验证参数正确
-     * 说明：roleId=4（业务员）的 hospitalScopeEnabled=1，hospitalIds 需要有效医院ID
+     * 测试用例：创建用户时传入角色（dataScopeType=hospitals）和 hospitalIds，验证参数正确
+     * 说明：roleId=4（业务员）的 dataScopeType=hospitals，hospitalIds 需要有效医院ID
      * 注意：由于测试环境无 hospital 表，验证返回 400（部分医院ID无效）而非业务成功
      */
     @Test
-    @DisplayName("create: hospitalScopeEnabled=1的角色传hospitalIds时需确保医院有效")
+    @DisplayName("create: dataScopeType=hospitals的角色传hospitalIds时需确保医院有效")
     void create_withHospitalScopeRoleAndHospitalIds_shouldValidateHospitalIds() throws Exception {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("username", "hospitaluser1");
@@ -566,7 +566,7 @@ class UserControllerTest {
         requestBody.put("phone", "13900000011");
         requestBody.put("accountType", 1);
         requestBody.put("orgId", 1);
-        requestBody.put("roleId", 4);  // 业务员角色，hospitalScopeEnabled=1
+        requestBody.put("roleId", 4);  // 业务员角色，dataScopeType=hospitals
         requestBody.put("hospitalIds", List.of(1L, 2L));
 
         // 由于测试环境无 hospital 表，UserHospitalServiceImpl.assignHospitals 会抛出异常
@@ -581,12 +581,12 @@ class UserControllerTest {
     }
 
     /**
-     * 测试用例：创建用户时传入角色（hospitalScopeEnabled=0），不传 hospitalIds
-     * 说明：roleId=1（公司管理员）的 hospitalScopeEnabled=0
+     * 测试用例：创建用户时传入角色（dataScopeType=all），不传 hospitalIds
+     * 说明：roleId=1（公司管理员）的 dataScopeType=all
      */
     @Test
-    @DisplayName("create: hospitalScopeEnabled=0的角色不传hospitalIds应成功创建")
-    void create_withHospitalScopeDisabledRole_shouldSuccess() throws Exception {
+    @DisplayName("create: dataScopeType=all的角色不传hospitalIds应成功创建")
+    void create_withNonHospitalScopeRole_shouldSuccess() throws Exception {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("username", "normaluser1");
         requestBody.put("password", "123456");
@@ -594,7 +594,7 @@ class UserControllerTest {
         requestBody.put("phone", "13900000012");
         requestBody.put("accountType", 1);
         requestBody.put("orgId", 1);
-        requestBody.put("roleId", 1);  // 公司管理员角色，hospitalScopeEnabled=0
+        requestBody.put("roleId", 1);  // 公司管理员角色，dataScopeType=all
         // 不传 hospitalIds
 
         mockMvc.perform(post("/system/user")
@@ -607,10 +607,10 @@ class UserControllerTest {
 
     /**
      * 测试用例：更新用户时传入 hospitalIds，验证参数正确
-     * 说明：用户1关联角色1（hospitalScopeEnabled=0），hospitalIds 会被忽略
+     * 说明：用户1关联角色1（dataScopeType=all），hospitalIds 会被忽略
      */
     @Test
-    @DisplayName("update: 传入hospitalIds应成功更新（角色hospitalScopeEnabled决定是否分配）")
+    @DisplayName("update: 传入hospitalIds应成功更新（角色dataScopeType决定是否分配）")
     void update_withHospitalIds_shouldSuccess() throws Exception {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("realName", "更新姓名");

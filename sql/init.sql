@@ -235,8 +235,8 @@ INSERT INTO sys_org (id, org_name, org_code, org_type, contact, phone, status) V
 -- ============================================================
 -- 角色基础数据初始化（sys_role）
 -- ------------------------------------------------------------
-INSERT INTO sys_role (id, role_name, role_code, role_desc, account_type, hospital_scope_enabled, status) VALUES
-(1, '超级管理员', 'admin', '系统管理员，拥有全部权限', 1, 0, 1);
+INSERT INTO sys_role (id, role_name, role_code, role_desc, account_type, data_scope_type, status) VALUES
+(1, '超级管理员', 'admin', '系统管理员，拥有全部权限', 1, 'all', 1);
 
 -- ============================================================
 -- 用户基础数据初始化（sys_user）

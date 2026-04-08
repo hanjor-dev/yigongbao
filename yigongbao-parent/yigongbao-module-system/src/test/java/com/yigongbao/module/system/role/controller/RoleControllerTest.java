@@ -123,7 +123,7 @@ class RoleControllerTest {
         requestBody.put("roleCode", "ROLE_TEST");
         requestBody.put("roleDesc", "测试角色描述");
         requestBody.put("accountType", 1);
-        requestBody.put("hospitalScopeEnabled", 0);
+        requestBody.put("dataScopeType", "org");
 
         mockMvc.perform(post("/system/role")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -140,7 +140,7 @@ class RoleControllerTest {
         requestBody.put("roleName", "测试角色");
         requestBody.put("roleCode", "ROLE_ADMIN");
         requestBody.put("accountType", 1);
-        requestBody.put("hospitalScopeEnabled", 0);
+        requestBody.put("dataScopeType", "org");
 
         mockMvc.perform(post("/system/role")
                         .contentType(MediaType.APPLICATION_JSON)

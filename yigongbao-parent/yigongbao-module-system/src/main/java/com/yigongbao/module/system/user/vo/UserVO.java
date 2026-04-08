@@ -103,10 +103,9 @@ public class UserVO implements Serializable {
     private String roleCode;
 
     /**
-     * 是否启用医院范围权限（0=否，1=是）
-     * 用于前端判断是否显示医院选择区域
+     * 数据权限范围（来自关联角色），前端通过 dataScopeType == 'hospitals' 判断是否显示医院选择区域
      */
-    private Integer hospitalScopeEnabled;
+    private String dataScopeType;
 
     /**
      * 工号

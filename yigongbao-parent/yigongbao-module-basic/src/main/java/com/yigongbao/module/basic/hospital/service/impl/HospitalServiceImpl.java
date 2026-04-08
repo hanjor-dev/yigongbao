@@ -236,7 +236,7 @@ public class HospitalServiceImpl extends ServiceImpl<HospitalMapper, HospitalEnt
         log.info("获取当前用户可操作的医院下拉选项，userId={}", userId);
         try {
             // 此方法由 HospitalScopeController 调用，实际逻辑在 Controller 层根据用户权限判断
-            // 这里默认返回所有正常状态的医院，Controller 层会根据角色的 hospitalScopeEnabled 进行过滤
+            // 这里默认返回所有正常状态的医院，Controller 层会根据角色的 dataScopeType 进行过滤
             LambdaQueryWrapper<HospitalEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(HospitalEntity::getStatus, StatusConstants.NORMAL)
                     .orderByAsc(HospitalEntity::getHospitalName);

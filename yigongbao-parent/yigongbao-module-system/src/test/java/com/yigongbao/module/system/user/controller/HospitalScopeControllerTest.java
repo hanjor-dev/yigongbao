@@ -68,7 +68,7 @@ class HospitalScopeControllerTest {
         testRole.setId(1L);
         testRole.setRoleName("业务员");
         testRole.setRoleCode("salesman");
-        testRole.setHospitalScopeEnabled(1); // 启用医院范围权限
+        testRole.setDataScopeType("hospitals"); // 医院范围权限
 
         // 准备测试医院
         testHospital = new HospitalVO();
@@ -109,11 +109,11 @@ class HospitalScopeControllerTest {
     }
 
     /**
-     * 测试用例：角色的 hospitalScopeEnabled=1 时返回用户关联的医院
+     * 测试用例：角色的 dataScopeType=hospitals 时返回用户关联的医院
      */
     @Test
-    @DisplayName("getMyHospitals: hospitalScopeEnabled=1 返回用户关联医院")
-    void getMyHospitals_whenHospitalScopeEnabled_shouldReturnUserHospitals() throws Exception {
+    @DisplayName("getMyHospitals: dataScopeType=hospitals 返回用户关联医院")
+    void getMyHospitals_whenDataScopeTypeHospitals_shouldReturnUserHospitals() throws Exception {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         when(roleService.getById(1L)).thenReturn(testRole);
         when(userHospitalService.getHospitalsByUserId(1L))
@@ -128,12 +128,12 @@ class HospitalScopeControllerTest {
     }
 
     /**
-     * 测试用例：角色的 hospitalScopeEnabled=0 时返回空列表
+     * 测试用例：角色的 dataScopeType!=hospitals 时返回空列表
      */
     @Test
-    @DisplayName("getMyHospitals: hospitalScopeEnabled=0 返回空列表")
-    void getMyHospitals_whenHospitalScopeDisabled_shouldReturnEmptyList() throws Exception {
-        testRole.setHospitalScopeEnabled(0);
+    @DisplayName("getMyHospitals: dataScopeType=org 返回空列表")
+    void getMyHospitals_whenDataScopeTypeOrg_shouldReturnEmptyList() throws Exception {
+        testRole.setDataScopeType("org");
         when(userMapper.selectById(1L)).thenReturn(testUser);
         when(roleService.getById(1L)).thenReturn(testRole);
 

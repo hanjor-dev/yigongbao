@@ -48,9 +48,9 @@ public interface UserHospitalService {
 
     /**
      * 获取当前用户可操作医院（下拉选项）
-     * 根据用户角色的 hospitalScopeEnabled 配置决定返回范围：
-     * - hospitalScopeEnabled == 1：返回用户关联的医院列表
-     * - hospitalScopeEnabled == 0 或无角色：返回空列表
+     * 根据用户角色的 dataScopeType 配置决定返回范围：
+     * - dataScopeType == 'hospitals'：返回用户关联的医院列表
+     * - 其他类型或无角色：返回空列表
      *
      * @param userId 用户ID
      * @return 医院列表
@@ -69,9 +69,12 @@ public interface UserHospitalService {
 
     /**
      * 获取用户的数据范围类型
-     * - 角色 hospitalScopeEnabled=1 → HOSPITALS（仅关联医院范围）
-     * - 内部用户（accountType=1）且 hospitalScopeEnabled=0 → ALL
-     * - 外部用户（accountType=2）且 hospitalScopeEnabled=0 → SELF
+     * 直接读取用户关联角色的 dataScopeType 字段：
+     * - 角色 dataScopeType=hospitals → HOSPITALS（仅关联医院范围）
+     * - 角色 dataScopeType=org → ORG（本机构全部数据）
+     * - 角色 dataScopeType=all → ALL（全部数据）
+     * - 角色 dataScopeType=self → SELF（仅自己创建的数据）
+     * - 用户无角色或角色未配置 dataScopeType → ORG（最保守权限）
      *
      * @param userId 用户ID
      * @return 数据范围类型枚举

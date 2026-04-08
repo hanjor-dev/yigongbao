@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.dept.dto.CreateDeptDTO;
+import com.yigongbao.module.system.dept.dto.DeptPageDTO;
 import com.yigongbao.module.system.dept.dto.UpdateDeptDTO;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.mapper.DeptMapper;
@@ -115,7 +116,11 @@ class DeptServiceImplTest {
         when(orgService.getById(1L)).thenReturn(testOrg);
 
         // 执行
-        IPage<DeptVO> result = deptService.listDept(1, 10, 1L, null, null);
+        DeptPageDTO pageDTO = new DeptPageDTO();
+        pageDTO.setPageNum(1);
+        pageDTO.setPageSize(10);
+        pageDTO.setOrgId(1L);
+        IPage<DeptVO> result = deptService.listDept(pageDTO);
 
         // 断言
         assertNotNull(result);
@@ -135,7 +140,10 @@ class DeptServiceImplTest {
         when(deptMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
 
         // 执行
-        IPage<DeptVO> result = deptService.listDept(1, 10, null, null, null);
+        DeptPageDTO pageDTO2 = new DeptPageDTO();
+        pageDTO2.setPageNum(1);
+        pageDTO2.setPageSize(10);
+        IPage<DeptVO> result = deptService.listDept(pageDTO2);
 
         // 断言
         assertNotNull(result);

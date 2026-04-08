@@ -48,14 +48,14 @@ public class RoleVO implements Serializable {
     private String accountTypeName;
 
     /**
-     * 是否启用医院范围权限（0=否，1=是）
+     * 数据权限范围（self/hospitals/org/all）
      */
-    private Integer hospitalScopeEnabled;
+    private String dataScopeType;
 
     /**
-     * 是否启用医院范围权限名称
+     * 数据权限范围名称（如：仅自己、医院范围、本机构、全部）
      */
-    private String hospitalScopeEnabledName;
+    private String dataScopeTypeName;
 
     /**
      * 状态（0=禁用，1=正常）

@@ -116,7 +116,7 @@ CREATE TABLE sys_role (
     role_code           VARCHAR(32)     NOT NULL COMMENT '角色编码',
     role_desc           VARCHAR(256)    COMMENT '角色描述',
     account_type        TINYINT         NOT NULL COMMENT '账户分类（关联字典编码=6）',
-    hospital_scope_enabled TINYINT       DEFAULT 0 COMMENT '是否启用医院范围权限（0=否，1=是，当启用时通过 sys_user_hospital 表分配具体医院范围）',
+    data_scope_type     VARCHAR(16)     NOT NULL DEFAULT 'org' COMMENT '数据权限范围（self=仅自己，hospitals=医院范围，org=本机构，all=全部）',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark              VARCHAR(512)    COMMENT '备注说明',
 
@@ -132,6 +132,14 @@ CREATE TABLE sys_role (
     KEY idx_role_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表';
 CREATE UNIQUE INDEX uk_role_code ON sys_role ((CASE WHEN is_deleted = 0 THEN role_code ELSE NULL END));
+
+-- 生产环境迁移参考（已有数据时使用，勿直接执行 DDL DROP/CREATE）：
+-- ALTER TABLE sys_role ADD COLUMN data_scope_type VARCHAR(16) NULL COMMENT '数据权限范围';
+-- UPDATE sys_role SET data_scope_type = CASE WHEN hospital_scope_enabled = 1 THEN 'hospitals' WHEN account_type = 1 THEN 'all' ELSE 'self' END;
+-- UPDATE sys_role SET data_scope_type = 'org'  WHERE role_code IN ('ROLE_DESIGNER', 'ROLE_PRODUCTION', 'ROLE_ORG_ADMIN');
+-- UPDATE sys_role SET data_scope_type = 'self' WHERE role_code IN ('ROLE_DOCTOR', 'ROLE_ORG_USER');
+-- ALTER TABLE sys_role MODIFY COLUMN data_scope_type VARCHAR(16) NOT NULL DEFAULT 'org';
+-- ALTER TABLE sys_role DROP COLUMN hospital_scope_enabled;
 
 
 -- ------------------------------------------------------------

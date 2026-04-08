@@ -86,7 +86,7 @@ public class CreateUserDTO implements Serializable {
 
     /**
      * 医院ID列表
-     * 当角色 hospitalScopeEnabled=1 时，用于分配医院范围权限
+     * 当角色 dataScopeType=hospitals 时，用于分配医院范围权限
      * 管理员可先选择模板（预览模板医院列表），再微调后提交
      */
     private List<Long> hospitalIds;

@@ -13,6 +13,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.StatusConstants;
+import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -92,6 +93,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
             // 批量查询关联数据，避免 N+1 问题
             Map<Long, List<Long>> userHospitalMap = Collections.emptyMap();
+            Map<Long, RoleEntity> roleMap = Collections.emptyMap();
             List<UserEntity> records = pageResult.getRecords();
             if (!records.isEmpty()) {
                 // 收集所有需要查询的 ID
@@ -109,7 +111,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                         .collect(Collectors.toSet());
 
                 // 批量查询角色信息
-                Map<Long, RoleEntity> roleMap = roleIds.isEmpty() ? Collections.emptyMap()
+                roleMap = roleIds.isEmpty() ? Collections.emptyMap()
                         : roleService.listByIds(roleIds).stream()
                                 .collect(Collectors.toMap(RoleEntity::getId, Function.identity()));
                 // 批量查询机构信息
@@ -142,6 +144,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 }
                 if (vo.getAccountType() != null) {
                     vo.setAccountTypeName(StatusConstants.getAccountTypeName(vo.getAccountType()));
+                }
+                // 填充角色的 dataScopeType
+                if (vo.getRoleId() != null) {
+                    RoleEntity roleEntity = roleMap.get(vo.getRoleId());
+                    if (roleEntity != null) {
+                        vo.setDataScopeType(roleEntity.getDataScopeType());
+                    }
                 }
                 // 填充医院ID列表
                 if (vo.getId() != null) {
@@ -277,11 +286,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             // 插入数据库
             save(entity);
 
-            // 处理医院范围权限分配（改为依赖角色的 hospitalScopeEnabled）
+            // 处理医院范围权限分配（当角色的 dataScopeType=hospitals 时才分配）
             if (dto.getHospitalIds() != null && !dto.getHospitalIds().isEmpty()) {
                 if (dto.getRoleId() != null) {
                     RoleEntity role = roleService.getById(dto.getRoleId());
-                    if (role != null && role.getHospitalScopeEnabled() != null && role.getHospitalScopeEnabled() == StatusConstants.YES) {
+                    if (role != null && DataScopeTypeEnum.HOSPITALS.getCode().equals(role.getDataScopeType())) {
                         userHospitalService.assignHospitals(entity.getId(), dto.getHospitalIds());
                     }
                 }
@@ -348,9 +357,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 entity.setRoleName(roleEntity.getRoleName());
                 entity.setRoleCode(roleEntity.getRoleCode());
 
-                // 处理医院范围权限变更（覆盖式，改为依赖角色的 hospitalScopeEnabled）
+                // 处理医院范围权限变更（覆盖式，当角色 dataScopeType=hospitals 时才分配）
                 if (dto.getHospitalIds() != null && !dto.getHospitalIds().isEmpty()) {
-                    if (roleEntity.getHospitalScopeEnabled() != null && roleEntity.getHospitalScopeEnabled() == StatusConstants.YES) {
+                    if (DataScopeTypeEnum.HOSPITALS.getCode().equals(roleEntity.getDataScopeType())) {
                         userHospitalService.assignHospitals(id, dto.getHospitalIds());
                     }
                 }
@@ -358,7 +367,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 // 角色未变更，但医院列表有变更（可能是编辑页单独调整医院）
                 if (entity.getRoleId() != null) {
                     RoleEntity currentRole = roleService.getById(entity.getRoleId());
-                    if (currentRole != null && currentRole.getHospitalScopeEnabled() != null && currentRole.getHospitalScopeEnabled() == StatusConstants.YES) {
+                    if (currentRole != null && DataScopeTypeEnum.HOSPITALS.getCode().equals(currentRole.getDataScopeType())) {
                         userHospitalService.assignHospitals(id, dto.getHospitalIds());
                     }
                 }
@@ -575,11 +584,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         if (vo.getAccountType() != null) {
             vo.setAccountTypeName(StatusConstants.getAccountTypeName(vo.getAccountType()));
         }
-        // 填充角色的 hospitalScopeEnabled
+        // 填充角色的 dataScopeType
         if (vo.getRoleId() != null) {
             RoleEntity roleEntity = roleService.getById(vo.getRoleId());
             if (roleEntity != null) {
-                vo.setHospitalScopeEnabled(roleEntity.getHospitalScopeEnabled());
+                vo.setDataScopeType(roleEntity.getDataScopeType());
             }
         }
         // 填充用户已分配的医院ID列表

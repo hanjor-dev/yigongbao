@@ -10,6 +10,7 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.system.org.dto.CreateOrgDTO;
+import com.yigongbao.module.system.org.dto.OrgPageDTO;
 import com.yigongbao.module.system.org.dto.UpdateOrgDTO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.mapper.OrgMapper;
@@ -123,7 +124,10 @@ class OrgServiceImplTest {
         when(dictService.listByTypeCode(DictCodeConstants.ORG_TYPE)).thenReturn(List.of(orgTypeVO));
 
         // 执行
-        IPage<OrgVO> result = orgService.listOrg(1, 10, null, null, null, null);
+        OrgPageDTO pageDTO = new OrgPageDTO();
+        pageDTO.setPageNum(1);
+        pageDTO.setPageSize(10);
+        IPage<OrgVO> result = orgService.listOrg(pageDTO);
 
         // 断言
         assertNotNull(result);
@@ -143,7 +147,10 @@ class OrgServiceImplTest {
         when(orgMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
 
         // 执行
-        IPage<OrgVO> result = orgService.listOrg(1, 10, null, null, null, null);
+        OrgPageDTO pageDTO2 = new OrgPageDTO();
+        pageDTO2.setPageNum(1);
+        pageDTO2.setPageSize(10);
+        IPage<OrgVO> result = orgService.listOrg(pageDTO2);
 
         // 断言
         assertNotNull(result);

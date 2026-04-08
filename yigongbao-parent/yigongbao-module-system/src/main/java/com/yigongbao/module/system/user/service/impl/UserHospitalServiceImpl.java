@@ -126,7 +126,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
 
     /**
      * 分配用户医院范围（覆盖式）
-     * 仅当用户角色的 hospitalScopeEnabled=1 时才调用此方法
+     * 仅当用户角色的 dataScopeType=hospitals 时才调用此方法
      *
      * @param userId      用户ID
      * @param hospitalIds 医院ID列表
@@ -196,9 +196,9 @@ public class UserHospitalServiceImpl implements UserHospitalService {
 
     /**
      * 获取当前用户可操作医院（下拉选项）
-     * 根据用户角色的 hospitalScopeEnabled 配置决定返回范围：
-     * - hospitalScopeEnabled == 1：返回用户关联的医院列表
-     * - hospitalScopeEnabled == 0 或无角色：返回空列表
+     * 根据用户角色的 dataScopeType 配置决定返回范围：
+     * - dataScopeType == 'hospitals'：返回用户关联的医院列表
+     * - 其他类型或无角色：返回空列表
      *
      * @param userId 用户ID
      * @return 医院列表
@@ -215,19 +215,18 @@ public class UserHospitalServiceImpl implements UserHospitalService {
                 throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
 
-            // 2. 检查角色的 hospitalScopeEnabled
-            boolean hospitalScopeEnabled = false;
+            // 2. 检查角色的 dataScopeType 是否为 hospitals
+            boolean isHospitalsScope = false;
             if (user.getRoleId() != null) {
                 RoleEntity role = roleService.getById(user.getRoleId());
-                if (role != null && role.getHospitalScopeEnabled() != null
-                        && role.getHospitalScopeEnabled() == StatusConstants.YES) {
-                    hospitalScopeEnabled = true;
+                if (role != null && DataScopeTypeEnum.HOSPITALS.getCode().equals(role.getDataScopeType())) {
+                    isHospitalsScope = true;
                 }
             }
 
-            // 3. 根据 hospitalScopeEnabled 决定查询范围
+            // 3. 根据 dataScopeType 决定查询范围
             List<HospitalVO> result;
-            if (hospitalScopeEnabled) {
+            if (isHospitalsScope) {
                 result = getHospitalsByUserId(userId);
             } else {
                 result = new ArrayList<>();
@@ -273,6 +272,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
 
     /**
      * 获取用户的数据范围类型
+     * 直接读取用户关联角色的 dataScopeType 字段，不再依赖 accountType 硬推断。
      * 高频调用场景（如订单列表查询），建议后续引入 Redis 缓存以降低 DB 压力。
      *
      * @param userId 用户ID
@@ -281,25 +281,20 @@ public class UserHospitalServiceImpl implements UserHospitalService {
     @Override
     public DataScopeTypeEnum getDataScopeType(Long userId) {
         if (userId == null) {
-            return DataScopeTypeEnum.SELF;
+            return DataScopeTypeEnum.ORG;
         }
         UserEntity user = userMapper.selectById(userId);
         if (user == null) {
-            return DataScopeTypeEnum.SELF;
+            return DataScopeTypeEnum.ORG;
         }
         if (user.getRoleId() != null) {
             RoleEntity role = roleService.getById(user.getRoleId());
-            if (role != null && role.getHospitalScopeEnabled() != null
-                    && role.getHospitalScopeEnabled() == StatusConstants.YES) {
-                return DataScopeTypeEnum.HOSPITALS;
+            if (role != null && role.getDataScopeType() != null) {
+                return DataScopeTypeEnum.getByCodeOrDefault(role.getDataScopeType());
             }
         }
-        // 内部用户（accountType=1）无医院范围限制时，享有全量权限
-        if (user.getAccountType() != null && user.getAccountType() == 1) {
-            return DataScopeTypeEnum.ALL;
-        }
-        // 外部用户（如医院侧）仅看自己创建的数据
-        return DataScopeTypeEnum.SELF;
+        // 用户无角色或角色未配置 dataScopeType 时，默认 ORG（最保守权限，不暴露他人数据）
+        return DataScopeTypeEnum.ORG;
     }
 
     /**

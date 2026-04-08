@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.system.config.dto.ConfigPageDTO;
 import com.yigongbao.module.system.config.dto.CreateConfigDTO;
 import com.yigongbao.module.system.config.dto.UpdateConfigDTO;
 import com.yigongbao.module.system.config.entity.ConfigEntity;
@@ -89,7 +90,10 @@ class ConfigServiceImplTest {
 
         when(configMapper.selectPage(any(), any(LambdaQueryWrapper.class))).thenReturn(page);
 
-        IPage<ConfigVO> result = configService.pageConfig(1, 10, null, null, null, null, null);
+        ConfigPageDTO pageDTO = new ConfigPageDTO();
+        pageDTO.setPageNum(1);
+        pageDTO.setPageSize(10);
+        IPage<ConfigVO> result = configService.pageConfig(pageDTO);
 
         assertNotNull(result);
         assertEquals(1, result.getRecords().size());
@@ -106,7 +110,10 @@ class ConfigServiceImplTest {
 
         when(configMapper.selectPage(any(), any(LambdaQueryWrapper.class))).thenReturn(page);
 
-        IPage<ConfigVO> result = configService.pageConfig(1, 10, null, null, null, null, null);
+        ConfigPageDTO pageDTO2 = new ConfigPageDTO();
+        pageDTO2.setPageNum(1);
+        pageDTO2.setPageSize(10);
+        IPage<ConfigVO> result = configService.pageConfig(pageDTO2);
 
         assertNotNull(result);
         assertTrue(result.getRecords().isEmpty());

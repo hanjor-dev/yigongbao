@@ -1,6 +1,5 @@
 package com.yigongbao.module.system.user.service.impl;
 
-import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
@@ -90,11 +89,11 @@ class UserHospitalServiceImplTest {
 
         enabledRole = new RoleEntity();
         enabledRole.setId(1L);
-        enabledRole.setHospitalScopeEnabled(StatusConstants.YES);
+        enabledRole.setDataScopeType("hospitals");
 
         disabledRole = new RoleEntity();
         disabledRole.setId(2L);
-        disabledRole.setHospitalScopeEnabled(StatusConstants.NO);
+        disabledRole.setDataScopeType("org");
     }
 
     // ==================== getHospitalIdsByUserId Tests ====================
@@ -292,8 +291,8 @@ class UserHospitalServiceImplTest {
     // ==================== getMyHospitalOptions Tests ====================
 
     @Test
-    @DisplayName("getMyHospitalOptions: Returns hospitals when role hospitalScopeEnabled=1")
-    void getMyHospitalOptions_whenHospitalScopeEnabled_shouldReturnHospitals() {
+    @DisplayName("getMyHospitalOptions: Returns hospitals when role dataScopeType=hospitals")
+    void getMyHospitalOptions_whenDataScopeTypeHospitals_shouldReturnHospitals() {
         List<Long> hospitalIds = List.of(1L);
         when(userMapper.selectById(1L)).thenReturn(testUser);
         when(roleService.getById(1L)).thenReturn(enabledRole);
@@ -308,8 +307,8 @@ class UserHospitalServiceImplTest {
     }
 
     @Test
-    @DisplayName("getMyHospitalOptions: Returns empty list when role hospitalScopeEnabled=0")
-    void getMyHospitalOptions_whenHospitalScopeDisabled_shouldReturnEmptyList() {
+    @DisplayName("getMyHospitalOptions: Returns empty list when role dataScopeType=org")
+    void getMyHospitalOptions_whenDataScopeTypeOrg_shouldReturnEmptyList() {
         testUser.setRoleId(2L);
         when(userMapper.selectById(1L)).thenReturn(testUser);
         when(roleService.getById(2L)).thenReturn(disabledRole);
