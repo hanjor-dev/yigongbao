@@ -144,76 +144,77 @@ public enum ErrorCodeEnum {
     CODE_RULE_DISABLED(669, "编码规则已禁用"),
     CODE_GENERATE_FAILED(670, "编码生成失败"),
     CODE_RULE_EXISTS(671, "规则编码已存在"),
+    CODE_SEQ_OVERFLOW(673, "编码序号超出最大限制，请联系管理员"),
 
-    // ==================== 医生相关 672-674 ====================
-    DOCTOR_NOT_FOUND(672, "医生不存在"),
-    DOCTOR_DISABLED(673, "医生已被禁用"),
-    DOCTOR_EXISTS(674, "医生编码已存在"),
+    // ==================== 医生相关 674-676 ====================
+    DOCTOR_NOT_FOUND(674, "医生不存在"),
+    DOCTOR_DISABLED(675, "医生已被禁用"),
+    DOCTOR_EXISTS(676, "医生编码已存在"),
 
-    // ==================== 订单相关 675-701 ====================
+    // ==================== 订单相关 677-714 ====================
     // 基础错误
-    ORDER_NOT_FOUND(675, "订单不存在"),
-    ORDER_DRAFT_NOT_FOUND(676, "草稿不存在"),
+    ORDER_NOT_FOUND(677, "订单不存在"),
+    ORDER_DRAFT_NOT_FOUND(678, "草稿不存在"),
 
     // 状态错误
-    ORDER_STATUS_ERROR(677, "订单状态不合法"),
-    ORDER_STATUS_TRANSITION_ERROR(678, "订单状态转换不合法"),
-    ORDER_NOT_DRAFT(679, "只有草稿状态的订单才能操作"),
-    ORDER_CANNOT_DELETE(680, "只有草稿状态的订单才能删除"),
-    ORDER_WITHDRAW_NOT_ALLOWED(681, "当前状态不允许撤回"),
-    ORDER_RESUBMIT_NOT_ALLOWED(682, "当前状态不允许重新提交"),
-    ORDER_ALREADY_SUBMITTED(683, "订单已提交，不能重复提交"),
-    ORDER_ALREADY_AUDITED(684, "订单已审核，不能重复操作"),
-    ORDER_NOT_WITHIN_WINDOW(685, "订单已超过10分钟修改窗口期"),
+    ORDER_STATUS_ERROR(679, "订单状态不合法"),
+    ORDER_STATUS_TRANSITION_ERROR(680, "订单状态转换不合法"),
+    ORDER_NOT_DRAFT(681, "只有草稿状态的订单才能操作"),
+    ORDER_CANNOT_DELETE(682, "只有草稿状态的订单才能删除"),
+    ORDER_WITHDRAW_NOT_ALLOWED(683, "当前状态不允许撤回"),
+    ORDER_RESUBMIT_NOT_ALLOWED(684, "当前状态不允许重新提交"),
+    ORDER_ALREADY_SUBMITTED(685, "订单已提交，不能重复提交"),
+    ORDER_ALREADY_AUDITED(686, "订单已审核，不能重复操作"),
+    ORDER_NOT_WITHIN_WINDOW(687, "订单已超过10分钟修改窗口期"),
 
     // 草稿相关
-    ORDER_DRAFT_EXPIRED(686, "草稿已过期，请重新创建"),
-    ORDER_DRAFT_NOT_MINE(687, "只能查看自己的草稿"),
-    ORDER_DRAFT_ALREADY_SUBMITTED(688, "草稿已提交，不能重复提交"),
+    ORDER_DRAFT_EXPIRED(688, "草稿已过期，请重新创建"),
+    ORDER_DRAFT_NOT_MINE(689, "只能查看自己的草稿"),
+    ORDER_DRAFT_ALREADY_SUBMITTED(690, "草稿已提交，不能重复提交"),
 
     // 文件相关
-    ORDER_FILE_NOT_FOUND(689, "文件不存在：%s"),
-    ORDER_FILE_REQUIRED(690, "请上传必需的文件：%s"),
-    ORDER_FILE_CATEGORY_ERROR(691, "文件类别不合法"),
+    ORDER_FILE_NOT_FOUND(691, "文件不存在：%s"),
+    ORDER_FILE_REQUIRED(692, "请上传必需的文件：%s"),
+    ORDER_FILE_CATEGORY_ERROR(693, "文件类别不合法"),
 
     // 明细相关
-    ORDER_ITEM_NOT_FOUND(692, "订单明细不存在"),
-    ORDER_ITEM_REQUIRED(693, "请至少添加一个重建项目"),
-    ORDER_ITEM_EMPTY(694, "重建项目明细不能为空"),
+    ORDER_ITEM_NOT_FOUND(694, "订单明细不存在"),
+    ORDER_ITEM_REQUIRED(695, "请至少添加一个重建项目"),
+    ORDER_ITEM_EMPTY(696, "重建项目明细不能为空"),
 
     // 类型相关
-    ORDER_TYPE_INVALID(695, "订单类型不合法"),
-    ORDER_BUSINESS_TYPE_INVALID(696, "业务类型不合法"),
-    ORDER_PATIENT_GENDER_INVALID(697, "患者性别不合法"),
+    ORDER_TYPE_INVALID(697, "订单类型不合法"),
+    ORDER_BUSINESS_TYPE_INVALID(698, "业务类型不合法"),
+    ORDER_PATIENT_GENDER_INVALID(699, "患者性别不合法"),
 
     // 是否需要实体交付相关
-    ORDER_NEEDS_PHYSICAL_DELIVERY_INVALID(698, "是否需要实体交付值不合法"),
-    ORDER_NEEDS_PHYSICAL_DELIVERY_CHANGE_FORBIDDEN(699, "需要实体交付的订单不允许修改为不需要实体交付"),
+    ORDER_NEEDS_PHYSICAL_DELIVERY_INVALID(700, "是否需要实体交付值不合法"),
+    ORDER_NEEDS_PHYSICAL_DELIVERY_CHANGE_FORBIDDEN(701, "需要实体交付的订单不允许修改为不需要实体交付"),
 
     // 审核相关
-    ORDER_AUDIT_REMARK_REQUIRED(700, "审核驳回时必须填写驳回原因"),
+    ORDER_AUDIT_REMARK_REQUIRED(702, "审核驳回时必须填写驳回原因"),
 
     // 修改申请相关
-    ORDER_MODIFY_APPLY_NOT_FOUND(701, "修改申请不存在"),
-    ORDER_MODIFY_APPLY_STATUS_ERROR(702, "修改申请状态不合法"),
-    ORDER_MODIFY_APPLY_ALREADY_PROCESSED(703, "该修改申请已处理"),
+    ORDER_MODIFY_APPLY_NOT_FOUND(703, "修改申请不存在"),
+    ORDER_MODIFY_APPLY_STATUS_ERROR(704, "修改申请状态不合法"),
+    ORDER_MODIFY_APPLY_ALREADY_PROCESSED(705, "该修改申请已处理"),
 
     // 状态机循环限制
-    ORDER_EXCESSIVE_AUDIT_REJECT(704, "审核驳回次数超过上限（%s次），请联系管理员处理"),
-    ORDER_EXCESSIVE_REWORK(705, "返工次数超过上限（%s次），请联系管理员处理"),
-    ORDER_EXCESSIVE_DESIGN_REJECT(706, "设计审核驳回次数超过上限（%s次），请联系管理员处理"),
+    ORDER_EXCESSIVE_AUDIT_REJECT(706, "审核驳回次数超过上限（%s次），请联系管理员处理"),
+    ORDER_EXCESSIVE_REWORK(707, "返工次数超过上限（%s次），请联系管理员处理"),
+    ORDER_EXCESSIVE_DESIGN_REJECT(708, "设计审核驳回次数超过上限（%s次），请联系管理员处理"),
 
     // 订单项目/权限
-    ORDER_PROJECT_DISABLED(707, "重建项目已禁用，不可下单"),
-    HOSPITAL_SCOPE_DENIED(708, "无权操作该医院的订单"),
+    ORDER_PROJECT_DISABLED(709, "重建项目已禁用，不可下单"),
+    HOSPITAL_SCOPE_DENIED(710, "无权操作该医院的订单"),
 
     // 订单部位/项目必填
-    ORDER_BODY_PART_REQUIRED(709, "重建部位不能为空"),
-    ORDER_BODY_PART_DISABLED(710, "重建部位已禁用，不可下单"),
-    ORDER_PROJECT_REQUIRED(711, "重建项目不能为空"),
+    ORDER_BODY_PART_REQUIRED(711, "重建部位不能为空"),
+    ORDER_BODY_PART_DISABLED(712, "重建部位已禁用，不可下单"),
+    ORDER_PROJECT_REQUIRED(713, "重建项目不能为空"),
 
     // 导出
-    ORDER_EXPORT_FAILED(712, "订单导出失败");
+    ORDER_EXPORT_FAILED(714, "订单导出失败");
 
     /**
      * 错误码

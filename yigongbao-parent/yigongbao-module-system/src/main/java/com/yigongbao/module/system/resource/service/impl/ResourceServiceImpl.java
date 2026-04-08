@@ -92,7 +92,9 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
                 wrapper.eq(ResourceEntity::getParentId, dto.getParentId());
             }
 
-            wrapper.orderByAsc(ResourceEntity::getSort)
+            // 先按 parentId 排序（同级资源在一起），再按 sort 排序（同级内的顺序）
+            wrapper.orderByAsc(ResourceEntity::getParentId)
+                    .orderByAsc(ResourceEntity::getSort)
                     .orderByDesc(BaseEntity::getCreateTime);
 
             IPage<ResourceEntity> pageResult = baseMapper.selectPage(page, wrapper);

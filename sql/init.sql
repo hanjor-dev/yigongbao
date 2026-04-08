@@ -230,6 +230,78 @@ INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_
 (502, 7, '参数配置', 'Param', 2, '&#xe60e;', '/param', 'system/param/index.vue', 2, 1, 1),
 (503, 7, '操作日志', 'Log', 2, '&#xe668;', '/log', 'system/log/index.vue', 3, 1, 1);
 
+--- ------------------------------------------------------------
+--- 按钮级别资源（resource_type=3）
+--- ------------------------------------------------------------
+INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, sort, status) VALUES
+-- 资源管理（parent_id=403）
+(1001, 403, '添加', 'resource:Add', 3, 1, 1),
+(1002, 403, '编辑', 'resource:Edit', 3, 2, 1),
+(1003, 403, '状态', 'resource:Status', 3, 3, 1),
+(1004, 403, '删除', 'resource:Delete', 3, 4, 1),
+-- 角色权限（parent_id=402）
+(1005, 402, '新建角色', 'role:Add', 3, 1, 1),
+(1006, 402, '编辑', 'role:Edit', 3, 2, 1),
+(1007, 402, '状态', 'role:Status', 3, 3, 1),
+(1008, 402, '删除', 'role:Delete', 3, 4, 1),
+(1009, 402, '配置权限', 'role:config', 3, 5, 1),
+-- 医院管理（parent_id=203）
+(1010, 203, '添加', 'hospital:Add', 3, 1, 1),
+(1011, 203, '编辑', 'hospital:Edit', 3, 2, 1),
+(1012, 203, '状态', 'hospital:Status', 3, 3, 1),
+(1013, 203, '删除', 'hospital:Delete', 3, 4, 1),
+-- 科室管理（parent_id=202）
+(1014, 202, '添加', 'hospital-dept:Add', 3, 1, 1),
+(1015, 202, '编辑', 'hospital-dept:Edit', 3, 2, 1),
+(1016, 202, '状态', 'hospital-dept:Status', 3, 3, 1),
+(1017, 202, '删除', 'hospital-dept:Delete', 3, 4, 1),
+-- 医生管理（parent_id=201）
+(1018, 201, '添加', 'doctor:Add', 3, 1, 1),
+(1019, 201, '编辑', 'doctor:Edit', 3, 2, 1),
+(1020, 201, '状态', 'doctor:Status', 3, 3, 1),
+(1021, 201, '删除', 'doctor:Delete', 3, 4, 1),
+-- 医院范围模板管理（parent_id=306）
+(1022, 306, '添加', 'hospital-Temp:Add', 3, 1, 1),
+(1023, 306, '编辑', 'hospital-Temp:Edit', 3, 2, 1),
+(1024, 306, '状态', 'hospital-Temp:Status', 3, 3, 1),
+(1025, 306, '删除', 'hospital-Temp:Delete', 3, 4, 1),
+-- 机构管理（parent_id=301）
+(1026, 301, '添加', 'org:Add', 3, 1, 1),
+(1027, 301, '编辑', 'org:Edit', 3, 2, 1),
+(1028, 301, '状态', 'org:Status', 3, 3, 1),
+(1029, 301, '删除', 'org:Delete', 3, 4, 1),
+-- 部门管理（parent_id=302）
+(1030, 302, '添加', 'department:Add', 3, 1, 1),
+(1031, 302, '编辑', 'department:Edit', 3, 2, 1),
+(1032, 302, '状态', 'department:Status', 3, 3, 1),
+(1033, 302, '删除', 'department:Delete', 3, 4, 1),
+-- 重建项目管理（parent_id=303）
+(1034, 303, '添加', 'project:Add', 3, 1, 1),
+(1035, 303, '编辑', 'project:Edit', 3, 2, 1),
+(1036, 303, '状态', 'project:Status', 3, 3, 1),
+(1037, 303, '删除', 'project:Delete', 3, 4, 1),
+-- 产品管理（parent_id=304）
+(1038, 304, '添加', 'product:Add', 3, 1, 1),
+(1039, 304, '编辑', 'product:Edit', 3, 2, 1),
+(1040, 304, '状态', 'product:Status', 3, 3, 1),
+(1041, 304, '删除', 'product:Delete', 3, 4, 1),
+-- 注册证管理（parent_id=305）
+(1042, 305, '添加', 'registration-cert:Add', 3, 1, 1),
+(1043, 305, '编辑', 'registration-cert:Edit', 3, 2, 1),
+(1044, 305, '状态', 'registration-cert:Status', 3, 3, 1),
+(1045, 305, '删除', 'registration-cert:Delete', 3, 4, 1),
+-- 字典管理（parent_id=501）
+(1046, 501, '添加', 'dict:Add', 3, 1, 1),
+(1047, 501, '编辑', 'dict:Edit', 3, 2, 1),
+(1048, 501, '状态', 'dict:Status', 3, 3, 1),
+(1049, 501, '删除', 'dict:Delete', 3, 4, 1),
+-- 参数配置（parent_id=502）
+(1050, 502, '添加', 'param:Add', 3, 1, 1),
+(1051, 502, '编辑', 'param:Edit', 3, 2, 1),
+(1052, 502, '删除', 'param:Delete', 3, 3, 1),
+-- 操作日志（parent_id=503）
+(1053, 503, '导出Excel', 'log:Export', 3, 1, 1);
+
 
 -- ============================================================
 -- 机构基础数据初始化（sys_org）
@@ -329,6 +401,15 @@ INSERT INTO hospital_dept (hospital_dept_code, hospital_dept_name, sort, status)
 ('HDEPT-0006', '整形科', 6, 1),
 ('HDEPT-0007', '康复科', 7, 1),
 ('HDEPT-0008', '影像科', 8, 1);
+
+
+-- ============================================================
+-- 编码序号同步（sys_code_rule.current_value）
+-- 注意：必须在对应业务表数据插入之后执行，确保 current_value 与实际序号一致
+-- ============================================================
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital) WHERE rule_code = 'HOSPITAL_NO';
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_group_template) WHERE rule_code = 'TEMPLATE_NO';
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_dept) WHERE rule_code = 'HDEPT_NO';
 
 
 -- ============================================================

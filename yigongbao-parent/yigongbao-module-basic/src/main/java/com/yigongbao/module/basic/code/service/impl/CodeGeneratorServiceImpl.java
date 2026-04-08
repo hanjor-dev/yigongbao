@@ -31,7 +31,7 @@ import java.time.LocalDateTime;
 @Slf4j
 public class CodeGeneratorServiceImpl implements CodeGeneratorService {
 
-    private static final int MAX_RETRY_COUNT = 3;
+    private static final int MAX_RETRY_COUNT = 5;
 
     private final CodeRuleMapper codeRuleMapper;
     private final CodeSequenceMapper codeSequenceMapper;
@@ -176,6 +176,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String generateWithSeqSuffix(String ruleCode, String bizKey) {
+        if (!StringUtils.hasText(bizKey)) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "bizKey");
+        }
         try {
             return generateWithSeqSuffixInternal(ruleCode, bizKey, 0);
         } catch (BusinessException e) {
@@ -200,6 +203,8 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             msg = "系统编码服务暂时不可用，" + businessName + "生成失败，请稍后重试";
         } else if (code == ErrorCodeEnum.CODE_GENERATE_FAILED.getCode()) {
             msg = businessName + "生成失败（系统繁忙），请稍后重试";
+        } else if (code == ErrorCodeEnum.CODE_SEQ_OVERFLOW.getCode()) {
+            msg = e.getMessage();
         } else {
             msg = e.getMessage();
         }
@@ -224,7 +229,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
                 log.warn("编码规则不存在，生成失败，返回基础编码，ruleCode={}", ruleCode);
                 return baseCode;
             }
-            String result = rule.getPrefix() + bizPrefix + "-" + baseCode;
+            // baseCode 已包含 rule.prefix，无需重复拼接
+            // 格式：{bizPrefix}-{prefix}{date?}{seq}（无 prefix 时：{bizPrefix}-{seq}）
+            String result = bizPrefix + "-" + baseCode;
             log.info("生成带业务前缀的编码成功，ruleCode={}, bizPrefix={}, result={}", ruleCode, bizPrefix, result);
             return result;
         } catch (Exception e) {
@@ -284,7 +291,10 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         if (sequence == null) {
             sequence = new CodeSequenceEntity();
             sequence.setRuleCode(ruleCode);
-            sequence.setCurrentSeq(0L);
+            // 从 sys_code_rule.current_value 读取初始序号，避免与已有数据编号冲突
+            CodeRuleEntity rule = codeRuleMapper.selectByRuleCode(ruleCode);
+            long initSeq = (rule != null && rule.getCurrentValue() != null) ? rule.getCurrentValue() : 0L;
+            sequence.setCurrentSeq(initSeq);
             sequence.setLastDate(LocalDate.now());
             sequence.setVersion(0);
             codeSequenceMapper.insert(sequence);
@@ -309,7 +319,10 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             sequence = new CodeSequenceEntity();
             sequence.setRuleCode(ruleCode);
             sequence.setBizKey(bizKey);
-            sequence.setCurrentSeq(0L);
+            // 从 sys_code_rule.current_value 读取初始序号（用于已有数据场景）
+            CodeRuleEntity rule = codeRuleMapper.selectByRuleCode(ruleCode);
+            long initSeq = (rule != null && rule.getCurrentValue() != null) ? rule.getCurrentValue() : 0L;
+            sequence.setCurrentSeq(initSeq);
             sequence.setLastDate(LocalDate.now());
             sequence.setVersion(0);
             codeSequenceMapper.insert(sequence);
@@ -393,6 +406,12 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 格式化序号
      */
     private String formatSeq(int length, Long seq) {
+        // 序号超出可表示范围时抛出明确错误，避免生成畸形编码
+        long maxSeq = (long) Math.pow(10, length) - 1;
+        if (seq > maxSeq) {
+            log.error("序号溢出，seqLength={}, seq={}, maxSeq={}", length, seq, maxSeq);
+            throw new BusinessException(ErrorCodeEnum.CODE_SEQ_OVERFLOW);
+        }
         String seqStr = String.valueOf(seq);
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < length - seqStr.length(); i++) {

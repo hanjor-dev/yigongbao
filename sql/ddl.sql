@@ -570,8 +570,9 @@ CREATE TABLE sys_code_rule (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_rule_code (rule_code)
+    KEY idx_code_rule_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='编码规则表';
+CREATE UNIQUE INDEX uk_code_rule_code ON sys_code_rule ((CASE WHEN is_deleted = 0 THEN rule_code ELSE NULL END));
 
 -- ============================================================
 -- 编码序号表（sys_code_sequence）
@@ -683,9 +684,9 @@ CREATE TABLE hospital_dept (
     is_deleted           TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_hospital_dept_code (hospital_dept_code),
     KEY idx_hospital_dept_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院科室表';
+CREATE UNIQUE INDEX uk_hospital_dept_code ON hospital_dept ((CASE WHEN is_deleted = 0 THEN hospital_dept_code ELSE NULL END));
 
 
 -- ============================================================
@@ -717,6 +718,7 @@ CREATE TABLE doctor (
     KEY idx_doctor_creator (creator_id),
     KEY idx_doctor_name (doctor_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医生表';
+CREATE UNIQUE INDEX uk_doctor_name ON doctor ((CASE WHEN is_deleted = 0 THEN doctor_name ELSE NULL END));
 
 
 -- ============================================================

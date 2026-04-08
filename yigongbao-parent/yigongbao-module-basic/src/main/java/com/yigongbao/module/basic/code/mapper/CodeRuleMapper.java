@@ -21,6 +21,6 @@ public interface CodeRuleMapper extends BaseMapper<CodeRuleEntity> {
      * @param ruleCode 规则编码
      * @return 编码规则
      */
-    @Select("SELECT * FROM sys_code_rule WHERE rule_code = #{ruleCode}")
+    @Select("SELECT * FROM sys_code_rule WHERE rule_code = #{ruleCode} AND is_deleted = 0")
     CodeRuleEntity selectByRuleCode(@Param("ruleCode") String ruleCode);
 }
