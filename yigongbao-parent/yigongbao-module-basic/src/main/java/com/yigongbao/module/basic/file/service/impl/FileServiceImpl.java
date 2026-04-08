@@ -16,6 +16,8 @@ import org.dromara.x.file.storage.core.Downloader;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import cn.hutool.core.collection.CollUtil;
+
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -87,6 +89,16 @@ public class FileServiceImpl implements FileService {
             log.error("查询文件信息异常，id={}", id, e);
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
+    }
+
+    @Override
+    public List<FileVO> listByIds(List<String> ids) {
+        log.info("批量查询文件信息，ids={}", ids);
+        if (CollUtil.isEmpty(ids)) {
+            return List.of();
+        }
+        List<FileDetail> details = fileRecorderService.listByIds(ids);
+        return details.stream().map(fileRecorderService::toFileVO).toList();
     }
 
     @Override

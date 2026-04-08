@@ -6,50 +6,58 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.constant.CodeRuleConstants;
-import com.yigongbao.common.constant.DictCodeConstants;
-import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.enums.DataScopeTypeEnum;
+import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
+import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
-import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.operator.FlowOperator;
-import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
 import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
-import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
+import com.yigongbao.module.order.dto.order.OrderPageDTO;
 import com.yigongbao.module.order.dto.order.UpdateOrderDTO;
 import com.yigongbao.module.order.entity.OrderDraftEntity;
+import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
-import com.yigongbao.module.order.entity.OrderFileEntity;
+import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.mapper.OrderDraftMapper;
+import com.yigongbao.module.order.mapper.OrderFileMapper;
 import com.yigongbao.module.order.mapper.OrderItemDraftMapper;
 import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
-import com.yigongbao.module.order.mapper.OrderFileMapper;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
 import com.yigongbao.module.system.config.service.ConfigService;
-import com.yigongbao.module.system.user.service.UserService;
 import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.service.UserHospitalService;
+import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -89,6 +97,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final FlowFacade flowFacade;
     private final ConfigService configService;
     private final UserService userService;
+    private final UserHospitalService userHospitalService;
+    private final OrderQueryHelper orderQueryHelper;
+    private final ObjectMapper objectMapper;
 
     // ==================== 私有方法 ====================
 
@@ -110,32 +121,111 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
     /**
      * 分页查询订单列表
-     * 仅查询订单阶段（phase=1）的订单，按创建时间倒序排列
+     * 支持多维度筛选，查询结果受当前用户的数据权限（dataScopeType）控制：
+     * - ALL：全部可见
+     * - ORG：仅本机构
+     * - HOSPITALS：仅关联医院
+     * - SELF：仅自己创建的
+     * 固定只查询订单阶段（phase=ORDER）数据。
      *
-     * @param pageNum 页码（默认1）
-     * @param pageSize 每页条数（默认10）
-     * @param orderCode 订单编号（可选，模糊查询）
-     * @param hospitalId 医院ID（可选）
-     * @param status 状态（可选）
+     * @param dto 查询参数
      * @return 分页后的订单列表
      */
     @Override
-    public IPage<OrderListVO> listOrders(Integer pageNum, Integer pageSize, String orderCode, Long hospitalId, Integer status) {
+    public IPage<OrderListVO> listOrders(OrderPageDTO dto) {
         log.info("分页查询订单列表，pageNum={}, pageSize={}, orderCode={}, hospitalId={}, status={}",
-                pageNum, pageSize, orderCode, hospitalId, status);
+                dto.getPageNum(), dto.getPageSize(), dto.getOrderCode(), dto.getHospitalId(), dto.getStatus());
         try {
-            // 构建分页对象
-            Page<OrderMainEntity> page = new Page<>(pageNum, pageSize);
-            // 构建查询条件：限定订单阶段=1，支持订单编号模糊查询
+            Long currentUserId = getCurrentUserId();
+            // 获取当前用户的数据权限类型（从角色表读取）
+            DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+            log.info("当前用户数据权限，userId={}, scopeType={}", currentUserId, scopeType);
+
             LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StrUtil.isNotBlank(orderCode), OrderMainEntity::getOrderCode, orderCode)
-                    .eq(Objects.nonNull(hospitalId), OrderMainEntity::getHospitalId, hospitalId)
-                    .eq(Objects.nonNull(status), OrderMainEntity::getStatus, status)
-                    .eq(OrderMainEntity::getPhase, 1)
-                    .orderByDesc(OrderMainEntity::getCreateTime);
-            // 执行分页查询并转换为 VO
+
+            // 注入数据权限过滤条件
+            orderQueryHelper.buildDataScopeCondition(wrapper, currentUserId, scopeType);
+
+            // hospitalId 参数处理：HOSPITALS 类型需校验是否在权限范围内
+            if (dto.getHospitalId() != null) {
+                if (scopeType == DataScopeTypeEnum.HOSPITALS) {
+                    List<Long> userHospitalIds = userHospitalService.getHospitalIdsByUserId(currentUserId);
+                    if (!userHospitalIds.contains(dto.getHospitalId())) {
+                        // 传入的 hospitalId 超出权限范围，返回空页，不报错
+                        log.warn("传入的医院ID不在用户权限范围内，返回空页，userId={}, hospitalId={}", currentUserId, dto.getHospitalId());
+                        Page<OrderListVO> emptyPage = new Page<>(dto.getPageNum(), dto.getPageSize(), 0);
+                        emptyPage.setRecords(new ArrayList<>());
+                        return emptyPage;
+                    }
+                }
+                wrapper.eq(OrderMainEntity::getHospitalId, dto.getHospitalId());
+            }
+
+            // 追加其他过滤条件
+            wrapper.like(StrUtil.isNotBlank(dto.getOrderCode()), OrderMainEntity::getOrderCode, dto.getOrderCode())
+                    .eq(Objects.nonNull(dto.getAreaId()), OrderMainEntity::getAreaId, dto.getAreaId())
+                    .like(StrUtil.isNotBlank(dto.getDoctorName()), OrderMainEntity::getDoctorName, dto.getDoctorName())
+                    .like(StrUtil.isNotBlank(dto.getPatientName()), OrderMainEntity::getPatientName, dto.getPatientName())
+                    .eq(StrUtil.isNotBlank(dto.getBusinessType()), OrderMainEntity::getBusinessType, dto.getBusinessType())
+                    .eq(Objects.nonNull(dto.getOperatorId()), OrderMainEntity::getOperatorId, dto.getOperatorId())
+                    .eq(Objects.nonNull(dto.getStatus()), OrderMainEntity::getStatus, dto.getStatus())
+                    .eq(Objects.nonNull(dto.getPhase()), OrderMainEntity::getPhase, dto.getPhase())
+                    .ge(Objects.nonNull(dto.getCreateTimeStart()), OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
+                    .le(Objects.nonNull(dto.getCreateTimeEnd()), OrderMainEntity::getCreateTime, dto.getCreateTimeEnd());
+
+            // bodyPartIds 过滤：先查 order_item 得到 orderIds，再用 MP in 条件（避免手写 SQL）
+            if (dto.getBodyPartIds() != null && !dto.getBodyPartIds().isEmpty()) {
+                List<Long> orderIdsByBodyPart = orderItemMapper.selectList(
+                                new LambdaQueryWrapper<OrderItemEntity>()
+                                        .select(OrderItemEntity::getOrderId)
+                                        .in(OrderItemEntity::getBodyPartId, dto.getBodyPartIds())
+                                        .eq(OrderItemEntity::getIsDeleted, 0))
+                        .stream().map(OrderItemEntity::getOrderId).distinct().collect(Collectors.toList());
+                if (orderIdsByBodyPart.isEmpty()) {
+                    // 没有匹配明细，直接返回空页
+                    Page<OrderListVO> emptyPage = new Page<>(dto.getPageNum(), dto.getPageSize(), 0);
+                    emptyPage.setRecords(new ArrayList<>());
+                    return emptyPage;
+                }
+                wrapper.in(OrderMainEntity::getId, orderIdsByBodyPart);
+            }
+
+            // projectIds 过滤：同上，先查 order_item 得到 orderIds，再用 MP in 条件
+            if (dto.getProjectIds() != null && !dto.getProjectIds().isEmpty()) {
+                List<Long> orderIdsByProject = orderItemMapper.selectList(
+                                new LambdaQueryWrapper<OrderItemEntity>()
+                                        .select(OrderItemEntity::getOrderId)
+                                        .in(OrderItemEntity::getProjectId, dto.getProjectIds())
+                                        .eq(OrderItemEntity::getIsDeleted, 0))
+                        .stream().map(OrderItemEntity::getOrderId).distinct().collect(Collectors.toList());
+                if (orderIdsByProject.isEmpty()) {
+                    // 没有匹配明细，直接返回空页
+                    Page<OrderListVO> emptyPage = new Page<>(dto.getPageNum(), dto.getPageSize(), 0);
+                    emptyPage.setRecords(new ArrayList<>());
+                    return emptyPage;
+                }
+                wrapper.in(OrderMainEntity::getId, orderIdsByProject);
+            }
+
+            // 动态排序（白名单校验，防 SQL 注入）
+            orderQueryHelper.applySort(wrapper, dto.getSortField(), dto.getSortOrder());
+
+            // 执行分页查询
+            Page<OrderMainEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
             IPage<OrderMainEntity> pageResult = page(page, wrapper);
-            IPage<OrderListVO> voPage = pageResult.convert(this::toOrderListVO);
+
+            // 转换为 VO（使用 OrderQueryHelper，含字段翻译）
+            List<OrderListVO> voList = pageResult.getRecords().stream()
+                    .map(orderQueryHelper::toOrderListVO)
+                    .collect(Collectors.toList());
+
+            // 批量填充重建项目列表（避免 N+1）
+            orderQueryHelper.fillRebuildProjectList(voList);
+
+            // 构建返回页（复用分页元信息，替换 records）
+            IPage<OrderListVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
+            ((Page<OrderListVO>) voPage).setRecords(voList);
+
             log.info("分页查询订单列表成功，总数={}", pageResult.getTotal());
             return voPage;
         } catch (Exception e) {
@@ -310,10 +400,17 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            // 删除订单主表（物理删除）
+            // 只允许删除草稿状态（status=10）的订单，正式提交后的订单不可删除
+            if (!FlowStatusEnum.DRAFT.getValue().equals(entity.getStatus())) {
+                log.warn("非草稿状态订单不允许删除，id={}, status={}", id, entity.getStatus());
+                throw new BusinessException(ErrorCodeEnum.ORDER_CANNOT_DELETE);
+            }
+            // 删除订单主表（软删除）
             removeById(id);
             // 清理关联明细
             orderItemMapper.delete(new LambdaQueryWrapper<OrderItemEntity>().eq(OrderItemEntity::getOrderId, id));
+            // 清理关联文件记录（软删除）
+            orderFileMapper.delete(new LambdaQueryWrapper<OrderFileEntity>().eq(OrderFileEntity::getOrderId, id));
             log.info("删除订单成功，id={}", id);
         } catch (BusinessException e) {
             throw e;
@@ -729,9 +826,14 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      * @throws BusinessException 存在文件不存在时抛出
      */
     private void validateFileIdsExist(List<String> fileIds, String fileCategoryName) {
+        if (fileIds == null || fileIds.isEmpty()) {
+            return;
+        }
+        // 批量查询，1次查询替代 N 次
+        List<FileVO> found = fileService.listByIds(fileIds);
+        Set<String> foundIds = found.stream().map(FileVO::getId).collect(Collectors.toSet());
         for (String fileId : fileIds) {
-            FileVO file = fileService.getById(fileId);
-            if (file == null) {
+            if (!foundIds.contains(fileId)) {
                 log.warn("{} 文件不存在，fileId={}", fileCategoryName, fileId);
                 throw new BusinessException(ErrorCodeEnum.ORDER_FILE_NOT_FOUND, fileCategoryName);
             }
@@ -832,27 +934,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     }
 
     /**
-     * 实体转换为订单列表 VO
-     *
-     * @param entity 订单实体
-     * @return 订单列表 VO
-     */
-    private OrderListVO toOrderListVO(OrderMainEntity entity) {
-        OrderListVO vo = new OrderListVO();
-        vo.setId(entity.getId());
-        vo.setOrderCode(entity.getOrderCode());
-        vo.setOrderType(entity.getOrderType());
-        vo.setNeedsPhysicalDelivery(entity.getNeedsPhysicalDelivery());
-        vo.setBusinessType(entity.getBusinessType());
-        vo.setHospitalName(entity.getHospitalName());
-        vo.setPatientName(entity.getPatientName());
-        vo.setPhase(entity.getPhase());
-        vo.setStatus(entity.getStatus());
-        vo.setCreateTime(entity.getCreateTime());
-        return vo;
-    }
-
-    /**
      * 实体转换为订单详情 VO
      *
      * @param entity 订单实体
@@ -861,26 +942,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private OrderDetailVO toOrderDetailVO(OrderMainEntity entity) {
         OrderDetailVO vo = new OrderDetailVO();
         BeanUtils.copyProperties(entity, vo);
-        // 补充性别显示名称
-        vo.setPatientGenderName(getGenderName(entity.getPatientGender()));
+        // 补充展示名称字段（通过 OrderQueryHelper 统一翻译，与列表 VO 保持一致）
+        orderQueryHelper.fillDisplayNames(entity, vo);
         return vo;
-    }
-
-    /**
-     * 获取性别名称
-     *
-     * @param gender 性别编码
-     * @return 性别名称
-     */
-    private String getGenderName(String gender) {
-        if (StrUtil.isBlank(gender)) {
-            return null;
-        }
-        return switch (gender) {
-            case DictCodeConstants.PATIENT_GENDER_MALE -> "男";
-            case DictCodeConstants.PATIENT_GENDER_FEMALE -> "女";
-            default -> null;
-        };
     }
 
     /**
@@ -893,5 +957,64 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         OrderDetailVO.OrderItemVO vo = new OrderDetailVO.OrderItemVO();
         BeanUtils.copyProperties(entity, vo);
         return vo;
+    }
+
+    // ==================== 列配置 ====================
+
+    /**
+     * 获取当前用户的列配置（个人配置 > 系统默认）
+     *
+     * @return 列配置 VO，均未配置时返回 null
+     */
+    @Override
+    public OrderColumnConfigVO getColumnConfig() {
+        log.info("获取当前用户列配置");
+        return orderQueryHelper.getColumnConfig();
+    }
+
+    /**
+     * 保存当前用户的列配置
+     * 将配置序列化为 JSON，存入 sys_user.column_settings 字段
+     *
+     * @param config 列配置 VO
+     * @throws BusinessException 序列化失败时抛出
+     */
+    @Override
+    public void saveColumnConfig(OrderColumnConfigVO config) {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCodeEnum.UNAUTHORIZED);
+        }
+        log.info("保存用户列配置，userId={}", currentUserId);
+        try {
+            // 序列化为 JSON 字符串
+            String json = objectMapper.writeValueAsString(config);
+            // 更新 UserEntity.columnSettings 字段
+            UserEntity user = new UserEntity();
+            user.setId(currentUserId);
+            user.setColumnSettings(json);
+            userService.updateById(user);
+            log.info("保存用户列配置成功，userId={}", currentUserId);
+        } catch (JsonProcessingException e) {
+            log.error("序列化列配置失败，userId={}", currentUserId, e);
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "列配置格式非法");
+        }
+    }
+
+    /**
+     * 重置当前用户列配置（删除个人配置，恢复系统默认）
+     */
+    @Override
+    public void resetColumnConfig() {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCodeEnum.UNAUTHORIZED);
+        }
+        log.info("重置用户列配置，userId={}", currentUserId);
+        UserEntity user = new UserEntity();
+        user.setId(currentUserId);
+        user.setColumnSettings(null);
+        userService.updateById(user);
+        log.info("重置用户列配置成功，userId={}", currentUserId);
     }
 }

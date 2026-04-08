@@ -171,6 +171,12 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             return new PhaseAndStatus(FlowPhaseEnum.POST_PROCESSING, FlowStatusEnum.POST_PROCESSING);
         }
 
+        // 后处理完成 → 进入质检阶段，初始状态为 QC_IN_PROGRESS
+        if (targetStatus == FlowStatusEnum.QC_IN_PROGRESS
+                && action == FlowActionEnum.COMPLETE_POST_PROCESSING) {
+            return new PhaseAndStatus(FlowPhaseEnum.QC, FlowStatusEnum.QC_IN_PROGRESS);
+        }
+
         // 质检合格 → 进入仓储阶段，初始状态为 WAREHOUSE_IN
         if (targetStatus == FlowStatusEnum.QC_PASSED) {
             return new PhaseAndStatus(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.WAREHOUSE_IN);
@@ -211,8 +217,8 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
     public static boolean isPhaseChangeAction(FlowActionEnum action) {
         return switch (action) {
             case DATA_AUDIT_PASS, DESIGN_REVIEW_PASS, COMPLETE_PRINT,
-                 COMPLETE_POST_PROCESSING, QC_PASS, COMPLETE_WAREHOUSE_IN,
-                 USER_CONFIRM -> true;
+                 COMPLETE_POST_PROCESSING, QC_PASS, REWORK_COMPLETE,
+                 COMPLETE_WAREHOUSE_IN, USER_CONFIRM -> true;
             default -> false;
         };
     }

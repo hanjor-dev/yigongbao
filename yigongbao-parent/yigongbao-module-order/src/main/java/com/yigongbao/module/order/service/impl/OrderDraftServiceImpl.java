@@ -107,24 +107,25 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
 
             // 查询每个草稿的明细数量
             List<OrderDraftEntity> records = pageResult.getRecords();
+            Map<Long, Long> itemCountMap = new java.util.HashMap<>();
             if (!records.isEmpty()) {
                 List<Long> draftIds = records.stream().map(OrderDraftEntity::getId).collect(Collectors.toList());
-                Map<Long, Long> itemCountMap = orderItemDraftMapper.selectList(
+                itemCountMap = orderItemDraftMapper.selectList(
                                 new LambdaQueryWrapper<OrderItemDraftEntity>()
                                         .in(OrderItemDraftEntity::getDraftId, draftIds)
                                         .eq(OrderItemDraftEntity::getIsDeleted, 0))
                         .stream()
                         .collect(Collectors.groupingBy(OrderItemDraftEntity::getDraftId, Collectors.counting()));
-                // 填充到 VO
-                for (OrderDraftEntity entity : records) {
-                    OrderDraftVO vo = toOrderDraftVO(entity);
-                    vo.setItemCount(itemCountMap.getOrDefault(entity.getId(), 0L).intValue());
-                    vo.setExpiresAt(entity.getExpiresAt());
-                    vo.setStatusName(getDraftStatusName(entity.getStatus()));
-                }
             }
 
-            IPage<OrderDraftVO> voPage = pageResult.convert(this::toOrderDraftVO);
+            // 在 convert lambda 中填充计算字段，确保数据正确传入 VO
+            final Map<Long, Long> finalItemCountMap = itemCountMap;
+            IPage<OrderDraftVO> voPage = pageResult.convert(entity -> {
+                OrderDraftVO vo = toOrderDraftVO(entity);
+                vo.setItemCount(finalItemCountMap.getOrDefault(entity.getId(), 0L).intValue());
+                vo.setStatusName(getDraftStatusName(entity.getStatus()));
+                return vo;
+            });
             log.info("分页查询我的草稿列表成功，总数={}", pageResult.getTotal());
             return voPage;
         } catch (Exception e) {
@@ -264,6 +265,10 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
                 throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_FOUND);
             }
             // 校验权限：只有创建人能删除
+            if (currentUserId == null) {
+                log.warn("未登录，无法删除草稿，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.UNAUTHORIZED);
+            }
             if (!currentUserId.equals(entity.getOperatorId())) {
                 log.warn("只能删除自己的草稿，id={}, operatorId={}, currentUserId={}",
                         id, entity.getOperatorId(), currentUserId);

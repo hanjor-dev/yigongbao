@@ -20,6 +20,8 @@ import com.yigongbao.module.basic.doctor.service.DoctorService;
 import com.yigongbao.module.basic.doctor.vo.DoctorVO;
 import com.yigongbao.module.basic.hospital.service.HospitalService;
 import com.yigongbao.module.basic.hospitalDept.service.HospitalDeptService;
+import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
+import com.yigongbao.module.basic.hospitalDept.entity.HospitalDeptEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -28,8 +30,12 @@ import org.springframework.transaction.annotation.Transactional;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 医生 Service 实现类
@@ -64,11 +70,12 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
 
             IPage<DoctorEntity> pageResult = page(page, wrapper);
 
-            IPage<DoctorVO> voPage = pageResult.convert(entity -> {
-                DoctorVO vo = DoctorConvert.toVO(entity);
-                fillExtraFields(vo, entity);
-                return vo;
-            });
+            // 批量填充医院名称和科室名称，避免 N+1 查询
+            List<DoctorEntity> records = pageResult.getRecords();
+            List<DoctorVO> voList = records.stream().map(DoctorConvert::toVO).collect(Collectors.toList());
+            fillExtraFieldsBatch(voList, records);
+            Page<DoctorVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
+            voPage.setRecords(voList);
 
             log.info("分页查询医生列表成功，总数={}", pageResult.getTotal());
             return voPage;
@@ -92,11 +99,9 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
                     .orderByDesc(DoctorEntity::getCreateTime);
 
             List<DoctorEntity> list = list(wrapper);
-            List<DoctorVO> voList = list.stream().map(entity -> {
-                DoctorVO vo = DoctorConvert.toVO(entity);
-                fillExtraFields(vo, entity);
-                return vo;
-            }).toList();
+            List<DoctorVO> voList = list.stream().map(DoctorConvert::toVO).collect(Collectors.toList());
+            // 批量填充医院名称和科室名称，避免 N+1 查询
+            fillExtraFieldsBatch(voList, list);
 
             log.info("查询所有医生列表成功，数量={}", voList.size());
             return voList;
@@ -235,11 +240,9 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             wrapper.like(StrUtil.isNotBlank(dto.getKeyword()), DoctorEntity::getDoctorName, dto.getKeyword());
             wrapper.orderByDesc(DoctorEntity::getCreateTime);
             List<DoctorEntity> list = baseMapper.selectList(wrapper);
-            List<DoctorVO> voList = list.stream().map(entity -> {
-                DoctorVO vo = DoctorConvert.toVO(entity);
-                fillExtraFields(vo, entity);
-                return vo;
-            }).toList();
+            List<DoctorVO> voList = list.stream().map(DoctorConvert::toVO).collect(Collectors.toList());
+            // 批量填充医院名称和科室名称，避免 N+1 查询
+            fillExtraFieldsBatch(voList, list);
             log.info("查询历史医生列表成功，数量={}", voList.size());
             return voList;
         } catch (Exception e) {
@@ -325,7 +328,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
     }
 
     /**
-     * 填充额外字段
+     * 填充额外字段（单条场景，用于 getById、quickAdd 等）
      */
     private void fillExtraFields(DoctorVO vo, DoctorEntity entity) {
         if (entity.getStatus() != null) {
@@ -349,6 +352,48 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
                 }
             } catch (Exception e) {
                 log.debug("获取科室信息失败，hospitalDeptId={}", entity.getHospitalDeptId());
+            }
+        }
+    }
+
+    /**
+     * 批量填充额外字段（列表场景，避免 N+1 查询）
+     * 对医院和科室各执行一次 IN 查询，替代原来对每条记录的单独查询
+     */
+    private void fillExtraFieldsBatch(List<DoctorVO> voList, List<DoctorEntity> entities) {
+        if (voList == null || voList.isEmpty()) {
+            return;
+        }
+        // 收集所有需要查询的医院ID和科室ID
+        Set<Long> hospitalIds = entities.stream()
+                .map(DoctorEntity::getHospitalId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<Long> deptIds = entities.stream()
+                .map(DoctorEntity::getHospitalDeptId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // 批量查询医院和科室（各1次 IN 查询）
+        Map<Long, String> hospitalNameMap = hospitalIds.isEmpty() ? Collections.emptyMap() :
+                hospitalService.listByIds(hospitalIds).stream()
+                        .collect(Collectors.toMap(HospitalEntity::getId, HospitalEntity::getHospitalName));
+        Map<Long, String> deptNameMap = deptIds.isEmpty() ? Collections.emptyMap() :
+                hospitalDeptService.listByIds(deptIds).stream()
+                        .collect(Collectors.toMap(HospitalDeptEntity::getId, HospitalDeptEntity::getHospitalDeptName));
+
+        // 批量填充 VO
+        for (int i = 0; i < voList.size(); i++) {
+            DoctorVO vo = voList.get(i);
+            DoctorEntity entity = entities.get(i);
+            if (entity.getStatus() != null) {
+                vo.setStatusName(StatusConstants.getStatusName(entity.getStatus()));
+            }
+            if (entity.getHospitalId() != null) {
+                vo.setHospitalName(hospitalNameMap.get(entity.getHospitalId()));
+            }
+            if (entity.getHospitalDeptId() != null) {
+                vo.setHospitalDeptName(deptNameMap.get(entity.getHospitalDeptId()));
             }
         }
     }

@@ -6,14 +6,19 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.module.order.dto.draft.CreateOrderDraftDTO;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
+import com.yigongbao.module.order.dto.order.OrderExportQueryDTO;
+import com.yigongbao.module.order.dto.order.OrderPageDTO;
 import com.yigongbao.module.order.service.OrderDraftService;
+import com.yigongbao.module.order.service.OrderExportService;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.draft.OrderDraftDetailVO;
 import com.yigongbao.module.order.vo.draft.OrderDraftVO;
+import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -34,6 +39,7 @@ public class OrderController {
 
     private final OrderDraftService orderDraftService;
     private final OrderMainService orderMainService;
+    private final OrderExportService orderExportService;
 
     // ==================== 草稿接口 ====================
 
@@ -82,14 +88,9 @@ public class OrderController {
     }
 
     @Operation(summary = "分页查询订单列表")
-    @GetMapping("/list")
-    public Result<IPage<OrderListVO>> listOrders(
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String orderCode,
-            @RequestParam(required = false) Long hospitalId,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(orderMainService.listOrders(pageNum, pageSize, orderCode, hospitalId, status));
+    @PostMapping("/page")
+    public Result<IPage<OrderListVO>> listOrders(@RequestBody OrderPageDTO dto) {
+        return Result.success(orderMainService.listOrders(dto));
     }
 
     @Operation(summary = "查询订单详情")
@@ -137,5 +138,35 @@ public class OrderController {
     public Result<Void> removeOrder(@PathVariable Long id) {
         orderMainService.removeOrder(id);
         return Result.success();
+    }
+
+    // ==================== 列配置接口 ====================
+
+    @Operation(summary = "获取当前用户列配置")
+    @GetMapping("/column-config")
+    public Result<OrderColumnConfigVO> getColumnConfig() {
+        return Result.success(orderMainService.getColumnConfig());
+    }
+
+    @Operation(summary = "保存用户列配置")
+    @PutMapping("/column-config")
+    public Result<Void> saveColumnConfig(@RequestBody OrderColumnConfigVO config) {
+        orderMainService.saveColumnConfig(config);
+        return Result.success();
+    }
+
+    @Operation(summary = "重置用户列配置（恢复系统默认）")
+    @DeleteMapping("/column-config")
+    public Result<Void> resetColumnConfig() {
+        orderMainService.resetColumnConfig();
+        return Result.success();
+    }
+
+    // ==================== 导出接口 ====================
+
+    @Operation(summary = "导出订单列表（Excel）")
+    @PostMapping("/export")
+    public void exportOrders(@RequestBody OrderExportQueryDTO dto, HttpServletResponse response) {
+        orderExportService.exportOrders(dto, response);
     }
 }

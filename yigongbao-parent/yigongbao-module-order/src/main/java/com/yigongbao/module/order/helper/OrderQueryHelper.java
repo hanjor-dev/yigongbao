@@ -387,6 +387,8 @@ public class OrderQueryHelper {
         vo.setOrderTypeName(getOrderTypeName(entity.getOrderType()));
         vo.setNeedsPhysicalDeliveryName(getNeedsPhysicalDeliveryName(entity.getNeedsPhysicalDelivery()));
         vo.setPatientGenderName(getGenderName(entity.getPatientGender()));
+        vo.setPhaseName(getPhaseName(entity.getPhase()));
+        vo.setStatusName(getStatusName(entity.getStatus()));
         // OrderDetailVO 无独立 businessTypeName 字段，将翻译后的名称写入 businessType
         vo.setBusinessType(getDictName(entity.getBusinessType()));
     }

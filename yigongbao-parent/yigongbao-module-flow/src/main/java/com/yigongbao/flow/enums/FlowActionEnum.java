@@ -108,6 +108,11 @@ public enum FlowActionEnum {
      */
     REWORK("REWORK", "返工"),
 
+    /**
+     * 返工完成（返工结束后重新进入质检）
+     */
+    REWORK_COMPLETE("REWORK_COMPLETE", "返工完成"),
+
     // ==================== 仓储阶段动作 ====================
     /**
      * 完成入库

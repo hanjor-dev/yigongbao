@@ -209,7 +209,7 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
             throw new BusinessException(ErrorCodeEnum.RESOURCE_HAS_ROLES);
         }
 
-        baseMapper.deleteById(id);
+        removeById(id);
         log.info("删除资源成功，id={}", id);
     }
 

@@ -483,6 +483,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 log.warn("旧密码不正确，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.OLD_PASSWORD_ERROR);
             }
+            // 校验新密码不能与旧密码相同
+            if (passwordEncoder.matches(dto.getNewPassword(), entity.getPassword())) {
+                log.warn("新密码与旧密码相同，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.NEW_PASSWORD_SAME_AS_OLD);
+            }
             // 更新密码
             entity.setPassword(passwordEncoder.encode(dto.getNewPassword()));
             updateById(entity);

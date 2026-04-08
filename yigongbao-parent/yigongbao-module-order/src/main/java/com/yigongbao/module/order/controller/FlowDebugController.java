@@ -15,17 +15,19 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
  * 流转状态机 Debug 控制器
- * 提供状态机开发调试接口，仅开发阶段使用，禁止暴露到外网
+ * 提供状态机开发调试接口，仅开发/测试环境使用，禁止暴露到生产环境
  *
  * @author hanjor
  * @date 2026-04-02
  */
+@Profile({"dev", "test"})
 @RestController
 @RequestMapping("/api/order/debug")
 @RequiredArgsConstructor
@@ -38,14 +40,14 @@ public class FlowDebugController {
     private final OrderMainService orderMainService;
 
     /**
-     * 预览状态转换结果（不落库）
-     * 用于在执行动作前预览转换结果，不实际修改订单状态
+     * 预览状态转换结果（真实执行，落库历史记录）
+     * 注意：此接口会调用完整的状态机流程，包括写入 order_flow_status_history，但不更新订单主表状态
      *
      * @param id 订单ID
      * @param actionCode 动作编码
      * @return 转换结果预览
      */
-    @Operation(summary = "预览状态转换结果（不落库）")
+    @Operation(summary = "预览状态转换结果（执行状态机但不更新订单状态）")
     @GetMapping("/preview")
     public Result<TransitionResult> preview(
             @RequestParam Long id,

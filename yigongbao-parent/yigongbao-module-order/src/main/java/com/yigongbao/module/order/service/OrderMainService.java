@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
+import com.yigongbao.module.order.dto.order.OrderPageDTO;
 import com.yigongbao.module.order.dto.order.UpdateOrderDTO;
 import com.yigongbao.module.order.entity.OrderDraftEntity;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
 
@@ -23,14 +25,10 @@ public interface OrderMainService extends IService<OrderMainEntity> {
     /**
      * 分页查询订单列表
      *
-     * @param pageNum 页码
-     * @param pageSize 每页大小
-     * @param orderCode 订单编号（可选）
-     * @param hospitalId 医院ID（可选）
-     * @param status 状态（可选）
+     * @param dto 查询参数
      * @return 订单列表
      */
-    IPage<OrderListVO> listOrders(Integer pageNum, Integer pageSize, String orderCode, Long hospitalId, Integer status);
+    IPage<OrderListVO> listOrders(OrderPageDTO dto);
 
     /**
      * 查询订单详情
@@ -109,4 +107,23 @@ public interface OrderMainService extends IService<OrderMainEntity> {
      * @return 订单ID
      */
     Long createOrder(CreateOrderDTO dto);
+
+    /**
+     * 获取当前用户的订单列配置（个人配置 > 系统默认）
+     *
+     * @return 列配置 VO，均未配置时返回 null
+     */
+    OrderColumnConfigVO getColumnConfig();
+
+    /**
+     * 保存当前用户的订单列配置
+     *
+     * @param config 列配置 VO
+     */
+    void saveColumnConfig(OrderColumnConfigVO config);
+
+    /**
+     * 重置当前用户列配置（删除个人配置，恢复系统默认）
+     */
+    void resetColumnConfig();
 }

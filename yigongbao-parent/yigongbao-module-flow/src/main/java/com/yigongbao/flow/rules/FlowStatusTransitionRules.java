@@ -98,7 +98,7 @@ public class FlowStatusTransitionRules {
                 Set.of(FlowStatusEnum.REWORK));
 
         transitions.put(statusKey(FlowPhaseEnum.QC, FlowStatusEnum.REWORK),
-                Set.of(FlowStatusEnum.PENDING_PRINT));
+                Set.of(FlowStatusEnum.QC_IN_PROGRESS));
 
         // ==================== 仓储阶段状态转换（60-69）====================
         transitions.put(statusKey(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.WAREHOUSE_IN),
@@ -175,6 +175,7 @@ public class FlowStatusTransitionRules {
                         ? List.of(FlowActionEnum.QC_PASS, FlowActionEnum.QC_FAIL)
                         : List.of();
                 case QC_FAILED -> List.of(FlowActionEnum.REWORK);
+                case REWORK -> List.of(FlowActionEnum.REWORK_COMPLETE);
                 // QC_PASSED 为过渡状态，不会出现在 phase=QC 的订单中（自动推进）
                 default -> List.of();
             };
@@ -259,6 +260,7 @@ public class FlowStatusTransitionRules {
             case QC_PASS -> FlowStatusEnum.QC_PASSED.getValue(); // 自动进入入库
             case QC_FAIL -> FlowStatusEnum.QC_FAILED.getValue();
             case REWORK -> FlowStatusEnum.REWORK.getValue();
+            case REWORK_COMPLETE -> FlowStatusEnum.QC_IN_PROGRESS.getValue();
 
             // 仓储阶段动作
             case COMPLETE_WAREHOUSE_IN -> FlowStatusEnum.WAREHOUSED.getValue();

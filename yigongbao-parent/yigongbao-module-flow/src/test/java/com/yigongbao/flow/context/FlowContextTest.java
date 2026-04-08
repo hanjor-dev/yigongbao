@@ -126,13 +126,17 @@ class FlowContextTest {
     class ValidateNoExcessiveLoopsTests {
 
         @Test
-        @DisplayName("驳回次数=10（边界值） → 不抛出异常")
+        @DisplayName("驳回次数=10（边界值） → 抛出 ORDER_EXCESSIVE_AUDIT_REJECT")
         void auditRejectCount_atBoundary_shouldNotThrow() {
             FlowContext ctx = new FlowContext();
             for (int i = 0; i < 10; i++) {
                 ctx.incrementAuditReject();
             }
-            assertDoesNotThrow(ctx::validateNoExcessiveLoops);
+            BusinessException ex = assertThrows(
+                    BusinessException.class,
+                    ctx::validateNoExcessiveLoops
+            );
+            assertEquals(ErrorCodeEnum.ORDER_EXCESSIVE_AUDIT_REJECT.getCode(), ex.getCode());
         }
 
         @Test
@@ -151,13 +155,17 @@ class FlowContextTest {
         }
 
         @Test
-        @DisplayName("返工次数=5（边界值） → 不抛出异常")
+        @DisplayName("返工次数=5（边界值） → 抛出 ORDER_EXCESSIVE_REWORK")
         void reworkCount_atBoundary_shouldNotThrow() {
             FlowContext ctx = new FlowContext();
             for (int i = 0; i < 5; i++) {
                 ctx.incrementRework();
             }
-            assertDoesNotThrow(ctx::validateNoExcessiveLoops);
+            BusinessException ex = assertThrows(
+                    BusinessException.class,
+                    ctx::validateNoExcessiveLoops
+            );
+            assertEquals(ErrorCodeEnum.ORDER_EXCESSIVE_REWORK.getCode(), ex.getCode());
         }
 
         @Test
@@ -176,13 +184,17 @@ class FlowContextTest {
         }
 
         @Test
-        @DisplayName("设计审核驳回次数=5（边界值） → 不抛出异常")
+        @DisplayName("设计审核驳回次数=5（边界值） → 抛出 ORDER_EXCESSIVE_DESIGN_REJECT")
         void designRejectCount_atBoundary_shouldNotThrow() {
             FlowContext ctx = new FlowContext();
             for (int i = 0; i < 5; i++) {
                 ctx.incrementDesignReject();
             }
-            assertDoesNotThrow(ctx::validateNoExcessiveLoops);
+            BusinessException ex = assertThrows(
+                    BusinessException.class,
+                    ctx::validateNoExcessiveLoops
+            );
+            assertEquals(ErrorCodeEnum.ORDER_EXCESSIVE_DESIGN_REJECT.getCode(), ex.getCode());
         }
 
         @Test
@@ -300,11 +312,11 @@ class FlowContextTest {
         }
 
         @Test
-        @DisplayName("从历史重建上下文后校验通过")
+        @DisplayName("从历史重建上下文后校验通过（9次驳回，未达上限）")
         void rebuildFromHistory_shouldPassValidation() {
-            // 构造包含10次驳回的假历史（边界值）
+            // 构造包含9次驳回的假历史（未达上限）
             List<String> history = new ArrayList<>();
-            for (int i = 0; i < 10; i++) {
+            for (int i = 0; i < 9; i++) {
                 history.add("DATA_AUDIT_REJECT");
             }
             FlowContext ctx = FlowContext.buildFromHistory(history);

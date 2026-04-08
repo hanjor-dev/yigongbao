@@ -54,6 +54,14 @@ public interface FileService {
     FileVO getById(String id);
 
     /**
+     * 根据ID列表批量查询文件
+     *
+     * @param ids 文件ID列表
+     * @return 文件列表（不存在的ID不会出现在结果中）
+     */
+    List<FileVO> listByIds(List<String> ids);
+
+    /**
      * 查询业务关联文件列表
      *
      * @param bizType 业务类型（字典 dict_code）

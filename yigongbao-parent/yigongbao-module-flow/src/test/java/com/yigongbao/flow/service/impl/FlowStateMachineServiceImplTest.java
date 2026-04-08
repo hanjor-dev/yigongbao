@@ -383,9 +383,9 @@ class FlowStateMachineServiceImplTest {
         }
 
         @Test
-        @DisplayName("驳回次数达边界值（9次）→ 不抛异常，正常执行")
+        @DisplayName("驳回次数达边界值（历史9次+本次=10次）→ 抛出 ORDER_EXCESSIVE_AUDIT_REJECT")
         void auditRejectAtBoundary_shouldNotThrow() {
-            // 模拟历史中已有9次驳回（在边界内）
+            // 模拟历史中已有9次驳回，本次执行后刚好达到上限（10次），应抛出异常
             testOrder.setPhase(1);
             testOrder.setStatus(11);
             testOrder.setNeedsPhysicalDelivery(1);
@@ -393,12 +393,12 @@ class FlowStateMachineServiceImplTest {
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(historyWith9Rejects);
 
-            TransitionResult result = flowStateMachineService.executeTransition(
-                    1L, FlowActionEnum.DATA_AUDIT_REJECT, testOperator);
-
-            assertFalse(result.isPhaseChanged());
-            assertEquals(1, result.getTargetPhase());
-            assertEquals(13, result.getFinalStatus());
+            BusinessException ex = assertThrows(
+                    BusinessException.class,
+                    () -> flowStateMachineService.executeTransition(
+                            1L, FlowActionEnum.DATA_AUDIT_REJECT, testOperator)
+            );
+            assertEquals(ErrorCodeEnum.ORDER_EXCESSIVE_AUDIT_REJECT.getCode(), ex.getCode());
         }
     }
 

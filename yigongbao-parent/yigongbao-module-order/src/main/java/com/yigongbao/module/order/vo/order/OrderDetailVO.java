@@ -199,9 +199,19 @@ public class OrderDetailVO implements Serializable {
     private Integer phase;
 
     /**
+     * 当前阶段名称（补充显示）
+     */
+    private String phaseName;
+
+    /**
      * 当前状态
      */
     private Integer status;
+
+    /**
+     * 当前状态名称（补充显示）
+     */
+    private String statusName;
 
     // ==================== 当前处理人 ====================
     /**

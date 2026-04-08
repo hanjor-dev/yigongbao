@@ -81,17 +81,17 @@ public class FlowContext {
      * @throws BusinessException 超出上限时抛出
      */
     public void validateNoExcessiveLoops() {
-        if (auditRejectCount > MAX_AUDIT_REJECT) {
+        if (auditRejectCount >= MAX_AUDIT_REJECT) {
             throw new BusinessException(
                     ErrorCodeEnum.ORDER_EXCESSIVE_AUDIT_REJECT,
                     String.valueOf(MAX_AUDIT_REJECT));
         }
-        if (reworkCount > MAX_REWORK) {
+        if (reworkCount >= MAX_REWORK) {
             throw new BusinessException(
                     ErrorCodeEnum.ORDER_EXCESSIVE_REWORK,
                     String.valueOf(MAX_REWORK));
         }
-        if (designRejectCount > MAX_DESIGN_REJECT) {
+        if (designRejectCount >= MAX_DESIGN_REJECT) {
             throw new BusinessException(
                     ErrorCodeEnum.ORDER_EXCESSIVE_DESIGN_REJECT,
                     String.valueOf(MAX_DESIGN_REJECT));
