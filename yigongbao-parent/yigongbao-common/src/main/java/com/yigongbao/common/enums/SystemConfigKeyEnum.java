@@ -77,6 +77,12 @@ public enum SystemConfigKeyEnum {
      */
     ORDER_COLUMN_CONFIG("order.column.config", "订单列表默认列配置"),
 
+    /**
+     * 订单修改申请字段配置（JSON 格式，顶层 key 为申请类型字典编码）
+     * 例：{"14.1":{"name":"基础信息","fields":[...]}}
+     */
+    ORDER_MODIFY_FIELD_CONFIG("order.modify.field.config", "订单修改申请字段配置"),
+
     // ==================== 流程状态机配置 ====================
     /**
      * 最大允许的审核驳回次数

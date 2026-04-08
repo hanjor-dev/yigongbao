@@ -160,7 +160,11 @@ INSERT INTO sys_config (config_key, config_name, config_value, config_type, conf
 -- 流程状态机配置
 ('flow.max.audit.reject', '最大允许的审核驳回次数', '3', 'number', 'system', '审核驳回超过此次数后不再允许提交', 1, 0, 11, 1),
 ('flow.max.rework', '最大允许的返工次数', '2', 'number', 'system', '返工超过此次数后不再允许继续', 1, 0, 12, 1),
-('flow.max.design.reject', '最大允许的设计审核驳回次数', '3', 'number', 'system', '设计审核驳回超过此次数后不再允许提交', 1, 0, 13, 1);
+('flow.max.design.reject', '最大允许的设计审核驳回次数', '3', 'number', 'system', '设计审核驳回超过此次数后不再允许提交', 1, 0, 13, 1),
+-- 订单修改申请配置
+-- config_value 为 JSON，结构：{ "14.1": { "name": "基础信息", "fields": [...] }, "14.2": {...}, "14.3": {...} }
+-- 完整格式化版本见 .docs/技术实现/order/03_订单修改审核实现方案.md
+('order.modify.field.config', '订单修改申请字段配置', '{"14.1":{"name":"基础信息","fields":[{"field":"patientName","label":"患者姓名","type":"text","required":false},{"field":"patientAge","label":"患者年龄","type":"number","required":false},{"field":"patientGender","label":"患者性别","type":"select","required":false,"options":[{"value":"12.1","label":"男"},{"value":"12.2","label":"女"}]},{"field":"doctorId","label":"关联医生","type":"autocomplete","required":false},{"field":"doctorPhone","label":"医生电话","type":"text","required":false},{"field":"isPostal","label":"是否邮寄","type":"switch","required":false},{"field":"postalAddress","label":"邮寄地址","type":"textarea","required":false},{"field":"expectedDeliveryDate","label":"期望交付时间","type":"datetime","required":false}]},"14.2":{"name":"影像文件","fields":[{"field":"imageDataFileIds","label":"影像数据文件","type":"file","required":false},{"field":"imageReportFileIds","label":"影像报告文件","type":"file","required":false}]},"14.3":{"name":"重建项目","fields":[{"field":"items","label":"重建项目明细","type":"array","required":false,"subFields":[{"field":"bodyPartId","label":"部位","type":"select"},{"field":"projectId","label":"重建项目","type":"select"},{"field":"projectDesc","label":"项目说明","type":"textarea"},{"field":"formingRequirement","label":"成形需求","type":"textarea"},{"field":"otherRequirement","label":"其他要求","type":"textarea"}]}]}}', 'json', 'order', '订单修改申请各类型允许修改的字段配置', 1, 0, 14, 1);
 
 
 -- ============================================================
@@ -584,3 +588,12 @@ INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, so
 (78, 76, '13.2', '导板', 'guide', 2, 2, 1),
 (79, 76, '13.3', '假体', 'implant', 2, 3, 1),
 (80, 76, '13.4', '其他', 'other', 2, 4, 1);
+
+-- 订单修改申请类型字典数据初始化（dict_code=14）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+-- 父节点
+(81, 0, '14', '订单修改申请类型', NULL, 1, 14, 1),
+-- 子节点
+(82, 81, '14.1', '基础信息', 'INFO',  2, 1, 1),
+(83, 81, '14.2', '影像文件', 'IMAGE', 2, 2, 1),
+(84, 81, '14.3', '重建项目', 'ITEM',  2, 3, 1);

@@ -5,6 +5,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.order.dto.draft.CreateOrderDraftDTO;
 import com.yigongbao.module.order.dto.draft.OrderDraftPageQueryDTO;
+import com.yigongbao.module.order.dto.modify.ExecuteModificationDTO;
+import com.yigongbao.module.order.dto.modify.ModificationLogPageQueryDTO;
+import com.yigongbao.module.order.dto.modify.ModifyApplyPageQueryDTO;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
 import com.yigongbao.module.order.dto.order.OrderExportQueryDTO;
@@ -12,8 +15,11 @@ import com.yigongbao.module.order.dto.order.OrderPageDTO;
 import com.yigongbao.module.order.service.OrderDraftService;
 import com.yigongbao.module.order.service.OrderExportService;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.order.service.OrderModifyApplyService;
 import com.yigongbao.module.order.vo.draft.OrderDraftDetailVO;
 import com.yigongbao.module.order.vo.draft.OrderDraftVO;
+import com.yigongbao.module.order.vo.modify.ModificationLogVO;
+import com.yigongbao.module.order.vo.modify.ModifyApplyListVO;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
@@ -41,6 +47,7 @@ public class OrderController {
     private final OrderDraftService orderDraftService;
     private final OrderMainService orderMainService;
     private final OrderExportService orderExportService;
+    private final OrderModifyApplyService orderModifyApplyService;
 
     // ==================== 草稿接口 ====================
 
@@ -165,5 +172,30 @@ public class OrderController {
     @PostMapping("/export")
     public void exportOrders(@RequestBody OrderExportQueryDTO dto, HttpServletResponse response) {
         orderExportService.exportOrders(dto, response);
+    }
+
+    // ==================== 修改申请相关（以订单为主体） ====================
+
+    @Operation(summary = "查询订单的修改申请记录列表")
+    @PostMapping("/{id}/modify-applies")
+    public Result<IPage<ModifyApplyListVO>> listModifyApplies(@PathVariable Long id,
+            @RequestBody ModifyApplyPageQueryDTO dto) {
+        return Result.success(orderModifyApplyService.listAppliesByOrder(id, dto));
+    }
+
+    @Operation(summary = "查询订单的修改留痕记录")
+    @PostMapping("/{id}/modification-logs")
+    public Result<IPage<ModificationLogVO>> listModificationLogs(@PathVariable Long id,
+            @RequestBody ModificationLogPageQueryDTO dto) {
+        return Result.success(orderModifyApplyService.listModificationLogs(id, dto));
+    }
+
+    @Operation(summary = "执行订单修改（审核通过后调用）")
+    @PutMapping("/{id}/modification")
+    public Result<Void> executeModification(@PathVariable Long id,
+            @RequestParam Long applyId,
+            @RequestBody ExecuteModificationDTO dto) {
+        orderModifyApplyService.executeModification(id, applyId, dto);
+        return Result.success();
     }
 }

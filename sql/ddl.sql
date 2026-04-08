@@ -1112,3 +1112,82 @@ CREATE TABLE order_flow_status_history (
     KEY idx_order_flow_order_id (order_id),
     KEY idx_order_flow_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单流程状态历史表';
+
+
+-- ============================================================
+-- 订单信息修改申请表（order_modify_apply）
+-- 设计说明：业务员发起、管理员审核的订单字段修改申请
+-- ============================================================
+DROP TABLE IF EXISTS order_modify_apply;
+CREATE TABLE order_modify_apply (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    order_id            BIGINT          NOT NULL COMMENT '订单ID',
+    order_code          VARCHAR(50)     NOT NULL COMMENT '订单编号（冗余）',
+    hospital_name       VARCHAR(100)    COMMENT '医院名称（冗余，用于列表展示）',
+    patient_name        VARCHAR(100)    COMMENT '患者姓名（冗余，用于列表展示）',
+
+    -- ==================== 申请信息 ====================
+    -- 多选时逗号分隔字典编码，如 "14.1,14.3"，最长 "14.1,14.2,14.3" = 11字符
+    apply_type_codes    VARCHAR(50)     NOT NULL COMMENT '申请类型字典编码（逗号分隔，如 14.1,14.3）',
+    apply_type_names    VARCHAR(200)    COMMENT '申请类型中文名冗余（如 基础信息、重建项目）',
+    apply_reason        TEXT            COMMENT '申请原因',
+
+    -- ==================== 审核信息 ====================
+    status              VARCHAR(20)     NOT NULL DEFAULT 'PENDING' COMMENT '状态：PENDING-待审核，APPROVED-已同意，REJECTED-已拒绝，COMPLETED-已执行',
+    reject_reason       TEXT            COMMENT '驳回原因（审核不通过时必填）',
+    auditor_id          BIGINT          COMMENT '审核人ID',
+    auditor_name        VARCHAR(100)    COMMENT '审核人姓名',
+    audit_time          DATETIME        COMMENT '审核时间',
+
+    -- ==================== 操作人 ====================
+    applicant_id        BIGINT          NOT NULL COMMENT '申请人ID',
+    applicant_name      VARCHAR(100)    COMMENT '申请人姓名',
+
+    -- ==================== 公共字段 ====================
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          COMMENT '创建人ID',
+    update_by           BIGINT          COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    KEY idx_order_modify_apply_order_id (order_id),
+    KEY idx_order_modify_apply_applicant_id (applicant_id),
+    KEY idx_order_modify_apply_status (status),
+    KEY idx_order_modify_apply_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单信息修改申请表';
+
+-- 并发控制：同一订单只能有1个 PENDING 申请（is_deleted=1 时返回 NULL，不触发唯一约束）
+CREATE UNIQUE INDEX uk_order_modify_apply_pending
+    ON order_modify_apply ((CASE WHEN is_deleted = 0 AND status = 'PENDING' THEN order_id ELSE NULL END));
+
+
+-- ============================================================
+-- 订单信息修改留痕表（order_modification_log）
+-- 设计说明：每次字段修改的不可变审计记录，永久留存
+-- ============================================================
+DROP TABLE IF EXISTS order_modification_log;
+CREATE TABLE order_modification_log (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    order_id        BIGINT          NOT NULL COMMENT '订单ID',
+    order_code      VARCHAR(50)     NOT NULL COMMENT '订单编号（冗余）',
+    apply_id        BIGINT          COMMENT '关联的修改申请ID',
+
+    -- ==================== 修改字段信息 ====================
+    field_name      VARCHAR(50)     NOT NULL COMMENT '修改字段名称（如 patient_name）',
+    field_label     VARCHAR(100)    COMMENT '修改字段中文名（如 患者姓名）',
+    old_value       TEXT            COMMENT '修改前的值',
+    new_value       TEXT            COMMENT '修改后的值',
+
+    -- ==================== 操作人 ====================
+    modifier_id     BIGINT          NOT NULL COMMENT '修改人ID',
+    modifier_name   VARCHAR(100)    COMMENT '修改人姓名',
+
+    -- ==================== 公共字段（仅 create_time，不继承 BaseEntity）====================
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+
+    PRIMARY KEY (id),
+    KEY idx_order_modification_log_order_id (order_id),
+    KEY idx_order_modification_log_apply_id (apply_id),
+    KEY idx_order_modification_log_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单信息修改留痕表';

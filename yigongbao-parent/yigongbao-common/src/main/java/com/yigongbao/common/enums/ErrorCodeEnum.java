@@ -214,7 +214,17 @@ public enum ErrorCodeEnum {
     ORDER_PROJECT_REQUIRED(713, "重建项目不能为空"),
 
     // 导出
-    ORDER_EXPORT_FAILED(714, "订单导出失败");
+    ORDER_EXPORT_FAILED(714, "订单导出失败"),
+
+    // 修改申请新增错误码（715 起）
+    ORDER_MODIFY_APPLY_EXISTS(715, "已有待审核的修改申请，请等待处理后再发起新申请"),
+    ORDER_MODIFY_FIELD_NOT_ALLOWED(716, "该字段不在申请范围内，请检查申请类型"),
+    ORDER_NOT_APPLICABLE_STATUS(717, "当前订单状态不适用修改申请功能"),
+    ORDER_MODIFY_APPLY_NOT_MINE(718, "只能撤回自己的申请"),
+    ORDER_MODIFY_REJECT_REASON_REQUIRED(719, "审核拒绝时必须填写驳回原因"),
+    ORDER_MODIFY_AUDIT_PERMISSION_DENIED(720, "只有管理员可以审核申请"),
+    ORDER_MODIFY_FIELD_CONFIG_NOT_FOUND(721, "字段配置不存在，请联系管理员"),
+    ORDER_MODIFY_TYPE_NOT_ALLOWED_IN_PHASE(722, "当前阶段不允许申请该类型的修改");
 
     /**
      * 错误码

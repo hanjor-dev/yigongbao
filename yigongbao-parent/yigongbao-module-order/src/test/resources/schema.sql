@@ -172,17 +172,19 @@ CREATE TABLE order_flow_status_history (
 CREATE TABLE order_modify_apply (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_id BIGINT NOT NULL COMMENT '订单ID',
-    order_code VARCHAR(64) COMMENT '订单编号',
-    apply_type VARCHAR(32) COMMENT '申请类型',
-    apply_reason VARCHAR(512) COMMENT '申请原因',
-    old_value VARCHAR(512) COMMENT '原值',
-    new_value VARCHAR(512) COMMENT '新值',
-    applicant_id BIGINT COMMENT '申请人ID',
-    applicant_name VARCHAR(64) COMMENT '申请人姓名',
+    order_code VARCHAR(50) NOT NULL COMMENT '订单编号',
+    hospital_name VARCHAR(100) COMMENT '医院名称（冗余）',
+    patient_name VARCHAR(100) COMMENT '患者姓名（冗余）',
+    apply_type_codes VARCHAR(50) NOT NULL COMMENT '申请类型字典编码（逗号分隔）',
+    apply_type_names VARCHAR(200) COMMENT '申请类型中文名冗余',
+    apply_reason VARCHAR(5000) COMMENT '申请原因',
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '状态：PENDING/APPROVED/REJECTED',
+    reject_reason VARCHAR(5000) COMMENT '驳回原因',
     auditor_id BIGINT COMMENT '审核人ID',
-    auditor_name VARCHAR(64) COMMENT '审核人姓名',
-    status INT DEFAULT 0 COMMENT '状态：0-待审核，1-通过，2-驳回',
-    audit_remark VARCHAR(512) COMMENT '审核备注',
+    auditor_name VARCHAR(100) COMMENT '审核人姓名',
+    audit_time TIMESTAMP COMMENT '审核时间',
+    applicant_id BIGINT NOT NULL COMMENT '申请人ID',
+    applicant_name VARCHAR(100) COMMENT '申请人姓名',
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     create_by BIGINT,
@@ -190,19 +192,17 @@ CREATE TABLE order_modify_apply (
     is_deleted INT DEFAULT 0
 );
 
--- 订单修改记录表（P1）
+-- 订单修改留痕表（P1）
 CREATE TABLE order_modification_log (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    order_id BIGINT COMMENT '订单ID',
-    order_code VARCHAR(64) COMMENT '订单编号',
-    modify_type VARCHAR(32) COMMENT '修改类型',
-    old_value VARCHAR(512) COMMENT '原值',
-    new_value VARCHAR(512) COMMENT '新值',
-    operator_id BIGINT COMMENT '操作人ID',
-    operator_name VARCHAR(64) COMMENT '操作人姓名',
-    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    create_by BIGINT,
-    update_by BIGINT,
-    is_deleted INT DEFAULT 0
+    order_id BIGINT NOT NULL COMMENT '订单ID',
+    order_code VARCHAR(50) NOT NULL COMMENT '订单编号',
+    apply_id BIGINT COMMENT '关联申请ID',
+    field_name VARCHAR(50) NOT NULL COMMENT '修改字段名',
+    field_label VARCHAR(100) COMMENT '修改字段中文名',
+    old_value VARCHAR(5000) COMMENT '修改前值',
+    new_value VARCHAR(5000) COMMENT '修改后值',
+    modifier_id BIGINT NOT NULL COMMENT '修改人ID',
+    modifier_name VARCHAR(100) COMMENT '修改人姓名',
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
