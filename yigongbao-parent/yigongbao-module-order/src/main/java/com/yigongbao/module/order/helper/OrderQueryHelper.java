@@ -110,6 +110,20 @@ public class OrderQueryHelper {
         return user != null ? user.getOrgId() : null;
     }
 
+    /**
+     * 获取当前登录用户的所属部门ID，用户未配置部门时返回 null
+     *
+     * @return 当前用户所属部门ID
+     */
+    public Long getCurrentUserDeptId() {
+        Long userId = getCurrentUserId();
+        if (userId == null) {
+            return null;
+        }
+        UserEntity user = userService.getById(userId);
+        return user != null ? user.getDeptId() : null;
+    }
+
     // ==================== 数据权限 ====================
 
     /**
@@ -117,6 +131,7 @@ public class OrderQueryHelper {
      * <p>
      * 数据范围类型说明：
      * - SELF：只看自己创建的订单
+     * - DEPT：只看同部门成员创建的订单（按 operator_dept_id 过滤）
      * - HOSPITALS：只看自己关联医院范围内的订单
      * - ORG：只看同机构下所有订单
      * - ALL：不受限制，查看所有订单
@@ -153,6 +168,17 @@ public class OrderQueryHelper {
                     // 用户无所属机构，兜底返回空列表，避免泄露全量数据
                     log.warn("用户无所属机构，ORG 数据范围返回空列表，userId={}", currentUserId);
                     wrapper.apply("1 = 0");
+                }
+                break;
+            case DEPT:
+                // 按提单人部门过滤，仅能查看同部门成员创建的订单
+                Long deptId = getCurrentUserDeptId();
+                if (deptId != null) {
+                    wrapper.eq(OrderMainEntity::getOperatorDeptId, deptId);
+                } else {
+                    // 用户未配置部门，降级为仅看自己，避免泄露全量数据
+                    log.warn("DEPT 类型用户未配置部门，降级为 SELF，userId={}", currentUserId);
+                    wrapper.eq(currentUserId != null, OrderMainEntity::getCreateBy, currentUserId);
                 }
                 break;
             case ALL:
@@ -236,8 +262,10 @@ public class OrderQueryHelper {
         vo.setAreaName(entity.getAreaName());
         vo.setFullAreaName(entity.getFullAreaName());
         // 科室与医生
-        vo.setDeptId(entity.getDeptId());
-        vo.setDeptName(entity.getDeptName());
+        vo.setHospitalDeptId(entity.getHospitalDeptId());
+        vo.setHospitalDeptName(entity.getHospitalDeptName());
+        vo.setOperatorDeptId(entity.getOperatorDeptId());
+        vo.setOperatorDeptName(entity.getOperatorDeptName());
         vo.setDoctorId(entity.getDoctorId());
         vo.setDoctorName(entity.getDoctorName());
         vo.setDoctorPhone(entity.getDoctorPhone());
