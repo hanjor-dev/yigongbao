@@ -109,4 +109,9 @@ public class TestController {
         testService.remove(id);
         return Result.success();
     }
+
+    @GetMapping("/time")
+    public String delete() {
+        return System.currentTimeMillis() + "";
+    }
 }

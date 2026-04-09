@@ -40,8 +40,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -103,6 +105,19 @@ class UserServiceImplTest {
         Field baseMapperField = ServiceImpl.class.getDeclaredField("baseMapper");
         baseMapperField.setAccessible(true);
         baseMapperField.set(userService, userMapper);
+
+        // 设置 hospitalService.listByIds 的默认 mock：将传入的 ID 集合转换为带相同 ID 的医院实体列表
+        lenient().doAnswer(invocation -> {
+            Collection<?> ids = invocation.getArgument(0);
+            if (ids == null || ids.isEmpty()) {
+                return Collections.emptyList();
+            }
+            return ids.stream().map(id -> {
+                com.yigongbao.module.basic.hospital.entity.HospitalEntity h = new com.yigongbao.module.basic.hospital.entity.HospitalEntity();
+                h.setId((Long) id);
+                return h;
+            }).collect(Collectors.toList());
+        }).when(hospitalService).listByIds(any());
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -701,9 +716,6 @@ class UserServiceImplTest {
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(orgService.getById(1L)).thenReturn(testOrg);
         when(roleService.getById(2L)).thenReturn(roleWithHospitalScope);
-        when(hospitalService.getById(10L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
-        when(hospitalService.getById(20L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
-        when(hospitalService.getById(30L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
         when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("$2a$10$encrypted");
         when(userMapper.insert(any(UserEntity.class))).thenAnswer(invocation -> {
             UserEntity entity = invocation.getArgument(0);
@@ -745,6 +757,9 @@ class UserServiceImplTest {
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(orgService.getById(1L)).thenReturn(testOrg);
         when(roleService.getById(3L)).thenReturn(roleWithoutHospitalScope);
+        doReturn(List.of(
+                new com.yigongbao.module.basic.hospital.entity.HospitalEntity(),
+                new com.yigongbao.module.basic.hospital.entity.HospitalEntity())).when(hospitalService).listByIds(any());
         when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("$2a$10$encrypted");
         when(userMapper.insert(any(UserEntity.class))).thenAnswer(invocation -> {
             UserEntity entity = invocation.getArgument(0);
@@ -825,8 +840,9 @@ class UserServiceImplTest {
         when(userMapper.selectById(1L)).thenReturn(existingUser);
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(roleService.getById(2L)).thenReturn(newRoleWithHospitalScope);
-        when(hospitalService.getById(10L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
-        when(hospitalService.getById(20L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
+        doReturn(List.of(
+                new com.yigongbao.module.basic.hospital.entity.HospitalEntity(),
+                new com.yigongbao.module.basic.hospital.entity.HospitalEntity())).when(hospitalService).listByIds(any());
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
         // 执行
@@ -863,8 +879,9 @@ class UserServiceImplTest {
         when(userMapper.selectById(1L)).thenReturn(existingUser);
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(roleService.getById(2L)).thenReturn(currentRole);
-        when(hospitalService.getById(99L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
-        when(hospitalService.getById(88L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
+        doReturn(List.of(
+                new com.yigongbao.module.basic.hospital.entity.HospitalEntity(),
+                new com.yigongbao.module.basic.hospital.entity.HospitalEntity())).when(hospitalService).listByIds(any());
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
         // 执行

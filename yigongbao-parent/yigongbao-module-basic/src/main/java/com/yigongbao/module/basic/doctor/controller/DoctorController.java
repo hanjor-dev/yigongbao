@@ -14,9 +14,9 @@ import com.yigongbao.module.basic.doctor.service.DoctorService;
 import com.yigongbao.module.basic.doctor.vo.DoctorVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -122,7 +122,7 @@ public class DoctorController {
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(
             @PathVariable Long id,
-            @RequestParam @Min(0) @Max(1) Integer status) {
+            @RequestParam @NotNull(message = "状态不能为空") @Min(0) @Max(1) Integer status) {
         doctorService.updateStatus(id, status);
         return Result.success();
     }

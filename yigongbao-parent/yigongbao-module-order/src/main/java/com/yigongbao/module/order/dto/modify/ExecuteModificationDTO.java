@@ -30,9 +30,14 @@ public class ExecuteModificationDTO implements Serializable {
     private Long deptId;
 
     /**
-     * 医生ID
+     * 医生ID（从历史联想列表选择时传入；与 doctorName 二选一）
      */
     private Long doctorId;
+
+    /**
+     * 医生姓名（手动输入时传入，触发快速创建/获取医生；与 doctorId 二选一）
+     */
+    private String doctorName;
 
     /**
      * 医生电话

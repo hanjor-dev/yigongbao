@@ -167,4 +167,10 @@ public class UserVO implements Serializable {
      * 用于前端展示用户已分配的医院
      */
     private List<Long> hospitalIds;
+
+    /**
+     * 已分配的医院名称列表
+     * 用于前端展示用户已分配的医院名称
+     */
+    private List<String> hospitalNames;
 }

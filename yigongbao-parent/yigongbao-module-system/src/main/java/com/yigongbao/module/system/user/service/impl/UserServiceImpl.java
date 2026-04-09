@@ -18,10 +18,12 @@ import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
 import com.yigongbao.module.basic.hospital.service.HospitalService;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.service.DeptService;
+import com.yigongbao.module.system.dict.entity.DictEntity;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
@@ -142,6 +144,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         }
 
         IPage<UserVO> voPage = pageResult.convert(UserConvert::toVO);
+        // 收集所有医院ID，批量查询医院名称
+        Set<Long> allHospitalIds = userHospitalMap.values().stream()
+                .flatMap(List::stream)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, String> hospitalNameMap = allHospitalIds.isEmpty() ? Collections.emptyMap()
+                : hospitalService.listByIds(allHospitalIds).stream()
+                        .collect(Collectors.toMap(HospitalEntity::getId, HospitalEntity::getHospitalName));
         // 转换后再填充 VO 中需要名称的字段和医院ID列表
         for (UserVO vo : voPage.getRecords()) {
             if (vo.getStatus() != null) {
@@ -160,9 +170,28 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     vo.setDataScopeType(roleEntity.getDataScopeType());
                 }
             }
-            // 填充医院ID列表
+            // 填充医院ID列表和医院名称列表
             if (vo.getId() != null) {
-                vo.setHospitalIds(userHospitalMap.getOrDefault(vo.getId(), Collections.emptyList()));
+                List<Long> hospitalIds = userHospitalMap.getOrDefault(vo.getId(), Collections.emptyList());
+                vo.setHospitalIds(hospitalIds);
+                vo.setHospitalNames(hospitalIds.stream()
+                        .map(hospitalNameMap::get)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList()));
+            }
+            // 填充专业方向名称
+            if (StrUtil.isNotBlank(vo.getSpecialty())) {
+                vo.setSpecialtyName(dictService.getByDictCode(vo.getSpecialty()) != null
+                        ? dictService.getByDictCode(vo.getSpecialty()).getDictName() : null);
+            }
+            // 填充结算类型名称
+            if (vo.getSettlementType() != null) {
+                // settlementType 存储的是整数值 1/2/3，对应字典 8.1/8.2/8.3
+                DictEntity dictEntity = dictService.lambdaQuery()
+                        .eq(DictEntity::getParentId, 36L) // 结算类型字典的父节点ID
+                        .eq(DictEntity::getDictValue, vo.getSettlementType().toString())
+                        .one();
+                vo.setSettlementTypeName(dictEntity != null ? dictEntity.getDictName() : null);
             }
         }
         log.info("分页查询用户列表成功，总数={}", pageResult.getTotal());
@@ -563,7 +592,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
      * @param specialty 专业方向字典编码
      */
     private void validateSpecialty(RoleEntity role, String specialty) {
-        if (role == null || !SPECIALTY_REQUIRED_ROLES.contains(role.getRoleCode())) {
+        if (role == null || role.getRoleCode() == null || !SPECIALTY_REQUIRED_ROLES.contains(role.getRoleCode())) {
             return;
         }
         if (StrUtil.isBlank(specialty)) {
@@ -687,8 +716,31 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 vo.setDataScopeType(roleEntity.getDataScopeType());
             }
         }
-        // 填充用户已分配的医院ID列表
-        vo.setHospitalIds(userHospitalService.getHospitalIdsByUserId(vo.getId()));
+        // 填充医院ID列表和医院名称列表
+        List<Long> hospitalIds = userHospitalService.getHospitalIdsByUserId(vo.getId());
+        vo.setHospitalIds(hospitalIds);
+        if (!hospitalIds.isEmpty()) {
+            List<String> hospitalNames = hospitalService.listByIds(hospitalIds).stream()
+                    .map(HospitalEntity::getHospitalName)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            vo.setHospitalNames(hospitalNames);
+        } else {
+            vo.setHospitalNames(Collections.emptyList());
+        }
+        // 填充专业方向名称
+        if (StrUtil.isNotBlank(vo.getSpecialty())) {
+            vo.setSpecialtyName(dictService.getByDictCode(vo.getSpecialty()) != null
+                    ? dictService.getByDictCode(vo.getSpecialty()).getDictName() : null);
+        }
+        // 填充结算类型名称
+        if (vo.getSettlementType() != null) {
+            DictEntity dictEntity = dictService.lambdaQuery()
+                    .eq(DictEntity::getParentId, 36L) // 结算类型字典的父节点ID
+                    .eq(DictEntity::getDictValue, vo.getSettlementType().toString())
+                    .one();
+            vo.setSettlementTypeName(dictEntity != null ? dictEntity.getDictName() : null);
+        }
         return vo;
     }
 

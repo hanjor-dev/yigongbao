@@ -16,8 +16,6 @@ import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
-import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
-import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
 import com.yigongbao.module.order.dto.modify.AuditModifyApplyDTO;
 import com.yigongbao.module.order.dto.modify.CreateModifyApplyDTO;
 import com.yigongbao.module.order.dto.modify.ExecuteModificationDTO;
@@ -68,7 +66,7 @@ import java.util.stream.Collectors;
  *
  * 【设计说明】
  * - 不注入 OrderMainService，直接注入 OrderMainMapper（规避循环依赖）
- * - fillAreaFromHospital 逻辑直接复现（4行代码，不跨 Service 调用）
+ * - 医院/科室/医生的冗余字段同步统一走 OrderDataValidator.validateAndFillForModify
  * - processInfoModification / processItemModification / processImageModification 均在同一事务内执行
  *
  * @author hanjor
@@ -84,8 +82,6 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     private final OrderMainMapper orderMainMapper;
     private final OrderItemMapper orderItemMapper;
     private final OrderFileMapper orderFileMapper;
-    // 复现 fillAreaFromHospital 逻辑（4行代码，不跨 Service 调用）
-    private final HospitalMapper hospitalMapper;
     private final OrderDataValidator orderDataValidator;
     // 文件存在性校验
     private final FileService fileService;
@@ -398,32 +394,35 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         String oldPostalAddress           = order.getPostalAddress();
         LocalDateTime oldExpectedDate     = order.getExpectedDeliveryDate();
 
-        // 2. 更新订单字段（显式赋值，仅更新非 null 值）
+        // 2. 更新订单字段（含医院/科室/医生冗余字段同步、quickAdd）
         applyInfoFields(order, dto);
         orderMainMapper.updateById(order);
 
         // 3. 逐字段对比记录留痕
+        // 注意：doctorId 用 order.getDoctorId() 作为新值，因为 quickAdd 场景下 dto.getDoctorId() 为 null
+        //       而实际写入的是 quickAdd 返回的 doctor.id
         logInfoFieldChanges(order.getId(), order.getOrderCode(), applyId,
                 oldHospitalId, oldPatientName, oldPatientAge, oldPatientGender,
                 oldDoctorId, oldDoctorPhone, oldIsUrgent, oldIsPostal, oldPostalAddress, oldExpectedDate,
-                dto, modifierId, modifierName);
+                order, dto, modifierId, modifierName);
     }
 
     /**
      * 将 dto 中非 null 的字段赋值到订单实体（显式赋值，无反射）
+     * 医院/科室/医生走 OrderDataValidator 统一校验+填充路径，保证冗余字段同步
      */
     private void applyInfoFields(OrderMainEntity order, ExecuteModificationDTO dto) {
-        if (dto.getHospitalId() != null) {
-            order.setHospitalId(dto.getHospitalId());
-            // 同步填充医院关联地区冗余字段
-            fillAreaFromHospital(order, dto.getHospitalId());
+        // 医院/科室/医生统一走 validator（含冗余字段同步、存在性校验、quickAdd）
+        boolean hasDoctorChange = dto.getDoctorId() != null || StrUtil.isNotBlank(dto.getDoctorName());
+        if (dto.getHospitalId() != null || dto.getDeptId() != null || hasDoctorChange) {
+            orderDataValidator.validateAndFillForModify(order,
+                    dto.getHospitalId(), dto.getDeptId(),
+                    dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone());
         }
-        if (dto.getDeptId()               != null) order.setDeptId(dto.getDeptId());
+        // 其他基础字段（不涉及冗余同步，直接赋值）
         if (dto.getPatientName()          != null) order.setPatientName(dto.getPatientName());
         if (dto.getPatientAge()           != null) order.setPatientAge(dto.getPatientAge());
         if (dto.getPatientGender()        != null) order.setPatientGender(dto.getPatientGender());
-        if (dto.getDoctorId()             != null) order.setDoctorId(dto.getDoctorId());
-        if (dto.getDoctorPhone()          != null) order.setDoctorPhone(dto.getDoctorPhone());
         if (dto.getIsUrgent()             != null) order.setIsUrgent(dto.getIsUrgent());
         if (dto.getIsPostal()             != null) order.setIsPostal(dto.getIsPostal());
         if (dto.getPostalAddress()        != null) order.setPostalAddress(dto.getPostalAddress());
@@ -431,26 +430,14 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     }
 
     /**
-     * 填充医院相关地区冗余字段（复现 OrderMainServiceImpl.fillAreaFromHospital 逻辑，4行代码）
-     */
-    private void fillAreaFromHospital(OrderMainEntity order, Long hospitalId) {
-        if (hospitalId == null) return;
-        HospitalEntity hospital = hospitalMapper.selectById(hospitalId);
-        if (hospital != null) {
-            order.setAreaId(hospital.getAreaId());
-            order.setAreaName(hospital.getAreaName());
-            order.setFullAreaName(hospital.getFullAreaName());
-        }
-    }
-
-    /**
      * 逐字段对比并记录留痕（显式比对，无反射）
+     * doctorId / doctorPhone 取修改后的 order 值，以覆盖 quickAdd 场景（dto.getDoctorId() 此时为 null）
      */
     private void logInfoFieldChanges(Long orderId, String orderCode, Long applyId,
             Long oldHospitalId, String oldPatientName, Integer oldPatientAge, String oldPatientGender,
             Long oldDoctorId, String oldDoctorPhone, Integer oldIsUrgent,
             Integer oldIsPostal, String oldPostalAddress, LocalDateTime oldExpectedDate,
-            ExecuteModificationDTO dto, Long modifierId, String modifierName) {
+            OrderMainEntity order, ExecuteModificationDTO dto, Long modifierId, String modifierName) {
         recordIfChanged(orderId, orderCode, applyId, "hospitalId", "医院",
                 oldHospitalId, dto.getHospitalId(), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "patientName", "患者姓名",
@@ -460,9 +447,9 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         recordIfChanged(orderId, orderCode, applyId, "patientGender", "患者性别",
                 oldPatientGender, dto.getPatientGender(), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "doctorId", "关联医生",
-                oldDoctorId, dto.getDoctorId(), modifierId, modifierName);
+                oldDoctorId, order.getDoctorId(), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "doctorPhone", "医生电话",
-                oldDoctorPhone, dto.getDoctorPhone(), modifierId, modifierName);
+                oldDoctorPhone, order.getDoctorPhone(), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "isUrgent", "是否加急",
                 oldIsUrgent, dto.getIsUrgent(), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "isPostal", "是否邮寄",
@@ -492,6 +479,11 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
      */
     private void processItemModification(OrderMainEntity order, ExecuteModificationDTO dto,
             Long applyId, Long modifierId, String modifierName) {
+        // 0. 重建订单的重建项目不允许为空
+        if (CollUtil.isEmpty(dto.getItems())) {
+            throw new BusinessException(400, "重建项目不能为空");
+        }
+
         // 1. 查询旧 items
         List<OrderItemEntity> oldItems = orderItemMapper.selectList(
                 new LambdaQueryWrapper<OrderItemEntity>()

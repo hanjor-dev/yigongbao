@@ -317,9 +317,15 @@ INSERT INTO sys_org (id, org_name, org_code, org_type, contact, phone, status) V
 -- 角色基础数据初始化（sys_role）
 -- ------------------------------------------------------------
 INSERT INTO sys_role (id, role_name, role_code, role_desc, account_type, data_scope_type, status) VALUES
+-- 生产企业角色
 (1, '超级管理员', 'admin', '系统管理员，拥有全部权限', 1, 'all', 1),
 (2, '设计师', 'designer', '设计人员，负责订单设计工作', 1, 'self', 1),
-(3, '设计师管理员', 'designer-manager', '设计团队管理员，负责设计工作分配、审核、统计等', 1, 'org', 1);
+(3, '设计师管理员', 'designer-manager', '设计团队管理员，负责设计工作分配、审核、统计等', 1, 'org', 1),
+-- 业务员角色
+(4, '业务员', 'salesman', '负责订单开拓、客户维护', 1, 'hospitals', 1),
+(5, '业务管理员', 'sale-manager', '管理下属业务员', 1, 'org', 1);
+
+
 
 -- ============================================================
 -- 用户基础数据初始化（sys_user）

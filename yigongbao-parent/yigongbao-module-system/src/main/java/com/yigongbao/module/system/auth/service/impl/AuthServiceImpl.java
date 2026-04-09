@@ -105,9 +105,9 @@ public class AuthServiceImpl implements AuthService {
             // 构建返回结果
             LoginVO loginVO = new LoginVO();
             loginVO.setToken(token);
-            loginVO.setUser(UserConvert.toVO(user));
-            loginVO.setMenus(resourceService.getUserMenuTree(user.getId()));
-            loginVO.setPermissions(resourceService.getUserPermissions(user.getId()));
+//            loginVO.setUser(UserConvert.toVO(user));
+//            loginVO.setMenus(resourceService.getUserMenuTree(user.getId()));
+//            loginVO.setPermissions(resourceService.getUserPermissions(user.getId()));
 
             log.info("用户登录成功，username={}", dto.getUsername());
             return loginVO;

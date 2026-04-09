@@ -301,6 +301,47 @@ public class OrderDataValidator {
     }
 
     /**
+     * 校验并填充订单修改时的医院/科室/医生冗余字段（修改执行专用）
+     *
+     * 【与 validateAndFillMasterForOrder 的区别】
+     * - 不校验 org、不校验医院权限范围（修改时无需重新校验提单机构）
+     * - 仅处理前端实际传入（非 null）的字段，null 表示本次不修改该项
+     * - hospitalId 有值：校验存在/启用，并同步 hospitalName + 地区冗余字段
+     * - deptId 有值：校验存在/启用，并同步 deptName
+     * - 医生字段：走 applyDoctorInfo 统一逻辑（支持 quickAdd）
+     *
+     * @param entity      订单主表实体（直接修改字段）
+     * @param hospitalId  新医院ID（null 表示不改）
+     * @param deptId      新科室ID（null 表示不改）
+     * @param doctorId    新医生ID（null 表示不选已有医生）
+     * @param doctorName  新医生姓名（doctorId 为 null 时触发 quickAdd）
+     * @param doctorPhone 新医生电话
+     */
+    public void validateAndFillForModify(OrderMainEntity entity,
+            Long hospitalId, Long deptId,
+            Long doctorId, String doctorName, String doctorPhone) {
+        // 校验医院并同步冗余字段
+        if (hospitalId != null) {
+            HospitalEntity hospital = lookupHospital(hospitalId, true);
+            entity.setHospitalName(hospital.getHospitalName());
+            entity.setAreaId(hospital.getAreaId());
+            entity.setAreaName(hospital.getAreaName());
+            entity.setFullAreaName(hospital.getFullAreaName());
+        }
+        // 校验科室并同步冗余字段
+        if (deptId != null) {
+            HospitalDeptVO dept = lookupHospitalDept(deptId);
+            if (dept != null) {
+                entity.setDeptName(dept.getHospitalDeptName());
+            }
+        }
+        // 校验并填充医生（支持 quickAdd，hospitalId 取实体上的最新值）
+        Long effectiveHospitalId = hospitalId != null ? hospitalId : entity.getHospitalId();
+        applyDoctorInfo(entity::setDoctorId, entity::setDoctorName, entity::setDoctorPhone,
+                doctorId, doctorName, doctorPhone, effectiveHospitalId, null);
+    }
+
+    /**
      * 校验草稿中已填写的部位/项目是否仍然有效（草稿模式下的数据新鲜度校验）
      * 与 validateAndFillItems 不同：本方法只检查"已填写 ID"的有效性，不强制要求字段必填
      *
