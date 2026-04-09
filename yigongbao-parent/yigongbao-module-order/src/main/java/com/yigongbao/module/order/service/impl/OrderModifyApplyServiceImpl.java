@@ -414,9 +414,9 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     private void applyInfoFields(OrderMainEntity order, ExecuteModificationDTO dto) {
         // 医院/科室/医生统一走 validator（含冗余字段同步、存在性校验、quickAdd）
         boolean hasDoctorChange = dto.getDoctorId() != null || StrUtil.isNotBlank(dto.getDoctorName());
-        if (dto.getHospitalId() != null || dto.getDeptId() != null || hasDoctorChange) {
+        if (dto.getHospitalId() != null || dto.getHospitalDeptId() != null || hasDoctorChange) {
             orderDataValidator.validateAndFillForModify(order,
-                    dto.getHospitalId(), dto.getDeptId(),
+                    dto.getHospitalId(), dto.getHospitalDeptId(),
                     dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone());
         }
         // 其他基础字段（不涉及冗余同步，直接赋值）
@@ -705,7 +705,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         OrderMainEntity order = orderMainMapper.selectById(apply.getOrderId());
         if (order != null) {
             vo.setHospitalName(order.getHospitalName());
-            vo.setDeptName(order.getDeptName());
+            vo.setHospitalDeptName(order.getHospitalDeptName());
             vo.setPatientName(order.getPatientName());
             vo.setDoctorName(order.getDoctorName());
             vo.setCurrentPhase(order.getPhase());

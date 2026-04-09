@@ -85,8 +85,8 @@ class OrderQueryHelperTest {
         e.setAreaId(300L);
         e.setAreaName("朝阳区");
         e.setFullAreaName("中国,北京,北京市,朝阳区");
-        e.setDeptId(400L);
-        e.setDeptName("骨科");
+        e.setHospitalDeptId(400L);
+        e.setHospitalDeptName("骨科");
         e.setDoctorId(500L);
         e.setDoctorName("张医生");
         e.setDoctorPhone("13800000002");
@@ -383,8 +383,8 @@ class OrderQueryHelperTest {
             assertThat(vo.getAreaId()).isEqualTo(300L);
             assertThat(vo.getAreaName()).isEqualTo("朝阳区");
             assertThat(vo.getFullAreaName()).isEqualTo("中国,北京,北京市,朝阳区");
-            assertThat(vo.getDeptId()).isEqualTo(400L);
-            assertThat(vo.getDeptName()).isEqualTo("骨科");
+            assertThat(vo.getHospitalDeptId()).isEqualTo(400L);
+            assertThat(vo.getHospitalDeptName()).isEqualTo("骨科");
             assertThat(vo.getDoctorId()).isEqualTo(500L);
             assertThat(vo.getDoctorName()).isEqualTo("张医生");
             assertThat(vo.getDoctorPhone()).isEqualTo("13800000002");
