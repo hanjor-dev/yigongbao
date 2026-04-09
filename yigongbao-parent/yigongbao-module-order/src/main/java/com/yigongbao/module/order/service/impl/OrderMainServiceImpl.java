@@ -242,11 +242,12 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
     /**
      * 查询订单详情
-     * 包含订单基本信息、明细列表、可执行动作列表
+     * 包含订单基本信息、明细列表、可执行动作列表。
+     * 查询结果受当前用户数据权限控制：无权访问的订单返回 ORDER_NOT_FOUND（不暴露存在性）。
      *
      * @param id 订单ID
      * @return 订单详情 VO
-     * @throws BusinessException 订单不存在
+     * @throws BusinessException 订单不存在或无权访问
      */
     @Override
     public OrderDetailVO getOrderDetail(Long id) {
@@ -256,6 +257,17 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             OrderMainEntity entity = getById(id);
             if (entity == null) {
                 log.warn("订单不存在，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+            }
+            // 数据权限校验：复用 buildDataScopeCondition 在同一 COUNT 查询中校验当前用户是否有权访问该订单
+            // 防止横向越权（A 用户访问 B 用户权限范围外的订单）
+            Long currentUserId = getCurrentUserId();
+            DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+            LambdaQueryWrapper<OrderMainEntity> scopeWrapper = new LambdaQueryWrapper<>();
+            scopeWrapper.eq(OrderMainEntity::getId, id);
+            orderQueryHelper.buildDataScopeCondition(scopeWrapper, currentUserId, scopeType);
+            if (count(scopeWrapper) == 0) {
+                log.warn("订单不在当前用户数据权限范围内，id={}, userId={}, scopeType={}", id, currentUserId, scopeType);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
             // 转换为详情 VO，补充性别名称等显示字段

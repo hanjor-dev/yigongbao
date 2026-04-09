@@ -75,14 +75,17 @@ public enum DataScopeTypeEnum {
     }
 
     /**
-     * 根据 code 获取枚举，未找到时返回默认值 ORG
+     * 根据 code 获取枚举，未找到时返回默认值 SELF（最小权限原则）
+     * <p>
+     * 使用 SELF 而非 ORG 作为默认值：当角色的 data_scope_type 配置缺失或非法时，
+     * 只看自己的数据，避免因配置错误导致意外暴露他人数据。
      *
      * @param code 枚举编码
-     * @return 对应的枚举实例，未找到则返回 ORG
+     * @return 对应的枚举实例，未找到则返回 SELF
      */
     public static DataScopeTypeEnum getByCodeOrDefault(String code) {
         DataScopeTypeEnum result = getByCode(code);
-        return result != null ? result : ORG;
+        return result != null ? result : SELF;
     }
 
     /**
