@@ -25,9 +25,9 @@ public class ExecuteModificationDTO implements Serializable {
     private Long hospitalId;
 
     /**
-     * 科室ID
+     * 医院科室ID
      */
-    private Long deptId;
+    private Long hospitalDeptId;
 
     /**
      * 医生ID（从历史联想列表选择时传入；与 doctorName 二选一）

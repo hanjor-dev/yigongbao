@@ -30,9 +30,9 @@ public class UpdateOrderDTO implements Serializable {
     private Long hospitalId;
 
     /**
-     * 科室ID
+     * 医院科室ID
      */
-    private Long deptId;
+    private Long hospitalDeptId;
 
     /**
      * 医生ID
