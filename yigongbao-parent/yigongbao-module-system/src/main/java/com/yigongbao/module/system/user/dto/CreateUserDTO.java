@@ -103,10 +103,9 @@ public class CreateUserDTO implements Serializable {
     private String employeeNo;
 
     /**
-     * 专业方向
+     * 专业方向字典编码列表（设计师/设计师管理员必填，如 ["7.1", "7.2"]）
      */
-    @Size(max = 64, message = "专业方向长度不能超过64个字符")
-    private String specialty;
+    private List<String> specialtyList;
 
     /**
      * 资质证书信息

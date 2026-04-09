@@ -123,6 +123,16 @@ public class UserVO implements Serializable {
     private String specialtyName;
 
     /**
+     * 专业方向字典编码列表（多选，供前端展示）
+     */
+    private List<String> specialtyList;
+
+    /**
+     * 专业方向名称列表（多选，供前端展示）
+     */
+    private List<String> specialtyNameList;
+
+    /**
      * 资质证书信息
      */
     private String qualification;

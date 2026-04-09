@@ -46,6 +46,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 
 import java.util.ArrayList;
@@ -179,10 +180,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                         .filter(Objects::nonNull)
                         .collect(Collectors.toList()));
             }
-            // 填充专业方向名称
+            // 填充专业方向多值列表及名称列表
             if (StrUtil.isNotBlank(vo.getSpecialty())) {
-                vo.setSpecialtyName(dictService.getByDictCode(vo.getSpecialty()) != null
-                        ? dictService.getByDictCode(vo.getSpecialty()).getDictName() : null);
+                List<String> specList = StrUtil.split(vo.getSpecialty(), ',');
+                vo.setSpecialtyList(specList);
+                List<String> nameList = specList.stream()
+                        .map(code -> {
+                            var dict = dictService.getByDictCode(code);
+                            return dict != null ? dict.getDictName() : code;
+                        })
+                        .collect(Collectors.toList());
+                vo.setSpecialtyNameList(nameList);
+                vo.setSpecialtyName(String.join(",", nameList));
             }
             // 填充结算类型名称
             if (vo.getSettlementType() != null) {
@@ -305,9 +314,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             }
             // 角色业务规则校验（hospitals范围 + 设计师specialty）
             validateHospitalScope(roleEntity, dto.getHospitalIds());
-            validateSpecialty(roleEntity, dto.getSpecialty());
+            validateSpecialty(roleEntity, dto.getSpecialtyList());
             // DTO转换为实体对象
             UserEntity entity = UserConvert.toEntity(dto);
+            // specialty List → 逗号拼接存储
+            if (CollUtil.isNotEmpty(dto.getSpecialtyList())) {
+                entity.setSpecialty(CollUtil.join(dto.getSpecialtyList(), ","));
+            } else {
+                entity.setSpecialty(null);
+            }
             // 填充冗余字段（复用已查询的实体，避免重复查询）
             fillRedundantFields(entity, orgEntity, deptEntity, roleEntity);
             // 密码加密存储（如果未提供密码则从系统配置获取默认密码）
@@ -404,7 +419,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             if (effectiveRole != null) {
                 // 角色业务规则校验（hospitals范围 + 设计师specialty）
                 validateHospitalScope(effectiveRole, dto.getHospitalIds());
-                validateSpecialty(effectiveRole, dto.getSpecialty());
+                validateSpecialty(effectiveRole, dto.getSpecialtyList());
             }
             // 更新角色冗余字段，并处理医院范围权限变更
             if (newRole != null) {
@@ -416,6 +431,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     && DataScopeTypeEnum.HOSPITALS.getCode().equals(effectiveRole.getDataScopeType())) {
                 // 覆盖式分配医院权限（角色变更或编辑页微调均走此路径）
                 userHospitalService.assignHospitals(id, dto.getHospitalIds());
+            }
+            if (dto.getSpecialtyList() != null) {
+                entity.setSpecialty(CollUtil.join(dto.getSpecialtyList(), ","));
             }
 
             // 更新用户信息（排除不允许通过此接口修改的字段）
@@ -586,27 +604,30 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     }
 
     /**
-     * 校验设计师专业方向：当角色为 designer/designer-manager 时，specialty 必填且字典编码合法
+     * 校验设计师专业方向：当角色为 designer/designer-manager 时，至少选择一个方向且全部合法
      *
-     * @param role      生效角色（null时跳过校验）
-     * @param specialty 专业方向字典编码
+     * @param role          生效角色（null 时跳过校验）
+     * @param specialtyList 专业方向字典编码列表
      */
-    private void validateSpecialty(RoleEntity role, String specialty) {
-        if (role == null || role.getRoleCode() == null || !SPECIALTY_REQUIRED_ROLES.contains(role.getRoleCode())) {
+    private void validateSpecialty(RoleEntity role, List<String> specialtyList) {
+        if (role == null || role.getRoleCode() == null
+                || !SPECIALTY_REQUIRED_ROLES.contains(role.getRoleCode())) {
             return;
         }
-        if (StrUtil.isBlank(specialty)) {
+        if (CollUtil.isEmpty(specialtyList)) {
             log.warn("角色为设计师/设计师管理员，但未指定专业方向，roleId={}", role.getId());
             throw new BusinessException(ErrorCodeEnum.USER_ROLE_SPECIALTY_REQUIRED);
         }
         String prefix = DictCodeConstants.USER_SPECIALTY + ".";
-        if (!specialty.startsWith(prefix)) {
-            log.warn("专业方向字典编码无效，specialty={}", specialty);
-            throw new BusinessException(ErrorCodeEnum.USER_SPECIALTY_INVALID, prefix);
-        }
-        if (dictService.getByDictCode(specialty) == null) {
-            log.warn("专业方向字典编码不存在，specialty={}", specialty);
-            throw new BusinessException(ErrorCodeEnum.USER_SPECIALTY_INVALID, specialty);
+        for (String specialty : specialtyList) {
+            if (StrUtil.isBlank(specialty) || !specialty.startsWith(prefix)) {
+                log.warn("专业方向字典编码无效，specialty={}", specialty);
+                throw new BusinessException(ErrorCodeEnum.USER_SPECIALTY_INVALID, prefix);
+            }
+            if (dictService.getByDictCode(specialty) == null) {
+                log.warn("专业方向字典编码不存在，specialty={}", specialty);
+                throw new BusinessException(ErrorCodeEnum.USER_SPECIALTY_INVALID, specialty);
+            }
         }
     }
 
@@ -728,10 +749,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         } else {
             vo.setHospitalNames(Collections.emptyList());
         }
-        // 填充专业方向名称
+        // 填充专业方向多值列表及名称列表
         if (StrUtil.isNotBlank(vo.getSpecialty())) {
-            vo.setSpecialtyName(dictService.getByDictCode(vo.getSpecialty()) != null
-                    ? dictService.getByDictCode(vo.getSpecialty()).getDictName() : null);
+            List<String> specList = StrUtil.split(vo.getSpecialty(), ',');
+            vo.setSpecialtyList(specList);
+            List<String> nameList = specList.stream()
+                    .map(code -> {
+                        var dict = dictService.getByDictCode(code);
+                        return dict != null ? dict.getDictName() : code;
+                    })
+                    .collect(Collectors.toList());
+            vo.setSpecialtyNameList(nameList);
+            // 保持 specialtyName 向后兼容（逗号拼接）
+            vo.setSpecialtyName(String.join(",", nameList));
         }
         // 填充结算类型名称
         if (vo.getSettlementType() != null) {

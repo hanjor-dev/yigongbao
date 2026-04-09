@@ -3,7 +3,10 @@ package com.yigongbao.module.system.user.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 /**
  * 用户 Mapper
@@ -49,4 +52,58 @@ public interface UserMapper extends BaseMapper<UserEntity> {
      */
     @Select("SELECT COUNT(*) FROM sys_user WHERE org_id = #{orgId} AND is_deleted = 0")
     Long countByOrgId(Long orgId);
+
+    /**
+     * 查询符合专业方向的设计师候选列表（按当前在手工单数升序）
+     * 用于自动分配：取负载最低的第一位
+     *
+     * @param specialty   项目专业方向（单值，如 "7.1"）
+     * @param maxCapacity 最大并发工单数上限（不含）
+     * @return 设计师列表，已按 current_load ASC 排序
+     */
+    @Select("""
+        SELECT u.*,
+               (SELECT COUNT(*) FROM order_main om
+                WHERE om.designer_id = u.id
+                  AND om.status BETWEEN 21 AND 29
+                  AND om.is_deleted = 0) AS current_load
+        FROM sys_user u
+        WHERE u.role_code IN ('designer', 'designer-manager')
+          AND u.status = 1
+          AND u.is_deleted = 0
+          AND FIND_IN_SET(#{specialty}, u.specialty) > 0
+          AND (SELECT COUNT(*) FROM order_main om
+               WHERE om.designer_id = u.id
+                 AND om.status BETWEEN 21 AND 29
+                 AND om.is_deleted = 0) < #{maxCapacity}
+        ORDER BY current_load ASC
+        """)
+    List<UserEntity> selectAvailableDesigners(@Param("specialty") String specialty,
+                                              @Param("maxCapacity") int maxCapacity);
+
+    /**
+     * 查询符合任意一个专业方向的设计师列表（用于手动分配时的候选展示）
+     * 注意：specialtyCondition 由 Service 层使用严格正则校验后拼接，防止注入
+     *
+     * @param specialtyCondition 已校验的 FIND_IN_SET 条件串，如
+     *        "FIND_IN_SET('7.1', specialty) > 0 OR FIND_IN_SET('7.2', specialty) > 0"
+     * @param maxCapacity        最大并发工单数上限
+     * @return 设计师列表，已按 current_load ASC 排序
+     */
+    @Select("""
+        SELECT u.*,
+               (SELECT COUNT(*) FROM order_main om
+                WHERE om.designer_id = u.id
+                  AND om.status BETWEEN 21 AND 29
+                  AND om.is_deleted = 0) AS current_load
+        FROM sys_user u
+        WHERE u.role_code IN ('designer', 'designer-manager')
+          AND u.status = 1
+          AND u.is_deleted = 0
+          AND (${specialtyCondition})
+        ORDER BY current_load ASC
+        """)
+    List<UserEntity> selectDesignersBySpecialties(
+            @Param("specialtyCondition") String specialtyCondition,
+            @Param("maxCapacity") int maxCapacity);
 }

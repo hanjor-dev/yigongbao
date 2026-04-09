@@ -1057,4 +1057,109 @@ class UserServiceImplTest {
         assertNull(result.getDataScopeType());
         assertTrue(result.getHospitalIds().isEmpty());
     }
+
+    // ==================== specialty 多选校验测试 ====================
+
+    @Test
+    @DisplayName("createUser: 设计师多个合法专业方向，成功")
+    void createUser_designerWithMultipleSpecialties_success() {
+        RoleEntity designerRole = new RoleEntity();
+        designerRole.setId(10L);
+        designerRole.setRoleName("设计师");
+        designerRole.setRoleCode("designer");
+        designerRole.setDataScopeType("all");
+        designerRole.setStatus(1);
+
+        CreateUserDTO dto = new CreateUserDTO();
+        dto.setUsername("designer_new");
+        dto.setPassword("test123");
+        dto.setRealName("新设计师");
+        dto.setPhone("13911111111");
+        dto.setAccountType(1);
+        dto.setOrgId(1L);
+        dto.setRoleId(10L);
+        dto.setSpecialtyList(List.of("7.1", "7.2"));
+
+        com.yigongbao.module.system.dict.vo.DictVO dict71 = new com.yigongbao.module.system.dict.vo.DictVO();
+        dict71.setDictCode("7.1");
+        dict71.setDictName("口腔修复");
+        com.yigongbao.module.system.dict.vo.DictVO dict72 = new com.yigongbao.module.system.dict.vo.DictVO();
+        dict72.setDictCode("7.2");
+        dict72.setDictName("种植设计");
+
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(roleService.getById(10L)).thenReturn(designerRole);
+        when(dictService.getByDictCode("7.1")).thenReturn(dict71);
+        when(dictService.getByDictCode("7.2")).thenReturn(dict72);
+        when(configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey())).thenReturn("Abc12345");
+        when(passwordEncoder.encode(any())).thenReturn("$2a$10$xxx");
+        when(userMapper.insert(any(UserEntity.class))).thenReturn(1);
+
+        userService.createUser(dto);
+
+        verify(userMapper, times(1)).insert(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("createUser: 设计师专业方向编码格式无效，抛 USER_SPECIALTY_INVALID")
+    void createUser_invalidSpecialtyCode_throwsException() {
+        RoleEntity designerRole = new RoleEntity();
+        designerRole.setId(10L);
+        designerRole.setRoleName("设计师");
+        designerRole.setRoleCode("designer");
+        designerRole.setDataScopeType("all");
+        designerRole.setStatus(1);
+
+        CreateUserDTO dto = new CreateUserDTO();
+        dto.setUsername("designer_new2");
+        dto.setPassword("test123");
+        dto.setRealName("新设计师2");
+        dto.setPhone("13922222222");
+        dto.setAccountType(1);
+        dto.setOrgId(1L);
+        dto.setRoleId(10L);
+        dto.setSpecialtyList(List.of("invalid"));
+
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(roleService.getById(10L)).thenReturn(designerRole);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.createUser(dto)
+        );
+        assertEquals(ErrorCodeEnum.USER_SPECIALTY_INVALID.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("createUser: 设计师未传专业方向，抛 USER_ROLE_SPECIALTY_REQUIRED")
+    void createUser_designerWithoutSpecialty_throwsException() {
+        RoleEntity designerRole = new RoleEntity();
+        designerRole.setId(10L);
+        designerRole.setRoleName("设计师");
+        designerRole.setRoleCode("designer");
+        designerRole.setDataScopeType("all");
+        designerRole.setStatus(1);
+
+        CreateUserDTO dto = new CreateUserDTO();
+        dto.setUsername("designer_new3");
+        dto.setPassword("test123");
+        dto.setRealName("新设计师3");
+        dto.setPhone("13933333333");
+        dto.setAccountType(1);
+        dto.setOrgId(1L);
+        dto.setRoleId(10L);
+        // specialtyList 为 null
+
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(roleService.getById(10L)).thenReturn(designerRole);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.createUser(dto)
+        );
+        assertEquals(ErrorCodeEnum.USER_ROLE_SPECIALTY_REQUIRED.getCode(), exception.getCode());
+    }
 }

@@ -1,5 +1,6 @@
 package com.yigongbao.module.system.user.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.yigongbao.common.entity.BaseEntity;
 import lombok.Data;
@@ -105,6 +106,12 @@ public class UserEntity extends BaseEntity implements Serializable {
      * 专业方向
      */
     private String specialty;
+
+    /**
+     * 当前在手工单数（非数据库字段，由自定义 SQL 查询填充）
+     */
+    @TableField(exist = false)
+    private Integer currentLoad;
 
     /**
      * 资质证书信息
