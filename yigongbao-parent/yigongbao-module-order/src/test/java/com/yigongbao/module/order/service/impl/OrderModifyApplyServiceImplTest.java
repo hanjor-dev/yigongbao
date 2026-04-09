@@ -29,7 +29,7 @@ import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
 import com.yigongbao.module.order.mapper.OrderModifyApplyMapper;
 import com.yigongbao.module.order.validator.OrderDataValidator;
-import com.yigongbao.module.order.vo.modify.CanApplyModifyResult;
+import com.yigongbao.module.order.vo.modify.ApplicableModifyTypesVO;
 import com.yigongbao.module.order.vo.modify.ModifyApplyVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -141,61 +141,65 @@ class OrderModifyApplyServiceImplTest {
         return item;
     }
 
-    // ==================== canApplyModify ====================
+    // ==================== getApplicableTypes ====================
 
     @Nested
-    class CanApplyModifyTests {
+    class GetApplicableTypesTests {
 
         @Test
-        void 订单不存在_返回不可申请() {
+        void 订单不存在_抛出ORDER_NOT_FOUND异常() {
             when(orderMainMapper.selectById(ORDER_ID)).thenReturn(null);
 
-            CanApplyModifyResult result = service.canApplyModify(ORDER_ID);
-
-            assertThat(result.isCanApply()).isFalse();
-            assertThat(result.getReason()).isEqualTo("ORDER_NOT_FOUND");
+            assertThatThrownBy(() -> service.getApplicableTypes(ORDER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("不存在");
         }
 
         @Test
-        void 阶段不允许_返回不可申请() {
+        void 阶段不允许_返回空类型列表且reason为PHASE_NOT_ALLOWED() {
             when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(3)); // 打印阶段
 
-            CanApplyModifyResult result = service.canApplyModify(ORDER_ID);
+            ApplicableModifyTypesVO result = service.getApplicableTypes(ORDER_ID);
 
-            assertThat(result.isCanApply()).isFalse();
-            assertThat(result.getReason()).isEqualTo("PHASE_NOT_ALLOWED");
+            assertThat(result.getAllowedTypes()).isEmpty();
+            assertThat(result.getReason()).isEqualTo(ApplicableModifyTypesVO.REASON_PHASE_NOT_ALLOWED);
+            assertThat(result.getPendingApplyId()).isNull();
         }
 
         @Test
-        void 已有待审核申请_返回不可申请() {
+        void 已有待审核申请_返回空类型列表且携带pendingApplyId() {
             when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(1));
-            when(orderModifyApplyMapper.selectCount(any())).thenReturn(1L);
+            OrderModifyApplyEntity pendingApply = new OrderModifyApplyEntity();
+            pendingApply.setId(999L);
+            pendingApply.setStatus(ModifyApplyStatusEnum.PENDING.getCode());
+            when(orderModifyApplyMapper.selectOne(any())).thenReturn(pendingApply);
 
-            CanApplyModifyResult result = service.canApplyModify(ORDER_ID);
+            ApplicableModifyTypesVO result = service.getApplicableTypes(ORDER_ID);
 
-            assertThat(result.isCanApply()).isFalse();
-            assertThat(result.getReason()).isEqualTo("PENDING_EXISTS");
+            assertThat(result.getAllowedTypes()).isEmpty();
+            assertThat(result.getReason()).isEqualTo(ApplicableModifyTypesVO.REASON_PENDING_EXISTS);
+            assertThat(result.getPendingApplyId()).isEqualTo(999L);
         }
 
         @Test
         void 订单阶段_返回可申请全部类型() {
             when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(1));
-            when(orderModifyApplyMapper.selectCount(any())).thenReturn(0L);
+            when(orderModifyApplyMapper.selectOne(any())).thenReturn(null);
 
-            CanApplyModifyResult result = service.canApplyModify(ORDER_ID);
+            ApplicableModifyTypesVO result = service.getApplicableTypes(ORDER_ID);
 
-            assertThat(result.isCanApply()).isTrue();
+            assertThat(result.getReason()).isNull();
             assertThat(result.getAllowedTypes()).containsExactlyInAnyOrder("14.1", "14.2", "14.3");
         }
 
         @Test
         void 设计阶段_只返回重建项目类型() {
             when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(2));
-            when(orderModifyApplyMapper.selectCount(any())).thenReturn(0L);
+            when(orderModifyApplyMapper.selectOne(any())).thenReturn(null);
 
-            CanApplyModifyResult result = service.canApplyModify(ORDER_ID);
+            ApplicableModifyTypesVO result = service.getApplicableTypes(ORDER_ID);
 
-            assertThat(result.isCanApply()).isTrue();
+            assertThat(result.getReason()).isNull();
             assertThat(result.getAllowedTypes()).containsExactly("14.3");
         }
     }

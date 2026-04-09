@@ -75,6 +75,13 @@ public enum ErrorCodeEnum {
     USER_DEPT_NOT_FOUND(629, "所属部门不存在"),
     USER_HOSPITAL_NOT_FOUND(630, "用户医院关联不存在"),
 
+    // ==================== 用户创建相关 631-634 ====================
+    USER_ROLE_HOSPITAL_SCOPE_REQUIRED(631, "角色数据权限为医院范围，请选择可操作的医院"),
+    USER_HOSPITAL_INVALID(632, "存在无效的医院ID"),
+    USER_ROLE_SPECIALTY_REQUIRED(633, "设计师角色必须选择专业方向"),
+    USER_SPECIALTY_INVALID(634, "专业方向无效，请选择有效的字典编码：%s"),
+    USER_PASSWORD_WEAK(635, "密码必须包含字母和数字，长度6-20位"),
+
     // ==================== 资源相关 631-634 ====================
     RESOURCE_NOT_FOUND(631, "资源不存在"),
     RESOURCE_EXISTS(632, "资源编码已存在"),

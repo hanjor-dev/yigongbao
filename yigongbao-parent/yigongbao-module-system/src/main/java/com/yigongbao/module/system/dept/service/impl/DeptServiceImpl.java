@@ -27,7 +27,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.hutool.core.util.StrUtil;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 部门 Service 实现类
@@ -232,6 +234,31 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             throw e;
         } catch (Exception e) {
             log.error("修改部门状态异常，id={}, status={}", id, status, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 全量查询部门列表（用于前端下拉选择）
+     *
+     * @param orgId 机构ID（非必填，传入则只查询该机构下的部门）
+     * @return 部门列表（包含关联名称）
+     */
+    @Override
+    public List<DeptVO> listAllDept(Long orgId) {
+        log.info("全量查询部门列表，orgId={}", orgId);
+        try {
+            LambdaQueryWrapper<DeptEntity> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(Objects.nonNull(orgId), DeptEntity::getOrgId, orgId)
+                    .orderByAsc(DeptEntity::getDeptName);
+            List<DeptEntity> entityList = list(wrapper);
+            List<DeptVO> voList = entityList.stream()
+                    .map(this::toVOWithNames)
+                    .collect(Collectors.toList());
+            log.info("全量查询部门列表成功，总数={}", voList.size());
+            return voList;
+        } catch (Exception e) {
+            log.error("全量查询部门列表异常", e);
             throw e;
         }
     }

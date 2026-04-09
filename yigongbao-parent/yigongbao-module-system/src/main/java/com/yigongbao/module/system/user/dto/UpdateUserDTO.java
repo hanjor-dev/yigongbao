@@ -24,8 +24,9 @@ public class UpdateUserDTO implements Serializable {
     private String realName;
 
     /**
-     * 手机号
+     * 手机号（不传则不修改；传空字符串无效，需传 null）
      */
+    @Size(min = 11, max = 11, message = "手机号长度必须为11位")
     @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
     private String phone;
 
@@ -37,8 +38,10 @@ public class UpdateUserDTO implements Serializable {
     private String email;
 
     /**
-     * 性别
+     * 性别（0=未知，1=男，2=女）
      */
+    @Min(value = 0, message = "性别值不合法")
+    @Max(value = 2, message = "性别值不合法")
     private Integer sex;
 
     /**
@@ -50,6 +53,8 @@ public class UpdateUserDTO implements Serializable {
     /**
      * 账户分类（1=内部用户，2=外部用户）
      */
+    @Min(value = 1, message = "账户分类值不合法，仅支持1（内部用户）或2（外部用户）")
+    @Max(value = 2, message = "账户分类值不合法，仅支持1（内部用户）或2（外部用户）")
     private Integer accountType;
 
     /**
@@ -92,13 +97,16 @@ public class UpdateUserDTO implements Serializable {
     private String qualification;
 
     /**
-     * 结算类型
+     * 结算类型（来自字典表）
      */
+    @Min(value = 0, message = "结算类型值不合法")
     private Integer settlementType;
 
     /**
      * 状态（0=禁用，1=正常）
      */
+    @Min(value = 0, message = "状态值不合法，仅支持0（禁用）或1（正常）")
+    @Max(value = 1, message = "状态值不合法，仅支持0（禁用）或1（正常）")
     private Integer status;
 
     /**

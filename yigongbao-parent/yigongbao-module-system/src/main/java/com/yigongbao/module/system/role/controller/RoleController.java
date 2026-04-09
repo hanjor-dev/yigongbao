@@ -17,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * 角色管理 Controller
  * 处理角色相关的 HTTP 请求
@@ -127,5 +129,16 @@ public class RoleController {
             @RequestParam @Min(0) @Max(1) Integer status) {
         roleService.updateStatus(id, status);
         return Result.success();
+    }
+
+    /**
+     * 全量查询角色列表（用于前端下拉选择）
+     *
+     * @return 角色列表（包含关联名称）
+     */
+    @GetMapping("/all")
+    @Operation(summary = "全量查询角色列表（用于下拉选择）")
+    public Result<List<RoleVO>> listAll() {
+        return Result.success(roleService.listAllRole());
     }
 }

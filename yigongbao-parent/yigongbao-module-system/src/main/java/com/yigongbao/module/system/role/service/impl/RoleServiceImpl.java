@@ -26,7 +26,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.hutool.core.util.StrUtil;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 角色 Service 实现类
@@ -226,6 +228,29 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             throw e;
         } catch (Exception e) {
             log.error("修改角色状态异常，id={}, status={}", id, status, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 全量查询角色列表（用于前端下拉选择）
+     *
+     * @return 角色列表（包含关联名称）
+     */
+    @Override
+    public List<RoleVO> listAllRole() {
+        log.info("全量查询角色列表，用于下拉选择");
+        try {
+            LambdaQueryWrapper<RoleEntity> wrapper = new LambdaQueryWrapper<>();
+            wrapper.orderByAsc(RoleEntity::getRoleName);
+            List<RoleEntity> entityList = list(wrapper);
+            List<RoleVO> voList = entityList.stream()
+                    .map(this::toVOWithNames)
+                    .collect(Collectors.toList());
+            log.info("全量查询角色列表成功，总数={}", voList.size());
+            return voList;
+        } catch (Exception e) {
+            log.error("全量查询角色列表异常", e);
             throw e;
         }
     }

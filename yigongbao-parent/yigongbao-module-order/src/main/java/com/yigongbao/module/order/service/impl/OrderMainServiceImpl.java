@@ -36,6 +36,7 @@ import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
+import com.yigongbao.module.order.service.OrderModifyApplyService;
 import com.yigongbao.module.order.mapper.OrderDraftMapper;
 import com.yigongbao.module.order.mapper.OrderFileMapper;
 import com.yigongbao.module.order.mapper.OrderItemDraftMapper;
@@ -102,6 +103,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderQueryHelper orderQueryHelper;
     private final ObjectMapper objectMapper;
     private final OrderDataValidator orderDataValidator;
+    private final OrderModifyApplyService orderModifyApplyService;
 
     // ==================== 私有方法 ====================
 
@@ -223,6 +225,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
             // 批量填充重建项目列表（避免 N+1）
             orderQueryHelper.fillRebuildProjectList(voList);
+            // 批量填充修改申请角标（避免 N+1）
+            orderModifyApplyService.fillModifyApplyStatus(voList);
 
             // 构建返回页（复用分页元信息，替换 records）
             IPage<OrderListVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());

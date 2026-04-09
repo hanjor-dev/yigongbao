@@ -83,8 +83,8 @@ mybatis-plus:
   configuration:
     # 驼峰命名映射
     map-underscore-to-camel-case: true
-    # 打印 SQL（开发环境）
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 禁用 SQL 日志输出
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
   # 配置扫描 XML
   mapper-locations: classpath*:/mapper/**/*.xml
 

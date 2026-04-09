@@ -8,9 +8,11 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.basic.hospital.service.HospitalService;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.service.DeptService;
+import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.role.entity.RoleEntity;
@@ -78,6 +80,12 @@ class UserServiceImplTest {
     @Mock
     private UserHospitalService userHospitalService;
 
+    @Mock
+    private HospitalService hospitalService;
+
+    @Mock
+    private DictService dictService;
+
     @InjectMocks
     private UserServiceImpl userService;
 
@@ -136,10 +144,10 @@ class UserServiceImplTest {
         testEntity.setCreateTime(now);
         testEntity.setUpdateTime(now);
 
-        // 初始化创建DTO
+        // 初始化创建DTO（密码需包含字母和数字，符合密码强度要求）
         createDTO = new CreateUserDTO();
         createDTO.setUsername("newuser");
-        createDTO.setPassword("123456");
+        createDTO.setPassword("test123");
         createDTO.setRealName("新用户");
         createDTO.setPhone("13900000000");
         createDTO.setAccountType(1);
@@ -563,16 +571,16 @@ class UserServiceImplTest {
     @Test
     @DisplayName("changePassword: 修改密码成功")
     void changePassword_shouldSuccess() {
-        // 准备
+        // 准备（密码需包含字母和数字，符合密码强度要求）
         when(userMapper.selectById(1L)).thenReturn(testEntity);
-        when(passwordEncoder.matches("123456", "$2a$10$xxx")).thenReturn(true);
-        when(passwordEncoder.encode("654321")).thenReturn("$2a$10$newencrypted");
+        when(passwordEncoder.matches("old123", "$2a$10$xxx")).thenReturn(true);
+        when(passwordEncoder.encode("new456")).thenReturn("$2a$10$newencrypted");
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
         // 执行
         ChangePasswordDTO cpDTO1 = new ChangePasswordDTO();
-        cpDTO1.setOldPassword("123456");
-        cpDTO1.setNewPassword("654321");
+        cpDTO1.setOldPassword("old123");
+        cpDTO1.setNewPassword("new456");
         userService.changePassword(1L, cpDTO1);
 
         // 断言
@@ -693,6 +701,9 @@ class UserServiceImplTest {
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(orgService.getById(1L)).thenReturn(testOrg);
         when(roleService.getById(2L)).thenReturn(roleWithHospitalScope);
+        when(hospitalService.getById(10L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
+        when(hospitalService.getById(20L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
+        when(hospitalService.getById(30L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
         when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("$2a$10$encrypted");
         when(userMapper.insert(any(UserEntity.class))).thenAnswer(invocation -> {
             UserEntity entity = invocation.getArgument(0);
@@ -751,11 +762,11 @@ class UserServiceImplTest {
 
     /**
      * 场景：角色 dataScopeType=hospitals，但未传入 hospitalIds
-     * 期望：不调用 userHospitalService.assignHospitals
+     * 期望：抛出异常（角色需要医院范围权限时必须分配医院）
      */
     @Test
-    @DisplayName("createUser: dataScopeType=hospitals但未传hospitalIds不分配医院权限")
-    void createUser_whenDataScopeTypeHospitalsWithoutHospitalIds_shouldNotAssignHospitals() {
+    @DisplayName("createUser: dataScopeType=hospitals但未传hospitalIds应抛出异常")
+    void createUser_whenDataScopeTypeHospitalsWithoutHospitalIds_shouldThrowException() {
         // 准备：dataScopeType=hospitals 的角色，但不传 hospitalIds
         RoleEntity roleWithHospitalScope = new RoleEntity();
         roleWithHospitalScope.setId(2L);
@@ -775,19 +786,13 @@ class UserServiceImplTest {
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(orgService.getById(1L)).thenReturn(testOrg);
         when(roleService.getById(2L)).thenReturn(roleWithHospitalScope);
-        when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("$2a$10$encrypted");
-        when(userMapper.insert(any(UserEntity.class))).thenAnswer(invocation -> {
-            UserEntity entity = invocation.getArgument(0);
-            entity.setId(102L);
-            return 1;
-        });
 
-        // 执行
-        userService.createUser(dtoWithoutHospitals);
-
-        // 断言：验证未分配医院权限
-        verify(userHospitalService, never()).assignHospitals(anyLong(), anyList());
-        verify(userMapper, times(1)).insert(any(UserEntity.class));
+        // 执行 & 断言：应抛出异常
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.createUser(dtoWithoutHospitals)
+        );
+        assertEquals(ErrorCodeEnum.USER_ROLE_HOSPITAL_SCOPE_REQUIRED.getCode(), exception.getCode());
     }
 
     // ==================== updateUser 医院范围权限测试 ====================
@@ -820,6 +825,8 @@ class UserServiceImplTest {
         when(userMapper.selectById(1L)).thenReturn(existingUser);
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(roleService.getById(2L)).thenReturn(newRoleWithHospitalScope);
+        when(hospitalService.getById(10L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
+        when(hospitalService.getById(20L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
         // 执行
@@ -856,6 +863,8 @@ class UserServiceImplTest {
         when(userMapper.selectById(1L)).thenReturn(existingUser);
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(roleService.getById(2L)).thenReturn(currentRole);
+        when(hospitalService.getById(99L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
+        when(hospitalService.getById(88L)).thenReturn(new com.yigongbao.module.basic.hospital.entity.HospitalEntity());
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
         // 执行
@@ -907,8 +916,8 @@ class UserServiceImplTest {
      * 期望：不调用 userHospitalService.assignHospitals
      */
     @Test
-    @DisplayName("updateUser: 变更角色为dataScopeType=hospitals但未传hospitalIds不应分配医院")
-    void updateUser_whenDataScopeTypeHospitalsWithoutHospitalIds_shouldNotAssignHospitals() {
+    @DisplayName("updateUser: 变更角色为dataScopeType=hospitals但未传hospitalIds应抛出异常")
+    void updateUser_whenDataScopeTypeHospitalsWithoutHospitalIds_shouldThrowException() {
         // 准备：变更到 dataScopeType=hospitals 的角色，但不传 hospitalIds
         UserEntity existingUser = new UserEntity();
         existingUser.setId(1L);
@@ -930,13 +939,13 @@ class UserServiceImplTest {
         when(userMapper.selectById(1L)).thenReturn(existingUser);
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(roleService.getById(2L)).thenReturn(newRoleWithHospitalScope);
-        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
-        // 执行
-        userService.updateUser(1L, dtoWithoutHospitals);
-
-        // 断言：验证未分配医院权限
-        verify(userHospitalService, never()).assignHospitals(anyLong(), anyList());
+        // 执行 & 断言：应抛出异常
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.updateUser(1L, dtoWithoutHospitals)
+        );
+        assertEquals(ErrorCodeEnum.USER_ROLE_HOSPITAL_SCOPE_REQUIRED.getCode(), exception.getCode());
     }
 
     /**

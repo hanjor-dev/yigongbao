@@ -8,6 +8,8 @@ import com.yigongbao.module.system.dept.dto.UpdateDeptDTO;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.vo.DeptVO;
 
+import java.util.List;
+
 /**
  * 部门 Service 接口
  *
@@ -61,4 +63,12 @@ public interface DeptService extends IService<DeptEntity> {
      * @param status 状态（0=禁用，1=正常）
      */
     void updateStatus(Long id, Integer status);
+
+    /**
+     * 全量查询部门列表（用于前端下拉选择）
+     *
+     * @param orgId 机构ID（非必填，传入则只查询该机构下的部门）
+     * @return 部门列表（包含关联名称）
+     */
+    List<DeptVO> listAllDept(Long orgId);
 }

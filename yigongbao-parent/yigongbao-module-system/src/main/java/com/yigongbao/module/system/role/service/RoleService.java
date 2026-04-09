@@ -8,6 +8,8 @@ import com.yigongbao.module.system.role.dto.UpdateRoleDTO;
 import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.vo.RoleVO;
 
+import java.util.List;
+
 /**
  * 角色 Service 接口
  *
@@ -61,4 +63,11 @@ public interface RoleService extends IService<RoleEntity> {
      * @param status 状态（0=禁用，1=正常）
      */
     void updateStatus(Long id, Integer status);
+
+    /**
+     * 全量查询角色列表（用于前端下拉选择）
+     *
+     * @return 角色列表（包含关联名称）
+     */
+    List<RoleVO> listAllRole();
 }

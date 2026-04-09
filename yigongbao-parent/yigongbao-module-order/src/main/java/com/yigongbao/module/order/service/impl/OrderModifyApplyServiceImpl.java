@@ -38,11 +38,12 @@ import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
 import com.yigongbao.module.order.mapper.OrderModifyApplyMapper;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
 import com.yigongbao.module.order.validator.OrderDataValidator;
-import com.yigongbao.module.order.vo.modify.CanApplyModifyResult;
+import com.yigongbao.module.order.vo.modify.ApplicableModifyTypesVO;
 import com.yigongbao.module.order.vo.modify.ModificationLogVO;
 import com.yigongbao.module.order.vo.modify.ModifyApplyDetailVO;
 import com.yigongbao.module.order.vo.modify.ModifyApplyListVO;
 import com.yigongbao.module.order.vo.modify.ModifyApplyVO;
+import com.yigongbao.module.order.vo.order.OrderListVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserService;
@@ -94,34 +95,35 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     // ==================== 阶段判断 ====================
 
     /**
-     * 判断订单是否可以发起修改申请
+     * 获取订单当前可申请的修改类型列表
      *
      * @param orderId 订单ID
-     * @return 判断结果（包含 canApply、allowedTypes、reason）
+     * @return 可申请修改类型结果
      */
     @Override
-    public CanApplyModifyResult canApplyModify(Long orderId) {
-        log.info("判断是否可申请修改，orderId={}", orderId);
+    public ApplicableModifyTypesVO getApplicableTypes(Long orderId) {
+        log.info("获取可申请修改类型，orderId={}", orderId);
         OrderMainEntity order = orderMainMapper.selectById(orderId);
         if (order == null) {
-            return CanApplyModifyResult.no("ORDER_NOT_FOUND");
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
         // 校验订单阶段（仅 phase=1 或 phase=2 可申请）
         Integer phase = order.getPhase();
         if (!FlowPhaseEnum.ORDER.getValue().equals(phase)
                 && !FlowPhaseEnum.DESIGN.getValue().equals(phase)) {
-            return CanApplyModifyResult.no("PHASE_NOT_ALLOWED");
+            return ApplicableModifyTypesVO.forPhaseNotAllowed();
         }
 
         // 校验是否有待审核申请
-        Long pendingCount = orderModifyApplyMapper.selectCount(
+        OrderModifyApplyEntity pendingApply = orderModifyApplyMapper.selectOne(
                 new LambdaQueryWrapper<OrderModifyApplyEntity>()
                         .eq(OrderModifyApplyEntity::getOrderId, orderId)
                         .eq(OrderModifyApplyEntity::getStatus, ModifyApplyStatusEnum.PENDING.getCode())
+                        .last("LIMIT 1")
         );
-        if (pendingCount > 0) {
-            return CanApplyModifyResult.no("PENDING_EXISTS");
+        if (pendingApply != null) {
+            return ApplicableModifyTypesVO.forPendingExists(pendingApply.getId());
         }
 
         // 获取允许的申请类型
@@ -138,7 +140,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             allowedTypes = List.of(ModifyApplyTypeEnum.ITEM.getDictCode());
         }
 
-        return CanApplyModifyResult.yes(allowedTypes);
+        return ApplicableModifyTypesVO.forAllowed(allowedTypes);
     }
 
     // ==================== 申请发起 ====================
@@ -895,5 +897,63 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         ModificationLogVO vo = new ModificationLogVO();
         BeanUtils.copyProperties(entity, vo);
         return vo;
+    }
+
+    // ==================== 列表角标填充 ====================
+
+    /**
+     * 批量填充订单列表的修改申请角标信息
+     * <p>
+     * 一次性查询所有订单的有效申请（PENDING/APPROVED），按订单分组后批量填充，避免 N+1 查询。
+     * 每个订单只保留最近一条有效申请（优先 PENDING，次选 APPROVED）。
+     *
+     * @param voList 订单列表 VO
+     */
+    @Override
+    public void fillModifyApplyStatus(List<OrderListVO> voList) {
+        if (voList == null || voList.isEmpty()) {
+            return;
+        }
+        // 提取所有订单ID
+        List<Long> orderIds = voList.stream()
+                .map(OrderListVO::getId)
+                .collect(Collectors.toList());
+        // 一次性查询所有有效申请
+        List<OrderModifyApplyEntity> activeApplies = orderModifyApplyMapper.selectList(
+                new LambdaQueryWrapper<OrderModifyApplyEntity>()
+                        .in(OrderModifyApplyEntity::getOrderId, orderIds)
+                        .in(OrderModifyApplyEntity::getStatus,
+                                ModifyApplyStatusEnum.PENDING.getCode(),
+                                ModifyApplyStatusEnum.APPROVED.getCode())
+        );
+        if (activeApplies.isEmpty()) {
+            return;
+        }
+        // 按 orderId 分组（每个订单只取最关键的一条：PENDING 优先于 APPROVED）
+        Map<Long, OrderModifyApplyEntity> applyByOrderId = activeApplies.stream()
+                .collect(Collectors.toMap(
+                        OrderModifyApplyEntity::getOrderId,
+                        apply -> apply,
+                        (a, b) -> {
+                            // PENDING 优先
+                            if (ModifyApplyStatusEnum.PENDING.getCode().equals(a.getStatus())) {
+                                return a;
+                            }
+                            if (ModifyApplyStatusEnum.PENDING.getCode().equals(b.getStatus())) {
+                                return b;
+                            }
+                            // 两条均为 APPROVED，正常不应发生（业务约束：同一订单最多一条有效申请）
+                            log.warn("订单存在多条 APPROVED 申请，取 ID 最大（最新）的一条，orderId={}", a.getOrderId());
+                            return a.getId() > b.getId() ? a : b;
+                        }
+                ));
+        // 批量填充角标信息
+        for (OrderListVO vo : voList) {
+            OrderModifyApplyEntity apply = applyByOrderId.get(vo.getId());
+            if (apply != null) {
+                vo.setPendingModifyApplyStatus(apply.getStatus());
+                vo.setPendingModifyApplyId(apply.getId());
+            }
+        }
     }
 }

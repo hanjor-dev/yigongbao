@@ -52,8 +52,10 @@ public class CreateUserDTO implements Serializable {
     private String email;
 
     /**
-     * 性别
+     * 性别（0=未知，1=男，2=女）
      */
+    @Min(value = 0, message = "性别值不合法")
+    @Max(value = 2, message = "性别值不合法")
     private Integer sex;
 
     /**
@@ -64,8 +66,10 @@ public class CreateUserDTO implements Serializable {
 
     /**
      * 账户分类（1=内部用户，2=外部用户）
+     * 允许为空，为空时默认设置为内部用户（1）
      */
-    @NotNull(message = "账户分类不能为空")
+    @Min(value = 1, message = "账户分类值不合法，仅支持1（内部用户）或2（外部用户）")
+    @Max(value = 2, message = "账户分类值不合法，仅支持1（内部用户）或2（外部用户）")
     private Integer accountType;
 
     /**
@@ -82,6 +86,7 @@ public class CreateUserDTO implements Serializable {
     /**
      * 关联角色ID
      */
+    @NotNull(message = "角色不能为空")
     private Long roleId;
 
     /**
@@ -110,8 +115,9 @@ public class CreateUserDTO implements Serializable {
     private String qualification;
 
     /**
-     * 结算类型
+     * 结算类型（来自字典表）
      */
+    @Min(value = 0, message = "结算类型值不合法")
     private Integer settlementType;
 
     /**

@@ -17,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * 机构管理 Controller
  * 处理机构相关的 HTTP 请求
@@ -127,5 +129,16 @@ public class OrgController {
             @RequestParam @Min(0) @Max(1) Integer status) {
         orgService.updateStatus(id, status);
         return Result.success();
+    }
+
+    /**
+     * 全量查询机构列表（用于前端下拉选择）
+     *
+     * @return 机构列表（包含字典名称）
+     */
+    @GetMapping("/all")
+    @Operation(summary = "全量查询机构列表（用于下拉选择）")
+    public Result<List<OrgVO>> listAll() {
+        return Result.success(orgService.listAllOrg());
     }
 }

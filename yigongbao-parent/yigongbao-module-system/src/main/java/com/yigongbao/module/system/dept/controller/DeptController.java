@@ -17,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * 部门管理 Controller
  * 处理部门相关的 HTTP 请求
@@ -127,5 +129,17 @@ public class DeptController {
             @RequestParam @Min(0) @Max(1) Integer status) {
         deptService.updateStatus(id, status);
         return Result.success();
+    }
+
+    /**
+     * 全量查询部门列表（用于前端下拉选择）
+     *
+     * @param orgId 机构ID（非必填，传入则只查询该机构下的部门）
+     * @return 部门列表（包含关联名称）
+     */
+    @GetMapping("/all")
+    @Operation(summary = "全量查询部门列表（用于下拉选择）")
+    public Result<List<DeptVO>> listAll(@RequestParam(required = false) Long orgId) {
+        return Result.success(deptService.listAllDept(orgId));
     }
 }

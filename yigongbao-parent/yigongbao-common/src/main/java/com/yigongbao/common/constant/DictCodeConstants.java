@@ -69,6 +69,13 @@ public final class DictCodeConstants {
      */
     public static final String PATIENT_GENDER_FEMALE = "12.2";
 
+    // ==================== 用户专业方向 ====================
+    /**
+     * 专业方向（父节点 dict_code）
+     * 设计师/设计师管理员角色的 specialty 字段必须是此节点的子节点
+     */
+    public static final String USER_SPECIALTY = "7";
+
     // ==================== 重建项目分类 ====================
     /**
      * 重建项目分类（父节点 dict_code）

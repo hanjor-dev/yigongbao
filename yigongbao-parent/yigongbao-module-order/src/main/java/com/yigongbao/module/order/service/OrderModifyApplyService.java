@@ -6,11 +6,12 @@ import com.yigongbao.module.order.dto.modify.CreateModifyApplyDTO;
 import com.yigongbao.module.order.dto.modify.ExecuteModificationDTO;
 import com.yigongbao.module.order.dto.modify.ModificationLogPageQueryDTO;
 import com.yigongbao.module.order.dto.modify.ModifyApplyPageQueryDTO;
-import com.yigongbao.module.order.vo.modify.CanApplyModifyResult;
+import com.yigongbao.module.order.vo.modify.ApplicableModifyTypesVO;
 import com.yigongbao.module.order.vo.modify.ModificationLogVO;
 import com.yigongbao.module.order.vo.modify.ModifyApplyDetailVO;
 import com.yigongbao.module.order.vo.modify.ModifyApplyListVO;
 import com.yigongbao.module.order.vo.modify.ModifyApplyVO;
+import com.yigongbao.module.order.vo.order.OrderListVO;
 
 import java.util.List;
 
@@ -24,12 +25,17 @@ import java.util.List;
 public interface OrderModifyApplyService {
 
     /**
-     * 判断订单是否可以发起修改申请
+     * 获取订单当前可申请的修改类型列表
+     * <p>
+     * - 订单不存在：抛出 ORDER_NOT_FOUND 异常
+     * - 阶段不允许：返回空 allowedTypes，reason=PHASE_NOT_ALLOWED
+     * - 已有待审核申请：返回空 allowedTypes，reason=PENDING_EXISTS，pendingApplyId 有值
+     * - 正常：返回允许的类型编码列表
      *
      * @param orderId 订单ID
-     * @return 判断结果（包含 canApply、allowedTypes、reason）
+     * @return 可申请修改类型结果
      */
-    CanApplyModifyResult canApplyModify(Long orderId);
+    ApplicableModifyTypesVO getApplicableTypes(Long orderId);
 
     /**
      * 发起修改申请
@@ -115,4 +121,12 @@ public interface OrderModifyApplyService {
      * @param fieldNames 要修改的字段名列表
      */
     void validateFieldsInScope(Long applyId, List<String> fieldNames);
+
+    /**
+     * 批量填充订单列表的修改申请角标信息
+     * 一次性查询所有订单的有效申请（PENDING/APPROVED），按订单分组后批量填充，避免 N+1 查询
+     *
+     * @param voList 订单列表 VO
+     */
+    void fillModifyApplyStatus(List<OrderListVO> voList);
 }

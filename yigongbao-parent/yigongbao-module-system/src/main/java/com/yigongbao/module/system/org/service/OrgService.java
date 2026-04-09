@@ -8,6 +8,8 @@ import com.yigongbao.module.system.org.dto.UpdateOrgDTO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.vo.OrgVO;
 
+import java.util.List;
+
 /**
  * 机构 Service 接口
  *
@@ -61,4 +63,11 @@ public interface OrgService extends IService<OrgEntity> {
      * @param status 状态（0=禁用，1=正常）
      */
     void updateStatus(Long id, Integer status);
+
+    /**
+     * 全量查询机构列表（用于前端下拉选择）
+     *
+     * @return 机构列表（包含字典名称）
+     */
+    List<OrgVO> listAllOrg();
 }

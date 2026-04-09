@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Collectors;
 
 /**
  * 机构 Service 实现类
@@ -238,6 +239,29 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             throw e;
         } catch (Exception e) {
             log.error("修改机构状态异常，id={}, status={}", id, status, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 全量查询机构列表（用于前端下拉选择）
+     *
+     * @return 机构列表（包含字典名称）
+     */
+    @Override
+    public List<OrgVO> listAllOrg() {
+        log.info("全量查询机构列表，用于下拉选择");
+        try {
+            LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
+            wrapper.orderByAsc(OrgEntity::getOrgName);
+            List<OrgEntity> entityList = list(wrapper);
+            List<OrgVO> voList = entityList.stream()
+                    .map(this::toVOWithDictNames)
+                    .collect(Collectors.toList());
+            log.info("全量查询机构列表成功，总数={}", voList.size());
+            return voList;
+        } catch (Exception e) {
+            log.error("全量查询机构列表异常", e);
             throw e;
         }
     }
