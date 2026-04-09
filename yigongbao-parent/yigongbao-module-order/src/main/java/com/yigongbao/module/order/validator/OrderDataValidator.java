@@ -89,7 +89,7 @@ public class OrderDataValidator {
      * @param entity     草稿实体（待填充 Name）
      * @param orgId      机构ID
      * @param hospitalId 医院ID
-     * @param deptId     医院科室ID
+     * @param hospitalDeptId 医院科室ID
      * @param doctorId   医生ID
      * @param doctorName 医生姓名（快速创建时传入）
      * @param doctorPhone 医生电话（快速创建时传入）
@@ -97,7 +97,7 @@ public class OrderDataValidator {
      * @param mode       校验模式
      */
     public void validateAndFillMaster(OrderDraftEntity entity,
-            Long orgId, Long hospitalId, Long deptId,
+            Long orgId, Long hospitalId, Long hospitalDeptId,
             Long doctorId, String doctorName, String doctorPhone, Long creatorId,
             ValidateMode mode) {
         boolean required = (mode != ValidateMode.DRAFT);
@@ -115,9 +115,9 @@ public class OrderDataValidator {
             validateHospitalScope(creatorId, hospitalId);
         }
         // 校验医院科室
-        HospitalDeptVO dept = lookupHospitalDept(deptId);
+        HospitalDeptVO dept = lookupHospitalDept(hospitalDeptId);
         if (dept != null) {
-            entity.setDeptName(dept.getHospitalDeptName());
+            entity.setHospitalDeptName(dept.getHospitalDeptName());
         }
         // 校验并填充医生（支持 quickAdd）
         applyDoctorInfo(entity::setDoctorId, entity::setDoctorName, entity::setDoctorPhone,
@@ -137,7 +137,7 @@ public class OrderDataValidator {
      * @param entity     订单主表实体（待填充 Name）
      * @param orgId      机构ID
      * @param hospitalId 医院ID
-     * @param deptId     医院科室ID
+     * @param hospitalDeptId 医院科室ID
      * @param doctorId   医生ID
      * @param doctorName 医生姓名（快速创建时传入）
      * @param doctorPhone 医生电话（快速创建时传入）
@@ -145,7 +145,7 @@ public class OrderDataValidator {
      * @param mode       校验模式
      */
     public void validateAndFillMasterForOrder(OrderMainEntity entity,
-            Long orgId, Long hospitalId, Long deptId,
+            Long orgId, Long hospitalId, Long hospitalDeptId,
             Long doctorId, String doctorName, String doctorPhone, Long creatorId,
             ValidateMode mode) {
         boolean required = (mode != ValidateMode.DRAFT);
@@ -166,9 +166,9 @@ public class OrderDataValidator {
             validateHospitalScope(creatorId, hospitalId);
         }
         // 校验医院科室
-        HospitalDeptVO dept = lookupHospitalDept(deptId);
+        HospitalDeptVO dept = lookupHospitalDept(hospitalDeptId);
         if (dept != null) {
-            entity.setDeptName(dept.getHospitalDeptName());
+            entity.setHospitalDeptName(dept.getHospitalDeptName());
         }
         // 校验并填充医生（支持 quickAdd）
         applyDoctorInfo(entity::setDoctorId, entity::setDoctorName, entity::setDoctorPhone,
@@ -312,13 +312,13 @@ public class OrderDataValidator {
      *
      * @param entity      订单主表实体（直接修改字段）
      * @param hospitalId  新医院ID（null 表示不改）
-     * @param deptId      新科室ID（null 表示不改）
+     * @param hospitalDeptId  新科室ID（null 表示不改）
      * @param doctorId    新医生ID（null 表示不选已有医生）
      * @param doctorName  新医生姓名（doctorId 为 null 时触发 quickAdd）
      * @param doctorPhone 新医生电话
      */
     public void validateAndFillForModify(OrderMainEntity entity,
-            Long hospitalId, Long deptId,
+            Long hospitalId, Long hospitalDeptId,
             Long doctorId, String doctorName, String doctorPhone) {
         // 校验医院并同步冗余字段
         if (hospitalId != null) {
@@ -329,10 +329,10 @@ public class OrderDataValidator {
             entity.setFullAreaName(hospital.getFullAreaName());
         }
         // 校验科室并同步冗余字段
-        if (deptId != null) {
-            HospitalDeptVO dept = lookupHospitalDept(deptId);
+        if (hospitalDeptId != null) {
+            HospitalDeptVO dept = lookupHospitalDept(hospitalDeptId);
             if (dept != null) {
-                entity.setDeptName(dept.getHospitalDeptName());
+                entity.setHospitalDeptName(dept.getHospitalDeptName());
             }
         }
         // 校验并填充医生（支持 quickAdd，hospitalId 取实体上的最新值）
