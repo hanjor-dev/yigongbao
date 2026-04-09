@@ -20,7 +20,7 @@ public class ModifyApplyDetailVO implements Serializable {
     private Long orderId;
     private String orderCode;
     private String hospitalName;
-    private String deptName;
+    private String hospitalDeptName;
     private String patientName;
     private String doctorName;
     private Integer currentPhase;

@@ -82,6 +82,16 @@ public class OrderDetailVO implements Serializable {
      */
     private String operatorPhone;
 
+    /**
+     * 提单人所属部门ID
+     */
+    private Long operatorDeptId;
+
+    /**
+     * 提单人所属部门名称
+     */
+    private String operatorDeptName;
+
     // ==================== 医院与科室 ====================
     /**
      * 医院ID
@@ -109,14 +119,14 @@ public class OrderDetailVO implements Serializable {
     private String fullAreaName;
 
     /**
-     * 科室ID
+     * 医院科室ID
      */
-    private Long deptId;
+    private Long hospitalDeptId;
 
     /**
-     * 科室名称（冗余）
+     * 医院科室名称（冗余）
      */
-    private String deptName;
+    private String hospitalDeptName;
 
     // ==================== 医生信息 ====================
     /**
