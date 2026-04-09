@@ -104,14 +104,24 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
     private String fullAreaName;
 
     /**
-     * 科室ID
+     * 医院科室ID
      */
-    private Long deptId;
+    private Long hospitalDeptId;
 
     /**
-     * 科室名称（冗余）
+     * 医院科室名称（冗余）
      */
-    private String deptName;
+    private String hospitalDeptName;
+
+    /**
+     * 提单人所属部门ID（冗余自 sys_user.dept_id，创建时填充，后续不可修改）
+     */
+    private Long operatorDeptId;
+
+    /**
+     * 提单人所属部门名称（冗余自 sys_user.dept_name，创建时填充，后续不可修改）
+     */
+    private String operatorDeptName;
 
     // ==================== 医生/患者信息 ====================
     /**
