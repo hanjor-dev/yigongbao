@@ -221,13 +221,13 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             // 复制 DTO 中允许前端设置的纯业务字段（排除关联名称类字段和 id/items）
             BeanUtils.copyProperties(dto, entity, "id", "items",
                     "orgName", "operatorName", "operatorPhone",
-                    "hospitalName", "deptName",
+                    "hospitalName", "hospitalDeptName",
                     "doctorName", "doctorPhone");
 
             // 校验关联数据并覆盖所有冗余名称字段（DRAFT 模式：仅校验已填写的字段）
             orderDataValidator.validateAndFillMaster(
                     entity,
-                    dto.getOrgId(), dto.getHospitalId(), dto.getDeptId(),
+                    dto.getOrgId(), dto.getHospitalId(), dto.getHospitalDeptId(),
                     dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone(),
                     currentUserId, OrderDataValidator.ValidateMode.DRAFT);
 
@@ -509,8 +509,8 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         vo.setOperatorPhone(entity.getOperatorPhone());
         vo.setHospitalId(entity.getHospitalId());
         vo.setHospitalName(entity.getHospitalName());
-        vo.setDeptId(entity.getDeptId());
-        vo.setDeptName(entity.getDeptName());
+        vo.setHospitalDeptId(entity.getHospitalDeptId());
+        vo.setHospitalDeptName(entity.getHospitalDeptName());
         vo.setDoctorId(entity.getDoctorId());
         vo.setDoctorName(entity.getDoctorName());
         vo.setDoctorPhone(entity.getDoctorPhone());

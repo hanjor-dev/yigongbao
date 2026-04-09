@@ -636,6 +636,18 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             order.setVersion(0);
             // 从医院表补充地区冗余字段（草稿中已复制 hospitalId，此处补充 area 字段）
             fillAreaFromHospital(order, order.getHospitalId());
+
+            // 提单人部门信息冗余写入（草稿提交时从提单人账号读取，创建后固化）
+            String operatorName = null;
+            if (draft.getOperatorId() != null) {
+                UserEntity user = userService.getById(draft.getOperatorId());
+                if (user != null) {
+                    operatorName = user.getRealName();
+                    order.setOperatorDeptId(user.getDeptId());
+                    order.setOperatorDeptName(user.getDeptName());
+                }
+            }
+
             save(order);
             Long orderId = order.getId();
             log.info("创建订单主表，orderId={}, orderCode={}", orderId, orderCode);
@@ -668,13 +680,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             log.info("复制文件关联，orderId={}, fileCount={}", orderId, draftFiles.size());
 
             // Step 5：记录状态历史（CREATE 动作仅记录历史，不改变 phase/status）
-            String operatorName = null;
-            if (draft.getOperatorId() != null) {
-                UserEntity user = userService.getById(draft.getOperatorId());
-                if (user != null) {
-                    operatorName = user.getRealName();
-                }
-            }
             flowFacade.executeFlow(orderId, FlowActionEnum.CREATE, new FlowOperator(draft.getOperatorId(), operatorName, "从草稿创建"));
             log.info("从草稿创建正式订单成功，orderId={}, orderCode={}", orderId, orderCode);
             return orderId;
@@ -695,7 +700,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      *    - orgName: 从机构表查询覆盖
      *    - operatorId/operatorName/operatorPhone: 从当前登录用户填充，不信任前端传入值
      *    - hospitalName/areaId/areaName/fullAreaName: 从医院表查询覆盖
-     *    - deptName: 从医院科室表查询覆盖
+     *    - deptName: 从医院科室表查询覆盖（hospitalDeptName）
      *    - doctorId/doctorName/doctorPhone: 已有 doctorId 则查询覆盖；仅有 doctorName 则 quickAdd 后填充
      *    - currentHandlerId/currentHandlerName: 设置为当前登录用户
      * 4. 保存重建项目明细，通过 OrderDataValidator 校验并覆盖 bodyPartName/projectName 等
@@ -738,10 +743,14 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             order.setCurrentHandlerId(currentUserId);
             order.setCurrentHandlerName(currentUser.getRealName());
 
-            // 校验关联数据并覆盖所有冗余名称字段（orgName/hospitalName/area/deptName/doctorId+Name+Phone）
+            // 提单人部门信息冗余写入（创建时固化，后续不可修改）
+            order.setOperatorDeptId(currentUser.getDeptId());
+            order.setOperatorDeptName(currentUser.getDeptName());
+
+            // 校验关联数据并覆盖所有冗余名称字段（orgName/hospitalName/area/hospitalDeptName/doctorId+Name+Phone）
             orderDataValidator.validateAndFillMasterForOrder(
                     order,
-                    dto.getOrgId(), dto.getHospitalId(), dto.getDeptId(),
+                    dto.getOrgId(), dto.getHospitalId(), dto.getHospitalDeptId(),
                     dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone(),
                     currentUserId, OrderDataValidator.ValidateMode.DIRECT);
 
