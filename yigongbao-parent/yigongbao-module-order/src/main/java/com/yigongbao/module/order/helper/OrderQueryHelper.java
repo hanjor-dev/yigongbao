@@ -178,7 +178,13 @@ public class OrderQueryHelper {
                 } else {
                     // 用户未配置部门，降级为仅看自己，避免泄露全量数据
                     log.warn("DEPT 类型用户未配置部门，降级为 SELF，userId={}", currentUserId);
-                    wrapper.eq(currentUserId != null, OrderMainEntity::getCreateBy, currentUserId);
+                    if (currentUserId != null) {
+                        wrapper.eq(OrderMainEntity::getCreateBy, currentUserId);
+                    } else {
+                        // currentUserId 也为 null（会话失效等异常情况），硬兜底返回空列表
+                        log.warn("DEPT 降级 SELF 但 currentUserId 也为 null，返回空列表");
+                        wrapper.apply("1 = 0");
+                    }
                 }
                 break;
             case ALL:

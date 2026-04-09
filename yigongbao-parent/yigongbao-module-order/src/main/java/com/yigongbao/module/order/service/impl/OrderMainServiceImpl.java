@@ -645,7 +645,12 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     operatorName = user.getRealName();
                     order.setOperatorDeptId(user.getDeptId());
                     order.setOperatorDeptName(user.getDeptName());
+                } else {
+                    log.warn("草稿提交时提单人账号不存在，operatorDeptId/Name 将为 null，draftId={}, operatorId={}",
+                            draft.getId(), draft.getOperatorId());
                 }
+            } else {
+                log.warn("草稿无 operatorId，operatorDeptId/Name 将为 null，draftId={}", draft.getId());
             }
 
             save(order);
