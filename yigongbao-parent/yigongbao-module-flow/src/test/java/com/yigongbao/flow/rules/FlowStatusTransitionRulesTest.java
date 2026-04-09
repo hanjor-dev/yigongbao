@@ -71,32 +71,39 @@ class FlowStatusTransitionRulesTest {
         // ==================== DESIGN 阶段测试 ====================
 
         @Test
-        @DisplayName("phase=DESIGN, status=DESIGNING(21) → 返回 [SUBMIT_DESIGN]")
-        void design_phase_designing_shouldReturn_submitDesign() {
+        @DisplayName("phase=DESIGN, status=PENDING_DESIGN(21) → 返回 [START_DESIGN]")
+        void design_phase_pendingDesign_shouldReturn_startDesign() {
             List<FlowActionEnum> actions = rules.getAvailableActions(21, 2, 1);
-            assertEquals(List.of(FlowActionEnum.SUBMIT_DESIGN), actions);
+            assertEquals(List.of(FlowActionEnum.START_DESIGN), actions);
         }
 
         @Test
-        @DisplayName("phase=DESIGN, status=DESIGN_COMPLETED(22) → 返回 [SUBMIT_DESIGN]")
-        void design_phase_designCompleted_shouldReturn_submitDesign() {
+        @DisplayName("phase=DESIGN, status=DESIGN_IN_PROGRESS(22) → 返回 [SUBMIT_DESIGN]")
+        void design_phase_designInProgress_shouldReturn_submitDesign() {
             List<FlowActionEnum> actions = rules.getAvailableActions(22, 2, 1);
             assertEquals(List.of(FlowActionEnum.SUBMIT_DESIGN), actions);
         }
 
         @Test
-        @DisplayName("phase=DESIGN, status=DESIGN_REVIEWING(23) → 返回 [DESIGN_REVIEW_PASS, DESIGN_REVIEW_REJECT]")
-        void design_phase_reviewing_shouldReturn_reviewActions() {
+        @DisplayName("phase=DESIGN, status=DESIGN_COMPLETED(23) → 返回 [SUBMIT_DESIGN]")
+        void design_phase_designCompleted_shouldReturn_submitDesign() {
             List<FlowActionEnum> actions = rules.getAvailableActions(23, 2, 1);
+            assertEquals(List.of(FlowActionEnum.SUBMIT_DESIGN), actions);
+        }
+
+        @Test
+        @DisplayName("phase=DESIGN, status=DESIGN_REVIEWING(24) → 返回 [DESIGN_REVIEW_PASS, DESIGN_REVIEW_REJECT]")
+        void design_phase_reviewing_shouldReturn_reviewActions() {
+            List<FlowActionEnum> actions = rules.getAvailableActions(24, 2, 1);
             assertEquals(2, actions.size());
             assertTrue(actions.contains(FlowActionEnum.DESIGN_REVIEW_PASS));
             assertTrue(actions.contains(FlowActionEnum.DESIGN_REVIEW_REJECT));
         }
 
         @Test
-        @DisplayName("phase=DESIGN, status=DESIGN_REVIEW_REJECTED(25) → 返回 [START_DESIGN]")
+        @DisplayName("phase=DESIGN, status=DESIGN_REVIEW_REJECTED(26) → 返回 [START_DESIGN]")
         void design_phase_reviewRejected_shouldReturn_startDesign() {
-            List<FlowActionEnum> actions = rules.getAvailableActions(25, 2, 1);
+            List<FlowActionEnum> actions = rules.getAvailableActions(26, 2, 1);
             assertEquals(List.of(FlowActionEnum.START_DESIGN), actions);
         }
 
@@ -281,27 +288,27 @@ class FlowStatusTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("START_DESIGN → DESIGNING(21)")
-        void startDesign_shouldReturn_designing() {
-            assertEquals(21, rules.getTargetStatus(25, FlowActionEnum.START_DESIGN));
+        @DisplayName("START_DESIGN → DESIGN_IN_PROGRESS(22)")
+        void startDesign_shouldReturn_designInProgress() {
+            assertEquals(22, rules.getTargetStatus(21, FlowActionEnum.START_DESIGN));
         }
 
         @Test
-        @DisplayName("SUBMIT_DESIGN → DESIGN_REVIEWING(23)")
+        @DisplayName("SUBMIT_DESIGN → DESIGN_REVIEWING(24)")
         void submitDesign_shouldReturn_designReviewing() {
-            assertEquals(23, rules.getTargetStatus(21, FlowActionEnum.SUBMIT_DESIGN));
+            assertEquals(24, rules.getTargetStatus(22, FlowActionEnum.SUBMIT_DESIGN));
         }
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASS → DESIGN_REVIEW_PASSED(24)（不可见状态）")
+        @DisplayName("DESIGN_REVIEW_PASS → DESIGN_REVIEW_PASSED(25)（不可见状态）")
         void designReviewPass_shouldReturn_designReviewPassed() {
-            assertEquals(24, rules.getTargetStatus(23, FlowActionEnum.DESIGN_REVIEW_PASS));
+            assertEquals(25, rules.getTargetStatus(24, FlowActionEnum.DESIGN_REVIEW_PASS));
         }
 
         @Test
-        @DisplayName("DESIGN_REVIEW_REJECT → DESIGN_REVIEW_REJECTED(25)")
+        @DisplayName("DESIGN_REVIEW_REJECT → DESIGN_REVIEW_REJECTED(26)")
         void designReviewReject_shouldReturn_designReviewRejected() {
-            assertEquals(25, rules.getTargetStatus(23, FlowActionEnum.DESIGN_REVIEW_REJECT));
+            assertEquals(26, rules.getTargetStatus(24, FlowActionEnum.DESIGN_REVIEW_REJECT));
         }
 
         @Test
@@ -446,7 +453,7 @@ class FlowStatusTransitionRulesTest {
                     FlowStatusEnum.DATA_AUDIT_PASSED, 1));
             assertFalse(rules.isValidStatusTransition(
                     FlowPhaseEnum.ORDER, FlowStatusEnum.DRAFT,
-                    FlowStatusEnum.DESIGNING, 1));
+                    FlowStatusEnum.DESIGN_IN_PROGRESS, 1));
         }
 
         @Test
@@ -487,8 +494,9 @@ class FlowStatusTransitionRulesTest {
         @DisplayName("DESIGN 阶段可见状态（不包含不可见的 DESIGN_REVIEW_PASSED）")
         void design_phase_visibleStatuses() {
             Set<FlowStatusEnum> statuses = rules.getValidStatusesForPhase(FlowPhaseEnum.DESIGN, 1);
-            assertEquals(4, statuses.size());
-            assertTrue(statuses.contains(FlowStatusEnum.DESIGNING));
+            assertEquals(5, statuses.size());
+            assertTrue(statuses.contains(FlowStatusEnum.PENDING_DESIGN));
+            assertTrue(statuses.contains(FlowStatusEnum.DESIGN_IN_PROGRESS));
             assertTrue(statuses.contains(FlowStatusEnum.DESIGN_COMPLETED));
             assertTrue(statuses.contains(FlowStatusEnum.DESIGN_REVIEWING));
             assertTrue(statuses.contains(FlowStatusEnum.DESIGN_REVIEW_REJECTED));

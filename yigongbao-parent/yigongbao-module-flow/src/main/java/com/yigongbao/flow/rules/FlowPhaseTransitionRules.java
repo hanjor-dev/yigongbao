@@ -152,9 +152,9 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
 
         boolean needsProduction = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
 
-        // 审核通过 → 进入设计阶段，初始状态为 DESIGNING
+        // 审核通过 → 进入设计阶段，初始状态为 PENDING_DESIGN（待分配设计师）
         if (targetStatus == FlowStatusEnum.DATA_AUDIT_PASSED) {
-            return new PhaseAndStatus(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGNING);
+            return new PhaseAndStatus(FlowPhaseEnum.DESIGN, FlowStatusEnum.PENDING_DESIGN);
         }
 
         // 设计审核通过 → 根据是否需要实体交付进入不同阶段

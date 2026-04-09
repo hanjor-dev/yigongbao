@@ -253,7 +253,7 @@ class FlowPhaseTransitionRulesTest {
     class DecideNextPhaseAndStatusTests {
 
         @Test
-        @DisplayName("DATA_AUDIT_PASSED(12) → DESIGN + DESIGNING(21)")
+        @DisplayName("DATA_AUDIT_PASSED(12) → DESIGN + PENDING_DESIGN(21)")
         void dataAuditPassed_shouldAdvanceToDesign() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.ORDER,
@@ -261,7 +261,7 @@ class FlowPhaseTransitionRulesTest {
                     FlowActionEnum.DATA_AUDIT_PASS,
                     1);
             assertEquals(FlowPhaseEnum.DESIGN, result.phase());
-            assertEquals(FlowStatusEnum.DESIGNING, result.initialStatus());
+            assertEquals(FlowStatusEnum.PENDING_DESIGN, result.initialStatus());
         }
 
         @Test
@@ -378,7 +378,7 @@ class FlowPhaseTransitionRulesTest {
         void otherStatuses_shouldBeVisible() {
             assertFalse(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.DRAFT));
             assertFalse(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.PENDING_DATA_AUDIT));
-            assertFalse(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.DESIGNING));
+            assertFalse(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.DESIGN_IN_PROGRESS));
             assertFalse(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.PRINTING));
             assertFalse(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.COMPLETED));
         }

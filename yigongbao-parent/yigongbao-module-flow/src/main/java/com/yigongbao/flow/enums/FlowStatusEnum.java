@@ -37,29 +37,34 @@ public enum FlowStatusEnum {
 
     // ==================== 设计阶段（20-29）====================
     /**
-     * 设计中
+     * 待设计（审核通过后进入；已分配设计师或待分配）
      */
-    DESIGNING(21, "设计中"),
+    PENDING_DESIGN(21, "待设计"),
+
+    /**
+     * 设计中（设计师已开始设计）
+     */
+    DESIGN_IN_PROGRESS(22, "设计中"),
 
     /**
      * 设计完成
      */
-    DESIGN_COMPLETED(22, "设计完成"),
+    DESIGN_COMPLETED(23, "设计完成"),
 
     /**
      * 设计审核中
      */
-    DESIGN_REVIEWING(23, "设计审核中"),
+    DESIGN_REVIEWING(24, "设计审核中"),
 
     /**
-     * 设计审核通过
+     * 设计审核通过（不可见状态，系统自动推进到下一阶段）
      */
-    DESIGN_REVIEW_PASSED(24, "设计审核通过"),
+    DESIGN_REVIEW_PASSED(25, "设计审核通过"),
 
     /**
      * 设计审核不通过
      */
-    DESIGN_REVIEW_REJECTED(25, "设计审核不通过"),
+    DESIGN_REVIEW_REJECTED(26, "设计审核不通过"),
 
     // ==================== 打印阶段（30-39）====================
     /**

@@ -171,7 +171,7 @@ class FlowStateMachineServiceImplTest {
             assertTrue(result.isPhaseChanged());
             assertEquals(2, result.getTargetPhase());
             assertEquals(12, result.getTargetStatus()); // DATA_AUDIT_PASSED
-            assertEquals(21, result.getInitialStatus()); // DESIGNING
+            assertEquals(21, result.getInitialStatus()); // PENDING_DESIGN
             assertEquals(21, result.getFinalStatus());
         }
     }
@@ -209,11 +209,11 @@ class FlowStateMachineServiceImplTest {
     class InvisibleStatusTests {
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASS: phase=2,status=23,needsPhysicalDelivery=0 → phase=7,finalStatus=71")
+        @DisplayName("DESIGN_REVIEW_PASS: phase=2,status=24,needsPhysicalDelivery=0 → phase=7,finalStatus=71")
         void designReviewPass_noDelivery_shouldAbsorbAndAdvanceToConfirm() {
-            // DESIGN_REVIEWING(23) 在 DESIGN 阶段允许 DESIGN_REVIEW_PASS
+            // DESIGN_REVIEWING(24) 在 DESIGN 阶段允许 DESIGN_REVIEW_PASS
             testOrder.setPhase(2);
-            testOrder.setStatus(23);
+            testOrder.setStatus(24);
             testOrder.setNeedsPhysicalDelivery(0);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -223,17 +223,17 @@ class FlowStateMachineServiceImplTest {
 
             assertTrue(result.isPhaseChanged());
             assertEquals(7, result.getTargetPhase()); // CONFIRM 阶段
-            assertEquals(24, result.getTargetStatus()); // DESIGN_REVIEW_PASSED（不可见）
+            assertEquals(25, result.getTargetStatus()); // DESIGN_REVIEW_PASSED（不可见）
             assertEquals(71, result.getInitialStatus()); // AWAITING_CONFIRM
             assertEquals(71, result.getFinalStatus());
         }
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASS: phase=2,status=23,needsPhysicalDelivery=1 → phase=3,finalStatus=31")
+        @DisplayName("DESIGN_REVIEW_PASS: phase=2,status=24,needsPhysicalDelivery=1 → phase=3,finalStatus=31")
         void designReviewPass_needDelivery_shouldAdvanceToPrint() {
-            // DESIGN_REVIEWING(23) 在 DESIGN 阶段允许 DESIGN_REVIEW_PASS
+            // DESIGN_REVIEWING(24) 在 DESIGN 阶段允许 DESIGN_REVIEW_PASS
             testOrder.setPhase(2);
-            testOrder.setStatus(23);
+            testOrder.setStatus(24);
             testOrder.setNeedsPhysicalDelivery(1);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -243,7 +243,7 @@ class FlowStateMachineServiceImplTest {
 
             assertTrue(result.isPhaseChanged());
             assertEquals(3, result.getTargetPhase()); // PRINT 阶段
-            assertEquals(24, result.getTargetStatus()); // DESIGN_REVIEW_PASSED（不可见）
+            assertEquals(25, result.getTargetStatus()); // DESIGN_REVIEW_PASSED（不可见）
             assertEquals(31, result.getInitialStatus()); // PENDING_PRINT
             assertEquals(31, result.getFinalStatus());
         }
