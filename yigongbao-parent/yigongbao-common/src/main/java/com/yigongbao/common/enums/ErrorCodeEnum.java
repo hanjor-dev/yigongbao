@@ -231,7 +231,14 @@ public enum ErrorCodeEnum {
     ORDER_MODIFY_REJECT_REASON_REQUIRED(719, "审核拒绝时必须填写驳回原因"),
     ORDER_MODIFY_AUDIT_PERMISSION_DENIED(720, "只有管理员可以审核申请"),
     ORDER_MODIFY_FIELD_CONFIG_NOT_FOUND(721, "字段配置不存在，请联系管理员"),
-    ORDER_MODIFY_TYPE_NOT_ALLOWED_IN_PHASE(722, "当前阶段不允许申请该类型的修改");
+    ORDER_MODIFY_TYPE_NOT_ALLOWED_IN_PHASE(722, "当前阶段不允许申请该类型的修改"),
+
+    // ==================== 设计师分配（723-729）====================
+    DESIGNER_NOT_FOUND(723, "设计师不存在"),
+    DESIGNER_ROLE_INVALID(724, "用户角色不是设计师或设计师管理员"),
+    DESIGNER_DISABLED(725, "设计师已被禁用"),
+    DESIGNER_SPECIALTY_MISMATCH(726, "设计师专业方向与订单项目专业方向不一致"),
+    ORDER_DESIGNER_MISMATCH(727, "非分配设计师，无权操作此订单");
 
     /**
      * 错误码

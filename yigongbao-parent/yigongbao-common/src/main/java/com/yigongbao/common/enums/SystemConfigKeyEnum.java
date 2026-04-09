@@ -97,7 +97,18 @@ public enum SystemConfigKeyEnum {
     /**
      * 最大允许的设计审核驳回次数
      */
-    FLOW_MAX_DESIGN_REJECT("flow.max.design.reject", "最大允许的设计审核驳回次数");
+    FLOW_MAX_DESIGN_REJECT("flow.max.design.reject", "最大允许的设计审核驳回次数"),
+
+    // ==================== 设计师分配配置 ====================
+    /**
+     * 设计师分配模式（auto-自动分配，manual-手动分配）
+     */
+    DESIGN_ASSIGN_MODE("design.assign.mode", "设计师分配模式"),
+
+    /**
+     * 单个设计师最大并发设计工单数（默认 10）
+     */
+    DESIGN_ASSIGN_MAX_CAPACITY("design.assign.max.capacity", "设计师最大并发工单数");
 
     /**
      * 配置键
