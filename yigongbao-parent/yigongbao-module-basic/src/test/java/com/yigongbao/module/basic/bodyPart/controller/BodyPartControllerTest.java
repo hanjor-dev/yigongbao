@@ -55,7 +55,6 @@ class BodyPartControllerTest {
         vo.setName(name);
         vo.setCode("BP_" + String.format("%03d", id));
         vo.setLevel(parentId == 0 ? 1 : 2);
-        vo.setDesignerCode("A");
         vo.setSort(1);
         vo.setStatus(1);
         vo.setStatusName("正常");
@@ -72,7 +71,6 @@ class BodyPartControllerTest {
         vo.setName(name);
         vo.setCode("BP_" + String.format("%03d", id));
         vo.setLevel(parentId == 0 ? 1 : 2);
-        vo.setDesignerCode("A");
         vo.setSort(1);
         vo.setStatus(1);
         vo.setStatusName("正常");
@@ -187,7 +185,6 @@ class BodyPartControllerTest {
             Map<String, Object> requestBody = Map.of(
                     "parentId", 0,
                     "name", "测试部位",
-                    "designerCode", "A",
                     "sort", 1
             );
 

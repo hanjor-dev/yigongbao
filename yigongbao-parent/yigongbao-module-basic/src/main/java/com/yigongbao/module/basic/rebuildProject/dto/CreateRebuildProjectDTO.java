@@ -79,6 +79,11 @@ public class CreateRebuildProjectDTO implements Serializable {
     private Integer status;
 
     /**
+     * 专业方向字典编码（单值，如 "7.1"）
+     */
+    private String specialty;
+
+    /**
      * 备注说明
      */
     private String remark;

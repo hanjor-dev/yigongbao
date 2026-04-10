@@ -25,11 +25,6 @@ public class UpdateBodyPartDTO implements Serializable {
     private String name;
 
     /**
-     * 设计师编号
-     */
-    private String designerCode;
-
-    /**
      * 排序
      */
     private Integer sort;

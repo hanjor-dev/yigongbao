@@ -167,7 +167,6 @@ public class BodyPartServiceImpl extends ServiceImpl<BodyPartMapper, BodyPartEnt
                 throw new BusinessException(ErrorCodeEnum.BODY_PART_NAME_EXISTS);
             }
             entity.setName(dto.getName());
-            entity.setDesignerCode(dto.getDesignerCode());
             entity.setSort(Objects.requireNonNullElse(dto.getSort(), 0));
             entity.setStatus(Objects.requireNonNullElse(dto.getStatus(), entity.getStatus()));
             entity.setRemark(dto.getRemark());
@@ -276,7 +275,6 @@ public class BodyPartServiceImpl extends ServiceImpl<BodyPartMapper, BodyPartEnt
         vo.setName(entity.getName());
         vo.setCode(entity.getCode());
         vo.setLevel(entity.getLevel());
-        vo.setDesignerCode(entity.getDesignerCode());
         vo.setSort(entity.getSort());
         vo.setStatus(entity.getStatus());
         vo.setStatusName(StatusConstants.getStatusName(entity.getStatus()));

@@ -93,6 +93,11 @@ public class RebuildProjectEntity extends BaseEntity implements Serializable {
     private Integer status;
 
     /**
+     * 专业方向字典编码（单值，如 "7.1"，关联 sys_dict；用于自动匹配设计师）
+     */
+    private String specialty;
+
+    /**
      * 备注说明
      */
     private String remark;

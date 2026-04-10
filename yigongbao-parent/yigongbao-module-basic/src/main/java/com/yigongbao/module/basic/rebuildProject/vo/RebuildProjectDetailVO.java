@@ -108,6 +108,16 @@ public class RebuildProjectDetailVO implements Serializable {
     private String statusName;
 
     /**
+     * 专业方向字典编码
+     */
+    private String specialty;
+
+    /**
+     * 专业方向名称（来自 sys_dict）
+     */
+    private String specialtyName;
+
+    /**
      * 备注
      */
     private String remark;

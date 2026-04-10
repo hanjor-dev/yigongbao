@@ -157,7 +157,6 @@ CREATE TABLE rebuild_body_part (
     name            VARCHAR(100)    NOT NULL COMMENT '部位名称',
     code            VARCHAR(50)     NOT NULL COMMENT '部位编码',
     level           INT             NOT NULL DEFAULT 1 COMMENT '层级（1=身体区域，2=具体部位）',
-    designer_code   VARCHAR(10)     DEFAULT NULL COMMENT '设计师编号（如A/B/C）',
     sort            INT             NOT NULL DEFAULT 0 COMMENT '排序',
     status          TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark          VARCHAR(512)    DEFAULT NULL COMMENT '备注说明',
@@ -172,11 +171,11 @@ CREATE TABLE rebuild_body_part (
     KEY idx_body_part_status (status)
 );
 
-INSERT INTO rebuild_body_part (id, parent_id, name, code, level, designer_code, sort, status, remark, create_time, update_time, is_deleted) VALUES
-(1, 0, '头部', 'BP_001', 1, 'A', 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, 1, '前额', 'BP_001_001', 2, 'A', 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(3, 1, '后脑', 'BP_001_002', 2, 'B', 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(4, 0, '躯干', 'BP_002', 1, 'B', 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO rebuild_body_part (id, parent_id, name, code, level, sort, status, remark, create_time, update_time, is_deleted) VALUES
+(1, 0, '头部', 'BP_001', 1, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 1, '前额', 'BP_001_001', 2, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 1, '后脑', 'BP_001_002', 2, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(4, 0, '躯干', 'BP_002', 1, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ============================================================
 -- 重建项目表（rebuild_project）
@@ -197,6 +196,7 @@ CREATE TABLE rebuild_project (
     forming_requirements  TEXT            DEFAULT NULL COMMENT '成形需求模板',
     sort                  INT             NOT NULL DEFAULT 0 COMMENT '排序',
     status                TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    specialty             VARCHAR(64)     DEFAULT NULL COMMENT '专业方向字典编码（单值，如 7.1）',
     remark                VARCHAR(500)    DEFAULT NULL COMMENT '备注说明',
     create_time           DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time           DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -210,10 +210,10 @@ CREATE TABLE rebuild_project (
     KEY idx_project_status (status)
 );
 
-INSERT INTO rebuild_project (id, body_part_id, parent_id, name, code, level, standard_price, urgent_price, category, estimated_hours, sort, status, create_time, update_time, is_deleted) VALUES
-(1, 1, 0, '颅骨重建', 'RP_1_001', 1, 5000.00, 7500.00, '模型', 8.5, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, 1, 1, '颞骨重建', 'RP_1_001_001', 2, 3000.00, 4500.00, '导板', 5.0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(3, 1, 0, '面部轮廓', 'RP_1_002', 1, 8000.00, 12000.00, '模型', 12.0, 2, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO rebuild_project (id, body_part_id, parent_id, name, code, level, standard_price, urgent_price, category, estimated_hours, specialty, sort, status, create_time, update_time, is_deleted) VALUES
+(1, 1, 0, '颅骨重建', 'RP_1_001', 1, 5000.00, 7500.00, '模型', 8.5, '7.1', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 1, 1, '颞骨重建', 'RP_1_001_001', 2, 3000.00, 4500.00, '导板', 5.0, '7.1', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 1, 0, '面部轮廓', 'RP_1_002', 1, 8000.00, 12000.00, '模型', 12.0, '7.2', 2, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ============================================================
 -- 医院科室表（hospital_dept）

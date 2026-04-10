@@ -81,4 +81,13 @@ public interface RebuildProjectService extends IService<RebuildProjectEntity> {
      * @param status 状态（0=禁用，1=正常）
      */
     void updateStatus(Long id, Integer status);
+
+    /**
+     * 根据项目ID查询专业方向字典编码
+     * 供 order 模块的设计师分配逻辑使用
+     *
+     * @param projectId 重建项目ID
+     * @return 专业方向字典编码（如 "7.1"），项目不存在或未设置时返回 null
+     */
+    String getSpecialtyByProjectId(Long projectId);
 }

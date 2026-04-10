@@ -42,11 +42,6 @@ public class BodyPartEntity extends BaseEntity implements Serializable {
     private Integer level;
 
     /**
-     * 设计师编号（如A/B/C）
-     */
-    private String designerCode;
-
-    /**
      * 排序
      */
     private Integer sort;

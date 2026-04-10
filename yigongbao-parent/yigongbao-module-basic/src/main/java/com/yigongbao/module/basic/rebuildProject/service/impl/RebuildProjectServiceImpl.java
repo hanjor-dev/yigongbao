@@ -205,6 +205,7 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
             entity.setSort(Objects.requireNonNullElse(dto.getSort(), 0));
             entity.setCategoryCode(dto.getCategoryCode());
             entity.setCategoryName(resolveCategoryName(dto.getCategoryCode()));
+            entity.setSpecialty(dto.getSpecialty());
             save(entity);
             log.info("创建项目成功，id={}", entity.getId());
         } catch (BusinessException e) {
@@ -248,6 +249,7 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
             entity.setRemark(dto.getRemark());
             entity.setCategoryCode(dto.getCategoryCode());
             entity.setCategoryName(resolveCategoryName(dto.getCategoryCode()));
+            entity.setSpecialty(dto.getSpecialty());
             updateById(entity);
             log.info("更新项目成功，id={}", id);
         } catch (BusinessException e) {
@@ -318,6 +320,15 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
         }
     }
 
+    @Override
+    public String getSpecialtyByProjectId(Long projectId) {
+        if (projectId == null) {
+            return null;
+        }
+        RebuildProjectEntity project = getById(projectId);
+        return project != null ? project.getSpecialty() : null;
+    }
+
     // ==================== 私有方法 ====================
 
     /**
@@ -370,6 +381,7 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
         vo.setRemark(entity.getRemark());
         vo.setCategoryCode(entity.getCategoryCode());
         vo.setCategoryName(entity.getCategoryName());
+        vo.setSpecialty(entity.getSpecialty());
         vo.setCreateTime(entity.getCreateTime());
         vo.setUpdateTime(entity.getUpdateTime());
         return vo;

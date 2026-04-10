@@ -48,11 +48,6 @@ public class BodyPartDetailVO implements Serializable {
     private Integer level;
 
     /**
-     * 设计师编号
-     */
-    private String designerCode;
-
-    /**
      * 排序
      */
     private Integer sort;
