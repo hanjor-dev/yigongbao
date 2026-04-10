@@ -166,7 +166,7 @@ CREATE TABLE sys_user (
 
     -- 扩展字段
     employee_no         VARCHAR(32)     COMMENT '工号',
-    specialty           VARCHAR(64)     COMMENT '专业方向（关联字典编码=7）',
+    specialty           VARCHAR(255)    COMMENT '专业方向（多选逗号拼接，如 7.1,7.2）',
     qualification       VARCHAR(256)    COMMENT '资质证书信息',
     settlement_type     TINYINT         COMMENT '结算类型（关联字典编码=8）',
 
@@ -449,7 +449,6 @@ CREATE TABLE rebuild_body_part (
     name            VARCHAR(100)    NOT NULL COMMENT '部位名称',
     code            VARCHAR(50)     NOT NULL COMMENT '部位编码',
     level           INT             NOT NULL DEFAULT 1 COMMENT '层级（1=身体区域，2=具体部位）',
-    designer_code   VARCHAR(10)     DEFAULT NULL COMMENT '设计师编号（如A/B/C）',
     sort            INT             NOT NULL DEFAULT 0 COMMENT '排序',
     status          TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark          VARCHAR(512)    DEFAULT NULL COMMENT '备注说明',
@@ -491,6 +490,7 @@ CREATE TABLE rebuild_project (
     forming_requirements  TEXT            DEFAULT NULL COMMENT '成形需求模板',
     sort                  INT             NOT NULL DEFAULT 0 COMMENT '排序',
     status                TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    specialty             VARCHAR(64)     DEFAULT NULL COMMENT '专业方向字典编码（单值，如 7.1）',
     remark                VARCHAR(500)    DEFAULT NULL COMMENT '备注说明',
 
     -- 通用字段
