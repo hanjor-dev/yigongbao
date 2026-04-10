@@ -18,6 +18,18 @@
             <artifactId>yigongbao-module-flow</artifactId>
         </dependency>
 
+        <!-- system：用户、设计师信息查询 -->
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-system</artifactId>
+        </dependency>
+
+        <!-- basic：重建项目专业方向查询 -->
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-basic</artifactId>
+        </dependency>
+
         <!-- 测试依赖 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

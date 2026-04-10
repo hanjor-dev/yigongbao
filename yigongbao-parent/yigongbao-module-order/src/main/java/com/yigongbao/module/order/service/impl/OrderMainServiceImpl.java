@@ -36,6 +36,7 @@ import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
+import com.yigongbao.module.order.service.DesignerAssignmentService;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
 import com.yigongbao.module.order.mapper.OrderDraftMapper;
 import com.yigongbao.module.order.mapper.OrderFileMapper;
@@ -53,6 +54,8 @@ import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -104,6 +107,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final ObjectMapper objectMapper;
     private final OrderDataValidator orderDataValidator;
     private final OrderModifyApplyService orderModifyApplyService;
+
+    /** 打破循环依赖：DesignerAssignmentServiceImpl 反向依赖 OrderMainService */
+    @Lazy
+    @Autowired
+    private DesignerAssignmentService designerAssignmentService;
 
     // ==================== 私有方法 ====================
 
@@ -556,6 +564,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 entity.setDataEvaluationOpinion(dto.getDataEvaluationOpinion());
             }
             updateById(entity);
+            // 触发设计师分配（分配失败不影响审核结果）
+            designerAssignmentService.triggerAssignmentAfterAudit(id);
             log.info("审核通过成功，id={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
         } catch (BusinessException e) {
             throw e;

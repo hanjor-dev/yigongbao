@@ -5,13 +5,17 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.order.dto.draft.CreateOrderDraftDTO;
 import com.yigongbao.module.order.dto.draft.OrderDraftPageQueryDTO;
+import com.yigongbao.module.order.dto.order.AssignDesignerDTO;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
+import com.yigongbao.module.order.dto.order.DesignerQueryDTO;
 import com.yigongbao.module.order.dto.order.OrderExportQueryDTO;
 import com.yigongbao.module.order.dto.order.OrderPageDTO;
+import com.yigongbao.module.order.service.DesignerAssignmentService;
 import com.yigongbao.module.order.service.OrderDraftService;
 import com.yigongbao.module.order.service.OrderExportService;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.order.vo.order.DesignerVO;
 import com.yigongbao.module.order.vo.draft.OrderDraftDetailVO;
 import com.yigongbao.module.order.vo.draft.OrderDraftVO;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
@@ -41,6 +45,7 @@ public class OrderController {
     private final OrderDraftService orderDraftService;
     private final OrderMainService orderMainService;
     private final OrderExportService orderExportService;
+    private final DesignerAssignmentService designerAssignmentService;
 
     // ==================== 草稿接口 ====================
 
@@ -134,6 +139,26 @@ public class OrderController {
     @DeleteMapping("/{id}")
     public Result<Void> removeOrder(@PathVariable Long id) {
         orderMainService.removeOrder(id);
+        return Result.success();
+    }
+
+    @Operation(summary = "查询可分配设计师列表")
+    @PostMapping("/designers/available")
+    public Result<List<DesignerVO>> listAvailableDesigners(@RequestBody DesignerQueryDTO dto) {
+        return Result.success(designerAssignmentService.listAvailableDesigners(dto));
+    }
+
+    @Operation(summary = "手动分配设计师（管理员）")
+    @PostMapping("/{id}/assign-designer")
+    public Result<Void> assignDesigner(@PathVariable Long id, @Valid @RequestBody AssignDesignerDTO dto) {
+        designerAssignmentService.manualAssignDesigner(id, dto.getDesignerId());
+        return Result.success();
+    }
+
+    @Operation(summary = "设计师开始设计")
+    @PostMapping("/{id}/start-design")
+    public Result<Void> startDesign(@PathVariable Long id) {
+        designerAssignmentService.startDesign(id);
         return Result.success();
     }
 
