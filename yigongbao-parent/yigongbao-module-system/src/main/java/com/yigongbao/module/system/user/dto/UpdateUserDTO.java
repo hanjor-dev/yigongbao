@@ -38,11 +38,9 @@ public class UpdateUserDTO implements Serializable {
     private String email;
 
     /**
-     * 性别（0=未知，1=男，2=女）
+     * 性别
      */
-    @Min(value = 0, message = "性别值不合法")
-    @Max(value = 2, message = "性别值不合法")
-    private Integer sex;
+    private String sex;
 
     /**
      * 头像路径

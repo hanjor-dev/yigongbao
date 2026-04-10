@@ -50,7 +50,7 @@ public class UserEntity extends BaseEntity implements Serializable {
     /**
      * 性别
      */
-    private Integer sex;
+    private String sex;
 
     /**
      * 头像路径

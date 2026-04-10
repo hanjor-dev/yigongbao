@@ -153,7 +153,7 @@ CREATE TABLE sys_user (
     real_name           VARCHAR(32)     NOT NULL COMMENT '真实姓名',
     phone               VARCHAR(20)     NOT NULL COMMENT '手机号',
     email               VARCHAR(64)     COMMENT '邮箱',
-    sex                 TINYINT         COMMENT '性别（关联字典编码=2）',
+    sex                 VARCHAR(20)     COMMENT '性别（关联字典编码）',
     avatar              VARCHAR(512)    COMMENT '头像路径',
     account_type        TINYINT         NOT NULL COMMENT '账户分类（关联字典编码=6）',
     org_id              BIGINT          NOT NULL COMMENT '所属机构ID（关联sys_org表）',
