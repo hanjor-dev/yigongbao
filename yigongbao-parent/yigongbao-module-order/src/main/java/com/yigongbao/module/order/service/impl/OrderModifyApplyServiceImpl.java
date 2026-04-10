@@ -18,8 +18,6 @@ import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.order.dto.modify.AuditModifyApplyDTO;
 import com.yigongbao.module.order.dto.modify.CreateModifyApplyDTO;
-import com.yigongbao.module.order.dto.modify.ExecuteModificationDTO;
-import com.yigongbao.module.order.dto.modify.ExecuteModificationItemDTO;
 import com.yigongbao.module.order.dto.modify.ModificationLogPageQueryDTO;
 import com.yigongbao.module.order.dto.modify.ModifyApplyFieldConfigDTO;
 import com.yigongbao.module.order.dto.modify.ModifyApplyPageQueryDTO;
@@ -60,6 +58,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.convert.Convert;
 
 /**
  * 订单修改申请 Service 实现类
@@ -317,14 +318,13 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
      * 执行订单修改（审核通过后调用）
      * 这是统一修改入口，包含基础信息/影像文件/重建项目三类修改，均在同一事务内
      *
-     * @param orderId 订单ID
-     * @param applyId 修改申请ID
-     * @param dto     修改字段参数
+     * @param applyId       修改申请ID
+     * @param modifications 修改字段 Map，只传需要修改的字段，后端根据申请类型白名单过滤
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void executeModification(Long orderId, Long applyId, ExecuteModificationDTO dto) {
-        log.info("执行订单修改，orderId={}, applyId={}", orderId, applyId);
+    public void executeModification(Long applyId, Map<String, Object> modifications) {
+        log.info("执行订单修改，applyId={}", applyId);
         // 1. 校验申请存在且状态为 APPROVED
         OrderModifyApplyEntity apply = orderModifyApplyMapper.selectById(applyId);
         if (apply == null) {
@@ -333,10 +333,9 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         if (!ModifyApplyStatusEnum.APPROVED.getCode().equals(apply.getStatus())) {
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_STATUS_ERROR);
         }
-        // 2. 校验申请与订单关联正确
-        if (!apply.getOrderId().equals(orderId)) {
-            throw new BusinessException(400, "订单与申请不匹配");
-        }
+
+        // 2. 通过 apply 反查 orderId（无需外部传入，自动保证关联一致性）
+        Long orderId = apply.getOrderId();
 
         // 3. 解析允许的申请类型（trim 防止存储时残留空格）
         Set<String> allowedTypes = Arrays.stream(apply.getApplyTypeCodes().split(","))
@@ -354,21 +353,28 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         String modifierName = getCurrentUserName();
 
         // 6. 处理基础信息修改（14.1）
+        boolean infoModified = false;
         if (allowedTypes.contains(ModifyApplyTypeEnum.INFO.getDictCode())) {
-            processInfoModification(order, dto, applyId, modifierId, modifierName);
+            processInfoModification(order, modifications, applyId, modifierId, modifierName);
+            infoModified = true;
         }
 
         // 7. 处理重建项目修改（14.3）
-        if (allowedTypes.contains(ModifyApplyTypeEnum.ITEM.getDictCode()) && dto.getItems() != null) {
-            processItemModification(order, dto, applyId, modifierId, modifierName);
+        if (allowedTypes.contains(ModifyApplyTypeEnum.ITEM.getDictCode()) && modifications.containsKey("items")) {
+            processItemModification(order, modifications, applyId, modifierId, modifierName);
         }
 
         // 8. 处理影像文件修改（14.2）
         if (allowedTypes.contains(ModifyApplyTypeEnum.IMAGE.getDictCode())) {
-            processImageModification(order, dto, applyId, modifierId, modifierName);
+            processImageModification(order, modifications, applyId, modifierId, modifierName);
         }
 
         log.info("执行订单修改成功，orderId={}, applyId={}", orderId, applyId);
+
+        // 仅 INFO 类型修改了 order 实体字段时才回写 DB（IMAGE/ITEM 不修改 order 主表字段）
+        if (infoModified) {
+            orderMainMapper.updateById(order);
+        }
 
         // 9. 将申请状态置为 COMPLETED（防止重复执行）
         apply.setStatus(ModifyApplyStatusEnum.COMPLETED.getCode());
@@ -378,86 +384,172 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     // ==================== 辅助方法：基础信息修改 ====================
 
     /**
-     * 处理基础信息修改（显式字段赋值 + 显式留痕，无反射）
+     * 处理基础信息修改（快照旧值 → 赋新值 → 留痕）
      */
-    private void processInfoModification(OrderMainEntity order, ExecuteModificationDTO dto,
+    private void processInfoModification(OrderMainEntity order, Map<String, Object> modifications,
             Long applyId, Long modifierId, String modifierName) {
-        // 1. 保存修改前快照（各字段的当前值）
-        Long oldHospitalId                = order.getHospitalId();
-        String oldPatientName             = order.getPatientName();
-        Integer oldPatientAge             = order.getPatientAge();
-        String oldPatientGender           = order.getPatientGender();
-        Long oldDoctorId                  = order.getDoctorId();
-        String oldDoctorPhone             = order.getDoctorPhone();
-        Integer oldIsUrgent               = order.getIsUrgent();
-        Integer oldIsPostal               = order.getIsPostal();
-        String oldPostalAddress           = order.getPostalAddress();
-        LocalDateTime oldExpectedDate     = order.getExpectedDeliveryDate();
+        // 1. 快照旧值（赋值前记录，用于留痕对比）
+        Long oldHospitalId = order.getHospitalId();
+        String oldPatientName = order.getPatientName();
+        Integer oldPatientAge = order.getPatientAge();
+        String oldPatientGender = order.getPatientGender();
+        Long oldDoctorId = order.getDoctorId();
+        String oldDoctorPhone = order.getDoctorPhone();
+        Integer oldIsUrgent = order.getIsUrgent();
+        Integer oldIsPostal = order.getIsPostal();
+        String oldPostalAddress = order.getPostalAddress();
+        LocalDateTime oldExpectedDate = order.getExpectedDeliveryDate();
 
-        // 2. 更新订单字段（含医院/科室/医生冗余字段同步、quickAdd）
-        applyInfoFields(order, dto);
-        orderMainMapper.updateById(order);
+        // 2. 将修改字段赋值到实体
+        applyInfoFields(order, modifications);
 
-        // 3. 逐字段对比记录留痕
-        // 注意：doctorId 用 order.getDoctorId() 作为新值，因为 quickAdd 场景下 dto.getDoctorId() 为 null
-        //       而实际写入的是 quickAdd 返回的 doctor.id
+        // 3. 记录变更留痕（仅实际变化的字段）
         logInfoFieldChanges(order.getId(), order.getOrderCode(), applyId,
                 oldHospitalId, oldPatientName, oldPatientAge, oldPatientGender,
                 oldDoctorId, oldDoctorPhone, oldIsUrgent, oldIsPostal, oldPostalAddress, oldExpectedDate,
-                order, dto, modifierId, modifierName);
+                order, modifications, modifierId, modifierName);
     }
 
     /**
-     * 将 dto 中非 null 的字段赋值到订单实体（显式赋值，无反射）
+     * 将 modifications 中非 null 的字段赋值到订单实体（显式赋值，无反射）
      * 医院/科室/医生走 OrderDataValidator 统一校验+填充路径，保证冗余字段同步
      */
-    private void applyInfoFields(OrderMainEntity order, ExecuteModificationDTO dto) {
+    private void applyInfoFields(OrderMainEntity order, Map<String, Object> modifications) {
         // 医院/科室/医生统一走 validator（含冗余字段同步、存在性校验、quickAdd）
-        boolean hasDoctorChange = dto.getDoctorId() != null || StrUtil.isNotBlank(dto.getDoctorName());
-        if (dto.getHospitalId() != null || dto.getHospitalDeptId() != null || hasDoctorChange) {
+        Long hospitalId = getLongValue(modifications, "hospitalId");
+        Long hospitalDeptId = getLongValue(modifications, "hospitalDeptId");
+        Long doctorId = getLongValue(modifications, "doctorId");
+        String doctorName = getStringValue(modifications, "doctorName", false);
+        String doctorPhone = getStringValue(modifications, "doctorPhone", false);
+
+        boolean hasDoctorChange = doctorId != null || StrUtil.isNotBlank(doctorName);
+        if (hospitalId != null || hospitalDeptId != null || hasDoctorChange) {
             orderDataValidator.validateAndFillForModify(order,
-                    dto.getHospitalId(), dto.getHospitalDeptId(),
-                    dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone());
+                    hospitalId, hospitalDeptId, doctorId, doctorName, doctorPhone);
         }
         // 其他基础字段（不涉及冗余同步，直接赋值）
-        if (dto.getPatientName()          != null) order.setPatientName(dto.getPatientName());
-        if (dto.getPatientAge()           != null) order.setPatientAge(dto.getPatientAge());
-        if (dto.getPatientGender()        != null) order.setPatientGender(dto.getPatientGender());
-        if (dto.getIsUrgent()             != null) order.setIsUrgent(dto.getIsUrgent());
-        if (dto.getIsPostal()             != null) order.setIsPostal(dto.getIsPostal());
-        if (dto.getPostalAddress()        != null) order.setPostalAddress(dto.getPostalAddress());
-        if (dto.getExpectedDeliveryDate() != null) order.setExpectedDeliveryDate(dto.getExpectedDeliveryDate());
+        // 注意：数值型字段用 hasKey 判断（0 是有效值），字符串型字段用 isNotBlank 判断（空字符串忽略）
+        if (modifications.containsKey("patientName")) {
+            String v = getStringValue(modifications, "patientName", true);
+            if (v != null) order.setPatientName(v);
+        }
+        if (modifications.containsKey("patientAge")) {
+            Integer v = getIntegerValue(modifications, "patientAge");
+            if (v != null) order.setPatientAge(v);
+        }
+        if (modifications.containsKey("patientGender")) {
+            String v = getStringValue(modifications, "patientGender", true);
+            if (v != null) order.setPatientGender(v);
+        }
+        if (modifications.containsKey("isUrgent")) {
+            Integer v = getIntegerValue(modifications, "isUrgent");
+            if (v != null) order.setIsUrgent(v);
+        }
+        if (modifications.containsKey("isPostal")) {
+            Integer v = getIntegerValue(modifications, "isPostal");
+            if (v != null) order.setIsPostal(v);
+        }
+        if (modifications.containsKey("postalAddress")) {
+            String v = getStringValue(modifications, "postalAddress", true);
+            if (v != null) order.setPostalAddress(v);
+        }
+        if (modifications.containsKey("expectedDeliveryDate")) {
+            LocalDateTime v = getLocalDateTimeValue(modifications, "expectedDeliveryDate");
+            if (v != null) order.setExpectedDeliveryDate(v);
+        }
+    }
+
+    /**
+     * 从 Map 中获取 String 值（带空字符串过滤）
+     * @param trimEmpty true-空字符串视为 null；false-保留空字符串
+     */
+    private String getStringValue(Map<String, Object> modifications, String key, boolean trimEmpty) {
+        Object raw = modifications.get(key);
+        if (raw == null) return null;
+        String val = Convert.convert(String.class, raw);
+        if (val == null) return null;
+        if (trimEmpty && StrUtil.isBlank(val)) return null;
+        return val;
+    }
+
+    /**
+     * 从 Map 中获取 Long 值（自动类型转换，null 或无法转换时返回 null）
+     */
+    private Long getLongValue(Map<String, Object> modifications, String key) {
+        if (!modifications.containsKey(key)) return null;
+        try {
+            return Convert.convert(Long.class, modifications.get(key));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 从 Map 中获取 Integer 值（自动类型转换，null 或无法��换时返回 null）
+     */
+    private Integer getIntegerValue(Map<String, Object> modifications, String key) {
+        if (!modifications.containsKey(key)) return null;
+        try {
+            return Convert.convert(Integer.class, modifications.get(key));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 从 Map 中获取 LocalDateTime 值（支持 ISO 8601 字符串或时间戳）
+     */
+    private LocalDateTime getLocalDateTimeValue(Map<String, Object> modifications, String key) {
+        if (!modifications.containsKey(key)) return null;
+        Object raw = modifications.get(key);
+        if (raw == null) return null;
+        try {
+            if (raw instanceof String str) {
+                // 优先尝试 ISO 格式
+                if (StrUtil.isNotBlank(str)) {
+                    return cn.hutool.core.date.DateUtil.parseLocalDateTime(str);
+                }
+            } else if (raw instanceof Number num) {
+                // 时间戳（毫秒）转换为 LocalDateTime（北京时间 UTC+8）
+                return java.time.LocalDateTime.ofInstant(
+                        java.time.Instant.ofEpochMilli(num.longValue()),
+                        java.time.ZoneId.of("Asia/Shanghai"));
+            }
+        } catch (Exception e) {
+            log.warn("时间格式解析失败，key={}, raw={}", key, raw);
+        }
+        return null;
     }
 
     /**
      * 逐字段对比并记录留痕（显式比对，无反射）
-     * doctorId / doctorPhone 取修改后的 order 值，以覆盖 quickAdd 场景（dto.getDoctorId() 此时为 null）
+     * doctorId / doctorPhone 取修改后的 order 值，以覆盖 quickAdd 场景（modifications 中 doctorId 此时为 null）
      */
     private void logInfoFieldChanges(Long orderId, String orderCode, Long applyId,
             Long oldHospitalId, String oldPatientName, Integer oldPatientAge, String oldPatientGender,
             Long oldDoctorId, String oldDoctorPhone, Integer oldIsUrgent,
             Integer oldIsPostal, String oldPostalAddress, LocalDateTime oldExpectedDate,
-            OrderMainEntity order, ExecuteModificationDTO dto, Long modifierId, String modifierName) {
+            OrderMainEntity order, Map<String, Object> modifications, Long modifierId, String modifierName) {
         recordIfChanged(orderId, orderCode, applyId, "hospitalId", "医院",
-                oldHospitalId, dto.getHospitalId(), modifierId, modifierName);
+                oldHospitalId, getLongValue(modifications, "hospitalId"), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "patientName", "患者姓名",
-                oldPatientName, dto.getPatientName(), modifierId, modifierName);
+                oldPatientName, getStringValue(modifications, "patientName", true), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "patientAge", "患者年龄",
-                oldPatientAge, dto.getPatientAge(), modifierId, modifierName);
+                oldPatientAge, getIntegerValue(modifications, "patientAge"), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "patientGender", "患者性别",
-                oldPatientGender, dto.getPatientGender(), modifierId, modifierName);
+                oldPatientGender, getStringValue(modifications, "patientGender", true), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "doctorId", "关联医生",
                 oldDoctorId, order.getDoctorId(), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "doctorPhone", "医生电话",
                 oldDoctorPhone, order.getDoctorPhone(), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "isUrgent", "是否加急",
-                oldIsUrgent, dto.getIsUrgent(), modifierId, modifierName);
+                oldIsUrgent, getIntegerValue(modifications, "isUrgent"), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "isPostal", "是否邮寄",
-                oldIsPostal, dto.getIsPostal(), modifierId, modifierName);
+                oldIsPostal, getIntegerValue(modifications, "isPostal"), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "postalAddress", "邮寄地址",
-                oldPostalAddress, dto.getPostalAddress(), modifierId, modifierName);
+                oldPostalAddress, getStringValue(modifications, "postalAddress", true), modifierId, modifierName);
         recordIfChanged(orderId, orderCode, applyId, "expectedDeliveryDate", "期望交付时间",
-                oldExpectedDate, dto.getExpectedDeliveryDate(), modifierId, modifierName);
+                oldExpectedDate, getLocalDateTimeValue(modifications, "expectedDeliveryDate"), modifierId, modifierName);
     }
 
     /**
@@ -476,12 +568,17 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
 
     /**
      * 处理重建项目修改（增量差异：以 orderItemId 匹配，新增/修改/删除各留痕）
+     * items 在 Map 中以 List<Map<String, Object>> 形式传递
      */
-    private void processItemModification(OrderMainEntity order, ExecuteModificationDTO dto,
+    @SuppressWarnings("unchecked")
+    private void processItemModification(OrderMainEntity order, Map<String, Object> modifications,
             Long applyId, Long modifierId, String modifierName) {
-        // 0. 重建订单的重建项目不允许为空
-        if (CollUtil.isEmpty(dto.getItems())) {
-            throw new BusinessException(400, "重建项目不能为空");
+        Object itemsObj = modifications.get("items");
+        List<Map<String, Object>> newItems = Convert.convert(List.class, itemsObj);
+
+        // 0. newItems 为 null 时等同于空列表（删除所有旧项目）
+        if (newItems == null) {
+            newItems = List.of();
         }
 
         // 1. 查询旧 items
@@ -495,9 +592,10 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         Set<Long> validItemIds = oldItems.stream()
                 .map(OrderItemEntity::getId)
                 .collect(Collectors.toSet());
-        for (ExecuteModificationItemDTO item : dto.getItems()) {
-            if (item.getOrderItemId() != null && !validItemIds.contains(item.getOrderItemId())) {
-                throw new BusinessException(400, "重建项目ID不属于当前订单：" + item.getOrderItemId());
+        for (Map<String, Object> item : newItems) {
+            Long orderItemId = Convert.convert(Long.class, item.get("orderItemId"));
+            if (orderItemId != null && !validItemIds.contains(orderItemId)) {
+                throw new BusinessException(400, "重建项目ID不属于当前订单：" + orderItemId);
             }
         }
 
@@ -506,12 +604,14 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 .collect(Collectors.toMap(OrderItemEntity::getId, item -> item));
 
         int sortOrder = 1;
-        for (ExecuteModificationItemDTO newItem : dto.getItems()) {
-            if (newItem.getOrderItemId() != null && oldItemMap.containsKey(newItem.getOrderItemId())) {
+        for (Map<String, Object> itemMap : newItems) {
+            Long orderItemId = Convert.convert(Long.class, itemMap.get("orderItemId"));
+            if (orderItemId != null && oldItemMap.containsKey(orderItemId)) {
                 // 修改：逐字段对比留痕，然后更新
-                OrderItemEntity oldItem = oldItemMap.remove(newItem.getOrderItemId());
-                compareAndLogItemFields(order, oldItem, newItem, applyId, modifierId, modifierName);
-                BeanUtils.copyProperties(newItem, oldItem, "orderItemId");
+                OrderItemEntity oldItem = oldItemMap.remove(orderItemId);
+                compareAndLogItemFields(order, oldItem, itemMap, applyId, modifierId, modifierName);
+                // 从 Map 复制到实体（排除 orderItemId）
+                BeanUtil.copyProperties(itemMap, oldItem, "orderItemId");
                 oldItem.setSortOrder(sortOrder++);
                 // 重新校验并填充冗余字段（bodyPartName、projectName 等）
                 orderDataValidator.validateAndFillItemsForOrder(
@@ -520,7 +620,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             } else {
                 // 新增：校验插入
                 OrderItemEntity newEntity = new OrderItemEntity();
-                BeanUtils.copyProperties(newItem, newEntity);
+                BeanUtil.copyProperties(itemMap, newEntity);
                 newEntity.setOrderId(order.getId());
                 newEntity.setOrderCode(order.getOrderCode());
                 newEntity.setSortOrder(sortOrder++);
@@ -529,14 +629,14 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 orderItemMapper.insert(newEntity);
                 // 记录新增留痕（projectName 可能未填充，使用 projectDesc 兜底）
                 String newItemDesc = newEntity.getProjectName() != null
-                        ? newEntity.getProjectName() : newItem.getProjectDesc();
+                        ? newEntity.getProjectName() : Convert.convert(String.class, itemMap.get("projectDesc"));
                 recordModificationLog(order.getId(), order.getOrderCode(), applyId,
                         "item_new", "新增重建项目",
                         null, newItemDesc != null ? newItemDesc : "新项目", modifierId, modifierName);
             }
         }
 
-        // 删除：oldItemMap 中剩余为未出现在 dto.items 中的旧项目
+        // 删除：oldItemMap 中剩余为未出现在 newItems 中的旧项目
         for (OrderItemEntity deletedItem : oldItemMap.values()) {
             orderItemMapper.deleteById(deletedItem.getId());
             recordModificationLog(order.getId(), order.getOrderCode(), applyId,
@@ -549,22 +649,22 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
      * 对比重建项目字段变更并记录留痕
      */
     private void compareAndLogItemFields(OrderMainEntity order, OrderItemEntity oldItem,
-            ExecuteModificationItemDTO newItem, Long applyId, Long modifierId, String modifierName) {
+            Map<String, Object> itemMap, Long applyId, Long modifierId, String modifierName) {
         recordIfChanged(order.getId(), order.getOrderCode(), applyId,
                 "item_" + oldItem.getId() + "_bodyPartId", "部位",
-                oldItem.getBodyPartId(), newItem.getBodyPartId(), modifierId, modifierName);
+                oldItem.getBodyPartId(), Convert.convert(Long.class, itemMap.get("bodyPartId")), modifierId, modifierName);
         recordIfChanged(order.getId(), order.getOrderCode(), applyId,
                 "item_" + oldItem.getId() + "_projectId", "重建项目",
-                oldItem.getProjectId(), newItem.getProjectId(), modifierId, modifierName);
+                oldItem.getProjectId(), Convert.convert(Long.class, itemMap.get("projectId")), modifierId, modifierName);
         recordIfChanged(order.getId(), order.getOrderCode(), applyId,
                 "item_" + oldItem.getId() + "_projectDesc", "项目说明",
-                oldItem.getProjectDesc(), newItem.getProjectDesc(), modifierId, modifierName);
+                oldItem.getProjectDesc(), Convert.convert(String.class, itemMap.get("projectDesc")), modifierId, modifierName);
         recordIfChanged(order.getId(), order.getOrderCode(), applyId,
                 "item_" + oldItem.getId() + "_formingRequirement", "成形需求",
-                oldItem.getFormingRequirement(), newItem.getFormingRequirement(), modifierId, modifierName);
+                oldItem.getFormingRequirement(), Convert.convert(String.class, itemMap.get("formingRequirement")), modifierId, modifierName);
         recordIfChanged(order.getId(), order.getOrderCode(), applyId,
                 "item_" + oldItem.getId() + "_otherRequirement", "其他要求",
-                oldItem.getOtherRequirement(), newItem.getOtherRequirement(), modifierId, modifierName);
+                oldItem.getOtherRequirement(), Convert.convert(String.class, itemMap.get("otherRequirement")), modifierId, modifierName);
     }
 
     // ==================== 辅助方法：影像文件修改 ====================
@@ -572,16 +672,20 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     /**
      * 处理影像文件修改（先校验文件存在性，再按类别替换）
      */
-    private void processImageModification(OrderMainEntity order, ExecuteModificationDTO dto,
+    @SuppressWarnings("unchecked")
+    private void processImageModification(OrderMainEntity order, Map<String, Object> modifications,
             Long applyId, Long modifierId, String modifierName) {
-        if (dto.getImageDataFileIds() != null) {
-            validateFileIds(dto.getImageDataFileIds(), "影像数据");
-            replaceOrderFiles(order, dto.getImageDataFileIds(),
+        List<String> imageDataFileIds = Convert.convert(List.class, modifications.get("imageDataFileIds"));
+        List<String> imageReportFileIds = Convert.convert(List.class, modifications.get("imageReportFileIds"));
+
+        if (imageDataFileIds != null) {
+            validateFileIds(imageDataFileIds, "影像数据");
+            replaceOrderFiles(order, imageDataFileIds,
                     FileBizTypeEnum.IMAGE_DATA.getDictCode(), applyId, modifierId, modifierName);
         }
-        if (dto.getImageReportFileIds() != null) {
-            validateFileIds(dto.getImageReportFileIds(), "影像报告");
-            replaceOrderFiles(order, dto.getImageReportFileIds(),
+        if (imageReportFileIds != null) {
+            validateFileIds(imageReportFileIds, "影像报告");
+            replaceOrderFiles(order, imageReportFileIds,
                     FileBizTypeEnum.IMAGE_REPORT.getDictCode(), applyId, modifierId, modifierName);
         }
     }
@@ -947,5 +1051,37 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 vo.setPendingModifyApplyId(apply.getId());
             }
         }
+    }
+
+    /**
+     * 校验订单是否存在阻断主流程的修改申请（PENDING 或 APPROVED 状态）
+     * PENDING 优先检查（申请等待审核时，流程不应推进）
+     * APPROVED 次之（申请已批准但未执行时，流程不应推进，防止修改内容丢失）
+     *
+     * @param orderId 订单ID
+     */
+    @Override
+    public void validateNoBlockingModifyApply(Long orderId) {
+        // 一次查询捞出所有阻断状态的申请，通过流式判断减少 DB 交互
+        List<OrderModifyApplyEntity> blockingApplies = orderModifyApplyMapper.selectList(
+                new LambdaQueryWrapper<OrderModifyApplyEntity>()
+                        .eq(OrderModifyApplyEntity::getOrderId, orderId)
+                        .in(OrderModifyApplyEntity::getStatus,
+                                ModifyApplyStatusEnum.PENDING.getCode(),
+                                ModifyApplyStatusEnum.APPROVED.getCode())
+        );
+        if (CollUtil.isEmpty(blockingApplies)) {
+            return;
+        }
+        // PENDING 优先：有待审核申请时立即阻断
+        boolean hasPending = blockingApplies.stream()
+                .anyMatch(a -> ModifyApplyStatusEnum.PENDING.getCode().equals(a.getStatus()));
+        if (hasPending) {
+            log.warn("订单存在待审核的修改申请，拒绝流转，orderId={}", orderId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_HAS_PENDING_MODIFY_APPLY);
+        }
+        // 有已批准但未执行的申请时阻断
+        log.warn("订单存在已批准但未执行的修改申请，拒绝流转，orderId={}", orderId);
+        throw new BusinessException(ErrorCodeEnum.ORDER_HAS_APPROVED_MODIFY_APPLY);
     }
 }
