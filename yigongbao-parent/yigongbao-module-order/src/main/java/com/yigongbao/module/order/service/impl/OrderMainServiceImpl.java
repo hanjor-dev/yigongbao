@@ -1,6 +1,5 @@
 package com.yigongbao.module.order.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -121,12 +120,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      * @return 当前登录用户ID，未登录返回 null
      */
     private Long getCurrentUserId() {
-        try {
-            return StpUtil.getLoginIdAsLong();
-        } catch (Exception e) {
-            log.debug("获取当前用户ID失败，可能未登录", e);
-            return null;
-        }
+        return orderQueryHelper.getCurrentUserId();
     }
 
     // ==================== 查询操作 ====================
@@ -155,6 +149,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
             LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
 
+            // 订单列表固定只查订单阶段（phase=1=ORDER）
+            wrapper.eq(OrderMainEntity::getPhase, FlowPhaseEnum.ORDER.getValue());
+
             // 注入数据权限过滤条件
             orderQueryHelper.buildDataScopeCondition(wrapper, currentUserId, scopeType);
 
@@ -181,17 +178,16 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     .eq(StrUtil.isNotBlank(dto.getBusinessType()), OrderMainEntity::getBusinessType, dto.getBusinessType())
                     .eq(Objects.nonNull(dto.getOperatorId()), OrderMainEntity::getOperatorId, dto.getOperatorId())
                     .eq(Objects.nonNull(dto.getStatus()), OrderMainEntity::getStatus, dto.getStatus())
-                    .eq(Objects.nonNull(dto.getPhase()), OrderMainEntity::getPhase, dto.getPhase())
                     .ge(Objects.nonNull(dto.getCreateTimeStart()), OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
                     .le(Objects.nonNull(dto.getCreateTimeEnd()), OrderMainEntity::getCreateTime, dto.getCreateTimeEnd());
 
             // bodyPartIds 过滤：先查 order_item 得到 orderIds，再用 MP in 条件（避免手写 SQL）
             if (dto.getBodyPartIds() != null && !dto.getBodyPartIds().isEmpty()) {
                 List<Long> orderIdsByBodyPart = orderItemMapper.selectList(
-                                new LambdaQueryWrapper<OrderItemEntity>()
-                                        .select(OrderItemEntity::getOrderId)
-                                        .in(OrderItemEntity::getBodyPartId, dto.getBodyPartIds())
-                                        .eq(OrderItemEntity::getIsDeleted, 0))
+                                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<OrderItemEntity>()
+                                        .select("order_id")
+                                        .in("body_part_id", dto.getBodyPartIds())
+                                        .eq("is_deleted", 0))
                         .stream().map(OrderItemEntity::getOrderId).distinct().collect(Collectors.toList());
                 if (orderIdsByBodyPart.isEmpty()) {
                     // 没有匹配明细，直接返回空页
@@ -205,10 +201,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             // projectIds 过滤：同上，先查 order_item 得到 orderIds，再用 MP in 条件
             if (dto.getProjectIds() != null && !dto.getProjectIds().isEmpty()) {
                 List<Long> orderIdsByProject = orderItemMapper.selectList(
-                                new LambdaQueryWrapper<OrderItemEntity>()
-                                        .select(OrderItemEntity::getOrderId)
-                                        .in(OrderItemEntity::getProjectId, dto.getProjectIds())
-                                        .eq(OrderItemEntity::getIsDeleted, 0))
+                                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<OrderItemEntity>()
+                                        .select("order_id")
+                                        .in("project_id", dto.getProjectIds())
+                                        .eq("is_deleted", 0))
                         .stream().map(OrderItemEntity::getOrderId).distinct().collect(Collectors.toList());
                 if (orderIdsByProject.isEmpty()) {
                     // 没有匹配明细，直接返回空页
@@ -471,6 +467,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
+            // 校验无阻断性修改申请
+            orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行提交动作，获取流转后的 phase 和 status
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.SUBMIT_ORDER, FlowOperator.of(currentUserId, null));
@@ -509,6 +507,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
+            // 校验无阻断性修改申请
+            orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行撤回动作
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.WITHDRAW, FlowOperator.of(currentUserId, null));
@@ -550,6 +550,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
+            // 校验无阻断性修改申请
+            orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行审核通过动作
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, null, dto.getRemark()));
@@ -606,6 +608,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("审核驳回时必须填写驳回原因");
                 throw new BusinessException(ErrorCodeEnum.ORDER_AUDIT_REMARK_REQUIRED);
             }
+            // 校验无阻断性修改申请
+            orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行审核驳回动作
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, null, dto.getRemark()));

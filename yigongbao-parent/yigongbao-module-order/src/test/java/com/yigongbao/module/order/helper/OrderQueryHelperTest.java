@@ -207,7 +207,7 @@ class OrderQueryHelperTest {
         }
 
         @Test
-        void orgScope_nullOrgId_noConditionAdded() {
+        void orgScope_nullOrgId_blockingConditionAdded() {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
                 when(userService.getById(100L)).thenReturn(null);
@@ -215,8 +215,8 @@ class OrderQueryHelperTest {
                 LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
                 orderQueryHelper.buildDataScopeCondition(wrapper, 100L, DataScopeTypeEnum.ORG);
 
-                // no orgId → no condition
-                assertThat(wrapper.getExpression().getNormal()).isEmpty();
+                // no orgId → blocking 1=0 condition added to prevent data leak
+                assertThat(wrapper.getExpression().getNormal()).isNotEmpty();
             }
         }
 

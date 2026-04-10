@@ -238,7 +238,11 @@ public enum ErrorCodeEnum {
     DESIGNER_ROLE_INVALID(724, "用户角色不是设计师或设计师管理员"),
     DESIGNER_DISABLED(725, "设计师已被禁用"),
     DESIGNER_SPECIALTY_MISMATCH(726, "设计师专业方向与订单项目专业方向不一致"),
-    ORDER_DESIGNER_MISMATCH(727, "非分配设计师，无权操作此订单");
+    ORDER_DESIGNER_MISMATCH(727, "非分配设计师，无权操作此订单"),
+
+    // ==================== 修改申请阻断（730-731）====================
+    ORDER_HAS_PENDING_MODIFY_APPLY(730, "订单存在待审核的修改申请，请先处理后再操作"),
+    ORDER_HAS_APPROVED_MODIFY_APPLY(731, "订单存在已批准但未执行的修改申请，请先执行或撤销后再操作");
 
     /**
      * 错误码

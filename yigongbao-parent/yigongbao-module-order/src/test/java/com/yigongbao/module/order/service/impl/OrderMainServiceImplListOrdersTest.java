@@ -66,6 +66,7 @@ class OrderMainServiceImplListOrdersTest {
     @Mock private com.yigongbao.module.system.dept.service.DeptService deptService;
     @Mock private com.yigongbao.module.system.dict.service.DictService dictService;
     @Mock private com.yigongbao.module.order.validator.OrderDataValidator orderDataValidator;
+    @Mock private com.yigongbao.module.order.service.OrderModifyApplyService orderModifyApplyService;
     @Mock private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @InjectMocks
@@ -401,6 +402,11 @@ class OrderMainServiceImplListOrdersTest {
             int baseline = getBaselineSegmentCount();
             clearInvocations(orderMainMapper);
 
+            // 模拟 orderItemMapper 返回匹配的订单ID，使 in 条件被加入 wrapper
+            com.yigongbao.module.order.entity.OrderItemEntity item = new com.yigongbao.module.order.entity.OrderItemEntity();
+            item.setOrderId(1L);
+            when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
+
             OrderPageDTO dto = baseDto();
             dto.setBodyPartIds(List.of(1L, 2L));
             int withFilter = executeAndGetSegmentCount(dto);
@@ -412,6 +418,11 @@ class OrderMainServiceImplListOrdersTest {
         void filterByProjectIds_addsMoreSegments() {
             int baseline = getBaselineSegmentCount();
             clearInvocations(orderMainMapper);
+
+            // 模拟 orderItemMapper 返回匹配的订单ID，使 in 条件被加入 wrapper
+            com.yigongbao.module.order.entity.OrderItemEntity item = new com.yigongbao.module.order.entity.OrderItemEntity();
+            item.setOrderId(1L);
+            when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
 
             OrderPageDTO dto = baseDto();
             dto.setProjectIds(List.of(3L, 4L));

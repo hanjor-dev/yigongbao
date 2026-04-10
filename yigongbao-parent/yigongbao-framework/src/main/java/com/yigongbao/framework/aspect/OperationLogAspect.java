@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.service.OperationLogService;
+import com.yigongbao.framework.util.IpLocationUtil;
 import com.yigongbao.framework.annotation.OperationLog;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +64,7 @@ public class OperationLogAspect {
         String requestUrl = request != null ? request.getRequestURI() : "";
         String requestMethod = request != null ? request.getMethod() : "";
         String requestIp = getClientIp(request);
+        String ipLocation = IpLocationUtil.getLocation(requestIp);
 
         // 获取当前用户
         Long userId = null;
@@ -101,14 +103,26 @@ public class OperationLogAspect {
                 errorRequestParams = getRequestParams(point, annotation);
             }
             long costTime = System.currentTimeMillis() - startTime;
-            saveLogAsync(annotation, requestUrl, requestMethod, requestIp,
+            saveLogAsync(annotation, requestUrl, requestMethod, requestIp, ipLocation,
                     userId, username, realName, errorRequestParams, userAgent, costTime, 0, e.getMessage());
             throw e;
         } finally {
             if (success) {
                 long costTime = System.currentTimeMillis() - startTime;
-                saveLogAsync(annotation, requestUrl, requestMethod, requestIp,
-                        userId, username, realName, requestParams, userAgent, costTime, 1, null);
+                // 重新获取登录用户信息：针对 login 接口，point.proceed() 执行后才完成登录，首次采集时用户未登录
+                Long finalUserId = userId;
+                String finalUsername = username;
+                String finalRealName = realName;
+                try {
+                    if (finalUserId == null && StpUtil.isLogin()) {
+                        finalUserId = StpUtil.getLoginIdAsLong();
+                        finalUsername = getUsername(finalUserId);
+                        finalRealName = getRealName(finalUserId);
+                    }
+                } catch (Exception ignored) {
+                }
+                saveLogAsync(annotation, requestUrl, requestMethod, requestIp, ipLocation,
+                        finalUserId, finalUsername, finalRealName, requestParams, userAgent, costTime, 1, null);
             }
         }
     }
@@ -118,7 +132,8 @@ public class OperationLogAspect {
      */
     @Async
     public void saveLogAsync(OperationLog annotation, String requestUrl,
-            String requestMethod, String requestIp, Long userId, String username, String realName,
+            String requestMethod, String requestIp, String ipLocation,
+            Long userId, String username, String realName,
             String requestParams, String userAgent, long costTime, Integer status, String errorMessage) {
         try {
             operationLogService.saveLog(
@@ -130,9 +145,10 @@ public class OperationLogAspect {
                     realName,
                     username,
                     requestIp,
+                    ipLocation,
                     userAgent,
                     requestMethod,
-                    costTime,
+                    (long) costTime,
                     status == 1,
                     errorMessage,
                     requestParams

@@ -3,7 +3,6 @@ package com.yigongbao.module.order.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.module.order.dto.modify.AuditModifyApplyDTO;
 import com.yigongbao.module.order.dto.modify.CreateModifyApplyDTO;
-import com.yigongbao.module.order.dto.modify.ExecuteModificationDTO;
 import com.yigongbao.module.order.dto.modify.ModificationLogPageQueryDTO;
 import com.yigongbao.module.order.dto.modify.ModifyApplyPageQueryDTO;
 import com.yigongbao.module.order.vo.modify.ApplicableModifyTypesVO;
@@ -14,6 +13,7 @@ import com.yigongbao.module.order.vo.modify.ModifyApplyVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 订单修改申请 Service
@@ -65,11 +65,10 @@ public interface OrderModifyApplyService {
      * 执行订单修改（审核通过后调用）
      * 核心方法：统一修改入口，所有模块均通过此方法执行修改
      *
-     * @param orderId 订单ID
-     * @param applyId 修改申请ID
-     * @param dto     修改字段参数
+     * @param applyId      修改申请ID（通过申请ID反查订单，自动完成关联校验）
+     * @param modifications 修改字段 Map，只传需要修改的字段，后端根据申请类型白名单过滤
      */
-    void executeModification(Long orderId, Long applyId, ExecuteModificationDTO dto);
+    void executeModification(Long applyId, Map<String, Object> modifications);
 
     /**
      * 查询当前用户发起的申请列表（分页）
@@ -129,4 +128,12 @@ public interface OrderModifyApplyService {
      * @param voList 订单列表 VO
      */
     void fillModifyApplyStatus(List<OrderListVO> voList);
+
+    /**
+     * 校验订单是否存在阻断主流程的修改申请（PENDING 或 APPROVED 状态）
+     * 存在时抛出 BusinessException，不存在时静默返回
+     *
+     * @param orderId 订单ID
+     */
+    void validateNoBlockingModifyApply(Long orderId);
 }

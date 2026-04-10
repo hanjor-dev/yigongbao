@@ -57,8 +57,7 @@ public interface UserMapper extends BaseMapper<UserEntity> {
      * 查询符合专业方向的设计师候选列表（按当前在手工单数升序）
      * 用于自动分配：取负载最低的第一位
      *
-     * @param specialty   项目专业方向（单值，如 "7.1"）
-     * @param maxCapacity 最大并发工单数上限（不含）
+     * @param specialty 项目专业方向（单值，如 "7.1"）
      * @return 设计师列表，已按 current_load ASC 排序
      */
     @Select("""
@@ -72,14 +71,9 @@ public interface UserMapper extends BaseMapper<UserEntity> {
           AND u.status = 1
           AND u.is_deleted = 0
           AND FIND_IN_SET(#{specialty}, u.specialty) > 0
-          AND (SELECT COUNT(*) FROM order_main om
-               WHERE om.designer_id = u.id
-                 AND om.status BETWEEN 21 AND 29
-                 AND om.is_deleted = 0) < #{maxCapacity}
         ORDER BY current_load ASC
         """)
-    List<UserEntity> selectAvailableDesigners(@Param("specialty") String specialty,
-                                              @Param("maxCapacity") int maxCapacity);
+    List<UserEntity> selectAvailableDesigners(@Param("specialty") String specialty);
 
     /**
      * 查询符合任意一个专业方向的设计师列表（用于手动分配时的候选展示）
@@ -87,7 +81,6 @@ public interface UserMapper extends BaseMapper<UserEntity> {
      *
      * @param specialtyCondition 已校验的 FIND_IN_SET 条件串，如
      *        "FIND_IN_SET('7.1', specialty) > 0 OR FIND_IN_SET('7.2', specialty) > 0"
-     * @param maxCapacity        最大并发工单数上限
      * @return 设计师列表，已按 current_load ASC 排序
      */
     @Select("""
@@ -104,6 +97,5 @@ public interface UserMapper extends BaseMapper<UserEntity> {
         ORDER BY current_load ASC
         """)
     List<UserEntity> selectDesignersBySpecialties(
-            @Param("specialtyCondition") String specialtyCondition,
-            @Param("maxCapacity") int maxCapacity);
+            @Param("specialtyCondition") String specialtyCondition);
 }

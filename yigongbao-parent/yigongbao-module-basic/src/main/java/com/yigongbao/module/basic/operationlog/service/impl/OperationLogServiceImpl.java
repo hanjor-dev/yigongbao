@@ -79,7 +79,7 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
     @Override
     public void saveLog(OperationTypeEnum operationType, String module, String businessNo,
                          String content, Long operatorId, String operatorName, String operatorUsername,
-                         String ipAddress, String userAgent, String requestMethod,
+                         String ipAddress, String ipLocation, String userAgent, String requestMethod,
                          Long duration, boolean success, String errorMessage, String requestParams) {
         OperationLogEntity logEntity = new OperationLogEntity();
         logEntity.setModule(module);
@@ -90,6 +90,7 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
         logEntity.setRequestUrl(businessNo);
         logEntity.setRequestParams(requestParams);
         logEntity.setIp(ipAddress);
+        logEntity.setLocation(ipLocation);
         logEntity.setUserId(operatorId);
         logEntity.setRealName(operatorName);
         logEntity.setUsername(operatorUsername);

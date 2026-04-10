@@ -451,7 +451,7 @@ public class OrderQueryHelper {
      */
     public String getNeedsPhysicalDeliveryName(Integer needsPhysicalDelivery) {
         if (needsPhysicalDelivery == null) return null;
-        return needsPhysicalDelivery == 1 ? "需要实体交付" : "不需要实体交付";
+        return needsPhysicalDelivery == 1 ? "是" : "否";
     }
 
     /**

@@ -22,6 +22,7 @@ public interface OperationLogService {
      * @param operatorName 操作人姓名
      * @param operatorUsername 操作人用户名
      * @param ipAddress IP地址
+     * @param ipLocation IP归属地
      * @param userAgent 用户代理
      * @param requestMethod 请求方法（GET/POST/PUT/DELETE）
      * @param duration 执行时长（毫秒）
@@ -31,6 +32,6 @@ public interface OperationLogService {
      */
     void saveLog(OperationTypeEnum operationType, String module, String businessNo,
                   String content, Long operatorId, String operatorName, String operatorUsername,
-                  String ipAddress, String userAgent, String requestMethod,
+                  String ipAddress, String ipLocation, String userAgent, String requestMethod,
                   Long duration, boolean success, String errorMessage, String requestParams);
 }

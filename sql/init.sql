@@ -166,8 +166,7 @@ INSERT INTO sys_config (config_key, config_name, config_value, config_type, conf
 -- 完整格式化版本见 .docs/技术实现/order/03_订单修改审核实现方案.md
 ('order.modify.field.config', '订单修改申请字段配置', '{"14.1":{"name":"基础信息","fields":[{"field":"patientName","label":"患者姓名","type":"text","required":false},{"field":"patientAge","label":"患者年龄","type":"number","required":false},{"field":"patientGender","label":"患者性别","type":"select","required":false,"options":[{"value":"12.1","label":"男"},{"value":"12.2","label":"女"}]},{"field":"doctorId","label":"关联医生","type":"autocomplete","required":false},{"field":"doctorPhone","label":"医生电话","type":"text","required":false},{"field":"isPostal","label":"是否邮寄","type":"switch","required":false},{"field":"postalAddress","label":"邮寄地址","type":"textarea","required":false},{"field":"expectedDeliveryDate","label":"期望交付时间","type":"datetime","required":false}]},"14.2":{"name":"影像文件","fields":[{"field":"imageDataFileIds","label":"影像数据文件","type":"file","required":false},{"field":"imageReportFileIds","label":"影像报告文件","type":"file","required":false}]},"14.3":{"name":"重建项目","fields":[{"field":"items","label":"重建项目明细","type":"array","required":false,"subFields":[{"field":"bodyPartId","label":"部位","type":"select"},{"field":"projectId","label":"重建项目","type":"select"},{"field":"projectDesc","label":"项目说明","type":"textarea"},{"field":"formingRequirement","label":"成形需求","type":"textarea"},{"field":"otherRequirement","label":"其他要求","type":"textarea"}]}]}}', 'json', 'order', '订单修改申请各类型允许修改的字段配置', 1, 0, 14, 1),
 -- 设计师分配配置
-('design.assign.mode', '设计师分配模式', 'manual', 'string', 'system', 'auto-自动分配，manual-手动分配', 1, 0, 15, 1),
-('design.assign.max.capacity', '设计师最大并发工单数', '10', 'number', 'system', '超出此数量不参与自动分配', 1, 0, 16, 1);
+('design.assign.mode', '设计师分配模式', 'manual', 'string', 'system', 'auto-自动分配，manual-手动分配', 1, 0, 15, 1);
 
 
 -- ============================================================
@@ -326,7 +325,7 @@ INSERT INTO sys_role (id, role_name, role_code, role_desc, account_type, data_sc
 (3, '设计师管理员', 'designer-manager', '设计团队管理员，负责设计工作分配、审核、统计等', 1, 'org', 1),
 -- 业务员角色
 (4, '业务员', 'salesman', '负责订单开拓、客户维护', 1, 'hospitals', 1),
-(5, '业务管理员', 'sale-manager', '管理下属业务员', 1, 'org', 1);
+(5, '业务管理员', 'sale-manager', '管理下属业务员', 1, 'dept', 1);
 
 
 

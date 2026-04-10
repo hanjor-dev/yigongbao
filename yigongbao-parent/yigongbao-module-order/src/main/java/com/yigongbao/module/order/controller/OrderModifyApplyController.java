@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.order.dto.modify.AuditModifyApplyDTO;
 import com.yigongbao.module.order.dto.modify.CreateModifyApplyDTO;
-import com.yigongbao.module.order.dto.modify.ExecuteModificationDTO;
 import com.yigongbao.module.order.dto.modify.ModificationLogPageQueryDTO;
 import com.yigongbao.module.order.dto.modify.ModifyApplyPageQueryDTO;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
@@ -26,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 /**
  * 订单修改申请 Controller
@@ -60,12 +61,12 @@ public class OrderModifyApplyController {
     }
 
     @Operation(summary = "执行订单修改（审核通过后调用）",
-            description = "必须提供已审核通过（APPROVED 状态）的 applyId，否则报错")
-    @PutMapping("/{orderId}/execute")
-    public Result<Void> executeModification(@PathVariable Long orderId,
-            @RequestParam Long applyId,
-            @Valid @RequestBody ExecuteModificationDTO dto) {
-        orderModifyApplyService.executeModification(orderId, applyId, dto);
+            description = "必须提供已审核通过（APPROVED 状态）的 applyId，否则报错。"
+                    + "modifications 为 Map，只传需要修改的字段，后端根据申请类型白名单过滤并处理。")
+    @PutMapping("/execute/{applyId}")
+    public Result<Void> executeModification(@PathVariable Long applyId,
+            @RequestBody Map<String, Object> modifications) {
+        orderModifyApplyService.executeModification(applyId, modifications);
         return Result.success();
     }
 

@@ -13,8 +13,6 @@ import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
 import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
 import com.yigongbao.module.order.dto.modify.AuditModifyApplyDTO;
 import com.yigongbao.module.order.dto.modify.CreateModifyApplyDTO;
-import com.yigongbao.module.order.dto.modify.ExecuteModificationDTO;
-import com.yigongbao.module.order.dto.modify.ExecuteModificationItemDTO;
 import com.yigongbao.module.order.dto.modify.ModificationLogPageQueryDTO;
 import com.yigongbao.module.order.dto.modify.ModifyApplyPageQueryDTO;
 import com.yigongbao.module.order.entity.OrderFileEntity;
@@ -46,7 +44,9 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -465,10 +465,10 @@ class OrderModifyApplyServiceImplTest {
                 when(orderModifyApplyMapper.selectById(APPLY_ID))
                         .thenReturn(buildApply(ModifyApplyStatusEnum.PENDING.getCode(), "14.1"));
 
-                ExecuteModificationDTO dto = new ExecuteModificationDTO();
-                dto.setPatientName("李四");
+                Map<String, Object> modifications = new HashMap<>();
+                modifications.put("patientName", "李四");
 
-                assertThatThrownBy(() -> service.executeModification(ORDER_ID, APPLY_ID, dto))
+                assertThatThrownBy(() -> service.executeModification(APPLY_ID, modifications))
                         .isInstanceOf(BusinessException.class)
                         .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
                                 .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_APPLY_STATUS_ERROR.getCode()));
@@ -476,19 +476,17 @@ class OrderModifyApplyServiceImplTest {
         }
 
         @Test
-        void 申请与订单不匹配_抛出异常() {
+        void 申请不存在_抛出ORDER_MODIFY_APPLY_NOT_FOUND异常() {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
-                // 申请关联的是其他订单
-                OrderModifyApplyEntity apply = buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.1");
-                apply.setOrderId(999L);
-                when(orderModifyApplyMapper.selectById(APPLY_ID)).thenReturn(apply);
+                when(orderModifyApplyMapper.selectById(APPLY_ID)).thenReturn(null);
 
-                ExecuteModificationDTO dto = new ExecuteModificationDTO();
-                dto.setPatientName("李四");
+                Map<String, Object> modifications = new HashMap<>();
 
-                assertThatThrownBy(() -> service.executeModification(ORDER_ID, APPLY_ID, dto))
-                        .isInstanceOf(BusinessException.class);
+                assertThatThrownBy(() -> service.executeModification(APPLY_ID, modifications))
+                        .isInstanceOf(BusinessException.class)
+                        .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                                .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_APPLY_NOT_FOUND.getCode()));
             }
         }
 
@@ -502,10 +500,10 @@ class OrderModifyApplyServiceImplTest {
                 OrderMainEntity order = buildOrder(1);
                 when(orderMainMapper.selectById(ORDER_ID)).thenReturn(order);
 
-                ExecuteModificationDTO dto = new ExecuteModificationDTO();
-                dto.setPatientName("李四（更新）");
+                Map<String, Object> modifications = new HashMap<>();
+                modifications.put("patientName", "李四（更新）");
 
-                service.executeModification(ORDER_ID, APPLY_ID, dto);
+                service.executeModification(APPLY_ID, modifications);
 
                 // 验证订单更新
                 verify(orderMainMapper).updateById(any(OrderMainEntity.class));
@@ -525,15 +523,15 @@ class OrderModifyApplyServiceImplTest {
                 // 旧 items 为空
                 when(orderItemMapper.selectList(any())).thenReturn(List.of());
 
-                ExecuteModificationItemDTO newItem = new ExecuteModificationItemDTO();
-                newItem.setBodyPartId(1L);
-                newItem.setProjectId(10L);
-                newItem.setProjectDesc("新项目");
+                Map<String, Object> item1 = new HashMap<>();
+                item1.put("bodyPartId", 1);
+                item1.put("projectId", 10);
+                item1.put("projectDesc", "新项目");
 
-                ExecuteModificationDTO dto = new ExecuteModificationDTO();
-                dto.setItems(List.of(newItem));
+                Map<String, Object> modifications = new HashMap<>();
+                modifications.put("items", List.of(item1));
 
-                service.executeModification(ORDER_ID, APPLY_ID, dto);
+                service.executeModification(APPLY_ID, modifications);
 
                 // 验证新 item 插入
                 verify(orderItemMapper).insert(any(OrderItemEntity.class));
@@ -554,11 +552,11 @@ class OrderModifyApplyServiceImplTest {
                 when(orderItemMapper.selectList(any()))
                         .thenReturn(List.of(buildOrderItem(10L, 100L)));
 
-                // dto.items 为空列表（删除全部旧项目）
-                ExecuteModificationDTO dto = new ExecuteModificationDTO();
-                dto.setItems(List.of());
+                // items 为空列表（删除全部旧项目）
+                Map<String, Object> modifications = new HashMap<>();
+                modifications.put("items", List.of());
 
-                service.executeModification(ORDER_ID, APPLY_ID, dto);
+                service.executeModification(APPLY_ID, modifications);
 
                 verify(orderItemMapper).deleteById(10L);
                 // 留痕：删除
@@ -579,14 +577,14 @@ class OrderModifyApplyServiceImplTest {
                         .thenReturn(List.of(buildOrderItem(10L, 100L)));
 
                 // 尝试更新 id=999（不属于该订单）
-                ExecuteModificationItemDTO badItem = new ExecuteModificationItemDTO();
-                badItem.setOrderItemId(999L);
-                badItem.setProjectId(100L);
+                Map<String, Object> badItem = new HashMap<>();
+                badItem.put("orderItemId", 999);
+                badItem.put("projectId", 100);
 
-                ExecuteModificationDTO dto = new ExecuteModificationDTO();
-                dto.setItems(List.of(badItem));
+                Map<String, Object> modifications = new HashMap<>();
+                modifications.put("items", List.of(badItem));
 
-                assertThatThrownBy(() -> service.executeModification(ORDER_ID, APPLY_ID, dto))
+                assertThatThrownBy(() -> service.executeModification(APPLY_ID, modifications))
                         .isInstanceOf(BusinessException.class)
                         .hasMessageContaining("不属于当前订单");
             }
@@ -603,10 +601,10 @@ class OrderModifyApplyServiceImplTest {
                 // 文件服务返回 0 个文件（请求了 1 个）
                 when(fileService.listByIds(any())).thenReturn(List.of());
 
-                ExecuteModificationDTO dto = new ExecuteModificationDTO();
-                dto.setImageDataFileIds(List.of("file-id-1"));
+                Map<String, Object> modifications = new HashMap<>();
+                modifications.put("imageDataFileIds", List.of("file-id-1"));
 
-                assertThatThrownBy(() -> service.executeModification(ORDER_ID, APPLY_ID, dto))
+                assertThatThrownBy(() -> service.executeModification(APPLY_ID, modifications))
                         .isInstanceOf(BusinessException.class)
                         .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
                                 .isEqualTo(ErrorCodeEnum.ORDER_FILE_NOT_FOUND.getCode()));
@@ -628,10 +626,10 @@ class OrderModifyApplyServiceImplTest {
                 // 旧文件关联为空
                 when(orderFileMapper.selectList(any())).thenReturn(List.of());
 
-                ExecuteModificationDTO dto = new ExecuteModificationDTO();
-                dto.setImageDataFileIds(List.of("file-id-1"));
+                Map<String, Object> modifications = new HashMap<>();
+                modifications.put("imageDataFileIds", List.of("file-id-1"));
 
-                service.executeModification(ORDER_ID, APPLY_ID, dto);
+                service.executeModification(APPLY_ID, modifications);
 
                 verify(orderFileMapper).insert(any(OrderFileEntity.class));
                 verify(orderModificationLogMapper).insert(any(OrderModificationLogEntity.class));

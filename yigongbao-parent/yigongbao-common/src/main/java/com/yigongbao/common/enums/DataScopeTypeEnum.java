@@ -38,7 +38,7 @@ public enum DataScopeTypeEnum {
      * 用户只能查看和操作同部门成员创建的数据
      * 部门通过 sys_user.dept_id 关联，业务管理员与其下属业务员同属一个部门
      */
-    DEPT("dept", "部门范围"),
+    DEPT("dept", "本部门"),
 
     /**
      * 全部数据

@@ -37,9 +37,4 @@ public class DesignerVO {
      * 当前在手工单数
      */
     private Integer currentLoad;
-
-    /**
-     * 最大并发工单数（来自系统配置）
-     */
-    private Integer maxCapacity;
 }

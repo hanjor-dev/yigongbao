@@ -34,6 +34,7 @@
         <mysql-connector.version>8.3.0</mysql-connector.version>
         <spring-security-crypto.version>6.2.4</spring-security-crypto.version>
         <openapi.version>2.3.0</openapi.version>
+        <ip2region.version>2.7.0</ip2region.version>
 
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
@@ -176,6 +177,13 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
                 <version>${openapi.version}</version>
+            </dependency>
+
+            <!-- ip2region 离线 IP 归属地解析 -->
+            <dependency>
+                <groupId>org.lionsoul</groupId>
+                <artifactId>ip2region</artifactId>
+                <version>${ip2region.version}</version>
             </dependency>
         </dependencies>
 

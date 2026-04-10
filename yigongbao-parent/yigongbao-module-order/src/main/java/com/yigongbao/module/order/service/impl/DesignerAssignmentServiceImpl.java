@@ -6,6 +6,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
@@ -93,13 +94,15 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         try {
             Long designerId = autoAssignDesigner(orderId);
             if (designerId == null) {
+                // 无可用设计师（专业方向无人覆盖或无在职设计师），订单保持 PENDING_DESIGN 状态
+                // 管理员可通过筛选 status=PENDING_DESIGN & designerId=null 找到此类待分配订单
                 log.warn("自动分配未找到合适设计师，订单进入待分配状态，orderId={}", orderId);
             } else {
                 log.info("自动分配成功，orderId={}, designerId={}", orderId, designerId);
             }
         } catch (Exception e) {
-            // 分配失败不影响审核结果，仅记录日志，管理员后续手动分配
-            log.warn("自动分配异常，订单保持 PENDING_DESIGN 状态，orderId={}, error={}", orderId, e.getMessage());
+            // 技术异常（DB 故障等），分配失败不阻断审核结果，管理员后续手动分配
+            log.error("自动分配异常，订单保持 PENDING_DESIGN 状态，orderId={}", orderId, e);
         }
     }
 
@@ -119,18 +122,17 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
             log.warn("订单无可用专业方向，跳过自动分配，orderId={}", orderId);
             return null;
         }
-        // 2. 获取容量上限配置
-        int maxCapacity = getMaxCapacity();
-        // 3. 查询候选设计师（FIND_IN_SET 匹配，按工单数 ASC）
-        List<UserEntity> candidates = userMapper.selectAvailableDesigners(specialty, maxCapacity);
+        // 2. 查询候选设计师（FIND_IN_SET 匹配，按工单数 ASC）
+        List<UserEntity> candidates = userMapper.selectAvailableDesigners(specialty);
         if (CollUtil.isEmpty(candidates)) {
-            log.warn("无满足条件的设计师，specialty={}, maxCapacity={}", specialty, maxCapacity);
+            log.warn("无满足条件的设计师，specialty={}", specialty);
             return null;
         }
-        // 4. 取负载最低的第一位
-        UserEntity designer = candidates.get(0);
-        // 5. 更新订单 designerId / designerName
-        updateOrderDesigner(orderId, designer);
+        // 3. 取负载最低的第一位
+        UserEntity designer = candidates.getFirst();
+        // 4. 更新订单 designerId / designerName
+        OrderMainEntity order = orderMainService.getById(orderId);
+        updateOrderDesigner(order, designer);
         return designer.getId();
     }
 
@@ -155,14 +157,14 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         }
         // 2. 校验设计师存在、角色合法、状态正常
         UserEntity designer = userMapper.selectById(designerId);
-        if (designer == null || designer.getIsDeleted() == 1) {
+        if (designer == null || designer.getIsDeleted() == StatusConstants.DELETED) {
             throw new BusinessException(ErrorCodeEnum.DESIGNER_NOT_FOUND);
         }
         if (!DESIGNER_ROLES.contains(designer.getRoleCode())) {
             log.warn("用户角色不合法，designerId={}, roleCode={}", designerId, designer.getRoleCode());
             throw new BusinessException(ErrorCodeEnum.DESIGNER_ROLE_INVALID);
         }
-        if (designer.getStatus() != 1) {
+        if (designer.getStatus() != StatusConstants.NORMAL) {
             log.warn("设计师已禁用，designerId={}", designerId);
             throw new BusinessException(ErrorCodeEnum.DESIGNER_DISABLED);
         }
@@ -174,7 +176,7 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
             throw new BusinessException(ErrorCodeEnum.DESIGNER_SPECIALTY_MISMATCH);
         }
         // 4. 更新订单
-        updateOrderDesigner(orderId, designer);
+        updateOrderDesigner(order, designer);
         log.info("手动分配成功，orderId={}, designerId={}", orderId, designerId);
     }
 
@@ -216,7 +218,6 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
     @Override
     public List<DesignerVO> listAvailableDesigners(DesignerQueryDTO dto) {
         log.info("查询可分配设计师，specialties={}", dto.getSpecialties());
-        int maxCapacity = getMaxCapacity();
         List<String> specialties = dto.getSpecialties();
         if (CollUtil.isEmpty(specialties)) {
             return List.of();
@@ -232,8 +233,8 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
             log.warn("所有专业方向编码均未通过白名单校验，返回空列表");
             return List.of();
         }
-        List<UserEntity> users = userMapper.selectDesignersBySpecialties(condition, maxCapacity);
-        return users.stream().map(u -> toDesignerVO(u, maxCapacity)).collect(Collectors.toList());
+        List<UserEntity> users = userMapper.selectDesignersBySpecialties(condition);
+        return users.stream().map(this::toDesignerVO).collect(Collectors.toList());
     }
 
     // ==================== 私有方法 ====================
@@ -271,36 +272,20 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
     /**
      * 更新订单的设计师冗余字段
      */
-    private void updateOrderDesigner(Long orderId, UserEntity designer) {
-        OrderMainEntity order = orderMainService.getById(orderId);
+    private void updateOrderDesigner(OrderMainEntity order, UserEntity designer) {
         order.setDesignerId(designer.getId());
         order.setDesignerName(designer.getRealName());
         orderMainService.updateById(order);
     }
 
     /**
-     * 从系统配置获取设计师最大并发工单数，解析失败时使用默认值 10
-     */
-    private int getMaxCapacity() {
-        String val = configService.getConfigValue(
-                SystemConfigKeyEnum.DESIGN_ASSIGN_MAX_CAPACITY.getKey());
-        try {
-            return Integer.parseInt(val);
-        } catch (NumberFormatException e) {
-            log.warn("设计师最大容量配置无效，使用默认值 10，configVal={}", val);
-            return 10;
-        }
-    }
-
-    /**
      * 将 UserEntity 转换为 DesignerVO，填充专业方向名称列表
      */
-    private DesignerVO toDesignerVO(UserEntity user, int maxCapacity) {
+    private DesignerVO toDesignerVO(UserEntity user) {
         DesignerVO vo = new DesignerVO();
         vo.setUserId(user.getId());
         vo.setRealName(user.getRealName());
         vo.setCurrentLoad(user.getCurrentLoad() != null ? user.getCurrentLoad() : 0);
-        vo.setMaxCapacity(maxCapacity);
         if (StrUtil.isNotBlank(user.getSpecialty())) {
             List<String> specList = StrUtil.split(user.getSpecialty(), ',');
             vo.setSpecialtyList(specList);

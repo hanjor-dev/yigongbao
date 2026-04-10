@@ -66,16 +66,14 @@ class DesignerAssignmentServiceImplTest {
     @DisplayName("trigger — 自动模式，无明细时不抛异常")
     void trigger_autoMode_noItems_shouldNotThrow() {
         when(configService.getConfigValue("design.assign.mode")).thenReturn("auto");
-        when(configService.getConfigValue("design.assign.max.capacity")).thenReturn("10");
         when(orderItemMapper.selectList(any())).thenReturn(List.of());
         assertDoesNotThrow(() -> service.triggerAssignmentAfterAudit(1L));
     }
 
     @Test
-    @DisplayName("trigger — 自动模式分配异常不上抛，不影响审核")
+    @DisplayName("trigger — 自动模式分配异常不上抛，订单不阻断")
     void trigger_autoMode_exceptionCaught_shouldNotThrow() {
         when(configService.getConfigValue("design.assign.mode")).thenReturn("auto");
-        when(configService.getConfigValue("design.assign.max.capacity")).thenReturn("10");
         when(orderItemMapper.selectList(any())).thenThrow(new RuntimeException("DB error"));
         assertDoesNotThrow(() -> service.triggerAssignmentAfterAudit(1L));
     }
@@ -90,11 +88,10 @@ class DesignerAssignmentServiceImplTest {
         item.setProjectId(10L);
         when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
         when(rebuildProjectService.getSpecialtyByProjectId(10L)).thenReturn("7.1");
-        when(configService.getConfigValue("design.assign.max.capacity")).thenReturn("10");
         UserEntity designer = new UserEntity();
         designer.setId(100L);
         designer.setRealName("张三");
-        when(userMapper.selectAvailableDesigners("7.1", 10)).thenReturn(List.of(designer));
+        when(userMapper.selectAvailableDesigners("7.1")).thenReturn(List.of(designer));
         OrderMainEntity order = new OrderMainEntity();
         order.setId(1L);
         when(orderMainService.getById(1L)).thenReturn(order);
@@ -112,8 +109,7 @@ class DesignerAssignmentServiceImplTest {
         item.setProjectId(10L);
         when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
         when(rebuildProjectService.getSpecialtyByProjectId(10L)).thenReturn("7.1");
-        when(configService.getConfigValue("design.assign.max.capacity")).thenReturn("10");
-        when(userMapper.selectAvailableDesigners("7.1", 10)).thenReturn(List.of());
+        when(userMapper.selectAvailableDesigners("7.1")).thenReturn(List.of());
         assertNull(service.autoAssignDesigner(1L));
     }
 
@@ -122,20 +118,6 @@ class DesignerAssignmentServiceImplTest {
     void autoAssign_noOrderItems_shouldReturnNull() {
         when(orderItemMapper.selectList(any())).thenReturn(List.of());
         assertNull(service.autoAssignDesigner(1L));
-    }
-
-    @Test
-    @DisplayName("autoAssign — 配置值非数字，使用默认容量 10")
-    void autoAssign_invalidCapacityConfig_usesDefault() {
-        OrderItemEntity item = new OrderItemEntity();
-        item.setProjectId(10L);
-        when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
-        when(rebuildProjectService.getSpecialtyByProjectId(10L)).thenReturn("7.1");
-        when(configService.getConfigValue("design.assign.max.capacity")).thenReturn("invalid");
-        when(userMapper.selectAvailableDesigners("7.1", 10)).thenReturn(List.of());
-        // should not throw, just use default 10
-        assertNull(service.autoAssignDesigner(1L));
-        verify(userMapper).selectAvailableDesigners("7.1", 10);
     }
 
     // ==================== manualAssignDesigner ====================
@@ -152,7 +134,6 @@ class DesignerAssignmentServiceImplTest {
         when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
         when(rebuildProjectService.getSpecialtyByProjectId(10L)).thenReturn("7.1");
         service.manualAssignDesigner(1L, 100L);
-        verify(orderMainService, times(2)).getById(1L);
         verify(orderMainService).updateById(argThat(o -> Long.valueOf(100L).equals(o.getDesignerId())));
     }
 
@@ -319,7 +300,6 @@ class DesignerAssignmentServiceImplTest {
     void listDesigners_invalidSpecialty_shouldReturnEmpty() {
         DesignerQueryDTO dto = new DesignerQueryDTO();
         dto.setSpecialties(List.of("invalid", "7.", "../hack"));
-        when(configService.getConfigValue("design.assign.max.capacity")).thenReturn("10");
         List<DesignerVO> result = service.listAvailableDesigners(dto);
         assertTrue(result.isEmpty());
         verifyNoInteractions(userMapper);
@@ -330,7 +310,6 @@ class DesignerAssignmentServiceImplTest {
     void listDesigners_emptySpecialties_shouldReturnEmpty() {
         DesignerQueryDTO dto = new DesignerQueryDTO();
         dto.setSpecialties(List.of());
-        when(configService.getConfigValue("design.assign.max.capacity")).thenReturn("10");
         List<DesignerVO> result = service.listAvailableDesigners(dto);
         assertTrue(result.isEmpty());
         verifyNoInteractions(userMapper);
@@ -341,10 +320,9 @@ class DesignerAssignmentServiceImplTest {
     void listDesigners_validSpecialty_shouldReturnList() {
         DesignerQueryDTO dto = new DesignerQueryDTO();
         dto.setSpecialties(List.of("7.1"));
-        when(configService.getConfigValue("design.assign.max.capacity")).thenReturn("10");
         UserEntity designer = buildDesigner(100L, "7.1");
         designer.setCurrentLoad(3);
-        when(userMapper.selectDesignersBySpecialties(anyString(), eq(10))).thenReturn(List.of(designer));
+        when(userMapper.selectDesignersBySpecialties(anyString())).thenReturn(List.of(designer));
         List<DesignerVO> result = service.listAvailableDesigners(dto);
         assertEquals(1, result.size());
         assertEquals(100L, result.get(0).getUserId());
@@ -356,12 +334,10 @@ class DesignerAssignmentServiceImplTest {
     void listDesigners_multipleSpecialties_shouldBuildOrCondition() {
         DesignerQueryDTO dto = new DesignerQueryDTO();
         dto.setSpecialties(List.of("7.1", "7.2"));
-        when(configService.getConfigValue("design.assign.max.capacity")).thenReturn("10");
-        when(userMapper.selectDesignersBySpecialties(anyString(), eq(10))).thenReturn(List.of());
+        when(userMapper.selectDesignersBySpecialties(anyString())).thenReturn(List.of());
         service.listAvailableDesigners(dto);
         verify(userMapper).selectDesignersBySpecialties(
-                argThat(cond -> cond.contains("7.1") && cond.contains("7.2") && cond.contains(" OR ")),
-                eq(10));
+                argThat(cond -> cond.contains("7.1") && cond.contains("7.2") && cond.contains(" OR ")));
     }
 
     // ==================== 辅助方法 ====================
