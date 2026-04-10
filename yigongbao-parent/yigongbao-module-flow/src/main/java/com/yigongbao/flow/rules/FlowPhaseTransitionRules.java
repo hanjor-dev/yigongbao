@@ -127,16 +127,16 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      * 根据当前阶段、目标状态决策下一阶段及初始状态
      *
      * 【核心修复 P1-3】：阶段推进时，必须同时确定初始可见状态
-     * - DATA_AUDIT_PASSED → DESIGN + DESIGNING
+     * - DATA_AUDIT_PASSED → DESIGN + PENDING_DESIGN
      * - DESIGN_REVIEW_PASSED → PRINT + PENDING_PRINT 或 CONFIRM + AWAITING_CONFIRM
      *
      * 阶段推进规则：
-     * - DATA_AUDIT_PASSED(12) → 进入 DESIGN(2)，status 变为 DESIGNING(21)
-     * - DESIGN_REVIEW_PASSED(24) → 进入 PRINT(3) 或 CONFIRM(7)
-     * - PRINT_COMPLETED(33) → 进入 POST_PROCESSING(4)
-     * - QC_PASSED(52) → 进入 WAREHOUSE(6)
-     * - WAREHOUSED(62) → 进入 COMPLETED(8)
-     * - COMPLETED(80) → 进入 COMPLETED(8)
+     * - DATA_AUDIT_PASSED(1003) → 进入 DESIGN(20)，status 变为 PENDING_DESIGN(2001)
+     * - DESIGN_REVIEW_PASSED(2005) → 进入 PRINT(30) 或 CONFIRM(70)
+     * - PRINT_COMPLETED(3003) → 进入 POST_PROCESSING(40)
+     * - QC_PASSED(5002) → 进入 WAREHOUSE(60)
+     * - WAREHOUSED(6002) → 进入 COMPLETED(80)
+     * - COMPLETED(8001) → 进入 COMPLETED(80)
      *
      * @param currentPhase 当前阶段
      * @param targetStatus 动作触发的目标状态

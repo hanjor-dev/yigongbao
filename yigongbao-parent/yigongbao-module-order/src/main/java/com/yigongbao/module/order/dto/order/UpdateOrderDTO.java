@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * 用于订单信息的修改操作
  *
  * 【重要】needsPhysicalDelivery 变更规则：
- * - 仅在订单阶段（phase=1）允许修改
+ * - 仅在订单阶段（phase=10）允许修改
  * - 仅允许 0→1 的变更（不需要→需要实体交付）
  * - 不允许 1→0 的变更（需要→不需要实体交付）
  * 业务校验逻辑在 OrderMainServiceImpl.updateOrder 中实现

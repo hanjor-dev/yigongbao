@@ -105,7 +105,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
-        // 校验订单阶段（仅 phase=1 或 phase=2 可申请）
+        // 校验订单阶段（仅 phase=10 或 phase=20 可申请）
         Integer phase = order.getPhase();
         if (!FlowPhaseEnum.ORDER.getValue().equals(phase)
                 && !FlowPhaseEnum.DESIGN.getValue().equals(phase)) {
@@ -159,7 +159,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
-        // 2. 校验订单阶段适用修改申请（phase=1 或 phase=2）
+        // 2. 校验订单阶段适用修改申请（phase=10 或 phase=20）
         Integer phase = order.getPhase();
         if (!FlowPhaseEnum.ORDER.getValue().equals(phase)
                 && !FlowPhaseEnum.DESIGN.getValue().equals(phase)) {
@@ -212,7 +212,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
 
     /**
      * 校验申请类型是否在当前阶段允许
-     * 订单阶段（phase=1）：允许全部类型；设计阶段（phase=2）：仅允许 14.3（重建项目）
+     * 订单阶段（phase=10）：允许全部类型；设计阶段（phase=20）：仅允许 14.3（重建项目）
      */
     private void validateTypeInPhase(Integer phase, String applyTypes) {
         if (FlowPhaseEnum.DESIGN.getValue().equals(phase)) {

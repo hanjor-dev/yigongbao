@@ -106,7 +106,7 @@ class OrderModifyApplyServiceImplTest {
         order.setId(ORDER_ID);
         order.setOrderCode(ORDER_CODE);
         order.setPhase(phase);
-        order.setStatus(20);
+        order.setStatus(2001);
         order.setHospitalId(10L);
         order.setHospitalName("测试医院");
         order.setPatientName("张三");
@@ -157,7 +157,7 @@ class OrderModifyApplyServiceImplTest {
 
         @Test
         void 阶段不允许_返回空类型列表且reason为PHASE_NOT_ALLOWED() {
-            when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(3)); // 打印阶段
+            when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(30)); // 打印阶段
 
             ApplicableModifyTypesVO result = service.getApplicableTypes(ORDER_ID);
 
@@ -168,7 +168,7 @@ class OrderModifyApplyServiceImplTest {
 
         @Test
         void 已有待审核申请_返回空类型列表且携带pendingApplyId() {
-            when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(1));
+            when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(10));
             OrderModifyApplyEntity pendingApply = new OrderModifyApplyEntity();
             pendingApply.setId(999L);
             pendingApply.setStatus(ModifyApplyStatusEnum.PENDING.getCode());
@@ -183,7 +183,7 @@ class OrderModifyApplyServiceImplTest {
 
         @Test
         void 订单阶段_返回可申请全部类型() {
-            when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(1));
+            when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(10));
             when(orderModifyApplyMapper.selectOne(any())).thenReturn(null);
 
             ApplicableModifyTypesVO result = service.getApplicableTypes(ORDER_ID);
@@ -194,7 +194,7 @@ class OrderModifyApplyServiceImplTest {
 
         @Test
         void 设计阶段_只返回重建项目类型() {
-            when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(2));
+            when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(20));
             when(orderModifyApplyMapper.selectOne(any())).thenReturn(null);
 
             ApplicableModifyTypesVO result = service.getApplicableTypes(ORDER_ID);
@@ -214,7 +214,7 @@ class OrderModifyApplyServiceImplTest {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
 
-                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(1));
+                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(10));
                 when(orderModifyApplyMapper.selectCount(any())).thenReturn(0L);
                 when(orderModifyApplyMapper.insert(any(OrderModifyApplyEntity.class))).thenReturn(1);
 
@@ -252,7 +252,7 @@ class OrderModifyApplyServiceImplTest {
         void 已有待审核申请_抛出ORDER_MODIFY_APPLY_EXISTS异常() {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
-                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(1));
+                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(10));
                 when(orderModifyApplyMapper.selectCount(any())).thenReturn(1L);
 
                 CreateModifyApplyDTO dto = new CreateModifyApplyDTO();
@@ -270,7 +270,7 @@ class OrderModifyApplyServiceImplTest {
         void 设计阶段申请基础信息类型_抛出ORDER_MODIFY_TYPE_NOT_ALLOWED_IN_PHASE异常() {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
-                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(2));
+                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(20));
                 when(orderModifyApplyMapper.selectCount(any())).thenReturn(0L);
 
                 CreateModifyApplyDTO dto = new CreateModifyApplyDTO();
@@ -288,7 +288,7 @@ class OrderModifyApplyServiceImplTest {
         void 无效申请类型_抛出异常() {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
-                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(1));
+                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(10));
                 when(orderModifyApplyMapper.selectCount(any())).thenReturn(0L);
 
                 CreateModifyApplyDTO dto = new CreateModifyApplyDTO();
@@ -304,7 +304,7 @@ class OrderModifyApplyServiceImplTest {
         void 其他阶段创建申请_抛出ORDER_NOT_APPLICABLE_STATUS异常() {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
-                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(5)); // 质检阶段
+                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(50)); // 质检阶段
 
                 CreateModifyApplyDTO dto = new CreateModifyApplyDTO();
                 dto.setApplyTypes("14.1");
@@ -497,7 +497,7 @@ class OrderModifyApplyServiceImplTest {
 
                 when(orderModifyApplyMapper.selectById(APPLY_ID))
                         .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.1"));
-                OrderMainEntity order = buildOrder(1);
+                OrderMainEntity order = buildOrder(10);
                 when(orderMainMapper.selectById(ORDER_ID)).thenReturn(order);
 
                 Map<String, Object> modifications = new HashMap<>();
@@ -519,7 +519,7 @@ class OrderModifyApplyServiceImplTest {
 
                 when(orderModifyApplyMapper.selectById(APPLY_ID))
                         .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.3"));
-                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(1));
+                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(10));
                 // 旧 items 为空
                 when(orderItemMapper.selectList(any())).thenReturn(List.of());
 
@@ -547,7 +547,7 @@ class OrderModifyApplyServiceImplTest {
 
                 when(orderModifyApplyMapper.selectById(APPLY_ID))
                         .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.3"));
-                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(1));
+                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(10));
                 // 旧 items 有一项
                 when(orderItemMapper.selectList(any()))
                         .thenReturn(List.of(buildOrderItem(10L, 100L)));
@@ -571,7 +571,7 @@ class OrderModifyApplyServiceImplTest {
 
                 when(orderModifyApplyMapper.selectById(APPLY_ID))
                         .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.3"));
-                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(1));
+                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(10));
                 // 旧 items 只有 id=10
                 when(orderItemMapper.selectList(any()))
                         .thenReturn(List.of(buildOrderItem(10L, 100L)));
@@ -597,7 +597,7 @@ class OrderModifyApplyServiceImplTest {
 
                 when(orderModifyApplyMapper.selectById(APPLY_ID))
                         .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.2"));
-                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(1));
+                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(10));
                 // 文件服务返回 0 个文件（请求了 1 个）
                 when(fileService.listByIds(any())).thenReturn(List.of());
 
@@ -618,7 +618,7 @@ class OrderModifyApplyServiceImplTest {
 
                 when(orderModifyApplyMapper.selectById(APPLY_ID))
                         .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.2"));
-                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(1));
+                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(buildOrder(10));
                 // 文件存在
                 FileVO fileVO = new FileVO();
                 fileVO.setId("file-id-1");

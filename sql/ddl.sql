@@ -970,8 +970,8 @@ CREATE TABLE order_main (
     actual_complete_time  DATETIME    COMMENT '实际完成时间',
 
     -- ==================== 【核心】阶段 + 状态 ====================
-    phase           TINYINT         NOT NULL DEFAULT 1 COMMENT '当前阶段：1-订单，2-设计，3-打印，4-后处理，5-质检，6-仓储，7-确认，8-完成',
-    status          TINYINT         NOT NULL DEFAULT 10 COMMENT '当前状态',
+    phase           INT             NOT NULL DEFAULT 10 COMMENT '当前阶段：10-订单，20-设计，30-打印，40-后处理，50-质检，60-仓储，70-确认，80-完成（间隔10，支持扩展插入）',
+    status          INT             NOT NULL DEFAULT 1001 COMMENT '当前状态（格式：phase×100+序号，如1001=订单草稿，2001=待设计）',
 
     -- ==================== 当前处理人 ====================
     current_handler_id BIGINT        COMMENT '当前处理人ID',
@@ -1092,9 +1092,12 @@ CREATE TABLE order_flow_status_history (
     order_code     VARCHAR(50)     NOT NULL COMMENT '订单编号',
 
     -- ==================== 状态变更信息 ====================
-    phase           TINYINT         COMMENT '变更时阶段',
-    from_status     TINYINT         COMMENT '变更前状态',
-    to_status       TINYINT         COMMENT '变更后状态',
+    phase           INT             COMMENT '变更时阶段（FlowPhaseEnum.value）',
+    phase_name      VARCHAR(50)     COMMENT '变更时阶段名称（快照，防止枚举改名后历史展示错误）',
+    from_status     INT             COMMENT '变更前状态（FlowStatusEnum.value）',
+    from_status_name VARCHAR(50)    COMMENT '变更前状态名称（快照）',
+    to_status       INT             COMMENT '变更后状态（FlowStatusEnum.value）',
+    to_status_name  VARCHAR(50)     COMMENT '变更后状态名称（快照）',
     action          VARCHAR(50)     COMMENT '触发动作（如 SUBMIT_ORDER、DATA_AUDIT_PASS）',
     action_name     VARCHAR(100)    COMMENT '动作名称',
 

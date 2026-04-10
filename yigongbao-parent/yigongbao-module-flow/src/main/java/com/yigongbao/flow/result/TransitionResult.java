@@ -13,7 +13,7 @@ import lombok.Data;
  * - 当 phase 推进时（phaseChanged=true）：
  *   - DB 落库使用 initialStatus（初始可见状态）
  *   - targetStatus 作为动作触发的中间状态，仅用于历史记录
- * - 【重要】phase 和 status 始终成对出现（phase=1 对应 ORDER 阶段状态，phase=2 对应 DESIGN 阶段状态）
+ * - 【重要】phase 和 status 始终成对出现（phase=10 对应 ORDER 阶段状态，phase=20 对应 DESIGN 阶段状态）
  *
  * @author hanjor
  * @date 2026-04-01

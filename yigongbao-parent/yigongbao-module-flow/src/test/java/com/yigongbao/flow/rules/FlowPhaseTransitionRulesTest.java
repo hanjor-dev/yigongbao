@@ -39,91 +39,91 @@ class FlowPhaseTransitionRulesTest {
         @Test
         @DisplayName("ORDER → DESIGN（合法）")
         void order_to_design_shouldReturn_true() {
-            assertTrue(rules.canTransition(1, 2));
+            assertTrue(rules.canTransition(10, 20));
         }
 
         @Test
         @DisplayName("DESIGN → PRINT（合法）")
         void design_to_print_shouldReturn_true() {
-            assertTrue(rules.canTransition(2, 3));
+            assertTrue(rules.canTransition(20, 30));
         }
 
         @Test
         @DisplayName("DESIGN → CONFIRM（合法，跳过生产）")
         void design_to_confirm_shouldReturn_true() {
-            assertTrue(rules.canTransition(2, 7));
+            assertTrue(rules.canTransition(20, 70));
         }
 
         @Test
         @DisplayName("PRINT → POST_PROCESSING（合法）")
         void print_to_postProcessing_shouldReturn_true() {
-            assertTrue(rules.canTransition(3, 4));
+            assertTrue(rules.canTransition(30, 40));
         }
 
         @Test
         @DisplayName("POST_PROCESSING → QC（合法）")
         void postProcessing_to_qc_shouldReturn_true() {
-            assertTrue(rules.canTransition(4, 5));
+            assertTrue(rules.canTransition(40, 50));
         }
 
         @Test
         @DisplayName("QC → WAREHOUSE（合法）")
         void qc_to_warehouse_shouldReturn_true() {
-            assertTrue(rules.canTransition(5, 6));
+            assertTrue(rules.canTransition(50, 60));
         }
 
         @Test
         @DisplayName("WAREHOUSE → COMPLETED（合法）")
         void warehouse_to_completed_shouldReturn_true() {
-            assertTrue(rules.canTransition(6, 8));
+            assertTrue(rules.canTransition(60, 80));
         }
 
         @Test
         @DisplayName("CONFIRM → COMPLETED（合法）")
         void confirm_to_completed_shouldReturn_true() {
-            assertTrue(rules.canTransition(7, 8));
+            assertTrue(rules.canTransition(70, 80));
         }
 
         @Test
         @DisplayName("COMPLETED → 任意阶段（非法，已完成不可跳转）")
         void completed_to_any_shouldReturn_false() {
-            assertFalse(rules.canTransition(8, 1));
-            assertFalse(rules.canTransition(8, 2));
+            assertFalse(rules.canTransition(80, 10));
+            assertFalse(rules.canTransition(80, 20));
         }
 
         @Test
         @DisplayName("ORDER → CONFIRM（非法，跨阶段跳转）")
         void order_to_confirm_shouldReturn_false() {
-            assertFalse(rules.canTransition(1, 7));
+            assertFalse(rules.canTransition(10, 70));
         }
 
         @Test
         @DisplayName("ORDER → PRINT（非法，跨阶段跳转）")
         void order_to_print_shouldReturn_false() {
-            assertFalse(rules.canTransition(1, 3));
+            assertFalse(rules.canTransition(10, 30));
         }
 
         @Test
         @DisplayName("逆向跳转（非法，排除QC→PRINT返工场景）")
         void reverse_transition_shouldReturn_false() {
-            assertFalse(rules.canTransition(3, 2));
-            // QC(5) → PRINT(3) 是允许的（返工场景）
-            assertTrue(rules.canTransition(5, 3));
+            assertFalse(rules.canTransition(30, 20));
+            // QC(50) → PRINT(30) 是允许的（返工场景）
+            assertTrue(rules.canTransition(50, 30));
         }
 
         @Test
         @DisplayName("null 参数 → 返回 false")
         void null_params_shouldReturn_false() {
-            assertFalse(rules.canTransition(null, 2));
-            assertFalse(rules.canTransition(1, null));
+            assertFalse(rules.canTransition(null, 20));
+            assertFalse(rules.canTransition(10, null));
             assertFalse(rules.canTransition(null, null));
         }
 
         @Test
         @DisplayName("非法阶段值 → 返回 false")
         void invalid_phase_shouldReturn_false() {
-            assertFalse(rules.canTransition(99, 2));
-            assertFalse(rules.canTransition(1, 99));
+            assertFalse(rules.canTransition(99, 20));
+            assertFalse(rules.canTransition(10, 99));
         }
     }
 
@@ -136,30 +136,30 @@ class FlowPhaseTransitionRulesTest {
         @Test
         @DisplayName("ORDER → [DESIGN]")
         void order_shouldReturn_design() {
-            List<Integer> nextPhases = rules.getAvailableNextPhases(1);
-            assertEquals(List.of(2), nextPhases);
+            List<Integer> nextPhases = rules.getAvailableNextPhases(10);
+            assertEquals(List.of(20), nextPhases);
         }
 
         @Test
         @DisplayName("DESIGN → [PRINT, CONFIRM]")
         void design_shouldReturn_printAndConfirm() {
-            List<Integer> nextPhases = rules.getAvailableNextPhases(2);
+            List<Integer> nextPhases = rules.getAvailableNextPhases(20);
             assertEquals(2, nextPhases.size());
-            assertTrue(nextPhases.contains(3));
-            assertTrue(nextPhases.contains(7));
+            assertTrue(nextPhases.contains(30));
+            assertTrue(nextPhases.contains(70));
         }
 
         @Test
         @DisplayName("PRINT → [POST_PROCESSING]")
         void print_shouldReturn_postProcessing() {
-            List<Integer> nextPhases = rules.getAvailableNextPhases(3);
-            assertEquals(List.of(4), nextPhases);
+            List<Integer> nextPhases = rules.getAvailableNextPhases(30);
+            assertEquals(List.of(40), nextPhases);
         }
 
         @Test
         @DisplayName("COMPLETED → []（无后续阶段）")
         void completed_shouldReturn_empty() {
-            List<Integer> nextPhases = rules.getAvailableNextPhases(8);
+            List<Integer> nextPhases = rules.getAvailableNextPhases(80);
             assertTrue(nextPhases.isEmpty());
         }
 
@@ -253,7 +253,7 @@ class FlowPhaseTransitionRulesTest {
     class DecideNextPhaseAndStatusTests {
 
         @Test
-        @DisplayName("DATA_AUDIT_PASSED(12) → DESIGN + PENDING_DESIGN(21)")
+        @DisplayName("DATA_AUDIT_PASSED(1003) → DESIGN + PENDING_DESIGN(2001)")
         void dataAuditPassed_shouldAdvanceToDesign() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.ORDER,
@@ -265,7 +265,7 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASSED(24) + needsPhysicalDelivery=1 → PRINT + PENDING_PRINT(31)")
+        @DisplayName("DESIGN_REVIEW_PASSED(2005) + needsPhysicalDelivery=1 → PRINT + PENDING_PRINT(3001)")
         void designReviewPassed_needDelivery_shouldAdvanceToPrint() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.DESIGN,
@@ -277,7 +277,7 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASSED(24) + needsPhysicalDelivery=0 → CONFIRM + AWAITING_CONFIRM(71)")
+        @DisplayName("DESIGN_REVIEW_PASSED(2005) + needsPhysicalDelivery=0 → CONFIRM + AWAITING_CONFIRM(7001)")
         void designReviewPassed_noDelivery_shouldAdvanceToConfirm() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.DESIGN,
@@ -289,7 +289,7 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("PRINT_COMPLETED(33) → POST_PROCESSING + POST_PROCESSING(41)")
+        @DisplayName("PRINT_COMPLETED(3003) → POST_PROCESSING + POST_PROCESSING(4001)")
         void printCompleted_shouldAdvanceToPostProcessing() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.PRINT,
@@ -301,7 +301,7 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("QC_PASSED(52) → WAREHOUSE + WAREHOUSE_IN(61)")
+        @DisplayName("QC_PASSED(5002) → WAREHOUSE + WAREHOUSE_IN(6001)")
         void qcPassed_shouldAdvanceToWarehouse() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.QC,
@@ -313,7 +313,7 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("WAREHOUSED(62) → COMPLETED + COMPLETED(80)")
+        @DisplayName("WAREHOUSED(6002) → COMPLETED + COMPLETED(8001)")
         void warehoused_shouldAdvanceToCompleted() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.WAREHOUSE,
@@ -325,7 +325,7 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("USER_CONFIRM → COMPLETED + COMPLETED(80)")
+        @DisplayName("USER_CONFIRM → COMPLETED + COMPLETED(8001)")
         void userConfirm_shouldAdvanceToCompleted() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.CONFIRM,
@@ -368,7 +368,7 @@ class FlowPhaseTransitionRulesTest {
     class IsInvisibleStatusTests {
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASSED(24) → true（不可见状态）")
+        @DisplayName("DESIGN_REVIEW_PASSED(2005) → true（不可见状态）")
         void designReviewPassed_shouldBeInvisible() {
             assertTrue(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.DESIGN_REVIEW_PASSED));
         }

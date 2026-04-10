@@ -68,21 +68,21 @@ class FlowStateMachineServiceImplTest {
         @Test
         @DisplayName("CREATE 动作 → 仅记录历史，phase/status 不变")
         void createAction_shouldOnlyRecordHistory() {
-            testOrder.setPhase(1);
-            testOrder.setStatus(10);
+            testOrder.setPhase(10);
+            testOrder.setStatus(1001);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
 
             TransitionResult result = flowStateMachineService.executeTransition(
                     1L, FlowActionEnum.CREATE, testOperator);
 
             assertFalse(result.isPhaseChanged());
-            assertEquals(1, result.getTargetPhase());
-            assertEquals(10, result.getTargetStatus());
+            assertEquals(10, result.getTargetPhase());
+            assertEquals(1001, result.getTargetStatus());
             assertNull(result.getInitialStatus());
 
             verify(flowStatusHistoryService).recordTransition(
-                    eq(1L), eq("ORD-20260402-0001"), eq(1),
-                    eq(10), eq(10),
+                    eq(1L), eq("ORD-20260402-0001"), eq(10),
+                    eq(1001), eq(1001),
                     eq("CREATE"), eq("创建订单"),
                     eq(testOperator));
         }
@@ -95,11 +95,11 @@ class FlowStateMachineServiceImplTest {
     class SubmitAndWithdrawTests {
 
         @Test
-        @DisplayName("SUBMIT_ORDER: DRAFT(10) → PENDING_DATA_AUDIT(11)")
+        @DisplayName("SUBMIT_ORDER: DRAFT(1001) → PENDING_DATA_AUDIT(1002)")
         void submitOrder_shouldChangeToPendingAudit() {
-            // DRAFT(10) 在 ORDER 阶段允许 SUBMIT_ORDER
-            testOrder.setPhase(1);
-            testOrder.setStatus(10);
+            // DRAFT(1001) 在 ORDER 阶段允许 SUBMIT_ORDER
+            testOrder.setPhase(10);
+            testOrder.setStatus(1001);
             testOrder.setNeedsPhysicalDelivery(1);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -108,16 +108,16 @@ class FlowStateMachineServiceImplTest {
                     1L, FlowActionEnum.SUBMIT_ORDER, testOperator);
 
             assertFalse(result.isPhaseChanged());
-            assertEquals(1, result.getTargetPhase());
-            assertEquals(11, result.getTargetStatus());
+            assertEquals(10, result.getTargetPhase());
+            assertEquals(1002, result.getTargetStatus());
         }
 
         @Test
-        @DisplayName("WITHDRAW: DATA_AUDIT_PASSED(12) → PENDING_DATA_AUDIT(11)")
+        @DisplayName("WITHDRAW: DATA_AUDIT_PASSED(1003) → PENDING_DATA_AUDIT(1002)")
         void withdraw_shouldReturnToPendingAudit() {
-            // WITHDRAW 在 ORDER 阶段仅允许从 DATA_AUDIT_PASSED(12) 执行
-            testOrder.setPhase(1);
-            testOrder.setStatus(12);
+            // WITHDRAW 在 ORDER 阶段仅允许从 DATA_AUDIT_PASSED(1003) 执行
+            testOrder.setPhase(10);
+            testOrder.setStatus(1003);
             testOrder.setNeedsPhysicalDelivery(1);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -126,16 +126,16 @@ class FlowStateMachineServiceImplTest {
                     1L, FlowActionEnum.WITHDRAW, testOperator);
 
             assertFalse(result.isPhaseChanged());
-            assertEquals(1, result.getTargetPhase());
-            assertEquals(11, result.getTargetStatus());
+            assertEquals(10, result.getTargetPhase());
+            assertEquals(1002, result.getTargetStatus());
         }
 
         @Test
-        @DisplayName("RESUBMIT: DATA_AUDIT_REJECTED(13) → PENDING_DATA_AUDIT(11)")
+        @DisplayName("RESUBMIT: DATA_AUDIT_REJECTED(1004) → PENDING_DATA_AUDIT(1002)")
         void resubmit_shouldChangeToPendingAudit() {
-            // RESUBMIT 在 ORDER 阶段仅允许从 DATA_AUDIT_REJECTED(13) 执行
-            testOrder.setPhase(1);
-            testOrder.setStatus(13);
+            // RESUBMIT 在 ORDER 阶段仅允许从 DATA_AUDIT_REJECTED(1004) 执行
+            testOrder.setPhase(10);
+            testOrder.setStatus(1004);
             testOrder.setNeedsPhysicalDelivery(1);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -144,8 +144,8 @@ class FlowStateMachineServiceImplTest {
                     1L, FlowActionEnum.RESUBMIT, testOperator);
 
             assertFalse(result.isPhaseChanged());
-            assertEquals(1, result.getTargetPhase());
-            assertEquals(11, result.getTargetStatus());
+            assertEquals(10, result.getTargetPhase());
+            assertEquals(1002, result.getTargetStatus());
         }
     }
 
@@ -156,11 +156,11 @@ class FlowStateMachineServiceImplTest {
     class AuditPassPhaseChangeTests {
 
         @Test
-        @DisplayName("DATA_AUDIT_PASS: phase=1,status=11 → phase=2,status=21")
+        @DisplayName("DATA_AUDIT_PASS: phase=10,status=1002 → phase=20,status=2001")
         void auditPass_shouldAdvancePhaseToDesign() {
-            // PENDING_DATA_AUDIT(11) 在 ORDER 阶段允许 DATA_AUDIT_PASS
-            testOrder.setPhase(1);
-            testOrder.setStatus(11);
+            // PENDING_DATA_AUDIT(1002) 在 ORDER 阶段允许 DATA_AUDIT_PASS
+            testOrder.setPhase(10);
+            testOrder.setStatus(1002);
             testOrder.setNeedsPhysicalDelivery(1);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -169,10 +169,10 @@ class FlowStateMachineServiceImplTest {
                     1L, FlowActionEnum.DATA_AUDIT_PASS, testOperator);
 
             assertTrue(result.isPhaseChanged());
-            assertEquals(2, result.getTargetPhase());
-            assertEquals(12, result.getTargetStatus()); // DATA_AUDIT_PASSED
-            assertEquals(21, result.getInitialStatus()); // PENDING_DESIGN
-            assertEquals(21, result.getFinalStatus());
+            assertEquals(20, result.getTargetPhase());
+            assertEquals(1003, result.getTargetStatus()); // DATA_AUDIT_PASSED
+            assertEquals(2001, result.getInitialStatus()); // PENDING_DESIGN
+            assertEquals(2001, result.getFinalStatus());
         }
     }
 
@@ -183,11 +183,11 @@ class FlowStateMachineServiceImplTest {
     class AuditRejectTests {
 
         @Test
-        @DisplayName("DATA_AUDIT_REJECT: phase=1,status=11 → phase=1,status=13（不推进阶段）")
+        @DisplayName("DATA_AUDIT_REJECT: phase=10,status=1002 → phase=10,status=1004（不推进阶段）")
         void auditReject_shouldReturnToDraft() {
-            // PENDING_DATA_AUDIT(11) 在 ORDER 阶段允许 DATA_AUDIT_REJECT
-            testOrder.setPhase(1);
-            testOrder.setStatus(11);
+            // PENDING_DATA_AUDIT(1002) 在 ORDER 阶段允许 DATA_AUDIT_REJECT
+            testOrder.setPhase(10);
+            testOrder.setStatus(1002);
             testOrder.setNeedsPhysicalDelivery(1);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -196,9 +196,9 @@ class FlowStateMachineServiceImplTest {
                     1L, FlowActionEnum.DATA_AUDIT_REJECT, testOperator);
 
             assertFalse(result.isPhaseChanged());
-            assertEquals(1, result.getTargetPhase());
-            assertEquals(13, result.getTargetStatus()); // DATA_AUDIT_REJECTED
-            assertEquals(13, result.getFinalStatus());
+            assertEquals(10, result.getTargetPhase());
+            assertEquals(1004, result.getTargetStatus()); // DATA_AUDIT_REJECTED
+            assertEquals(1004, result.getFinalStatus());
         }
     }
 
@@ -209,11 +209,11 @@ class FlowStateMachineServiceImplTest {
     class InvisibleStatusTests {
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASS: phase=2,status=24,needsPhysicalDelivery=0 → phase=7,finalStatus=71")
+        @DisplayName("DESIGN_REVIEW_PASS: phase=20,status=2004,needsPhysicalDelivery=0 → phase=70,finalStatus=7001")
         void designReviewPass_noDelivery_shouldAbsorbAndAdvanceToConfirm() {
-            // DESIGN_REVIEWING(24) 在 DESIGN 阶段允许 DESIGN_REVIEW_PASS
-            testOrder.setPhase(2);
-            testOrder.setStatus(24);
+            // DESIGN_REVIEWING(2004) 在 DESIGN 阶段允许 DESIGN_REVIEW_PASS
+            testOrder.setPhase(20);
+            testOrder.setStatus(2004);
             testOrder.setNeedsPhysicalDelivery(0);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -222,18 +222,18 @@ class FlowStateMachineServiceImplTest {
                     1L, FlowActionEnum.DESIGN_REVIEW_PASS, testOperator);
 
             assertTrue(result.isPhaseChanged());
-            assertEquals(7, result.getTargetPhase()); // CONFIRM 阶段
-            assertEquals(25, result.getTargetStatus()); // DESIGN_REVIEW_PASSED（不可见）
-            assertEquals(71, result.getInitialStatus()); // AWAITING_CONFIRM
-            assertEquals(71, result.getFinalStatus());
+            assertEquals(70, result.getTargetPhase()); // CONFIRM 阶段
+            assertEquals(2005, result.getTargetStatus()); // DESIGN_REVIEW_PASSED（不可见）
+            assertEquals(7001, result.getInitialStatus()); // AWAITING_CONFIRM
+            assertEquals(7001, result.getFinalStatus());
         }
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASS: phase=2,status=24,needsPhysicalDelivery=1 → phase=3,finalStatus=31")
+        @DisplayName("DESIGN_REVIEW_PASS: phase=20,status=2004,needsPhysicalDelivery=1 → phase=30,finalStatus=3001")
         void designReviewPass_needDelivery_shouldAdvanceToPrint() {
-            // DESIGN_REVIEWING(24) 在 DESIGN 阶段允许 DESIGN_REVIEW_PASS
-            testOrder.setPhase(2);
-            testOrder.setStatus(24);
+            // DESIGN_REVIEWING(2004) 在 DESIGN 阶段允许 DESIGN_REVIEW_PASS
+            testOrder.setPhase(20);
+            testOrder.setStatus(2004);
             testOrder.setNeedsPhysicalDelivery(1);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -242,10 +242,10 @@ class FlowStateMachineServiceImplTest {
                     1L, FlowActionEnum.DESIGN_REVIEW_PASS, testOperator);
 
             assertTrue(result.isPhaseChanged());
-            assertEquals(3, result.getTargetPhase()); // PRINT 阶段
-            assertEquals(25, result.getTargetStatus()); // DESIGN_REVIEW_PASSED（不可见）
-            assertEquals(31, result.getInitialStatus()); // PENDING_PRINT
-            assertEquals(31, result.getFinalStatus());
+            assertEquals(30, result.getTargetPhase()); // PRINT 阶段
+            assertEquals(2005, result.getTargetStatus()); // DESIGN_REVIEW_PASSED（不可见）
+            assertEquals(3001, result.getInitialStatus()); // PENDING_PRINT
+            assertEquals(3001, result.getFinalStatus());
         }
     }
 
@@ -256,11 +256,11 @@ class FlowStateMachineServiceImplTest {
     class CompletePrintTests {
 
         @Test
-        @DisplayName("COMPLETE_PRINT: phase=3,status=32 → phase=4,status=41")
+        @DisplayName("COMPLETE_PRINT: phase=30,status=3002 → phase=40,status=4001")
         void completePrint_shouldAdvanceToPostProcessing() {
-            // PRINTING(32) 在 PRINT 阶段允许 COMPLETE_PRINT
-            testOrder.setPhase(3);
-            testOrder.setStatus(32);
+            // PRINTING(3002) 在 PRINT 阶段允许 COMPLETE_PRINT
+            testOrder.setPhase(30);
+            testOrder.setStatus(3002);
             testOrder.setNeedsPhysicalDelivery(1);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -269,10 +269,10 @@ class FlowStateMachineServiceImplTest {
                     1L, FlowActionEnum.COMPLETE_PRINT, testOperator);
 
             assertTrue(result.isPhaseChanged());
-            assertEquals(4, result.getTargetPhase());
-            assertEquals(33, result.getTargetStatus()); // PRINT_COMPLETED（过渡）
-            assertEquals(41, result.getInitialStatus()); // POST_PROCESSING
-            assertEquals(41, result.getFinalStatus());
+            assertEquals(40, result.getTargetPhase());
+            assertEquals(3003, result.getTargetStatus()); // PRINT_COMPLETED（过渡）
+            assertEquals(4001, result.getInitialStatus()); // POST_PROCESSING
+            assertEquals(4001, result.getFinalStatus());
         }
     }
 
@@ -283,11 +283,11 @@ class FlowStateMachineServiceImplTest {
     class QcPassTests {
 
         @Test
-        @DisplayName("QC_PASS: phase=5,status=51 → phase=6,status=61")
+        @DisplayName("QC_PASS: phase=50,status=5001 → phase=60,status=6001")
         void qcPass_shouldAdvanceToWarehouse() {
-            // QC_IN_PROGRESS(51) 在 QC 阶段允许 QC_PASS
-            testOrder.setPhase(5);
-            testOrder.setStatus(51);
+            // QC_IN_PROGRESS(5001) 在 QC 阶段允许 QC_PASS
+            testOrder.setPhase(50);
+            testOrder.setStatus(5001);
             testOrder.setNeedsPhysicalDelivery(1);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -296,10 +296,10 @@ class FlowStateMachineServiceImplTest {
                     1L, FlowActionEnum.QC_PASS, testOperator);
 
             assertTrue(result.isPhaseChanged());
-            assertEquals(6, result.getTargetPhase());
-            assertEquals(52, result.getTargetStatus()); // QC_PASSED（过渡）
-            assertEquals(61, result.getInitialStatus()); // WAREHOUSE_IN
-            assertEquals(61, result.getFinalStatus());
+            assertEquals(60, result.getTargetPhase());
+            assertEquals(5002, result.getTargetStatus()); // QC_PASSED（过渡）
+            assertEquals(6001, result.getInitialStatus()); // WAREHOUSE_IN
+            assertEquals(6001, result.getFinalStatus());
         }
     }
 
@@ -310,11 +310,11 @@ class FlowStateMachineServiceImplTest {
     class CompleteWarehouseInTests {
 
         @Test
-        @DisplayName("COMPLETE_WAREHOUSE_IN: phase=6,status=61 → phase=8,status=80")
+        @DisplayName("COMPLETE_WAREHOUSE_IN: phase=60,status=6001 → phase=80,status=8001")
         void completeWarehouseIn_shouldAdvanceToCompleted() {
-            // WAREHOUSE_IN(61) 在 WAREHOUSE 阶段允许 COMPLETE_WAREHOUSE_IN
-            testOrder.setPhase(6);
-            testOrder.setStatus(61);
+            // WAREHOUSE_IN(6001) 在 WAREHOUSE 阶段允许 COMPLETE_WAREHOUSE_IN
+            testOrder.setPhase(60);
+            testOrder.setStatus(6001);
             testOrder.setNeedsPhysicalDelivery(1);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -323,10 +323,10 @@ class FlowStateMachineServiceImplTest {
                     1L, FlowActionEnum.COMPLETE_WAREHOUSE_IN, testOperator);
 
             assertTrue(result.isPhaseChanged());
-            assertEquals(8, result.getTargetPhase());
-            assertEquals(62, result.getTargetStatus()); // WAREHOUSED（过渡）
-            assertEquals(80, result.getInitialStatus()); // COMPLETED
-            assertEquals(80, result.getFinalStatus());
+            assertEquals(80, result.getTargetPhase());
+            assertEquals(6002, result.getTargetStatus()); // WAREHOUSED（过渡）
+            assertEquals(8001, result.getInitialStatus()); // COMPLETED
+            assertEquals(8001, result.getFinalStatus());
         }
     }
 
@@ -337,11 +337,11 @@ class FlowStateMachineServiceImplTest {
     class UserConfirmTests {
 
         @Test
-        @DisplayName("USER_CONFIRM: phase=7,status=71 → phase=8,status=80")
+        @DisplayName("USER_CONFIRM: phase=70,status=7001 → phase=80,status=8001")
         void userConfirm_shouldAdvanceToCompleted() {
-            // AWAITING_CONFIRM(71) 在 CONFIRM 阶段允许 USER_CONFIRM
-            testOrder.setPhase(7);
-            testOrder.setStatus(71);
+            // AWAITING_CONFIRM(7001) 在 CONFIRM 阶段允许 USER_CONFIRM
+            testOrder.setPhase(70);
+            testOrder.setStatus(7001);
             testOrder.setNeedsPhysicalDelivery(0);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -350,10 +350,10 @@ class FlowStateMachineServiceImplTest {
                     1L, FlowActionEnum.USER_CONFIRM, testOperator);
 
             assertTrue(result.isPhaseChanged());
-            assertEquals(8, result.getTargetPhase());
-            assertEquals(80, result.getTargetStatus()); // COMPLETED
-            assertEquals(80, result.getInitialStatus());
-            assertEquals(80, result.getFinalStatus());
+            assertEquals(80, result.getTargetPhase());
+            assertEquals(8001, result.getTargetStatus()); // COMPLETED
+            assertEquals(8001, result.getInitialStatus());
+            assertEquals(8001, result.getFinalStatus());
         }
     }
 
@@ -367,8 +367,8 @@ class FlowStateMachineServiceImplTest {
         @DisplayName("驳回次数已达上限（10次）→ 抛出 ORDER_EXCESSIVE_AUDIT_REJECT")
         void auditRejectExceedLimit_shouldThrow() {
             // 模拟历史中已有10次 DATA_AUDIT_REJECT
-            testOrder.setPhase(1);
-            testOrder.setStatus(11);
+            testOrder.setPhase(10);
+            testOrder.setStatus(1002);
             testOrder.setNeedsPhysicalDelivery(1);
             java.util.List<String> historyWith10Rejects = Collections.nCopies(10, "DATA_AUDIT_REJECT");
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
@@ -386,8 +386,8 @@ class FlowStateMachineServiceImplTest {
         @DisplayName("驳回次数达边界值（历史9次+本次=10次）→ 抛出 ORDER_EXCESSIVE_AUDIT_REJECT")
         void auditRejectAtBoundary_shouldNotThrow() {
             // 模拟历史中已有9次驳回，本次执行后刚好达到上限（10次），应抛出异常
-            testOrder.setPhase(1);
-            testOrder.setStatus(11);
+            testOrder.setPhase(10);
+            testOrder.setStatus(1002);
             testOrder.setNeedsPhysicalDelivery(1);
             java.util.List<String> historyWith9Rejects = Collections.nCopies(9, "DATA_AUDIT_REJECT");
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
@@ -411,9 +411,9 @@ class FlowStateMachineServiceImplTest {
         @Test
         @DisplayName("在不允许的状态下执行动作 → 抛出 ORDER_STATUS_TRANSITION_ERROR")
         void invalidAction_shouldThrow() {
-            // DRAFT(10) 不允许 DATA_AUDIT_PASS（允许 SUBMIT_ORDER）
-            testOrder.setPhase(1);
-            testOrder.setStatus(10);
+            // DRAFT(1001) 不允许 DATA_AUDIT_PASS（允许 SUBMIT_ORDER）
+            testOrder.setPhase(10);
+            testOrder.setStatus(1001);
             testOrder.setNeedsPhysicalDelivery(1);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
@@ -457,7 +457,7 @@ class FlowStateMachineServiceImplTest {
         @DisplayName("订单 phase=null → 抛出 ORDER_STATUS_TRANSITION_ERROR")
         void nullPhase_shouldThrow() {
             testOrder.setPhase(null);
-            testOrder.setStatus(10);
+            testOrder.setStatus(1001);
             testOrder.setNeedsPhysicalDelivery(1);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());

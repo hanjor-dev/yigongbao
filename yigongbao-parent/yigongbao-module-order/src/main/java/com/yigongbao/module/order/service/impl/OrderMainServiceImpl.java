@@ -78,7 +78,7 @@ import java.util.stream.Collectors;
  * - 创建记录：CREATE 动作（仅记录历史，不改变状态）
  *
  * 【needsPhysicalDelivery 变更规则】
- * - 仅在订单阶段（phase=1）允许修改
+ * - 仅在订单阶段（phase=10）允许修改
  * - 仅允许 0→1 的变更（不需要→需要实体交付）
  * - 不允许 1→0 的变更（需要→不需要实体交付）
  * 校验逻辑见 {@link #validateNeedsPhysicalDeliveryChange(OrderMainEntity, UpdateOrderDTO)}
@@ -149,7 +149,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
             LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
 
-            // 订单列表固定只查订单阶段（phase=1=ORDER）
+            // 订单列表固定只查订单阶段（phase=10=ORDER）
             wrapper.eq(OrderMainEntity::getPhase, FlowPhaseEnum.ORDER.getValue());
 
             // 注入数据权限过滤条件
@@ -334,7 +334,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      * 仅公司管理员或提交后10分钟内的提单人/区域管理员可修改
      *
      * 【needsPhysicalDelivery 变更规则】
-     * - 仅在订单阶段（phase=1）允许修改
+     * - 仅在订单阶段（phase=10）允许修改
      * - 仅允许 0→1 的变更（不需要→需要实体交付）
      * - 不允许 1→0 的变更（需要→不需要实体交付）
      *
@@ -422,7 +422,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            // 只允许删除草稿状态（status=10）的订单，正式提交后的订单不可删除
+            // 只允许删除草稿状态（status=1001）的订单，正式提交后的订单不可删除
             if (!FlowStatusEnum.DRAFT.getValue().equals(entity.getStatus())) {
                 log.warn("非草稿状态订单不允许删除，id={}, status={}", id, entity.getStatus());
                 throw new BusinessException(ErrorCodeEnum.ORDER_CANNOT_DELETE);

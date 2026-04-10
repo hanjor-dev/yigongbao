@@ -2,6 +2,8 @@ package com.yigongbao.flow.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.FlowStatusHistoryEntity;
+import com.yigongbao.flow.enums.FlowPhaseEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.mapper.FlowStatusHistoryMapper;
 import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.service.FlowStatusHistoryService;
@@ -59,8 +61,15 @@ public class FlowStatusHistoryServiceImpl implements FlowStatusHistoryService {
             entity.setOrderId(orderId);
             entity.setOrderCode(orderCode);
             entity.setPhase(phase);
+            // 快照阶段和状态名称，防止枚举后续改名导致历史展示错误
+            FlowPhaseEnum phaseEnum = FlowPhaseEnum.getByValue(phase);
+            entity.setPhaseName(phaseEnum != null ? phaseEnum.getName() : null);
             entity.setFromStatus(fromStatus);
+            FlowStatusEnum fromStatusEnum = FlowStatusEnum.getByValue(fromStatus);
+            entity.setFromStatusName(fromStatusEnum != null ? fromStatusEnum.getName() : null);
             entity.setToStatus(toStatus);
+            FlowStatusEnum toStatusEnum = FlowStatusEnum.getByValue(toStatus);
+            entity.setToStatusName(toStatusEnum != null ? toStatusEnum.getName() : null);
             entity.setAction(action);
             entity.setActionName(actionName);
             entity.setOperatorId(operator.getOperatorId());

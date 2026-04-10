@@ -42,14 +42,29 @@ public class FlowStatusHistoryEntity extends BaseEntity {
     private Integer phase;
 
     /**
+     * 变更时阶段名称（快照，历史展示用）
+     */
+    private String phaseName;
+
+    /**
      * 变更前状态
      */
     private Integer fromStatus;
 
     /**
+     * 变更前状态名称（快照，历史展示用）
+     */
+    private String fromStatusName;
+
+    /**
      * 变更后状态
      */
     private Integer toStatus;
+
+    /**
+     * 变更后状态名称（快照，历史展示用）
+     */
+    private String toStatusName;
 
     /**
      * 触发动作（如 SUBMIT_ORDER、DATA_AUDIT_PASS）
