@@ -718,7 +718,10 @@ CREATE TABLE doctor (
     KEY idx_doctor_creator (creator_id),
     KEY idx_doctor_name (doctor_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医生表';
-CREATE UNIQUE INDEX uk_doctor_name ON doctor ((CASE WHEN is_deleted = 0 THEN doctor_name ELSE NULL END));
+-- 唯一索引改为（医院+姓名）组合索引，仅对未删除记录生效（is_deleted=0）
+-- 使用函数索引：is_deleted=0 时表达式非 NULL 参与唯一约束，is_deleted=1 时返回 NULL 跳过唯一约束
+-- 效果：同一医院内未删除的医生姓名唯一，不同医院可重名，已删除医生不受此约束
+CREATE UNIQUE INDEX uk_doctor_hospital_name ON doctor ((CASE WHEN is_deleted = 0 THEN CONCAT_WS('|', hospital_id, doctor_name) ELSE NULL END));
 
 
 -- ============================================================

@@ -11,10 +11,14 @@ import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
 import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.module.order.dto.modify.AuditModifyApplyDTO;
 import com.yigongbao.module.order.dto.modify.CreateModifyApplyDTO;
+import com.yigongbao.module.order.dto.modify.ExecuteModifyDTO;
 import com.yigongbao.module.order.dto.modify.ModificationLogPageQueryDTO;
 import com.yigongbao.module.order.dto.modify.ModifyApplyPageQueryDTO;
+import com.yigongbao.module.order.enums.AuditActionEnum;
 import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.entity.OrderModificationLogEntity;
@@ -39,14 +43,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -78,6 +81,8 @@ class OrderModifyApplyServiceImplTest {
     @Mock private FileService fileService;
     @Mock private ConfigService configService;
     @Mock private UserService userService;
+    // 注入真实 ObjectMapper，因为 loadFieldConfig 使用 Jackson 反序列化字段配置 JSON
+    @Spy  private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private OrderModifyApplyServiceImpl service;
@@ -87,6 +92,52 @@ class OrderModifyApplyServiceImplTest {
     private static final long USER_ID = 5L;
     private static final String ORDER_CODE = "ORD-20260408-000001";
 
+    /**
+     * 与 sql/init.sql 中 order.modify.field.config 保持一致的字段配置 JSON（测试用简版）
+     * 含 14.1（含 hospital_doctor 分组）、14.2、14.3（含 subFields）
+     */
+    private static final String FIELD_CONFIG_JSON = """
+            {
+              "14.1": {
+                "name": "基础信息",
+                "fields": [
+                  {"field":"hospitalId","label":"医院","type":"autocomplete","required":false,"group":"hospital_doctor"},
+                  {"field":"hospitalDeptId","label":"科室","type":"autocomplete","required":false,"group":"hospital_doctor"},
+                  {"field":"doctorId","label":"关联医生","type":"autocomplete","required":false,"group":"hospital_doctor"},
+                  {"field":"doctorName","label":"医生姓名","type":"text","required":false,"group":"hospital_doctor"},
+                  {"field":"doctorPhone","label":"医生电话","type":"text","required":false,"group":"hospital_doctor"},
+                  {"field":"patientName","label":"患者姓名","type":"text","required":false},
+                  {"field":"patientAge","label":"患者年龄","type":"number","required":false},
+                  {"field":"patientGender","label":"患者性别","type":"select","required":false},
+                  {"field":"isUrgent","label":"是否加急","type":"switch","required":false},
+                  {"field":"isPostal","label":"是否邮寄","type":"switch","required":false},
+                  {"field":"postalAddress","label":"邮寄地址","type":"textarea","required":false},
+                  {"field":"expectedDeliveryDate","label":"期望交付时间","type":"datetime","required":false}
+                ]
+              },
+              "14.2": {
+                "name": "影像文件",
+                "fields": [
+                  {"field":"imageDataFileIds","label":"影像数据文件","type":"file","required":false},
+                  {"field":"imageReportFileIds","label":"影像报告文件","type":"file","required":false}
+                ]
+              },
+              "14.3": {
+                "name": "重建项目",
+                "fields": [
+                  {"field":"items","label":"重建项目明细","type":"array","required":false,
+                   "subFields":[
+                     {"field":"bodyPartId","label":"部位","type":"select"},
+                     {"field":"projectId","label":"重建项目","type":"select"},
+                     {"field":"projectDesc","label":"项目说明","type":"textarea"},
+                     {"field":"formingRequirement","label":"成形需求","type":"textarea"},
+                     {"field":"otherRequirement","label":"其他要求","type":"textarea"}
+                   ]}
+                ]
+              }
+            }
+            """;
+
     @BeforeEach
     void setUp() {
         // 默认用户信息
@@ -94,9 +145,7 @@ class OrderModifyApplyServiceImplTest {
         user.setId(USER_ID);
         user.setRealName("测试用户");
         when(userService.getById(anyLong())).thenReturn(user);
-
-        // 默认字段配置为空（加载失败时使用默认配置）
-        when(configService.getConfigValue(any())).thenReturn(null);
+        // configService 默认返回 null（字段配置为空时使用默认配置，Mock 默认行为即 null，此处明确）
     }
 
     // ==================== 辅助方法 ====================
@@ -388,7 +437,7 @@ class OrderModifyApplyServiceImplTest {
                 when(orderModifyApplyMapper.selectById(APPLY_ID)).thenReturn(apply);
 
                 AuditModifyApplyDTO dto = new AuditModifyApplyDTO();
-                dto.setAction("APPROVE");
+                dto.setAction(AuditActionEnum.APPROVE);
 
                 service.auditApply(APPLY_ID, dto);
 
@@ -407,7 +456,7 @@ class OrderModifyApplyServiceImplTest {
                 when(orderModifyApplyMapper.selectById(APPLY_ID)).thenReturn(apply);
 
                 AuditModifyApplyDTO dto = new AuditModifyApplyDTO();
-                dto.setAction("REJECT");
+                dto.setAction(AuditActionEnum.REJECT);
                 dto.setRejectReason("信息不符合要求");
 
                 service.auditApply(APPLY_ID, dto);
@@ -425,7 +474,7 @@ class OrderModifyApplyServiceImplTest {
                         .thenReturn(buildApply(ModifyApplyStatusEnum.PENDING.getCode(), "14.1"));
 
                 AuditModifyApplyDTO dto = new AuditModifyApplyDTO();
-                dto.setAction("REJECT");
+                dto.setAction(AuditActionEnum.REJECT);
                 // rejectReason 为空
 
                 assertThatThrownBy(() -> service.auditApply(APPLY_ID, dto))
@@ -443,7 +492,7 @@ class OrderModifyApplyServiceImplTest {
                         .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.1"));
 
                 AuditModifyApplyDTO dto = new AuditModifyApplyDTO();
-                dto.setAction("APPROVE");
+                dto.setAction(AuditActionEnum.APPROVE);
 
                 assertThatThrownBy(() -> service.auditApply(APPLY_ID, dto))
                         .isInstanceOf(BusinessException.class)
@@ -465,10 +514,13 @@ class OrderModifyApplyServiceImplTest {
                 when(orderModifyApplyMapper.selectById(APPLY_ID))
                         .thenReturn(buildApply(ModifyApplyStatusEnum.PENDING.getCode(), "14.1"));
 
-                Map<String, Object> modifications = new HashMap<>();
-                modifications.put("patientName", "李四");
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
+                ExecuteModifyDTO.ModifyField f = new ExecuteModifyDTO.ModifyField();
+                f.setField("patientName");
+                f.setValue("李四");
+                dto.setInfoFields(List.of(f));
 
-                assertThatThrownBy(() -> service.executeModification(APPLY_ID, modifications))
+                assertThatThrownBy(() -> service.executeModification(APPLY_ID, dto))
                         .isInstanceOf(BusinessException.class)
                         .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
                                 .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_APPLY_STATUS_ERROR.getCode()));
@@ -481,9 +533,9 @@ class OrderModifyApplyServiceImplTest {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
                 when(orderModifyApplyMapper.selectById(APPLY_ID)).thenReturn(null);
 
-                Map<String, Object> modifications = new HashMap<>();
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
 
-                assertThatThrownBy(() -> service.executeModification(APPLY_ID, modifications))
+                assertThatThrownBy(() -> service.executeModification(APPLY_ID, dto))
                         .isInstanceOf(BusinessException.class)
                         .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
                                 .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_APPLY_NOT_FOUND.getCode()));
@@ -495,15 +547,20 @@ class OrderModifyApplyServiceImplTest {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
 
+                when(configService.getConfigValue(SystemConfigKeyEnum.ORDER_MODIFY_FIELD_CONFIG.getKey()))
+                        .thenReturn(FIELD_CONFIG_JSON);
                 when(orderModifyApplyMapper.selectById(APPLY_ID))
                         .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.1"));
                 OrderMainEntity order = buildOrder(10);
                 when(orderMainMapper.selectById(ORDER_ID)).thenReturn(order);
 
-                Map<String, Object> modifications = new HashMap<>();
-                modifications.put("patientName", "李四（更新）");
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
+                ExecuteModifyDTO.ModifyField f = new ExecuteModifyDTO.ModifyField();
+                f.setField("patientName");
+                f.setValue("李四（更新）");
+                dto.setInfoFields(List.of(f));
 
-                service.executeModification(APPLY_ID, modifications);
+                service.executeModification(APPLY_ID, dto);
 
                 // 验证订单更新
                 verify(orderMainMapper).updateById(any(OrderMainEntity.class));
@@ -523,15 +580,23 @@ class OrderModifyApplyServiceImplTest {
                 // 旧 items 为空
                 when(orderItemMapper.selectList(any())).thenReturn(List.of());
 
-                Map<String, Object> item1 = new HashMap<>();
-                item1.put("bodyPartId", 1);
-                item1.put("projectId", 10);
-                item1.put("projectDesc", "新项目");
+                ExecuteModifyDTO.ModifyField bodyPartField = new ExecuteModifyDTO.ModifyField();
+                bodyPartField.setField("bodyPartId");
+                bodyPartField.setValue(1L);
+                ExecuteModifyDTO.ModifyField projectField = new ExecuteModifyDTO.ModifyField();
+                projectField.setField("projectId");
+                projectField.setValue(10L);
+                ExecuteModifyDTO.ModifyField descField = new ExecuteModifyDTO.ModifyField();
+                descField.setField("projectDesc");
+                descField.setValue("新项目");
 
-                Map<String, Object> modifications = new HashMap<>();
-                modifications.put("items", List.of(item1));
+                ExecuteModifyDTO.ModifyItem item1 = new ExecuteModifyDTO.ModifyItem();
+                item1.setFields(List.of(bodyPartField, projectField, descField));
 
-                service.executeModification(APPLY_ID, modifications);
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
+                dto.setItems(List.of(item1));
+
+                service.executeModification(APPLY_ID, dto);
 
                 // 验证新 item 插入
                 verify(orderItemMapper).insert(any(OrderItemEntity.class));
@@ -553,10 +618,10 @@ class OrderModifyApplyServiceImplTest {
                         .thenReturn(List.of(buildOrderItem(10L, 100L)));
 
                 // items 为空列表（删除全部旧项目）
-                Map<String, Object> modifications = new HashMap<>();
-                modifications.put("items", List.of());
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
+                dto.setItems(List.of());
 
-                service.executeModification(APPLY_ID, modifications);
+                service.executeModification(APPLY_ID, dto);
 
                 verify(orderItemMapper).deleteById(10L);
                 // 留痕：删除
@@ -577,14 +642,17 @@ class OrderModifyApplyServiceImplTest {
                         .thenReturn(List.of(buildOrderItem(10L, 100L)));
 
                 // 尝试更新 id=999（不属于该订单）
-                Map<String, Object> badItem = new HashMap<>();
-                badItem.put("orderItemId", 999);
-                badItem.put("projectId", 100);
+                ExecuteModifyDTO.ModifyField projectField = new ExecuteModifyDTO.ModifyField();
+                projectField.setField("projectId");
+                projectField.setValue(100L);
+                ExecuteModifyDTO.ModifyItem badItem = new ExecuteModifyDTO.ModifyItem();
+                badItem.setOrderItemId(999L);
+                badItem.setFields(List.of(projectField));
 
-                Map<String, Object> modifications = new HashMap<>();
-                modifications.put("items", List.of(badItem));
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
+                dto.setItems(List.of(badItem));
 
-                assertThatThrownBy(() -> service.executeModification(APPLY_ID, modifications))
+                assertThatThrownBy(() -> service.executeModification(APPLY_ID, dto))
                         .isInstanceOf(BusinessException.class)
                         .hasMessageContaining("不属于当前订单");
             }
@@ -601,10 +669,10 @@ class OrderModifyApplyServiceImplTest {
                 // 文件服务返回 0 个文件（请求了 1 个）
                 when(fileService.listByIds(any())).thenReturn(List.of());
 
-                Map<String, Object> modifications = new HashMap<>();
-                modifications.put("imageDataFileIds", List.of("file-id-1"));
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
+                dto.setImageDataFileIds(List.of("file-id-1"));
 
-                assertThatThrownBy(() -> service.executeModification(APPLY_ID, modifications))
+                assertThatThrownBy(() -> service.executeModification(APPLY_ID, dto))
                         .isInstanceOf(BusinessException.class)
                         .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
                                 .isEqualTo(ErrorCodeEnum.ORDER_FILE_NOT_FOUND.getCode()));
@@ -626,13 +694,69 @@ class OrderModifyApplyServiceImplTest {
                 // 旧文件关联为空
                 when(orderFileMapper.selectList(any())).thenReturn(List.of());
 
-                Map<String, Object> modifications = new HashMap<>();
-                modifications.put("imageDataFileIds", List.of("file-id-1"));
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
+                dto.setImageDataFileIds(List.of("file-id-1"));
 
-                service.executeModification(APPLY_ID, modifications);
+                service.executeModification(APPLY_ID, dto);
 
                 verify(orderFileMapper).insert(any(OrderFileEntity.class));
                 verify(orderModificationLogMapper).insert(any(OrderModificationLogEntity.class));
+            }
+        }
+
+        @Test
+        void 基础信息修改_配置存在的字段_通过反射赋值成功() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+
+                when(configService.getConfigValue(SystemConfigKeyEnum.ORDER_MODIFY_FIELD_CONFIG.getKey()))
+                        .thenReturn(FIELD_CONFIG_JSON);
+                when(orderModifyApplyMapper.selectById(APPLY_ID))
+                        .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.1"));
+                OrderMainEntity order = buildOrder(10);
+                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(order);
+
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
+                ExecuteModifyDTO.ModifyField f = new ExecuteModifyDTO.ModifyField();
+                f.setField("isUrgent");
+                f.setValue(1);
+                dto.setInfoFields(List.of(f));
+
+                service.executeModification(APPLY_ID, dto);
+
+                // isUrgent 原值为 null，修改为 1，应赋值成功
+                assertThat(order.getIsUrgent()).isEqualTo(1);
+                verify(orderMainMapper).updateById(any(OrderMainEntity.class));
+                // 值发生了变化，应记录留痕
+                verify(orderModificationLogMapper).insert(any(OrderModificationLogEntity.class));
+            }
+        }
+
+        @Test
+        void 基础信息修改_配置不存在的字段_静默忽略不抛异常() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+
+                when(configService.getConfigValue(SystemConfigKeyEnum.ORDER_MODIFY_FIELD_CONFIG.getKey()))
+                        .thenReturn(FIELD_CONFIG_JSON);
+                when(orderModifyApplyMapper.selectById(APPLY_ID))
+                        .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.1"));
+                OrderMainEntity order = buildOrder(10);
+                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(order);
+
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
+                // 传入一个配置中不存在的字段
+                ExecuteModifyDTO.ModifyField f = new ExecuteModifyDTO.ModifyField();
+                f.setField("nonExistentField");
+                f.setValue("someValue");
+                dto.setInfoFields(List.of(f));
+
+                // 不应抛出异常（配置白名单外字段静默忽略）
+                service.executeModification(APPLY_ID, dto);
+
+                // 无留痕记录（字段未在配置中，没有任何修改）
+                verify(orderModificationLogMapper, never()).insert(any(OrderModificationLogEntity.class));
+                verify(orderMainMapper).updateById(any(OrderMainEntity.class));
             }
         }
     }

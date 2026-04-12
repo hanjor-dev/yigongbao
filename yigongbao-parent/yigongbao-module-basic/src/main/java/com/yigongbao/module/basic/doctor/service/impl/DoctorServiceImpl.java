@@ -266,7 +266,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
 
             // 从 Sa-Token 会话获取当前登录用户ID
             Long creatorId = StpUtil.isLogin() ? StpUtil.getLoginIdAsLong() : null;
-            // 查询是否已存在同名医生
+            // 查询是否已存在同名医生（在同一医院内，未删除）
             LambdaQueryWrapper<DoctorEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(DoctorEntity::getDoctorName, dto.getDoctorName())
                     .eq(DoctorEntity::getHospitalId, dto.getHospitalId())
@@ -277,6 +277,19 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
                 DoctorVO vo = DoctorConvert.toVO(existing);
                 fillExtraFields(vo, existing);
                 return vo;
+            }
+
+            // 检查是否存在已删除的同名医生记录（函数索引跳过 is_deleted=1 的记录）
+            // 如有则物理删除，避免历史垃圾数据残留
+            LambdaQueryWrapper<DoctorEntity> deletedWrapper = new LambdaQueryWrapper<>();
+            deletedWrapper.eq(DoctorEntity::getDoctorName, dto.getDoctorName())
+                    .eq(DoctorEntity::getHospitalId, dto.getHospitalId())
+                    .eq(DoctorEntity::getIsDeleted, StatusConstants.DELETED);
+            DoctorEntity deletedDoctor = getOne(deletedWrapper, false);
+            if (deletedDoctor != null) {
+                log.info("发现已删除的医生记录，物理删除后重新创建，deletedId={}", deletedDoctor.getId());
+                // 物理删除已删除的医生记录（@TableLogic 只影响查询，删除为物理删除）
+                baseMapper.deleteById(deletedDoctor.getId());
             }
 
             // 创建新医生

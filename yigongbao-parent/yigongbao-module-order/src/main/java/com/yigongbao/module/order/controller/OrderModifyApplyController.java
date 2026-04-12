@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.order.dto.modify.AuditModifyApplyDTO;
 import com.yigongbao.module.order.dto.modify.CreateModifyApplyDTO;
+import com.yigongbao.module.order.dto.modify.ExecuteModifyDTO;
 import com.yigongbao.module.order.dto.modify.ModificationLogPageQueryDTO;
 import com.yigongbao.module.order.dto.modify.ModifyApplyPageQueryDTO;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
@@ -23,10 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 /**
  * 订单修改申请 Controller
@@ -62,11 +60,20 @@ public class OrderModifyApplyController {
 
     @Operation(summary = "执行订单修改（审核通过后调用）",
             description = "必须提供已审核通过（APPROVED 状态）的 applyId，否则报错。"
-                    + "modifications 为 Map，只传需要修改的字段，后端根据申请类型白名单过滤并处理。")
+                    + "参数说明：\n"
+                    + "① infoFields（14.1 基础信息）：差量列表，只传需要修改的字段。"
+                    + "每个元素格式为 {\"field\":\"字段名\",\"value\":\"新值\"}，"
+                    + "字段名须与 sys_config key=order.modify.field.config 中 \"14.1\".fields[].field 一致。\n"
+                    + "② items（14.3 重建项目）：全量替换列表，列表即为最终状态。"
+                    + "orderItemId 不为 null 时修改已有项目，null 时新增；不在列表内的旧项目自动删除。"
+                    + "item 内 fields 字段名须与配置 \"14.3\".fields[].field 一致。\n"
+                    + "③ imageDataFileIds / imageReportFileIds（14.2 影像文件）：全量替换文件ID列表，"
+                    + "两者共用 14.2 申请类型控制，传 null 表示不修改该类别，传空列表表示清空。\n"
+                    + "各子结构仅在申请类型白名单内时生效，白名单外的字段即使传入也会被忽略。")
     @PutMapping("/execute/{applyId}")
     public Result<Void> executeModification(@PathVariable Long applyId,
-            @RequestBody Map<String, Object> modifications) {
-        orderModifyApplyService.executeModification(applyId, modifications);
+            @RequestBody ExecuteModifyDTO dto) {
+        orderModifyApplyService.executeModification(applyId, dto);
         return Result.success();
     }
 
