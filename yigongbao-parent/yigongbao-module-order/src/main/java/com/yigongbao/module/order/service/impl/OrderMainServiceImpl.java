@@ -422,7 +422,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            // 只允许删除草稿状态（status=1001）的订单，正式提交后的订单不可删除
+            // 只允许删除草稿状态（status=1010）的订单，正式提交后的订单不可删除
             if (!FlowStatusEnum.DRAFT.getValue().equals(entity.getStatus())) {
                 log.warn("非草稿状态订单不允许删除，id={}, status={}", id, entity.getStatus());
                 throw new BusinessException(ErrorCodeEnum.ORDER_CANNOT_DELETE);

@@ -102,7 +102,7 @@ class OrderQueryHelperTest {
         e.setEstimatedCost(new BigDecimal("1500.00"));
         e.setDataEvaluationOpinion("数据质量良好");
         e.setPhase(10);
-        e.setStatus(2001);
+        e.setStatus(2010);
         e.setCreateTime(LocalDateTime.of(2026, 4, 1, 10, 0));
         return e;
     }
@@ -394,7 +394,7 @@ class OrderQueryHelperTest {
             assertThat(vo.getDesignerName()).isEqualTo("王设计师");
             assertThat(vo.getIsUrgent()).isEqualTo(1);
             assertThat(vo.getPhase()).isEqualTo(10);
-            assertThat(vo.getStatus()).isEqualTo(2001);
+            assertThat(vo.getStatus()).isEqualTo(2010);
             assertThat(vo.getOrgId()).isEqualTo(10L);
             assertThat(vo.getOrgName()).isEqualTo("测试机构");
         }

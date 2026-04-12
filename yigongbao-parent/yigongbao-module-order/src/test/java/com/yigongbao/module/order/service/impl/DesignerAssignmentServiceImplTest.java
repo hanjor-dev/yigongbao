@@ -150,7 +150,7 @@ class DesignerAssignmentServiceImplTest {
     @DisplayName("manualAssign — 订单状态非 PENDING_DESIGN，抛 ORDER_STATUS_ERROR")
     void manualAssign_wrongStatus_shouldThrow() {
         OrderMainEntity order = new OrderMainEntity();
-        order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue()); // 2002
+        order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue()); // 2020
         when(orderMainService.getById(1L)).thenReturn(order);
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.manualAssignDesigner(1L, 100L));

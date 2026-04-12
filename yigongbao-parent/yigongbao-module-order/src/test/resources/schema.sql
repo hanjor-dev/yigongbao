@@ -94,7 +94,7 @@ CREATE TABLE order_main (
     user_confirm_time TIMESTAMP COMMENT '用户确认时间',
     actual_complete_time TIMESTAMP COMMENT '实际完成时间',
     phase INT DEFAULT 10 COMMENT '当前阶段：10-订单，20-设计，30-打印，40-后处理，50-质检，60-仓储，70-确认，80-完成',
-    status INT DEFAULT 1001 COMMENT '当前状态（格式：phase×100+序号）',
+    status INT DEFAULT 1010 COMMENT '当前状态（格式：phase×100+序号×10）',
     current_handler_id BIGINT COMMENT '当前处理人ID',
     current_handler_name VARCHAR(64) COMMENT '当前处理人姓名',
     designer_id BIGINT COMMENT '设计师ID',

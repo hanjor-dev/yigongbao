@@ -16,7 +16,7 @@ import java.util.*;
  * 新增/删除状态只需修改此文件
  *
  * 【设计审核通过的不可见状态】：
- * - DESIGN_REVIEW_PASSED(2005) 为不可见状态
+ * - DESIGN_REVIEW_PASSED(2050) 为不可见状态
  * - 审核通过后系统自动将订单推进到下一阶段
  * - order_flow_status_history 表中仍记录完整的审核通过动作，便于追溯
  * - 前端不显示"设计审核通过"这个状态
@@ -50,7 +50,7 @@ public class FlowStatusTransitionRules {
     static {
         Map<StatusKey, Set<FlowStatusEnum>> transitions = new HashMap<>();
 
-        // ==================== 订单阶段状态转换（1001-1009）====================
+        // ==================== 订单阶段状态转换（1010-1090）====================
         transitions.put(statusKey(FlowPhaseEnum.ORDER, FlowStatusEnum.DRAFT),
                 Set.of(FlowStatusEnum.PENDING_DATA_AUDIT));
 
@@ -63,12 +63,12 @@ public class FlowStatusTransitionRules {
         transitions.put(statusKey(FlowPhaseEnum.ORDER, FlowStatusEnum.DATA_AUDIT_REJECTED),
                 Set.of(FlowStatusEnum.PENDING_DATA_AUDIT)); // 重新提交
 
-        // ==================== 设计阶段状态转换（2001-2009）====================
-        // PENDING_DESIGN(2001) → DESIGN_IN_PROGRESS(2002)（设计师开始设计）
+        // ==================== 设计阶段状态转换（2010-2090）====================
+        // PENDING_DESIGN(2010) → DESIGN_IN_PROGRESS(2020)（设计师开始设计）
         transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.PENDING_DESIGN),
                 Set.of(FlowStatusEnum.DESIGN_IN_PROGRESS));
 
-        // DESIGN_IN_PROGRESS(2002) → DESIGN_COMPLETED(2003)（提交设计）
+        // DESIGN_IN_PROGRESS(2020) → DESIGN_COMPLETED(2030)（提交设计）
         transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_IN_PROGRESS),
                 Set.of(FlowStatusEnum.DESIGN_COMPLETED));
 
@@ -82,18 +82,18 @@ public class FlowStatusTransitionRules {
         transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_REVIEW_REJECTED),
                 Set.of(FlowStatusEnum.DESIGN_IN_PROGRESS));
 
-        // ==================== 打印阶段状态转换（3001-3009）====================
+        // ==================== 打印阶段状态转换（3010-3090）====================
         transitions.put(statusKey(FlowPhaseEnum.PRINT, FlowStatusEnum.PENDING_PRINT),
                 Set.of(FlowStatusEnum.PRINTING));
 
         transitions.put(statusKey(FlowPhaseEnum.PRINT, FlowStatusEnum.PRINTING),
                 Set.of(FlowStatusEnum.PRINT_COMPLETED));
 
-        // ==================== 后处理阶段状态转换（4001-4009）====================
+        // ==================== 后处理阶段状态转换（4010-4090）====================
         transitions.put(statusKey(FlowPhaseEnum.POST_PROCESSING, FlowStatusEnum.POST_PROCESSING),
                 Set.of(FlowStatusEnum.QC_IN_PROGRESS));
 
-        // ==================== 质检阶段状态转换（5001-5009）====================
+        // ==================== 质检阶段状态转换（5010-5090）====================
         transitions.put(statusKey(FlowPhaseEnum.QC, FlowStatusEnum.QC_IN_PROGRESS),
                 Set.of(FlowStatusEnum.QC_PASSED, FlowStatusEnum.QC_FAILED));
 
@@ -106,14 +106,14 @@ public class FlowStatusTransitionRules {
         transitions.put(statusKey(FlowPhaseEnum.QC, FlowStatusEnum.REWORK),
                 Set.of(FlowStatusEnum.QC_IN_PROGRESS));
 
-        // ==================== 仓储阶段状态转换（6001-6009）====================
+        // ==================== 仓储阶段状态转换（6010-6090）====================
         transitions.put(statusKey(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.WAREHOUSE_IN),
                 Set.of(FlowStatusEnum.WAREHOUSED));
 
         transitions.put(statusKey(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.WAREHOUSED),
                 Set.of(FlowStatusEnum.COMPLETED));
 
-        // ==================== 确认阶段状态转换（7001-7009，服务订单专用）====================
+        // ==================== 确认阶段状态转换（7010-7090，服务订单专用）====================
         transitions.put(statusKey(FlowPhaseEnum.CONFIRM, FlowStatusEnum.AWAITING_CONFIRM),
                 Set.of(FlowStatusEnum.COMPLETED));
 

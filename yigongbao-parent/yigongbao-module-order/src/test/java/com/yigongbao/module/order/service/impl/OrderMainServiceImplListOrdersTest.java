@@ -92,7 +92,7 @@ class OrderMainServiceImplListOrdersTest {
         e.setId(id);
         e.setOrderCode("ORD-" + id);
         e.setPhase(10);
-        e.setStatus(2001);
+        e.setStatus(2010);
         return e;
     }
 
@@ -364,7 +364,7 @@ class OrderMainServiceImplListOrdersTest {
             clearInvocations(orderMainMapper);
 
             OrderPageDTO dto = baseDto();
-            dto.setStatus(2001);
+            dto.setStatus(2010);
             int withFilter = executeAndGetSegmentCount(dto);
 
             assertThat(withFilter).isGreaterThan(baseline);

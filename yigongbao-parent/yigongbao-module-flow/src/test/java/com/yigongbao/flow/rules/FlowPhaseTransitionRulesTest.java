@@ -253,7 +253,7 @@ class FlowPhaseTransitionRulesTest {
     class DecideNextPhaseAndStatusTests {
 
         @Test
-        @DisplayName("DATA_AUDIT_PASSED(1003) → DESIGN + PENDING_DESIGN(2001)")
+        @DisplayName("DATA_AUDIT_PASSED(1030) → DESIGN + PENDING_DESIGN(2010)")
         void dataAuditPassed_shouldAdvanceToDesign() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.ORDER,
@@ -265,7 +265,7 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASSED(2005) + needsPhysicalDelivery=1 → PRINT + PENDING_PRINT(3001)")
+        @DisplayName("DESIGN_REVIEW_PASSED(2050) + needsPhysicalDelivery=1 → PRINT + PENDING_PRINT(3010)")
         void designReviewPassed_needDelivery_shouldAdvanceToPrint() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.DESIGN,
@@ -277,7 +277,7 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASSED(2005) + needsPhysicalDelivery=0 → CONFIRM + AWAITING_CONFIRM(7001)")
+        @DisplayName("DESIGN_REVIEW_PASSED(2050) + needsPhysicalDelivery=0 → CONFIRM + AWAITING_CONFIRM(7010)")
         void designReviewPassed_noDelivery_shouldAdvanceToConfirm() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.DESIGN,
@@ -289,7 +289,7 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("PRINT_COMPLETED(3003) → POST_PROCESSING + POST_PROCESSING(4001)")
+        @DisplayName("PRINT_COMPLETED(3030) → POST_PROCESSING + POST_PROCESSING(4010)")
         void printCompleted_shouldAdvanceToPostProcessing() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.PRINT,
@@ -301,7 +301,7 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("QC_PASSED(5002) → WAREHOUSE + WAREHOUSE_IN(6001)")
+        @DisplayName("QC_PASSED(5020) → WAREHOUSE + WAREHOUSE_IN(6010)")
         void qcPassed_shouldAdvanceToWarehouse() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.QC,
@@ -313,7 +313,7 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("WAREHOUSED(6002) → COMPLETED + COMPLETED(8001)")
+        @DisplayName("WAREHOUSED(6020) → COMPLETED + COMPLETED(8010)")
         void warehoused_shouldAdvanceToCompleted() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.WAREHOUSE,
@@ -325,7 +325,7 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("USER_CONFIRM → COMPLETED + COMPLETED(8001)")
+        @DisplayName("USER_CONFIRM → COMPLETED + COMPLETED(8010)")
         void userConfirm_shouldAdvanceToCompleted() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.CONFIRM,
@@ -368,7 +368,7 @@ class FlowPhaseTransitionRulesTest {
     class IsInvisibleStatusTests {
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASSED(2005) → true（不可见状态）")
+        @DisplayName("DESIGN_REVIEW_PASSED(2050) → true（不可见状态）")
         void designReviewPassed_shouldBeInvisible() {
             assertTrue(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.DESIGN_REVIEW_PASSED));
         }

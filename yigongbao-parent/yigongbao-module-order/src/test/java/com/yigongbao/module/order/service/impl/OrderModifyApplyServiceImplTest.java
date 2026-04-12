@@ -106,7 +106,7 @@ class OrderModifyApplyServiceImplTest {
         order.setId(ORDER_ID);
         order.setOrderCode(ORDER_CODE);
         order.setPhase(phase);
-        order.setStatus(2001);
+        order.setStatus(2010);
         order.setHospitalId(10L);
         order.setHospitalName("测试医院");
         order.setPatientName("张三");

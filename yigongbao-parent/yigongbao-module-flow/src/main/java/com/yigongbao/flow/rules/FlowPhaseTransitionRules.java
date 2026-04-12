@@ -131,12 +131,12 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      * - DESIGN_REVIEW_PASSED → PRINT + PENDING_PRINT 或 CONFIRM + AWAITING_CONFIRM
      *
      * 阶段推进规则：
-     * - DATA_AUDIT_PASSED(1003) → 进入 DESIGN(20)，status 变为 PENDING_DESIGN(2001)
-     * - DESIGN_REVIEW_PASSED(2005) → 进入 PRINT(30) 或 CONFIRM(70)
-     * - PRINT_COMPLETED(3003) → 进入 POST_PROCESSING(40)
-     * - QC_PASSED(5002) → 进入 WAREHOUSE(60)
-     * - WAREHOUSED(6002) → 进入 COMPLETED(80)
-     * - COMPLETED(8001) → 进入 COMPLETED(80)
+     * - DATA_AUDIT_PASSED(1030) → 进入 DESIGN(20)，status 变为 PENDING_DESIGN(2010)
+     * - DESIGN_REVIEW_PASSED(2050) → 进入 PRINT(30) 或 CONFIRM(70)
+     * - PRINT_COMPLETED(3030) → 进入 POST_PROCESSING(40)
+     * - QC_PASSED(5020) → 进入 WAREHOUSE(60)
+     * - WAREHOUSED(6020) → 进入 COMPLETED(80)
+     * - COMPLETED(8010) → 进入 COMPLETED(80)
      *
      * @param currentPhase 当前阶段
      * @param targetStatus 动作触发的目标状态

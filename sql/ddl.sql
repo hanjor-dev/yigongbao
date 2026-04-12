@@ -971,7 +971,7 @@ CREATE TABLE order_main (
 
     -- ==================== 【核心】阶段 + 状态 ====================
     phase           INT             NOT NULL DEFAULT 10 COMMENT '当前阶段：10-订单，20-设计，30-打印，40-后处理，50-质检，60-仓储，70-确认，80-完成（间隔10，支持扩展插入）',
-    status          INT             NOT NULL DEFAULT 1001 COMMENT '当前状态（格式：phase×100+序号，如1001=订单草稿，2001=待设计）',
+    status          INT             NOT NULL DEFAULT 1010 COMMENT '当前状态（格式：phase×100+序号×10，如1010=订单草稿，2010=待设计）',
 
     -- ==================== 当前处理人 ====================
     current_handler_id BIGINT        COMMENT '当前处理人ID',
