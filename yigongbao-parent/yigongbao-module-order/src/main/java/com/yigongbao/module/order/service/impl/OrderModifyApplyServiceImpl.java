@@ -364,9 +364,6 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             }
         }
 
-        // 0. 预加载字段配置（供后续白名单校验和 processInfoModification 用）
-        ModifyApplyFieldConfigDTO fieldConfig = loadFieldConfig();
-
         // 1. 校验申请存在且状态为 APPROVED
         OrderModifyApplyEntity apply = orderModifyApplyMapper.selectById(applyId);
         if (apply == null) {
@@ -383,6 +380,9 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         Set<String> allowedTypes = Arrays.stream(apply.getApplyTypeCodes().split(","))
                 .map(String::trim)
                 .collect(Collectors.toSet());
+
+        // 0. apply 确认有效后再加载字段配置（避免无效 applyId 触发配置 I/O）
+        ModifyApplyFieldConfigDTO fieldConfig = loadFieldConfig();
 
         // 3a. 严格校验：infoFields 中不得包含白名单外的字段
         if (dto != null && dto.getInfoFields() != null && !dto.getInfoFields().isEmpty()) {
@@ -407,8 +407,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         // 6. 处理基础信息修改（14.1）
         boolean infoModified = false;
         if (allowedTypes.contains(ModifyApplyTypeEnum.INFO.getDictCode())) {
-            processInfoModification(order, modifications, applyId, modifierId, modifierName, fieldConfig);
-            infoModified = true;
+            infoModified = processInfoModification(order, modifications, applyId, modifierId, modifierName, fieldConfig);
         }
 
         // 7. 处理重建项目修改（14.3）
@@ -446,12 +445,14 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
      */
     private void validateInfoFieldsInWhitelist(List<ExecuteModifyDTO.ModifyField> infoFields,
             ModifyApplyFieldConfigDTO.TypeConfig infoTypeConfig) {
-        // 配置为空时白名单为空集，所有字段都非法
-        Set<String> whitelist = (infoTypeConfig != null && infoTypeConfig.getFields() != null)
-                ? infoTypeConfig.getFields().stream()
-                        .map(ModifyApplyFieldConfigDTO.FieldConfig::getField)
-                        .collect(Collectors.toSet())
-                : Set.of();
+        // 配置本身缺失属于运维问题，抛 721 而非 716
+        if (infoTypeConfig == null || infoTypeConfig.getFields() == null) {
+            log.warn("14.1 字段配置缺失，无法执行白名单校验");
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_CONFIG_NOT_FOUND);
+        }
+        Set<String> whitelist = infoTypeConfig.getFields().stream()
+                .map(ModifyApplyFieldConfigDTO.FieldConfig::getField)
+                .collect(Collectors.toSet());
         List<String> illegalFields = infoFields.stream()
                 .map(ExecuteModifyDTO.ModifyField::getField)
                 .filter(f -> !whitelist.contains(f))
@@ -475,23 +476,14 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
      */
     private void validateModificationCompleteness(Set<String> allowedTypes, ExecuteModifyDTO dto) {
         for (String typeCode : allowedTypes) {
-            boolean provided = switch (typeCode) {
-                case "14.1" -> dto != null && dto.getInfoFields() != null && !dto.getInfoFields().isEmpty();
-                case "14.2" -> dto != null
-                        && (dto.getImageDataFileIds() != null || dto.getImageReportFileIds() != null);
-                case "14.3" -> dto != null && dto.getItems() != null;
-                default -> true; // 未知类型不强制校验，保持向前兼容
-            };
-            if (!provided) {
-                // 取申请类型名称用于错误提示（后续可扩展为从 fieldConfig 读取）
-                String typeName = switch (typeCode) {
-                    case "14.1" -> "基础信息";
-                    case "14.2" -> "影像文件";
-                    case "14.3" -> "重建项目";
-                    default -> typeCode;
-                };
+            ModifyApplyTypeEnum typeEnum = ModifyApplyTypeEnum.getByDictCode(typeCode);
+            if (typeEnum == null) {
+                // 未知类型不强制校验，保持向前兼容
+                continue;
+            }
+            if (!typeEnum.isProvided(dto)) {
                 log.warn("执行修改完整性校验失败，typeCode={} 未提供修改内容", typeCode);
-                throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_INCOMPLETE, typeName);
+                throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_INCOMPLETE, typeEnum.getName());
             }
         }
     }
@@ -505,14 +497,16 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
      * - 无 group 的字段：通过 BeanUtil 反射直接赋值到 order 实体
      * - group="hospital_doctor" 的字段：收集后统一调用 validateAndFillForModify 同步冗余字段
      * - 快照（赋值前后对比）用于生成变更留痕，label 从配置读取
+     *
+     * @return true 表示至少有一个字段值发生了变化（调用方据此决定是否执行 updateById）
      */
-    private void processInfoModification(OrderMainEntity order, Map<String, Object> modifications,
+    private boolean processInfoModification(OrderMainEntity order, Map<String, Object> modifications,
             Long applyId, Long modifierId, String modifierName, ModifyApplyFieldConfigDTO fieldConfig) {
         ModifyApplyFieldConfigDTO.TypeConfig typeConfig =
                 fieldConfig.getTypeConfig(ModifyApplyTypeEnum.INFO.getDictCode());
         if (typeConfig == null || typeConfig.getFields() == null) {
             log.warn("未获取到 14.1 字段配置，跳过基础信息修改");
-            return;
+            return false;
         }
         List<ModifyApplyFieldConfigDTO.FieldConfig> allFields = typeConfig.getFields();
 
@@ -562,8 +556,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         // 4. 快照新值（反射读取赋值后的 order，用于留痕对比）
         Map<String, Object> afterSnapshot = snapshotFields(order, allFieldNames);
 
-        // 5. 逐字段对比快照生成留痕
-        recordChangesFromSnapshots(order.getId(), order.getOrderCode(), applyId,
+        // 5. 逐字段对比快照生成留痕，返回是否有实际变化
+        return recordChangesFromSnapshots(order.getId(), order.getOrderCode(), applyId,
                 beforeSnapshot, afterSnapshot, allFields, modifierId, modifierName);
     }
 
@@ -629,8 +623,10 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     /**
      * 对比前后快照，对有变化的字段记录留痕
      * label 从 fieldConfigs 中读取，避免硬编码中文名
+     *
+     * @return true 表示至少检测到一个字段发生了变化
      */
-    private void recordChangesFromSnapshots(Long orderId, String orderCode, Long applyId,
+    private boolean recordChangesFromSnapshots(Long orderId, String orderCode, Long applyId,
             Map<String, Object> before, Map<String, Object> after,
             List<ModifyApplyFieldConfigDTO.FieldConfig> fieldConfigs,
             Long modifierId, String modifierName) {
@@ -640,6 +636,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                         ModifyApplyFieldConfigDTO.FieldConfig::getField,
                         fc -> StrUtil.blankToDefault(fc.getLabel(), fc.getField()),
                         (a, b) -> a));
+        boolean hasChange = false;
         for (String fieldName : after.keySet()) {
             Object oldValue = before.get(fieldName);
             Object newValue = after.get(fieldName);
@@ -647,8 +644,10 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 String label = labelMap.getOrDefault(fieldName, fieldName);
                 recordModificationLog(orderId, orderCode, applyId,
                         fieldName, label, oldValue, newValue, modifierId, modifierName);
+                hasChange = true;
             }
         }
+        return hasChange;
     }
 
     // ==================== 辅助方法：重建项目修改 ====================

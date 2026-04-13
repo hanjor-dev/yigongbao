@@ -1,5 +1,6 @@
 package com.yigongbao.module.order.enums;
 
+import com.yigongbao.module.order.dto.modify.ExecuteModifyDTO;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -19,9 +20,25 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public enum ModifyApplyTypeEnum {
 
-    INFO("14.1", "基础信息"),
-    IMAGE("14.2", "影像文件"),
-    ITEM("14.3", "重建项目");
+    INFO("14.1", "基础信息") {
+        @Override
+        public boolean isProvided(ExecuteModifyDTO dto) {
+            return dto != null && dto.getInfoFields() != null && !dto.getInfoFields().isEmpty();
+        }
+    },
+    IMAGE("14.2", "影像文件") {
+        @Override
+        public boolean isProvided(ExecuteModifyDTO dto) {
+            return dto != null
+                    && (dto.getImageDataFileIds() != null || dto.getImageReportFileIds() != null);
+        }
+    },
+    ITEM("14.3", "重建项目") {
+        @Override
+        public boolean isProvided(ExecuteModifyDTO dto) {
+            return dto != null && dto.getItems() != null;
+        }
+    };
 
     /**
      * 字典编码（存储到数据库，对应 sys_dict.dict_code）
@@ -32,6 +49,15 @@ public enum ModifyApplyTypeEnum {
      * 类型名称（中文描述）
      */
     private final String name;
+
+    /**
+     * 判断 ExecuteModifyDTO 中是否提供了本类型对应的修改内容
+     * 各枚举值覆盖此方法，定义各自的"已提交"判断规则
+     *
+     * @param dto 执行修改 DTO
+     * @return true 表示已提供内容，false 表示缺失
+     */
+    public abstract boolean isProvided(ExecuteModifyDTO dto);
 
     /**
      * 根据字典编码获取枚举

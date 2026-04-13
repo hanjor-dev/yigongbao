@@ -800,6 +800,30 @@ class OrderModifyApplyServiceImplTest {
                                 .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_INCOMPLETE.getCode()));
             }
         }
+
+        @Test
+        void 基础信息修改_字段配置缺失_抛出ORDER_MODIFY_FIELD_CONFIG_NOT_FOUND异常() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+
+                // 配置为空（模拟运维未配置或配置加载失败）
+                when(configService.getConfigValue(SystemConfigKeyEnum.ORDER_MODIFY_FIELD_CONFIG.getKey()))
+                        .thenReturn(null);
+                when(orderModifyApplyMapper.selectById(APPLY_ID))
+                        .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.1"));
+
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
+                ExecuteModifyDTO.ModifyField f = new ExecuteModifyDTO.ModifyField();
+                f.setField("patientName");
+                f.setValue("张三");
+                dto.setInfoFields(List.of(f));
+
+                assertThatThrownBy(() -> service.executeModification(APPLY_ID, dto))
+                        .isInstanceOf(BusinessException.class)
+                        .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                                .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_FIELD_CONFIG_NOT_FOUND.getCode()));
+            }
+        }
     }
 
     // ==================== listModificationLogs ====================
