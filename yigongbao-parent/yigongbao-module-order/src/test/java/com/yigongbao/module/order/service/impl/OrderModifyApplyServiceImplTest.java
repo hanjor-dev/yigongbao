@@ -733,7 +733,7 @@ class OrderModifyApplyServiceImplTest {
         }
 
         @Test
-        void 基础信息修改_配置不存在的字段_静默忽略不抛异常() {
+        void 基础信息修改_非白名单字段_抛出ORDER_MODIFY_FIELD_NOT_ALLOWED异常() {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
 
@@ -741,22 +741,63 @@ class OrderModifyApplyServiceImplTest {
                         .thenReturn(FIELD_CONFIG_JSON);
                 when(orderModifyApplyMapper.selectById(APPLY_ID))
                         .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.1"));
-                OrderMainEntity order = buildOrder(10);
-                when(orderMainMapper.selectById(ORDER_ID)).thenReturn(order);
 
                 ExecuteModifyDTO dto = new ExecuteModifyDTO();
-                // 传入一个配置中不存在的字段
+                // 传入一个配置白名单外的字段（testFiled 不在 14.1 fields 中）
                 ExecuteModifyDTO.ModifyField f = new ExecuteModifyDTO.ModifyField();
-                f.setField("nonExistentField");
-                f.setValue("someValue");
+                f.setField("testFiled");
+                f.setValue(1);
                 dto.setInfoFields(List.of(f));
 
-                // 不应抛出异常（配置白名单外字段静默忽略）
-                service.executeModification(APPLY_ID, dto);
+                assertThatThrownBy(() -> service.executeModification(APPLY_ID, dto))
+                        .isInstanceOf(BusinessException.class)
+                        .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                                .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED.getCode()));
+            }
+        }
 
-                // 无留痕记录（字段未在配置中，没有任何修改）
-                verify(orderModificationLogMapper, never()).insert(any(OrderModificationLogEntity.class));
-                verify(orderMainMapper).updateById(any(OrderMainEntity.class));
+        @Test
+        void 申请了14_1但未提交infoFields_抛出ORDER_MODIFY_INCOMPLETE异常() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+
+                when(configService.getConfigValue(SystemConfigKeyEnum.ORDER_MODIFY_FIELD_CONFIG.getKey()))
+                        .thenReturn(FIELD_CONFIG_JSON);
+                when(orderModifyApplyMapper.selectById(APPLY_ID))
+                        .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.1"));
+
+                // dto 的 infoFields 为 null（未提交基础信息内容）
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
+
+                assertThatThrownBy(() -> service.executeModification(APPLY_ID, dto))
+                        .isInstanceOf(BusinessException.class)
+                        .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                                .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_INCOMPLETE.getCode()));
+            }
+        }
+
+        @Test
+        void 申请了14_1和14_2但只提交了infoFields_抛出ORDER_MODIFY_INCOMPLETE异常() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+
+                when(configService.getConfigValue(SystemConfigKeyEnum.ORDER_MODIFY_FIELD_CONFIG.getKey()))
+                        .thenReturn(FIELD_CONFIG_JSON);
+                when(orderModifyApplyMapper.selectById(APPLY_ID))
+                        .thenReturn(buildApply(ModifyApplyStatusEnum.APPROVED.getCode(), "14.1,14.2"));
+
+                // 只提交了 infoFields，未提交影像文件内容
+                ExecuteModifyDTO dto = new ExecuteModifyDTO();
+                ExecuteModifyDTO.ModifyField f = new ExecuteModifyDTO.ModifyField();
+                f.setField("patientName");
+                f.setValue("张三");
+                dto.setInfoFields(List.of(f));
+                // imageDataFileIds 和 imageReportFileIds 均为 null
+
+                assertThatThrownBy(() -> service.executeModification(APPLY_ID, dto))
+                        .isInstanceOf(BusinessException.class)
+                        .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                                .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_INCOMPLETE.getCode()));
             }
         }
     }

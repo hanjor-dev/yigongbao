@@ -364,7 +364,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             }
         }
 
-        // 0. 预加载字段配置（供 processInfoModification 用于白名单过滤和 label 读取）
+        // 0. 预加载字段配置（供后续白名单校验和 processInfoModification 用）
         ModifyApplyFieldConfigDTO fieldConfig = loadFieldConfig();
 
         // 1. 校验申请存在且状态为 APPROVED
@@ -383,6 +383,16 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         Set<String> allowedTypes = Arrays.stream(apply.getApplyTypeCodes().split(","))
                 .map(String::trim)
                 .collect(Collectors.toSet());
+
+        // 3a. 严格校验：infoFields 中不得包含白名单外的字段
+        if (dto != null && dto.getInfoFields() != null && !dto.getInfoFields().isEmpty()) {
+            ModifyApplyFieldConfigDTO.TypeConfig infoTypeConfig =
+                    fieldConfig.getTypeConfig(ModifyApplyTypeEnum.INFO.getDictCode());
+            validateInfoFieldsInWhitelist(dto.getInfoFields(), infoTypeConfig);
+        }
+
+        // 3b. 完整性校验：申请了哪种类型，必须提供对应内容
+        validateModificationCompleteness(allowedTypes, dto);
 
         // 4. 查询订单实体
         OrderMainEntity order = orderMainMapper.selectById(orderId);
@@ -421,6 +431,69 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         // 9. 将申请状态置为 COMPLETED（防止重复执行）
         apply.setStatus(ModifyApplyStatusEnum.COMPLETED.getCode());
         orderModifyApplyMapper.updateById(apply);
+    }
+
+    // ==================== 辅助方法：执行前校验 ====================
+
+    /**
+     * 严格校验 infoFields 中的字段名必须全部在 14.1 白名单内
+     * <p>
+     * 白名单来自 sys_config order.modify.field.config 中 "14.1".fields[].field。
+     * 存在任何不在白名单内的字段名时，直接抛出业务异常，拒绝整个请求。
+     *
+     * @param infoFields     前端传入的基础信息字段列表
+     * @param infoTypeConfig 14.1 类型配置（白名单来源）
+     */
+    private void validateInfoFieldsInWhitelist(List<ExecuteModifyDTO.ModifyField> infoFields,
+            ModifyApplyFieldConfigDTO.TypeConfig infoTypeConfig) {
+        // 配置为空时白名单为空集，所有字段都非法
+        Set<String> whitelist = (infoTypeConfig != null && infoTypeConfig.getFields() != null)
+                ? infoTypeConfig.getFields().stream()
+                        .map(ModifyApplyFieldConfigDTO.FieldConfig::getField)
+                        .collect(Collectors.toSet())
+                : Set.of();
+        List<String> illegalFields = infoFields.stream()
+                .map(ExecuteModifyDTO.ModifyField::getField)
+                .filter(f -> !whitelist.contains(f))
+                .toList();
+        if (!illegalFields.isEmpty()) {
+            log.warn("infoFields 包含非白名单字段，illegalFields={}", illegalFields);
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED,
+                    String.join(", ", illegalFields));
+        }
+    }
+
+    /**
+     * 完整性校验：申请了哪种类型，提交内容中必须包含该类型对应的修改数据
+     * <p>
+     * 14.1：infoFields 非空<br>
+     * 14.2：imageDataFileIds 或 imageReportFileIds 至少一个非 null<br>
+     * 14.3：items 非 null
+     *
+     * @param allowedTypes 本次申请包含的类型编码集合
+     * @param dto          执行修改 DTO
+     */
+    private void validateModificationCompleteness(Set<String> allowedTypes, ExecuteModifyDTO dto) {
+        for (String typeCode : allowedTypes) {
+            boolean provided = switch (typeCode) {
+                case "14.1" -> dto != null && dto.getInfoFields() != null && !dto.getInfoFields().isEmpty();
+                case "14.2" -> dto != null
+                        && (dto.getImageDataFileIds() != null || dto.getImageReportFileIds() != null);
+                case "14.3" -> dto != null && dto.getItems() != null;
+                default -> true; // 未知类型不强制校验，保持向前兼容
+            };
+            if (!provided) {
+                // 取申请类型名称用于错误提示（后续可扩展为从 fieldConfig 读取）
+                String typeName = switch (typeCode) {
+                    case "14.1" -> "基础信息";
+                    case "14.2" -> "影像文件";
+                    case "14.3" -> "重建项目";
+                    default -> typeCode;
+                };
+                log.warn("执行修改完整性校验失败，typeCode={} 未提供修改内容", typeCode);
+                throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_INCOMPLETE, typeName);
+            }
+        }
     }
 
     // ==================== 辅助方法：基础信息修改 ====================
