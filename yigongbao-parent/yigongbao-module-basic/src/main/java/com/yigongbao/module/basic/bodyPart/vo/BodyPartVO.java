@@ -53,6 +53,11 @@ public class BodyPartVO implements Serializable {
     private String remark;
 
     /**
+     * 范围值（JSON 字符串）
+     */
+    private String scope;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

@@ -45,4 +45,9 @@ public class BodyPartEntity extends BaseEntity implements Serializable {
      * 备注说明
      */
     private String remark;
+
+    /**
+     * 范围值（JSON 字符串，存储部位的扩展范围数据）
+     */
+    private String scope;
 }

@@ -138,6 +138,7 @@ public class BodyPartServiceImpl extends ServiceImpl<BodyPartMapper, BodyPartEnt
             entity.setSort(Objects.requireNonNullElse(dto.getSort(), 0));
             entity.setStatus(Objects.requireNonNullElse(dto.getStatus(), entity.getStatus()));
             entity.setRemark(dto.getRemark());
+            entity.setScope(dto.getScope());
             updateById(entity);
             log.info("更新部位成功，id={}", id);
         } catch (BusinessException e) {
@@ -229,6 +230,7 @@ public class BodyPartServiceImpl extends ServiceImpl<BodyPartMapper, BodyPartEnt
         vo.setStatus(entity.getStatus());
         vo.setStatusName(StatusConstants.getStatusName(entity.getStatus()));
         vo.setRemark(entity.getRemark());
+        vo.setScope(entity.getScope());
         vo.setCreateTime(entity.getCreateTime());
         vo.setUpdateTime(entity.getUpdateTime());
         return vo;

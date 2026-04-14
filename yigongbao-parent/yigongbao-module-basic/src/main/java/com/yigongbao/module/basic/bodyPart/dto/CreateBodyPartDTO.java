@@ -38,4 +38,9 @@ public class CreateBodyPartDTO implements Serializable {
      * 备注说明
      */
     private String remark;
+
+    /**
+     * 范围值（JSON 字符串）
+     */
+    private String scope;
 }

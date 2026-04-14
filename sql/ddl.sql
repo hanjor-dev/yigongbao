@@ -449,6 +449,7 @@ CREATE TABLE rebuild_body_part (
     sort            INT             NOT NULL DEFAULT 0 COMMENT '排序',
     status          TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark          VARCHAR(512)    DEFAULT NULL COMMENT '备注说明',
+    scope           TEXT            DEFAULT NULL COMMENT '范围值（JSON 字符串，存储部位的扩展范围数据）',
 
     -- 通用字段
     create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
