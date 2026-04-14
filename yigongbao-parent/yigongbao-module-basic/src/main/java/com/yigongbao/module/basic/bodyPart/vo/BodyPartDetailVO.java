@@ -23,16 +23,6 @@ public class BodyPartDetailVO implements Serializable {
     private Long id;
 
     /**
-     * 父级ID
-     */
-    private Long parentId;
-
-    /**
-     * 父级名称
-     */
-    private String parentName;
-
-    /**
      * 部位名称
      */
     private String name;
@@ -41,11 +31,6 @@ public class BodyPartDetailVO implements Serializable {
      * 部位编码
      */
     private String code;
-
-    /**
-     * 层级（1=身体区域，2=具体部位）
-     */
-    private Integer level;
 
     /**
      * 排序

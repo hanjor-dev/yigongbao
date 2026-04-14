@@ -1,7 +1,6 @@
 package com.yigongbao.module.basic.bodyPart.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -17,12 +16,6 @@ import java.io.Serializable;
 public class CreateBodyPartDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
-
-    /**
-     * 父级ID（0=顶级身体区域）
-     */
-    @NotNull(message = "父级ID不能为空")
-    private Long parentId;
 
     /**
      * 部位名称

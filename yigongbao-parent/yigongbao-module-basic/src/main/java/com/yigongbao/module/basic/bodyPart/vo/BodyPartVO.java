@@ -4,11 +4,10 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * 重建部位 VO（视图对象）
- * 用于返回给前端的身体部位树形结构数据
+ * 用于返回给前端的平级部位列表数据
  *
  * @author hanjor
  * @date 2026-03-23
@@ -24,11 +23,6 @@ public class BodyPartVO implements Serializable {
     private Long id;
 
     /**
-     * 父级ID（0=顶级）
-     */
-    private Long parentId;
-
-    /**
      * 部位名称
      */
     private String name;
@@ -37,11 +31,6 @@ public class BodyPartVO implements Serializable {
      * 部位编码
      */
     private String code;
-
-    /**
-     * 层级（1=身体区域，2=具体部位）
-     */
-    private Integer level;
 
     /**
      * 排序
@@ -72,9 +61,4 @@ public class BodyPartVO implements Serializable {
      * 更新时间
      */
     private LocalDateTime updateTime;
-
-    /**
-     * 子节点列表
-     */
-    private List<BodyPartVO> children;
 }
