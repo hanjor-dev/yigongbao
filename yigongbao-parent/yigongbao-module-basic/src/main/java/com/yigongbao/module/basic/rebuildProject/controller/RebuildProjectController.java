@@ -6,13 +6,11 @@ import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.rebuildProject.dto.CreateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectByBodyPartDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectFullTreeDTO;
-import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectOptionsDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectTreeDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.UpdateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
 import com.yigongbao.module.basic.rebuildProject.vo.BodyPartProjectTreeVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
-import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectOptionVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -55,7 +53,7 @@ public class RebuildProjectController {
     @Operation(summary = "获取项目树形结构")
     @PostMapping("/tree")
     public Result<List<RebuildProjectVO>> tree(@RequestBody RebuildProjectTreeDTO dto) {
-        return Result.success(rebuildProjectService.listTree(dto.getCategoryCode()));
+        return Result.success(rebuildProjectService.listTree(dto.getCategoryCode(), dto.getKeyword()));
     }
 
     /**
@@ -64,25 +62,17 @@ public class RebuildProjectController {
     @Operation(summary = "根据部位ID获取项目列表")
     @PostMapping("/by-body-part")
     public Result<List<RebuildProjectVO>> byBodyPart(@Validated @RequestBody RebuildProjectByBodyPartDTO dto) {
-        return Result.success(rebuildProjectService.listByBodyPartId(dto.getBodyPartId(), dto.getCategoryCode()));
-    }
-
-    /**
-     * 获取项目下拉选项
-     */
-    @Operation(summary = "获取项目下拉选项")
-    @PostMapping("/options")
-    public Result<List<RebuildProjectOptionVO>> options(@RequestBody RebuildProjectOptionsDTO dto) {
-        return Result.success(rebuildProjectService.listOptions(dto.getBodyPartId(), dto.getCategoryCode()));
+        return Result.success(rebuildProjectService.listByBodyPartId(dto.getBodyPartId(), dto.getCategoryCode(), dto.getKeyword()));
     }
 
     /**
      * 获取完整部位-项目树形结构
+     * 前端选项场景使用，支持 bodyPartId/categoryCode/keyword 三个可选过滤参数
      */
     @Operation(summary = "获取完整部位-项目树形结构")
     @PostMapping("/full-tree")
     public Result<List<BodyPartProjectTreeVO>> fullTree(@RequestBody RebuildProjectFullTreeDTO dto) {
-        return Result.success(rebuildProjectService.listFullTree(dto.getCategoryCode()));
+        return Result.success(rebuildProjectService.listFullTree(dto.getCategoryCode(), dto.getBodyPartId(), dto.getKeyword()));
     }
 
     /**

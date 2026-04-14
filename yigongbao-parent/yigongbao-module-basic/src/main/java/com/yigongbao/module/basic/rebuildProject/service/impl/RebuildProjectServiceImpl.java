@@ -19,7 +19,6 @@ import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
 import com.yigongbao.module.basic.rebuildProject.vo.BodyPartProjectTreeVO;
 import com.yigongbao.module.basic.rebuildProject.vo.ProjectOptionItemVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
-import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectOptionVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,14 +59,15 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
      * 获取项目树形结构（按部位分组）
      *
      * @param categoryCode 项目分类编码（可选，传入则精确匹配，不传则返回全部）
+     * @param keyword      项目名称关键字（可选，传入则模糊匹配）
      * @return 项目树形列表
      */
     @Override
-    public List<RebuildProjectVO> listTree(String categoryCode) {
-        log.info("获取项目树形结构，categoryCode={}", categoryCode);
+    public List<RebuildProjectVO> listTree(String categoryCode, String keyword) {
+        log.info("获取项目树形结构，categoryCode={}, keyword={}", categoryCode, keyword);
         try {
             Map<Long, String> bodyPartNameMap = getBodyPartNameMap();
-            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(null, categoryCode);
+            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(null, categoryCode, keyword);
             List<RebuildProjectEntity> allList = list(wrapper
                     .orderByAsc(RebuildProjectEntity::getSort)
                     .orderByDesc(RebuildProjectEntity::getCreateTime));
@@ -86,13 +86,14 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
     /**
      * 根据部位ID获取项目列表
      *
-     * @param bodyPartId 部位ID
-     * @param category   项目分类（可选，不传则返回全部）
+     * @param bodyPartId   部位ID
+     * @param categoryCode 项目分类编码（可选，不传则返回全部）
+     * @param keyword      项目名称关键字（可选，传入则模糊匹配）
      * @return 该部位下的项目树
      */
     @Override
-    public List<RebuildProjectVO> listByBodyPartId(Long bodyPartId, String categoryCode) {
-        log.info("根据部位ID获取项目列表，bodyPartId={}, categoryCode={}", bodyPartId, categoryCode);
+    public List<RebuildProjectVO> listByBodyPartId(Long bodyPartId, String categoryCode, String keyword) {
+        log.info("根据部位ID获取项目列表，bodyPartId={}, categoryCode={}, keyword={}", bodyPartId, categoryCode, keyword);
         try {
             BodyPartEntity bodyPart = bodyPartService.getById(bodyPartId);
             if (bodyPart == null) {
@@ -100,7 +101,7 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
                 throw new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND);
             }
             Map<Long, String> bodyPartNameMap = getBodyPartNameMap();
-            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(bodyPartId, categoryCode);
+            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(bodyPartId, categoryCode, keyword);
             List<RebuildProjectEntity> allList = list(wrapper
                     .orderByAsc(RebuildProjectEntity::getSort));
             List<RebuildProjectVO> voList = allList.stream()
@@ -118,30 +119,62 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
     }
 
     /**
-     * 获取项目下拉选项
+     * 获取完整部位-项目树形结构
      *
-     * @param bodyPartId 部位ID（可选，不传则返回全部）
-     * @param category   项目分类（可选，不传则返回全部）
-     * @return 项目下拉选项列表
+     * @param bodyPartId   部位ID（可选，传入则只返回该部位）
+     * @param categoryCode 项目分类编码（可选，传入则精确匹配，不传则返回全部）
+     * @param keyword      项目名称关键字（可选，传入则模糊匹配项目名称）
+     * @return 按部位分组的项目树列表
      */
     @Override
-    public List<RebuildProjectOptionVO> listOptions(Long bodyPartId, String categoryCode) {
-        log.info("获取项目下拉选项，bodyPartId={}, categoryCode={}", bodyPartId, categoryCode);
+    public List<BodyPartProjectTreeVO> listFullTree(String categoryCode, Long bodyPartId, String keyword) {
+        log.info("获取完整部位-项目树形结构，bodyPartId={}, categoryCode={}, keyword={}", bodyPartId, categoryCode, keyword);
         try {
-            Map<Long, String> bodyPartNameMap = getBodyPartNameMap();
-            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(bodyPartId, categoryCode);
+            // 1. 查询启用部位（可按 bodyPartId 过滤），按 sort 升序
+            LambdaQueryWrapper<BodyPartEntity> partWrapper = new LambdaQueryWrapper<BodyPartEntity>()
+                    .eq(BodyPartEntity::getStatus, StatusConstants.NORMAL)
+                    .eq(Objects.nonNull(bodyPartId), BodyPartEntity::getId, bodyPartId)
+                    .orderByAsc(BodyPartEntity::getSort);
+            List<BodyPartEntity> bodyParts = bodyPartService.list(partWrapper);
+            if (bodyParts.isEmpty()) {
+                return new ArrayList<>();
+            }
+            // 2. 查询启用的重建项目（可按 categoryCode/keyword/bodyPartId 过滤），按部位+排序
+            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(bodyPartId, categoryCode, keyword);
             wrapper.eq(RebuildProjectEntity::getStatus, StatusConstants.NORMAL)
                     .orderByAsc(RebuildProjectEntity::getBodyPartId)
                     .orderByAsc(RebuildProjectEntity::getSort);
-            List<RebuildProjectEntity> allList = list(wrapper);
-            List<RebuildProjectVO> voList = allList.stream()
-                    .map(e -> toVO(e, bodyPartNameMap))
-                    .collect(Collectors.toList());
-            List<RebuildProjectOptionVO> result = buildOptionTree(voList, bodyPartNameMap);
-            log.info("获取项目下拉选项成功");
+            List<RebuildProjectEntity> projects = list(wrapper);
+            // 3. 按 bodyPartId 分组
+            Map<Long, List<RebuildProjectEntity>> projectsByPart = projects.stream()
+                    .collect(Collectors.groupingBy(RebuildProjectEntity::getBodyPartId));
+            // 4. 为每个部位构建项目子树，只保留有项目的部位
+            List<BodyPartProjectTreeVO> result = new ArrayList<>();
+            for (BodyPartEntity part : bodyParts) {
+                List<RebuildProjectEntity> partProjects = projectsByPart.getOrDefault(part.getId(), new ArrayList<>());
+                List<ProjectOptionItemVO> items = partProjects.stream()
+                        .map(this::toOptionItemFromEntity)
+                        .collect(Collectors.toList());
+                // 构建项目两级树
+                Map<Long, List<ProjectOptionItemVO>> childMap = items.stream()
+                        .filter(i -> i.getParentId() != null && i.getParentId() > 0)
+                        .collect(Collectors.groupingBy(ProjectOptionItemVO::getParentId));
+                items.forEach(item -> item.setChildren(childMap.getOrDefault(item.getId(), new ArrayList<>())));
+                List<ProjectOptionItemVO> roots = items.stream()
+                        .filter(i -> i.getParentId() == null || i.getParentId() == 0)
+                        .collect(Collectors.toList());
+                if (!roots.isEmpty()) {
+                    BodyPartProjectTreeVO partVO = new BodyPartProjectTreeVO();
+                    partVO.setBodyPartId(part.getId());
+                    partVO.setBodyPartName(part.getName());
+                    partVO.setChildren(roots);
+                    result.add(partVO);
+                }
+            }
+            log.info("获取完整部位-项目树形结构成功，部位数={}", result.size());
             return result;
         } catch (Exception e) {
-            log.error("获取项目下拉选项异常", e);
+            log.error("获取完整部位-项目树形结构异常", e);
             throw e;
         }
     }
@@ -330,77 +363,21 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
         return project != null ? project.getSpecialty() : null;
     }
 
-    /**
-     * 获取完整部位-项目树形结构
-     *
-     * @param categoryCode 项目分类编码（可选，传入则精确匹配，不传则返回全部）
-     * @return 按部位分组的项目树列表
-     */
-    @Override
-    public List<BodyPartProjectTreeVO> listFullTree(String categoryCode) {
-        log.info("获取完整部位-项目树形结构，categoryCode={}", categoryCode);
-        try {
-            // 1. 查询所有启用的部位，按 sort 升序
-            List<BodyPartEntity> bodyParts = bodyPartService.list(
-                    new LambdaQueryWrapper<BodyPartEntity>()
-                            .eq(BodyPartEntity::getStatus, StatusConstants.NORMAL)
-                            .orderByAsc(BodyPartEntity::getSort));
-            if (bodyParts.isEmpty()) {
-                return new ArrayList<>();
-            }
-            // 2. 查询启用的重建项目（可按 categoryCode 过滤），按部位+排序
-            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(null, categoryCode);
-            wrapper.eq(RebuildProjectEntity::getStatus, StatusConstants.NORMAL)
-                    .orderByAsc(RebuildProjectEntity::getBodyPartId)
-                    .orderByAsc(RebuildProjectEntity::getSort);
-            List<RebuildProjectEntity> projects = list(wrapper);
-            // 3. 按 bodyPartId 分组
-            Map<Long, List<RebuildProjectEntity>> projectsByPart = projects.stream()
-                    .collect(Collectors.groupingBy(RebuildProjectEntity::getBodyPartId));
-            // 4. 为每个部位构建项目子树，只保留有项目的部位
-            List<BodyPartProjectTreeVO> result = new ArrayList<>();
-            for (BodyPartEntity part : bodyParts) {
-                List<RebuildProjectEntity> partProjects = projectsByPart.getOrDefault(part.getId(), new ArrayList<>());
-                List<ProjectOptionItemVO> items = partProjects.stream()
-                        .map(this::toOptionItemFromEntity)
-                        .collect(Collectors.toList());
-                // 构建项目两级树
-                Map<Long, List<ProjectOptionItemVO>> childMap = items.stream()
-                        .filter(i -> i.getParentId() != null && i.getParentId() > 0)
-                        .collect(Collectors.groupingBy(ProjectOptionItemVO::getParentId));
-                items.forEach(item -> item.setChildren(childMap.getOrDefault(item.getId(), new ArrayList<>())));
-                List<ProjectOptionItemVO> roots = items.stream()
-                        .filter(i -> i.getParentId() == null || i.getParentId() == 0)
-                        .collect(Collectors.toList());
-                if (!roots.isEmpty()) {
-                    BodyPartProjectTreeVO partVO = new BodyPartProjectTreeVO();
-                    partVO.setBodyPartId(part.getId());
-                    partVO.setBodyPartName(part.getName());
-                    partVO.setChildren(roots);
-                    result.add(partVO);
-                }
-            }
-            log.info("获取完整部位-项目树形结构成功，部位数={}", result.size());
-            return result;
-        } catch (Exception e) {
-            log.error("获取完整部位-项目树形结构异常", e);
-            throw e;
-        }
-    }
-
     // ==================== 私有方法 ====================
 
     /**
      * 构建查询条件
      *
-     * @param bodyPartId 部位ID（可选）
-     * @param category   项目分类（可选）
+     * @param bodyPartId   部位ID（可选）
+     * @param categoryCode 项目分类编码（可选）
+     * @param keyword      项目名称关键字（可选，模糊匹配）
      * @return 查询条件
      */
-    private LambdaQueryWrapper<RebuildProjectEntity> buildQueryWrapper(Long bodyPartId, String categoryCode) {
+    private LambdaQueryWrapper<RebuildProjectEntity> buildQueryWrapper(Long bodyPartId, String categoryCode, String keyword) {
         LambdaQueryWrapper<RebuildProjectEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Objects.nonNull(bodyPartId), RebuildProjectEntity::getBodyPartId, bodyPartId)
-                .eq(StrUtil.isNotBlank(categoryCode), RebuildProjectEntity::getCategoryCode, categoryCode);
+                .eq(StrUtil.isNotBlank(categoryCode), RebuildProjectEntity::getCategoryCode, categoryCode)
+                .like(StrUtil.isNotBlank(keyword), RebuildProjectEntity::getName, keyword);
         return wrapper;
     }
 
@@ -478,38 +455,6 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
         return list.stream()
                 .filter(item -> item.getParentId() == null || item.getParentId() == 0)
                 .collect(Collectors.toList());
-    }
-
-    private List<RebuildProjectOptionVO> buildOptionTree(List<RebuildProjectVO> voList, Map<Long, String> bodyPartNameMap) {
-        Map<Long, List<RebuildProjectVO>> byPart = voList.stream()
-                .collect(Collectors.groupingBy(RebuildProjectVO::getBodyPartId));
-        List<RebuildProjectOptionVO> result = new ArrayList<>();
-        byPart.forEach((partId, projects) -> {
-            RebuildProjectOptionVO partVo = new RebuildProjectOptionVO();
-            partVo.setBodyPartId(partId);
-            partVo.setBodyPartName(bodyPartNameMap.getOrDefault(partId, "未知部位"));
-            List<ProjectOptionItemVO> items = projects.stream()
-                    .map(this::toOptionItem)
-                    .collect(Collectors.toList());
-            Map<Long, List<ProjectOptionItemVO>> childMap = items.stream()
-                    .filter(i -> i.getParentId() != null && i.getParentId() > 0)
-                    .collect(Collectors.groupingBy(ProjectOptionItemVO::getParentId));
-            items.forEach(item -> item.setChildren(childMap.getOrDefault(item.getId(), new ArrayList<>())));
-            partVo.setChildren(items.stream()
-                    .filter(i -> i.getParentId() == null || i.getParentId() == 0)
-                    .collect(Collectors.toList()));
-            result.add(partVo);
-        });
-        return result;
-    }
-
-    private ProjectOptionItemVO toOptionItem(RebuildProjectVO vo) {
-        ProjectOptionItemVO item = new ProjectOptionItemVO();
-        item.setId(vo.getId());
-        item.setParentId(vo.getParentId());
-        item.setName(vo.getName());
-        item.setLevel(vo.getLevel());
-        return item;
     }
 
     private ProjectOptionItemVO toOptionItemFromEntity(RebuildProjectEntity entity) {

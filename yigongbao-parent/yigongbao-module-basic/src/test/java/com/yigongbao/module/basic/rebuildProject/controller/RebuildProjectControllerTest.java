@@ -7,9 +7,9 @@ import com.yigongbao.module.basic.BasicTestApplication;
 import com.yigongbao.module.basic.rebuildProject.dto.CreateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.UpdateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
+import com.yigongbao.module.basic.rebuildProject.vo.BodyPartProjectTreeVO;
 import com.yigongbao.module.basic.rebuildProject.vo.ProjectOptionItemVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
-import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectOptionVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectVO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -56,10 +56,10 @@ class RebuildProjectControllerTest {
         RebuildProjectVO vo = new RebuildProjectVO();
         vo.setId(id);
         vo.setBodyPartId(bodyPartId);
-        vo.setBodyPartName("头部");
+        vo.setBodyPartName("颅骨");
         vo.setParentId(0L);
         vo.setName(name);
-        vo.setCode("RP_" + bodyPartId + "_001");
+        vo.setCode("RP-" + String.format("%04d", id));
         vo.setLevel(1);
         vo.setStandardPrice(new BigDecimal("5000.00"));
         vo.setUrgentPrice(new BigDecimal("7500.00"));
@@ -78,10 +78,10 @@ class RebuildProjectControllerTest {
         RebuildProjectDetailVO vo = new RebuildProjectDetailVO();
         vo.setId(id);
         vo.setBodyPartId(bodyPartId);
-        vo.setBodyPartName("头部");
+        vo.setBodyPartName("颅骨");
         vo.setParentId(0L);
         vo.setName(name);
-        vo.setCode("RP_" + bodyPartId + "_001");
+        vo.setCode("RP-" + String.format("%04d", id));
         vo.setLevel(1);
         vo.setStandardPrice(new BigDecimal("5000.00"));
         vo.setUrgentPrice(new BigDecimal("7500.00"));
@@ -106,7 +106,7 @@ class RebuildProjectControllerTest {
         void tree_shouldReturnTreeStructure() throws Exception {
             RebuildProjectVO parent = buildTestVO(1L, "颅骨重建", 1L);
             parent.setChildren(List.of(buildTestVO(2L, "颞骨重建", 1L)));
-            when(rebuildProjectService.listTree(null)).thenReturn(List.of(parent));
+            when(rebuildProjectService.listTree(null, null)).thenReturn(List.of(parent));
 
             mockMvc.perform(post("/basic/rebuild-project/tree")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -121,7 +121,7 @@ class RebuildProjectControllerTest {
         @Test
         @DisplayName("tree: 空数据时返回空数组")
         void tree_whenEmpty_shouldReturnEmptyArray() throws Exception {
-            when(rebuildProjectService.listTree(null)).thenReturn(new ArrayList<>());
+            when(rebuildProjectService.listTree(null, null)).thenReturn(new ArrayList<>());
 
             mockMvc.perform(post("/basic/rebuild-project/tree")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -138,7 +138,7 @@ class RebuildProjectControllerTest {
             RebuildProjectVO project = buildTestVO(1L, "颅骨重建", 1L);
             project.setCategoryCode("13.1");
             project.setCategoryName("模型");
-            when(rebuildProjectService.listTree("13.1")).thenReturn(List.of(project));
+            when(rebuildProjectService.listTree("13.1", null)).thenReturn(List.of(project));
 
             mockMvc.perform(post("/basic/rebuild-project/tree")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -146,6 +146,20 @@ class RebuildProjectControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data[0].categoryCode").value("13.1"));
+        }
+
+        @Test
+        @DisplayName("tree: 按名称关键字搜索")
+        void tree_withKeyword_shouldFilter() throws Exception {
+            RebuildProjectVO project = buildTestVO(1L, "颅骨修补", 1L);
+            when(rebuildProjectService.listTree(null, "修补")).thenReturn(List.of(project));
+
+            mockMvc.perform(post("/basic/rebuild-project/tree")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"keyword\":\"修补\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data[0].name").value("颅骨修补"));
         }
     }
 
@@ -158,7 +172,7 @@ class RebuildProjectControllerTest {
         @Test
         @DisplayName("byBodyPart: 返回该部位下的项目列表")
         void byBodyPart_shouldReturnProjects() throws Exception {
-            when(rebuildProjectService.listByBodyPartId(1L, null)).thenReturn(List.of(buildTestVO(1L, "颅骨重建", 1L)));
+            when(rebuildProjectService.listByBodyPartId(1L, null, null)).thenReturn(List.of(buildTestVO(1L, "颅骨重建", 1L)));
 
             mockMvc.perform(post("/basic/rebuild-project/by-body-part")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -171,7 +185,7 @@ class RebuildProjectControllerTest {
         @Test
         @DisplayName("byBodyPart: 部位不存在时返回错误")
         void byBodyPart_whenNotExists_shouldReturnError() throws Exception {
-            when(rebuildProjectService.listByBodyPartId(999L, null))
+            when(rebuildProjectService.listByBodyPartId(999L, null, null))
                     .thenThrow(new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND));
 
             mockMvc.perform(post("/basic/rebuild-project/by-body-part")
@@ -187,7 +201,7 @@ class RebuildProjectControllerTest {
             RebuildProjectVO project = buildTestVO(1L, "颅骨重建", 1L);
             project.setCategoryCode("13.2");
             project.setCategoryName("导板");
-            when(rebuildProjectService.listByBodyPartId(1L, "13.2")).thenReturn(List.of(project));
+            when(rebuildProjectService.listByBodyPartId(1L, "13.2", null)).thenReturn(List.of(project));
 
             mockMvc.perform(post("/basic/rebuild-project/by-body-part")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -196,37 +210,56 @@ class RebuildProjectControllerTest {
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data[0].categoryCode").value("13.2"));
         }
-    }
-
-    // ==================== options 测试 ====================
-
-    @Nested
-    @DisplayName("options 测试")
-    class OptionsTests {
 
         @Test
-        @DisplayName("options: 返回下拉选项")
-        void options_shouldReturnOptions() throws Exception {
-            RebuildProjectOptionVO option = new RebuildProjectOptionVO();
-            option.setBodyPartId(1L);
-            option.setBodyPartName("头部");
-            option.setChildren(new ArrayList<>());
-            when(rebuildProjectService.listOptions(null, null)).thenReturn(List.of(option));
+        @DisplayName("byBodyPart: 按名称关键字搜索")
+        void byBodyPart_withKeyword_shouldFilter() throws Exception {
+            when(rebuildProjectService.listByBodyPartId(1L, null, "修补")).thenReturn(new ArrayList<>());
 
-            mockMvc.perform(post("/basic/rebuild-project/options")
+            mockMvc.perform(post("/basic/rebuild-project/by-body-part")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"bodyPartId\":1,\"keyword\":\"修补\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+        }
+    }
+
+    // ==================== fullTree 测试 ====================
+
+    @Nested
+    @DisplayName("fullTree 测试")
+    class FullTreeTests {
+
+        @Test
+        @DisplayName("fullTree: 返回部位-项目树形结构")
+        void fullTree_shouldReturnTree() throws Exception {
+            ProjectOptionItemVO item = new ProjectOptionItemVO();
+            item.setId(1L);
+            item.setParentId(0L);
+            item.setName("颅骨重建");
+            item.setLevel(1);
+            item.setChildren(new ArrayList<>());
+            BodyPartProjectTreeVO partVO = new BodyPartProjectTreeVO();
+            partVO.setBodyPartId(1L);
+            partVO.setBodyPartName("颅骨");
+            partVO.setChildren(List.of(item));
+            when(rebuildProjectService.listFullTree(null, null, null)).thenReturn(List.of(partVO));
+
+            mockMvc.perform(post("/basic/rebuild-project/full-tree")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
-                    .andExpect(jsonPath("$.data[0].bodyPartName").value("头部"));
+                    .andExpect(jsonPath("$.data[0].bodyPartName").value("颅骨"))
+                    .andExpect(jsonPath("$.data[0].children[0].name").value("颅骨重建"));
         }
 
         @Test
-        @DisplayName("options: 按部位筛选")
-        void options_withBodyPartId_shouldFilter() throws Exception {
-            when(rebuildProjectService.listOptions(1L, null)).thenReturn(new ArrayList<>());
+        @DisplayName("fullTree: 按部位筛选")
+        void fullTree_withBodyPartId_shouldFilter() throws Exception {
+            when(rebuildProjectService.listFullTree(null, 1L, null)).thenReturn(new ArrayList<>());
 
-            mockMvc.perform(post("/basic/rebuild-project/options")
+            mockMvc.perform(post("/basic/rebuild-project/full-tree")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"bodyPartId\":1}"))
                     .andExpect(status().isOk())
@@ -234,37 +267,28 @@ class RebuildProjectControllerTest {
         }
 
         @Test
-        @DisplayName("options: 按分类筛选")
-        void options_withCategory_shouldFilter() throws Exception {
-            RebuildProjectOptionVO option = new RebuildProjectOptionVO();
-            option.setBodyPartId(1L);
-            option.setBodyPartName("头部");
-            ProjectOptionItemVO item = new ProjectOptionItemVO();
-            item.setId(1L);
-            item.setParentId(0L);
-            item.setName("颅骨重建");
-            item.setLevel(1);
-            item.setChildren(new ArrayList<>());
-            option.setChildren(List.of(item));
-            when(rebuildProjectService.listOptions(null, "13.1")).thenReturn(List.of(option));
+        @DisplayName("fullTree: 按分类筛选")
+        void fullTree_withCategory_shouldFilter() throws Exception {
+            when(rebuildProjectService.listFullTree("13.3", null, null)).thenReturn(new ArrayList<>());
 
-            mockMvc.perform(post("/basic/rebuild-project/options")
+            mockMvc.perform(post("/basic/rebuild-project/full-tree")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"categoryCode\":\"13.1\"}"))
+                            .content("{\"categoryCode\":\"13.3\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
         }
 
         @Test
-        @DisplayName("options: 按部位和分类联合筛选")
-        void options_withBodyPartIdAndCategory_shouldFilter() throws Exception {
-            when(rebuildProjectService.listOptions(1L, "13.1")).thenReturn(new ArrayList<>());
+        @DisplayName("fullTree: 按名称关键字搜索，无匹配时返回空数组")
+        void fullTree_withKeyword_noMatch_shouldReturnEmpty() throws Exception {
+            when(rebuildProjectService.listFullTree(null, null, "不存在项目")).thenReturn(new ArrayList<>());
 
-            mockMvc.perform(post("/basic/rebuild-project/options")
+            mockMvc.perform(post("/basic/rebuild-project/full-tree")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"bodyPartId\":1,\"categoryCode\":\"13.1\"}"))
+                            .content("{\"keyword\":\"不存在项目\"}"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.code").value(200));
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data").isEmpty());
         }
     }
 
@@ -412,7 +436,6 @@ class RebuildProjectControllerTest {
         @Test
         @DisplayName("delete: 存在子项目时返回错误")
         void delete_whenHasChildren_shouldReturnError() throws Exception {
-            // removeProject 为 void，不能使用 when(...)，需使用 doThrow
             doThrow(new BusinessException(ErrorCodeEnum.DATA_HAS_CHILDREN))
                     .when(rebuildProjectService).removeProject(1L);
 
