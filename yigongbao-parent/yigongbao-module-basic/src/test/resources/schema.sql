@@ -257,10 +257,8 @@ INSERT INTO product (id, product_code, product_name, category, spec, cert_id, ma
 DROP TABLE IF EXISTS rebuild_body_part;
 CREATE TABLE rebuild_body_part (
     id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    parent_id           BIGINT          DEFAULT 0 COMMENT '父级ID（0=顶级身体区域）',
     name                VARCHAR(100)    NOT NULL COMMENT '部位名称',
     code                VARCHAR(50)     COMMENT '部位编码',
-    level               TINYINT         COMMENT '层级（1=身体区域，2=具体部位）',
     sort                INT             DEFAULT 0 COMMENT '排序',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark              VARCHAR(512)    COMMENT '备注说明',
@@ -272,17 +270,14 @@ CREATE TABLE rebuild_body_part (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    KEY idx_bodypart_parent (parent_id),
     KEY idx_bodypart_status (status)
 );
 
--- 插入部位测试数据
-INSERT INTO rebuild_body_part (id, parent_id, name, code, level, sort, status, remark, create_time, update_time, is_deleted) VALUES
-(1, 0, '头部', 'HEAD', 1, 1, 1, '头部区域', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, 1, '颅骨', 'HEAD-SKULL', 2, 1, 1, '颅骨修补区域', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(3, 1, '下颌骨', 'HEAD-MANDIBLE', 2, 2, 1, '下颌骨重建区域', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(4, 0, '躯干', 'BODY', 1, 2, 1, '躯干区域', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(5, 4, '脊柱', 'BODY-SPINE', 2, 1, 1, '脊柱区域', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+-- 插入部位测试数据（平级结构）
+INSERT INTO rebuild_body_part (id, name, code, sort, status, remark, create_time, update_time, is_deleted) VALUES
+(1, '颅骨', 'BP-0001', 1, 1, '颅骨修补区域', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, '颌面', 'BP-0002', 2, 1, '颌面重建区域', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, '脊柱', 'BP-0003', 3, 1, '脊柱区域', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ------------------------------------------------------------
 -- 重建项目表（对应 RebuildProjectEntity）
@@ -319,9 +314,9 @@ CREATE TABLE rebuild_project (
 
 -- 插入重建项目测试数据
 INSERT INTO rebuild_project (id, body_part_id, parent_id, name, code, level, standard_price, urgent_price, category, estimated_hours, specialty, status, remark, create_time, update_time, is_deleted) VALUES
-(1, 2, 0, '颅骨修补术', 'HEAD-SKULL-001', 1, 8000.00, 10000.00, '修补类', 4.0, '7.1', 1, '颅骨修补术', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, 3, 0, '下颌骨重建术', 'HEAD-MANDIBLE-001', 1, 12000.00, 15000.00, '重建类', 6.0, '7.1', 1, '下颌骨重建术', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(3, 5, 0, '脊柱矫形术', 'BODY-SPINE-001', 1, 15000.00, 20000.00, '矫形类', 8.0, '7.2', 1, '脊柱矫形术', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+(1, 1, 0, '颅骨修补术', 'HEAD-SKULL-001', 1, 8000.00, 10000.00, '修补类', 4.0, '7.1', 1, '颅骨修补术', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 2, 0, '颌面重建术', 'HEAD-MANDIBLE-001', 1, 12000.00, 15000.00, '重建类', 6.0, '7.1', 1, '颌面重建术', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 3, 0, '脊柱矫形术', 'BODY-SPINE-001', 1, 15000.00, 20000.00, '矫形类', 8.0, '7.2', 1, '脊柱矫形术', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ------------------------------------------------------------
 -- 注册证表（对应 RegistrationCertEntity）
