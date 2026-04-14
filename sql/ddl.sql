@@ -439,16 +439,13 @@ CREATE TABLE sys_user_hospital (
 
 -- ============================================================
 -- 重建部位表（rebuild_body_part）
--- 用于管理身体部位树形结构（最多2级：身体区域 → 具体部位）
--- 设计师编号用于自动匹配设计师
+-- 平级结构，部位直接关联重建项目
 -- ============================================================
 DROP TABLE IF EXISTS rebuild_body_part;
 CREATE TABLE rebuild_body_part (
     id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    parent_id       BIGINT          NOT NULL DEFAULT 0 COMMENT '父级ID（0=顶级身体区域）',
     name            VARCHAR(100)    NOT NULL COMMENT '部位名称',
     code            VARCHAR(50)     NOT NULL COMMENT '部位编码',
-    level           INT             NOT NULL DEFAULT 1 COMMENT '层级（1=身体区域，2=具体部位）',
     sort            INT             NOT NULL DEFAULT 0 COMMENT '排序',
     status          TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark          VARCHAR(512)    DEFAULT NULL COMMENT '备注说明',
@@ -461,8 +458,6 @@ CREATE TABLE rebuild_body_part (
     is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    KEY idx_body_part_parent_id (parent_id),
-    KEY idx_body_part_level (level),
     KEY idx_body_part_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='重建部位表';
 CREATE UNIQUE INDEX uk_body_part_code ON rebuild_body_part ((CASE WHEN is_deleted = 0 THEN code ELSE NULL END));

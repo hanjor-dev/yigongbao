@@ -428,17 +428,13 @@ UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_dept) WH
 
 -- ============================================================
 -- 重建部位数据初始化（rebuild_body_part）
--- 层级结构：身体区域（level=1） → 具体部位（level=2）
+-- 平级结构，直接列出所有具体部位
 -- ============================================================
-INSERT INTO rebuild_body_part (id, parent_id, name, code, level, sort, status) VALUES
--- 头部区域
-(1, 0, '头部', 'HEAD', 1, 1, 1),
-(2, 1, '颅骨', 'HEAD-SKULL', 2,  1, 1),
-(3, 1, '颌面', 'HEAD-FACE', 2,  2, 1),
-(4, 1, '眼眶', 'HEAD-ORBIT', 2,  3, 1),
--- 颈部区域
-(5, 0, '颈部', 'NECK', 1,  2, 1),
-(6, 5, '颈椎', 'NECK-CSPINE', 2, 1, 1);
+INSERT INTO rebuild_body_part (id, name, code, sort, status) VALUES
+(1, '颅骨', 'BP-0001', 1, 1),
+(2, '颌面', 'BP-0002', 2, 1),
+(3, '眼眶', 'BP-0003', 3, 1),
+(4, '颈椎', 'BP-0004', 4, 1);
 
 
 -- ============================================================
@@ -446,13 +442,13 @@ INSERT INTO rebuild_body_part (id, parent_id, name, code, level, sort, status) V
 -- 层级结构：部位（body_part_id） → 重建项目（level=1） → 子重建项目（level=2）
 -- ============================================================
 INSERT INTO rebuild_project (id, body_part_id, parent_id, name, code, level, standard_price, urgent_price, category_code, category_name, estimated_hours, sort, status, specialty) VALUES
--- 颅骨重建
-(1, 2, 0, '颅骨缺损修补', 'RP-HEAD-SKULL-001', 1, 15000.00, 22000.00, '13.1', '模型', 48.0, 1, 1, '7.1'),
-(2, 2, 1, '3D钛网修补', 'RP-HEAD-SKULL-001-01', 2, 8000.00, 12000.00, '13.2', '导板', 8.0, 1, 1, '7.1'),
-(3, 2, 1, 'PEEK材料修补', 'RP-HEAD-SKULL-001-02', 2, 12000.00, 18000.00, '13.2', '导板', 12.0, 2, 1, '7.1'),
--- 颌面重建
-(4, 3, 0, '颌面部骨折复位', 'RP-HEAD-FACE-001', 1, 20000.00, 30000.00, '13.1', '模型', 72.0, 2, 1, '7.2'),
-(5, 3, 4, '下颌骨骨折复位导板', 'RP-HEAD-FACE-001-01', 2, 6000.00, 9000.00, '13.2', '导板', 6.0, 1, 1, '7.2');
+-- 颅骨重建（body_part_id=1）
+(1, 1, 0, '颅骨缺损修补', 'RP-HEAD-SKULL-001', 1, 15000.00, 22000.00, '13.1', '模型', 48.0, 1, 1, '7.1'),
+(2, 1, 1, '3D钛网修补', 'RP-HEAD-SKULL-001-01', 2, 8000.00, 12000.00, '13.2', '导板', 8.0, 1, 1, '7.1'),
+(3, 1, 1, 'PEEK材料修补', 'RP-HEAD-SKULL-001-02', 2, 12000.00, 18000.00, '13.2', '导板', 12.0, 2, 1, '7.1'),
+-- 颌面重建（body_part_id=2）
+(4, 2, 0, '颌面部骨折复位', 'RP-HEAD-FACE-001', 1, 20000.00, 30000.00, '13.1', '模型', 72.0, 2, 1, '7.2'),
+(5, 2, 4, '下颌骨骨折复位导板', 'RP-HEAD-FACE-001-01', 2, 6000.00, 9000.00, '13.2', '导板', 6.0, 1, 1, '7.2');
 
 
 -- ============================================================
@@ -486,7 +482,7 @@ INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, so
 -- 文件业务类型（子节点：医生相关）
 INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
 (60, 50, '10.10', '医生资质证明',  '10.10', 2, 10, 1),
-(61, 50, '10.11', '医生头像',       '10.11', 2, 11, 1);
+(61, 50, '10.11', '头像',       '10.11', 2, 11, 1);
 
 -- 文件业务类型（子节点：医院/机构相关）
 INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
