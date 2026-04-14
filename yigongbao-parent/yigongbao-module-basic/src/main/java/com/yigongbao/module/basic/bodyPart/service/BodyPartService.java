@@ -5,7 +5,6 @@ import com.yigongbao.module.basic.bodyPart.dto.CreateBodyPartDTO;
 import com.yigongbao.module.basic.bodyPart.dto.UpdateBodyPartDTO;
 import com.yigongbao.module.basic.bodyPart.entity.BodyPartEntity;
 import com.yigongbao.module.basic.bodyPart.vo.BodyPartDetailVO;
-import com.yigongbao.module.basic.bodyPart.vo.BodyPartOptionVO;
 import com.yigongbao.module.basic.bodyPart.vo.BodyPartVO;
 
 import java.util.List;
@@ -19,18 +18,11 @@ import java.util.List;
 public interface BodyPartService extends IService<BodyPartEntity> {
 
     /**
-     * 获取部位树形结构
+     * 获取所有部位平级列表
      *
-     * @return 部位树形列表
+     * @return 部位列表（按 sort 升序）
      */
-    List<BodyPartVO> listTree();
-
-    /**
-     * 获取部位下拉选项（仅返回启用状态）
-     *
-     * @return 部位下拉选项列表
-     */
-    List<BodyPartOptionVO> listOptions();
+    List<BodyPartVO> listAll();
 
     /**
      * 查询部位详情
