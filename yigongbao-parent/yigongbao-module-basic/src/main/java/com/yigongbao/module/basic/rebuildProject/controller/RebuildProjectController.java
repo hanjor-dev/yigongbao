@@ -5,10 +5,12 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.rebuildProject.dto.CreateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectByBodyPartDTO;
+import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectFullTreeDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectOptionsDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectTreeDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.UpdateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
+import com.yigongbao.module.basic.rebuildProject.vo.BodyPartProjectTreeVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectOptionVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectVO;
@@ -72,6 +74,15 @@ public class RebuildProjectController {
     @PostMapping("/options")
     public Result<List<RebuildProjectOptionVO>> options(@RequestBody RebuildProjectOptionsDTO dto) {
         return Result.success(rebuildProjectService.listOptions(dto.getBodyPartId(), dto.getCategoryCode()));
+    }
+
+    /**
+     * 获取完整部位-项目树形结构
+     */
+    @Operation(summary = "获取完整部位-项目树形结构")
+    @PostMapping("/full-tree")
+    public Result<List<BodyPartProjectTreeVO>> fullTree(@RequestBody RebuildProjectFullTreeDTO dto) {
+        return Result.success(rebuildProjectService.listFullTree(dto.getCategoryCode()));
     }
 
     /**

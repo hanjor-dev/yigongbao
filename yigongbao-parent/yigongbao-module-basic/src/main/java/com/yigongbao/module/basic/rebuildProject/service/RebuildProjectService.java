@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.basic.rebuildProject.dto.CreateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.UpdateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.entity.RebuildProjectEntity;
+import com.yigongbao.module.basic.rebuildProject.vo.BodyPartProjectTreeVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectOptionVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectVO;
@@ -81,6 +82,16 @@ public interface RebuildProjectService extends IService<RebuildProjectEntity> {
      * @param status 状态（0=禁用，1=正常）
      */
     void updateStatus(Long id, Integer status);
+
+    /**
+     * 获取完整部位-项目树形结构
+     * 返回三层结构：部位 → 重建项目 → 子重建项目
+     * 仅包含启用状态的部位和项目
+     *
+     * @param categoryCode 项目分类编码（可选，传入则精确匹配，不传则返回全部）
+     * @return 按部位分组的项目树列表
+     */
+    List<BodyPartProjectTreeVO> listFullTree(String categoryCode);
 
     /**
      * 根据项目ID查询专业方向字典编码

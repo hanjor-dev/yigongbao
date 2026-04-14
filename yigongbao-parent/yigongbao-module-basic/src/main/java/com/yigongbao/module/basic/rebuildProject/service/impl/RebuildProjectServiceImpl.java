@@ -16,6 +16,7 @@ import com.yigongbao.module.basic.rebuildProject.dto.UpdateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.entity.RebuildProjectEntity;
 import com.yigongbao.module.basic.rebuildProject.mapper.RebuildProjectMapper;
 import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
+import com.yigongbao.module.basic.rebuildProject.vo.BodyPartProjectTreeVO;
 import com.yigongbao.module.basic.rebuildProject.vo.ProjectOptionItemVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectOptionVO;
@@ -329,6 +330,64 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
         return project != null ? project.getSpecialty() : null;
     }
 
+    /**
+     * 获取完整部位-项目树形结构
+     *
+     * @param categoryCode 项目分类编码（可选，传入则精确匹配，不传则返回全部）
+     * @return 按部位分组的项目树列表
+     */
+    @Override
+    public List<BodyPartProjectTreeVO> listFullTree(String categoryCode) {
+        log.info("获取完整部位-项目树形结构，categoryCode={}", categoryCode);
+        try {
+            // 1. 查询所有启用的部位，按 sort 升序
+            List<BodyPartEntity> bodyParts = bodyPartService.list(
+                    new LambdaQueryWrapper<BodyPartEntity>()
+                            .eq(BodyPartEntity::getStatus, StatusConstants.NORMAL)
+                            .orderByAsc(BodyPartEntity::getSort));
+            if (bodyParts.isEmpty()) {
+                return new ArrayList<>();
+            }
+            // 2. 查询启用的重建项目（可按 categoryCode 过滤），按部位+排序
+            LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(null, categoryCode);
+            wrapper.eq(RebuildProjectEntity::getStatus, StatusConstants.NORMAL)
+                    .orderByAsc(RebuildProjectEntity::getBodyPartId)
+                    .orderByAsc(RebuildProjectEntity::getSort);
+            List<RebuildProjectEntity> projects = list(wrapper);
+            // 3. 按 bodyPartId 分组
+            Map<Long, List<RebuildProjectEntity>> projectsByPart = projects.stream()
+                    .collect(Collectors.groupingBy(RebuildProjectEntity::getBodyPartId));
+            // 4. 为每个部位构建项目子树，只保留有项目的部位
+            List<BodyPartProjectTreeVO> result = new ArrayList<>();
+            for (BodyPartEntity part : bodyParts) {
+                List<RebuildProjectEntity> partProjects = projectsByPart.getOrDefault(part.getId(), new ArrayList<>());
+                List<ProjectOptionItemVO> items = partProjects.stream()
+                        .map(this::toOptionItemFromEntity)
+                        .collect(Collectors.toList());
+                // 构建项目两级树
+                Map<Long, List<ProjectOptionItemVO>> childMap = items.stream()
+                        .filter(i -> i.getParentId() != null && i.getParentId() > 0)
+                        .collect(Collectors.groupingBy(ProjectOptionItemVO::getParentId));
+                items.forEach(item -> item.setChildren(childMap.getOrDefault(item.getId(), new ArrayList<>())));
+                List<ProjectOptionItemVO> roots = items.stream()
+                        .filter(i -> i.getParentId() == null || i.getParentId() == 0)
+                        .collect(Collectors.toList());
+                if (!roots.isEmpty()) {
+                    BodyPartProjectTreeVO partVO = new BodyPartProjectTreeVO();
+                    partVO.setBodyPartId(part.getId());
+                    partVO.setBodyPartName(part.getName());
+                    partVO.setChildren(roots);
+                    result.add(partVO);
+                }
+            }
+            log.info("获取完整部位-项目树形结构成功，部位数={}", result.size());
+            return result;
+        } catch (Exception e) {
+            log.error("获取完整部位-项目树形结构异常", e);
+            throw e;
+        }
+    }
+
     // ==================== 私有方法 ====================
 
     /**
@@ -450,6 +509,15 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
         item.setParentId(vo.getParentId());
         item.setName(vo.getName());
         item.setLevel(vo.getLevel());
+        return item;
+    }
+
+    private ProjectOptionItemVO toOptionItemFromEntity(RebuildProjectEntity entity) {
+        ProjectOptionItemVO item = new ProjectOptionItemVO();
+        item.setId(entity.getId());
+        item.setParentId(entity.getParentId());
+        item.setName(entity.getName());
+        item.setLevel(entity.getLevel());
         return item;
     }
 
