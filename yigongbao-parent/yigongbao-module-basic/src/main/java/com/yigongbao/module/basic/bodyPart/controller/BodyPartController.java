@@ -3,13 +3,10 @@ package com.yigongbao.module.basic.bodyPart.controller;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
-import com.yigongbao.module.basic.bodyPart.dto.BodyPartOptionsDTO;
-import com.yigongbao.module.basic.bodyPart.dto.BodyPartTreeDTO;
 import com.yigongbao.module.basic.bodyPart.dto.CreateBodyPartDTO;
 import com.yigongbao.module.basic.bodyPart.dto.UpdateBodyPartDTO;
 import com.yigongbao.module.basic.bodyPart.service.BodyPartService;
 import com.yigongbao.module.basic.bodyPart.vo.BodyPartDetailVO;
-import com.yigongbao.module.basic.bodyPart.vo.BodyPartOptionVO;
 import com.yigongbao.module.basic.bodyPart.vo.BodyPartVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,21 +43,12 @@ public class BodyPartController {
     private final BodyPartService bodyPartService;
 
     /**
-     * 获取部位树形结构
+     * 获取部位列表
      */
-    @Operation(summary = "获取部位树形结构")
-    @PostMapping("/tree")
-    public Result<List<BodyPartVO>> tree(@RequestBody BodyPartTreeDTO dto) {
-        return Result.success(bodyPartService.listTree());
-    }
-
-    /**
-     * 获取部位下拉选项
-     */
-    @Operation(summary = "获取部位下拉选项")
-    @PostMapping("/options")
-    public Result<List<BodyPartOptionVO>> options(@RequestBody BodyPartOptionsDTO dto) {
-        return Result.success(bodyPartService.listOptions());
+    @Operation(summary = "获取部位列表")
+    @PostMapping("/list")
+    public Result<List<BodyPartVO>> list() {
+        return Result.success(bodyPartService.listAll());
     }
 
     /**
