@@ -165,7 +165,12 @@ public class UserVO implements Serializable {
     /**
      * 订单列配置（JSON，用户个人自定义列显示设置）
      */
-    private String columnSettings;
+    private String orderColumnSettings;
+
+    /**
+     * 设计工单列配置（JSON，用户个人自定义列显示设置）
+     */
+    private String designColumnSettings;
 
     /**
      * 创建时间

@@ -179,8 +179,9 @@ CREATE TABLE sys_user (
 
     remark              VARCHAR(512)    COMMENT '备注说明',
 
-    -- 订单列配置
-    column_settings     TEXT            COMMENT '订单列配置（JSON，用户个人自定义列显示设置）',
+    -- 列配置
+    order_column_settings  TEXT         COMMENT '订单列配置（JSON，用户个人自定义列显示设置）',
+    design_column_settings TEXT         COMMENT '设计工单列配置（JSON，用户个人自定义列显示设置）',
 
     -- 通用字段
     create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

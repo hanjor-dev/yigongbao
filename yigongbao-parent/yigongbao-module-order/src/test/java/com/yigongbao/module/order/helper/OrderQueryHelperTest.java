@@ -282,11 +282,11 @@ class OrderQueryHelperTest {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
                 UserEntity user = new UserEntity();
-                user.setColumnSettings("{\"module\":\"order\",\"columns\":[]}");
+                user.setOrderColumnSettings("{\"module\":\"order\",\"columns\":[]}");
                 when(userService.getById(100L)).thenReturn(user);
 
                 OrderColumnConfigVO userConfig = buildDummyConfig();
-                when(objectMapper.readValue(eq(user.getColumnSettings()), eq(OrderColumnConfigVO.class)))
+                when(objectMapper.readValue(eq(user.getOrderColumnSettings()), eq(OrderColumnConfigVO.class)))
                         .thenReturn(userConfig);
 
                 OrderColumnConfigVO result = orderQueryHelper.getColumnConfig();
@@ -301,7 +301,7 @@ class OrderQueryHelperTest {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
                 UserEntity user = new UserEntity();
-                user.setColumnSettings("");
+                user.setOrderColumnSettings("");
                 when(userService.getById(100L)).thenReturn(user);
 
                 OrderColumnConfigVO systemConfig = buildDummyConfig();
@@ -320,7 +320,7 @@ class OrderQueryHelperTest {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
                 UserEntity user = new UserEntity();
-                user.setColumnSettings("{invalid json}");
+                user.setOrderColumnSettings("{invalid json}");
                 when(userService.getById(100L)).thenReturn(user);
                 when(objectMapper.readValue(eq("{invalid json}"), eq(OrderColumnConfigVO.class)))
                         .thenThrow(mock(JsonProcessingException.class));

@@ -1058,10 +1058,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         try {
             // 序列化为 JSON 字符串
             String json = objectMapper.writeValueAsString(config);
-            // 更新 UserEntity.columnSettings 字段
+            // 更新 UserEntity.orderColumnSettings 字段
             UserEntity user = new UserEntity();
             user.setId(currentUserId);
-            user.setColumnSettings(json);
+            user.setOrderColumnSettings(json);
             userService.updateById(user);
             log.info("保存用户列配置成功，userId={}", currentUserId);
         } catch (JsonProcessingException e) {
@@ -1082,7 +1082,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         log.info("重置用户列配置，userId={}", currentUserId);
         UserEntity user = new UserEntity();
         user.setId(currentUserId);
-        user.setColumnSettings(null);
+        user.setOrderColumnSettings(null);
         userService.updateById(user);
         log.info("重置用户列配置成功，userId={}", currentUserId);
     }

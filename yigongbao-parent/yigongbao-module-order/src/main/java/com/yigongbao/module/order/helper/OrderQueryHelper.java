@@ -375,9 +375,9 @@ public class OrderQueryHelper {
             return getSystemDefaultColumnConfig();
         }
         // 用户已配置个人列设置，优先使用
-        if (StrUtil.isNotBlank(user.getColumnSettings())) {
+        if (StrUtil.isNotBlank(user.getOrderColumnSettings())) {
             try {
-                return objectMapper.readValue(user.getColumnSettings(), OrderColumnConfigVO.class);
+                return objectMapper.readValue(user.getOrderColumnSettings(), OrderColumnConfigVO.class);
             } catch (JsonProcessingException e) {
                 // JSON 解析失败时降级为系统默认，记录警告
                 log.warn("解析用户列配置失败，使用系统默认配置，userId={}", currentUserId, e);
