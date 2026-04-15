@@ -55,9 +55,9 @@ public class DesignProductEntity extends BaseEntity {
     private String certNo;
 
     /**
-     * 材质ID（字典）
+     * 材质 dict_code（如 15.1）
      */
-    private Long materialId;
+    private String materialId;
 
     /**
      * 材质名称（冗余）
@@ -65,9 +65,9 @@ public class DesignProductEntity extends BaseEntity {
     private String materialName;
 
     /**
-     * 颜色ID（字典）
+     * 颜色 dict_code（如 16.1.1）
      */
-    private Long colorId;
+    private String colorId;
 
     /**
      * 颜色名称（冗余）

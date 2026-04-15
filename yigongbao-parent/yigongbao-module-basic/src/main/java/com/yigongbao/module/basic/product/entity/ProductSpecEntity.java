@@ -8,33 +8,43 @@ import lombok.EqualsAndHashCode;
 import java.io.Serializable;
 
 /**
- * 产品实体（产品大类）
- * 产品按大类管理，规格单独维护于 ProductSpecEntity
+ * 产品规格实体
+ * 一个产品（大类）下可关联多条规格，每条规格独立关联注册证
  *
  * @author hanjor
  * @date 2026-04-15
  */
 @Data
-@TableName("product")
+@TableName("product_spec")
 @EqualsAndHashCode(callSuper = false)
-public class ProductEntity extends BaseEntity implements Serializable {
+public class ProductSpecEntity extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /**
-     * 产品名称
+     * 关联产品ID
      */
-    private String productName;
+    private Long productId;
 
     /**
-     * 产品大类 dict_code（如 17.1）
+     * 规格名称
      */
-    private String category;
+    private String specName;
 
     /**
-     * 大类名称（冗余，来自字典）
+     * 关联注册证ID（可空）
      */
-    private String categoryName;
+    private Long certId;
+
+    /**
+     * 注册证号（冗余）
+     */
+    private String certNo;
+
+    /**
+     * 排序
+     */
+    private Integer sort;
 
     /**
      * 状态（0=禁用，1=正常）

@@ -18,9 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -50,12 +48,9 @@ class ProductControllerTest {
     private ProductVO buildTestVO(Long id, String name) {
         ProductVO vo = new ProductVO();
         vo.setId(id);
-        vo.setProductCode("P-" + String.format("%04d", id));
         vo.setProductName(name);
-        vo.setCategory("关节");
-        vo.setCertId(1L);
-        vo.setCertCode("REG-001");
-        vo.setPrice(new BigDecimal("50000.00"));
+        vo.setCategory("17.1");
+        vo.setCategoryName("下肢关节");
         vo.setStatus(1);
         vo.setStatusName("正常");
         vo.setCreateTime(LocalDateTime.now());
@@ -78,7 +73,9 @@ class ProductControllerTest {
             when(productService.listProducts(eq(1), eq(10), any(), any(), any(), any()))
                     .thenReturn(page);
 
-            mockMvc.perform(get("/basic/product/page"))
+            mockMvc.perform(post("/basic/product/page")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("操作成功"))
@@ -98,7 +95,9 @@ class ProductControllerTest {
             when(productService.listAll(any(), any(), any()))
                     .thenReturn(List.of(buildTestVO(1L, "膝关节假体"), buildTestVO(2L, "髋关节假体")));
 
-            mockMvc.perform(get("/basic/product/list"))
+            mockMvc.perform(post("/basic/product/list")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").isArray())
@@ -132,7 +131,7 @@ class ProductControllerTest {
 
             mockMvc.perform(get("/basic/product/999"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.code").value(710))
+                    .andExpect(jsonPath("$.code").value(ErrorCodeEnum.PRODUCT_NOT_FOUND.getCode()))
                     .andExpect(jsonPath("$.message").value("产品型号不存在"));
         }
     }
@@ -148,7 +147,7 @@ class ProductControllerTest {
         void create_shouldSuccess() throws Exception {
             Map<String, Object> requestBody = Map.of(
                     "productName", "测试产品",
-                    "category", "关节"
+                    "category", "17.1"
             );
 
             mockMvc.perform(post("/basic/product")
@@ -163,7 +162,7 @@ class ProductControllerTest {
         @DisplayName("create: 缺少必填参数时返回400")
         void create_whenMissingRequiredParam_shouldReturnError() throws Exception {
             Map<String, Object> requestBody = Map.of(
-                    "category", "关节"
+                    "category", "17.1"
             );
 
             mockMvc.perform(post("/basic/product")
@@ -209,7 +208,7 @@ class ProductControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.code").value(710))
+                    .andExpect(jsonPath("$.code").value(ErrorCodeEnum.PRODUCT_NOT_FOUND.getCode()))
                     .andExpect(jsonPath("$.message").value("产品型号不存在"));
         }
     }
@@ -237,7 +236,7 @@ class ProductControllerTest {
 
             mockMvc.perform(delete("/basic/product/999"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.code").value(710));
+                    .andExpect(jsonPath("$.code").value(ErrorCodeEnum.PRODUCT_NOT_FOUND.getCode()));
         }
     }
 
@@ -269,11 +268,12 @@ class ProductControllerTest {
         @Test
         @DisplayName("listByCategory: 按分类查询成功")
         void listByCategory_shouldReturnList() throws Exception {
-            when(productService.listByCategory("关节"))
+            when(productService.listByCategory("17.1"))
                     .thenReturn(List.of(buildTestVO(1L, "膝关节假体")));
 
-            mockMvc.perform(get("/basic/product/list-by-category")
-                            .param("category", "关节"))
+            mockMvc.perform(post("/basic/product/list-by-category")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"category\":\"17.1\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data[0].productName").value("膝关节假体"));

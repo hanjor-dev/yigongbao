@@ -112,9 +112,9 @@ public enum ErrorCodeEnum {
     HOSPITAL_DEPT_EXISTS(647, "科室已存在"),
     HOSPITAL_DEPT_DISABLED(6460, "科室已停用"),
 
-    // ==================== 产品型号 648-649 ====================
-    PRODUCT_NOT_FOUND(648, "产品型号不存在"),
-    PRODUCT_EXISTS(649, "产品编码已存在"),
+    // ==================== 产品 648-649 ====================
+    PRODUCT_NOT_FOUND(648, "产品不存在"),
+    PRODUCT_EXISTS(649, "产品名称已存在"),
 
     // ==================== 部位相关 650-651 ====================
     BODY_PART_NOT_FOUND(650, "部位不存在"),
@@ -255,7 +255,13 @@ public enum ErrorCodeEnum {
     DESIGN_ARCHIVE_PARSE_FAILED(737, "压缩包解析失败：%s"),
     DESIGN_ARCHIVE_EMPTY(738, "压缩包中无有效文件"),
     DESIGN_ORDER_STATUS_NOT_ALLOWED(739, "当前工单状态不允许此操作"),
-    DESIGN_OPERATOR_NOT_ALLOWED(740, "非当前设计师，无权操作此工单");
+    DESIGN_OPERATOR_NOT_ALLOWED(740, "非当前设计师，无权操作此工单"),
+
+    // ==================== 产品规格相关 741-744 ====================
+    PRODUCT_HAS_SPECS(741, "产品下存在规格，无法删除"),
+    PRODUCT_SPEC_NOT_FOUND(742, "产品规格不存在"),
+    PRODUCT_SPEC_EXISTS(743, "同一产品下规格名称已存在"),
+    PRODUCT_SPEC_IN_USE(744, "规格已被打印信息引用，无法删除");
 
     /**
      * 错误码

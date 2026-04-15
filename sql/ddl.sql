@@ -721,23 +721,18 @@ CREATE UNIQUE INDEX uk_doctor_hospital_name ON doctor ((CASE WHEN is_deleted = 0
 
 
 -- ============================================================
--- 产品型号表（product）
--- 用于管理产品型号，关联注册证、材质等信息
+-- 产品表（product）
+-- 产品按大类管理，规格单独维护于 product_spec 表
 -- ============================================================
+DROP TABLE IF EXISTS product_spec;
 DROP TABLE IF EXISTS product;
 CREATE TABLE product (
     id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    product_code    VARCHAR(64)     NOT NULL COMMENT '产品型号编码',
-    product_name    VARCHAR(128)   NOT NULL COMMENT '产品名称',
-    category        VARCHAR(64)    COMMENT '产品分类（如：髋关节、膝关节、脊柱）',
-    spec            VARCHAR(128)   COMMENT '规格',
-    cert_id         BIGINT          COMMENT '关联注册证ID（关联registration_cert表）',
-    material        VARCHAR(128)   COMMENT '材质',
-    color_options   VARCHAR(512)   COMMENT '可选颜色（JSON数组）',
-    price           DECIMAL(10,2) COMMENT '标准价格',
-    image_url       VARCHAR(512)   COMMENT '产品图片URL',
-    status          TINYINT        DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
-    remark          VARCHAR(512)  COMMENT '备注',
+    product_name    VARCHAR(128)    NOT NULL COMMENT '产品名称',
+    category        VARCHAR(20)     COMMENT '产品大类 dict_code（如 17.1）',
+    category_name   VARCHAR(64)     COMMENT '大类名称（冗余）',
+    status          TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark          VARCHAR(512)    COMMENT '备注',
 
     -- 通用字段
     create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -748,10 +743,38 @@ CREATE TABLE product (
 
     PRIMARY KEY (id),
     KEY idx_product_category (category),
-    KEY idx_product_cert (cert_id),
     KEY idx_product_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='产品型号表';
-CREATE UNIQUE INDEX uk_product_code ON product ((CASE WHEN is_deleted = 0 THEN product_code ELSE NULL END));
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='产品表';
+CREATE UNIQUE INDEX uk_product_name ON product ((CASE WHEN is_deleted = 0 THEN product_name ELSE NULL END));
+
+
+-- ============================================================
+-- 产品规格表（product_spec）
+-- 一个产品大类下可关联多条规格，每条规格独立关联注册证
+-- ============================================================
+CREATE TABLE product_spec (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    product_id      BIGINT          NOT NULL COMMENT '关联产品ID',
+    spec_name       VARCHAR(128)    NOT NULL COMMENT '规格名称',
+    cert_id         BIGINT          DEFAULT NULL COMMENT '关联注册证ID（可空）',
+    cert_no         VARCHAR(64)     DEFAULT NULL COMMENT '注册证号（冗余）',
+    sort            INT             DEFAULT 0 COMMENT '排序',
+    status          TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark          VARCHAR(512)    COMMENT '备注',
+
+    -- 通用字段
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by       BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    KEY idx_product_spec_product_id (product_id),
+    KEY idx_product_spec_cert_id (cert_id),
+    KEY idx_product_spec_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='产品规格表';
+CREATE UNIQUE INDEX uk_product_spec_name ON product_spec ((CASE WHEN is_deleted = 0 THEN CONCAT_WS('|', product_id, spec_name) ELSE NULL END));
 
 
 -- ============================================================
@@ -1289,9 +1312,9 @@ CREATE TABLE design_product (
     spec_id         BIGINT          NOT NULL COMMENT '型号规格ID',
     spec_name       VARCHAR(128)    DEFAULT NULL COMMENT '型号规格名称（冗余）',
     cert_no         VARCHAR(64)     DEFAULT NULL COMMENT '注册证号（冗余）',
-    material_id     BIGINT          DEFAULT NULL COMMENT '材质ID（字典）',
+    material_id     VARCHAR(20)     DEFAULT NULL COMMENT '材质 dict_code（如 15.1）',
     material_name   VARCHAR(64)     DEFAULT NULL COMMENT '材质名称（冗余）',
-    color_id        BIGINT          DEFAULT NULL COMMENT '颜色ID（字典）',
+    color_id        VARCHAR(20)     DEFAULT NULL COMMENT '颜色 dict_code（如 16.1.1）',
     color_name      VARCHAR(64)     DEFAULT NULL COMMENT '颜色名称（冗余）',
     quantity        INT             NOT NULL DEFAULT 1 COMMENT '数量',
     pack_quantity   INT             DEFAULT NULL COMMENT '包装数量',

@@ -6,7 +6,7 @@ import lombok.Data;
 import java.io.Serializable;
 
 /**
- * 创建产品型号 DTO
+ * 创建产品 DTO
  *
  * @author hanjor
  * @date 2026-03-24
@@ -23,39 +23,19 @@ public class CreateProductDTO implements Serializable {
     private String productName;
 
     /**
-     * 产品分类
+     * 产品大类 dict_code（如 17.1）
      */
     private String category;
 
     /**
-     * 规格
+     * 大类名称（冗余）
      */
-    private String spec;
+    private String categoryName;
 
     /**
-     * 关联注册证ID
+     * 状态（0=禁用，1=正常）
      */
-    private Long certId;
-
-    /**
-     * 材质
-     */
-    private String material;
-
-    /**
-     * 可选颜色（JSON数组）
-     */
-    private String colorOptions;
-
-    /**
-     * 标准价格
-     */
-    private java.math.BigDecimal price;
-
-    /**
-     * 产品图片URL
-     */
-    private String imageUrl;
+    private Integer status;
 
     /**
      * 备注

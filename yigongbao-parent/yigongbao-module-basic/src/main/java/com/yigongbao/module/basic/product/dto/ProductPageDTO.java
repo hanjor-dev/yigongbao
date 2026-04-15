@@ -31,14 +31,9 @@ public class ProductPageDTO implements Serializable {
     private String productName;
 
     /**
-     * 产品分类
+     * 产品大类 dict_code
      */
     private String category;
-
-    /**
-     * 注册证ID
-     */
-    private Long certId;
 
     /**
      * 状态（0=禁用，1=正常）

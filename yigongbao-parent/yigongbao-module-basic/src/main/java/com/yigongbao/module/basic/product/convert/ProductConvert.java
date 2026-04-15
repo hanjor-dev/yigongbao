@@ -1,13 +1,12 @@
 package com.yigongbao.module.basic.product.convert;
 
 import com.yigongbao.module.basic.product.dto.CreateProductDTO;
-import com.yigongbao.module.basic.product.dto.UpdateProductDTO;
 import com.yigongbao.module.basic.product.entity.ProductEntity;
 import com.yigongbao.module.basic.product.vo.ProductVO;
 import org.springframework.beans.BeanUtils;
 
 /**
- * 产品型号转换器
+ * 产品转换器
  *
  * @author hanjor
  * @date 2026-03-24

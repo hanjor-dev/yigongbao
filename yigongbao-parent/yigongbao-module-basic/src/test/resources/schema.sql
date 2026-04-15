@@ -216,40 +216,55 @@ INSERT INTO hospital_dept (id, hospital_dept_code, hospital_dept_name, sort, sta
 (3, 'HDEPT-003', '口腔科', 3, 1, '口腔科', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ------------------------------------------------------------
--- 产品型号表（对应 ProductEntity）
+-- 产品表（对应 ProductEntity）
 -- ------------------------------------------------------------
+DROP TABLE IF EXISTS product_spec;
 DROP TABLE IF EXISTS product;
 CREATE TABLE product (
-    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    product_code        VARCHAR(64)     NOT NULL COMMENT '产品型号编码',
-    product_name        VARCHAR(128)   NOT NULL COMMENT '产品名称',
-    category            VARCHAR(50)     COMMENT '产品分类（如：髋关节、膝关节、脊柱）',
-    spec                VARCHAR(128)    COMMENT '规格',
-    cert_id             BIGINT          NOT NULL COMMENT '关联注册证ID',
-    material            VARCHAR(128)    COMMENT '材质',
-    color_options       VARCHAR(512)    COMMENT '可选颜色（JSON数组）',
-    price               DECIMAL(12,2)   DEFAULT 0 COMMENT '标准价格',
-    image_url           VARCHAR(512)    COMMENT '产品图片URL',
-    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
-    remark              VARCHAR(512)    COMMENT '备注说明',
-
-    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
-    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
-    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
-
+    id            BIGINT         NOT NULL AUTO_INCREMENT,
+    product_name  VARCHAR(128)   NOT NULL,
+    category      VARCHAR(20),
+    category_name VARCHAR(64),
+    status        TINYINT        DEFAULT 1,
+    remark        VARCHAR(512),
+    create_time   DATETIME       DEFAULT CURRENT_TIMESTAMP,
+    update_time   DATETIME       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    create_by     BIGINT         DEFAULT NULL,
+    update_by     BIGINT         DEFAULT NULL,
+    is_deleted    TINYINT        DEFAULT 0,
     PRIMARY KEY (id),
-    KEY idx_product_cert (cert_id),
     KEY idx_product_category (category),
     KEY idx_product_status (status)
 );
 
 -- 插入产品测试数据
-INSERT INTO product (id, product_code, product_name, category, spec, cert_id, material, color_options, price, status, remark, create_time, update_time, is_deleted) VALUES
-(1, 'PROD-001', '膝关节假体', '膝关节类', '标准型', NULL, '钴铬钼合金', '["银色", "钛金色"]', 25000.00, 1, '膝关节假体标准型', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, 'PROD-002', '髋关节假体', '髋关节类', '标准型', NULL, '钛合金', '["银色"]', 28000.00, 1, '髋关节假体标准型', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(3, 'PROD-003', '椎间融合器', '脊柱类', 'PEEK材质', NULL, 'PEEK', '["本色"]', 15000.00, 1, '椎间融合器PEEK材质', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO product (id, product_name, category, category_name, status, remark, create_time, update_time, is_deleted) VALUES
+(1, '膝关节假体', '17.1', '下肢关节', 1, '膝关节假体', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, '髋关节假体', '17.1', '下肢关节', 1, '髋关节假体', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, '椎间融合器', '17.2', '脊柱', 1, '椎间融合器', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+
+-- ------------------------------------------------------------
+-- 产品规格表（对应 ProductSpecEntity）
+-- ------------------------------------------------------------
+CREATE TABLE product_spec (
+    id          BIGINT        NOT NULL AUTO_INCREMENT,
+    product_id  BIGINT        NOT NULL,
+    spec_name   VARCHAR(128)  NOT NULL,
+    cert_id     BIGINT        DEFAULT NULL,
+    cert_no     VARCHAR(64)   DEFAULT NULL,
+    sort        INT           DEFAULT 0,
+    status      TINYINT       DEFAULT 1,
+    remark      VARCHAR(512),
+    create_time DATETIME      DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    create_by   BIGINT        DEFAULT NULL,
+    update_by   BIGINT        DEFAULT NULL,
+    is_deleted  TINYINT       DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_product_spec_product_id (product_id),
+    KEY idx_product_spec_cert_id (cert_id),
+    KEY idx_product_spec_status (status)
+);
 
 -- ------------------------------------------------------------
 -- 重建部位表（对应 BodyPartEntity）

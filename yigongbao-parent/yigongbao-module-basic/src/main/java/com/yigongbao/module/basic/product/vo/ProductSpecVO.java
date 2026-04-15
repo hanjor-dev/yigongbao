@@ -4,16 +4,15 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
- * 产品 VO
+ * 产品规格 VO
  *
  * @author hanjor
- * @date 2026-03-24
+ * @date 2026-04-15
  */
 @Data
-public class ProductVO implements Serializable {
+public class ProductSpecVO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -23,19 +22,29 @@ public class ProductVO implements Serializable {
     private Long id;
 
     /**
-     * 产品名称
+     * 关联产品ID
      */
-    private String productName;
+    private Long productId;
 
     /**
-     * 产品大类 dict_code（如 17.1）
+     * 规格名称
      */
-    private String category;
+    private String specName;
 
     /**
-     * 大类名称（冗余）
+     * 关联注册证ID
      */
-    private String categoryName;
+    private Long certId;
+
+    /**
+     * 注册证号（冗余）
+     */
+    private String certNo;
+
+    /**
+     * 排序
+     */
+    private Integer sort;
 
     /**
      * 状态（0=禁用，1=正常）
@@ -56,14 +65,4 @@ public class ProductVO implements Serializable {
      * 创建时间
      */
     private LocalDateTime createTime;
-
-    /**
-     * 创建人ID
-     */
-    private Long createBy;
-
-    /**
-     * 规格列表（仅在 getById 时填充）
-     */
-    private List<ProductSpecVO> specs;
 }

@@ -5,30 +5,35 @@ import lombok.Data;
 import java.io.Serializable;
 
 /**
- * 更新产品 DTO
+ * 更新产品规格 DTO
  *
  * @author hanjor
- * @date 2026-03-24
+ * @date 2026-04-15
  */
 @Data
-public class UpdateProductDTO implements Serializable {
+public class UpdateProductSpecDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /**
-     * 产品名称
+     * 规格名称
      */
-    private String productName;
+    private String specName;
 
     /**
-     * 产品大类 dict_code（如 17.1）
+     * 关联注册证ID（可空）
      */
-    private String category;
+    private Long certId;
 
     /**
-     * 大类名称（冗余）
+     * 注册证号（冗余）
      */
-    private String categoryName;
+    private String certNo;
+
+    /**
+     * 排序
+     */
+    private Integer sort;
 
     /**
      * 状态（0=禁用，1=正常）
