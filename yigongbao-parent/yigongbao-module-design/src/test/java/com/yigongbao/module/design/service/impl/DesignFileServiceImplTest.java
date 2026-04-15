@@ -9,7 +9,6 @@ import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
-import com.yigongbao.module.design.constant.DesignConfigConstants;
 import com.yigongbao.module.design.entity.DesignModelEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.mapper.DesignModelMapper;
@@ -34,8 +33,10 @@ import org.mockito.quality.Strictness;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.ByteArrayOutputStream;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -138,39 +139,66 @@ class DesignFileServiceImplTest {
     }
 
     @Nested
-    @DisplayName("uploadModel 测试")
-    class UploadModelTest {
+    @DisplayName("linkModels 测试")
+    class LinkModelsTest {
 
         @Test
-        @DisplayName("成功上传可视化模型")
-        void shouldUploadModelSuccessfully() {
+        @DisplayName("成功批量关联可视化模型")
+        void shouldLinkModelsSuccessfully() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
                 when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
 
-                FileVO fileVO = new FileVO();
-                fileVO.setId("file-456");
-                fileVO.setFileUrl("http://example.com/model.stl");
-                fileVO.setFileSize(2048L);
-                when(fileService.uploadFile(any(), eq("10.7"))).thenReturn(fileVO);
+                List<String> fileIds = List.of("file-1", "file-2");
+
+                FileVO fileVO1 = new FileVO();
+                fileVO1.setId("file-1");
+                fileVO1.setFileName("model1.stl");
+                fileVO1.setFileExt("stl");
+
+                FileVO fileVO2 = new FileVO();
+                fileVO2.setId("file-2");
+                fileVO2.setFileName("model2.stl");
+                fileVO2.setFileExt("stl");
+
+                when(fileService.listByIds(fileIds)).thenReturn(List.of(fileVO1, fileVO2));
+                when(fileService.linkFile(anyString(), eq("10.6"), eq(orderId))).thenAnswer(inv -> {
+                    String fid = inv.getArgument(0);
+                    return "file-1".equals(fid) ? fileVO1 : fileVO2;
+                });
 
                 when(modelMapper.insert(any(DesignModelEntity.class))).thenAnswer(invocation -> {
                     DesignModelEntity entity = invocation.getArgument(0);
-                    entity.setId(1L);
+                    entity.setId(System.currentTimeMillis());
+                    entity.setCreateTime(LocalDateTime.now());
                     return 1;
                 });
 
-                MockMultipartFile file = new MockMultipartFile(
-                        "file", "model.stl", "application/octet-stream", "content".getBytes());
+                List<DesignModelVO> results = designFileService.linkModels(orderId, fileIds);
 
-                DesignModelVO result = designFileService.uploadModel(orderId, file);
+                assertEquals(2, results.size());
+                verify(modelMapper, times(2)).insert(any(DesignModelEntity.class));
+                verify(fileService, times(2)).linkFile(anyString(), eq("10.6"), eq(orderId));
+            }
+        }
 
-                assertNotNull(result);
-                assertEquals("file-456", result.getFileId());
-                assertEquals("model.stl", result.getFileName());
-                assertEquals("stl", result.getFileExt());
+        @Test
+        @DisplayName("部分文件不存在抛出异常")
+        void shouldThrowExceptionWhenSomeFilesNotFound() {
+            try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+                stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
+                when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
 
-                verify(modelMapper).insert(any(DesignModelEntity.class));
+                List<String> fileIds = List.of("file-1", "not-exist");
+
+                FileVO fileVO1 = new FileVO();
+                fileVO1.setId("file-1");
+                when(fileService.listByIds(fileIds)).thenReturn(List.of(fileVO1)); // 只返回1个
+
+                BusinessException exception = assertThrows(BusinessException.class,
+                        () -> designFileService.linkModels(orderId, fileIds));
+
+                assertEquals(ErrorCodeEnum.ATTACHMENT_NOT_FOUND.getCode(), exception.getCode());
             }
         }
     }
@@ -216,59 +244,67 @@ class DesignFileServiceImplTest {
     }
 
     @Nested
-    @DisplayName("uploadReport 测试")
-    class UploadReportTest {
+    @DisplayName("linkReport 测试")
+    class LinkReportTest {
 
         @Test
-        @DisplayName("成功上传设计报告")
-        void shouldUploadReportSuccessfully() {
+        @DisplayName("成功关联设计报告")
+        void shouldLinkReportSuccessfully() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
                 when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
 
-                // 无已有报告
                 when(fileService.listByBiz("10.5", orderId)).thenReturn(Collections.emptyList());
 
                 FileVO fileVO = new FileVO();
                 fileVO.setId("file-789");
                 fileVO.setFileName("report.pdf");
-                when(fileService.uploadAndLink(any(), eq("10.5"), eq(orderId))).thenReturn(fileVO);
+                when(fileService.getById("file-789")).thenReturn(fileVO);
+                when(fileService.linkFile(eq("file-789"), eq("10.5"), eq(orderId))).thenReturn(fileVO);
 
-                MockMultipartFile file = new MockMultipartFile(
-                        "file", "report.pdf", "application/pdf", "content".getBytes());
-
-                FileVO result = designFileService.uploadReport(orderId, file);
+                FileVO result = designFileService.linkReport(orderId, "file-789");
 
                 assertNotNull(result);
                 assertEquals("file-789", result.getId());
-                verify(fileService).uploadAndLink(any(), eq("10.5"), eq(orderId));
+                verify(fileService).linkFile(eq("file-789"), eq("10.5"), eq(orderId));
             }
         }
 
         @Test
-        @DisplayName("上传新报告时删除旧报告")
-        void shouldDeleteOldReportWhenUploadNew() {
+        @DisplayName("关联新报告时删除旧报告")
+        void shouldDeleteOldReportWhenLinkNew() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
                 when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
 
-                // 有已有报告
                 FileVO oldReport = new FileVO();
                 oldReport.setId("old-file");
                 when(fileService.listByBiz("10.5", orderId)).thenReturn(List.of(oldReport));
 
                 FileVO newFileVO = new FileVO();
                 newFileVO.setId("new-file");
-                when(fileService.uploadAndLink(any(), eq("10.5"), eq(orderId))).thenReturn(newFileVO);
+                when(fileService.getById("new-file")).thenReturn(newFileVO);
+                when(fileService.linkFile(eq("new-file"), eq("10.5"), eq(orderId))).thenReturn(newFileVO);
 
-                MockMultipartFile file = new MockMultipartFile(
-                        "file", "report.pdf", "application/pdf", "content".getBytes());
+                designFileService.linkReport(orderId, "new-file");
 
-                designFileService.uploadReport(orderId, file);
-
-                // 验证删除旧报告
                 verify(fileService).deleteById("old-file");
-                verify(fileService).uploadAndLink(any(), eq("10.5"), eq(orderId));
+                verify(fileService).linkFile(eq("new-file"), eq("10.5"), eq(orderId));
+            }
+        }
+
+        @Test
+        @DisplayName("文件不存在抛出异常")
+        void shouldThrowExceptionWhenFileNotFound() {
+            try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+                stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
+                when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
+                when(fileService.getById("not-exist")).thenReturn(null);
+
+                BusinessException exception = assertThrows(BusinessException.class,
+                        () -> designFileService.linkReport(orderId, "not-exist"));
+
+                assertEquals(ErrorCodeEnum.ATTACHMENT_NOT_FOUND.getCode(), exception.getCode());
             }
         }
     }
