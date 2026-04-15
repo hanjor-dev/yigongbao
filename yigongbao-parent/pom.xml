@@ -36,6 +36,8 @@
         <spring-security-crypto.version>6.2.4</spring-security-crypto.version>
         <openapi.version>2.3.0</openapi.version>
         <ip2region.version>2.7.0</ip2region.version>
+        <junrar.version>7.5.5</junrar.version>
+        <commons-compress.version>1.26.1</commons-compress.version>
 
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
@@ -190,6 +192,20 @@
                 <groupId>org.lionsoul</groupId>
                 <artifactId>ip2region</artifactId>
                 <version>${ip2region.version}</version>
+            </dependency>
+
+            <!-- junrar：RAR 压缩包解析 -->
+            <dependency>
+                <groupId>com.github.junrar</groupId>
+                <artifactId>junrar</artifactId>
+                <version>${junrar.version}</version>
+            </dependency>
+
+            <!-- commons-compress：7Z/TAR 等压缩包解析 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-compress</artifactId>
+                <version>${commons-compress.version}</version>
             </dependency>
         </dependencies>
 

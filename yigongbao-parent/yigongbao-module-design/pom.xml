@@ -18,6 +18,18 @@
             <artifactId>yigongbao-module-order</artifactId>
         </dependency>
 
+        <!-- RAR 压缩包解析 -->
+        <dependency>
+            <groupId>com.github.junrar</groupId>
+            <artifactId>junrar</artifactId>
+        </dependency>
+
+        <!-- 7Z/TAR 等压缩包解析 -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+        </dependency>
+
         <!-- 测试依赖 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
