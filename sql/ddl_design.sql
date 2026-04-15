@@ -184,18 +184,13 @@ CREATE TABLE design_drawing (
 
 -- ============================================================
 -- 可视化模型文件表（design_model）
--- 存储设计师上传的可视化模型文件
+-- 精简版，文件详情通过 file_detail 查询
 -- ============================================================
 DROP TABLE IF EXISTS design_model;
 CREATE TABLE design_model (
     id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     order_id        BIGINT          NOT NULL COMMENT '订单ID',
-    file_id         VARCHAR(32)     NOT NULL COMMENT '文件ID（关联 file_detail）',
-    file_name       VARCHAR(256)    DEFAULT NULL COMMENT '原始文件名',
-    file_url        VARCHAR(512)    DEFAULT NULL COMMENT '文件访问地址',
-    file_size       BIGINT          DEFAULT NULL COMMENT '文件大小（字节）',
-    file_ext        VARCHAR(32)     DEFAULT NULL COMMENT '文件扩展名（3dpdf/ply/stl）',
-    upload_time     DATETIME        DEFAULT NULL COMMENT '上传时间',
+    file_id         VARCHAR(32)     NOT NULL COMMENT '文件ID（关联 file_detail.id）',
 
     -- 公共字段
     create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

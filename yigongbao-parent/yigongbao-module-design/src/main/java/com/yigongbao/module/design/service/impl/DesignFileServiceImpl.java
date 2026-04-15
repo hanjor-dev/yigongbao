@@ -2,19 +2,18 @@ package com.yigongbao.module.design.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
-import com.yigongbao.module.design.constant.DesignConfigConstants;
 import com.yigongbao.module.design.dto.ArchiveFileInfo;
 import com.yigongbao.module.design.entity.DesignModelEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
@@ -63,19 +62,19 @@ public class DesignFileServiceImpl implements DesignFileService {
     private final ConfigService configService;
 
     /**
-     * 设计报告业务类型（对应字典 10.5）
+     * 设计报告业务类型（对应 FileBizTypeEnum.DESIGN_REPORT = "10.5"）
      */
     private static final String BIZ_TYPE_DESIGN_REPORT = "10.5";
 
     /**
-     * 数据包业务类型（对应字典 10.6）
+     * 打印文件包业务类型（对应 FileBizTypeEnum.PRINT_PACKAGE = "10.4"）
      */
-    private static final String BIZ_TYPE_DESIGN_PACKAGE = "10.6";
+    private static final String BIZ_TYPE_DESIGN_PACKAGE = "10.4";
 
     /**
-     * 可视化模型业务类型（对应字典 10.7）
+     * 可视化模型业务类型（对应 FileBizTypeEnum.VISUAL_MODEL = "10.6"）
      */
-    private static final String BIZ_TYPE_DESIGN_MODEL = "10.7";
+    private static final String BIZ_TYPE_DESIGN_MODEL = "10.6";
 
     // ==================== 数据包 ====================
 
@@ -235,29 +234,42 @@ public class DesignFileServiceImpl implements DesignFileService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public DesignModelVO uploadModel(Long orderId, MultipartFile file) {
-        log.info("上传可视化模型, orderId={}, fileName={}", orderId, file.getOriginalFilename());
+    public List<DesignModelVO> linkModels(Long orderId, List<String> fileIds) {
+        log.info("批量关联可视化模型, orderId={}, fileIds={}", orderId, fileIds);
 
         // 1. 校验工单状态和操作权限
         checkOrderAndPermission(orderId);
 
-        // 2. 上传文件
-        FileVO fileVO = fileService.uploadFile(file, BIZ_TYPE_DESIGN_MODEL);
-        log.info("可视化模型文件上传成功, fileId={}", fileVO.getId());
+        // 2. 批量校验文件是否存在
+        List<FileVO> fileVOs = fileService.listByIds(fileIds);
+        if (fileVOs.size() != fileIds.size()) {
+            // 找出不存在的 fileId
+            Set<String> foundIds = fileVOs.stream().map(FileVO::getId).collect(Collectors.toSet());
+            List<String> notFoundIds = fileIds.stream().filter(id -> !foundIds.contains(id)).toList();
+            log.warn("部分文件不存在, notFoundIds={}", notFoundIds);
+            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
+        }
 
-        // 3. 保存模型记录
-        DesignModelEntity modelEntity = new DesignModelEntity();
-        modelEntity.setOrderId(orderId);
-        modelEntity.setFileId(fileVO.getId());
-        modelEntity.setFileName(file.getOriginalFilename());
-        modelEntity.setFileUrl(fileVO.getFileUrl());
-        modelEntity.setFileSize(fileVO.getFileSize());
-        modelEntity.setFileExt(FileUtil.extName(file.getOriginalFilename()));
-        modelEntity.setUploadTime(LocalDateTime.now());
-        modelMapper.insert(modelEntity);
-        log.info("可视化模型记录保存成功, modelId={}", modelEntity.getId());
+        // 3. 批量关联文件到业务，并保存模型记录
+        Map<String, FileVO> fileMap = fileVOs.stream()
+                .collect(Collectors.toMap(FileVO::getId, f -> f));
 
-        return buildModelVO(modelEntity);
+        List<DesignModelVO> results = new ArrayList<>();
+        for (String fileId : fileIds) {
+            // 关联文件到业务
+            fileService.linkFile(fileId, BIZ_TYPE_DESIGN_MODEL, orderId);
+
+            // 保存模型记录
+            DesignModelEntity modelEntity = new DesignModelEntity();
+            modelEntity.setOrderId(orderId);
+            modelEntity.setFileId(fileId);
+            modelMapper.insert(modelEntity);
+
+            results.add(buildModelVO(modelEntity, fileMap.get(fileId)));
+        }
+
+        log.info("批量关联可视化模型成功, orderId={}, count={}", orderId, results.size());
+        return results;
     }
 
     @Override
@@ -285,13 +297,27 @@ public class DesignFileServiceImpl implements DesignFileService {
 
     @Override
     public List<DesignModelVO> listModels(Long orderId) {
+        // 1. 查询模型记录
         List<DesignModelEntity> models = modelMapper.selectList(
                 new LambdaQueryWrapper<DesignModelEntity>()
                         .eq(DesignModelEntity::getOrderId, orderId)
-                        .orderByDesc(DesignModelEntity::getUploadTime));
+                        .orderByDesc(DesignModelEntity::getCreateTime));
 
+        if (CollUtil.isEmpty(models)) {
+            return Collections.emptyList();
+        }
+
+        // 2. 批量查询文件信息
+        List<String> fileIds = models.stream()
+                .map(DesignModelEntity::getFileId)
+                .collect(Collectors.toList());
+        List<FileVO> fileVOs = fileService.listByIds(fileIds);
+        Map<String, FileVO> fileMap = fileVOs.stream()
+                .collect(Collectors.toMap(FileVO::getId, f -> f, (a, b) -> a));
+
+        // 3. 构建 VO
         return models.stream()
-                .map(this::buildModelVO)
+                .map(entity -> buildModelVO(entity, fileMap.get(entity.getFileId())))
                 .collect(Collectors.toList());
     }
 
@@ -299,24 +325,27 @@ public class DesignFileServiceImpl implements DesignFileService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public FileVO uploadReport(Long orderId, MultipartFile file) {
-        log.info("上传设计报告, orderId={}, fileName={}", orderId, file.getOriginalFilename());
+    public FileVO linkReport(Long orderId, String fileId) {
+        log.info("关联设计报告, orderId={}, fileId={}", orderId, fileId);
 
         // 1. 校验工单状态和操作权限
         checkOrderAndPermission(orderId);
 
-        // 2. 删除旧报告（每工单仅一份）
+        // 2. 校验文件是否存在
+        FileVO fileVO = fileService.getById(fileId);
+        if (fileVO == null) {
+            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
+        }
+
+        // 3. 删除旧报告（每工单仅一份）
         List<FileVO> existingReports = fileService.listByBiz(BIZ_TYPE_DESIGN_REPORT, orderId);
         for (FileVO existing : existingReports) {
             fileService.deleteById(existing.getId());
             log.info("删除旧设计报告, fileId={}", existing.getId());
         }
 
-        // 3. 上传新报告
-        FileVO fileVO = fileService.uploadAndLink(file, BIZ_TYPE_DESIGN_REPORT, orderId);
-        log.info("设计报告上传成功, fileId={}", fileVO.getId());
-
-        return fileVO;
+        // 4. 关联新文件到业务
+        return fileService.linkFile(fileId, BIZ_TYPE_DESIGN_REPORT, orderId);
     }
 
     @Override
@@ -386,9 +415,9 @@ public class DesignFileServiceImpl implements DesignFileService {
      * 获取允许的文件扩展名集合
      */
     private Set<String> getAllowedExtensions() {
-        String config = configService.getConfigValue(DesignConfigConstants.PACKAGE_ALLOWED_EXTENSIONS);
+        String config = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_PACKAGE_ALLOWED_EXTENSIONS.getKey());
         if (StrUtil.isBlank(config)) {
-            config = DesignConfigConstants.PACKAGE_ALLOWED_EXTENSIONS_DEFAULT;
+            config = ".stl,.obj,.ply,.3mf,.gcode,.ctb,.cbddlp";
         }
         return Arrays.stream(config.split(","))
                 .map(String::trim)
@@ -477,16 +506,20 @@ public class DesignFileServiceImpl implements DesignFileService {
     /**
      * 构建模型 VO
      */
-    private DesignModelVO buildModelVO(DesignModelEntity entity) {
+    private DesignModelVO buildModelVO(DesignModelEntity entity, FileVO fileVO) {
         DesignModelVO vo = new DesignModelVO();
         vo.setId(entity.getId());
         vo.setOrderId(entity.getOrderId());
         vo.setFileId(entity.getFileId());
-        vo.setFileName(entity.getFileName());
-        vo.setFileUrl(entity.getFileUrl());
-        vo.setFileSize(entity.getFileSize());
-        vo.setFileExt(entity.getFileExt());
-        vo.setUploadTime(entity.getUploadTime());
+        vo.setCreateTime(entity.getCreateTime());
+
+        // 从 FileVO 填充文件信息
+        if (fileVO != null) {
+            vo.setFileName(fileVO.getFileName());
+            vo.setFileUrl(fileVO.getFileUrl());
+            vo.setFileSize(fileVO.getFileSize());
+            vo.setFileExt(fileVO.getFileExt());
+        }
         return vo;
     }
 }

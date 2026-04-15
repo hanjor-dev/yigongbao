@@ -5,10 +5,9 @@ import com.yigongbao.common.entity.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
-
 /**
  * 可视化模型文件 Entity
+ * 文件详情通过 fileId 关联 file_detail 表查询
  *
  * @author hanjor
  * @date 2026-04-15
@@ -26,32 +25,7 @@ public class DesignModelEntity extends BaseEntity {
     private Long orderId;
 
     /**
-     * 文件ID（关联 file_detail）
+     * 文件ID（关联 file_detail.id）
      */
     private String fileId;
-
-    /**
-     * 原始文件名
-     */
-    private String fileName;
-
-    /**
-     * 文件访问地址
-     */
-    private String fileUrl;
-
-    /**
-     * 文件大小（字节）
-     */
-    private Long fileSize;
-
-    /**
-     * 文件扩展名（3dpdf/ply/stl）
-     */
-    private String fileExt;
-
-    /**
-     * 上传时间
-     */
-    private LocalDateTime uploadTime;
 }

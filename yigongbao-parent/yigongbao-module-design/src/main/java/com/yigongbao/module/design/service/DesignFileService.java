@@ -9,7 +9,8 @@ import java.util.List;
 
 /**
  * 设计文件服务接口
- * 负责数据包、可视化模型、设计报告的上传和删除
+ * 数据包：直接上传（需解析压缩包）
+ * 模型/报告：关联已上传的文件（通过 FileController 上传）
  *
  * @author hanjor
  * @date 2026-04-15
@@ -46,13 +47,14 @@ public interface DesignFileService {
     // ==================== 可视化模型 ====================
 
     /**
-     * 上传可视化模型文件
+     * 批量关联可视化模型文件
+     * 文件需先通过 FileController 上传
      *
      * @param orderId 订单ID
-     * @param file    模型文件
-     * @return 模型信息
+     * @param fileIds 文件ID列表
+     * @return 模型信息列表
      */
-    DesignModelVO uploadModel(Long orderId, MultipartFile file);
+    List<DesignModelVO> linkModels(Long orderId, List<String> fileIds);
 
     /**
      * 删除可视化模型
@@ -73,13 +75,14 @@ public interface DesignFileService {
     // ==================== 设计报告 ====================
 
     /**
-     * 上传设计报告
+     * 关联设计报告
+     * 文件需先通过 FileController 上传
      *
      * @param orderId 订单ID
-     * @param file    报告文件
+     * @param fileId  文件ID
      * @return 文件信息
      */
-    FileVO uploadReport(Long orderId, MultipartFile file);
+    FileVO linkReport(Long orderId, String fileId);
 
     /**
      * 删除设计报告

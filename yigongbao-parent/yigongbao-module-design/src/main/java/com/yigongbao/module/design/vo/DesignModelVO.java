@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 
 /**
  * 可视化模型 VO
+ * 文件详情通过 fileId 从 FileService 获取后填充
  *
  * @author hanjor
  * @date 2026-04-15
@@ -19,7 +20,7 @@ public class DesignModelVO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 模型ID
+     * 模型ID（design_model.id）
      */
     private Long id;
 
@@ -29,32 +30,32 @@ public class DesignModelVO implements Serializable {
     private Long orderId;
 
     /**
-     * 文件ID
+     * 文件ID（file_detail.id）
      */
     private String fileId;
 
     /**
-     * 原始文件名
+     * 原始文件名（来自 FileVO）
      */
     private String fileName;
 
     /**
-     * 文件访问地址
+     * 文件访问地址（来自 FileVO）
      */
     private String fileUrl;
 
     /**
-     * 文件大小（字节）
+     * 文件大小（字节，来自 FileVO）
      */
     private Long fileSize;
 
     /**
-     * 文件扩展名
+     * 文件扩展名（来自 FileVO）
      */
     private String fileExt;
 
     /**
-     * 上传时间
+     * 创建时间（来自 design_model.create_time）
      */
-    private LocalDateTime uploadTime;
+    private LocalDateTime createTime;
 }
