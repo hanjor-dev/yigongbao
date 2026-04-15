@@ -72,6 +72,39 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    public FileVO linkFile(String fileId, String bizType, Long bizId) {
+        log.info("关联文件到业务，fileId={}, bizType={}, bizId={}", fileId, bizType, bizId);
+        try {
+            // 1. 校验文件是否存在
+            FileDetail detail = fileRecorderService.getDetailById(fileId);
+            if (detail == null) {
+                log.warn("文件不存在，fileId={}", fileId);
+                throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
+            }
+
+            // 2. 校验 bizType 是否为合法的字典编码
+            FileBizTypeEnum fileBizTypeEnum = FileBizTypeEnum.getByDictCode(bizType);
+            if (fileBizTypeEnum == null) {
+                log.warn("业务类型不合法，bizType={}", bizType);
+                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "bizType");
+            }
+
+            // 3. 更新文件的业务关联信息
+            detail.setObjectType(bizType);
+            detail.setObjectId(bizId != null ? bizId.toString() : null);
+            fileRecorderService.updateById(detail);
+
+            log.info("文件关联成功，fileId={}, bizType={}, bizId={}", fileId, bizType, bizId);
+            return fileRecorderService.toFileVO(detail);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("关联文件异常，fileId={}", fileId, e);
+            throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
+        }
+    }
+
+    @Override
     public FileVO getById(String id) {
         log.info("根据ID查询文件信息，id={}", id);
         try {

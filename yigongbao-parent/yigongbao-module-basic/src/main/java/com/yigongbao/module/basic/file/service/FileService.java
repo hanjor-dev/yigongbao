@@ -36,6 +36,17 @@ public interface FileService {
     FileVO uploadAndLink(MultipartFile file, String bizType, Long bizId);
 
     /**
+     * 将已上传的文件关联到业务
+     * 用于前端先上传文件，后端再关联业务的场景
+     *
+     * @param fileId  文件ID（必须是已上传的文件）
+     * @param bizType 业务类型（字典 dict_code）
+     * @param bizId   业务ID
+     * @return 更新后的文件信息
+     */
+    FileVO linkFile(String fileId, String bizType, Long bizId);
+
+    /**
      * 批量上传
      *
      * @param files 文件列表
