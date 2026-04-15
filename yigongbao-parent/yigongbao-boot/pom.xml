@@ -33,6 +33,10 @@
             <groupId>com.yigongbao</groupId>
             <artifactId>yigongbao-module-order</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-design</artifactId>
+        </dependency>
 
         <!-- spring boot -->
         <dependency>

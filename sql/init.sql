@@ -555,3 +555,44 @@ INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, so
 (82, 81, '14.1', '基础信息', 'INFO',  2, 1, 1),
 (83, 81, '14.2', '影像文件', 'IMAGE', 2, 2, 1),
 (84, 81, '14.3', '重建项目', 'ITEM',  2, 3, 1);
+
+
+-- ============================================================
+-- 设计模式系统配置初始化
+-- ============================================================
+INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status) VALUES
+('DESIGN_MODE', '设计模式', '1', 'number', 'business', '设计模式：1=线下修改（需上传修订版），2=在线编辑', 1, 1, 100, 1);
+
+
+-- ============================================================
+-- 打印信息相关字典数据初始化
+-- ============================================================
+
+-- 材质字典（dict_code=15）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+-- 父节点
+(85, 0, '15', '打印材质', NULL, 1, 15, 1),
+-- 子节点
+(86, 85, '15.1', '树脂', 'resin', 2, 1, 1),
+(87, 85, '15.2', '尼龙', 'nylon', 2, 2, 1),
+(88, 85, '15.3', '金属', 'metal', 2, 3, 1),
+(89, 85, '15.4', 'PEEK', 'peek', 2, 4, 1);
+
+-- 打印颜色字典（dict_code=16）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+-- 父节点
+(90, 0, '16', '打印颜色', NULL, 1, 16, 1),
+-- 子节点（categoryCode 用于按产品大类过滤）
+(91, 90, '16.1', '白色', 'white', 2, 1, 1),
+(92, 90, '16.2', '透明', 'transparent', 2, 2, 1),
+(93, 90, '16.3', '肤色', 'skin', 2, 3, 1),
+(94, 90, '16.4', '蓝色', 'blue', 2, 4, 1);
+
+-- 产品大类字典（dict_code=17）- 用于颜色过滤
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status) VALUES
+-- 父节点
+(95, 0, '17', '产品大类', NULL, 1, 17, 1),
+-- 子节点
+(96, 95, '17.1', '模型类', 'MODEL', 2, 1, 1),
+(97, 95, '17.2', '导板类', 'GUIDE', 2, 2, 1),
+(98, 95, '17.3', '假体类', 'IMPLANT', 2, 3, 1);
