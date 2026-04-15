@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
@@ -18,17 +19,16 @@ import com.yigongbao.module.design.dto.ArchiveFileInfo;
 import com.yigongbao.module.design.entity.DesignModelEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignPackageFileEntity;
-import com.yigongbao.module.design.entity.DesignProductEntity;
-import com.yigongbao.module.design.mapper.DesignModelMapper;
-import com.yigongbao.module.design.mapper.DesignPackageFileMapper;
-import com.yigongbao.module.design.mapper.DesignPackageMapper;
-import com.yigongbao.module.design.mapper.DesignProductMapper;
 import com.yigongbao.module.design.service.DesignFileService;
+import com.yigongbao.module.design.service.DesignModelService;
+import com.yigongbao.module.design.service.DesignPackageFileService;
+import com.yigongbao.module.design.service.DesignPackageService;
+import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.util.ArchiveParserUtil;
 import com.yigongbao.module.design.vo.DesignModelVO;
 import com.yigongbao.module.design.vo.DesignPackageFileVO;
 import com.yigongbao.module.design.vo.DesignPackageVO;
-import com.yigongbao.module.order.mapper.OrderMainMapper;
+import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.system.config.service.ConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,29 +52,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DesignFileServiceImpl implements DesignFileService {
 
-    private final OrderMainMapper orderMainMapper;
-    private final DesignPackageMapper packageMapper;
-    private final DesignPackageFileMapper packageFileMapper;
-    private final DesignModelMapper modelMapper;
-    private final DesignProductMapper productMapper;
+    private final OrderMainService orderMainService;
+    private final DesignPackageService packageService;
+    private final DesignPackageFileService packageFileService;
+    private final DesignModelService modelService;
+    private final DesignProductService productService;
     private final FileService fileService;
     private final CodeGeneratorService codeGeneratorService;
     private final ConfigService configService;
-
-    /**
-     * 设计报告业务类型（对应 FileBizTypeEnum.DESIGN_REPORT = "10.5"）
-     */
-    private static final String BIZ_TYPE_DESIGN_REPORT = "10.5";
-
-    /**
-     * 打印文件包业务类型（对应 FileBizTypeEnum.PRINT_PACKAGE = "10.4"）
-     */
-    private static final String BIZ_TYPE_DESIGN_PACKAGE = "10.4";
-
-    /**
-     * 可视化模型业务类型（对应 FileBizTypeEnum.VISUAL_MODEL = "10.6"）
-     */
-    private static final String BIZ_TYPE_DESIGN_MODEL = "10.6";
 
     // ==================== 数据包 ====================
 
@@ -93,7 +78,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         }
 
         // 3. 上传压缩包文件
-        FileVO fileVO = fileService.uploadFile(file, BIZ_TYPE_DESIGN_PACKAGE);
+        FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.PRINT_PACKAGE.getDictCode());
         log.info("压缩包上传成功, fileId={}", fileVO.getId());
 
         // 4. 解析压缩包内文件列表
@@ -134,7 +119,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         packageEntity.setFileSize(fileVO.getFileSize());
         packageEntity.setFileCount(archiveFiles.size());
         packageEntity.setUploadTime(LocalDateTime.now());
-        packageMapper.insert(packageEntity);
+        packageService.save(packageEntity);
         log.info("数据包记录保存成功, packageId={}, packageCode={}", packageEntity.getId(), packageCode);
 
         // 9. 保存包内文件记录
@@ -151,9 +136,7 @@ public class DesignFileServiceImpl implements DesignFileService {
             fileEntities.add(fileEntity);
         }
         // 批量插入
-        for (DesignPackageFileEntity fileEntity : fileEntities) {
-            packageFileMapper.insert(fileEntity);
-        }
+        packageFileService.saveBatch(fileEntities);
         log.info("包内文件记录保存成功, count={}", fileEntities.size());
 
         // 10. 构建返回结果
@@ -169,26 +152,24 @@ public class DesignFileServiceImpl implements DesignFileService {
         checkOrderAndPermission(orderId);
 
         // 2. 查询数据包
-        DesignPackageEntity packageEntity = packageMapper.selectById(packageId);
+        DesignPackageEntity packageEntity = packageService.getById(packageId);
         if (packageEntity == null || !packageEntity.getOrderId().equals(orderId)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
         }
 
         // 3. 检查是否有关联的打印产品
-        Long productCount = productMapper.selectCount(
-                new LambdaQueryWrapper<DesignProductEntity>()
-                        .eq(DesignProductEntity::getPackageId, packageId));
+        long productCount = productService.countByPackageId(packageId);
         if (productCount > 0) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_HAS_PRODUCTS);
         }
 
         // 4. 删除包内文件记录
-        packageFileMapper.delete(
+        packageFileService.remove(
                 new LambdaQueryWrapper<DesignPackageFileEntity>()
                         .eq(DesignPackageFileEntity::getPackageId, packageId));
 
         // 5. 删除数据包记录
-        packageMapper.deleteById(packageId);
+        packageService.removeById(packageId);
 
         // 6. 删除存储的压缩包文件
         fileService.deleteById(packageEntity.getFileId());
@@ -199,7 +180,7 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Override
     public List<DesignPackageVO> listPackages(Long orderId) {
         // 1. 查询数据包列表
-        List<DesignPackageEntity> packages = packageMapper.selectList(
+        List<DesignPackageEntity> packages = packageService.list(
                 new LambdaQueryWrapper<DesignPackageEntity>()
                         .eq(DesignPackageEntity::getOrderId, orderId)
                         .orderByAsc(DesignPackageEntity::getPackageSeq));
@@ -212,7 +193,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         List<Long> packageIds = packages.stream()
                 .map(DesignPackageEntity::getId)
                 .collect(Collectors.toList());
-        List<DesignPackageFileEntity> allFiles = packageFileMapper.selectList(
+        List<DesignPackageFileEntity> allFiles = packageFileService.list(
                 new LambdaQueryWrapper<DesignPackageFileEntity>()
                         .in(DesignPackageFileEntity::getPackageId, packageIds)
                         .orderByAsc(DesignPackageFileEntity::getSortOrder));
@@ -257,13 +238,13 @@ public class DesignFileServiceImpl implements DesignFileService {
         List<DesignModelVO> results = new ArrayList<>();
         for (String fileId : fileIds) {
             // 关联文件到业务
-            fileService.linkFile(fileId, BIZ_TYPE_DESIGN_MODEL, orderId);
+            fileService.linkFile(fileId, FileBizTypeEnum.VISUAL_MODEL.getDictCode(), orderId);
 
             // 保存模型记录
             DesignModelEntity modelEntity = new DesignModelEntity();
             modelEntity.setOrderId(orderId);
             modelEntity.setFileId(fileId);
-            modelMapper.insert(modelEntity);
+            modelService.save(modelEntity);
 
             results.add(buildModelVO(modelEntity, fileMap.get(fileId)));
         }
@@ -281,13 +262,13 @@ public class DesignFileServiceImpl implements DesignFileService {
         checkOrderAndPermission(orderId);
 
         // 2. 查询模型
-        DesignModelEntity modelEntity = modelMapper.selectById(modelId);
+        DesignModelEntity modelEntity = modelService.getById(modelId);
         if (modelEntity == null || !modelEntity.getOrderId().equals(orderId)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_MODEL_NOT_FOUND);
         }
 
         // 3. 删除模型记录
-        modelMapper.deleteById(modelId);
+        modelService.removeById(modelId);
 
         // 4. 删除存储的文件
         fileService.deleteById(modelEntity.getFileId());
@@ -298,7 +279,7 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Override
     public List<DesignModelVO> listModels(Long orderId) {
         // 1. 查询模型记录
-        List<DesignModelEntity> models = modelMapper.selectList(
+        List<DesignModelEntity> models = modelService.list(
                 new LambdaQueryWrapper<DesignModelEntity>()
                         .eq(DesignModelEntity::getOrderId, orderId)
                         .orderByDesc(DesignModelEntity::getCreateTime));
@@ -338,14 +319,14 @@ public class DesignFileServiceImpl implements DesignFileService {
         }
 
         // 3. 删除旧报告（每工单仅一份）
-        List<FileVO> existingReports = fileService.listByBiz(BIZ_TYPE_DESIGN_REPORT, orderId);
+        List<FileVO> existingReports = fileService.listByBiz(FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId);
         for (FileVO existing : existingReports) {
             fileService.deleteById(existing.getId());
             log.info("删除旧设计报告, fileId={}", existing.getId());
         }
 
         // 4. 关联新文件到业务
-        return fileService.linkFile(fileId, BIZ_TYPE_DESIGN_REPORT, orderId);
+        return fileService.linkFile(fileId, FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId);
     }
 
     @Override
@@ -358,7 +339,7 @@ public class DesignFileServiceImpl implements DesignFileService {
 
         // 2. 校验文件归属
         FileVO fileVO = fileService.getById(fileId);
-        if (fileVO == null || !BIZ_TYPE_DESIGN_REPORT.equals(fileVO.getBizType())
+        if (fileVO == null || !FileBizTypeEnum.DESIGN_REPORT.getDictCode().equals(fileVO.getBizType())
                 || !orderId.equals(fileVO.getBizId())) {
             throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
         }
@@ -371,7 +352,7 @@ public class DesignFileServiceImpl implements DesignFileService {
 
     @Override
     public FileVO getReport(Long orderId) {
-        List<FileVO> reports = fileService.listByBiz(BIZ_TYPE_DESIGN_REPORT, orderId);
+        List<FileVO> reports = fileService.listByBiz(FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId);
         return CollUtil.isEmpty(reports) ? null : reports.get(0);
     }
 
@@ -385,7 +366,7 @@ public class DesignFileServiceImpl implements DesignFileService {
      */
     private OrderMainEntity checkOrderAndPermission(Long orderId) {
         // 1. 查询订单
-        OrderMainEntity order = orderMainMapper.selectById(orderId);
+        OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
@@ -430,32 +411,14 @@ public class DesignFileServiceImpl implements DesignFileService {
      * 获取下一个数据包序号
      */
     private Integer getNextPackageSeq(Long orderId) {
-        Integer maxSeq = packageMapper.selectList(
-                        new LambdaQueryWrapper<DesignPackageEntity>()
-                                .eq(DesignPackageEntity::getOrderId, orderId)
-                                .select(DesignPackageEntity::getPackageSeq))
-                .stream()
-                .map(DesignPackageEntity::getPackageSeq)
-                .max(Integer::compareTo)
-                .orElse(0);
-        return maxSeq + 1;
+        return packageService.getNextPackageSeq(orderId);
     }
 
     /**
      * 获取已填写打印信息的文件ID集合
      */
     private Set<Long> getFilledFileIds(List<Long> packageIds) {
-        if (CollUtil.isEmpty(packageIds)) {
-            return Collections.emptySet();
-        }
-        List<DesignProductEntity> products = productMapper.selectList(
-                new LambdaQueryWrapper<DesignProductEntity>()
-                        .in(DesignProductEntity::getPackageId, packageIds)
-                        .select(DesignProductEntity::getPackageFileId));
-        return products.stream()
-                .map(DesignProductEntity::getPackageFileId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        return productService.getFilledFileIds(packageIds);
     }
 
     /**

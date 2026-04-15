@@ -11,13 +11,13 @@ import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.design.entity.DesignModelEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
-import com.yigongbao.module.design.mapper.DesignModelMapper;
-import com.yigongbao.module.design.mapper.DesignPackageFileMapper;
-import com.yigongbao.module.design.mapper.DesignPackageMapper;
-import com.yigongbao.module.design.mapper.DesignProductMapper;
+import com.yigongbao.module.design.service.DesignModelService;
+import com.yigongbao.module.design.service.DesignPackageFileService;
+import com.yigongbao.module.design.service.DesignPackageService;
+import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.vo.DesignModelVO;
 import com.yigongbao.module.design.vo.DesignPackageVO;
-import com.yigongbao.module.order.mapper.OrderMainMapper;
+import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.system.config.service.ConfigService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -56,19 +56,19 @@ import static org.mockito.Mockito.*;
 class DesignFileServiceImplTest {
 
     @Mock
-    private OrderMainMapper orderMainMapper;
+    private OrderMainService orderMainService;
 
     @Mock
-    private DesignPackageMapper packageMapper;
+    private DesignPackageService packageService;
 
     @Mock
-    private DesignPackageFileMapper packageFileMapper;
+    private DesignPackageFileService packageFileService;
 
     @Mock
-    private DesignModelMapper modelMapper;
+    private DesignModelService modelService;
 
     @Mock
-    private DesignProductMapper productMapper;
+    private DesignProductService productService;
 
     @Mock
     private FileService fileService;
@@ -105,7 +105,7 @@ class DesignFileServiceImplTest {
         void shouldThrowExceptionForUnsupportedFormat() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
-                when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
 
                 MockMultipartFile file = new MockMultipartFile(
                         "file", "test.tar", "application/x-tar", new byte[10]);
@@ -127,8 +127,8 @@ class DesignFileServiceImplTest {
         void shouldThrowExceptionWhenPackageNotFound() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
-                when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
-                when(packageMapper.selectById(999L)).thenReturn(null);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
+                when(packageService.getById(999L)).thenReturn(null);
 
                 BusinessException exception = assertThrows(BusinessException.class,
                         () -> designFileService.deletePackage(orderId, 999L));
@@ -147,7 +147,7 @@ class DesignFileServiceImplTest {
         void shouldLinkModelsSuccessfully() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
-                when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
 
                 List<String> fileIds = List.of("file-1", "file-2");
 
@@ -167,17 +167,17 @@ class DesignFileServiceImplTest {
                     return "file-1".equals(fid) ? fileVO1 : fileVO2;
                 });
 
-                when(modelMapper.insert(any(DesignModelEntity.class))).thenAnswer(invocation -> {
+                when(modelService.save(any(DesignModelEntity.class))).thenAnswer(invocation -> {
                     DesignModelEntity entity = invocation.getArgument(0);
                     entity.setId(System.currentTimeMillis());
                     entity.setCreateTime(LocalDateTime.now());
-                    return 1;
+                    return true;
                 });
 
                 List<DesignModelVO> results = designFileService.linkModels(orderId, fileIds);
 
                 assertEquals(2, results.size());
-                verify(modelMapper, times(2)).insert(any(DesignModelEntity.class));
+                verify(modelService, times(2)).save(any(DesignModelEntity.class));
                 verify(fileService, times(2)).linkFile(anyString(), eq("10.6"), eq(orderId));
             }
         }
@@ -187,7 +187,7 @@ class DesignFileServiceImplTest {
         void shouldThrowExceptionWhenSomeFilesNotFound() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
-                when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
 
                 List<String> fileIds = List.of("file-1", "not-exist");
 
@@ -212,17 +212,17 @@ class DesignFileServiceImplTest {
         void shouldDeleteModelSuccessfully() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
-                when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
 
                 DesignModelEntity modelEntity = new DesignModelEntity();
                 modelEntity.setId(1L);
                 modelEntity.setOrderId(orderId);
                 modelEntity.setFileId("file-456");
-                when(modelMapper.selectById(1L)).thenReturn(modelEntity);
+                when(modelService.getById(1L)).thenReturn(modelEntity);
 
                 designFileService.deleteModel(orderId, 1L);
 
-                verify(modelMapper).deleteById(1L);
+                verify(modelService).removeById(1L);
                 verify(fileService).deleteById("file-456");
             }
         }
@@ -232,8 +232,8 @@ class DesignFileServiceImplTest {
         void shouldThrowExceptionWhenModelNotFound() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
-                when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
-                when(modelMapper.selectById(999L)).thenReturn(null);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
+                when(modelService.getById(999L)).thenReturn(null);
 
                 BusinessException exception = assertThrows(BusinessException.class,
                         () -> designFileService.deleteModel(orderId, 999L));
@@ -252,7 +252,7 @@ class DesignFileServiceImplTest {
         void shouldLinkReportSuccessfully() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
-                when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
 
                 when(fileService.listByBiz("10.5", orderId)).thenReturn(Collections.emptyList());
 
@@ -275,7 +275,7 @@ class DesignFileServiceImplTest {
         void shouldDeleteOldReportWhenLinkNew() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
-                when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
 
                 FileVO oldReport = new FileVO();
                 oldReport.setId("old-file");
@@ -298,7 +298,7 @@ class DesignFileServiceImplTest {
         void shouldThrowExceptionWhenFileNotFound() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
-                when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
                 when(fileService.getById("not-exist")).thenReturn(null);
 
                 BusinessException exception = assertThrows(BusinessException.class,
@@ -318,7 +318,7 @@ class DesignFileServiceImplTest {
         void shouldThrowExceptionWhenOrderNotFound() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
-                when(orderMainMapper.selectById(999L)).thenReturn(null);
+                when(orderMainService.getById(999L)).thenReturn(null);
 
                 MockMultipartFile file = new MockMultipartFile(
                         "file", "test.zip", "application/zip", new byte[10]);
@@ -340,7 +340,7 @@ class DesignFileServiceImplTest {
                 orderInPrint.setId(orderId);
                 orderInPrint.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
                 orderInPrint.setDesignerId(designerId);
-                when(orderMainMapper.selectById(orderId)).thenReturn(orderInPrint);
+                when(orderMainService.getById(orderId)).thenReturn(orderInPrint);
 
                 MockMultipartFile file = new MockMultipartFile(
                         "file", "test.zip", "application/zip", new byte[10]);
@@ -358,7 +358,7 @@ class DesignFileServiceImplTest {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 Long otherUserId = 999L;
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(otherUserId);
-                when(orderMainMapper.selectById(orderId)).thenReturn(designingOrder);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
 
                 MockMultipartFile file = new MockMultipartFile(
                         "file", "test.zip", "application/zip", new byte[10]);
@@ -378,7 +378,7 @@ class DesignFileServiceImplTest {
         @Test
         @DisplayName("返回空列表当无数据包")
         void shouldReturnEmptyListWhenNoPackages() {
-            when(packageMapper.selectList(any(Wrapper.class)))
+            when(packageService.list(any(Wrapper.class)))
                     .thenReturn(Collections.emptyList());
 
             List<DesignPackageVO> result = designFileService.listPackages(orderId);
