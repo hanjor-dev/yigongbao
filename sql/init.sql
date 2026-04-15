@@ -563,6 +563,13 @@ INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, so
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status) VALUES
 ('DESIGN_MODE', '设计模式', '1', 'number', 'business', '设计模式：1=线下修改（需上传修订版），2=在线编辑', 1, 1, 100, 1);
 
+-- 设计文件上传相关配置
+INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status) VALUES
+('design.package.allowed_extensions', '数据包允许的文件扩展名', '.stl,.obj,.ply,.3mf,.gcode,.ctb,.cbddlp', 'string', 'design', '数据包压缩包内允许的文件扩展名，逗号分隔', 0, 0, 101, 1),
+('design.package.max_size_mb', '数据包最大大小', '500', 'number', 'design', '数据包文件最大大小（MB）', 0, 0, 102, 1),
+('design.model.max_size_mb', '可视化模型最大大小', '200', 'number', 'design', '可视化模型文件最大大小（MB）', 0, 0, 103, 1),
+('design.report.max_size_mb', '设计报告最大大小', '50', 'number', 'design', '设计报告文件最大大小（MB）', 0, 0, 104, 1);
+
 
 -- ============================================================
 -- 打印信息相关字典数据初始化

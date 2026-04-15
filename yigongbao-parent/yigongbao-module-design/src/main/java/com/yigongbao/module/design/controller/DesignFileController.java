@@ -23,7 +23,7 @@ import java.util.List;
  */
 @Tag(name = "设计文件管理")
 @RestController
-@RequestMapping("/api/design/workorder/{orderId}")
+@RequestMapping("/design/workorder/{orderId}")
 @RequiredArgsConstructor
 public class DesignFileController {
 
