@@ -158,6 +158,15 @@ yigongbao:
     flow-max-rework: 2
     # 最大允许的设计审核驳回次数，默认 3 次
     flow-max-design-reject: 3
+    # ==================== 设计文件配置 ====================
+    # 数据包允许的文件扩展名（逗号分隔）
+    design-package-allowed-extensions: ".stl,.obj,.ply,.3mf,.gcode,.ctb,.cbddlp"
+    # 数据包最大大小（MB），默认 500MB
+    design-package-max-size-mb: 500
+    # 可视化模型最大大小（MB），默认 200MB
+    design-model-max-size-mb: 200
+    # 设计报告最大大小（MB），默认 50MB
+    design-report-max-size-mb: 50
   # 文件存储业务配置
   file-storage:
     # 最大文件大小（字节），默认 500MB

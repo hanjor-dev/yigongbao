@@ -103,7 +103,28 @@ public enum SystemConfigKeyEnum {
     /**
      * 设计师分配模式（auto-自动分配，manual-手动分配）
      */
-    DESIGN_ASSIGN_MODE("design.assign.mode", "设计师分配模式");
+    DESIGN_ASSIGN_MODE("design.assign.mode", "设计师分配模式"),
+
+    // ==================== 设计文件配置 ====================
+    /**
+     * 数据包允许的文件扩展名（逗号分隔）
+     */
+    DESIGN_PACKAGE_ALLOWED_EXTENSIONS("design.package.allowed_extensions", "数据包允许的文件扩展名"),
+
+    /**
+     * 数据包最大大小（MB）
+     */
+    DESIGN_PACKAGE_MAX_SIZE_MB("design.package.max_size_mb", "数据包最大大小"),
+
+    /**
+     * 可视化模型最大大小（MB）
+     */
+    DESIGN_MODEL_MAX_SIZE_MB("design.model.max_size_mb", "可视化模型最大大小"),
+
+    /**
+     * 设计报告最大大小（MB）
+     */
+    DESIGN_REPORT_MAX_SIZE_MB("design.report.max_size_mb", "设计报告最大大小");
 
     /**
      * 配置键

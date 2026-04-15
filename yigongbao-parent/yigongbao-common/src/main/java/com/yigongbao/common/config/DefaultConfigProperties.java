@@ -110,4 +110,29 @@ public class DefaultConfigProperties {
      * manual - 手动分配
      */
     private String configDesignAssignMode = "auto";
+
+    // ==================== 设计文件配置 ====================
+    /**
+     * 数据包允许的文件扩展名（逗号分隔）
+     * 默认：.stl,.obj,.ply,.3mf,.gcode,.ctb,.cbddlp
+     */
+    private String configDesignPackageAllowedExtensions = ".stl,.obj,.ply,.3mf,.gcode,.ctb,.cbddlp";
+
+    /**
+     * 数据包最大大小（MB）
+     * 默认 500MB
+     */
+    private Integer configDesignPackageMaxSizeMb = 500;
+
+    /**
+     * 可视化模型最大大小（MB）
+     * 默认 200MB
+     */
+    private Integer configDesignModelMaxSizeMb = 200;
+
+    /**
+     * 设计报告最大大小（MB）
+     * 默认 50MB
+     */
+    private Integer configDesignReportMaxSizeMb = 50;
 }
