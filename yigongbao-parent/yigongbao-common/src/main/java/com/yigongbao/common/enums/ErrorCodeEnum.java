@@ -261,7 +261,11 @@ public enum ErrorCodeEnum {
     PRODUCT_HAS_SPECS(741, "产品下存在规格，无法删除"),
     PRODUCT_SPEC_NOT_FOUND(742, "产品规格不存在"),
     PRODUCT_SPEC_EXISTS(743, "同一产品下规格名称已存在"),
-    PRODUCT_SPEC_IN_USE(744, "规格已被打印信息引用，无法删除");
+    PRODUCT_SPEC_IN_USE(744, "规格已被打印信息引用，无法删除"),
+
+    // ==================== 设计文档生成（750-751）====================
+    PRINT_INFO_REQUIRED(750, "请先填写数据包的打印信息，再生成指令单和图纸"),
+    DOC_VERSION_NOT_FOUND(751, "指定版本的文档不存在");
 
     /**
      * 错误码
