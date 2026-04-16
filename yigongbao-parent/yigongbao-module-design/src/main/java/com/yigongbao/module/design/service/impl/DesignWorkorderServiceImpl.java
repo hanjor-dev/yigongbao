@@ -1,0 +1,523 @@
+package com.yigongbao.module.design.service.impl;
+
+import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yigongbao.common.constant.StatusConstants;
+import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.enums.DataScopeTypeEnum;
+import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.basic.file.entity.FileDetail;
+import com.yigongbao.module.basic.file.mapper.FileDetailMapper;
+import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
+import com.yigongbao.module.design.dto.SaveDesignColumnConfigDTO;
+import com.yigongbao.module.design.entity.DesignDrawingEntity;
+import com.yigongbao.module.design.entity.DesignInstructionEntity;
+import com.yigongbao.module.design.entity.DesignModelEntity;
+import com.yigongbao.module.design.entity.DesignPackageEntity;
+import com.yigongbao.module.design.entity.DesignProductEntity;
+import com.yigongbao.module.design.entity.DesignReviewEntity;
+import com.yigongbao.module.design.helper.DesignQueryHelper;
+import com.yigongbao.module.design.mapper.DesignDrawingMapper;
+import com.yigongbao.module.design.mapper.DesignInstructionMapper;
+import com.yigongbao.module.design.mapper.DesignModelMapper;
+import com.yigongbao.module.design.mapper.DesignPackageMapper;
+import com.yigongbao.module.design.mapper.DesignProductMapper;
+import com.yigongbao.module.design.mapper.DesignReviewMapper;
+import com.yigongbao.module.design.service.DesignWorkorderService;
+import com.yigongbao.module.design.vo.DesignColumnConfigVO;
+import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
+import com.yigongbao.module.design.vo.DesignWorkorderListVO;
+import com.yigongbao.module.design.vo.SubmitCheckVO;
+import com.yigongbao.module.order.entity.OrderItemEntity;
+import com.yigongbao.module.order.mapper.OrderItemMapper;
+import com.yigongbao.module.order.mapper.OrderMainMapper;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.service.UserHospitalService;
+import com.yigongbao.module.system.user.service.UserService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * 设计工单查询服务实现类
+ *
+ * @author hanjor
+ * @date 2026-04-16
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class DesignWorkorderServiceImpl implements DesignWorkorderService {
+
+    private final OrderMainMapper orderMainMapper;
+    private final OrderItemMapper orderItemMapper;
+    private final DesignPackageMapper designPackageMapper;
+    private final DesignProductMapper designProductMapper;
+    private final DesignInstructionMapper designInstructionMapper;
+    private final DesignDrawingMapper designDrawingMapper;
+    private final DesignModelMapper designModelMapper;
+    private final DesignReviewMapper designReviewMapper;
+    private final FileDetailMapper fileDetailMapper;
+    private final UserService userService;
+    private final UserHospitalService userHospitalService;
+    private final DesignQueryHelper designQueryHelper;
+    private final ObjectMapper objectMapper;
+
+    /**
+     * 分页查询设计工单列表
+     * 按当前用户的数据权限范围过滤，固定查询设计阶段（phase=20）的工单
+     *
+     * @param queryDTO 查询参数
+     * @return 分页工单列表
+     */
+    @Override
+    public IPage<DesignWorkorderListVO> listWorkorders(DesignWorkorderQueryDTO queryDTO) {
+        log.info("查询设计工单列表，queryDTO={}", queryDTO);
+
+        // 获取当前用户信息和数据权限类型
+        Long currentUserId = designQueryHelper.getCurrentUserId();
+        UserEntity currentUser = designQueryHelper.getCurrentUser();
+        DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+        log.info("当前用户数据权限类型，userId={}，scopeType={}", currentUserId, scopeType);
+
+        // 构建查询条件
+        LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
+
+        // 固定过滤：仅查询设计阶段订单（phase=20）
+        wrapper.eq(OrderMainEntity::getPhase, 20);
+
+        // 注入数据权限过滤（按 designer_id）
+        designQueryHelper.buildDataScopeCondition(wrapper, currentUser, scopeType);
+
+        // 动态筛选条件
+        wrapper.like(StrUtil.isNotBlank(queryDTO.getOrderCode()), OrderMainEntity::getOrderCode, queryDTO.getOrderCode());
+        wrapper.like(StrUtil.isNotBlank(queryDTO.getPatientName()), OrderMainEntity::getPatientName, queryDTO.getPatientName());
+        wrapper.eq(queryDTO.getStatus() != null, OrderMainEntity::getStatus, queryDTO.getStatus());
+        wrapper.eq(queryDTO.getIsUrgent() != null, OrderMainEntity::getIsUrgent, queryDTO.getIsUrgent());
+        wrapper.eq(queryDTO.getHospitalId() != null, OrderMainEntity::getHospitalId, queryDTO.getHospitalId());
+        wrapper.eq(StrUtil.isNotBlank(queryDTO.getBusinessType()), OrderMainEntity::getBusinessType, queryDTO.getBusinessType());
+        wrapper.ge(queryDTO.getCreateTimeStart() != null, OrderMainEntity::getCreateTime, queryDTO.getCreateTimeStart());
+        wrapper.le(queryDTO.getCreateTimeEnd() != null, OrderMainEntity::getCreateTime, queryDTO.getCreateTimeEnd());
+
+        // 排序
+        designQueryHelper.applySort(wrapper, queryDTO.getSortField(), queryDTO.getSortOrder());
+
+        // 分页参数校验（pageSize 最大 100）
+        int pageSize = queryDTO.getPageSize() == null ? 10 : Math.min(queryDTO.getPageSize(), 100);
+        int pageNum = queryDTO.getPageNum() == null ? 1 : queryDTO.getPageNum();
+        IPage<OrderMainEntity> entityPage = orderMainMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        log.info("查询到工单数量，total={}", entityPage.getTotal());
+
+        // 转换为列表 VO
+        List<OrderMainEntity> entities = entityPage.getRecords();
+        List<DesignWorkorderListVO> voList = entities.stream()
+                .map(this::toWorkorderListVO)
+                .collect(Collectors.toList());
+
+        // 批量填充重建项目摘要（避免 N+1 问题）
+        fillRebuildProjectSummary(voList);
+
+        // 批量填充数据包数量
+        fillPackageCount(voList);
+
+        // 批量填充驳回原因
+        fillRejectReason(voList);
+
+        // 构建返回分页对象
+        IPage<DesignWorkorderListVO> resultPage = new Page<>(entityPage.getCurrent(), entityPage.getSize(), entityPage.getTotal());
+        resultPage.setRecords(voList);
+        return resultPage;
+    }
+
+    /**
+     * 获取工单详情
+     *
+     * @param orderId 订单ID
+     * @return 工单详情 VO
+     */
+    @Override
+    public DesignWorkorderDetailVO getWorkorderDetail(Long orderId) {
+        log.info("查询设计工单详情，orderId={}", orderId);
+
+        OrderMainEntity order = orderMainMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+        }
+
+        DesignWorkorderDetailVO vo = new DesignWorkorderDetailVO();
+
+        // 基本信息
+        vo.setId(order.getId());
+        vo.setOrderCode(order.getOrderCode());
+        vo.setStatus(order.getStatus());
+        vo.setStatusName(designQueryHelper.getStatusName(order.getStatus()));
+        vo.setPhase(order.getPhase());
+        vo.setPhaseName(designQueryHelper.getPhaseName(order.getPhase()));
+
+        // 订单类型
+        vo.setOrderType(order.getOrderType());
+        vo.setOrderTypeName(designQueryHelper.getOrderTypeName(order.getOrderType()));
+        vo.setNeedsPhysicalDelivery(order.getNeedsPhysicalDelivery());
+        vo.setNeedsPhysicalDeliveryName(designQueryHelper.getNeedsPhysicalDeliveryName(order.getNeedsPhysicalDelivery()));
+        vo.setBusinessType(order.getBusinessType());
+        vo.setBusinessTypeName(designQueryHelper.getDictName(order.getBusinessType()));
+
+        // 机构信息
+        vo.setOrgId(order.getOrgId());
+        vo.setOrgName(order.getOrgName());
+        vo.setOperatorId(order.getOperatorId());
+        vo.setOperatorName(order.getOperatorName());
+        vo.setOperatorPhone(order.getOperatorPhone());
+
+        // 医院信息
+        vo.setHospitalId(order.getHospitalId());
+        vo.setHospitalName(order.getHospitalName());
+        vo.setHospitalDeptName(order.getHospitalDeptName());
+        vo.setAreaName(order.getAreaName());
+        vo.setFullAreaName(order.getFullAreaName());
+
+        // 医生/患者信息
+        vo.setDoctorName(order.getDoctorName());
+        vo.setDoctorPhone(order.getDoctorPhone());
+        vo.setPatientName(order.getPatientName());
+        vo.setPatientAge(order.getPatientAge());
+        vo.setPatientGender(order.getPatientGender());
+        vo.setPatientGenderName(designQueryHelper.getGenderName(order.getPatientGender()));
+
+        // 业务信息
+        vo.setIsUrgent(order.getIsUrgent());
+        vo.setIsPostal(order.getIsPostal());
+        vo.setPostalAddress(order.getPostalAddress());
+        vo.setExpectedDeliveryDate(order.getExpectedDeliveryDate());
+
+        // 设计信息
+        vo.setDesignerId(order.getDesignerId());
+        vo.setDesignerName(order.getDesignerName());
+        vo.setDesignStartTime(order.getDesignStartTime());
+        vo.setDesignSubmitTime(order.getDesignSubmitTime());
+
+        // 最近一次驳回原因
+        vo.setRejectReason(getLatestRejectReason(orderId));
+
+        // 重建项目列表
+        vo.setRebuildProjectList(buildRebuildProjectList(orderId));
+
+        // 提交校验状态
+        vo.setSubmitCheck(buildSubmitCheck(orderId));
+
+        return vo;
+    }
+
+    /**
+     * 获取当前用户列配置
+     *
+     * @return 列配置 VO
+     */
+    @Override
+    public DesignColumnConfigVO getColumnConfig() {
+        log.info("获取用户设计列配置");
+        return designQueryHelper.getColumnConfig();
+    }
+
+    /**
+     * 保存用户列配置到 sys_user.design_column_settings
+     *
+     * @param dto 列配置参数
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void saveColumnConfig(SaveDesignColumnConfigDTO dto) {
+        Long currentUserId = designQueryHelper.getCurrentUserId();
+        log.info("保存用户设计列配置，userId={}", currentUserId);
+
+        UserEntity user = userService.getById(currentUserId);
+        if (user == null) {
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+        }
+
+        // 将列配置序列化为 JSON 写入 design_column_settings 字段
+        DesignColumnConfigVO configVO = new DesignColumnConfigVO();
+        List<DesignColumnConfigVO.ColumnItemVO> columnItems = dto.getColumns().stream()
+                .map(item -> {
+                    DesignColumnConfigVO.ColumnItemVO colVO = new DesignColumnConfigVO.ColumnItemVO();
+                    colVO.setField(item.getField());
+                    colVO.setLabel(item.getLabel());
+                    colVO.setVisible(item.getVisible());
+                    colVO.setSort(item.getSort());
+                    colVO.setWidth(item.getWidth());
+                    colVO.setFixed(item.getFixed());
+                    return colVO;
+                })
+                .collect(Collectors.toList());
+        configVO.setColumns(columnItems);
+
+        try {
+            String configJson = objectMapper.writeValueAsString(configVO);
+            UserEntity update = new UserEntity();
+            update.setId(currentUserId);
+            update.setDesignColumnSettings(configJson);
+            userService.updateById(update);
+            log.info("用户设计列配置保存成功，userId={}", currentUserId);
+        } catch (JsonProcessingException e) {
+            log.error("序列化列配置失败，userId={}", currentUserId, e);
+            throw new BusinessException(500, "列配置保存失败");
+        }
+    }
+
+    // ==================== 私有辅助方法 ====================
+
+    /**
+     * 将订单主表实体转换为工单列表 VO（不含批量填充字段）
+     */
+    private DesignWorkorderListVO toWorkorderListVO(OrderMainEntity entity) {
+        DesignWorkorderListVO vo = new DesignWorkorderListVO();
+        vo.setId(entity.getId());
+        vo.setIsUrgent(entity.getIsUrgent());
+        vo.setOrderCode(entity.getOrderCode());
+        vo.setStatus(entity.getStatus());
+        vo.setStatusName(designQueryHelper.getStatusName(entity.getStatus()));
+        vo.setBusinessType(entity.getBusinessType());
+        vo.setBusinessTypeName(designQueryHelper.getDictName(entity.getBusinessType()));
+        vo.setOrderType(entity.getOrderType());
+        vo.setOrderTypeName(designQueryHelper.getOrderTypeName(entity.getOrderType()));
+        vo.setNeedsPhysicalDelivery(entity.getNeedsPhysicalDelivery());
+        vo.setNeedsPhysicalDeliveryName(designQueryHelper.getNeedsPhysicalDeliveryName(entity.getNeedsPhysicalDelivery()));
+        vo.setPatientName(entity.getPatientName());
+        vo.setHospitalId(entity.getHospitalId());
+        vo.setHospitalName(entity.getHospitalName());
+        vo.setHospitalDeptName(entity.getHospitalDeptName());
+        vo.setDoctorName(entity.getDoctorName());
+        vo.setAreaName(entity.getAreaName());
+        vo.setDesignerId(entity.getDesignerId());
+        vo.setDesignerName(entity.getDesignerName());
+        vo.setDesignStartTime(entity.getDesignStartTime());
+        vo.setExpectedDeliveryDate(entity.getExpectedDeliveryDate());
+        vo.setCreateTime(entity.getCreateTime());
+        return vo;
+    }
+
+    /**
+     * 批量填充工单列表的重建项目摘要（避免 N+1 查询）
+     * 格式：左髋骨导板, 右髋骨模型
+     */
+    private void fillRebuildProjectSummary(List<DesignWorkorderListVO> voList) {
+        if (voList.isEmpty()) {
+            return;
+        }
+        List<Long> orderIds = voList.stream().map(DesignWorkorderListVO::getId).collect(Collectors.toList());
+        List<OrderItemEntity> allItems = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItemEntity>()
+                        .in(OrderItemEntity::getOrderId, orderIds)
+                        .eq(OrderItemEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+        Map<Long, List<OrderItemEntity>> itemsByOrderId = allItems.stream()
+                .collect(Collectors.groupingBy(OrderItemEntity::getOrderId));
+
+        for (DesignWorkorderListVO vo : voList) {
+            List<OrderItemEntity> items = itemsByOrderId.get(vo.getId());
+            if (items != null && !items.isEmpty()) {
+                String summary = items.stream()
+                        .map(item -> {
+                            String bodyPart = StrUtil.isNotBlank(item.getBodyPartName()) ? item.getBodyPartName() : "";
+                            String project = StrUtil.isNotBlank(item.getProjectName()) ? item.getProjectName() : "";
+                            return bodyPart + project;
+                        })
+                        .filter(StrUtil::isNotBlank)
+                        .collect(Collectors.joining(", "));
+                vo.setRebuildProjectSummary(summary);
+            }
+        }
+    }
+
+    /**
+     * 批量填充工单列表的数据包数量（避免 N+1 查询）
+     */
+    private void fillPackageCount(List<DesignWorkorderListVO> voList) {
+        if (voList.isEmpty()) {
+            return;
+        }
+        List<Long> orderIds = voList.stream().map(DesignWorkorderListVO::getId).collect(Collectors.toList());
+        List<DesignPackageEntity> allPackages = designPackageMapper.selectList(
+                new LambdaQueryWrapper<DesignPackageEntity>()
+                        .in(DesignPackageEntity::getOrderId, orderIds)
+                        .eq(DesignPackageEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+        Map<Long, Long> countByOrderId = allPackages.stream()
+                .collect(Collectors.groupingBy(DesignPackageEntity::getOrderId, Collectors.counting()));
+
+        for (DesignWorkorderListVO vo : voList) {
+            Long count = countByOrderId.get(vo.getId());
+            vo.setPackageCount(count != null ? count.intValue() : 0);
+        }
+    }
+
+    /**
+     * 批量填充工单列表的最近一次驳回原因（避免 N+1 查询）
+     */
+    private void fillRejectReason(List<DesignWorkorderListVO> voList) {
+        if (voList.isEmpty()) {
+            return;
+        }
+        List<Long> orderIds = voList.stream().map(DesignWorkorderListVO::getId).collect(Collectors.toList());
+        // 查询所有相关驳回记录（reviewResult=0 为驳回），按创建时间倒序
+        List<DesignReviewEntity> allReviews = designReviewMapper.selectList(
+                new LambdaQueryWrapper<DesignReviewEntity>()
+                        .in(DesignReviewEntity::getOrderId, orderIds)
+                        .eq(DesignReviewEntity::getReviewResult, StatusConstants.NO)
+                        .eq(DesignReviewEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                        .orderByDesc(DesignReviewEntity::getCreateTime));
+        // 按 orderId 取最近一条驳回记录（LinkedHashMap 保证插入有序，putIfAbsent 保证只取最新）
+        Map<Long, String> rejectReasonByOrderId = new LinkedHashMap<>();
+        for (DesignReviewEntity review : allReviews) {
+            rejectReasonByOrderId.putIfAbsent(review.getOrderId(), review.getRejectReason());
+        }
+        for (DesignWorkorderListVO vo : voList) {
+            vo.setRejectReason(rejectReasonByOrderId.get(vo.getId()));
+        }
+    }
+
+    /**
+     * 获取工单最近一次驳回原因
+     */
+    private String getLatestRejectReason(Long orderId) {
+        List<DesignReviewEntity> reviews = designReviewMapper.selectList(
+                new LambdaQueryWrapper<DesignReviewEntity>()
+                        .eq(DesignReviewEntity::getOrderId, orderId)
+                        .eq(DesignReviewEntity::getReviewResult, StatusConstants.NO)
+                        .eq(DesignReviewEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                        .orderByDesc(DesignReviewEntity::getCreateTime)
+                        .last("LIMIT 1"));
+        return reviews.isEmpty() ? null : reviews.get(0).getRejectReason();
+    }
+
+    /**
+     * 构建详情页重建项目列表
+     */
+    private List<DesignWorkorderDetailVO.RebuildProjectItemVO> buildRebuildProjectList(Long orderId) {
+        List<OrderItemEntity> items = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItemEntity>()
+                        .eq(OrderItemEntity::getOrderId, orderId)
+                        .eq(OrderItemEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+        return items.stream()
+                .map(item -> {
+                    DesignWorkorderDetailVO.RebuildProjectItemVO projectVO = new DesignWorkorderDetailVO.RebuildProjectItemVO();
+                    projectVO.setProjectName(item.getProjectName());
+                    projectVO.setBodyPartName(item.getBodyPartName());
+                    projectVO.setCategoryCode(item.getCategoryCode());
+                    projectVO.setCategoryName(item.getCategoryName());
+                    projectVO.setCount(1);
+                    projectVO.setProjectDesc(item.getProjectDesc());
+                    projectVO.setFormingRequirement(item.getFormingRequirement());
+                    projectVO.setOtherRequirement(item.getOtherRequirement());
+                    return projectVO;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 构建提交校验状态
+     * 依次检查：数据包 → 打印信息 → 指令单 → 图纸 → 可视化模型 → 设计报告
+     */
+    private SubmitCheckVO buildSubmitCheck(Long orderId) {
+        SubmitCheckVO check = new SubmitCheckVO();
+
+        // 1. 查询所有未删除数据包
+        List<DesignPackageEntity> packages = designPackageMapper.selectList(
+                new LambdaQueryWrapper<DesignPackageEntity>()
+                        .eq(DesignPackageEntity::getOrderId, orderId)
+                        .eq(DesignPackageEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+        check.setHasPackage(!packages.isEmpty());
+
+        if (!packages.isEmpty()) {
+            Set<Long> packageIds = packages.stream()
+                    .map(DesignPackageEntity::getId)
+                    .collect(Collectors.toSet());
+
+            // 2. 打印信息：每个数据包都有至少一条 design_product 记录
+            List<DesignProductEntity> products = designProductMapper.selectList(
+                    new LambdaQueryWrapper<DesignProductEntity>()
+                            .in(DesignProductEntity::getPackageId, packageIds)
+                            .eq(DesignProductEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+            Set<Long> pkgsWithProduct = products.stream()
+                    .map(DesignProductEntity::getPackageId)
+                    .collect(Collectors.toSet());
+            check.setHasPrintInfo(pkgsWithProduct.containsAll(packageIds));
+
+            // 3. 指令单：每个数据包都有 design_instruction 记录
+            List<DesignInstructionEntity> instructions = designInstructionMapper.selectList(
+                    new LambdaQueryWrapper<DesignInstructionEntity>()
+                            .in(DesignInstructionEntity::getPackageId, packageIds)
+                            .eq(DesignInstructionEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+            Set<Long> pkgsWithInstruction = instructions.stream()
+                    .map(DesignInstructionEntity::getPackageId)
+                    .collect(Collectors.toSet());
+            check.setHasInstruction(pkgsWithInstruction.containsAll(packageIds));
+
+            // 4. 图纸：每个数据包都有 design_drawing 记录
+            List<DesignDrawingEntity> drawings = designDrawingMapper.selectList(
+                    new LambdaQueryWrapper<DesignDrawingEntity>()
+                            .in(DesignDrawingEntity::getPackageId, packageIds)
+                            .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+            Set<Long> pkgsWithDrawing = drawings.stream()
+                    .map(DesignDrawingEntity::getPackageId)
+                    .collect(Collectors.toSet());
+            check.setHasDrawing(pkgsWithDrawing.containsAll(packageIds));
+        } else {
+            // 无数据包时，后续所有检查均为 false
+            check.setHasPrintInfo(false);
+            check.setHasInstruction(false);
+            check.setHasDrawing(false);
+        }
+
+        // 5. 可视化模型
+        long modelCount = designModelMapper.selectCount(
+                new LambdaQueryWrapper<DesignModelEntity>()
+                        .eq(DesignModelEntity::getOrderId, orderId)
+                        .eq(DesignModelEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+        check.setHasModel(modelCount > 0);
+
+        // 6. 设计报告（objectType = '10.5'）
+        long reportCount = fileDetailMapper.selectCount(
+                new LambdaQueryWrapper<FileDetail>()
+                        .eq(FileDetail::getObjectType, "10.5")
+                        .eq(FileDetail::getObjectId, String.valueOf(orderId)));
+        check.setHasReport(reportCount > 0);
+
+        // 计算 canSubmit 和 blockReason（按优先级顺序）
+        if (!check.getHasPackage()) {
+            check.setCanSubmit(false);
+            check.setBlockReason("请先上传打印文件数据包");
+        } else if (!check.getHasPrintInfo()) {
+            check.setCanSubmit(false);
+            check.setBlockReason("请完善数据包的打印信息");
+        } else if (!check.getHasInstruction()) {
+            check.setCanSubmit(false);
+            check.setBlockReason("请生成指令单");
+        } else if (!check.getHasDrawing()) {
+            check.setCanSubmit(false);
+            check.setBlockReason("请生成图纸");
+        } else if (!check.getHasModel()) {
+            check.setCanSubmit(false);
+            check.setBlockReason("请上传可视化模型文件");
+        } else if (!check.getHasReport()) {
+            check.setCanSubmit(false);
+            check.setBlockReason("请上传设计报告");
+        } else {
+            check.setCanSubmit(true);
+            check.setBlockReason(null);
+        }
+
+        return check;
+    }
+}
