@@ -6,6 +6,8 @@ import com.yigongbao.module.design.mapper.DesignInstructionMapper;
 import com.yigongbao.module.design.service.DesignInstructionService;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
  * 设计指令单服务实现类
  *
@@ -16,4 +18,23 @@ import org.springframework.stereotype.Service;
 public class DesignInstructionServiceImpl
         extends ServiceImpl<DesignInstructionMapper, DesignInstructionEntity>
         implements DesignInstructionService {
+
+    @Override
+    public int getMaxVersionSeq(Long packageId) {
+        return lambdaQuery()
+                .eq(DesignInstructionEntity::getPackageId, packageId)
+                .orderByDesc(DesignInstructionEntity::getVersionSeq)
+                .last("LIMIT 1")
+                .oneOpt()
+                .map(DesignInstructionEntity::getVersionSeq)
+                .orElse(0);
+    }
+
+    @Override
+    public List<DesignInstructionEntity> listVersions(Long packageId) {
+        return lambdaQuery()
+                .eq(DesignInstructionEntity::getPackageId, packageId)
+                .orderByDesc(DesignInstructionEntity::getVersionSeq)
+                .list();
+    }
 }
