@@ -10,6 +10,8 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
+import com.yigongbao.module.basic.file.service.FileService;
+import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.design.entity.DesignDrawingEntity;
 import com.yigongbao.module.design.entity.DesignInstructionEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
@@ -23,23 +25,14 @@ import com.yigongbao.module.design.service.DesignPackageService;
 import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.vo.DesignDocVersionVO;
 import com.yigongbao.module.design.vo.DocItemVO;
-import com.yigongbao.module.design.vo.GenerateDocsResultVO;
 import com.yigongbao.module.order.service.OrderMainService;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.x.file.storage.core.FileInfo;
-import org.dromara.x.file.storage.core.FileStorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -64,10 +57,14 @@ public class DesignDocServiceImpl implements DesignDocService {
     private final InstructionExcelBuilder instructionBuilder;
     private final DrawingExcelBuilder drawingBuilder;
     private final CodeGeneratorService codeGeneratorService;
-    private final FileStorageService fileStorageService;
+    private final FileService fileService;
 
     /**
-     * 同时生成指令单和图纸
+     * 生成指令单
+     * <p>
+     * 版本策略：若最新版尚未上传修订版（revisedFileId==null），覆盖其模板文件，版本号不变；
+     * 若最新版已封版（revisedFileId 非空）或首次生成，新建记录，版本序号+1。
+     * </p>
      *
      * @param orderId   订单ID
      * @param packageId 数据包ID
@@ -75,8 +72,8 @@ public class DesignDocServiceImpl implements DesignDocService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public GenerateDocsResultVO generateDocs(Long orderId, Long packageId) {
-        log.info("开始生成指令单和图纸，orderId={}, packageId={}", orderId, packageId);
+    public DocItemVO generateInstruction(Long orderId, Long packageId) {
+        log.info("开始生成指令单，orderId={}, packageId={}", orderId, packageId);
 
         // 1. 权限校验
         OrderMainEntity order = checkOrderAndPermission(orderId);
@@ -90,12 +87,14 @@ public class DesignDocServiceImpl implements DesignDocService {
             throw new BusinessException(ErrorCodeEnum.PRINT_INFO_REQUIRED);
         }
 
-        // 3. 计算新版本号（取指令单和图纸中较大的版本序号 + 1，保持一致）
-        int newSeq = Math.max(
-                instructionService.getMaxVersionSeq(packageId),
-                drawingService.getMaxVersionSeq(packageId)) + 1;
+        // 3. 查询最新版本，判断是否需要新建版本
+        DesignInstructionEntity latest = instructionService.getLatestVersion(packageId);
+        // 最新版已封版（上传过修订版）或无历史版本，则新建；否则覆盖
+        boolean isNewVersion = (latest == null || latest.getRevisedFileId() != null);
+        int newSeq = isNewVersion ? (latest == null ? 1 : latest.getVersionSeq() + 1)
+                : latest.getVersionSeq();
         String version = "A/" + newSeq;
-        log.info("新版本号：{}，packageId={}", version, packageId);
+        log.info("指令单版本：{}，isNewVersion={}，packageId={}", version, isNewVersion, packageId);
 
         // 4. 查询打印产品列表
         List<DesignProductEntity> products = productService.list(
@@ -104,7 +103,9 @@ public class DesignDocServiceImpl implements DesignDocService {
                         .orderByAsc(DesignProductEntity::getSortOrder));
 
         // 5. 生成指令单 Excel
-        String instructionCode = codeGeneratorService.generate(CodeRuleConstants.INSTRUCTION_NO);
+        String instructionCode = isNewVersion
+                ? codeGeneratorService.generate(CodeRuleConstants.INSTRUCTION_NO)
+                : latest.getInstructionCode();
         InstructionExcelBuilder.BuildContext instrCtx = buildInstructionContext(order, pkg, products, version);
         byte[] instrBytes;
         try {
@@ -114,7 +115,87 @@ public class DesignDocServiceImpl implements DesignDocService {
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
 
-        // 6. 生成图纸 Excel
+        // 6. 上传文件
+        String filename = instructionCode + ".xlsx";
+        FileVO instrFile = fileService.uploadBytes(instrBytes, filename, FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
+
+        // 7. 新建记录或更新模板文件
+        DesignInstructionEntity instrEntity;
+        if (isNewVersion) {
+            instrEntity = new DesignInstructionEntity();
+            instrEntity.setOrderId(orderId);
+            instrEntity.setPackageId(packageId);
+            instrEntity.setInstructionCode(instructionCode);
+            instrEntity.setVersion(version);
+            instrEntity.setVersionSeq(newSeq);
+            instrEntity.setGenerateTime(LocalDateTime.now());
+            instrEntity.setTemplateFileId(instrFile.getId());
+            instrEntity.setTemplateFileUrl(instrFile.getFileUrl());
+            instructionService.save(instrEntity);
+        } else {
+            // 覆盖当前版本的模板文件
+            latest.setTemplateFileId(instrFile.getId());
+            latest.setTemplateFileUrl(instrFile.getFileUrl());
+            latest.setGenerateTime(LocalDateTime.now());
+            instructionService.updateById(latest);
+            instrEntity = latest;
+        }
+
+        // 8. 构造返回值
+        DocItemVO vo = new DocItemVO();
+        vo.setId(instrEntity.getId());
+        vo.setVersion(version);
+        vo.setFileId(instrFile.getId());
+        vo.setTemplateFileUrl(instrFile.getFileUrl());
+        vo.setGenerateTime(instrEntity.getGenerateTime());
+
+        log.info("生成指令单完成，orderId={}, packageId={}, version={}", orderId, packageId, version);
+        return vo;
+    }
+
+    /**
+     * 生成图纸
+     * <p>
+     * 版本策略：若最新版尚未上传修订版（revisedFileId==null），覆盖其模板文件，版本号不变；
+     * 若最新版已封版（revisedFileId 非空）或首次生成，新建记录，版本序号+1。
+     * </p>
+     *
+     * @param orderId   订单ID
+     * @param packageId 数据包ID
+     * @return 生成结果
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocItemVO generateDrawing(Long orderId, Long packageId) {
+        log.info("开始生成图纸，orderId={}, packageId={}", orderId, packageId);
+
+        // 1. 权限校验
+        OrderMainEntity order = checkOrderAndPermission(orderId);
+        DesignPackageEntity pkg = validatePackage(orderId, packageId);
+
+        // 2. 前置校验：打印信息已填写
+        long productCount = productService.count(
+                new LambdaQueryWrapper<DesignProductEntity>()
+                        .eq(DesignProductEntity::getPackageId, packageId));
+        if (productCount == 0) {
+            throw new BusinessException(ErrorCodeEnum.PRINT_INFO_REQUIRED);
+        }
+
+        // 3. 查询最新版本，判断是否需要新建版本
+        DesignDrawingEntity latest = drawingService.getLatestVersion(packageId);
+        boolean isNewVersion = (latest == null || latest.getRevisedFileId() != null);
+        int newSeq = isNewVersion ? (latest == null ? 1 : latest.getVersionSeq() + 1)
+                : latest.getVersionSeq();
+        String version = "A/" + newSeq;
+        log.info("图纸版本：{}，isNewVersion={}，packageId={}", version, isNewVersion, packageId);
+
+        // 4. 查询打印产品列表
+        List<DesignProductEntity> products = productService.list(
+                new LambdaQueryWrapper<DesignProductEntity>()
+                        .eq(DesignProductEntity::getPackageId, packageId)
+                        .orderByAsc(DesignProductEntity::getSortOrder));
+
+        // 5. 生成图纸 Excel
         DrawingExcelBuilder.BuildContext drawCtx = buildDrawingContext(order, pkg, products);
         byte[] drawBytes;
         try {
@@ -124,59 +205,40 @@ public class DesignDocServiceImpl implements DesignDocService {
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
 
-        // 7. 上传文件到存储服务
-        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-        FileInfo instrFile = uploadBytes(instrBytes,
-                FileBizTypeEnum.INSTRUCTION_FILE.getCode() + "/" + datePath + "/",
-                FileBizTypeEnum.INSTRUCTION_FILE.getDictCode(),
-                instructionCode + ".xlsx");
-        FileInfo drawFile = uploadBytes(drawBytes,
-                FileBizTypeEnum.DRAWING_FILE.getCode() + "/" + datePath + "/",
-                FileBizTypeEnum.DRAWING_FILE.getDictCode(),
-                pkg.getPackageCode() + "-图纸-" + version + ".xlsx");
+        // 6. 上传文件
+        String filename = pkg.getPackageCode() + "-图纸-" + version + ".xlsx";
+        FileVO drawFile = fileService.uploadBytes(drawBytes, filename, FileBizTypeEnum.DRAWING_FILE.getDictCode());
 
-        // 8. 插入指令单记录（保留历史版本，不逻辑删除旧记录）
-        DesignInstructionEntity instrEntity = new DesignInstructionEntity();
-        instrEntity.setOrderId(orderId);
-        instrEntity.setPackageId(packageId);
-        instrEntity.setInstructionCode(instructionCode);
-        instrEntity.setVersion(version);
-        instrEntity.setVersionSeq(newSeq);
-        instrEntity.setTemplateFileId(instrFile.getId());
-        instrEntity.setTemplateFileUrl(instrFile.getUrl());
-        instrEntity.setGenerateTime(LocalDateTime.now());
-        instructionService.save(instrEntity);
+        // 7. 新建记录或更新模板文件
+        DesignDrawingEntity drawEntity;
+        if (isNewVersion) {
+            drawEntity = new DesignDrawingEntity();
+            drawEntity.setOrderId(orderId);
+            drawEntity.setPackageId(packageId);
+            drawEntity.setVersion(version);
+            drawEntity.setVersionSeq(newSeq);
+            drawEntity.setGenerateTime(LocalDateTime.now());
+            drawEntity.setTemplateFileId(drawFile.getId());
+            drawEntity.setTemplateFileUrl(drawFile.getFileUrl());
+            drawingService.save(drawEntity);
+        } else {
+            latest.setTemplateFileId(drawFile.getId());
+            latest.setTemplateFileUrl(drawFile.getFileUrl());
+            latest.setGenerateTime(LocalDateTime.now());
+            drawingService.updateById(latest);
+            drawEntity = latest;
+        }
 
-        // 9. 插入图纸记录（保留历史版本，不逻辑删除旧记录）
-        DesignDrawingEntity drawEntity = new DesignDrawingEntity();
-        drawEntity.setOrderId(orderId);
-        drawEntity.setPackageId(packageId);
-        drawEntity.setVersion(version);
-        drawEntity.setVersionSeq(newSeq);
-        drawEntity.setTemplateFileId(drawFile.getId());
-        drawEntity.setTemplateFileUrl(drawFile.getUrl());
-        drawEntity.setGenerateTime(LocalDateTime.now());
-        drawingService.save(drawEntity);
+        // 8. 构造返回值
+        DocItemVO vo = new DocItemVO();
+        vo.setId(drawEntity.getId());
+        vo.setVersion(version);
+        vo.setFileId(drawFile.getId());
+        vo.setTemplateFileUrl(drawFile.getFileUrl());
+        vo.setGenerateTime(drawEntity.getGenerateTime());
 
-        // 10. 构造返回值
-        GenerateDocsResultVO result = new GenerateDocsResultVO();
-
-        DocItemVO instrVO = new DocItemVO();
-        instrVO.setId(instrEntity.getId());
-        instrVO.setVersion(version);
-        instrVO.setTemplateFileUrl(instrFile.getUrl());
-        instrVO.setGenerateTime(instrEntity.getGenerateTime());
-        result.setInstruction(instrVO);
-
-        DocItemVO drawVO = new DocItemVO();
-        drawVO.setId(drawEntity.getId());
-        drawVO.setVersion(version);
-        drawVO.setTemplateFileUrl(drawFile.getUrl());
-        drawVO.setGenerateTime(drawEntity.getGenerateTime());
-        result.setDrawing(drawVO);
-
-        log.info("生成指令单和图纸完成，orderId={}, packageId={}, version={}", orderId, packageId, version);
-        return result;
+        log.info("生成图纸完成，orderId={}, packageId={}, version={}", orderId, packageId, version);
+        return vo;
     }
 
     /**
@@ -204,37 +266,6 @@ public class DesignDocServiceImpl implements DesignDocService {
     }
 
     /**
-     * 下载指定版本的指令单（模板版）
-     */
-    @Override
-    public void downloadInstruction(Long orderId, Long packageId, Long id,
-                                    HttpServletResponse response) throws IOException {
-        log.info("下载指令单，orderId={}, packageId={}, id={}", orderId, packageId, id);
-        validatePackage(orderId, packageId);
-        DesignInstructionEntity entity = instructionService.getById(id);
-        if (entity == null || !entity.getPackageId().equals(packageId)) {
-            throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
-        }
-        downloadFile(entity.getTemplateFileUrl(), entity.getInstructionCode() + ".xlsx", response);
-    }
-
-    /**
-     * 下载指定版本的图纸（模板版）
-     */
-    @Override
-    public void downloadDrawing(Long orderId, Long packageId, Long id,
-                                HttpServletResponse response) throws IOException {
-        log.info("下载图纸，orderId={}, packageId={}, id={}", orderId, packageId, id);
-        validatePackage(orderId, packageId);
-        DesignDrawingEntity entity = drawingService.getById(id);
-        if (entity == null || !entity.getPackageId().equals(packageId)) {
-            throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
-        }
-        String filename = "图纸-" + entity.getVersion() + ".xlsx";
-        downloadFile(entity.getTemplateFileUrl(), filename, response);
-    }
-
-    /**
      * 上传修订版指令单
      */
     @Override
@@ -247,12 +278,9 @@ public class DesignDocServiceImpl implements DesignDocService {
         if (entity == null || !entity.getPackageId().equals(packageId)) {
             throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
         }
-        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-        FileInfo fileInfo = uploadMultipartFile(file,
-                FileBizTypeEnum.INSTRUCTION_FILE.getCode() + "/" + datePath + "/",
-                FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
-        entity.setRevisedFileId(fileInfo.getId());
-        entity.setRevisedFileUrl(fileInfo.getUrl());
+        FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
+        entity.setRevisedFileId(fileVO.getId());
+        entity.setRevisedFileUrl(fileVO.getFileUrl());
         entity.setRevisedUploadTime(LocalDateTime.now());
         instructionService.updateById(entity);
         log.info("上传修订版指令单成功，id={}", id);
@@ -271,12 +299,9 @@ public class DesignDocServiceImpl implements DesignDocService {
         if (entity == null || !entity.getPackageId().equals(packageId)) {
             throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
         }
-        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-        FileInfo fileInfo = uploadMultipartFile(file,
-                FileBizTypeEnum.DRAWING_FILE.getCode() + "/" + datePath + "/",
-                FileBizTypeEnum.DRAWING_FILE.getDictCode());
-        entity.setRevisedFileId(fileInfo.getId());
-        entity.setRevisedFileUrl(fileInfo.getUrl());
+        FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.DRAWING_FILE.getDictCode());
+        entity.setRevisedFileId(fileVO.getId());
+        entity.setRevisedFileUrl(fileVO.getFileUrl());
         entity.setRevisedUploadTime(LocalDateTime.now());
         drawingService.updateById(entity);
         log.info("上传修订版图纸成功，id={}", id);
@@ -332,7 +357,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         ctx.setOrderCode(order.getOrderCode());
         ctx.setPatientName(order.getPatientName());
         ctx.setHospitalName(order.getHospitalName());
-        ctx.setContactName(""); // OrderMainEntity 暂无联系人字段，由线下填写
+        ctx.setContactName(order.getDoctorName());
         ctx.setPackageCode(pkg.getPackageCode());
         ctx.setVersion(version);
         ctx.setProducts(products);
@@ -358,69 +383,14 @@ public class DesignDocServiceImpl implements DesignDocService {
         return ctx;
     }
 
-    /**
-     * 将 byte[] 上传到 x-file-storage
-     *
-     * @param bytes      文件字节数组
-     * @param path       存储路径
-     * @param objectType 业务类型编码
-     * @param filename   文件名
-     * @return 上传结果 FileInfo
-     */
-    protected FileInfo uploadBytes(byte[] bytes, String path, String objectType, String filename) {
-        try {
-            return fileStorageService.of(bytes)
-                    .setPath(path)
-                    .setObjectType(objectType)
-                    .setOriginalFilename(filename)
-                    .upload();
-        } catch (Exception e) {
-            log.error("上传文件失败，filename={}", filename, e);
-            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_UPLOAD_FAILED);
-        }
-    }
-
-    /**
-     * 将 MultipartFile 上传到 x-file-storage
-     *
-     * @param file       修订版文件
-     * @param path       存储路径
-     * @param objectType 业务类型编码
-     * @return 上传结果 FileInfo
-     */
-    protected FileInfo uploadMultipartFile(MultipartFile file, String path, String objectType) {
-        try {
-            return fileStorageService.of(file)
-                    .setPath(path)
-                    .setObjectType(objectType)
-                    .upload();
-        } catch (Exception e) {
-            log.error("上传修订版文件失败", e);
-            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_UPLOAD_FAILED);
-        }
-    }
-
-    /**
-     * 通过 URL 直接流式下载文件到响应
-     */
-    private void downloadFile(String fileUrl, String filename, HttpServletResponse response) throws IOException {
-        if (fileUrl == null) {
-            throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
-        }
-        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        response.setHeader("Content-Disposition",
-                "attachment; filename=\"" + URLEncoder.encode(filename, StandardCharsets.UTF_8) + "\"");
-        try (InputStream is = new URL(fileUrl).openStream()) {
-            is.transferTo(response.getOutputStream());
-        }
-    }
-
     private DesignDocVersionVO toInstructionVersionVO(DesignInstructionEntity entity) {
         DesignDocVersionVO vo = new DesignDocVersionVO();
         vo.setId(entity.getId());
         vo.setVersion(entity.getVersion());
         vo.setVersionSeq(entity.getVersionSeq());
+        vo.setTemplateFileId(entity.getTemplateFileId());
         vo.setTemplateFileUrl(entity.getTemplateFileUrl());
+        vo.setRevisedFileId(entity.getRevisedFileId());
         vo.setRevisedFileUrl(entity.getRevisedFileUrl());
         vo.setGenerateTime(entity.getGenerateTime());
         vo.setRevisedUploadTime(entity.getRevisedUploadTime());
@@ -432,7 +402,9 @@ public class DesignDocServiceImpl implements DesignDocService {
         vo.setId(entity.getId());
         vo.setVersion(entity.getVersion());
         vo.setVersionSeq(entity.getVersionSeq());
+        vo.setTemplateFileId(entity.getTemplateFileId());
         vo.setTemplateFileUrl(entity.getTemplateFileUrl());
+        vo.setRevisedFileId(entity.getRevisedFileId());
         vo.setRevisedFileUrl(entity.getRevisedFileUrl());
         vo.setGenerateTime(entity.getGenerateTime());
         vo.setRevisedUploadTime(entity.getRevisedUploadTime());

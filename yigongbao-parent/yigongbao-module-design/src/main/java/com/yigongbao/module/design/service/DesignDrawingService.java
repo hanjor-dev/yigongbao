@@ -14,12 +14,12 @@ import java.util.List;
 public interface DesignDrawingService extends IService<DesignDrawingEntity> {
 
     /**
-     * 查询数据包的最大版本序号（无记录时返回 0）
+     * 查询数据包最新版本记录（version_seq 最大），无记录时返回 null
      *
      * @param packageId 数据包ID
-     * @return 最大版本序号
+     * @return 最新版本记录，或 null
      */
-    int getMaxVersionSeq(Long packageId);
+    DesignDrawingEntity getLatestVersion(Long packageId);
 
     /**
      * 查询数据包的版本历史列表（按 version_seq 倒序）

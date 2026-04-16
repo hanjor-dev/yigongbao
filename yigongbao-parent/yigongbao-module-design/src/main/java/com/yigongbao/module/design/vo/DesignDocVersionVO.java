@@ -22,8 +22,14 @@ public class DesignDocVersionVO {
     /** 版本序号，用于排序 */
     private Integer versionSeq;
 
+    /** 模板文件ID，前端通过 GET /basic/file/download/{fileId} 下载 */
+    private String templateFileId;
+
     /** 系统生成的模板文件访问URL */
     private String templateFileUrl;
+
+    /** 修订版文件ID（可为空），前端通过 GET /basic/file/download/{fileId} 下载 */
+    private String revisedFileId;
 
     /** 设计师上传的修订版文件访问URL（可为空） */
     private String revisedFileUrl;

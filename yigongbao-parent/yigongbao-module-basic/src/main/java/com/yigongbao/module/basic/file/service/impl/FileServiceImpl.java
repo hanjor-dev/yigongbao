@@ -20,7 +20,9 @@ import org.springframework.web.multipart.MultipartFile;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -77,6 +79,11 @@ public class FileServiceImpl implements FileService {
     @Override
     public FileVO uploadFile(MultipartFile file, String bizType) {
         return doUpload(file, bizType, null);
+    }
+
+    @Override
+    public FileVO uploadBytes(byte[] bytes, String filename, String bizType) {
+        return doUpload(new ByteArrayMultipartFile(bytes, filename), bizType, null);
     }
 
     @Override
@@ -518,5 +525,32 @@ public class FileServiceImpl implements FileService {
             }
         }
         return true;
+    }
+
+    /**
+     * 将 byte[] 包装为 MultipartFile，供 doUpload 统一处理
+     */
+    private static class ByteArrayMultipartFile implements MultipartFile {
+
+        private final byte[] content;
+        private final String filename;
+
+        ByteArrayMultipartFile(byte[] content, String filename) {
+            this.content = content;
+            this.filename = filename;
+        }
+
+        @Override public String getName() { return "file"; }
+        @Override public String getOriginalFilename() { return filename; }
+        @Override public String getContentType() { return "application/octet-stream"; }
+        @Override public boolean isEmpty() { return content == null || content.length == 0; }
+        @Override public long getSize() { return content == null ? 0 : content.length; }
+        @Override public byte[] getBytes() { return content; }
+        @Override public InputStream getInputStream() { return new ByteArrayInputStream(content); }
+        @Override public void transferTo(java.io.File dest) throws IOException {
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(dest)) {
+                fos.write(content);
+            }
+        }
     }
 }

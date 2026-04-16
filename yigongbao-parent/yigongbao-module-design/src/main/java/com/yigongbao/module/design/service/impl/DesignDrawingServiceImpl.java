@@ -20,14 +20,13 @@ public class DesignDrawingServiceImpl
         implements DesignDrawingService {
 
     @Override
-    public int getMaxVersionSeq(Long packageId) {
+    public DesignDrawingEntity getLatestVersion(Long packageId) {
         return lambdaQuery()
                 .eq(DesignDrawingEntity::getPackageId, packageId)
                 .orderByDesc(DesignDrawingEntity::getVersionSeq)
                 .last("LIMIT 1")
                 .oneOpt()
-                .map(DesignDrawingEntity::getVersionSeq)
-                .orElse(0);
+                .orElse(null);
     }
 
     @Override

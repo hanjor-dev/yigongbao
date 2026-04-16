@@ -20,14 +20,13 @@ public class DesignInstructionServiceImpl
         implements DesignInstructionService {
 
     @Override
-    public int getMaxVersionSeq(Long packageId) {
+    public DesignInstructionEntity getLatestVersion(Long packageId) {
         return lambdaQuery()
                 .eq(DesignInstructionEntity::getPackageId, packageId)
                 .orderByDesc(DesignInstructionEntity::getVersionSeq)
                 .last("LIMIT 1")
                 .oneOpt()
-                .map(DesignInstructionEntity::getVersionSeq)
-                .orElse(0);
+                .orElse(null);
     }
 
     @Override

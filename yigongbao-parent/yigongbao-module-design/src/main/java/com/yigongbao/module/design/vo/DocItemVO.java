@@ -19,6 +19,9 @@ public class DocItemVO {
     /** 版本号，格式 A/1, A/2, ... */
     private String version;
 
+    /** 模板文件ID，前端通过 GET /basic/file/download/{fileId} 下载 */
+    private String fileId;
+
     /** 系统生成的模板文件访问URL */
     private String templateFileUrl;
 

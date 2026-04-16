@@ -1,11 +1,9 @@
 package com.yigongbao.module.design.service;
 
 import com.yigongbao.module.design.vo.DesignDocVersionVO;
-import com.yigongbao.module.design.vo.GenerateDocsResultVO;
-import jakarta.servlet.http.HttpServletResponse;
+import com.yigongbao.module.design.vo.DocItemVO;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.List;
 
 /**
@@ -17,13 +15,22 @@ import java.util.List;
 public interface DesignDocService {
 
     /**
-     * 同时生成指令单和图纸（填充 Excel 模板 → 上传 → 保存记录）
+     * 生成指令单（填充 Excel 模板 → 上传 → 保存记录）
      *
      * @param orderId   订单ID
      * @param packageId 数据包ID
-     * @return 生成结果（两个文档的 id、version、url）
+     * @return 生成结果（id、version、fileId、url）
      */
-    GenerateDocsResultVO generateDocs(Long orderId, Long packageId);
+    DocItemVO generateInstruction(Long orderId, Long packageId);
+
+    /**
+     * 生成图纸（填充 Excel 模板 → 上传 → 保存记录）
+     *
+     * @param orderId   订单ID
+     * @param packageId 数据包ID
+     * @return 生成结果（id、version、fileId、url）
+     */
+    DocItemVO generateDrawing(Long orderId, Long packageId);
 
     /**
      * 查询指令单版本历史列表
@@ -42,28 +49,6 @@ public interface DesignDocService {
      * @return 版本列表（按 versionSeq 倒序）
      */
     List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId);
-
-    /**
-     * 下载指定版本的指令单（模板版）
-     *
-     * @param orderId   订单ID
-     * @param packageId 数据包ID
-     * @param id        指令单记录ID
-     * @param response  HTTP 响应
-     * @throws IOException IO异常
-     */
-    void downloadInstruction(Long orderId, Long packageId, Long id, HttpServletResponse response) throws IOException;
-
-    /**
-     * 下载指定版本的图纸（模板版）
-     *
-     * @param orderId   订单ID
-     * @param packageId 数据包ID
-     * @param id        图纸记录ID
-     * @param response  HTTP 响应
-     * @throws IOException IO异常
-     */
-    void downloadDrawing(Long orderId, Long packageId, Long id, HttpServletResponse response) throws IOException;
 
     /**
      * 上传修订版指令单

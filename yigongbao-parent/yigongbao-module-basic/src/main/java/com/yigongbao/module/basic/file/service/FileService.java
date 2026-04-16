@@ -27,6 +27,17 @@ public interface FileService {
     FileVO uploadFile(MultipartFile file, String bizType);
 
     /**
+     * 上传 byte[] 内容（不关联业务）
+     * 内部包装为 ByteArrayMultipartFile 后走统一上传流程
+     *
+     * @param bytes    文件内容
+     * @param filename 文件名（含扩展名，用于类型校验）
+     * @param bizType  业务类型（字典 dict_code）
+     * @return 文件信息
+     */
+    FileVO uploadBytes(byte[] bytes, String filename, String bizType);
+
+    /**
      * 上传并关联业务
      *
      * @param file 上传的文件
