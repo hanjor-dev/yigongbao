@@ -229,7 +229,8 @@ public class SelectController {
         SelectTreeVO vo = new SelectTreeVO();
         vo.setId(dictVO.getId());
         vo.setName(dictVO.getDictName());
-        vo.setValue(dictVO.getDictValue());
+        // 前端统一使用 dict_code 作为值标识，dict_value 用于存储扩展信息（如 configPrefix）
+        vo.setValue(dictVO.getDictCode());
         vo.setParentId(dictVO.getParentId());
         vo.setLevel(dictVO.getLevel());
         // 递归转换子节点

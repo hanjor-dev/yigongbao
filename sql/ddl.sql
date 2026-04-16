@@ -210,7 +210,7 @@ CREATE TABLE sys_config (
     config_name     VARCHAR(128)    NOT NULL COMMENT '配置名称',
     config_value    TEXT            COMMENT '配置值',
     config_type     VARCHAR(32)     DEFAULT 'string' COMMENT '配置类型（string/number/boolean/json）',
-    config_group    VARCHAR(32)     DEFAULT 'system' COMMENT '配置分组（system/security/other）',
+    config_group    VARCHAR(32)     DEFAULT 'system' COMMENT '配置分组（system/security/file/other）',
     config_desc     VARCHAR(256)    COMMENT '配置说明',
     is_system       TINYINT         DEFAULT 0 COMMENT '是否系统内置（0=否，1=是）',
     is_public       TINYINT         DEFAULT 1 COMMENT '是否公开（0=私密，1=公开）',

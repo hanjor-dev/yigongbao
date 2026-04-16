@@ -61,6 +61,30 @@ public enum SystemConfigKeyEnum {
     ORDER_IMAGE_REQUIRED("order.image.required", "提交订单是否必须上传影像文件"),
 
     /**
+     * 影像数据包允许的文件扩展名（逗号分隔）
+     * 默认：.zip,.rar,.7z
+     */
+    ORDER_IMAGE_DATA_ALLOWED_EXTENSIONS("order.image.data.allowed_extensions", "影像数据包允许的文件扩展名"),
+
+    /**
+     * 影像数据包最大文件大小（MB）
+     * 默认：500 MB；由 FileUploadConfigProvider 通过 configPrefix 读取，无需业务代码直接调用
+     */
+    ORDER_IMAGE_DATA_MAX_SIZE_MB("order.image.data.max_size_mb", "影像数据包最大文件大小（MB）"),
+
+    /**
+     * 影像报告允许的文件扩展名（逗号分隔）
+     * 默认：.pdf,.doc,.docx,.xls,.xlsx
+     */
+    ORDER_IMAGE_REPORT_ALLOWED_EXTENSIONS("order.image.report.allowed_extensions", "影像报告允许的文件扩展名"),
+
+    /**
+     * 影像报告最大文件大小（MB）
+     * 默认：50 MB；由 FileUploadConfigProvider 通过 configPrefix 读取
+     */
+    ORDER_IMAGE_REPORT_MAX_SIZE_MB("order.image.report.max_size_mb", "影像报告最大文件大小（MB）"),
+
+    /**
      * 草稿自动过期天数
      * 默认 30 天
      */
@@ -107,30 +131,50 @@ public enum SystemConfigKeyEnum {
 
     // ==================== 设计文件配置 ====================
     /**
-     * 数据包允许的文件扩展名（逗号分隔）
+     * 设计文件数据包容器格式（压缩包本身允许的扩展名，逗号分隔）
+     * 默认：.zip,.rar,.7z
      */
-    DESIGN_PACKAGE_ALLOWED_EXTENSIONS("design.package.allowed_extensions", "数据包允许的文件扩展名"),
+    DESIGN_PACKAGE_ARCHIVE_EXTENSIONS("design.package.archive_extensions", "设计文件数据包容器格式"),
 
     /**
-     * 数据包最大大小（MB）
+     * 设计文件数据包最大文件大小（MB）
+     * 默认：500 MB；由 FileUploadConfigProvider 通过 configPrefix 读取
      */
-    DESIGN_PACKAGE_MAX_SIZE_MB("design.package.max_size_mb", "数据包最大大小"),
+    DESIGN_PACKAGE_MAX_SIZE_MB("design.package.max_size_mb", "设计文件数据包最大文件大小（MB）"),
 
     /**
-     * 可视化模型最大大小（MB）
+     * 数据包内部允许的文件扩展名（逗号分隔，用于解析压缩包内容）
      */
-    DESIGN_MODEL_MAX_SIZE_MB("design.model.max_size_mb", "可视化模型最大大小"),
-
-    /**
-     * 设计报告最大大小（MB）
-     */
-    DESIGN_REPORT_MAX_SIZE_MB("design.report.max_size_mb", "设计报告最大大小"),
+    DESIGN_PACKAGE_ALLOWED_EXTENSIONS("design.package.allowed_extensions", "数据包内部允许的文件扩展名"),
 
     /**
      * 设计报告允许的文件扩展名（逗号分隔）
      * 默认：.pdf,.doc,.docx,.xls,.xlsx
      */
     DESIGN_REPORT_ALLOWED_EXTENSIONS("design.report.allowed_extensions", "设计报告允许的文件扩展名"),
+
+    /**
+     * 设计报告最大文件大小（MB）
+     * 默认：50 MB；由 FileUploadConfigProvider 通过 configPrefix 读取
+     */
+    DESIGN_REPORT_MAX_SIZE_MB("design.report.max_size_mb", "设计报告最大文件大小（MB）"),
+
+    /**
+     * 可视化模型允许的文件扩展名（逗号分隔）
+     * 默认：.stl,.obj,.ply,.3mf
+     */
+    DESIGN_MODEL_ALLOWED_EXTENSIONS("design.model.allowed_extensions", "可视化模型允许的文件扩展名"),
+
+    /**
+     * 可视化模型最大文件大小（MB）
+     * 默认：200 MB；由 FileUploadConfigProvider 通过 configPrefix 读取
+     */
+    DESIGN_MODEL_MAX_SIZE_MB("design.model.max_size_mb", "可视化模型最大文件大小（MB）"),
+
+    /**
+     * 设计模式（1=线下修改，2=在线编辑）
+     */
+    DESIGN_MODE("design.mode", "设计模式"),
 
     // ==================== 设计工单列配置 ====================
     /**

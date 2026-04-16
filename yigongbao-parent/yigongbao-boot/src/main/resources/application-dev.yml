@@ -61,10 +61,10 @@ spring:
     multipart:
       # 启用 multipart 上传
       enabled: true
-      # 最大单个文件大小（默认 500MB）
-      max-file-size: 500MB
-      # 最大请求总大小（默认 500MB）
-      max-request-size: 500MB
+      # 最大单个文件大小（全局上限 2GB，各业务类型由业务层单独校验）
+      max-file-size: 2GB
+      # 最大请求总大小（全局上限 2GB）
+      max-request-size: 2GB
       # 文件写入磁盘的阈值
       file-size-threshold: 512KB
 
@@ -142,8 +142,8 @@ yigongbao:
     # ==================== 系统配置 ====================
     # 系统名称
     system-name: "医工宝"
-    # 文件上传最大大小（字节），默认 500MB
-    max-upload-size: 524288000
+    # 文件上传最大大小（字节），默认 2GB
+    max-upload-size: 2147483648
     # ==================== 订单配置 ====================
     # 提交订单是否必须上传影像文件（true-必须，false-非必填）
     order-image-required: true
@@ -151,6 +151,15 @@ yigongbao:
     order-draft-expire-days: 30
     # 订单提交后修改窗口期（分钟），默认 10 分钟
     order-modify-window-minutes: 10
+    # ==================== 订单文件配置 ====================
+    # 影像数据包允许的文件扩展名（逗号分隔）
+    order-image-data-allowed-extensions: ".zip,.rar,.7z"
+    # 影像数据包最大文件大小（MB），由 Provider 读取 DB 配置，此处仅作兜底
+    order-image-data-max-size-mb: 500
+    # 影像报告允许的文件扩展名（逗号分隔）
+    order-image-report-allowed-extensions: ".pdf,.doc,.docx,.xls,.xlsx"
+    # 影像报告最大文件大小（MB），由 Provider 读取 DB 配置，此处仅作兜底
+    order-image-report-max-size-mb: 50
     # ==================== 流程状态机配置 ====================
     # 最大允许的审核驳回次数，默认 3 次
     flow-max-audit-reject: 3
@@ -159,43 +168,26 @@ yigongbao:
     # 最大允许的设计审核驳回次数，默认 3 次
     flow-max-design-reject: 3
     # ==================== 设计文件配置 ====================
-    # 数据包允许的文件扩展名（逗号分隔）
-    design-package-allowed-extensions: ".stl,.obj,.ply,.3mf,.gcode,.ctb,.cbddlp"
-    # 数据包最大大小（MB），默认 500MB
+    # 设计文件数据包容器格式（压缩包本身，逗号分隔）
+    design-package-archive-extensions: ".zip,.rar,.7z"
+    # 设计文件数据包最大文件大小（MB），由 Provider 读取 DB 配置，此处仅作兜底
     design-package-max-size-mb: 500
-    # 可视化模型最大大小（MB），默认 200MB
-    design-model-max-size-mb: 200
-    # 设计报告最大大小（MB），默认 50MB
-    design-report-max-size-mb: 50
+    # 数据包内部允许的文件扩展名（逗号分隔，用于解析压缩包内容）
+    design-package-allowed-extensions: ".stl,.obj,.ply,.3mf,.gcode,.ctb,.cbddlp"
     # 设计报告允许的文件扩展名（逗号分隔）
     design-report-allowed-extensions: ".pdf,.doc,.docx,.xls,.xlsx"
-    # ==================== 设计工单列配置 ====================
+    # 设计报告最大文件大小（MB），由 Provider 读取 DB 配置，此处仅作兜底
+    design-report-max-size-mb: 50
+    # 可视化模型允许的文件扩展名（逗号分隔）
+    design-model-allowed-extensions: ".stl,.obj,.ply,.3mf"
+    # 可视化模型最大文件大小（MB），由 Provider 读取 DB 配置，此处仅作兜底
+    design-model-max-size-mb: 200
     # 设计工单列表默认列配置（兜底值，优先使用数据库配置）
-    design-column-config: '{"module":"design","columns":[{"field":"isUrgent","label":"加急","visible":true,"sort":1,"width":70,"fixed":null},{"field":"orderCode","label":"订单编号","visible":true,"sort":2,"width":160,"fixed":null},{"field":"statusName","label":"当前状态","visible":true,"sort":3,"width":120,"fixed":null},{"field":"businessTypeName","label":"业务类型","visible":true,"sort":4,"width":100,"fixed":null},{"field":"orderTypeName","label":"订单类型","visible":true,"sort":5,"width":110,"fixed":null},{"field":"needsPhysicalDeliveryName","label":"实体交付","visible":true,"sort":6,"width":90,"fixed":null},{"field":"patientName","label":"患者姓名","visible":true,"sort":7,"width":100,"fixed":null},{"field":"hospitalName","label":"医院","visible":true,"sort":8,"width":180,"fixed":null},{"field":"hospitalDeptName","label":"科室","visible":true,"sort":9,"width":100,"fixed":null},{"field":"doctorName","label":"医生姓名","visible":true,"sort":10,"width":100,"fixed":null},{"field":"areaName","label":"地区","visible":true,"sort":11,"width":100,"fixed":null},{"field":"rebuildProjectSummary","label":"重建项目","visible":true,"sort":12,"width":200,"fixed":null},{"field":"designerName","label":"设计师","visible":true,"sort":13,"width":100,"fixed":null},{"field":"packageCount","label":"数据包数","visible":true,"sort":14,"width":90,"fixed":null},{"field":"designStartTime","label":"开始设计时间","visible":true,"sort":15,"width":160,"fixed":null},{"field":"expectedDeliveryDate","label":"期望交付","visible":true,"sort":16,"width":120,"fixed":null},{"field":"createTime","label":"创建时间","visible":true,"sort":17,"width":160,"fixed":null},{"field":"rejectReason","label":"驳回原因","visible":false,"sort":18,"width":160,"fixed":null},{"field":"action","label":"操作","visible":true,"sort":19,"width":150,"fixed":"right"}]}'
+    design-column-config: '{"module":"design","columns":[{"field":"isUrgent","label":"加急","visible":true,"sort":1,"width":70,"fixed":null},{"field":"orderCode","label":"订单编号","visible":true,"sort":2,"width":160,"fixed":null},{"field":"statusName","label":"当前状态","visible":true,"sort":3,"width":120,"fixed":null},{"field":"businessTypeName","label":"业务类型","visible":true,"sort":4,"width":100,"fixed":null},{"field":"orderTypeName","label":"订单类型","visible":true,"sort":5,"width":110,"fixed":null},{"field":"needsPhysicalDeliveryName","label":"实体交付","visible":true,"sort":6,"width":90,"fixed":null},{"field":"patientName","label":"患者姓名","visible":true,"sort":7,"width":100,"fixed":null},{"field":"hospitalName","label":"医院","visible":true,"sort":8,"width":180,"fixed":null},{"field":"hospitalDeptName","label":"科室","visible":true,"sort":9,"width":100,"fixed":null},{"field":"doctorName","label":"医生姓名","visible":true,"sort":10,"width":100,"fixed":null},{"field":"areaName","label":"地区","visible":true,"sort":11,"width":100,"fixed":null},{"field":"rebuildProjectSummary","label":"重建项目","visible":true,"sort":12,"width":200,"fixed":null},{"field":"designerName","label":"设计师","visible":true,"sort":13,"width":100,"fixed":null},{"field":"packageCount","label":"数据包数","visible":true,"sort":14,"width":90,"fixed":null},{"field":"designStartTime","label":"开始设计时间","visible":true,"sort":15,"width":160,"fixed":null},{"field":"expectedDeliveryDate","label":"期望交付","visible":true,"sort":16,"width":120,"fixed":null},{"field":"createTime","label":"创建时间","visible":true,"sort":17,"width":160,"fixed":null},{"field":"rejectReason","label":"驳回原因","visible":false,"sort":18,"width":160,"fixed":null},{"field":"    action","label":"操作","visible":true,"sort":19,"width":150,"fixed":"right"}]}'
   # 文件存储业务配置
   file-storage:
-    # 最大文件大小（字节），默认 500MB
-    max-file-size: 524288000
-    # 允许的文件扩展名
-    allowed-extensions:
-      - jpg
-      - jpeg
-      - png
-      - gif
-      - bmp
-      - pdf
-      - doc
-      - docx
-      - xls
-      - xlsx
-      - zip
-      - rar
-      - stl
-      - obj
-      - 3ds
-      - ply
-      - step
-      - dcm
+    # 最大文件大小（字节），全局上限 2GB
+    max-file-size: 2147483648
 
 # springdoc-openapi 配置（用于 Apifox 导入）
 springdoc:

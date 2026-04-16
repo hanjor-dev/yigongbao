@@ -71,13 +71,18 @@ public class DesignFileServiceImpl implements DesignFileService {
         // 1. 校验工单状态和操作权限
         OrderMainEntity order = checkOrderAndPermission(orderId);
 
-        // 2. 校验压缩包格式
+        // 2. 校验压缩包容器格式（由配置决定允许的格式）
         String fileName = file.getOriginalFilename();
-        if (!ArchiveParserUtil.isSupported(fileName)) {
+        Set<String> archiveExts = fileService.parseAllowedExtensions(
+                configService.getConfigValue(SystemConfigKeyEnum.DESIGN_PACKAGE_ARCHIVE_EXTENSIONS.getKey()),
+                ".zip,.rar,.7z");
+        String fileExt = fileName != null && fileName.contains(".")
+                ? fileName.substring(fileName.lastIndexOf('.')).toLowerCase() : "";
+        if (fileExt.isEmpty() || !archiveExts.contains(fileExt)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED);
         }
 
-        // 3. 上传压缩包文件
+        // 3. 上传压缩包文件（上传时由 FileService/Provider 完成大小校验）
         FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.PRINT_PACKAGE.getDictCode());
         log.info("压缩包上传成功, fileId={}", fileVO.getId());
 
@@ -221,7 +226,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         // 1. 校验工单状态和操作权限
         checkOrderAndPermission(orderId);
 
-        // 2. 批量校验文件是否存在
+        // 2. 批量校验文件是否存在（类型和大小已在上传时由 FileService/Provider 校验）
         List<FileVO> fileVOs = fileService.listByIds(fileIds);
         if (fileVOs.size() != fileIds.size()) {
             // 找出不存在的 fileId
@@ -312,22 +317,13 @@ public class DesignFileServiceImpl implements DesignFileService {
         // 1. 校验工单状态和操作权限
         checkOrderAndPermission(orderId);
 
-        // 2. 校验文件是否存在
+        // 2. 校验文件是否存在（类型和大小已在上传时由 FileService/Provider 校验）
         FileVO fileVO = fileService.getById(fileId);
         if (fileVO == null) {
             throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
         }
 
-        // 3. 校验设计报告文件类型
-        Set<String> allowedReportExtensions = getAllowedReportExtensions();
-        String fileName = fileVO.getFileName();
-        String ext = StrUtil.isBlank(fileName) ? "" : fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-        if (!allowedReportExtensions.contains(ext)) {
-            log.warn("设计报告文件类型不允许, fileId={}, ext={}, allowed={}", fileId, ext, allowedReportExtensions);
-            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_TYPE_NOT_ALLOWED);
-        }
-
-        // 4. 删除旧报告（每工单仅一份）
+        // 3. 删除旧报告（每工单仅一份）
         List<FileVO> existingReports = fileService.listByBiz(FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId);
         for (FileVO existing : existingReports) {
             fileService.deleteById(existing.getId());
@@ -408,21 +404,6 @@ public class DesignFileServiceImpl implements DesignFileService {
         String config = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_PACKAGE_ALLOWED_EXTENSIONS.getKey());
         if (StrUtil.isBlank(config)) {
             config = ".stl,.obj,.ply,.3mf,.gcode,.ctb,.cbddlp";
-        }
-        return Arrays.stream(config.split(","))
-                .map(String::trim)
-                .map(String::toLowerCase)
-                .filter(StrUtil::isNotBlank)
-                .collect(Collectors.toSet());
-    }
-
-    /**
-     * 获取设计报告允许的文件扩展名集合
-     */
-    private Set<String> getAllowedReportExtensions() {
-        String config = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_REPORT_ALLOWED_EXTENSIONS.getKey());
-        if (StrUtil.isBlank(config)) {
-            config = ".pdf,.doc,.docx,.xls,.xlsx";
         }
         return Arrays.stream(config.split(","))
                 .map(String::trim)

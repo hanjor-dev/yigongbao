@@ -415,29 +415,29 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
 
     /**
      * 校验草稿文件
-     * 根据系统配置 order.image.required 判断影像文件是否必填
+     * 必填性受 order.image.required 配置控制；类型和大小已在上传时由 FileService（Provider）校验
      */
     private void validateDraftFiles(Long draftId) {
-        // 通过 FileService 查询草稿关联的文件
-        // bizType 使用 FileBizTypeEnum.ORDER_DRAFT.getCode() 作为业务标识
         List<FileVO> files = fileService.listByBiz(FileBizTypeEnum.ORDER_DRAFT.getCode(), draftId);
-        // 获取系统配置：是否必须上传影像文件（ConfigService 已内置兜底逻辑）
         String imageRequired = configService.getConfigValue(SystemConfigKeyEnum.ORDER_IMAGE_REQUIRED.getKey());
-        if ("true".equalsIgnoreCase(imageRequired)) {
-            // 校验影像数据（dict_code=10.1）
-            boolean hasImageData = files.stream()
-                    .anyMatch(f -> FileBizTypeEnum.IMAGE_DATA.getDictCode().equals(f.getBizType()));
-            if (!hasImageData) {
-                log.warn("草稿缺少影像数据，draftId={}", draftId);
-                throw new BusinessException(ErrorCodeEnum.ORDER_FILE_REQUIRED, "影像数据（CT/MRI等）");
-            }
-            // 校验影像报告（dict_code=10.2）
-            boolean hasImageReport = files.stream()
-                    .anyMatch(f -> FileBizTypeEnum.IMAGE_REPORT.getDictCode().equals(f.getBizType()));
-            if (!hasImageReport) {
-                log.warn("草稿缺少影像报告，draftId={}", draftId);
-                throw new BusinessException(ErrorCodeEnum.ORDER_FILE_REQUIRED, "影像报告");
-            }
+        boolean required = "true".equalsIgnoreCase(imageRequired);
+
+        // ---- 影像数据包 ----
+        List<FileVO> imageDataFiles = files.stream()
+                .filter(f -> FileBizTypeEnum.IMAGE_DATA.getDictCode().equals(f.getBizType()))
+                .collect(Collectors.toList());
+        if (required && imageDataFiles.isEmpty()) {
+            log.warn("草稿缺少影像数据，draftId={}", draftId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_FILE_REQUIRED, "影像数据（CT/MRI等）");
+        }
+
+        // ---- 影像报告 ----
+        List<FileVO> imageReportFiles = files.stream()
+                .filter(f -> FileBizTypeEnum.IMAGE_REPORT.getDictCode().equals(f.getBizType()))
+                .collect(Collectors.toList());
+        if (required && imageReportFiles.isEmpty()) {
+            log.warn("草稿缺少影像报告，draftId={}", draftId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_FILE_REQUIRED, "影像报告");
         }
     }
 

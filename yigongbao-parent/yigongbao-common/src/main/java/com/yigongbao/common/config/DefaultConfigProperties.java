@@ -53,9 +53,9 @@ public class DefaultConfigProperties {
 
     /**
      * 文件上传最大大小（字节）
-     * 默认 500MB
+     * 默认 2GB
      */
-    private Long configMaxUploadSize = 524288000L;
+    private Long configMaxUploadSize = 2147483648L;
 
     // ==================== 订单配置 ====================
     /**
@@ -64,6 +64,30 @@ public class DefaultConfigProperties {
      * false - 非必填
      */
     private Boolean configOrderImageRequired = true;
+
+    /**
+     * 影像数据包允许的文件扩展名（逗号分隔）
+     * 默认：.zip,.rar,.7z
+     */
+    private String configOrderImageDataAllowedExtensions = ".zip,.rar,.7z";
+
+    /**
+     * 影像报告允许的文件扩展名（逗号分隔）
+     * 默认：.pdf,.doc,.docx,.xls,.xlsx
+     */
+    private String configOrderImageReportAllowedExtensions = ".pdf,.doc,.docx,.xls,.xlsx";
+
+    /**
+     * 影像数据包最大文件大小（MB）
+     * 默认：500 MB；由 FileUploadConfigProvider 通过 configPrefix 读取，此处仅作兜底
+     */
+    private Integer configOrderImageDataMaxSizeMb = 500;
+
+    /**
+     * 影像报告最大文件大小（MB）
+     * 默认：50 MB；由 FileUploadConfigProvider 通过 configPrefix 读取，此处仅作兜底
+     */
+    private Integer configOrderImageReportMaxSizeMb = 50;
 
     /**
      * 草稿自动过期天数
@@ -113,34 +137,51 @@ public class DefaultConfigProperties {
 
     // ==================== 设计文件配置 ====================
     /**
-     * 数据包允许的文件扩展名（逗号分隔）
+     * 设计文件数据包容器格式（压缩包本身允许的扩展名，逗号分隔）
+     * 默认：.zip,.rar,.7z
+     */
+    private String configDesignPackageArchiveExtensions = ".zip,.rar,.7z";
+
+    /**
+     * 数据包内部允许的文件扩展名（逗号分隔，用于解析压缩包内容）
      * 默认：.stl,.obj,.ply,.3mf,.gcode,.ctb,.cbddlp
      */
     private String configDesignPackageAllowedExtensions = ".stl,.obj,.ply,.3mf,.gcode,.ctb,.cbddlp";
-
-    /**
-     * 数据包最大大小（MB）
-     * 默认 500MB
-     */
-    private Integer configDesignPackageMaxSizeMb = 500;
-
-    /**
-     * 可视化模型最大大小（MB）
-     * 默认 200MB
-     */
-    private Integer configDesignModelMaxSizeMb = 200;
-
-    /**
-     * 设计报告最大大小（MB）
-     * 默认 50MB
-     */
-    private Integer configDesignReportMaxSizeMb = 50;
 
     /**
      * 设计报告允许的文件扩展名（逗号分隔）
      * 默认：.pdf,.doc,.docx,.xls,.xlsx
      */
     private String configDesignReportAllowedExtensions = ".pdf,.doc,.docx,.xls,.xlsx";
+
+    /**
+     * 可视化模型允许的文件扩展名（逗号分隔）
+     * 默认：.stl,.obj,.ply,.3mf
+     */
+    private String configDesignModelAllowedExtensions = ".stl,.obj,.ply,.3mf";
+
+    /**
+     * 设计文件数据包最大文件大小（MB）
+     * 默认：500 MB；由 FileUploadConfigProvider 通过 configPrefix 读取，此处仅作兜底
+     */
+    private Integer configDesignPackageMaxSizeMb = 500;
+
+    /**
+     * 设计报告最大文件大小（MB）
+     * 默认：50 MB；由 FileUploadConfigProvider 通过 configPrefix 读取，此处仅作兜底
+     */
+    private Integer configDesignReportMaxSizeMb = 50;
+
+    /**
+     * 可视化模型最大文件大小（MB）
+     * 默认：200 MB；由 FileUploadConfigProvider 通过 configPrefix 读取，此处仅作兜底
+     */
+    private Integer configDesignModelMaxSizeMb = 200;
+
+    /**
+     * 设计模式（1=线下修改，2=在线编辑）
+     */
+    private Integer configDesignMode = 1;
 
     // ==================== 设计工单列配置 ====================
     /**

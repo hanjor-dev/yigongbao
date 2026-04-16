@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.yigongbao.module.system.basedata.vo.SelectTreeVO;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -319,37 +320,39 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
 
     /**
      * 获取配置分组列表
-     * 预设分组：系统配置、安全配置、其他配置
+     * 从数据库动态查询所有启用的配置分组，而不是硬编码，以便新增分组后无需修改代码
      *
-     * @return 分组列表（label=分组名称，value=分组编码）
+     * @return 分组列表（name=分组名称，value=分组编码）
      */
     @Override
-    public List<com.yigongbao.module.system.basedata.vo.SelectTreeVO> listConfigGroups() {
-        // 记录查询日志
+    public List<SelectTreeVO> listConfigGroups() {
         log.info("获取配置分组列表");
-        // 预设分组：系统配置、安全配置、其他配置
-        List<com.yigongbao.module.system.basedata.vo.SelectTreeVO> groups = new java.util.ArrayList<>();
+        // 动态查询 sys_config 中存在的所有分组（status=1 的记录）
+        List<String> groups = this.baseMapper.selectList(
+                new LambdaQueryWrapper<ConfigEntity>()
+                        .eq(ConfigEntity::getStatus, StatusConstants.NORMAL)
+                        .select(ConfigEntity::getConfigGroup))
+                .stream()
+                .map(ConfigEntity::getConfigGroup)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
 
-        // 系统配置分组
-        com.yigongbao.module.system.basedata.vo.SelectTreeVO system = new com.yigongbao.module.system.basedata.vo.SelectTreeVO();
-        system.setValue("system");
-        system.setName("系统配置");
-        groups.add(system);
+        // 分组编码 → 中文名称映射（仅用于显示，不限制分组值的范围）
+        java.util.Map<String, String> groupNameMap = new java.util.LinkedHashMap<>();
+        groupNameMap.put("system", "系统配置");
+        groupNameMap.put("security", "安全配置");
+        groupNameMap.put("file", "文件配置");
+        groupNameMap.put("other", "其他配置");
 
-        // 安全配置分组
-        com.yigongbao.module.system.basedata.vo.SelectTreeVO security = new com.yigongbao.module.system.basedata.vo.SelectTreeVO();
-        security.setValue("security");
-        security.setName("安全配置");
-        groups.add(security);
-
-        // 其他配置分组
-        com.yigongbao.module.system.basedata.vo.SelectTreeVO other = new com.yigongbao.module.system.basedata.vo.SelectTreeVO();
-        other.setValue("other");
-        other.setName("其他配置");
-        groups.add(other);
-
-        // 返回分组列表
-        return groups;
+        return groups.stream().map(g -> {
+            SelectTreeVO vo = new SelectTreeVO();
+            vo.setValue(g);
+            // 已知分组使用中文名称，未知分组直接显示编码
+            vo.setName(groupNameMap.getOrDefault(g, g));
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     /**
@@ -420,16 +423,20 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
 
     /**
      * 将 configKey 转换为字段名
-     * 规则：去除点号后转驼峰，再加 config 前缀
-     * 例如：default.password → configDefaultPassword
+     * 规则：按点号和下划线分割后转驼峰，再加 config 前缀
+     * 例如：default.password           → configDefaultPassword
+     *       order.image.data.allowed_extensions → configOrderImageDataAllowedExtensions
      *
      * @param configKey 配置键
      * @return 字段名
      */
     private String toFieldName(String configKey) {
         StringBuilder sb = new StringBuilder("config");
-        for (String part : configKey.split("\\.")) {
-            sb.append(capitalize(part));
+        // 先按点号分割，再按下划线分割，每段首字母大写后拼接
+        for (String dotPart : configKey.split("\\.")) {
+            for (String underPart : dotPart.split("_")) {
+                sb.append(capitalize(underPart));
+            }
         }
         return sb.toString();
     }

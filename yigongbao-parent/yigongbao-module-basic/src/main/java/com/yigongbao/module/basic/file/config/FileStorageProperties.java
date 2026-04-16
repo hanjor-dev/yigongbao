@@ -17,16 +17,8 @@ import org.springframework.stereotype.Component;
 public class FileStorageProperties {
 
     /**
-     * 最大文件大小（字节），默认 500MB
+     * 最大文件大小（字节），默认 2GB
+     * 全局上限，各业务类型的实际限制由业务层自行校验
      */
-    private long maxFileSize = 524288000L;
-
-    /**
-     * 允许的文件扩展名
-     */
-    private String[] allowedExtensions = {
-            "jpg", "jpeg", "png", "gif", "bmp", "pdf",
-            "doc", "docx", "xls", "xlsx", "zip", "rar",
-            "stl", "obj", "3ds", "ply", "step", "dcm"
-    };
+    private long maxFileSize = 2147483648L;
 }

@@ -95,7 +95,6 @@ public class OrderPageDTO implements Serializable {
 
     /**
      * 阶段筛选（可选，不传则查询全部阶段）
-     * 1-订单, 2-设计, 3-打印, 4-后处理, 5-质检, 6-仓储, 7-确认, 8-完成
      */
     private Integer phase;
 

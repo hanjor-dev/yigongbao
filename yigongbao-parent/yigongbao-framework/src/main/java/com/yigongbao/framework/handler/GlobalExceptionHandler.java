@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.sql.SQLIntegrityConstraintViolationException;
@@ -219,6 +221,35 @@ public class GlobalExceptionHandler {
     public Result<Void> handleNoHandlerFoundException(NoHandlerFoundException e) {
         log.warn("请求路径不存在：{}", e.getRequestURL());
         return Result.error(404, "请求路径不存在：" + e.getRequestURL());
+    }
+
+    /**
+     * 处理文件大小超出限制异常
+     * 由 Spring Multipart 层在请求解析阶段抛出，早于 Controller 执行
+     * 对应配置：spring.servlet.multipart.max-file-size / max-request-size
+     *
+     * @param e 文件大小超出异常实例
+     * @return 统一返回结果
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.OK)
+    public Result<Void> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
+        log.warn("文件大小超出系统限制：{}", e.getMessage());
+        return Result.error(664, "文件大小超出系统允许的最大限制，请压缩后重试");
+    }
+
+    /**
+     * 处理 Multipart 请求解析异常
+     * 当请求不是合法的 multipart 格式，或文件流读取失败时触发
+     *
+     * @param e Multipart 异常实例
+     * @return 统一返回结果
+     */
+    @ExceptionHandler(MultipartException.class)
+    @ResponseStatus(HttpStatus.OK)
+    public Result<Void> handleMultipartException(MultipartException e) {
+        log.warn("文件上传请求解析失败：{}", e.getMessage());
+        return Result.error(661, "文件上传失败，请检查文件格式后重试");
     }
 
     /**

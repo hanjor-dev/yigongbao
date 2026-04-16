@@ -30,7 +30,7 @@ public class UpdateConfigDTO {
     private String configType;
 
     /**
-     * 配置分组（system/security/other）
+     * 配置分组（system/security/file/other）
      */
     private String configGroup;
 

@@ -40,7 +40,7 @@ public class CreateConfigDTO {
     private String configType = "string";
 
     /**
-     * 配置分组（system/security/other）
+     * 配置分组（system/security/file/other）
      */
     @NotBlank(message = "配置分组不能为空")
     private String configGroup;

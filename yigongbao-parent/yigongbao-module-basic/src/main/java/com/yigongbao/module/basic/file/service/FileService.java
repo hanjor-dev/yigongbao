@@ -6,6 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 文件存储服务接口
@@ -105,4 +106,50 @@ public interface FileService {
      * @param id 文件ID
      */
     void deleteById(String id);
+
+    // ==================== 文件类型校验工具方法 ====================
+
+    /**
+     * 解析允许扩展名配置字符串为集合
+     * 逗号分隔、trim、toLowerCase、过滤空串
+     * 业务模块负责从 ConfigService 取得配置字符串后调用此方法
+     *
+     * @param config   配置值（可为 null/blank，此时使用 fallback）
+     * @param fallback 兜底值（逗号分隔，如 ".pdf,.docx,.xlsx"）
+     * @return 小写扩展名集合（含点，如 {".pdf", ".docx"}）
+     */
+    Set<String> parseAllowedExtensions(String config, String fallback);
+
+    /**
+     * 校验文件列表中每个文件的扩展名是否在允许集合中
+     *
+     * @param files        文件列表
+     * @param allowedExts  允许的扩展名集合（含点，如 {".pdf", ".docx"}）
+     * @param categoryName 文件类别名称（用于日志和错误提示）
+     * @throws com.yigongbao.common.exception.BusinessException 任一文件类型不允许时抛出 ATTACHMENT_TYPE_NOT_ALLOWED
+     */
+    void assertAllFileTypesAllowed(List<FileVO> files, Set<String> allowedExts, String categoryName);
+
+    /**
+     * 批量查询文件，同时校验存在性与扩展名（一次 DB 查询）
+     *
+     * @param fileIds      文件 ID 列表（为空时直接返回空列表）
+     * @param allowedExts  允许的扩展名集合
+     * @param categoryName 文件类别名称（用于日志和错误提示）
+     * @return 查询到的文件 VO 列表
+     * @throws com.yigongbao.common.exception.BusinessException 任一文件不存在或类型不允许时抛出
+     */
+    List<FileVO> listAndValidate(List<String> fileIds, Set<String> allowedExts, String categoryName);
+
+    /**
+     * 校验文件大小是否超出限制
+     * 业务模块从 ConfigService 取得最大大小（MB）配置字符串后调用此方法
+     *
+     * @param fileSizeBytes  文件实际大小（字节），通常来自 MultipartFile.getSize() 或 FileVO.getFileSize()
+     * @param maxSizeMbStr   最大允许大小配置值（MB，字符串形式，可为 null/blank，此时使用 fallbackMb）
+     * @param fallbackMb     兜底最大大小（MB）
+     * @param categoryName   文件类别名称（用于日志和错误提示）
+     * @throws com.yigongbao.common.exception.BusinessException 超出限制时抛出 ATTACHMENT_SIZE_EXCEEDED
+     */
+    void assertFileSizeAllowed(long fileSizeBytes, String maxSizeMbStr, int fallbackMb, String categoryName);
 }

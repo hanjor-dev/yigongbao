@@ -64,6 +64,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+
 /**
  * 订单主表 Service 实现类
  * 处理订单相关的业务逻辑，包括订单CRUD、状态流转、审核流程等
@@ -852,59 +853,49 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
     /**
      * 校验直提订单的影像文件
-     * 根据系统配置 order.image.required 判断影像文件是否必填，并校验文件是否真实存在
-     *
-     * @param dto 创建订单参数
-     * @throws BusinessException 配置要求必须上传但未上传，或文件不存在时抛出
+     * 类型和大小在上传时已由 FileService（Provider 机制）校验，此处只做：
+     * 1. 必填性校验（受 order.image.required 配置控制）
+     * 2. 文件 ID 存在性校验
      */
     private void validateOrderFiles(CreateOrderDTO dto) {
-        // 获取系统配置：是否必须上传影像文件
         String imageRequired = configService.getConfigValue(SystemConfigKeyEnum.ORDER_IMAGE_REQUIRED.getKey());
-        if (!"true".equalsIgnoreCase(imageRequired)) {
-            // 配置关闭时，不校验
-            log.info("系统配置 order.image.required={}，跳过影像文件校验", imageRequired);
-            return;
-        }
-        // 校验影像数据（dict_code=10.1）
+        boolean required = "true".equalsIgnoreCase(imageRequired);
+
+        // ---- 影像数据包 ----
         boolean hasImageData = dto.getImageDataFileIds() != null && !dto.getImageDataFileIds().isEmpty();
-        if (!hasImageData) {
+        if (required && !hasImageData) {
             log.warn("直提创建订单缺少影像数据，配置要求必须上传");
             throw new BusinessException(ErrorCodeEnum.ORDER_FILE_REQUIRED, "影像数据");
         }
-        // 校验影像数据文件是否真实存在
-        validateFileIdsExist(dto.getImageDataFileIds(), "影像数据");
+        if (hasImageData) {
+            // 只做存在性校验，类型/大小已在上传时由 FileService（Provider）校验
+            assertFilesExist(fileService.listByIds(dto.getImageDataFileIds()), dto.getImageDataFileIds(), "影像数据包");
+        }
 
-        // 校验影像报告（dict_code=10.2）
+        // ---- 影像报告 ----
         boolean hasImageReport = dto.getImageReportFileIds() != null && !dto.getImageReportFileIds().isEmpty();
-        if (!hasImageReport) {
+        if (required && !hasImageReport) {
             log.warn("直提创建订单缺少影像报告，配置要求必须上传");
             throw new BusinessException(ErrorCodeEnum.ORDER_FILE_REQUIRED, "影像报告");
         }
-        // 校验影像报告文件是否真实存在
-        validateFileIdsExist(dto.getImageReportFileIds(), "影像报告");
+        if (hasImageReport) {
+            assertFilesExist(fileService.listByIds(dto.getImageReportFileIds()), dto.getImageReportFileIds(), "影像报告");
+        }
 
         log.info("直提创建订单影像文件校验通过，imageDataCount={}, imageReportCount={}",
-                dto.getImageDataFileIds().size(), dto.getImageReportFileIds().size());
+                hasImageData ? dto.getImageDataFileIds().size() : 0,
+                hasImageReport ? dto.getImageReportFileIds().size() : 0);
     }
 
     /**
-     * 校验文件ID列表对应的文件是否全部真实存在
-     *
-     * @param fileIds 文件ID列表
-     * @param fileCategoryName 文件类别名称（用于错误提示）
-     * @throws BusinessException 存在文件不存在时抛出
+     * 校验文件列表中每个 fileId 都存在于查询结果中，否则抛出 ATTACHMENT_NOT_FOUND
      */
-    private void validateFileIdsExist(List<String> fileIds, String fileCategoryName) {
-        if (fileIds == null || fileIds.isEmpty()) {
-            return;
-        }
-        // 批量查询，1次查询替代 N 次
-        List<FileVO> found = fileService.listByIds(fileIds);
+    private void assertFilesExist(List<FileVO> found, List<String> fileIds, String categoryName) {
         Set<String> foundIds = found.stream().map(FileVO::getId).collect(Collectors.toSet());
         for (String fileId : fileIds) {
             if (!foundIds.contains(fileId)) {
-                log.warn("{} 文件不存在，fileId={}", fileCategoryName, fileId);
-                throw new BusinessException(ErrorCodeEnum.ORDER_FILE_NOT_FOUND, fileCategoryName);
+                log.warn("{} 文件不存在，fileId={}", categoryName, fileId);
+                throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
             }
         }
     }
