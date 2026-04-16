@@ -37,13 +37,6 @@ public interface DesignerAssignmentService {
     void manualAssignDesigner(Long orderId, Long designerId);
 
     /**
-     * 设计师开始设计（仅分配给本人的订单；订单必须处于 PENDING_DESIGN 状态）
-     *
-     * @param orderId 订单ID
-     */
-    void startDesign(Long orderId);
-
-    /**
      * 查询可分配设计师列表（按专业方向过滤 + 负载排序）
      *
      * @param dto 查询条件

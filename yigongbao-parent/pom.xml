@@ -38,6 +38,7 @@
         <ip2region.version>2.7.0</ip2region.version>
         <junrar.version>7.5.5</junrar.version>
         <commons-compress.version>1.26.1</commons-compress.version>
+        <xz.version>1.9</xz.version>
 
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
@@ -206,6 +207,13 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-compress</artifactId>
                 <version>${commons-compress.version}</version>
+            </dependency>
+
+            <!-- xz：commons-compress 解析 7Z 格式的运行时依赖（optional，需显式声明） -->
+            <dependency>
+                <groupId>org.tukaani</groupId>
+                <artifactId>xz</artifactId>
+                <version>${xz.version}</version>
             </dependency>
         </dependencies>
 

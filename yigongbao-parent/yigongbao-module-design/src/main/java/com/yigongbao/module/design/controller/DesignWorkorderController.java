@@ -43,4 +43,15 @@ public class DesignWorkorderController {
     public Result<DesignWorkorderDetailVO> getWorkorderDetail(@PathVariable Long orderId) {
         return Result.success(designWorkorderService.getWorkorderDetail(orderId));
     }
+
+    /**
+     * 设计师开始设计
+     * 仅分配给本人的订单，状态必须为待设计（PENDING_DESIGN）
+     */
+    @Operation(summary = "设计师开始设计")
+    @PostMapping("/{orderId}/start-design")
+    public Result<Void> startDesign(@PathVariable Long orderId) {
+        designWorkorderService.startDesign(orderId);
+        return Result.success();
+    }
 }

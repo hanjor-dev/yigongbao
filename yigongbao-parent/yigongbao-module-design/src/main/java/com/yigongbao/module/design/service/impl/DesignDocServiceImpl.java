@@ -205,8 +205,8 @@ public class DesignDocServiceImpl implements DesignDocService {
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
 
-        // 6. 上传文件
-        String filename = pkg.getPackageCode() + "-图纸-" + version + ".xlsx";
+        // 6. 上传文件（version 中含 / 不能直接用于文件名，替换为 -）
+        String filename = pkg.getPackageCode() + "-图纸-" + version.replace("/", "-") + ".xlsx";
         FileVO drawFile = fileService.uploadBytes(drawBytes, filename, FileBizTypeEnum.DRAWING_FILE.getDictCode());
 
         // 7. 新建记录或更新模板文件

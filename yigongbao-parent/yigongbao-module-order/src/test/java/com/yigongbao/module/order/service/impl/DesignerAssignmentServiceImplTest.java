@@ -1,10 +1,8 @@
 package com.yigongbao.module.order.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowStatusEnum;
-import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
 import com.yigongbao.module.order.dto.order.DesignerQueryDTO;
 import com.yigongbao.common.entity.OrderMainEntity;
@@ -21,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -48,7 +45,6 @@ class DesignerAssignmentServiceImplTest {
     @Mock private ConfigService configService;
     @Mock private DictService dictService;
     @Mock private RebuildProjectService rebuildProjectService;
-    @Mock private FlowFacade flowFacade;
 
     @InjectMocks private DesignerAssignmentServiceImpl service;
 
@@ -235,62 +231,6 @@ class DesignerAssignmentServiceImplTest {
         when(orderItemMapper.selectList(any())).thenReturn(List.of());
         service.manualAssignDesigner(1L, 100L);
         verify(orderMainService).updateById(argThat(o -> Long.valueOf(100L).equals(o.getDesignerId())));
-    }
-
-    // ==================== startDesign ====================
-
-    @Test
-    @DisplayName("startDesign — 当前用户是分配设计师，状态正确，执行成功")
-    void startDesign_success() {
-        try (MockedStatic<StpUtil> mockedStpUtil = mockStatic(StpUtil.class)) {
-            mockedStpUtil.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
-            OrderMainEntity order = buildPendingDesignOrder(1L);
-            order.setDesignerId(100L);
-            when(orderMainService.getById(1L)).thenReturn(order);
-            service.startDesign(1L);
-            verify(flowFacade).executeFlow(eq(1L), eq(com.yigongbao.flow.enums.FlowActionEnum.START_DESIGN), any());
-        }
-    }
-
-    @Test
-    @DisplayName("startDesign — 订单不存在，抛 ORDER_NOT_FOUND")
-    void startDesign_orderNotFound_shouldThrow() {
-        try (MockedStatic<StpUtil> mockedStpUtil = mockStatic(StpUtil.class)) {
-            mockedStpUtil.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
-            when(orderMainService.getById(1L)).thenReturn(null);
-            BusinessException ex = assertThrows(BusinessException.class,
-                    () -> service.startDesign(1L));
-            assertEquals(ErrorCodeEnum.ORDER_NOT_FOUND.getCode(), ex.getCode());
-        }
-    }
-
-    @Test
-    @DisplayName("startDesign — 订单状态非 PENDING_DESIGN，抛 ORDER_STATUS_ERROR")
-    void startDesign_wrongStatus_shouldThrow() {
-        try (MockedStatic<StpUtil> mockedStpUtil = mockStatic(StpUtil.class)) {
-            mockedStpUtil.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
-            OrderMainEntity order = new OrderMainEntity();
-            order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
-            order.setDesignerId(100L);
-            when(orderMainService.getById(1L)).thenReturn(order);
-            BusinessException ex = assertThrows(BusinessException.class,
-                    () -> service.startDesign(1L));
-            assertEquals(ErrorCodeEnum.ORDER_STATUS_ERROR.getCode(), ex.getCode());
-        }
-    }
-
-    @Test
-    @DisplayName("startDesign — 非分配设计师，抛 ORDER_DESIGNER_MISMATCH")
-    void startDesign_notAssignedDesigner_shouldThrow() {
-        try (MockedStatic<StpUtil> mockedStpUtil = mockStatic(StpUtil.class)) {
-            mockedStpUtil.when(StpUtil::getLoginIdAsLong).thenReturn(999L); // 不是分配的设计师
-            OrderMainEntity order = buildPendingDesignOrder(1L);
-            order.setDesignerId(100L); // 分配给 100
-            when(orderMainService.getById(1L)).thenReturn(order);
-            BusinessException ex = assertThrows(BusinessException.class,
-                    () -> service.startDesign(1L));
-            assertEquals(ErrorCodeEnum.ORDER_DESIGNER_MISMATCH.getCode(), ex.getCode());
-        }
     }
 
     // ==================== listAvailableDesigners ====================

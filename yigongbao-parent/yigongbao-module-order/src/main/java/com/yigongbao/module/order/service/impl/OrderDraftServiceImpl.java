@@ -418,7 +418,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
      * 必填性受 order.image.required 配置控制；类型和大小已在上传时由 FileService（Provider）校验
      */
     private void validateDraftFiles(Long draftId) {
-        List<FileVO> files = fileService.listByBiz(FileBizTypeEnum.ORDER_DRAFT.getCode(), draftId);
+        List<FileVO> files = fileService.listByBiz(FileBizTypeEnum.ORDER_DRAFT.getDictCode(), draftId);
         String imageRequired = configService.getConfigValue(SystemConfigKeyEnum.ORDER_IMAGE_REQUIRED.getKey());
         boolean required = "true".equalsIgnoreCase(imageRequired);
 

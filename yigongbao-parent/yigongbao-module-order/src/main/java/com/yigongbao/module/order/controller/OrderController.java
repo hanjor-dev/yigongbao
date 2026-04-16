@@ -155,13 +155,6 @@ public class OrderController {
         return Result.success();
     }
 
-    @Operation(summary = "设计师开始设计")
-    @PostMapping("/{id}/start-design")
-    public Result<Void> startDesign(@PathVariable Long id) {
-        designerAssignmentService.startDesign(id);
-        return Result.success();
-    }
-
     // ==================== 列配置接口 ====================
 
     @Operation(summary = "获取当前用户列配置")

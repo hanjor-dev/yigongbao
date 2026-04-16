@@ -5,10 +5,13 @@ import com.yigongbao.module.design.dto.ArchiveFileInfo;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -54,7 +57,6 @@ class ArchiveParserUtilTest {
         @Test
         @DisplayName("不支持其他格式")
         void shouldNotSupportOtherFormats() {
-            assertFalse(ArchiveParserUtil.isSupported("test.tar"));
             assertFalse(ArchiveParserUtil.isSupported("test.gz"));
             assertFalse(ArchiveParserUtil.isSupported("test.txt"));
             assertFalse(ArchiveParserUtil.isSupported("test.stl"));
@@ -180,7 +182,7 @@ class ArchiveParserUtilTest {
             InputStream inputStream = new ByteArrayInputStream(new byte[0]);
 
             BusinessException exception = assertThrows(BusinessException.class,
-                    () -> ArchiveParserUtil.parse(inputStream, "test.tar", null));
+                    () -> ArchiveParserUtil.parse(inputStream, "test.gz", null));
 
             assertEquals(736, exception.getCode()); // DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED
         }
@@ -236,6 +238,85 @@ class ArchiveParserUtilTest {
             List<ArchiveFileInfo> result = ArchiveParserUtil.parse(inputStream, "test.zip", Set.of(".stl"));
 
             assertEquals(2, result.size());
+        }
+    }
+
+    // ==================== 真实文件测试（需要本地测试数据，CI 跳过） ====================
+
+    /**
+     * 真实文件解析测试
+     * 依赖 E:\99_Temp\医工宝测试数据\ 目录下的测试文件，本地开发时运行，CI 自动跳过。
+     * 运行方式：mvn test -Dtest=ArchiveParserUtilTest -Dlocal.test.data=true -pl yigongbao-module-design
+     * 或在 IDE 中直接运行此 Nested 类（需在 JVM 参数中加 -Dlocal.test.data=true）。
+     */
+    @Nested
+    @DisplayName("真实文件解析测试（本地）")
+    @EnabledIfSystemProperty(named = "local.test.data", matches = "true")
+    class RealFileTest {
+
+        private static final String TEST_DIR = "E:/99_Temp/医工宝测试数据/";
+        private static final Set<String> ALLOWED_EXTS = Set.of(".stl", ".obj", ".ply", ".3mf", ".gcode", ".ctb", ".cbddlp");
+
+        @Test
+        @DisplayName("解析真实 ZIP 文件")
+        void parseRealZip() throws Exception {
+            Path file = Path.of(TEST_DIR, "测试设计数据包3.zip");
+            System.out.println("=== 解析 ZIP: " + file);
+            try (InputStream is = new FileInputStream(file.toFile())) {
+                List<ArchiveFileInfo> result = ArchiveParserUtil.parse(is, file.getFileName().toString(), ALLOWED_EXTS);
+                printResult(result);
+                assertNotNull(result);
+                System.out.println("ZIP 解析成功，有效文件数=" + result.size());
+            }
+        }
+
+        @Test
+        @DisplayName("解析真实 7Z 文件")
+        void parseReal7z() throws Exception {
+            Path file = Path.of(TEST_DIR, "测试设计数据包1.7z");
+            System.out.println("=== 解析 7Z: " + file);
+            try (InputStream is = new FileInputStream(file.toFile())) {
+                List<ArchiveFileInfo> result = ArchiveParserUtil.parse(is, file.getFileName().toString(), ALLOWED_EXTS);
+                printResult(result);
+                assertNotNull(result);
+                System.out.println("7Z 解析成功，有效文件数=" + result.size());
+            }
+        }
+
+        @Test
+        @DisplayName("TAR 格式正常解析（已支持）")
+        void parseTarShouldSucceed() throws Exception {
+            Path file = Path.of(TEST_DIR, "测试设计数据包2.tar");
+            System.out.println("=== 解析 TAR: " + file);
+            try (InputStream is = new FileInputStream(file.toFile())) {
+                List<ArchiveFileInfo> result = ArchiveParserUtil.parse(is, file.getFileName().toString(), ALLOWED_EXTS);
+                printResult(result);
+                assertNotNull(result);
+                System.out.println("TAR 解析成功，有效文件数=" + result.size());
+            }
+        }
+
+        @Test
+        @DisplayName("不过滤扩展名时返回压缩包内所有文件")
+        void parseZipNoFilter() throws Exception {
+            Path file = Path.of(TEST_DIR, "测试设计数据包3.zip");
+            System.out.println("=== ZIP 无过滤解析: " + file);
+            try (InputStream is = new FileInputStream(file.toFile())) {
+                List<ArchiveFileInfo> result = ArchiveParserUtil.parse(is, file.getFileName().toString(), null);
+                printResult(result);
+                System.out.println("ZIP 无过滤解析成功，文件总数=" + result.size());
+            }
+        }
+
+        private void printResult(List<ArchiveFileInfo> result) {
+            if (result.isEmpty()) {
+                System.out.println("  （无匹配文件）");
+                return;
+            }
+            for (ArchiveFileInfo f : result) {
+                System.out.printf("  %-40s  ext=%-8s  size=%d bytes%n",
+                        f.getFilePath(), f.getExtension(), f.getFileSize());
+            }
         }
     }
 

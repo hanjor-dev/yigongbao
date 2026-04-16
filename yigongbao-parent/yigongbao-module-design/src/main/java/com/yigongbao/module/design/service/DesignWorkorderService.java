@@ -47,4 +47,15 @@ public interface DesignWorkorderService {
      * @param dto 列配置参数
      */
     void saveColumnConfig(SaveDesignColumnConfigDTO dto);
+
+    /**
+     * 设计师开始设计
+     * <p>
+     * 仅分配给本人的订单，且订单必须处于 PENDING_DESIGN 状态。
+     * 执行后：状态流转至 DESIGN_IN_PROGRESS，并更新 designStartTime、currentHandlerId/Name。
+     * </p>
+     *
+     * @param orderId 订单ID
+     */
+    void startDesign(Long orderId);
 }

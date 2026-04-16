@@ -341,7 +341,7 @@ VALUES
 ('order.image.data.max_size_mb', '影像数据包最大文件大小', '500', 'number', 'file', '影像数据包上传时的最大文件大小（MB）', 0, 0, 3, 1),
 ('order.image.report.allowed_extensions', '影像报告允许的文件扩展名', '.pdf,.doc,.docx,.xls,.xlsx', 'string', 'file', '影像报告允许的文件扩展名，逗号分隔（pdf/word/excel）', 0, 0, 4, 1),
 ('order.image.report.max_size_mb', '影像报告最大文件大小', '50', 'number', 'file', '影像报告上传时的最大文件大小（MB）', 0, 0, 5, 1),
-('design.package.archive_extensions', '设计数据包容器格式', '.zip,.rar,.7z', 'string', 'file', '上传数据包时允许的压缩包格式，逗号分隔', 0, 0, 6, 1),
+('design.package.archive_extensions', '设计数据包容器格式', '.zip,.rar,.7z,.tar', 'string', 'file', '上传数据包时允许的压缩包格式，逗号分隔', 0, 0, 6, 1),
 ('design.package.max_size_mb', '设计数据包最大文件大小', '500', 'number', 'file', '设计数据包压缩包上传时的最大文件大小（MB）', 0, 0, 7, 1),
 ('design.package.allowed_extensions', '数据包内部允许的文件类型', '.stl,.obj,.ply,.3mf,.gcode,.ctb,.cbddlp', 'string', 'file', '数据包压缩包内允许的文件扩展名，逗号分隔（3D打印格式）', 0, 0, 8, 1),
 ('design.report.allowed_extensions', '设计报告允许的文件扩展名', '.pdf,.doc,.docx,.xls,.xlsx', 'string', 'file', '设计报告允许的文件扩展名，逗号分隔（word/pdf/excel）', 0, 0, 9, 1),

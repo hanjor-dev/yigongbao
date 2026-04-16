@@ -75,18 +75,22 @@ public class DesignFileServiceImpl implements DesignFileService {
         String fileName = file.getOriginalFilename();
         Set<String> archiveExts = fileService.parseAllowedExtensions(
                 configService.getConfigValue(SystemConfigKeyEnum.DESIGN_PACKAGE_ARCHIVE_EXTENSIONS.getKey()),
-                ".zip,.rar,.7z");
+                ".zip,.rar,.7z,.tar");
         String fileExt = fileName != null && fileName.contains(".")
                 ? fileName.substring(fileName.lastIndexOf('.')).toLowerCase() : "";
         if (fileExt.isEmpty() || !archiveExts.contains(fileExt)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED);
         }
 
-        // 3. 上传压缩包文件（上传时由 FileService/Provider 完成大小校验）
+        // 3. 校验压缩包大小
+        String maxSizeMbStr = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_PACKAGE_MAX_SIZE_MB.getKey());
+        fileService.assertFileSizeAllowed(file.getSize(), maxSizeMbStr, 500, "打印文件包");
+
+        // 4. 上传压缩包文件
         FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.PRINT_PACKAGE.getDictCode());
         log.info("压缩包上传成功, fileId={}", fileVO.getId());
 
-        // 4. 解析压缩包内文件列表
+        // 5. 解析压缩包内文件列表
         Set<String> allowedExtensions = getAllowedExtensions();
         List<ArchiveFileInfo> archiveFiles;
         try {
@@ -98,21 +102,21 @@ public class DesignFileServiceImpl implements DesignFileService {
             throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_PARSE_FAILED, e.getMessage());
         }
 
-        // 5. 校验是否有有效文件
+        // 6. 校验是否有有效文件
         if (CollUtil.isEmpty(archiveFiles)) {
             fileService.deleteById(fileVO.getId());
             throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_EMPTY);
         }
         log.info("压缩包解析成功, 有效文件数={}", archiveFiles.size());
 
-        // 6. 生成数据包编号
+        // 7. 生成数据包编号
         String packageCode = codeGeneratorService.generateWithSeqSuffix(
                 CodeRuleConstants.DATA_PACKAGE_NO, order.getOrderCode());
 
-        // 7. 计算序号
+        // 8. 计算序号
         Integer packageSeq = getNextPackageSeq(orderId);
 
-        // 8. 保存数据包记录
+        // 9. 保存数据包记录
         DesignPackageEntity packageEntity = new DesignPackageEntity();
         packageEntity.setOrderId(orderId);
         packageEntity.setOrderCode(order.getOrderCode());
@@ -127,7 +131,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         packageService.save(packageEntity);
         log.info("数据包记录保存成功, packageId={}, packageCode={}", packageEntity.getId(), packageCode);
 
-        // 9. 保存包内文件记录
+        // 10. 保存包内文件记录
         List<DesignPackageFileEntity> fileEntities = new ArrayList<>();
         int sortOrder = 1;
         for (ArchiveFileInfo archiveFile : archiveFiles) {

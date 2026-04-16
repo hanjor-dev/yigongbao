@@ -51,8 +51,10 @@ public enum FileBizTypeEnum {
     // ==================== 设计文件（工单设计） ====================
     /**
      * 打印文件包：3D 打印设计文件压缩包，格式 ZIP/RAR/7Z（内含 STL/3MF/OBJ）
+     * configPrefix=null：容器格式和大小由 DesignFileServiceImpl.uploadPackage 手动校验，
+     * 不走 FileUploadConfigProvider，避免与内容文件格式（design.package.allowed_extensions）混淆。
      */
-    PRINT_PACKAGE("print_package", "10.4", "打印文件包", "design.package"),
+    PRINT_PACKAGE("print_package", "10.4", "打印文件包", null),
 
     /**
      * 设计报告：设计说明、设计参数等，格式 PDF/Word/Excel

@@ -1,5 +1,6 @@
 package com.yigongbao.module.design.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -10,9 +11,14 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.module.basic.file.entity.FileDetail;
-import com.yigongbao.module.basic.file.mapper.FileDetailMapper;
+import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
+import com.yigongbao.flow.facade.FlowFacade;
+import com.yigongbao.flow.operator.FlowOperator;
+import com.yigongbao.flow.result.TransitionResult;
+import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
 import com.yigongbao.module.design.dto.SaveDesignColumnConfigDTO;
 import com.yigongbao.module.design.entity.DesignDrawingEntity;
@@ -34,8 +40,8 @@ import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
 import com.yigongbao.module.design.vo.DesignWorkorderListVO;
 import com.yigongbao.module.design.vo.SubmitCheckVO;
 import com.yigongbao.module.order.entity.OrderItemEntity;
-import com.yigongbao.module.order.mapper.OrderItemMapper;
-import com.yigongbao.module.order.mapper.OrderMainMapper;
+import com.yigongbao.module.order.service.OrderItemService;
+import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.service.UserService;
@@ -44,6 +50,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,19 +69,20 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DesignWorkorderServiceImpl implements DesignWorkorderService {
 
-    private final OrderMainMapper orderMainMapper;
-    private final OrderItemMapper orderItemMapper;
+    private final OrderMainService orderMainService;
+    private final OrderItemService orderItemService;
+    private final FileService fileService;
     private final DesignPackageMapper designPackageMapper;
     private final DesignProductMapper designProductMapper;
     private final DesignInstructionMapper designInstructionMapper;
     private final DesignDrawingMapper designDrawingMapper;
     private final DesignModelMapper designModelMapper;
     private final DesignReviewMapper designReviewMapper;
-    private final FileDetailMapper fileDetailMapper;
     private final UserService userService;
     private final UserHospitalService userHospitalService;
     private final DesignQueryHelper designQueryHelper;
     private final ObjectMapper objectMapper;
+    private final FlowFacade flowFacade;
 
     /**
      * 分页查询设计工单列表
@@ -118,7 +126,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         // 分页参数校验（pageSize 最大 100）
         int pageSize = queryDTO.getPageSize() == null ? 10 : Math.min(queryDTO.getPageSize(), 100);
         int pageNum = queryDTO.getPageNum() == null ? 1 : queryDTO.getPageNum();
-        IPage<OrderMainEntity> entityPage = orderMainMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        IPage<OrderMainEntity> entityPage = orderMainService.page(new Page<>(pageNum, pageSize), wrapper);
         log.info("查询到工单数量，total={}", entityPage.getTotal());
 
         // 转换为列表 VO
@@ -152,7 +160,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     public DesignWorkorderDetailVO getWorkorderDetail(Long orderId) {
         log.info("查询设计工单详情，orderId={}", orderId);
 
-        OrderMainEntity order = orderMainMapper.selectById(orderId);
+        OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
@@ -277,6 +285,59 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         }
     }
 
+    /**
+     * 设计师开始设计
+     * <p>
+     * 校验规则：订单必须处于 PENDING_DESIGN 状态，且当前登录用户是该订单的分配设计师。
+     * 执行后更新：phase、status、designStartTime、currentHandlerId、currentHandlerName。
+     * </p>
+     *
+     * @param orderId 订单ID
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void startDesign(Long orderId) {
+        log.info("设计师开始设计，orderId={}", orderId);
+
+        // 1. 校验订单存在
+        OrderMainEntity order = orderMainService.getById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+
+        // 2. 校验订单状态（必须是待设计）
+        if (!FlowStatusEnum.PENDING_DESIGN.getValue().equals(order.getStatus())) {
+            log.warn("订单状态不允许开始设计，orderId={}, status={}", orderId, order.getStatus());
+            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR);
+        }
+
+        // 3. 校验当前登录用户是该订单的分配设计师
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (!currentUserId.equals(order.getDesignerId())) {
+            log.warn("非分配设计师，无权开始设计，orderId={}, designerId={}, currentUserId={}",
+                    orderId, order.getDesignerId(), currentUserId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_DESIGNER_MISMATCH);
+        }
+
+        // 4. 查询当前用户姓名（用于冗余字段回写）
+        UserEntity currentUser = userService.getById(currentUserId);
+        String currentUserName = currentUser != null ? currentUser.getRealName() : null;
+
+        // 5. 通过 FlowFacade 执行状态流转（PENDING_DESIGN → DESIGN_IN_PROGRESS）
+        TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.START_DESIGN,
+                FlowOperator.of(currentUserId, currentUserName));
+
+        // 6. 将流转结果和设计开始时间写回订单表
+        order.setPhase(result.getTargetPhase());
+        order.setStatus(result.getFinalStatus());
+        order.setDesignStartTime(LocalDateTime.now());
+        order.setCurrentHandlerId(currentUserId);
+        order.setCurrentHandlerName(currentUserName);
+        orderMainService.updateById(order);
+
+        log.info("开始设计成功，orderId={}, phase={}, status={}", orderId, result.getTargetPhase(), result.getFinalStatus());
+    }
+
     // ==================== 私有辅助方法 ====================
 
     /**
@@ -318,10 +379,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             return;
         }
         List<Long> orderIds = voList.stream().map(DesignWorkorderListVO::getId).collect(Collectors.toList());
-        List<OrderItemEntity> allItems = orderItemMapper.selectList(
-                new LambdaQueryWrapper<OrderItemEntity>()
-                        .in(OrderItemEntity::getOrderId, orderIds)
-                        .eq(OrderItemEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+        List<OrderItemEntity> allItems = orderItemService.listByOrderIds(orderIds);
         Map<Long, List<OrderItemEntity>> itemsByOrderId = allItems.stream()
                 .collect(Collectors.groupingBy(OrderItemEntity::getOrderId));
 
@@ -405,10 +463,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
      * 构建详情页重建项目列表
      */
     private List<DesignWorkorderDetailVO.RebuildProjectItemVO> buildRebuildProjectList(Long orderId) {
-        List<OrderItemEntity> items = orderItemMapper.selectList(
-                new LambdaQueryWrapper<OrderItemEntity>()
-                        .eq(OrderItemEntity::getOrderId, orderId)
-                        .eq(OrderItemEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+        List<OrderItemEntity> items = orderItemService.listByOrderId(orderId);
         return items.stream()
                 .map(item -> {
                     DesignWorkorderDetailVO.RebuildProjectItemVO projectVO = new DesignWorkorderDetailVO.RebuildProjectItemVO();
@@ -488,10 +543,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         check.setHasModel(modelCount > 0);
 
         // 6. 设计报告（objectType = '10.5'）
-        long reportCount = fileDetailMapper.selectCount(
-                new LambdaQueryWrapper<FileDetail>()
-                        .eq(FileDetail::getObjectType, "10.5")
-                        .eq(FileDetail::getObjectId, String.valueOf(orderId)));
+        long reportCount = fileService.listByBiz(FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId).size();
         check.setHasReport(reportCount > 0);
 
         // 计算 canSubmit 和 blockReason（按优先级顺序）

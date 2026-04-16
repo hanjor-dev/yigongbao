@@ -1,5 +1,11 @@
 package com.yigongbao.module.design.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
+import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
+import com.yigongbao.flow.facade.FlowFacade;
+import com.yigongbao.flow.operator.FlowOperator;
+import com.yigongbao.flow.result.TransitionResult;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -9,8 +15,8 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.module.basic.file.entity.FileDetail;
-import com.yigongbao.module.basic.file.mapper.FileDetailMapper;
+import com.yigongbao.module.basic.file.service.FileService;
+import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
 import com.yigongbao.module.design.dto.SaveDesignColumnConfigDTO;
 import com.yigongbao.module.design.entity.DesignDrawingEntity;
@@ -31,8 +37,8 @@ import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
 import com.yigongbao.module.design.vo.DesignWorkorderListVO;
 import com.yigongbao.module.design.vo.SubmitCheckVO;
 import com.yigongbao.module.order.entity.OrderItemEntity;
-import com.yigongbao.module.order.mapper.OrderItemMapper;
-import com.yigongbao.module.order.mapper.OrderMainMapper;
+import com.yigongbao.module.order.service.OrderItemService;
+import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.service.UserService;
@@ -43,6 +49,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -66,19 +73,20 @@ import static org.mockito.Mockito.*;
 @DisplayName("DesignWorkorderService 单元测试")
 class DesignWorkorderServiceImplTest {
 
-    @Mock private OrderMainMapper orderMainMapper;
-    @Mock private OrderItemMapper orderItemMapper;
+    @Mock private OrderMainService orderMainService;
+    @Mock private OrderItemService orderItemService;
+    @Mock private FileService fileService;
     @Mock private DesignPackageMapper designPackageMapper;
     @Mock private DesignProductMapper designProductMapper;
     @Mock private DesignInstructionMapper designInstructionMapper;
     @Mock private DesignDrawingMapper designDrawingMapper;
     @Mock private DesignModelMapper designModelMapper;
     @Mock private DesignReviewMapper designReviewMapper;
-    @Mock private FileDetailMapper fileDetailMapper;
     @Mock private UserService userService;
     @Mock private UserHospitalService userHospitalService;
     @Mock private DesignQueryHelper designQueryHelper;
     @Mock private ObjectMapper objectMapper;
+    @Mock private FlowFacade flowFacade;
 
     @InjectMocks
     private DesignWorkorderServiceImpl service;
@@ -124,10 +132,10 @@ class DesignWorkorderServiceImplTest {
             OrderMainEntity order = buildOrder(10L);
             Page<OrderMainEntity> page = new Page<>(1, 10, 1);
             page.setRecords(List.of(order));
-            when(orderMainMapper.selectPage(any(), any())).thenReturn(page);
+            when(orderMainService.page(any(), any())).thenReturn(page);
 
             // Mock：批量填充子查询
-            when(orderItemMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
+            when(orderItemService.listByOrderIds(any())).thenReturn(Collections.emptyList());
             when(designPackageMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
             when(designReviewMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
 
@@ -154,12 +162,12 @@ class DesignWorkorderServiceImplTest {
 
             Page<OrderMainEntity> emptyPage = new Page<>(1, 100, 0);
             emptyPage.setRecords(Collections.emptyList());
-            when(orderMainMapper.selectPage(any(), any())).thenReturn(emptyPage);
+            when(orderMainService.page(any(), any())).thenReturn(emptyPage);
 
             IPage<DesignWorkorderListVO> result = service.listWorkorders(dto);
 
-            // 验证传入 selectPage 的 Page 对象 size=100
-            verify(orderMainMapper).selectPage(argThat(p -> ((Page<?>) p).getSize() == 100), any());
+            // 验证传入 page 方法的 Page 对象 size=100
+            verify(orderMainService).page(argThat(p -> ((Page<?>) p).getSize() == 100), any());
         }
 
         @Test
@@ -176,14 +184,14 @@ class DesignWorkorderServiceImplTest {
             OrderMainEntity order = buildOrder(10L);
             Page<OrderMainEntity> page = new Page<>(1, 10, 1);
             page.setRecords(List.of(order));
-            when(orderMainMapper.selectPage(any(), any())).thenReturn(page);
+            when(orderMainService.page(any(), any())).thenReturn(page);
 
             // 构造 OrderItem
             OrderItemEntity item = new OrderItemEntity();
             item.setOrderId(10L);
             item.setBodyPartName("左髋骨");
             item.setProjectName("导板");
-            when(orderItemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(item));
+            when(orderItemService.listByOrderIds(any())).thenReturn(List.of(item));
             when(designPackageMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
             when(designReviewMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
 
@@ -201,17 +209,17 @@ class DesignWorkorderServiceImplTest {
         void setUp() {
             // 通用子查询 mock
             when(designReviewMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
-            when(orderItemMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
+            when(orderItemService.listByOrderId(any())).thenReturn(Collections.emptyList());
             when(designPackageMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
             when(designModelMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
-            when(fileDetailMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+            when(fileService.listByBiz(any(), any())).thenReturn(Collections.emptyList());
         }
 
         @Test
         @DisplayName("订单存在——返回详情 VO")
         void getWorkorderDetail_success() {
             OrderMainEntity order = buildOrder(10L);
-            when(orderMainMapper.selectById(10L)).thenReturn(order);
+            when(orderMainService.getById(10L)).thenReturn(order);
 
             DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
 
@@ -223,7 +231,7 @@ class DesignWorkorderServiceImplTest {
         @Test
         @DisplayName("订单不存在——抛出 DATA_NOT_FOUND")
         void getWorkorderDetail_notFound() {
-            when(orderMainMapper.selectById(999L)).thenReturn(null);
+            when(orderMainService.getById(999L)).thenReturn(null);
 
             BusinessException ex = assertThrows(BusinessException.class,
                     () -> service.getWorkorderDetail(999L));
@@ -233,7 +241,7 @@ class DesignWorkorderServiceImplTest {
         @Test
         @DisplayName("无数据包时 submitCheck.hasPackage=false 且 canSubmit=false")
         void getWorkorderDetail_submitCheck_noPackage() {
-            when(orderMainMapper.selectById(10L)).thenReturn(buildOrder(10L));
+            when(orderMainService.getById(10L)).thenReturn(buildOrder(10L));
 
             DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
 
@@ -246,7 +254,7 @@ class DesignWorkorderServiceImplTest {
         @Test
         @DisplayName("所有条件满足时 canSubmit=true")
         void getWorkorderDetail_submitCheck_canSubmit() {
-            when(orderMainMapper.selectById(10L)).thenReturn(buildOrder(10L));
+            when(orderMainService.getById(10L)).thenReturn(buildOrder(10L));
 
             // 一个数据包
             DesignPackageEntity pkg = new DesignPackageEntity();
@@ -273,7 +281,7 @@ class DesignWorkorderServiceImplTest {
             when(designModelMapper.selectCount(any(Wrapper.class))).thenReturn(1L);
 
             // 设计报告
-            when(fileDetailMapper.selectCount(any(Wrapper.class))).thenReturn(1L);
+            when(fileService.listByBiz(eq("10.5"), eq(10L))).thenReturn(List.of(new FileVO()));
 
             DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
             SubmitCheckVO check = vo.getSubmitCheck();
@@ -291,7 +299,7 @@ class DesignWorkorderServiceImplTest {
         @Test
         @DisplayName("有驳回记录时填充 rejectReason")
         void getWorkorderDetail_rejectReasonFilled() {
-            when(orderMainMapper.selectById(10L)).thenReturn(buildOrder(10L));
+            when(orderMainService.getById(10L)).thenReturn(buildOrder(10L));
 
             DesignReviewEntity review = new DesignReviewEntity();
             review.setOrderId(10L);
@@ -371,6 +379,89 @@ class DesignWorkorderServiceImplTest {
             BusinessException ex = assertThrows(BusinessException.class,
                     () -> service.saveColumnConfig(dto));
             assertEquals(500, ex.getCode());
+        }
+    }
+
+    @Nested
+    @DisplayName("startDesign")
+    class StartDesign {
+
+        @Test
+        @DisplayName("成功开始设计")
+        void startDesign_success() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+
+                OrderMainEntity order = new OrderMainEntity();
+                order.setId(1L);
+                order.setStatus(FlowStatusEnum.PENDING_DESIGN.getValue());
+                order.setDesignerId(100L);
+
+                UserEntity user = new UserEntity();
+                user.setId(100L);
+                user.setRealName("张设计");
+
+                when(orderMainService.getById(1L)).thenReturn(order);
+                when(userService.getById(100L)).thenReturn(user);
+                when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.START_DESIGN), any(FlowOperator.class)))
+                        .thenReturn(TransitionResult.of(20, FlowStatusEnum.DESIGN_IN_PROGRESS.getValue()));
+
+                assertDoesNotThrow(() -> service.startDesign(1L));
+
+                // 验证订单字段已回写
+                verify(orderMainService).updateById(argThat((OrderMainEntity o) ->
+                        o.getStatus().equals(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue())
+                                && o.getDesignStartTime() != null
+                                && Long.valueOf(100L).equals(o.getCurrentHandlerId())
+                                && "张设计".equals(o.getCurrentHandlerName())));
+            }
+        }
+
+        @Test
+        @DisplayName("订单不存在，抛 ORDER_NOT_FOUND")
+        void startDesign_orderNotFound() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+                when(orderMainService.getById(1L)).thenReturn(null);
+
+                BusinessException ex = assertThrows(BusinessException.class,
+                        () -> service.startDesign(1L));
+                assertEquals(ErrorCodeEnum.ORDER_NOT_FOUND.getCode(), ex.getCode());
+            }
+        }
+
+        @Test
+        @DisplayName("订单状态非 PENDING_DESIGN，抛 ORDER_STATUS_ERROR")
+        void startDesign_wrongStatus() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+
+                OrderMainEntity order = new OrderMainEntity();
+                order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
+                order.setDesignerId(100L);
+                when(orderMainService.getById(1L)).thenReturn(order);
+
+                BusinessException ex = assertThrows(BusinessException.class,
+                        () -> service.startDesign(1L));
+                assertEquals(ErrorCodeEnum.ORDER_STATUS_ERROR.getCode(), ex.getCode());
+            }
+        }
+
+        @Test
+        @DisplayName("非分配设计师，抛 ORDER_DESIGNER_MISMATCH")
+        void startDesign_notAssignedDesigner() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(999L);
+
+                OrderMainEntity order = new OrderMainEntity();
+                order.setStatus(FlowStatusEnum.PENDING_DESIGN.getValue());
+                order.setDesignerId(100L);
+                when(orderMainService.getById(1L)).thenReturn(order);
+
+                BusinessException ex = assertThrows(BusinessException.class,
+                        () -> service.startDesign(1L));
+                assertEquals(ErrorCodeEnum.ORDER_DESIGNER_MISMATCH.getCode(), ex.getCode());
+            }
         }
     }
 }

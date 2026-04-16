@@ -1,6 +1,5 @@
 package com.yigongbao.module.order.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -9,10 +8,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
-import com.yigongbao.flow.facade.FlowFacade;
-import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
 import com.yigongbao.module.order.dto.order.DesignerQueryDTO;
 import com.yigongbao.module.order.entity.OrderItemEntity;
@@ -53,7 +49,6 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
     private final ConfigService configService;
     private final DictService dictService;
     private final RebuildProjectService rebuildProjectService;
-    private final FlowFacade flowFacade;
 
     /**
      * 手写构造函数，对 OrderMainService 使用 @Lazy 打破循环依赖
@@ -66,15 +61,13 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
             UserMapper userMapper,
             ConfigService configService,
             DictService dictService,
-            RebuildProjectService rebuildProjectService,
-            FlowFacade flowFacade) {
+            RebuildProjectService rebuildProjectService) {
         this.orderMainService = orderMainService;
         this.orderItemMapper = orderItemMapper;
         this.userMapper = userMapper;
         this.configService = configService;
         this.dictService = dictService;
         this.rebuildProjectService = rebuildProjectService;
-        this.flowFacade = flowFacade;
     }
 
     /**
@@ -178,35 +171,6 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         // 4. 更新订单
         updateOrderDesigner(order, designer);
         log.info("手动分配成功，orderId={}, designerId={}", orderId, designerId);
-    }
-
-    /**
-     * 设计师开始设计（仅分配给本人的订单；订单必须处于 PENDING_DESIGN 状态）
-     *
-     * @param orderId 订单ID
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void startDesign(Long orderId) {
-        log.info("设计师开始设计，orderId={}", orderId);
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-        OrderMainEntity order = orderMainService.getById(orderId);
-        if (order == null) {
-            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
-        }
-        if (!FlowStatusEnum.PENDING_DESIGN.getValue().equals(order.getStatus())) {
-            log.warn("订单状态不允许开始设计，orderId={}, status={}", orderId, order.getStatus());
-            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR);
-        }
-        if (!currentUserId.equals(order.getDesignerId())) {
-            log.warn("非分配设计师，无权开始设计，orderId={}, designerId={}, currentUserId={}",
-                    orderId, order.getDesignerId(), currentUserId);
-            throw new BusinessException(ErrorCodeEnum.ORDER_DESIGNER_MISMATCH);
-        }
-        // 通过 FlowFacade 执行 START_DESIGN，状态 PENDING_DESIGN → DESIGN_IN_PROGRESS
-        flowFacade.executeFlow(orderId, FlowActionEnum.START_DESIGN,
-                FlowOperator.of(currentUserId, null));
-        log.info("开始设计成功，orderId={}", orderId);
     }
 
     /**

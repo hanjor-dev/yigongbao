@@ -10,6 +10,8 @@ import com.yigongbao.module.design.dto.ArchiveFileInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry;
 import org.apache.commons.compress.archivers.sevenz.SevenZFile;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.utils.SeekableInMemoryByteChannel;
 
 import java.io.ByteArrayOutputStream;
@@ -37,7 +39,7 @@ public final class ArchiveParserUtil {
     /**
      * 支持的压缩包扩展名
      */
-    public static final Set<String> SUPPORTED_EXTENSIONS = Set.of(".zip", ".rar", ".7z");
+    public static final Set<String> SUPPORTED_EXTENSIONS = Set.of(".zip", ".rar", ".7z", ".tar");
 
     /**
      * 判断是否为支持的压缩包格式
@@ -74,6 +76,7 @@ public final class ArchiveParserUtil {
                 case "zip" -> parseZip(inputStream, allowedExtensions);
                 case "rar" -> parseRar(inputStream, allowedExtensions);
                 case "7z" -> parse7z(inputStream, allowedExtensions);
+                case "tar" -> parseTar(inputStream, allowedExtensions);
                 default -> throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED);
             };
         } catch (BusinessException e) {
@@ -187,6 +190,40 @@ public final class ArchiveParserUtil {
                         .fileName(entryFileName)
                         .filePath(filePath)
                         .fileSize(entry.getSize())
+                        .extension(ext)
+                        .build());
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 解析 TAR 格式
+     */
+    private static List<ArchiveFileInfo> parseTar(InputStream inputStream,
+                                                   Set<String> allowedExtensions) throws IOException {
+        List<ArchiveFileInfo> result = new ArrayList<>();
+        try (TarArchiveInputStream tis = new TarArchiveInputStream(inputStream)) {
+            TarArchiveEntry entry;
+            while ((entry = tis.getNextEntry()) != null) {
+                // 跳过目录
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                String filePath = entry.getName();
+                String entryFileName = extractFileName(filePath);
+                String ext = getExtension(entryFileName);
+
+                // 按扩展名过滤
+                if (allowedExtensions != null && !allowedExtensions.isEmpty()
+                        && !allowedExtensions.contains(ext)) {
+                    continue;
+                }
+
+                result.add(ArchiveFileInfo.builder()
+                        .fileName(entryFileName)
+                        .filePath(filePath)
+                        .fileSize(entry.getRealSize())
                         .extension(ext)
                         .build());
             }
