@@ -124,7 +124,13 @@ public enum SystemConfigKeyEnum {
     /**
      * 设计报告最大大小（MB）
      */
-    DESIGN_REPORT_MAX_SIZE_MB("design.report.max_size_mb", "设计报告最大大小");
+    DESIGN_REPORT_MAX_SIZE_MB("design.report.max_size_mb", "设计报告最大大小"),
+
+    // ==================== 设计工单列配置 ====================
+    /**
+     * 设计工单列表默认列配置（JSON 格式）
+     */
+    DESIGN_COLUMN_CONFIG("design.column.config", "设计工单列表默认列配置");
 
     /**
      * 配置键
