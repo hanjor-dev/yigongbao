@@ -126,6 +126,12 @@ public enum SystemConfigKeyEnum {
      */
     DESIGN_REPORT_MAX_SIZE_MB("design.report.max_size_mb", "设计报告最大大小"),
 
+    /**
+     * 设计报告允许的文件扩展名（逗号分隔）
+     * 默认：.pdf,.doc,.docx,.xls,.xlsx
+     */
+    DESIGN_REPORT_ALLOWED_EXTENSIONS("design.report.allowed_extensions", "设计报告允许的文件扩展名"),
+
     // ==================== 设计工单列配置 ====================
     /**
      * 设计工单列表默认列配置（JSON 格式）

@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.lang.reflect.Method;
@@ -166,16 +167,16 @@ class FileServiceImplTest {
         @DisplayName("uploadMultiple: 空数组返回空列表")
         void uploadMultiple_whenEmptyArray_shouldReturnEmptyList() {
             MultipartFile[] emptyFiles = new MultipartFile[0];
-            List<FileVO> result = fileService.uploadMultiple(emptyFiles, "10.15", 1L);
+            List<FileVO> result = fileService.uploadMultiple(emptyFiles, "10.15");
             assertNotNull(result);
             assertTrue(result.isEmpty());
         }
 
         @Test
-        @DisplayName("uploadMultiple: 多文件上传成功")
+        @DisplayName("uploadMultiple: 多文件上传成功（不关联业务）")
         void uploadMultiple_shouldSuccess() {
-            FileInfo fileInfo1 = createFileInfo("1926082412345678903", "10.15", "1");
-            FileInfo fileInfo2 = createFileInfo("1926082412345678904", "10.15", "1");
+            FileInfo fileInfo1 = createFileInfo("1926082412345678903", "10.15", null);
+            FileInfo fileInfo2 = createFileInfo("1926082412345678904", "10.15", null);
 
             UploadPretreatment pretreatment1 = mock(UploadPretreatment.class);
             UploadPretreatment pretreatment2 = mock(UploadPretreatment.class);
@@ -198,7 +199,43 @@ class FileServiceImplTest {
                     "files", "test2.jpg", MediaType.IMAGE_JPEG_VALUE, "content2".getBytes());
             MultipartFile[] files = new MultipartFile[]{file1, file2};
 
-            List<FileVO> result = fileService.uploadMultiple(files, "10.15", 1L);
+            List<FileVO> result = fileService.uploadMultiple(files, "10.15");
+
+            assertNotNull(result);
+            assertEquals(2, result.size());
+            verify(fileStorageService, times(2)).of(any());
+            verify(pretreatment1, times(1)).upload();
+            verify(pretreatment2, times(1)).upload();
+        }
+
+        @Test
+        @DisplayName("uploadMultipleWithBizId: 多文件上传成功（关联业务）")
+        void uploadMultipleWithBizId_shouldSuccess() {
+            FileInfo fileInfo1 = createFileInfo("1926082412345678905", "10.15", "1");
+            FileInfo fileInfo2 = createFileInfo("1926082412345678906", "10.15", "1");
+
+            UploadPretreatment pretreatment1 = mock(UploadPretreatment.class);
+            UploadPretreatment pretreatment2 = mock(UploadPretreatment.class);
+            when(fileStorageService.of(any())).thenReturn(pretreatment1).thenReturn(pretreatment2);
+            when(pretreatment1.setPath(anyString())).thenReturn(pretreatment1);
+            when(pretreatment1.setObjectType(anyString())).thenReturn(pretreatment1);
+            when(pretreatment1.setObjectId(any())).thenReturn(pretreatment1);
+            when(pretreatment1.upload()).thenReturn(fileInfo1);
+            when(pretreatment2.setPath(anyString())).thenReturn(pretreatment2);
+            when(pretreatment2.setObjectType(anyString())).thenReturn(pretreatment2);
+            when(pretreatment2.setObjectId(any())).thenReturn(pretreatment2);
+            when(pretreatment2.upload()).thenReturn(fileInfo2);
+            when(fileRecorderService.getDetailById("1926082412345678905")).thenReturn(testDetail);
+            when(fileRecorderService.getDetailById("1926082412345678906")).thenReturn(testDetail);
+            when(fileRecorderService.toFileVO(any())).thenReturn(testVO);
+
+            MockMultipartFile file1 = new MockMultipartFile(
+                    "files", "cert1.pdf", MediaType.APPLICATION_PDF_VALUE, "content1".getBytes());
+            MockMultipartFile file2 = new MockMultipartFile(
+                    "files", "cert2.pdf", MediaType.APPLICATION_PDF_VALUE, "content2".getBytes());
+            MultipartFile[] files = new MultipartFile[]{file1, file2};
+
+            List<FileVO> result = fileService.uploadMultipleWithBizId(files, "10.15", 1L);
 
             assertNotNull(result);
             assertEquals(2, result.size());

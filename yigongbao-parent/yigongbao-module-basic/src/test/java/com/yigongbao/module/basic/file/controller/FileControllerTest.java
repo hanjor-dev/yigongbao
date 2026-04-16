@@ -152,12 +152,12 @@ class FileControllerTest {
     class UploadMultipleTests {
 
         @Test
-        @DisplayName("uploadMultiple: 批量上传成功")
+        @DisplayName("uploadMultiple: 批量上传成功（不关联业务）")
         void uploadMultiple_shouldSuccess() throws Exception {
             List<FileVO> vos = Arrays.asList(
-                    buildTestVO("1926082412345678903", "10.15", 1L, "test1.jpg"),
-                    buildTestVO("1926082412345678904", "10.15", 1L, "test2.jpg"));
-            when(fileService.uploadMultiple(any(), eq("10.15"), eq(1L))).thenReturn(vos);
+                    buildTestVO("1926082412345678903", "10.15", null, "test1.jpg"),
+                    buildTestVO("1926082412345678904", "10.15", null, "test2.jpg"));
+            when(fileService.uploadMultiple(any(), eq("10.15"))).thenReturn(vos);
 
             MockMultipartFile file1 = new MockMultipartFile(
                     "files", "test1.jpg", MediaType.IMAGE_JPEG_VALUE, "content1".getBytes());
@@ -165,6 +165,32 @@ class FileControllerTest {
                     "files", "test2.jpg", MediaType.IMAGE_JPEG_VALUE, "content2".getBytes());
 
             mockMvc.perform(multipart("/basic/file/upload-multiple")
+                            .file(file1)
+                            .file(file2)
+                            .param("bizType", "10.15"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.message").value("操作成功"))
+                    .andExpect(jsonPath("$.data").isArray())
+                    .andExpect(jsonPath("$.data.length()").value(2));
+
+            verify(fileService, times(1)).uploadMultiple(any(), eq("10.15"));
+        }
+
+        @Test
+        @DisplayName("uploadMultipleWithBiz: 批量上传并关联业务成功")
+        void uploadMultipleWithBiz_shouldSuccess() throws Exception {
+            List<FileVO> vos = Arrays.asList(
+                    buildTestVO("1926082412345678905", "10.15", 1L, "cert1.pdf"),
+                    buildTestVO("1926082412345678906", "10.15", 1L, "cert2.pdf"));
+            when(fileService.uploadMultipleWithBizId(any(), eq("10.15"), eq(1L))).thenReturn(vos);
+
+            MockMultipartFile file1 = new MockMultipartFile(
+                    "files", "cert1.pdf", MediaType.APPLICATION_PDF_VALUE, "content1".getBytes());
+            MockMultipartFile file2 = new MockMultipartFile(
+                    "files", "cert2.pdf", MediaType.APPLICATION_PDF_VALUE, "content2".getBytes());
+
+            mockMvc.perform(multipart("/basic/file/upload-multiple-with-biz")
                             .file(file1)
                             .file(file2)
                             .param("bizType", "10.15")
@@ -175,7 +201,7 @@ class FileControllerTest {
                     .andExpect(jsonPath("$.data").isArray())
                     .andExpect(jsonPath("$.data.length()").value(2));
 
-            verify(fileService, times(1)).uploadMultiple(any(), eq("10.15"), eq(1L));
+            verify(fileService, times(1)).uploadMultipleWithBizId(any(), eq("10.15"), eq(1L));
         }
     }
 

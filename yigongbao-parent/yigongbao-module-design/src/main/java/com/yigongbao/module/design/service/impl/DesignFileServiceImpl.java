@@ -318,14 +318,23 @@ public class DesignFileServiceImpl implements DesignFileService {
             throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
         }
 
-        // 3. 删除旧报告（每工单仅一份）
+        // 3. 校验设计报告文件类型
+        Set<String> allowedReportExtensions = getAllowedReportExtensions();
+        String fileName = fileVO.getFileName();
+        String ext = StrUtil.isBlank(fileName) ? "" : fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+        if (!allowedReportExtensions.contains(ext)) {
+            log.warn("设计报告文件类型不允许, fileId={}, ext={}, allowed={}", fileId, ext, allowedReportExtensions);
+            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_TYPE_NOT_ALLOWED);
+        }
+
+        // 4. 删除旧报告（每工单仅一份）
         List<FileVO> existingReports = fileService.listByBiz(FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId);
         for (FileVO existing : existingReports) {
             fileService.deleteById(existing.getId());
             log.info("删除旧设计报告, fileId={}", existing.getId());
         }
 
-        // 4. 关联新文件到业务
+        // 5. 关联新文件到业务
         return fileService.linkFile(fileId, FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId);
     }
 
@@ -399,6 +408,21 @@ public class DesignFileServiceImpl implements DesignFileService {
         String config = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_PACKAGE_ALLOWED_EXTENSIONS.getKey());
         if (StrUtil.isBlank(config)) {
             config = ".stl,.obj,.ply,.3mf,.gcode,.ctb,.cbddlp";
+        }
+        return Arrays.stream(config.split(","))
+                .map(String::trim)
+                .map(String::toLowerCase)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 获取设计报告允许的文件扩展名集合
+     */
+    private Set<String> getAllowedReportExtensions() {
+        String config = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_REPORT_ALLOWED_EXTENSIONS.getKey());
+        if (StrUtil.isBlank(config)) {
+            config = ".pdf,.doc,.docx,.xls,.xlsx";
         }
         return Arrays.stream(config.split(","))
                 .map(String::trim)

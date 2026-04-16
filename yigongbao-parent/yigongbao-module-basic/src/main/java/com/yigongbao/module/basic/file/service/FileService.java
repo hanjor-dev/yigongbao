@@ -47,14 +47,23 @@ public interface FileService {
     FileVO linkFile(String fileId, String bizType, Long bizId);
 
     /**
-     * 批量上传
+     * 批量上传（不关联业务）
+     *
+     * @param files 文件列表
+     * @param bizType 业务类型（字典 dict_code）
+     * @return 文件列表
+     */
+    List<FileVO> uploadMultiple(MultipartFile[] files, String bizType);
+
+    /**
+     * 批量上传并关联业务
      *
      * @param files 文件列表
      * @param bizType 业务类型（字典 dict_code）
      * @param bizId 业务ID
      * @return 文件列表
      */
-    List<FileVO> uploadMultiple(MultipartFile[] files, String bizType, Long bizId);
+    List<FileVO> uploadMultipleWithBizId(MultipartFile[] files, String bizType, Long bizId);
 
     /**
      * 根据ID查询文件详情

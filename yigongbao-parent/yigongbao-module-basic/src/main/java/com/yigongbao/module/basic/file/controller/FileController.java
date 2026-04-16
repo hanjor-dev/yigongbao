@@ -73,12 +73,11 @@ public class FileController {
     }
 
     /**
-     * 批量上传
+     * 批量上传（不关联业务）
      *
-     * @param bizType 业务类型（字典 dict_code）
-     * @param bizId 业务ID
+     * @param bizType 业务类型（字典 dict_code，如 10.1、10.4）
      */
-    @Operation(summary = "批量上传")
+    @Operation(summary = "批量上传（不关联业务）")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.UPLOAD,
@@ -87,9 +86,28 @@ public class FileController {
     @PostMapping("/upload-multiple")
     public Result<List<FileVO>> uploadMultiple(
             @RequestParam("files") MultipartFile[] files,
+            @RequestParam @NotBlank(message = "业务类型不能为空") String bizType) {
+        return Result.success(fileService.uploadMultiple(files, bizType));
+    }
+
+    /**
+     * 批量上传并关联业务
+     *
+     * @param bizType 业务类型（字典 dict_code）
+     * @param bizId 业务ID
+     */
+    @Operation(summary = "批量上传并关联业务")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.UPLOAD,
+            operation = "批量上传文件并关联业务"
+    )
+    @PostMapping("/upload-multiple-with-biz")
+    public Result<List<FileVO>> uploadMultipleWithBiz(
+            @RequestParam("files") MultipartFile[] files,
             @RequestParam @NotBlank(message = "业务类型不能为空") String bizType,
             @RequestParam @NotNull(message = "业务ID不能为空") Long bizId) {
-        return Result.success(fileService.uploadMultiple(files, bizType, bizId));
+        return Result.success(fileService.uploadMultipleWithBizId(files, bizType, bizId));
     }
 
     /**

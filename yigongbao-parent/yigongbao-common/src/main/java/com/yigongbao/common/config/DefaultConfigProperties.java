@@ -136,6 +136,12 @@ public class DefaultConfigProperties {
      */
     private Integer configDesignReportMaxSizeMb = 50;
 
+    /**
+     * 设计报告允许的文件扩展名（逗号分隔）
+     * 默认：.pdf,.doc,.docx,.xls,.xlsx
+     */
+    private String configDesignReportAllowedExtensions = ".pdf,.doc,.docx,.xls,.xlsx";
+
     // ==================== 设计工单列配置 ====================
     /**
      * 设计工单列表默认列配置（JSON 格式）

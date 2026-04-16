@@ -58,7 +58,21 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    public List<FileVO> uploadMultiple(MultipartFile[] files, String bizType, Long bizId) {
+    public List<FileVO> uploadMultiple(MultipartFile[] files, String bizType) {
+        if (files == null || files.length == 0) {
+            return new ArrayList<>();
+        }
+        List<FileVO> results = new ArrayList<>();
+        for (MultipartFile file : files) {
+            if (file != null && !file.isEmpty()) {
+                results.add(uploadFile(file, bizType));
+            }
+        }
+        return results;
+    }
+
+    @Override
+    public List<FileVO> uploadMultipleWithBizId(MultipartFile[] files, String bizType, Long bizId) {
         if (files == null || files.length == 0) {
             return new ArrayList<>();
         }
