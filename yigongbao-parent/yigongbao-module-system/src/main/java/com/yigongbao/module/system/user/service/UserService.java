@@ -10,6 +10,8 @@ import com.yigongbao.module.system.user.dto.UserPageDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.vo.UserVO;
 
+import java.util.List;
+
 /**
  * 用户 Service 接口
  *
@@ -87,4 +89,22 @@ public interface UserService extends IService<UserEntity> {
      * @param dto 更新参数（仅手机号和头像）
      */
     void updateUserBySelf(Long id, com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO dto);
+
+    /**
+     * 根据部门ID查询用户ID列表
+     * 用于设计工单数据权限过滤（DEPT 类型）
+     *
+     * @param deptId 部门ID
+     * @return 该部门下所有正常状态用户的ID列表，deptId 为 null 时返回空列表
+     */
+    List<Long> listUserIdsByDeptId(Long deptId);
+
+    /**
+     * 根据机构ID查询用户ID列表
+     * 用于设计工单数据权限过滤（ORG 类型）
+     *
+     * @param orgId 机构ID
+     * @return 该机构下所有正常状态用户的ID列表，orgId 为 null 时返回空列表
+     */
+    List<Long> listUserIdsByOrgId(Long orgId);
 }

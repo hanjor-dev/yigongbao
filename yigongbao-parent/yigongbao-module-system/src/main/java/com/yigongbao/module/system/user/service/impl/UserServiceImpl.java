@@ -798,4 +798,44 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 .eq(UserEntity::getPhone, phone)
                 .ne(UserEntity::getId, excludeId)) > 0;
     }
+
+    /**
+     * 根据部门ID查询用户ID列表
+     *
+     * @param deptId 部门ID
+     * @return 用户ID列表
+     */
+    @Override
+    public List<Long> listUserIdsByDeptId(Long deptId) {
+        if (deptId == null) {
+            return Collections.emptyList();
+        }
+        return list(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getDeptId, deptId)
+                .eq(UserEntity::getStatus, StatusConstants.NORMAL)
+                .eq(UserEntity::getIsDeleted, StatusConstants.NOT_DELETED))
+                .stream()
+                .map(UserEntity::getId)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 根据机构ID查询用户ID列表
+     *
+     * @param orgId 机构ID
+     * @return 用户ID列表
+     */
+    @Override
+    public List<Long> listUserIdsByOrgId(Long orgId) {
+        if (orgId == null) {
+            return Collections.emptyList();
+        }
+        return list(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getOrgId, orgId)
+                .eq(UserEntity::getStatus, StatusConstants.NORMAL)
+                .eq(UserEntity::getIsDeleted, StatusConstants.NOT_DELETED))
+                .stream()
+                .map(UserEntity::getId)
+                .collect(Collectors.toList());
+    }
 }
