@@ -6,7 +6,6 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.module.order.dto.order.OrderExportQueryDTO;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
@@ -116,8 +115,8 @@ public class OrderExportServiceImpl implements OrderExportService {
 
         // 其他查询条件
         wrapper.like(StrUtil.isNotBlank(dto.getOrderCode()), OrderMainEntity::getOrderCode, dto.getOrderCode())
-                .eq(Objects.nonNull(dto.getStatus()), OrderMainEntity::getStatus, dto.getStatus())
-                .eq(OrderMainEntity::getPhase, FlowPhaseEnum.ORDER.getValue());
+                .eq(Objects.nonNull(dto.getPhase()), OrderMainEntity::getPhase, dto.getPhase())
+                .eq(Objects.nonNull(dto.getStatus()), OrderMainEntity::getStatus, dto.getStatus());
 
         orderQueryHelper.applySort(wrapper, dto.getSortField(), dto.getSortOrder());
         wrapper.last("LIMIT " + MAX_EXPORT_COUNT);

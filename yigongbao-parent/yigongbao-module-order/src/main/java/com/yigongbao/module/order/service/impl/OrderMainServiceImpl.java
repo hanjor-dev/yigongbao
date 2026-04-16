@@ -133,15 +133,15 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      * - ORG：仅本机构
      * - HOSPITALS：仅关联医院
      * - SELF：仅自己创建的
-     * 固定只查询订单阶段（phase=ORDER）数据。
+     * phase/status 均为可选参数，不传则不限制阶段/状态。
      *
      * @param dto 查询参数
      * @return 分页后的订单列表
      */
     @Override
     public IPage<OrderListVO> listOrders(OrderPageDTO dto) {
-        log.info("分页查询订单列表，pageNum={}, pageSize={}, orderCode={}, hospitalId={}, status={}",
-                dto.getPageNum(), dto.getPageSize(), dto.getOrderCode(), dto.getHospitalId(), dto.getStatus());
+        log.info("分页查询订单列表，pageNum={}, pageSize={}, orderCode={}, hospitalId={}, phase={}, status={}",
+                dto.getPageNum(), dto.getPageSize(), dto.getOrderCode(), dto.getHospitalId(), dto.getPhase(), dto.getStatus());
         try {
             Long currentUserId = getCurrentUserId();
             // 获取当前用户的数据权限类型（从角色表读取）
@@ -150,8 +150,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
             LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
 
-            // 订单列表固定只查订单阶段（phase=10=ORDER）
-            wrapper.eq(OrderMainEntity::getPhase, FlowPhaseEnum.ORDER.getValue());
+            // phase/status 动态过滤（不传则不限制）
+            wrapper.eq(Objects.nonNull(dto.getPhase()), OrderMainEntity::getPhase, dto.getPhase())
+                   .eq(Objects.nonNull(dto.getStatus()), OrderMainEntity::getStatus, dto.getStatus());
 
             // 注入数据权限过滤条件
             orderQueryHelper.buildDataScopeCondition(wrapper, currentUserId, scopeType);
@@ -178,7 +179,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     .like(StrUtil.isNotBlank(dto.getPatientName()), OrderMainEntity::getPatientName, dto.getPatientName())
                     .eq(StrUtil.isNotBlank(dto.getBusinessType()), OrderMainEntity::getBusinessType, dto.getBusinessType())
                     .eq(Objects.nonNull(dto.getOperatorId()), OrderMainEntity::getOperatorId, dto.getOperatorId())
-                    .eq(Objects.nonNull(dto.getStatus()), OrderMainEntity::getStatus, dto.getStatus())
                     .ge(Objects.nonNull(dto.getCreateTimeStart()), OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
                     .le(Objects.nonNull(dto.getCreateTimeEnd()), OrderMainEntity::getCreateTime, dto.getCreateTimeEnd());
 
