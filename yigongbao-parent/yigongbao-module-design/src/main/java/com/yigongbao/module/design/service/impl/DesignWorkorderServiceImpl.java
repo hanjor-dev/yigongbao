@@ -673,17 +673,16 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         // designMode=null 视为线下模式（保守处理）
         boolean isOfflineMode = !DesignModeEnum.ONLINE.getCode().equals(designMode);
         if (isOfflineMode && !packages.isEmpty()) {
-            // 取每包的最新版指令单（按 version_seq 倒序，保留第一条）
+            // 取每包的最新版指令单（按 version_seq 倒序，putIfAbsent 保留第一个即最新版本）
             List<DesignInstructionEntity> allInstructions = designInstructionMapper.selectList(
                     new LambdaQueryWrapper<DesignInstructionEntity>()
                             .in(DesignInstructionEntity::getPackageId, packageIds)
                             .eq(DesignInstructionEntity::getIsDeleted, StatusConstants.NOT_DELETED)
                             .orderByDesc(DesignInstructionEntity::getVersionSeq));
-            Map<Long, DesignInstructionEntity> latestInstructionByPkg = allInstructions.stream()
-                    .collect(Collectors.toMap(
-                            DesignInstructionEntity::getPackageId,
-                            i -> i,
-                            (existing, newer) -> existing)); // 已倒序，保留最新版本
+            Map<Long, DesignInstructionEntity> latestInstructionByPkg = new java.util.LinkedHashMap<>();
+            for (DesignInstructionEntity inst : allInstructions) {
+                latestInstructionByPkg.putIfAbsent(inst.getPackageId(), inst);
+            }
 
             // 取每包的最新版图纸
             List<DesignDrawingEntity> allDrawings = designDrawingMapper.selectList(
@@ -691,11 +690,10 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
                             .in(DesignDrawingEntity::getPackageId, packageIds)
                             .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED)
                             .orderByDesc(DesignDrawingEntity::getVersionSeq));
-            Map<Long, DesignDrawingEntity> latestDrawingByPkg = allDrawings.stream()
-                    .collect(Collectors.toMap(
-                            DesignDrawingEntity::getPackageId,
-                            d -> d,
-                            (existing, newer) -> existing));
+            Map<Long, DesignDrawingEntity> latestDrawingByPkg = new java.util.LinkedHashMap<>();
+            for (DesignDrawingEntity drawing : allDrawings) {
+                latestDrawingByPkg.putIfAbsent(drawing.getPackageId(), drawing);
+            }
 
             boolean allInstructionRevised = packageIds.stream().allMatch(pkgId -> {
                 DesignInstructionEntity inst = latestInstructionByPkg.get(pkgId);

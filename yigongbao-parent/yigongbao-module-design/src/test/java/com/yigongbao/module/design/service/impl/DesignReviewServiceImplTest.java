@@ -277,6 +277,20 @@ class DesignReviewServiceImplTest {
                 assertThrows(BusinessException.class, () -> reviewService.reviewReject(1L, dto));
             }
         }
+
+        @Test
+        void designerNotAssigned() {
+            // 设计师未分配（designerId 为 null），驳回应抛异常
+            OrderMainEntity order = buildOrder(FlowStatusEnum.DESIGN_REVIEWING.getValue(), 1);
+            // 不设置 designerId，默认为 null
+            when(orderMainService.getById(1L)).thenReturn(order);
+            ReviewRejectDTO dto = new ReviewRejectDTO();
+            dto.setRejectReason("原因");
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+                assertThrows(BusinessException.class, () -> reviewService.reviewReject(1L, dto));
+            }
+        }
     }
 
     // ==================== 辅助方法 ====================
