@@ -12,10 +12,17 @@ public final class CodeRuleConstants {
     private CodeRuleConstants() {
     }
 
+    // ==================== 系统模块编码 ====================
+
+    /**
+     * 部门编码（系统内部机构部门，区别于医院科室 HDEPT_NO）
+     */
+    public static final String DEPT_NO = "DEPT_NO";
+
     // ==================== 基础模块编码 ====================
 
     /**
-     * 机构编码
+     * 机构编码（generateWithCustomPrefix 调用，运行时拼接机构类型前缀）
      */
     public static final String ORG_NO = "ORG_NO";
 
@@ -25,7 +32,7 @@ public final class CodeRuleConstants {
     public static final String HOSPITAL_NO = "HOSPITAL_NO";
 
     /**
-     * 科室编码
+     * 医院科室编码
      */
     public static final String HDEPT_NO = "HDEPT_NO";
 
@@ -35,24 +42,14 @@ public final class CodeRuleConstants {
     public static final String PROJECT_NO = "PROJECT_NO";
 
     /**
-     * 产品型号编码
-     */
-    public static final String PRODUCT_CODE = "PRODUCT_CODE";
-
-    /**
-     * 部位编码
+     * 重建部位编码
      */
     public static final String BODYPART_NO = "BODYPART_NO";
 
     /**
-     * 模板编码
+     * 医院组合模板编码
      */
     public static final String TEMPLATE_NO = "TEMPLATE_NO";
-
-    /**
-     * 医生编码
-     */
-    public static final String DOCTOR_NO = "DOCTOR_NO";
 
     // ==================== 订单相关编码 ====================
 
@@ -62,13 +59,7 @@ public final class CodeRuleConstants {
     public static final String ORDER_NO = "ORDER_NO";
 
     /**
-     * 订单明细编码
-     */
-    public static final String ORDER_ITEM_NO = "ORDER_ITEM_NO";
-
-    /**
-     * 数据包编码
-     * 支持按业务前缀生成子序号，如 202603250001-1、202603250001-2
+     * 数据包编码（generateWithSeqSuffix 调用，按订单号隔离序号池）
      */
     public static final String DATA_PACKAGE_NO = "DATA_PACKAGE_NO";
 
@@ -76,11 +67,4 @@ public final class CodeRuleConstants {
      * 指令单编码
      */
     public static final String INSTRUCTION_NO = "INSTRUCTION_NO";
-
-    // ==================== 其他编码 ====================
-
-    /**
-     * 文件编码
-     */
-    public static final String FILE_NO = "FILE_NO";
 }

@@ -500,7 +500,7 @@ VALUES
 -- ============================================================
 INSERT INTO sys_org (id, org_name, org_code, org_type, contact, phone, status)
 VALUES
-(1, '系统默认机构', 'ORG-DEFAULT', '1.1', '管理员', '13800000000', 1);
+(1, '系统默认机构', 'ORG-0001', '1.1', '管理员', '13800000000', 1);
 
 
 -- ============================================================
@@ -541,10 +541,10 @@ SELECT 1, id FROM sys_resource;
 -- ============================================================
 INSERT INTO hospital (id, hospital_name, hospital_code, area_id, area_name, full_area_name, hospital_level, hospital_type, contact, phone, email, address, status)
 VALUES
-(1, '北京协和医院', 'HOS-001', 111, '东城区', '中国,北京,北京市,东城区', '3.1', '4.1', '张主任', '13800138001', 'info@pekingunion.com', '北京市东城区帅府园1号', 1),
-(2, '上海市第一人民医院', 'HOS-002', 21, '上海市', '中国,上海,上海市', '3.2', '4.1', '李医生', '13800138002', 'info@shfirsthospital.com', '上海市虹口区武进路85号', 1),
-(3, '浙江大学医学院附属第一医院', 'HOS-003', 311, '上城区', '中国,浙江,杭州市,上城区', 1, 1, '王医生', '13800138003', 'info@hzdu1hospital.com', '杭州市上城区庆春路79号', 1),
-(4, '广东省人民医院', 'HOS-004', 411, '荔湾区', '中国,广东,广州市,荔湾区', 1, 1, '陈医生', '13800138004', 'info@gdhospital.com', '广州市荔湾区岭南大道123号', 1);
+(1, '北京协和医院',             'HOS-0001', 111, '东城区', '中国,北京,北京市,东城区',   '3.1', '4.1', '张主任', '13800138001', 'info@pekingunion.com',      '北京市东城区帅府园1号',         1),
+(2, '上海市第一人民医院',       'HOS-0002', 21,  '上海市', '中国,上海,上海市',           '3.2', '4.1', '李医生', '13800138002', 'info@shfirsthospital.com',  '上海市虹口区武进路85号',         1),
+(3, '浙江大学医学院附属第一医院','HOS-0003', 311, '上城区', '中国,浙江,杭州市,上城区',   '3.1', '4.1', '王医生', '13800138003', 'info@hzdu1hospital.com',    '杭州市上城区庆春路79号',         1),
+(4, '广东省人民医院',           'HOS-0004', 411, '荔湾区', '中国,广东,广州市,荔湾区',   '3.1', '4.1', '陈医生', '13800138004', 'info@gdhospital.com',       '广州市荔湾区岭南大道123号',       1);
 
 
 -- ============================================================
@@ -552,9 +552,9 @@ VALUES
 -- ============================================================
 INSERT INTO hospital_group_template (id, template_name, template_code, template_desc, status, remark)
 VALUES
-(1, '北京市医院联盟', 'TPL-HOS-001', '覆盖北京市主要三甲医院', 1, '用于北京地区业务拓展'),
-(2, '华东地区医院群', 'TPL-HOS-002', '覆盖华东地区重点医院', 1, '用于华东区域业务'),
-(3, '广东省医院联盟', 'TPL-HOS-003', '覆盖广东省主要医院', 1, '用于广东地区业务');
+(1, '北京市医院联盟', 'TPL-0001', '覆盖北京市主要三甲医院', 1, '用于北京地区业务拓展'),
+(2, '华东地区医院群', 'TPL-0002', '覆盖华东地区重点医院',   1, '用于华东区域业务'),
+(3, '广东省医院联盟', 'TPL-0003', '覆盖广东省主要医院',     1, '用于广东地区业务');
 
 
 -- ============================================================
@@ -570,32 +570,23 @@ VALUES
 
 -- ============================================================
 -- 编码规则数据初始化（sys_code_rule）
+-- 仅保留代码中实际调用的规则（通过 CodeRuleConstants 或硬编码字符串调用）
 -- ============================================================
 INSERT INTO sys_code_rule (rule_code, rule_name, prefix, date_format, seq_length, reset_type, status)
 VALUES
 -- 订单相关编码
-('ORDER_NO', '订单编号', 'ORD-', '{yyyy}{MM}{dd}', 6, 'DAY', 1),
-('WORK_NO', '工单编号', 'WO-', '{yyyy}{MM}', 4, 'MONTH', 1),
-('INSTRUCTION_NO', '指令单编号', 'ZL-', NULL, 4, 'NEVER', 1),
-('DRAWING_NO', '图纸编号', 'TZ-', NULL, 4, 'NEVER', 1),
-('IMAGE_PACKAGE_NO', '影像数据包编号', 'SJB-', '{yyyy}{MM}{dd}', 4, 'DAY', 1),
-('UDI', 'UDI码', 'UDI-', NULL, 8, 'NEVER', 1),
-('ATTACHMENT_NO', '附件编号', 'ATT-', '{yyyy}{MM}{dd}', 6, 'DAY', 1),
+('ORDER_NO',       '订单编号',       NULL,   '{yyyy}{MM}{dd}', 6, 'DAY',   1),  -- OrderMainServiceImpl
+('INSTRUCTION_NO', '指令单编号',     'ZL-',    NULL,             4, 'NEVER', 1),  -- DesignDocServiceImpl
+('DATA_PACKAGE_NO','数据包编号',     NULL,     NULL,             4, 'NEVER', 1),  -- DesignFileServiceImpl（generateWithSeqSuffix，格式：{orderCode}-1/-2/-N，prefix/dateFormat 不参与生成）
 -- 基础数据编码
-('HOSPITAL_NO', '医院编码', 'HOS-', NULL, 4, 'NEVER', 1),
-('TEMPLATE_NO', '医院组合模板编码', 'TPL-', NULL, 4, 'NEVER', 1),
-('DEPT_NO', '部门编码', 'DEPT-', NULL, 4, 'NEVER', 1),
-('ORG_NO', '机构编码', NULL, NULL, 4, 'NEVER', 1),
-('BODYPART_NO', '重建部位编码', 'BP-', NULL, 4, 'NEVER', 1),
-('PROJECT_NO', '重建项目编码', 'RP-', NULL, 4, 'NEVER', 1),
-('PRODUCT_CODE', '产品型号编码', 'PROD-', NULL, 4, 'NEVER', 1),
-('HDEPT_NO', '医院科室编码', 'HDEPT-', NULL, 4, 'NEVER', 1),
-('DOCTOR_NO', '医生编码', 'DOC-', NULL, 4, 'NEVER', 1),
-('FILE_NO', '文件编码', 'FILE-', NULL, 4, 'NEVER', 1),
-('ORDER_ITEM_NO', '订单明细编码', NULL, NULL, 4, 'NEVER', 1),
--- 设计模块编码
-('DESIGN_NO', '设计工单编号', NULL, NULL, 6, 'NEVER', 1),
-('DATA_PACKAGE_NO', '数据包编号', NULL, '{yyyy}{MM}{dd}', 4, 'DAY', 1);
+('ORG_NO',         '机构编码',       NULL,     NULL,             4, 'NEVER', 1),  -- OrgServiceImpl（generateWithCustomPrefix，运行时拼接前缀）
+('HOSPITAL_NO',    '医院编码',       'HOS-',   NULL,             4, 'NEVER', 1),  -- HospitalServiceImpl
+('HDEPT_NO',       '医院科室编码',   'HDEPT-', NULL,             4, 'NEVER', 1),  -- HospitalDeptServiceImpl
+('TEMPLATE_NO',    '医院组合模板编码','TPL-',  NULL,             4, 'NEVER', 1),  -- HospitalGroupTemplateServiceImpl
+('BODYPART_NO',    '重建部位编码',   'BP-',    NULL,             4, 'NEVER', 1),  -- BodyPartServiceImpl
+('PROJECT_NO',     '重建项目编码',   'RP-',    NULL,             4, 'NEVER', 1),  -- RebuildProjectServiceImpl
+-- 系统模块编码
+('DEPT_NO',        '部门编码',       'DEPT-',  NULL,             4, 'NEVER', 1);  -- DeptServiceImpl
 
 
 -- ============================================================
@@ -615,38 +606,42 @@ VALUES
 
 -- ============================================================
 -- 编码序号同步（sys_code_rule.current_value）
+-- 编码生成器首次调用时以此值为初始序号，确保新生成的编码不与已有种子数据冲突
 -- 注意：必须在对应业务表数据插入之后执行
 -- ============================================================
-UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital) WHERE rule_code = 'HOSPITAL_NO';
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital)               WHERE rule_code = 'HOSPITAL_NO';
 UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_group_template) WHERE rule_code = 'TEMPLATE_NO';
-UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_dept) WHERE rule_code = 'HDEPT_NO';
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_dept)          WHERE rule_code = 'HDEPT_NO';
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM rebuild_body_part)      WHERE rule_code = 'BODYPART_NO';
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM rebuild_project)        WHERE rule_code = 'PROJECT_NO';
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM sys_org)                WHERE rule_code = 'ORG_NO';
 
 
--- ============================================================
--- 重建部位数据初始化（rebuild_body_part）
--- 平级结构，直接列出所有具体部位
--- ============================================================
-INSERT INTO rebuild_body_part (id, name, code, sort, status)
-VALUES
-(1, '颅骨', 'BP-0001', 1, 1),
-(2, '颌面', 'BP-0002', 2, 1),
-(3, '眼眶', 'BP-0003', 3, 1),
-(4, '颈椎', 'BP-0004', 4, 1);
+-- -- ============================================================
+-- -- 重建部位数据初始化（rebuild_body_part）
+-- -- 平级结构，直接列出所有具体部位
+-- -- ============================================================
+-- INSERT INTO rebuild_body_part (id, name, code, sort, status)
+-- VALUES
+-- (1, '颅骨', 'BP-0001', 1, 1),
+-- (2, '颌面', 'BP-0002', 2, 1),
+-- (3, '眼眶', 'BP-0003', 3, 1),
+-- (4, '颈椎', 'BP-0004', 4, 1);
 
 
--- ============================================================
--- 重建项目数据初始化（rebuild_project）
--- 层级结构：部位（body_part_id） → 重建项目（level=1） → 子重建项目（level=2）
--- ============================================================
-INSERT INTO rebuild_project (id, body_part_id, parent_id, name, code, level, standard_price, urgent_price, category_code, category_name, estimated_hours, sort, status, specialty)
-VALUES
--- 颅骨重建（body_part_id=1）
-(1, 1, 0, '颅骨缺损修补', 'RP-HEAD-SKULL-001', 1, 15000.00, 22000.00, '13.1', '模型', 48.0, 1, 1, '7.1'),
-(2, 1, 1, '3D钛网修补', 'RP-HEAD-SKULL-001-01', 2, 8000.00, 12000.00, '13.2', '导板', 8.0, 1, 1, '7.1'),
-(3, 1, 1, 'PEEK材料修补', 'RP-HEAD-SKULL-001-02', 2, 12000.00, 18000.00, '13.2', '导板', 12.0, 2, 1, '7.1'),
--- 颌面重建（body_part_id=2）
-(4, 2, 0, '颌面部骨折复位', 'RP-HEAD-FACE-001', 1, 20000.00, 30000.00, '13.1', '模型', 72.0, 2, 1, '7.2'),
-(5, 2, 4, '下颌骨骨折复位导板', 'RP-HEAD-FACE-001-01', 2, 6000.00, 9000.00, '13.2', '导板', 6.0, 1, 1, '7.2');
+-- -- ============================================================
+-- -- 重建项目数据初始化（rebuild_project）
+-- -- 层级结构：部位（body_part_id） → 重建项目（level=1） → 子重建项目（level=2）
+-- -- ============================================================
+-- INSERT INTO rebuild_project (id, body_part_id, parent_id, name, code, level, standard_price, urgent_price, category_code, category_name, estimated_hours, sort, status, specialty)
+-- VALUES
+-- -- 颅骨重建（body_part_id=1）
+-- (1, 1, 0, '颅骨缺损修补',       'RP-0001', 1, 15000.00, 22000.00, '13.1', '模型', 48.0, 1, 1, '7.1'),
+-- (2, 1, 1, '3D钛网修补',         'RP-0002', 2,  8000.00, 12000.00, '13.2', '导板',  8.0, 1, 1, '7.1'),
+-- (3, 1, 1, 'PEEK材料修补',       'RP-0003', 2, 12000.00, 18000.00, '13.2', '导板', 12.0, 2, 1, '7.1'),
+-- -- 颌面重建（body_part_id=2）
+-- (4, 2, 0, '颌面部骨折复位',     'RP-0004', 1, 20000.00, 30000.00, '13.1', '模型', 72.0, 2, 1, '7.2'),
+-- (5, 2, 4, '下颌骨骨折复位导板', 'RP-0005', 2,  6000.00,  9000.00, '13.2', '导板',  6.0, 1, 1, '7.2');
 
 
 -- ============================================================

@@ -27,11 +27,13 @@ public class CreateOrgDTO {
     /**
      * 机构类型（字典编码，如：1.1=生产企业，1.2=经销商，1.3=医疗机构，1.4=其他）
      */
+    @NotBlank(message = "机构类型不能为空")
     private String orgType;
 
     /**
      * 所属地区ID
      */
+    @NotBlank(message = "地区不能为空")
     private Long areaId;
 
     /**

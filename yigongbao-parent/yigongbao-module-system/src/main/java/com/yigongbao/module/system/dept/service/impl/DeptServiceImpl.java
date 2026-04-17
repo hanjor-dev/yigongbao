@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -124,7 +125,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                 throw new BusinessException(ErrorCodeEnum.DEPT_EXISTS);
             }
             // 生成部门编码
-            String deptCode = codeGeneratorService.generate("DEPT_NO");
+            String deptCode = codeGeneratorService.generate(CodeRuleConstants.DEPT_NO);
             // DTO转换为实体对象
             DeptEntity entity = DeptConvert.toEntity(dto);
             entity.setDeptCode(deptCode);

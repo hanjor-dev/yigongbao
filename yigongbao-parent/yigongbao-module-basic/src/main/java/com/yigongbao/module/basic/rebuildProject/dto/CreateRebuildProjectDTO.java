@@ -51,6 +51,7 @@ public class CreateRebuildProjectDTO implements Serializable {
     /**
      * 项目分类编码（字典 dict_code=13，如 13.1=模型，13.2=导板）
      */
+    @NotNull(message = "项目分类不能为空")
     private String categoryCode;
 
     /**
@@ -81,6 +82,7 @@ public class CreateRebuildProjectDTO implements Serializable {
     /**
      * 专业方向字典编码（单值，如 "7.1"）
      */
+    @NotNull(message = "专业方向不能为空")
     private String specialty;
 
     /**

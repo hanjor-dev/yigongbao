@@ -25,6 +25,7 @@ public class CreateProductDTO implements Serializable {
     /**
      * 产品大类 dict_code（如 17.1）
      */
+    @NotBlank(message = "产品类型不能为空")
     private String category;
 
     /**

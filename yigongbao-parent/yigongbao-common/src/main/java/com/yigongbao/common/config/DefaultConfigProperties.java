@@ -140,7 +140,7 @@ public class DefaultConfigProperties {
      * 设计文件数据包容器格式（压缩包本身允许的扩展名，逗号分隔）
      * 默认：.zip,.rar,.7z
      */
-    private String configDesignPackageArchiveExtensions = ".zip,.rar,.7z";
+    private String configDesignPackageArchiveExtensions = ".zip,.rar,.7z,.tar";
 
     /**
      * 数据包内部允许的文件扩展名（逗号分隔，用于解析压缩包内容）

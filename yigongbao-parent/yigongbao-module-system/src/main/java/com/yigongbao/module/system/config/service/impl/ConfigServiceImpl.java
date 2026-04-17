@@ -163,6 +163,8 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
             }
             // DTO转换为实体对象
             ConfigEntity entity = ConfigConvert.toEntity(dto);
+            // 通过接口创建的配置强制为非系统内置，忽略前端传入值
+            entity.setIsSystem(0);
             // 插入数据库
             this.save(entity);
             // 记录创建成功
