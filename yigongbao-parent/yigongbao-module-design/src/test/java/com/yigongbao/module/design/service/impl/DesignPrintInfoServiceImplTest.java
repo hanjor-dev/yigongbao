@@ -355,7 +355,7 @@ class DesignPrintInfoServiceImplTest {
         }
 
         @Test
-        @DisplayName("权限校验：非设计师操作抛出 DESIGN_OPERATOR_NOT_ALLOWED（错误码740）")
+        @DisplayName("权限校验：非设计师操作抛出 DESIGN_OPERATOR_NOT_ALLOWED（错误码741）")
         void savePrintInfo_notDesigner_shouldThrow740() {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(888L); // 非设计师
@@ -367,7 +367,7 @@ class DesignPrintInfoServiceImplTest {
 
                 BusinessException ex = assertThrows(BusinessException.class,
                         () -> printInfoService.savePrintInfo(ORDER_ID, PACKAGE_ID, dto));
-                assertEquals(740, ex.getCode());
+                assertEquals(741, ex.getCode());
             }
         }
     }

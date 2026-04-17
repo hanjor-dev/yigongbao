@@ -184,7 +184,7 @@ class ArchiveParserUtilTest {
             BusinessException exception = assertThrows(BusinessException.class,
                     () -> ArchiveParserUtil.parse(inputStream, "test.gz", null));
 
-            assertEquals(736, exception.getCode()); // DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED
+            assertEquals(737, exception.getCode()); // DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED
         }
 
         @Test
@@ -195,7 +195,7 @@ class ArchiveParserUtilTest {
             BusinessException exception = assertThrows(BusinessException.class,
                     () -> ArchiveParserUtil.parse(inputStream, "filename", null));
 
-            assertEquals(736, exception.getCode());
+            assertEquals(737, exception.getCode());
         }
 
         @Test

@@ -250,12 +250,13 @@ public enum ErrorCodeEnum {
     // ==================== 设计阶段（733-750）====================
     DESIGN_PACKAGE_NOT_FOUND(733, "数据包不存在"),
     DESIGN_PACKAGE_HAS_PRODUCTS(734, "数据包已关联打印产品，无法删除"),
-    DESIGN_MODEL_NOT_FOUND(735, "可视化模型不存在"),
-    DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED(736, "不支持的压缩包格式，仅支持 ZIP/RAR/7Z"),
-    DESIGN_ARCHIVE_PARSE_FAILED(737, "压缩包解析失败：%s"),
-    DESIGN_ARCHIVE_EMPTY(738, "压缩包中无有效文件"),
-    DESIGN_ORDER_STATUS_NOT_ALLOWED(739, "当前工单状态不允许此操作"),
-    DESIGN_OPERATOR_NOT_ALLOWED(740, "非当前设计师，无权操作此工单"),
+    DESIGN_PACKAGE_HAS_DOCS(735, "数据包已生成指令单或图纸，无法删除"),
+    DESIGN_MODEL_NOT_FOUND(736, "可视化模型不存在"),
+    DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED(737, "不支持的压缩包格式，仅支持 ZIP/RAR/7Z"),
+    DESIGN_ARCHIVE_PARSE_FAILED(738, "压缩包解析失败：%s"),
+    DESIGN_ARCHIVE_EMPTY(739, "压缩包中无有效文件"),
+    DESIGN_ORDER_STATUS_NOT_ALLOWED(740, "当前工单状态不允许此操作"),
+    DESIGN_OPERATOR_NOT_ALLOWED(741, "非当前设计师，无权操作此工单"),
 
     // ==================== 产品规格相关 741-744 ====================
     PRODUCT_HAS_SPECS(741, "产品下存在规格，无法删除"),

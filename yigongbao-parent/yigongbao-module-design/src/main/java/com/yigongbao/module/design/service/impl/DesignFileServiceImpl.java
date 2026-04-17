@@ -20,6 +20,8 @@ import com.yigongbao.module.design.entity.DesignModelEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignPackageFileEntity;
 import com.yigongbao.module.design.service.DesignFileService;
+import com.yigongbao.module.design.service.DesignInstructionService;
+import com.yigongbao.module.design.service.DesignDrawingService;
 import com.yigongbao.module.design.service.DesignModelService;
 import com.yigongbao.module.design.service.DesignPackageFileService;
 import com.yigongbao.module.design.service.DesignPackageService;
@@ -59,6 +61,8 @@ public class DesignFileServiceImpl implements DesignFileService {
     private final DesignModelService modelService;
     private final DesignProductService productService;
     private final DesignProductFileService productFileService;
+    private final DesignInstructionService instructionService;
+    private final DesignDrawingService drawingService;
     private final FileService fileService;
     private final CodeGeneratorService codeGeneratorService;
     private final ConfigService configService;
@@ -88,37 +92,46 @@ public class DesignFileServiceImpl implements DesignFileService {
         String maxSizeMbStr = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_PACKAGE_MAX_SIZE_MB.getKey());
         fileService.assertFileSizeAllowed(file.getSize(), maxSizeMbStr, 500, "打印文件包");
 
-        // 4. 上传压缩包文件
-        FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.PRINT_PACKAGE.getDictCode());
-        log.info("压缩包上传成功, fileId={}", fileVO.getId());
+        // 4. 先读取文件流到内存，避免 MultipartFile InputStream 被上传步骤消费后无法重新读取
+        byte[] fileBytes;
+        try {
+            fileBytes = file.getBytes();
+        } catch (IOException e) {
+            log.error("读取上传文件流失败", e);
+            throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_PARSE_FAILED, e.getMessage());
+        }
 
-        // 5. 解析压缩包内文件列表
+        // 5. 解析压缩包内文件列表（使用缓存的 byte[]，避免流被消费后为空）
         Set<String> allowedExtensions = getAllowedExtensions();
         List<ArchiveFileInfo> archiveFiles;
         try {
-            archiveFiles = ArchiveParserUtil.parse(file.getInputStream(), fileName, allowedExtensions);
-        } catch (IOException e) {
+            archiveFiles = ArchiveParserUtil.parse(new java.io.ByteArrayInputStream(fileBytes),
+                    fileName, allowedExtensions);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
             log.error("读取压缩包流失败", e);
-            // 删除已上传的文件
-            fileService.deleteById(fileVO.getId());
             throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_PARSE_FAILED, e.getMessage());
         }
 
         // 6. 校验是否有有效文件
         if (CollUtil.isEmpty(archiveFiles)) {
-            fileService.deleteById(fileVO.getId());
             throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_EMPTY);
         }
         log.info("压缩包解析成功, 有效文件数={}", archiveFiles.size());
 
-        // 7. 生成数据包编号
+        // 7. 上传压缩包文件（使用缓存的 byte[]）
+        FileVO fileVO = fileService.uploadBytes(fileBytes, fileName, FileBizTypeEnum.PRINT_PACKAGE.getDictCode());
+        log.info("压缩包上传成功, fileId={}", fileVO.getId());
+
+        // 8. 生成数据包编号
         String packageCode = codeGeneratorService.generateWithSeqSuffix(
                 CodeRuleConstants.DATA_PACKAGE_NO, order.getOrderCode());
 
-        // 8. 计算序号
+        // 9. 计算序号
         Integer packageSeq = getNextPackageSeq(orderId);
 
-        // 9. 保存数据包记录
+        // 10. 保存数据包记录
         DesignPackageEntity packageEntity = new DesignPackageEntity();
         packageEntity.setOrderId(orderId);
         packageEntity.setOrderCode(order.getOrderCode());
@@ -133,7 +146,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         packageService.save(packageEntity);
         log.info("数据包记录保存成功, packageId={}, packageCode={}", packageEntity.getId(), packageCode);
 
-        // 10. 保存包内文件记录
+        // 11. 保存包内文件记录
         List<DesignPackageFileEntity> fileEntities = new ArrayList<>();
         int sortOrder = 1;
         for (ArchiveFileInfo archiveFile : archiveFiles) {
@@ -150,7 +163,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         packageFileService.saveBatch(fileEntities);
         log.info("包内文件记录保存成功, count={}", fileEntities.size());
 
-        // 10. 构建返回结果
+        // 12. 构建返回结果
         return buildPackageVO(packageEntity, fileEntities);
     }
 
@@ -172,6 +185,17 @@ public class DesignFileServiceImpl implements DesignFileService {
         long productCount = productService.countByPackageId(packageId);
         if (productCount > 0) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_HAS_PRODUCTS);
+        }
+
+        // 4. 检查是否已生成指令单或图纸（有则拒绝删除，防止产生孤儿记录）
+        long instructionCount = instructionService.count(
+                new LambdaQueryWrapper<com.yigongbao.module.design.entity.DesignInstructionEntity>()
+                        .eq(com.yigongbao.module.design.entity.DesignInstructionEntity::getPackageId, packageId));
+        long drawingCount = drawingService.count(
+                new LambdaQueryWrapper<com.yigongbao.module.design.entity.DesignDrawingEntity>()
+                        .eq(com.yigongbao.module.design.entity.DesignDrawingEntity::getPackageId, packageId));
+        if (instructionCount > 0 || drawingCount > 0) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_HAS_DOCS);
         }
 
         // 4. 删除包内文件记录
