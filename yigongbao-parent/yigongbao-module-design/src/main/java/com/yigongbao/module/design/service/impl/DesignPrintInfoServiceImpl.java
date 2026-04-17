@@ -292,18 +292,19 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
             designProductService.saveBatch(entities);
 
             // 8. 批量插入关联文件行（遍历每个产品行及其 packageFileIds）
+            // 预加载所有涉及的 packageFile 文件名，避免在循环中逐条查询
+            Map<Long, String> fileNameMap = packageFileService.listByIds(allFileIds).stream()
+                    .collect(Collectors.toMap(DesignPackageFileEntity::getId, DesignPackageFileEntity::getFileName));
             List<DesignProductFileEntity> fileEntities = new ArrayList<>();
             for (int i = 0; i < entities.size(); i++) {
                 DesignProductEntity saved = entities.get(i);
                 List<Long> fileIds = items.get(i).getPackageFileIds();
                 for (int j = 0; j < fileIds.size(); j++) {
                     Long fileId = fileIds.get(j);
-                    // 查文件名（冗余存储）
-                    DesignPackageFileEntity pf = packageFileService.getById(fileId);
                     DesignProductFileEntity dpf = new DesignProductFileEntity();
                     dpf.setDesignProductId(saved.getId());
                     dpf.setPackageFileId(fileId);
-                    dpf.setPackageFileName(pf != null ? pf.getFileName() : null);
+                    dpf.setPackageFileName(fileNameMap.get(fileId));
                     dpf.setSortOrder(j);
                     fileEntities.add(dpf);
                 }

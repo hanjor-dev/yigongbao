@@ -334,12 +334,14 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
                 FlowOperator.of(currentUserId, currentUserName));
 
         // 6. 将流转结果和设计开始时间写回订单表
-        order.setPhase(result.getTargetPhase());
-        order.setStatus(result.getFinalStatus());
-        order.setDesignStartTime(LocalDateTime.now());
-        order.setCurrentHandlerId(currentUserId);
-        order.setCurrentHandlerName(currentUserName);
-        orderMainService.updateById(order);
+        OrderMainEntity update = new OrderMainEntity();
+        update.setId(orderId);
+        update.setPhase(result.getTargetPhase());
+        update.setStatus(result.getFinalStatus());
+        update.setDesignStartTime(LocalDateTime.now());
+        update.setCurrentHandlerId(currentUserId);
+        update.setCurrentHandlerName(currentUserName);
+        orderMainService.updateById(update);
 
         log.info("开始设计成功，orderId={}, phase={}, status={}", orderId, result.getTargetPhase(), result.getFinalStatus());
     }
