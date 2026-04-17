@@ -277,9 +277,10 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                 }
             }
 
-            // 7. 批量插入新产品行
+            // 7. 批量插入新产品行（sortOrder 由服务端按提交顺序赋值，忽略前端传值）
             List<DesignProductEntity> entities = new ArrayList<>();
-            for (SavePrintInfoItemDTO item : items) {
+            for (int i = 0; i < items.size(); i++) {
+                SavePrintInfoItemDTO item = items.get(i);
                 DesignProductEntity entity = new DesignProductEntity();
                 BeanUtils.copyProperties(item, entity);
                 entity.setOrderId(orderId);
@@ -287,6 +288,8 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                 // certNo 从 spec 对象中取，覆盖前端传值
                 ProductSpecEntity spec = specMap.get(item.getSpecId());
                 entity.setCertNo(spec.getCertNo());
+                // sortOrder 由服务端按提交顺序赋值（0-based），不信任前端传值
+                entity.setSortOrder(i);
                 entities.add(entity);
             }
             designProductService.saveBatch(entities);

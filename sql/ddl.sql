@@ -1274,6 +1274,8 @@ CREATE TABLE design_package (
     KEY idx_design_package_order_id (order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='打印文件数据包表';
 CREATE UNIQUE INDEX uk_design_package_code ON design_package ((CASE WHEN is_deleted = 0 THEN package_code ELSE NULL END));
+-- 防止并发上传时 package_seq 重复（order_id + package_seq 在未删除记录中唯一）
+CREATE UNIQUE INDEX uk_design_package_order_seq ON design_package ((CASE WHEN is_deleted = 0 THEN order_id ELSE NULL END), (CASE WHEN is_deleted = 0 THEN package_seq ELSE NULL END));
 
 
 -- ============================================================
@@ -1399,6 +1401,8 @@ CREATE TABLE design_instruction (
     KEY idx_design_instruction_package_id (package_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='指令单表';
 CREATE UNIQUE INDEX uk_design_instruction_code ON design_instruction ((CASE WHEN is_deleted = 0 THEN instruction_code ELSE NULL END));
+-- 防止并发生成时同一数据包写入重复版本号
+CREATE UNIQUE INDEX uk_design_instruction_pkg_ver ON design_instruction ((CASE WHEN is_deleted = 0 THEN package_id ELSE NULL END), (CASE WHEN is_deleted = 0 THEN version_seq ELSE NULL END));
 
 
 -- ============================================================
@@ -1437,6 +1441,8 @@ CREATE TABLE design_drawing (
     KEY idx_design_drawing_order_id (order_id),
     KEY idx_design_drawing_package_id (package_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='图纸表';
+-- 防止并发生成时同一数据包写入重复版本号
+CREATE UNIQUE INDEX uk_design_drawing_pkg_ver ON design_drawing ((CASE WHEN is_deleted = 0 THEN package_id ELSE NULL END), (CASE WHEN is_deleted = 0 THEN version_seq ELSE NULL END));
 
 
 -- ============================================================
