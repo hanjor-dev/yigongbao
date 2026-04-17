@@ -1,8 +1,11 @@
 package com.yigongbao.module.design.dto;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+
+import java.util.List;
 
 /**
  * 保存打印信息单条记录 DTO
@@ -14,11 +17,9 @@ import lombok.Data;
 @Data
 public class SavePrintInfoItemDTO {
 
-    @NotNull(message = "数据包文件ID不能为空")
-    private Long packageFileId;
-
-    /** 文件名（冗余） */
-    private String packageFileName;
+    /** 关联文件ID列表（至少1个） */
+    @NotEmpty(message = "至少关联一个数据文件")
+    private List<Long> packageFileIds;
 
     @NotNull(message = "产品ID不能为空")
     private Long productId;
@@ -41,7 +42,7 @@ public class SavePrintInfoItemDTO {
     /** 材质名称（冗余） */
     private String materialName;
 
-    /** 颜色 dict_code（如 16.1.1） */
+    /** 颜色 dict_code（如 16.1） */
     private String colorId;
 
     /** 颜色名称（冗余） */
@@ -51,11 +52,8 @@ public class SavePrintInfoItemDTO {
     @Min(value = 1, message = "数量最小为1")
     private Integer quantity;
 
-    private Integer packQuantity;
-
-    private String timeliness;
-
-    private String productMark;
+    /** 是否加急（0=普通，1=加急） */
+    private Integer isUrgent;
 
     private Integer sortOrder;
 }

@@ -5,7 +5,7 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 打印信息选项 VO（GET /print-info/options 响应）
+ * 打印信息选项 VO（GET /{orderId}/package/{packageId}/print-info/options 响应）
  *
  * @author hanjor
  * @date 2026-04-15
@@ -32,4 +32,19 @@ public class PrintInfoOptionsVO {
      * 颜色分组（按产品大类分组）
      */
     private List<ColorGroupVO> colorGroups;
+
+    /**
+     * 产品标识（已保存值，供编辑页回显）
+     */
+    private String productMark;
+
+    /**
+     * 包装数量（已保存值，供编辑页回显）
+     */
+    private Integer packQuantity;
+
+    /**
+     * 备注（已保存值，供编辑页回显）
+     */
+    private String remark;
 }

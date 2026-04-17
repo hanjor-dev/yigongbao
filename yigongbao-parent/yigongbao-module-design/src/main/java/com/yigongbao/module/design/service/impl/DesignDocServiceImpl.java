@@ -16,12 +16,14 @@ import com.yigongbao.module.design.entity.DesignDrawingEntity;
 import com.yigongbao.module.design.entity.DesignInstructionEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
+import com.yigongbao.module.design.entity.DesignProductFileEntity;
 import com.yigongbao.module.design.helper.DrawingExcelBuilder;
 import com.yigongbao.module.design.helper.InstructionExcelBuilder;
 import com.yigongbao.module.design.service.DesignDocService;
 import com.yigongbao.module.design.service.DesignDrawingService;
 import com.yigongbao.module.design.service.DesignInstructionService;
 import com.yigongbao.module.design.service.DesignPackageService;
+import com.yigongbao.module.design.service.DesignProductFileService;
 import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.vo.DesignDocVersionVO;
 import com.yigongbao.module.design.vo.DocItemVO;
@@ -35,7 +37,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -52,6 +56,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     private final OrderMainService orderMainService;
     private final DesignPackageService packageService;
     private final DesignProductService productService;
+    private final DesignProductFileService productFileService;
     private final DesignInstructionService instructionService;
     private final DesignDrawingService drawingService;
     private final InstructionExcelBuilder instructionBuilder;
@@ -89,24 +94,25 @@ public class DesignDocServiceImpl implements DesignDocService {
 
         // 3. 查询最新版本，判断是否需要新建版本
         DesignInstructionEntity latest = instructionService.getLatestVersion(packageId);
-        // 最新版已封版（上传过修订版）或无历史版本，则新建；否则覆盖
         boolean isNewVersion = (latest == null || latest.getRevisedFileId() != null);
         int newSeq = isNewVersion ? (latest == null ? 1 : latest.getVersionSeq() + 1)
                 : latest.getVersionSeq();
         String version = "A/" + newSeq;
         log.info("指令单版本：{}，isNewVersion={}，packageId={}", version, isNewVersion, packageId);
 
-        // 4. 查询打印产品列表
+        // 4. 查询打印产品列表并展开为产品×文件行
         List<DesignProductEntity> products = productService.list(
                 new LambdaQueryWrapper<DesignProductEntity>()
                         .eq(DesignProductEntity::getPackageId, packageId)
                         .orderByAsc(DesignProductEntity::getSortOrder));
+        List<InstructionExcelBuilder.ProductRow> rows = expandProductRows(products);
 
         // 5. 生成指令单 Excel
+        LocalDateTime now = LocalDateTime.now();
         String instructionCode = isNewVersion
                 ? codeGeneratorService.generate(CodeRuleConstants.INSTRUCTION_NO)
                 : latest.getInstructionCode();
-        InstructionExcelBuilder.BuildContext instrCtx = buildInstructionContext(order, pkg, products, version);
+        InstructionExcelBuilder.BuildContext instrCtx = buildInstructionContext(order, pkg, rows, version, now);
         byte[] instrBytes;
         try {
             instrBytes = instructionBuilder.build(instrCtx);
@@ -128,15 +134,14 @@ public class DesignDocServiceImpl implements DesignDocService {
             instrEntity.setInstructionCode(instructionCode);
             instrEntity.setVersion(version);
             instrEntity.setVersionSeq(newSeq);
-            instrEntity.setGenerateTime(LocalDateTime.now());
+            instrEntity.setGenerateTime(now);
             instrEntity.setTemplateFileId(instrFile.getId());
             instrEntity.setTemplateFileUrl(instrFile.getFileUrl());
             instructionService.save(instrEntity);
         } else {
-            // 覆盖当前版本的模板文件
             latest.setTemplateFileId(instrFile.getId());
             latest.setTemplateFileUrl(instrFile.getFileUrl());
-            latest.setGenerateTime(LocalDateTime.now());
+            latest.setGenerateTime(now);
             instructionService.updateById(latest);
             instrEntity = latest;
         }
@@ -189,14 +194,16 @@ public class DesignDocServiceImpl implements DesignDocService {
         String version = "A/" + newSeq;
         log.info("图纸版本：{}，isNewVersion={}，packageId={}", version, isNewVersion, packageId);
 
-        // 4. 查询打印产品列表
+        // 4. 查询打印产品列表并展开为产品×文件行
         List<DesignProductEntity> products = productService.list(
                 new LambdaQueryWrapper<DesignProductEntity>()
                         .eq(DesignProductEntity::getPackageId, packageId)
                         .orderByAsc(DesignProductEntity::getSortOrder));
+        List<DrawingExcelBuilder.ProductRow> drawingRows = expandDrawingRows(products);
 
         // 5. 生成图纸 Excel
-        DrawingExcelBuilder.BuildContext drawCtx = buildDrawingContext(order, pkg, products);
+        LocalDateTime now = LocalDateTime.now();
+        DrawingExcelBuilder.BuildContext drawCtx = buildDrawingContext(order, pkg, drawingRows, now);
         byte[] drawBytes;
         try {
             drawBytes = drawingBuilder.build(drawCtx);
@@ -217,14 +224,14 @@ public class DesignDocServiceImpl implements DesignDocService {
             drawEntity.setPackageId(packageId);
             drawEntity.setVersion(version);
             drawEntity.setVersionSeq(newSeq);
-            drawEntity.setGenerateTime(LocalDateTime.now());
+            drawEntity.setGenerateTime(now);
             drawEntity.setTemplateFileId(drawFile.getId());
             drawEntity.setTemplateFileUrl(drawFile.getFileUrl());
             drawingService.save(drawEntity);
         } else {
             latest.setTemplateFileId(drawFile.getId());
             latest.setTemplateFileUrl(drawFile.getFileUrl());
-            latest.setGenerateTime(LocalDateTime.now());
+            latest.setGenerateTime(now);
             drawingService.updateById(latest);
             drawEntity = latest;
         }
@@ -310,25 +317,75 @@ public class DesignDocServiceImpl implements DesignDocService {
     // ==================== 私有方法 ====================
 
     /**
+     * 将产品行 + 文件关联展开为指令单行列表（一个文件=一行）
+     */
+    private List<InstructionExcelBuilder.ProductRow> expandProductRows(
+            List<DesignProductEntity> products) {
+        if (products.isEmpty()) return List.of();
+        List<Long> productIds = products.stream().map(DesignProductEntity::getId).toList();
+        List<DesignProductFileEntity> allFiles = productFileService.listByProductIds(productIds);
+        Map<Long, List<DesignProductFileEntity>> fileMap = allFiles.stream()
+                .collect(Collectors.groupingBy(DesignProductFileEntity::getDesignProductId));
+
+        List<InstructionExcelBuilder.ProductRow> rows = new ArrayList<>();
+        for (DesignProductEntity p : products) {
+            List<DesignProductFileEntity> files = fileMap.getOrDefault(p.getId(), List.of());
+            for (DesignProductFileEntity f : files) {
+                InstructionExcelBuilder.ProductRow row = new InstructionExcelBuilder.ProductRow();
+                row.setCertNo(p.getCertNo());
+                row.setProductName(p.getProductName());
+                row.setPackageFileName(f.getPackageFileName());
+                row.setSpecName(p.getSpecName());
+                row.setMaterialName(p.getMaterialName());
+                row.setQuantity(p.getQuantity());
+                row.setIsUrgent(p.getIsUrgent()); // 行级 is_urgent
+                row.setColorName(p.getColorName());
+                rows.add(row);
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * 将产品行 + 文件关联展开为图纸行列表（一个文件=一行）
+     */
+    private List<DrawingExcelBuilder.ProductRow> expandDrawingRows(
+            List<DesignProductEntity> products) {
+        if (products.isEmpty()) return List.of();
+        List<Long> productIds = products.stream().map(DesignProductEntity::getId).toList();
+        List<DesignProductFileEntity> allFiles = productFileService.listByProductIds(productIds);
+        Map<Long, List<DesignProductFileEntity>> fileMap = allFiles.stream()
+                .collect(Collectors.groupingBy(DesignProductFileEntity::getDesignProductId));
+
+        List<DrawingExcelBuilder.ProductRow> rows = new ArrayList<>();
+        for (DesignProductEntity p : products) {
+            List<DesignProductFileEntity> files = fileMap.getOrDefault(p.getId(), List.of());
+            for (DesignProductFileEntity f : files) {
+                DrawingExcelBuilder.ProductRow row = new DrawingExcelBuilder.ProductRow();
+                row.setPackageFileName(f.getPackageFileName());
+                row.setProductName(p.getProductName());
+                rows.add(row);
+            }
+        }
+        return rows;
+    }
+
+    /**
      * 校验订单状态和操作权限（设计中或设计审核不通过时，当前用户是订单设计师）
      */
     private OrderMainEntity checkOrderAndPermission(Long orderId) {
-        // 查询订单
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
-        // 校验阶段（必须在设计阶段）
         FlowStatusEnum status = FlowStatusEnum.getByValue(order.getStatus());
         if (status == null || !status.belongsTo(FlowPhaseEnum.DESIGN)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
         }
-        // 校验状态（设计中或设计审核不通过才能操作）
         if (status != FlowStatusEnum.DESIGN_IN_PROGRESS
                 && status != FlowStatusEnum.DESIGN_REVIEW_REJECTED) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
         }
-        // 校验操作人（必须是当前设计师）
         Long currentUserId = StpUtil.getLoginIdAsLong();
         if (!currentUserId.equals(order.getDesignerId())) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_OPERATOR_NOT_ALLOWED);
@@ -352,7 +409,7 @@ public class DesignDocServiceImpl implements DesignDocService {
      */
     private InstructionExcelBuilder.BuildContext buildInstructionContext(
             OrderMainEntity order, DesignPackageEntity pkg,
-            List<DesignProductEntity> products, String version) {
+            List<InstructionExcelBuilder.ProductRow> rows, String version, LocalDateTime generateTime) {
         InstructionExcelBuilder.BuildContext ctx = new InstructionExcelBuilder.BuildContext();
         ctx.setOrderCode(order.getOrderCode());
         ctx.setPatientName(order.getPatientName());
@@ -360,13 +417,23 @@ public class DesignDocServiceImpl implements DesignDocService {
         ctx.setContactName(order.getDoctorName());
         ctx.setPackageCode(pkg.getPackageCode());
         ctx.setVersion(version);
-        ctx.setProducts(products);
-        // 预交货时间（LocalDateTime 转字符串）
+        ctx.setRows(rows);
+        ctx.setProductMark(pkg.getProductMark());
+        ctx.setPackQuantity(pkg.getPackQuantity());
+        ctx.setRemark(pkg.getRemark());
+        ctx.setDesignerName(order.getDesignerName());
         if (order.getExpectedDeliveryDate() != null) {
             ctx.setExpectedDeliveryDate(order.getExpectedDeliveryDate()
                     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
         }
+        if (order.getDesignStartTime() != null) {
+            ctx.setDesignStartTime(order.getDesignStartTime()
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+        }
+        ctx.setGenerateDate(generateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        ctx.setGenerateTime(generateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
         ctx.setPostalAddress(order.getPostalAddress());
+        ctx.setIsPostal(order.getIsPostal() != null && order.getIsPostal() == 1 ? "是" : "否");
         return ctx;
     }
 
@@ -375,11 +442,13 @@ public class DesignDocServiceImpl implements DesignDocService {
      */
     private DrawingExcelBuilder.BuildContext buildDrawingContext(
             OrderMainEntity order, DesignPackageEntity pkg,
-            List<DesignProductEntity> products) {
+            List<DrawingExcelBuilder.ProductRow> rows, LocalDateTime generateTime) {
         DrawingExcelBuilder.BuildContext ctx = new DrawingExcelBuilder.BuildContext();
         ctx.setOrderCode(order.getOrderCode());
         ctx.setPackageCode(pkg.getPackageCode());
-        ctx.setProducts(products);
+        ctx.setRows(rows);
+        ctx.setDesignerName(order.getDesignerName());
+        ctx.setGenerateDate(generateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
         return ctx;
     }
 

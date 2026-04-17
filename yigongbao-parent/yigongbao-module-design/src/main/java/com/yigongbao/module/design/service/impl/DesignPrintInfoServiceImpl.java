@@ -13,15 +13,16 @@ import com.yigongbao.module.basic.product.entity.ProductSpecEntity;
 import com.yigongbao.module.basic.product.service.ProductService;
 import com.yigongbao.module.basic.product.service.ProductSpecService;
 import com.yigongbao.module.basic.product.vo.ProductVO;
-import com.yigongbao.module.basic.product.vo.ProductSpecVO;
 import com.yigongbao.module.design.dto.SavePrintInfoDTO;
 import com.yigongbao.module.design.dto.SavePrintInfoItemDTO;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignPackageFileEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
+import com.yigongbao.module.design.entity.DesignProductFileEntity;
 import com.yigongbao.module.design.service.DesignPackageFileService;
 import com.yigongbao.module.design.service.DesignPackageService;
 import com.yigongbao.module.design.service.DesignPrintInfoService;
+import com.yigongbao.module.design.service.DesignProductFileService;
 import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.vo.ColorGroupVO;
 import com.yigongbao.module.design.vo.DesignProductVO;
@@ -62,27 +63,27 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
     private final DesignPackageService packageService;
     private final DesignPackageFileService packageFileService;
     private final DesignProductService designProductService;
+    private final DesignProductFileService productFileService;
     private final DictService dictService;
 
     /**
-     * 获取打印信息选项数据
-     * 不校验操作人，任何登录用户均可查询选项
+     * 获取打印信息选项数据以及包级已保存回显字段
      *
-     * @param orderId 订单ID
-     * @return 选项 VO（designMode、产品树、材质、颜色分组）
+     * @param orderId   订单ID
+     * @param packageId 数据包ID
+     * @return 选项 VO（designMode、产品树、材质、颜色分组、包级字段回显）
      */
     @Override
-    public PrintInfoOptionsVO getOptions(Long orderId) {
-        log.info("获取打印信息选项，orderId={}", orderId);
+    public PrintInfoOptionsVO getOptions(Long orderId, Long packageId) {
+        log.info("获取打印信息选项，orderId={}, packageId={}", orderId, packageId);
 
-        // 1. 查订单，取 designMode（暂无该字段，预留为 null）
+        // 1. 查订单
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
         PrintInfoOptionsVO vo = new PrintInfoOptionsVO();
-        // designMode 暂未存于 order_main，返回 null
         vo.setDesignMode(null);
 
         // 2. 查所有 status=1 的产品（含 status=1 的规格），产品无规格时 specs 为空列表
@@ -118,37 +119,39 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
         }).toList();
         vo.setMaterials(materials);
 
-        // 4. 查颜色三级树（dict typeCode="16"）
-        // 结构：16（根）→ 16.x（二级，dictValue 存产品大类 dict_code 如 17.1）→ 16.x.y（三级，颜色选项）
+        // 4. 查颜色二级节点（dict typeCode="16"）
+        // 二级节点 dictValue 存产品大类 dict_code（如 17.1），供前端按产品分类过滤颜色
         List<DictVO> colorTree = dictService.listTreeByTypeCode("16");
         List<ColorGroupVO> colorGroups = new ArrayList<>();
         if (CollUtil.isNotEmpty(colorTree)) {
-            // listTreeByTypeCode 返回 [根节点]，根节点的 children 是二级节点
             DictVO root = colorTree.get(0);
             if (root.getChildren() != null) {
                 for (DictVO level2 : root.getChildren()) {
                     ColorGroupVO group = new ColorGroupVO();
-                    // 二级节点 dictValue 存对应产品大类 dict_code（如 17.1）
+                    // 二级节点 dictValue 存对应产品大类 dict_code（如 17.1）；null 表示通用
                     group.setCategoryCode(level2.getDictValue());
                     group.setCategoryName(level2.getDictName());
-                    List<DictOptionVO> colors = new ArrayList<>();
-                    if (level2.getChildren() != null) {
-                        for (DictVO level3 : level2.getChildren()) {
-                            DictOptionVO colorOpt = new DictOptionVO();
-                            colorOpt.setCode(level3.getDictCode());
-                            colorOpt.setName(level3.getDictName());
-                            colorOpt.setIsDefault(false);
-                            colors.add(colorOpt);
-                        }
-                    }
-                    group.setColors(colors);
+                    // 颜色本身直接使用二级节点（16.1=白色 等），无三级结构
+                    DictOptionVO colorOpt = new DictOptionVO();
+                    colorOpt.setCode(level2.getDictCode());
+                    colorOpt.setName(level2.getDictName());
+                    colorOpt.setIsDefault(false);
+                    group.setColors(List.of(colorOpt));
                     colorGroups.add(group);
                 }
             }
         }
         vo.setColorGroups(colorGroups);
 
-        log.info("获取打印信息选项成功，orderId={}", orderId);
+        // 5. 回填包级已保存字段（productMark、packQuantity、remark）
+        DesignPackageEntity pkg = packageService.getById(packageId);
+        if (pkg != null && pkg.getOrderId().equals(orderId)) {
+            vo.setProductMark(pkg.getProductMark());
+            vo.setPackQuantity(pkg.getPackQuantity());
+            vo.setRemark(pkg.getRemark());
+        }
+
+        log.info("获取打印信息选项成功，orderId={}, packageId={}", orderId, packageId);
         return vo;
     }
 
@@ -169,12 +172,34 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
         }
 
-        List<DesignProductEntity> list = designProductService.list(
+        List<DesignProductEntity> entities = designProductService.list(
                 new LambdaQueryWrapper<DesignProductEntity>()
                         .eq(DesignProductEntity::getPackageId, packageId)
                         .orderByAsc(DesignProductEntity::getSortOrder));
 
-        return list.stream().map(this::toVO).toList();
+        if (entities.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 批量查关联文件，按 designProductId 分组
+        List<Long> productIds = entities.stream().map(DesignProductEntity::getId).toList();
+        List<DesignProductFileEntity> allFiles = productFileService.listByProductIds(productIds);
+        Map<Long, List<DesignProductFileEntity>> fileMap = allFiles.stream()
+                .collect(Collectors.groupingBy(DesignProductFileEntity::getDesignProductId));
+
+        // 组装 VO
+        return entities.stream().map(e -> {
+            DesignProductVO vo = toVO(e);
+            List<DesignProductFileEntity> files = fileMap.getOrDefault(e.getId(), List.of());
+            vo.setFiles(files.stream().map(f -> {
+                DesignProductVO.ProductFileVO fvo = new DesignProductVO.ProductFileVO();
+                fvo.setId(f.getId());
+                fvo.setPackageFileId(f.getPackageFileId());
+                fvo.setPackageFileName(f.getPackageFileName());
+                return fvo;
+            }).toList());
+            return vo;
+        }).toList();
     }
 
     /**
@@ -194,7 +219,7 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
         // 1. 校验订单状态和操作人
         checkOrderAndPermission(orderId);
 
-        // 2. 校验 packageId 的 orderId 等于传入 orderId
+        // 2. 校验 packageId 属于 orderId
         DesignPackageEntity pkg = packageService.getById(packageId);
         if (pkg == null || !pkg.getOrderId().equals(orderId)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
@@ -202,19 +227,35 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
 
         List<SavePrintInfoItemDTO> items = dto.getItems();
 
+        // 3. 删除旧产品行的关联文件（先删文件关联，再删产品行）
+        List<Long> oldProductIds = designProductService.list(
+                new LambdaQueryWrapper<DesignProductEntity>()
+                        .eq(DesignProductEntity::getPackageId, packageId)
+                        .select(DesignProductEntity::getId))
+                .stream().map(DesignProductEntity::getId).toList();
+        if (!oldProductIds.isEmpty()) {
+            productFileService.removeByProductIds(oldProductIds);
+        }
+
+        // 4. 删除旧产品行
+        designProductService.remove(
+                new LambdaQueryWrapper<DesignProductEntity>()
+                        .eq(DesignProductEntity::getPackageId, packageId));
+
         if (CollUtil.isNotEmpty(items)) {
-            // 3. 校验每条 packageFileId 属于该 packageId
-            Set<Long> fileIds = items.stream().map(SavePrintInfoItemDTO::getPackageFileId)
+            // 5. 校验所有 packageFileIds 均属于该 packageId
+            Set<Long> allFileIds = items.stream()
+                    .flatMap(item -> item.getPackageFileIds().stream())
                     .collect(Collectors.toSet());
             long validFileCount = packageFileService.count(
                     new LambdaQueryWrapper<DesignPackageFileEntity>()
                             .eq(DesignPackageFileEntity::getPackageId, packageId)
-                            .in(DesignPackageFileEntity::getId, fileIds));
-            if (validFileCount != fileIds.size()) {
+                            .in(DesignPackageFileEntity::getId, allFileIds));
+            if (validFileCount != allFileIds.size()) {
                 throw new BusinessException(ErrorCodeEnum.ORDER_FILE_NOT_FOUND, "部分文件不属于该数据包");
             }
 
-            // 4. 校验每条 productId / specId，并批量加载 spec 对象（用于覆盖 certNo）
+            // 6. 校验 productId / specId，批量加载 spec 对象（用于覆盖 certNo）
             Set<Long> specIds = items.stream().map(SavePrintInfoItemDTO::getSpecId).collect(Collectors.toSet());
             List<ProductSpecEntity> specList = productSpecService.listByIds(specIds);
             Map<Long, ProductSpecEntity> specMap = specList.stream()
@@ -226,7 +267,6 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                 if (product == null || !Integer.valueOf(StatusConstants.NORMAL).equals(product.getStatus())) {
                     throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
                 }
-
                 // 校验 specId 存在、status=1，且 spec.productId == productId
                 ProductSpecEntity spec = specMap.get(item.getSpecId());
                 if (spec == null || !Integer.valueOf(StatusConstants.NORMAL).equals(spec.getStatus())) {
@@ -237,12 +277,7 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                 }
             }
 
-            // 5. 删除旧记录
-            designProductService.remove(
-                    new LambdaQueryWrapper<DesignProductEntity>()
-                            .eq(DesignProductEntity::getPackageId, packageId));
-
-            // 6. 批量插入新记录，certNo 从 spec 对象中取
+            // 7. 批量插入新产品行
             List<DesignProductEntity> entities = new ArrayList<>();
             for (SavePrintInfoItemDTO item : items) {
                 DesignProductEntity entity = new DesignProductEntity();
@@ -255,12 +290,34 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                 entities.add(entity);
             }
             designProductService.saveBatch(entities);
-        } else {
-            // 空列表：清空该数据包的所有打印信息
-            designProductService.remove(
-                    new LambdaQueryWrapper<DesignProductEntity>()
-                            .eq(DesignProductEntity::getPackageId, packageId));
+
+            // 8. 批量插入关联文件行（遍历每个产品行及其 packageFileIds）
+            List<DesignProductFileEntity> fileEntities = new ArrayList<>();
+            for (int i = 0; i < entities.size(); i++) {
+                DesignProductEntity saved = entities.get(i);
+                List<Long> fileIds = items.get(i).getPackageFileIds();
+                for (int j = 0; j < fileIds.size(); j++) {
+                    Long fileId = fileIds.get(j);
+                    // 查文件名（冗余存储）
+                    DesignPackageFileEntity pf = packageFileService.getById(fileId);
+                    DesignProductFileEntity dpf = new DesignProductFileEntity();
+                    dpf.setDesignProductId(saved.getId());
+                    dpf.setPackageFileId(fileId);
+                    dpf.setPackageFileName(pf != null ? pf.getFileName() : null);
+                    dpf.setSortOrder(j);
+                    fileEntities.add(dpf);
+                }
+            }
+            productFileService.saveBatch(fileEntities);
         }
+
+        // 9. 更新 design_package 包级字段（productMark、packQuantity、remark）
+        DesignPackageEntity pkgUpdate = new DesignPackageEntity();
+        pkgUpdate.setId(packageId);
+        pkgUpdate.setProductMark(dto.getProductMark());
+        pkgUpdate.setPackQuantity(dto.getPackQuantity());
+        pkgUpdate.setRemark(dto.getRemark());
+        packageService.updateById(pkgUpdate);
 
         log.info("保存打印信息成功，orderId={}, packageId={}", orderId, packageId);
     }
@@ -289,7 +346,8 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
 
-        // 3. 逻辑删除
+        // 3. 先删关联文件行，再删产品行
+        productFileService.removeByProductId(printInfoId);
         designProductService.removeById(printInfoId);
         log.info("删除打印信息成功，printInfoId={}", printInfoId);
     }
@@ -307,17 +365,14 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
-        // 校验阶段（必须在设计阶段）
         FlowStatusEnum status = FlowStatusEnum.getByValue(order.getStatus());
         if (status == null || !status.belongsTo(FlowPhaseEnum.DESIGN)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
         }
-        // 校验状态（设计中或设计审核不通过才能操作）
         if (status != FlowStatusEnum.DESIGN_IN_PROGRESS
                 && status != FlowStatusEnum.DESIGN_REVIEW_REJECTED) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
         }
-        // 校验操作人（必须是当前设计师）
         Long currentUserId = StpUtil.getLoginIdAsLong();
         if (!currentUserId.equals(order.getDesignerId())) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_OPERATOR_NOT_ALLOWED);

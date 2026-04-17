@@ -15,9 +15,11 @@ import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.helper.DrawingExcelBuilder;
 import com.yigongbao.module.design.helper.InstructionExcelBuilder;
+import com.yigongbao.module.design.entity.DesignProductFileEntity;
 import com.yigongbao.module.design.service.DesignDrawingService;
 import com.yigongbao.module.design.service.DesignInstructionService;
 import com.yigongbao.module.design.service.DesignPackageService;
+import com.yigongbao.module.design.service.DesignProductFileService;
 import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.vo.DocItemVO;
 import com.yigongbao.module.order.service.OrderMainService;
@@ -54,6 +56,7 @@ class DesignDocServiceImplTest {
     @Mock private DrawingExcelBuilder drawingBuilder;
     @Mock private CodeGeneratorService codeGeneratorService;
     @Mock private FileService fileService;
+    @Mock private DesignProductFileService productFileService;
 
     @InjectMocks
     private DesignDocServiceImpl docService;
@@ -101,6 +104,7 @@ class DesignDocServiceImplTest {
                 when(instructionService.getLatestVersion(PACKAGE_ID)).thenReturn(null);
                 when(codeGeneratorService.generate(any())).thenReturn("ZL-0001");
                 when(productService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(new DesignProductEntity()));
+                when(productFileService.listByProductIds(any())).thenReturn(List.of(buildProductFile()));
                 when(instructionBuilder.build(any())).thenReturn(new byte[]{1, 2, 3});
                 when(fileService.uploadBytes(any(), any(), any())).thenReturn(mockFileVO);
                 when(instructionService.save(any())).thenReturn(true);
@@ -130,6 +134,7 @@ class DesignDocServiceImplTest {
                 when(instructionService.getLatestVersion(PACKAGE_ID)).thenReturn(latestSealed);
                 when(codeGeneratorService.generate(any())).thenReturn("ZL-0002");
                 when(productService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(new DesignProductEntity()));
+                when(productFileService.listByProductIds(any())).thenReturn(List.of(buildProductFile()));
                 when(instructionBuilder.build(any())).thenReturn(new byte[]{1, 2, 3});
                 when(fileService.uploadBytes(any(), any(), any())).thenReturn(mockFileVO);
                 when(instructionService.save(any())).thenReturn(true);
@@ -159,6 +164,7 @@ class DesignDocServiceImplTest {
                 when(productService.count(any())).thenReturn(2L);
                 when(instructionService.getLatestVersion(PACKAGE_ID)).thenReturn(latestOpen);
                 when(productService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(new DesignProductEntity()));
+                when(productFileService.listByProductIds(any())).thenReturn(List.of(buildProductFile()));
                 when(instructionBuilder.build(any())).thenReturn(new byte[]{1, 2, 3});
                 when(fileService.uploadBytes(any(), any(), any())).thenReturn(mockFileVO);
                 when(instructionService.updateById(any())).thenReturn(true);
@@ -221,6 +227,7 @@ class DesignDocServiceImplTest {
                 when(productService.count(any())).thenReturn(2L);
                 when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(null);
                 when(productService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(new DesignProductEntity()));
+                when(productFileService.listByProductIds(any())).thenReturn(List.of(buildProductFile()));
                 when(drawingBuilder.build(any())).thenReturn(new byte[]{4, 5, 6});
                 when(fileService.uploadBytes(any(), any(), any())).thenReturn(mockFileVO);
                 when(drawingService.save(any())).thenReturn(true);
@@ -275,5 +282,16 @@ class DesignDocServiceImplTest {
                         mock(MultipartFile.class)));
             }
         }
+    }
+
+    // ==================== 辅助方法 ====================
+
+    private DesignProductFileEntity buildProductFile() {
+        DesignProductFileEntity f = new DesignProductFileEntity();
+        f.setId(1L);
+        f.setDesignProductId(1L);
+        f.setPackageFileId(100L);
+        f.setPackageFileName("左髋骨.stl");
+        return f;
     }
 }

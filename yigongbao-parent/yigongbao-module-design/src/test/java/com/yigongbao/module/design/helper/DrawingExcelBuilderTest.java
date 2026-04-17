@@ -1,6 +1,5 @@
 package com.yigongbao.module.design.helper;
 
-import com.yigongbao.module.design.entity.DesignProductEntity;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
@@ -16,12 +15,10 @@ class DrawingExcelBuilderTest {
     void build_withFewProducts_shouldFillSlotsOnSingleSheet() throws Exception {
         DrawingExcelBuilder builder = new DrawingExcelBuilder();
 
-        List<DesignProductEntity> products = buildProducts(3);
-
         DrawingExcelBuilder.BuildContext ctx = new DrawingExcelBuilder.BuildContext();
         ctx.setOrderCode("ORD-001");
         ctx.setPackageCode("PKG-001");
-        ctx.setProducts(products);
+        ctx.setRows(buildRows(3));
 
         byte[] result = builder.build(ctx);
 
@@ -36,12 +33,10 @@ class DrawingExcelBuilderTest {
     void build_withMoreThan11Products_shouldCreateMultipleSheets() throws Exception {
         DrawingExcelBuilder builder = new DrawingExcelBuilder();
 
-        List<DesignProductEntity> products = buildProducts(13);
-
         DrawingExcelBuilder.BuildContext ctx = new DrawingExcelBuilder.BuildContext();
         ctx.setOrderCode("ORD-001");
         ctx.setPackageCode("PKG-001");
-        ctx.setProducts(products);
+        ctx.setRows(buildRows(13));
 
         byte[] result = builder.build(ctx);
 
@@ -52,13 +47,13 @@ class DrawingExcelBuilderTest {
         }
     }
 
-    private List<DesignProductEntity> buildProducts(int count) {
-        List<DesignProductEntity> list = new ArrayList<>();
+    private List<DrawingExcelBuilder.ProductRow> buildRows(int count) {
+        List<DrawingExcelBuilder.ProductRow> list = new ArrayList<>();
         for (int i = 1; i <= count; i++) {
-            DesignProductEntity p = new DesignProductEntity();
-            p.setPackageFileName("文件" + i + ".stl");
-            p.setProductName("产品" + i);
-            list.add(p);
+            DrawingExcelBuilder.ProductRow row = new DrawingExcelBuilder.ProductRow();
+            row.setPackageFileName("文件" + i + ".stl");
+            row.setProductName("产品" + i);
+            list.add(row);
         }
         return list;
     }

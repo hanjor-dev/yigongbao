@@ -23,6 +23,7 @@ import com.yigongbao.module.design.service.DesignFileService;
 import com.yigongbao.module.design.service.DesignModelService;
 import com.yigongbao.module.design.service.DesignPackageFileService;
 import com.yigongbao.module.design.service.DesignPackageService;
+import com.yigongbao.module.design.service.DesignProductFileService;
 import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.util.ArchiveParserUtil;
 import com.yigongbao.module.design.vo.DesignModelVO;
@@ -57,6 +58,7 @@ public class DesignFileServiceImpl implements DesignFileService {
     private final DesignPackageFileService packageFileService;
     private final DesignModelService modelService;
     private final DesignProductService productService;
+    private final DesignProductFileService productFileService;
     private final FileService fileService;
     private final CodeGeneratorService codeGeneratorService;
     private final ConfigService configService;
@@ -427,7 +429,7 @@ public class DesignFileServiceImpl implements DesignFileService {
      * 获取已填写打印信息的文件ID集合
      */
     private Set<Long> getFilledFileIds(List<Long> packageIds) {
-        return productService.getFilledFileIds(packageIds);
+        return productFileService.getFilledPackageFileIds(packageIds);
     }
 
     /**

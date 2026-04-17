@@ -1,6 +1,5 @@
 package com.yigongbao.module.design.helper;
 
-import com.yigongbao.module.design.entity.DesignProductEntity;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -32,6 +31,17 @@ public class DrawingExcelBuilder {
     private static final int SLOTS_PER_PAGE = 11;
 
     /**
+     * 展开后的产品×文件行（一个文件=一行）
+     */
+    @Data
+    public static class ProductRow {
+        /** 文件名（含后缀，填充时去后缀） */
+        private String packageFileName;
+        /** 产品名称 */
+        private String productName;
+    }
+
+    /**
      * 填充上下文
      */
     @Data
@@ -39,26 +49,32 @@ public class DrawingExcelBuilder {
         private String orderCode;
         private String packageCode;
         private String remark;
-        private List<DesignProductEntity> products;
+        /** 生成日期（yyyy-MM-dd，填入设计/日期和审核/日期列） */
+        private String generateDate;
+        /** 设计师名（填入设计/日期行姓名列） */
+        private String designerName;
+        /** 展开后的产品×文件行列表 */
+        private List<ProductRow> rows;
     }
 
     /**
      * 槽位坐标定义：[文件名行, 文件名列, 产品名行, 产品名列]
-     * 基于模板分析（0-indexed），共11个内容槽位
+     * 基于模板分析（0-indexed）：每槽4列，标签列固定（不覆盖），值写入标签右侧
+     * 文件名值列：D/H/L/P（col 3/7/11/15）；产品名值列：C/G/K/O（col 2/6/10/14）
      */
     private static final int[][] SLOT_COORDS = {
         // {fileNameRow, fileNameCol, productNameRow, productNameCol}
-        {0,  2,  1,  0},   // 槽1：A-D区
-        {0,  6,  1,  4},   // 槽2：E-H区
-        {0,  10, 1,  8},   // 槽3：I-L区
-        {12, 2,  13, 0},   // 槽4：A-D区 第2行组
-        {12, 6,  13, 4},   // 槽5：E-H区
-        {12, 10, 13, 8},   // 槽6：I-L区
-        {12, 14, 13, 12},  // 槽7：M-P区
-        {24, 2,  25, 0},   // 槽8：A-D区 第3行组
-        {24, 6,  25, 4},   // 槽9：E-H区
-        {24, 10, 25, 8},   // 槽10：I-L区
-        {24, 14, 25, 12},  // 槽11：M-P区
+        {0,  3,  1,  2},   // 槽1：D1 / C2
+        {0,  7,  1,  6},   // 槽2：H1 / G2
+        {0,  11, 1,  10},  // 槽3：L1 / K2
+        {12, 3,  13, 2},   // 槽4：D13 / C14
+        {12, 7,  13, 6},   // 槽5：H13 / G14
+        {12, 11, 13, 10},  // 槽6：L13 / K14
+        {12, 15, 13, 14},  // 槽7：P13 / O14
+        {24, 3,  25, 2},   // 槽8：D25 / C26
+        {24, 7,  25, 6},   // 槽9：H25 / G26
+        {24, 11, 25, 10},  // 槽10：L25 / K26
+        {24, 15, 25, 14},  // 槽11：P25 / O26
     };
 
     /** footer 行（0-indexed）：原模板行37=row36 */
@@ -70,6 +86,14 @@ public class DrawingExcelBuilder {
     /** 页码文本行列：M39=row38,col12 */
     private static final int PAGE_TEXT_ROW = 38;
     private static final int PAGE_TEXT_COL = 12;
+    /** 设计师名列：J39=row38,col9；设计日期列：L39=row38,col11 */
+    private static final int DESIGN_NAME_ROW = 38;
+    private static final int DESIGN_NAME_COL = 9;
+    private static final int DESIGN_DATE_ROW = 38;
+    private static final int DESIGN_DATE_COL = 11;
+    /** 审核日期列：L41=row40,col11（审核人不填） */
+    private static final int REVIEW_DATE_ROW = 40;
+    private static final int REVIEW_DATE_COL = 11;
 
     /**
      * 根据上下文填充图纸模板，返回填充后的 xlsx 字节数组
@@ -79,12 +103,12 @@ public class DrawingExcelBuilder {
      * @throws IOException 读取模板或写出失败时
      */
     public byte[] build(BuildContext ctx) throws IOException {
-        List<DesignProductEntity> products = ctx.getProducts() == null ? List.of() : ctx.getProducts();
-        int n = products.size();
+        List<ProductRow> rows = ctx.getRows() == null ? List.of() : ctx.getRows();
+        int n = rows.size();
         // 计算总页数：至少1页
         int totalPages = Math.max(1, (int) Math.ceil((double) n / SLOTS_PER_PAGE));
 
-        log.info("开始生成图纸，orderCode={}, productCount={}, totalPages={}",
+        log.info("开始生成图纸，orderCode={}, rowCount={}, totalPages={}",
                 ctx.getOrderCode(), n, totalPages);
 
         try (InputStream is = new ClassPathResource(TEMPLATE_PATH).getInputStream();
@@ -92,30 +116,27 @@ public class DrawingExcelBuilder {
 
             Sheet templateSheet = wb.getSheetAt(0);
 
-            // 对每一页处理
             for (int page = 0; page < totalPages; page++) {
                 Sheet sheet;
                 if (page == 0) {
-                    // 第一页直接使用模板 Sheet
                     sheet = templateSheet;
                 } else {
-                    // 复制模板 Sheet 作为新页
                     sheet = wb.cloneSheet(0);
                     wb.setSheetName(wb.getSheetIndex(sheet), "图纸-" + (page + 1));
                 }
 
-                // 计算本页产品范围
+                // 计算本页行范围
                 int from = page * SLOTS_PER_PAGE;
                 int to = Math.min(from + SLOTS_PER_PAGE, n);
 
                 // 填充槽位
                 for (int slot = 0; slot < SLOTS_PER_PAGE; slot++) {
-                    int productIdx = from + slot;
+                    int rowIdx = from + slot;
                     int[] coord = SLOT_COORDS[slot];
-                    if (productIdx < to) {
-                        DesignProductEntity p = products.get(productIdx);
-                        setCell(sheet, coord[0], coord[1], strOrEmpty(p.getPackageFileName())); // 文件名
-                        setCell(sheet, coord[2], coord[3], strOrEmpty(p.getProductName()));     // 产品名
+                    if (rowIdx < to) {
+                        ProductRow row = rows.get(rowIdx);
+                        setCell(sheet, coord[0], coord[1], stripExtension(row.getPackageFileName())); // 文件名（去后缀）
+                        setCell(sheet, coord[2], coord[3], strOrEmpty(row.getProductName()));         // 产品名
                     } else {
                         // 清空多余槽位
                         setCell(sheet, coord[0], coord[1], "");
@@ -127,7 +148,10 @@ public class DrawingExcelBuilder {
                 setCell(sheet, FOOTER_ROW, PKG_CODE_COL, strOrEmpty(ctx.getPackageCode()));
                 setCell(sheet, FOOTER_ROW, ORDER_CODE_COL, strOrEmpty(ctx.getOrderCode()));
                 setCell(sheet, PAGE_TEXT_ROW, PAGE_TEXT_COL,
-                        "第" + (page + 1) + "页/共" + totalPages + "页");
+                        "第" + toChinese(page + 1) + "页/共" + toChinese(totalPages) + "页");
+                setCell(sheet, DESIGN_NAME_ROW, DESIGN_NAME_COL, strOrEmpty(ctx.getDesignerName()));
+                setCell(sheet, DESIGN_DATE_ROW, DESIGN_DATE_COL, strOrEmpty(ctx.getGenerateDate()));
+                setCell(sheet, REVIEW_DATE_ROW, REVIEW_DATE_COL, strOrEmpty(ctx.getGenerateDate()));
             }
 
             // 写出
@@ -148,5 +172,24 @@ public class DrawingExcelBuilder {
 
     private String strOrEmpty(String s) {
         return s != null ? s : "";
+    }
+
+    /** 将正整数转为中文数字（1-99，超出范围退回阿拉伯数字） */
+    private String toChinese(int n) {
+        String[] units = {"", "十", "百"};
+        String[] digits = {"零", "一", "二", "三", "四", "五", "六", "七", "八", "九"};
+        if (n <= 0 || n >= 100) return String.valueOf(n);
+        if (n < 10) return digits[n];
+        int tens = n / 10, ones = n % 10;
+        String result = (tens == 1 ? "" : digits[tens]) + units[1];
+        if (ones > 0) result += digits[ones];
+        return result;
+    }
+
+    /** 去除文件名后缀（如 "左髋骨.stl" → "左髋骨"） */
+    private String stripExtension(String fileName) {
+        if (fileName == null || fileName.isBlank()) return "";
+        int dot = fileName.lastIndexOf('.');
+        return dot > 0 ? fileName.substring(0, dot) : fileName;
     }
 }

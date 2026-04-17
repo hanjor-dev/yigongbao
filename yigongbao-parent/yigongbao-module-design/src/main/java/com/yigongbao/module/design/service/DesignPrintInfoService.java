@@ -15,12 +15,13 @@ import java.util.List;
 public interface DesignPrintInfoService {
 
     /**
-     * 获取打印信息选项数据（产品树、材质、颜色）
+     * 获取打印信息选项数据（产品树、材质、颜色）以及包级已保存回显字段
      *
-     * @param orderId 订单ID
+     * @param orderId   订单ID
+     * @param packageId 数据包ID
      * @return 选项 VO
      */
-    PrintInfoOptionsVO getOptions(Long orderId);
+    PrintInfoOptionsVO getOptions(Long orderId, Long packageId);
 
     /**
      * 查询数据包打印信息列表

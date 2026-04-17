@@ -7,7 +7,7 @@ import lombok.EqualsAndHashCode;
 
 /**
  * 打印产品信息 Entity
- * 一行对应一个打印文件（指令单中的一行）
+ * 一行对应一个产品+规格，关联文件通过 design_product_file 表存储
  *
  * @author hanjor
  * @date 2026-04-15
@@ -80,29 +80,9 @@ public class DesignProductEntity extends BaseEntity {
     private Integer quantity;
 
     /**
-     * 包装数量
+     * 是否加急（0=普通，1=加急），默认从订单带出，允许修改
      */
-    private Integer packQuantity;
-
-    /**
-     * 时效
-     */
-    private String timeliness;
-
-    /**
-     * 产品标识
-     */
-    private String productMark;
-
-    /**
-     * 数据包内文件ID（design_package_file.id）
-     */
-    private Long packageFileId;
-
-    /**
-     * 文件名（冗余）
-     */
-    private String packageFileName;
+    private Integer isUrgent;
 
     /**
      * 排序序号

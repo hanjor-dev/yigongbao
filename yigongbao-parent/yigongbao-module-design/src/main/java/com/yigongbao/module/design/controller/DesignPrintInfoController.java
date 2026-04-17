@@ -28,12 +28,13 @@ public class DesignPrintInfoController {
     private final DesignPrintInfoService printInfoService;
 
     /**
-     * 获取打印信息选项数据（产品树、材质、颜色）
+     * 获取打印信息选项数据（产品树、材质、颜色）以及包级已保存回显字段
      */
     @Operation(summary = "获取打印信息选项")
-    @GetMapping("/{orderId}/print-info/options")
-    public Result<PrintInfoOptionsVO> getOptions(@PathVariable Long orderId) {
-        return Result.success(printInfoService.getOptions(orderId));
+    @GetMapping("/{orderId}/package/{packageId}/print-info/options")
+    public Result<PrintInfoOptionsVO> getOptions(@PathVariable Long orderId,
+                                                  @PathVariable Long packageId) {
+        return Result.success(printInfoService.getOptions(orderId, packageId));
     }
 
     /**

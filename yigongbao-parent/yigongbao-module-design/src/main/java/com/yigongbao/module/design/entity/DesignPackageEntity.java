@@ -69,4 +69,19 @@ public class DesignPackageEntity extends BaseEntity {
      * 上传时间
      */
     private LocalDateTime uploadTime;
+
+    /**
+     * 产品标识（必填，数据包级别）
+     */
+    private String productMark;
+
+    /**
+     * 包装数量（数据包级别统计值）
+     */
+    private Integer packQuantity;
+
+    /**
+     * 备注
+     */
+    private String remark;
 }

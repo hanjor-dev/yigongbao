@@ -1259,6 +1259,9 @@ CREATE TABLE design_package (
     file_size       BIGINT          DEFAULT NULL COMMENT '文件大小（字节）',
     file_count      INT             DEFAULT 0 COMMENT '包内文件数量',
     upload_time     DATETIME        DEFAULT NULL COMMENT '上传时间',
+    product_mark    VARCHAR(100)    DEFAULT NULL COMMENT '产品标识（必填，数据包级别）',
+    pack_quantity   INT             DEFAULT NULL COMMENT '包装数量（数据包级别统计值）',
+    remark          VARCHAR(500)    DEFAULT NULL COMMENT '备注',
 
     -- 公共字段
     create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1318,11 +1321,7 @@ CREATE TABLE design_product (
     color_id        VARCHAR(20)     DEFAULT NULL COMMENT '颜色 dict_code（如 16.1.1）',
     color_name      VARCHAR(64)     DEFAULT NULL COMMENT '颜色名称（冗余）',
     quantity        INT             NOT NULL DEFAULT 1 COMMENT '数量',
-    pack_quantity   INT             DEFAULT NULL COMMENT '包装数量',
-    timeliness      VARCHAR(64)     DEFAULT NULL COMMENT '时效',
-    product_mark    VARCHAR(128)    DEFAULT NULL COMMENT '产品标识',
-    package_file_id BIGINT          NOT NULL COMMENT '数据包内文件ID（design_package_file.id）',
-    package_file_name VARCHAR(256)  DEFAULT NULL COMMENT '文件名（冗余）',
+    is_urgent       TINYINT         DEFAULT 0 COMMENT '是否加急（0=普通，1=加急），默认从订单带出，可修改',
     sort_order      INT             DEFAULT 0 COMMENT '排序序号',
 
     -- 公共字段
@@ -1334,9 +1333,33 @@ CREATE TABLE design_product (
 
     PRIMARY KEY (id),
     KEY idx_design_product_order_id (order_id),
-    KEY idx_design_product_package_id (package_id),
-    KEY idx_design_product_package_file_id (package_file_id)
+    KEY idx_design_product_package_id (package_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='打印产品信息表';
+
+
+-- ============================================================
+-- 打印产品关联文件表（design_product_file）
+-- 存储产品行与数据包内文件的一对多关联
+-- ============================================================
+DROP TABLE IF EXISTS design_product_file;
+CREATE TABLE design_product_file (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    design_product_id   BIGINT          NOT NULL COMMENT '关联 design_product.id',
+    package_file_id     BIGINT          NOT NULL COMMENT '关联 design_package_file.id',
+    package_file_name   VARCHAR(256)    DEFAULT NULL COMMENT '文件名（冗余）',
+    sort_order          INT             DEFAULT 0 COMMENT '排序',
+
+    -- 公共字段
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    KEY idx_dpf_design_product_id (design_product_id),
+    KEY idx_dpf_package_file_id (package_file_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='打印产品关联文件表';
 
 
 -- ============================================================
