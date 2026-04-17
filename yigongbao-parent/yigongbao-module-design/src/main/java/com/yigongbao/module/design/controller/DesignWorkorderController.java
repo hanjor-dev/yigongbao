@@ -54,4 +54,26 @@ public class DesignWorkorderController {
         designWorkorderService.startDesign(orderId);
         return Result.success();
     }
+
+    /**
+     * 驳回后继续修改
+     * POST /design/workorder/{orderId}/continue-design
+     */
+    @Operation(summary = "驳回后继续修改")
+    @PostMapping("/{orderId}/continue-design")
+    public Result<Void> continueDesign(@PathVariable Long orderId) {
+        designWorkorderService.continueDesign(orderId);
+        return Result.success();
+    }
+
+    /**
+     * 提交设计审核
+     * POST /design/workorder/{orderId}/submit-design
+     */
+    @Operation(summary = "提交设计审核")
+    @PostMapping("/{orderId}/submit-design")
+    public Result<Void> submitDesign(@PathVariable Long orderId) {
+        designWorkorderService.submitDesign(orderId);
+        return Result.success();
+    }
 }

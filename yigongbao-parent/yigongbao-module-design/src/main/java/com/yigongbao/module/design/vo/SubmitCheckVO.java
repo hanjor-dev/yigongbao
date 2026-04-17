@@ -29,6 +29,9 @@ public class SubmitCheckVO {
     /** 是否已上传设计报告 */
     private Boolean hasReport;
 
+    /** 是否已上传修订版指令单和图纸（所有数据包，仅线下模式时校验） */
+    private Boolean hasRevisedDocs;
+
     /** 是否可以提交（全部为 true 时才为 true） */
     private Boolean canSubmit;
 

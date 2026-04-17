@@ -13,6 +13,7 @@ import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
@@ -27,6 +28,7 @@ import com.yigongbao.module.design.entity.DesignModelEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignReviewEntity;
+import com.yigongbao.module.design.enums.DesignModeEnum;
 import com.yigongbao.module.design.helper.DesignQueryHelper;
 import com.yigongbao.module.design.mapper.DesignDrawingMapper;
 import com.yigongbao.module.design.mapper.DesignInstructionMapper;
@@ -42,6 +44,7 @@ import com.yigongbao.module.design.vo.SubmitCheckVO;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.service.OrderItemService;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.service.UserService;
@@ -81,6 +84,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     private final UserService userService;
     private final UserHospitalService userHospitalService;
     private final DesignQueryHelper designQueryHelper;
+    private final ConfigService configService;
     private final ObjectMapper objectMapper;
     private final FlowFacade flowFacade;
 
@@ -223,8 +227,10 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         // 重建项目列表
         vo.setRebuildProjectList(buildRebuildProjectList(orderId));
 
-        // 提交校验状态
-        vo.setSubmitCheck(buildSubmitCheck(orderId));
+        // 提交校验状态（读取系统配置的设计模式）
+        Integer designMode = getDesignMode();
+        vo.setDesignMode(designMode);
+        vo.setSubmitCheck(buildSubmitCheck(orderId, designMode));
 
         return vo;
     }
@@ -336,6 +342,120 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         orderMainService.updateById(order);
 
         log.info("开始设计成功，orderId={}, phase={}, status={}", orderId, result.getTargetPhase(), result.getFinalStatus());
+    }
+
+    /**
+     * 驳回后继续修改
+     * 校验：订单状态必须为 DESIGN_REVIEW_REJECTED(2060)，且当前用户是分配设计师
+     *
+     * @param orderId 订单ID
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void continueDesign(Long orderId) {
+        log.info("设计师继续修改，orderId={}", orderId);
+
+        // 1. 校验订单存在
+        OrderMainEntity order = orderMainService.getById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+
+        // 2. 校验订单状态（必须是设计审核不通过）
+        if (!FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue().equals(order.getStatus())) {
+            log.warn("订单状态不允许继续修改，orderId={}, status={}", orderId, order.getStatus());
+            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR);
+        }
+
+        // 3. 校验当前登录用户是该订单的分配设计师
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (!currentUserId.equals(order.getDesignerId())) {
+            log.warn("非分配设计师，无权继续修改，orderId={}, designerId={}, currentUserId={}",
+                    orderId, order.getDesignerId(), currentUserId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_DESIGNER_MISMATCH);
+        }
+
+        // 4. 查询当前用户姓名
+        UserEntity currentUser = userService.getById(currentUserId);
+        String currentUserName = currentUser != null ? currentUser.getRealName() : null;
+
+        // 5. 执行状态流转：DESIGN_REVIEW_REJECTED → DESIGN_IN_PROGRESS
+        TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.CONTINUE_DESIGN,
+                FlowOperator.of(currentUserId, currentUserName));
+
+        // 6. 回写订单表
+        OrderMainEntity update = new OrderMainEntity();
+        update.setId(orderId);
+        update.setPhase(result.getTargetPhase());
+        update.setStatus(result.getFinalStatus());
+        update.setCurrentHandlerId(currentUserId);
+        update.setCurrentHandlerName(currentUserName);
+        orderMainService.updateById(update);
+
+        log.info("继续修改成功，orderId={}, phase={}, status={}",
+                orderId, result.getTargetPhase(), result.getFinalStatus());
+    }
+
+    /**
+     * 提交设计审核
+     * 校验：订单状态必须为 DESIGN_IN_PROGRESS(2020)，且当前用户是分配设计师
+     * 提交前执行完整的 7 项校验（线下模式下包括修订版文件校验）
+     *
+     * @param orderId 订单ID
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void submitDesign(Long orderId) {
+        log.info("设计师提交设计审核，orderId={}", orderId);
+
+        // 1. 校验订单存在
+        OrderMainEntity order = orderMainService.getById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+
+        // 2. 校验订单状态（必须是设计中）
+        if (!FlowStatusEnum.DESIGN_IN_PROGRESS.getValue().equals(order.getStatus())) {
+            log.warn("订单状态不允许提交设计，orderId={}, status={}", orderId, order.getStatus());
+            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR);
+        }
+
+        // 3. 校验当前登录用户是该订单的分配设计师
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (!currentUserId.equals(order.getDesignerId())) {
+            log.warn("非分配设计师，无权提交设计，orderId={}, designerId={}, currentUserId={}",
+                    orderId, order.getDesignerId(), currentUserId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_DESIGNER_MISMATCH);
+        }
+
+        // 4. 执行提交前完整校验（含修订版文件检查）
+        Integer designMode = getDesignMode();
+        SubmitCheckVO check = buildSubmitCheck(orderId, designMode);
+        if (!Boolean.TRUE.equals(check.getCanSubmit())) {
+            log.warn("提交设计校验未通过，orderId={}, blockReason={}", orderId, check.getBlockReason());
+            throw new BusinessException(400, check.getBlockReason());
+        }
+
+        // 5. 查询当前用户姓名
+        UserEntity currentUser = userService.getById(currentUserId);
+        String currentUserName = currentUser != null ? currentUser.getRealName() : null;
+
+        // 6. 执行状态流转：DESIGN_IN_PROGRESS → DESIGN_REVIEWING(2040)
+        TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.SUBMIT_DESIGN,
+                FlowOperator.of(currentUserId, currentUserName));
+
+        // 7. 回写订单表（含设计提交时间）
+        OrderMainEntity update = new OrderMainEntity();
+        update.setId(orderId);
+        update.setPhase(result.getTargetPhase());
+        update.setStatus(result.getFinalStatus());
+        update.setDesignSubmitTime(LocalDateTime.now());
+        update.setCurrentHandlerId(currentUserId);
+        update.setCurrentHandlerName(currentUserName);
+        orderMainService.updateById(update);
+
+        log.info("提交设计审核成功，orderId={}, phase={}, status={}",
+                orderId, result.getTargetPhase(), result.getFinalStatus());
     }
 
     // ==================== 私有辅助方法 ====================
@@ -482,9 +602,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
 
     /**
      * 构建提交校验状态
-     * 依次检查：数据包 → 打印信息 → 指令单 → 图纸 → 可视化模型 → 设计报告
+     * 依次检查：数据包 → 打印信息 → 指令单 → 图纸 → 可视化模型 → 设计报告 → 修订版文件（线下模式）
+     *
+     * @param orderId    订单ID
+     * @param designMode 设计模式（1-线下修改，2-在线编辑，null 视为线下）
      */
-    private SubmitCheckVO buildSubmitCheck(Long orderId) {
+    private SubmitCheckVO buildSubmitCheck(Long orderId, Integer designMode) {
         SubmitCheckVO check = new SubmitCheckVO();
 
         // 1. 查询所有未删除数据包
@@ -494,11 +617,11 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
                         .eq(DesignPackageEntity::getIsDeleted, StatusConstants.NOT_DELETED));
         check.setHasPackage(!packages.isEmpty());
 
-        if (!packages.isEmpty()) {
-            Set<Long> packageIds = packages.stream()
-                    .map(DesignPackageEntity::getId)
-                    .collect(Collectors.toSet());
+        Set<Long> packageIds = packages.stream()
+                .map(DesignPackageEntity::getId)
+                .collect(Collectors.toSet());
 
+        if (!packages.isEmpty()) {
             // 2. 打印信息：每个数据包都有至少一条 design_product 记录
             List<DesignProductEntity> products = designProductMapper.selectList(
                     new LambdaQueryWrapper<DesignProductEntity>()
@@ -546,6 +669,48 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         long reportCount = fileService.listByBiz(FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId).size();
         check.setHasReport(reportCount > 0);
 
+        // 7. 修订版文件：线下模式下每个数据包的指令单和图纸都必须有 revised_file_id
+        // designMode=null 视为线下模式（保守处理）
+        boolean isOfflineMode = !DesignModeEnum.ONLINE.getCode().equals(designMode);
+        if (isOfflineMode && !packages.isEmpty()) {
+            // 取每包的最新版指令单（按 version_seq 倒序，保留第一条）
+            List<DesignInstructionEntity> allInstructions = designInstructionMapper.selectList(
+                    new LambdaQueryWrapper<DesignInstructionEntity>()
+                            .in(DesignInstructionEntity::getPackageId, packageIds)
+                            .eq(DesignInstructionEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                            .orderByDesc(DesignInstructionEntity::getVersionSeq));
+            Map<Long, DesignInstructionEntity> latestInstructionByPkg = allInstructions.stream()
+                    .collect(Collectors.toMap(
+                            DesignInstructionEntity::getPackageId,
+                            i -> i,
+                            (existing, newer) -> existing)); // 已倒序，保留最新版本
+
+            // 取每包的最新版图纸
+            List<DesignDrawingEntity> allDrawings = designDrawingMapper.selectList(
+                    new LambdaQueryWrapper<DesignDrawingEntity>()
+                            .in(DesignDrawingEntity::getPackageId, packageIds)
+                            .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                            .orderByDesc(DesignDrawingEntity::getVersionSeq));
+            Map<Long, DesignDrawingEntity> latestDrawingByPkg = allDrawings.stream()
+                    .collect(Collectors.toMap(
+                            DesignDrawingEntity::getPackageId,
+                            d -> d,
+                            (existing, newer) -> existing));
+
+            boolean allInstructionRevised = packageIds.stream().allMatch(pkgId -> {
+                DesignInstructionEntity inst = latestInstructionByPkg.get(pkgId);
+                return inst != null && StrUtil.isNotBlank(inst.getRevisedFileId());
+            });
+            boolean allDrawingRevised = packageIds.stream().allMatch(pkgId -> {
+                DesignDrawingEntity drawing = latestDrawingByPkg.get(pkgId);
+                return drawing != null && StrUtil.isNotBlank(drawing.getRevisedFileId());
+            });
+            check.setHasRevisedDocs(allInstructionRevised && allDrawingRevised);
+        } else {
+            // 在线模式或无数据包，跳过修订版校验
+            check.setHasRevisedDocs(true);
+        }
+
         // 计算 canSubmit 和 blockReason（按优先级顺序）
         if (!check.getHasPackage()) {
             check.setCanSubmit(false);
@@ -565,11 +730,28 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         } else if (!check.getHasReport()) {
             check.setCanSubmit(false);
             check.setBlockReason("请上传设计报告");
+        } else if (!Boolean.TRUE.equals(check.getHasRevisedDocs())) {
+            check.setCanSubmit(false);
+            check.setBlockReason("请上传修订版指令单和图纸");
         } else {
             check.setCanSubmit(true);
             check.setBlockReason(null);
         }
 
         return check;
+    }
+
+    /**
+     * 从系统配置中读取当前设计模式
+     * 返回 {@link DesignModeEnum#getCode()}，null 视为线下模式
+     */
+    private Integer getDesignMode() {
+        try {
+            String modeStr = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_MODE.getKey());
+            return modeStr != null ? Integer.parseInt(modeStr) : null;
+        } catch (Exception e) {
+            log.warn("读取设计模式配置失败，默认使用线下模式", e);
+            return null;
+        }
     }
 }

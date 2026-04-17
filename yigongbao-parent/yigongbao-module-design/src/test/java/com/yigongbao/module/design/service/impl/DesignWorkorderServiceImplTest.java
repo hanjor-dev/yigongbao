@@ -26,6 +26,7 @@ import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignReviewEntity;
 import com.yigongbao.module.design.helper.DesignQueryHelper;
+import com.yigongbao.module.design.enums.DesignModeEnum;
 import com.yigongbao.module.design.mapper.DesignDrawingMapper;
 import com.yigongbao.module.design.mapper.DesignInstructionMapper;
 import com.yigongbao.module.design.mapper.DesignModelMapper;
@@ -42,6 +43,7 @@ import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.service.UserService;
+import com.yigongbao.module.system.config.service.ConfigService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -85,6 +87,7 @@ class DesignWorkorderServiceImplTest {
     @Mock private UserService userService;
     @Mock private UserHospitalService userHospitalService;
     @Mock private DesignQueryHelper designQueryHelper;
+    @Mock private ConfigService configService;
     @Mock private ObjectMapper objectMapper;
     @Mock private FlowFacade flowFacade;
 
@@ -252,9 +255,11 @@ class DesignWorkorderServiceImplTest {
         }
 
         @Test
-        @DisplayName("所有条件满足时 canSubmit=true")
+        @DisplayName("所有条件满足时 canSubmit=true（在线模式，无需修订版文件）")
         void getWorkorderDetail_submitCheck_canSubmit() {
             when(orderMainService.getById(10L)).thenReturn(buildOrder(10L));
+            // 在线模式下跳过修订版文件校验
+            when(configService.getConfigValue(any())).thenReturn(String.valueOf(DesignModeEnum.ONLINE.getCode()));
 
             // 一个数据包
             DesignPackageEntity pkg = new DesignPackageEntity();
@@ -461,6 +466,249 @@ class DesignWorkorderServiceImplTest {
                 BusinessException ex = assertThrows(BusinessException.class,
                         () -> service.startDesign(1L));
                 assertEquals(ErrorCodeEnum.ORDER_DESIGNER_MISMATCH.getCode(), ex.getCode());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("continueDesign")
+    class ContinueDesign {
+
+        @Test
+        @DisplayName("成功继续修改")
+        void success() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+
+                OrderMainEntity order = new OrderMainEntity();
+                order.setId(1L);
+                order.setStatus(FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue());
+                order.setDesignerId(100L);
+                when(orderMainService.getById(1L)).thenReturn(order);
+
+                UserEntity user = new UserEntity();
+                user.setId(100L);
+                user.setRealName("设计师A");
+                when(userService.getById(100L)).thenReturn(user);
+
+                TransitionResult mockResult = TransitionResult.of(20, FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
+                when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.CONTINUE_DESIGN), any()))
+                        .thenReturn(mockResult);
+                when(orderMainService.updateById(any())).thenReturn(true);
+
+                assertDoesNotThrow(() -> service.continueDesign(1L));
+                verify(flowFacade).executeFlow(eq(1L), eq(FlowActionEnum.CONTINUE_DESIGN), any());
+                verify(orderMainService).updateById(any());
+            }
+        }
+
+        @Test
+        @DisplayName("订单不存在，抛 ORDER_NOT_FOUND")
+        void orderNotFound() {
+            when(orderMainService.getById(999L)).thenReturn(null);
+            assertThrows(BusinessException.class, () -> service.continueDesign(999L));
+        }
+
+        @Test
+        @DisplayName("订单状态非 DESIGN_REVIEW_REJECTED，抛 ORDER_STATUS_ERROR")
+        void wrongStatus() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+
+                OrderMainEntity order = new OrderMainEntity();
+                order.setId(1L);
+                order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
+                order.setDesignerId(100L);
+                when(orderMainService.getById(1L)).thenReturn(order);
+
+                assertThrows(BusinessException.class, () -> service.continueDesign(1L));
+            }
+        }
+
+        @Test
+        @DisplayName("非分配设计师，抛 ORDER_DESIGNER_MISMATCH")
+        void notAssignedDesigner() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+
+                OrderMainEntity order = new OrderMainEntity();
+                order.setId(1L);
+                order.setStatus(FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue());
+                order.setDesignerId(200L);
+                when(orderMainService.getById(1L)).thenReturn(order);
+
+                assertThrows(BusinessException.class, () -> service.continueDesign(1L));
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("submitDesign")
+    class SubmitDesign {
+
+        @Test
+        @DisplayName("成功提交设计（线下模式，所有校验通过）")
+        void success() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+
+                OrderMainEntity order = new OrderMainEntity();
+                order.setId(1L);
+                order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
+                order.setDesignerId(100L);
+                when(orderMainService.getById(1L)).thenReturn(order);
+
+                // 设计模式：线下（OFFLINE = 1）
+                when(configService.getConfigValue(any())).thenReturn(String.valueOf(DesignModeEnum.OFFLINE.getCode()));
+
+                UserEntity user = new UserEntity();
+                user.setId(100L);
+                user.setRealName("设计师A");
+                when(userService.getById(100L)).thenReturn(user);
+
+                // 数据包
+                DesignPackageEntity pkg = new DesignPackageEntity();
+                pkg.setId(10L);
+                pkg.setOrderId(1L);
+                when(designPackageMapper.selectList(any())).thenReturn(List.of(pkg));
+
+                // 打印信息
+                DesignProductEntity prod = new DesignProductEntity();
+                prod.setPackageId(10L);
+                when(designProductMapper.selectList(any())).thenReturn(List.of(prod));
+
+                // 指令单（有修订版）
+                DesignInstructionEntity inst = new DesignInstructionEntity();
+                inst.setPackageId(10L);
+                inst.setVersionSeq(1);
+                inst.setRevisedFileId("revised-inst-1");
+                when(designInstructionMapper.selectList(any())).thenReturn(List.of(inst));
+
+                // 图纸（有修订版）
+                DesignDrawingEntity drawing = new DesignDrawingEntity();
+                drawing.setPackageId(10L);
+                drawing.setVersionSeq(1);
+                drawing.setRevisedFileId("revised-drawing-1");
+                when(designDrawingMapper.selectList(any())).thenReturn(List.of(drawing));
+
+                // 可视化模型和设计报告
+                when(designModelMapper.selectCount(any())).thenReturn(1L);
+                when(fileService.listByBiz(any(), any())).thenReturn(List.of(new FileVO()));
+
+                TransitionResult mockResult = TransitionResult.of(20, FlowStatusEnum.DESIGN_REVIEWING.getValue());
+                when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.SUBMIT_DESIGN), any()))
+                        .thenReturn(mockResult);
+                when(orderMainService.updateById(any())).thenReturn(true);
+
+                assertDoesNotThrow(() -> service.submitDesign(1L));
+                verify(flowFacade).executeFlow(eq(1L), eq(FlowActionEnum.SUBMIT_DESIGN), any());
+                verify(orderMainService).updateById(argThat(u -> u.getDesignSubmitTime() != null));
+            }
+        }
+
+        @Test
+        @DisplayName("订单不存在，抛 ORDER_NOT_FOUND")
+        void orderNotFound() {
+            when(orderMainService.getById(999L)).thenReturn(null);
+            assertThrows(BusinessException.class, () -> service.submitDesign(999L));
+        }
+
+        @Test
+        @DisplayName("订单状态非 DESIGN_IN_PROGRESS，抛 ORDER_STATUS_ERROR")
+        void wrongStatus() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+
+                OrderMainEntity order = new OrderMainEntity();
+                order.setId(1L);
+                order.setStatus(FlowStatusEnum.PENDING_DESIGN.getValue());
+                order.setDesignerId(100L);
+                when(orderMainService.getById(1L)).thenReturn(order);
+
+                assertThrows(BusinessException.class, () -> service.submitDesign(1L));
+            }
+        }
+
+        @Test
+        @DisplayName("非分配设计师，抛 ORDER_DESIGNER_MISMATCH")
+        void notAssignedDesigner() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+
+                OrderMainEntity order = new OrderMainEntity();
+                order.setId(1L);
+                order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
+                order.setDesignerId(200L);
+                when(orderMainService.getById(1L)).thenReturn(order);
+
+                assertThrows(BusinessException.class, () -> service.submitDesign(1L));
+            }
+        }
+
+        @Test
+        @DisplayName("无数据包，提交校验未通过")
+        void submitCheckFailed_noPackage() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+
+                OrderMainEntity order = new OrderMainEntity();
+                order.setId(1L);
+                order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
+                order.setDesignerId(100L);
+                when(orderMainService.getById(1L)).thenReturn(order);
+                when(configService.getConfigValue(any())).thenReturn(String.valueOf(DesignModeEnum.OFFLINE.getCode()));
+                when(designPackageMapper.selectList(any())).thenReturn(Collections.emptyList());
+                when(designModelMapper.selectCount(any())).thenReturn(0L);
+                when(fileService.listByBiz(any(), any())).thenReturn(Collections.emptyList());
+
+                BusinessException ex = assertThrows(BusinessException.class,
+                        () -> service.submitDesign(1L));
+                assertTrue(ex.getMessage().contains("数据包"));
+            }
+        }
+
+        @Test
+        @DisplayName("线下模式下无修订版文件，提交校验未通过")
+        void submitCheckFailed_missingRevisedDocs_offlineMode() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+
+                OrderMainEntity order = new OrderMainEntity();
+                order.setId(1L);
+                order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
+                order.setDesignerId(100L);
+                when(orderMainService.getById(1L)).thenReturn(order);
+                when(configService.getConfigValue(any())).thenReturn(String.valueOf(DesignModeEnum.OFFLINE.getCode()));
+
+                DesignPackageEntity pkg = new DesignPackageEntity();
+                pkg.setId(10L);
+                pkg.setOrderId(1L);
+                when(designPackageMapper.selectList(any())).thenReturn(List.of(pkg));
+
+                DesignProductEntity prod = new DesignProductEntity();
+                prod.setPackageId(10L);
+                when(designProductMapper.selectList(any())).thenReturn(List.of(prod));
+
+                // 指令单无修订版
+                DesignInstructionEntity inst = new DesignInstructionEntity();
+                inst.setPackageId(10L);
+                inst.setVersionSeq(1);
+                inst.setRevisedFileId(null);
+                when(designInstructionMapper.selectList(any())).thenReturn(List.of(inst));
+
+                // 图纸无修订版
+                DesignDrawingEntity drawing = new DesignDrawingEntity();
+                drawing.setPackageId(10L);
+                drawing.setVersionSeq(1);
+                drawing.setRevisedFileId(null);
+                when(designDrawingMapper.selectList(any())).thenReturn(List.of(drawing));
+
+                when(designModelMapper.selectCount(any())).thenReturn(1L);
+                when(fileService.listByBiz(any(), any())).thenReturn(List.of(new FileVO()));
+
+                BusinessException ex = assertThrows(BusinessException.class,
+                        () -> service.submitDesign(1L));
+                assertTrue(ex.getMessage().contains("修订版"));
             }
         }
     }

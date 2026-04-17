@@ -75,6 +75,11 @@ public enum FlowActionEnum {
      */
     DESIGN_REVIEW_REJECT("DESIGN_REVIEW_REJECT", "设计审核驳回"),
 
+    /**
+     * 继续修改（审核驳回后重新进入设计中）
+     */
+    CONTINUE_DESIGN("CONTINUE_DESIGN", "继续修改"),
+
     // ==================== 打印阶段动作 ====================
     /**
      * 开始打印

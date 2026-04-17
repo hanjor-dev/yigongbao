@@ -58,4 +58,21 @@ public interface DesignWorkorderService {
      * @param orderId 订单ID
      */
     void startDesign(Long orderId);
+
+    /**
+     * 驳回后继续修改
+     * 状态流转：设计审核不通过(2060) → 设计中(2020)
+     *
+     * @param orderId 订单ID
+     */
+    void continueDesign(Long orderId);
+
+    /**
+     * 提交设计审核
+     * 状态流转：设计中(2020) → 设计审核中(2040)
+     * 提交前执行完整校验（7项），线下模式下额外校验修订版文件
+     *
+     * @param orderId 订单ID
+     */
+    void submitDesign(Long orderId);
 }

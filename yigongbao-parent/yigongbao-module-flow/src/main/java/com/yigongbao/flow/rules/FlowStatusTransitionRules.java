@@ -158,7 +158,7 @@ public class FlowStatusTransitionRules {
                 case DESIGN_IN_PROGRESS -> List.of(FlowActionEnum.SUBMIT_DESIGN);
                 case DESIGN_COMPLETED -> List.of(FlowActionEnum.SUBMIT_DESIGN);
                 case DESIGN_REVIEWING -> List.of(FlowActionEnum.DESIGN_REVIEW_PASS, FlowActionEnum.DESIGN_REVIEW_REJECT);
-                case DESIGN_REVIEW_REJECTED -> List.of(FlowActionEnum.START_DESIGN);
+                case DESIGN_REVIEW_REJECTED -> List.of(FlowActionEnum.CONTINUE_DESIGN);
                 // DESIGN_REVIEW_PASSED 为不可见状态，不会出现在 phase=DESIGN 的订单中
                 default -> List.of();
             };
@@ -255,6 +255,7 @@ public class FlowStatusTransitionRules {
             case SUBMIT_DESIGN -> FlowStatusEnum.DESIGN_REVIEWING.getValue();
             case DESIGN_REVIEW_PASS -> FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue(); // 不可见状态
             case DESIGN_REVIEW_REJECT -> FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue();
+            case CONTINUE_DESIGN -> FlowStatusEnum.DESIGN_IN_PROGRESS.getValue();
 
             // 打印阶段动作
             case START_PRINT -> FlowStatusEnum.PRINTING.getValue();
