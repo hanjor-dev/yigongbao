@@ -1501,3 +1501,18 @@ CREATE TABLE design_review (
 -- ============================================================
 -- ALTER TABLE order_main ADD COLUMN design_mode TINYINT DEFAULT 1 COMMENT '设计模式：1=线下修改，2=在线编辑' AFTER design_submit_time;
 
+
+
+-- ============================================================
+-- 部位颜色透明度配置表（从 image-3d-ai 迁移，新增 opacity 字段）
+-- ============================================================
+CREATE TABLE part_colors
+(
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    part_detail VARCHAR(255) NULL COMMENT '部位名称（与模型文件名精确匹配，去扩展名）',
+    color_code  VARCHAR(255) NULL COMMENT '颜色RGB值（如：170,255,0）',
+    opacity     DECIMAL(3, 2) DEFAULT 1.00 COMMENT '透明度（0.00~1.00，1=不透明）'
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '部位颜色透明度配置表';
+
+CREATE INDEX idx_part_colors_part_detail ON part_colors (part_detail);
