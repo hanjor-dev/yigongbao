@@ -3,7 +3,6 @@ package com.yigongbao.module.order.vo.draft;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**

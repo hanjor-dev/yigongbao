@@ -189,6 +189,17 @@ public class OrderDraftDetailVO implements Serializable {
      */
     private Integer itemCount;
 
+    // ==================== 文件列表 ====================
+    /**
+     * 影像数据文件列表（dict_code=10.1，CT/MRI等）
+     */
+    private List<DraftFileVO> imageDataFiles;
+
+    /**
+     * 影像报告文件列表（dict_code=10.2）
+     */
+    private List<DraftFileVO> imageReportFiles;
+
     // ==================== 时间信息 ====================
     /**
      * 创建时间
@@ -277,5 +288,63 @@ public class OrderDraftDetailVO implements Serializable {
          * 创建时间
          */
         private LocalDateTime createTime;
+    }
+
+    // ==================== 草稿文件 VO ====================
+    /**
+     * 草稿关联影像文件 VO
+     *
+     * @author hanjor
+     * @date 2026-04-20
+     */
+    @Data
+    public static class DraftFileVO implements Serializable {
+
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * 文件ID
+         */
+        private String fileId;
+
+        /**
+         * 文件名称
+         */
+        private String fileName;
+
+        /**
+         * 文件类别（字典 dict_code：10.1-影像数据，10.2-影像报告）
+         */
+        private String fileCategory;
+
+        /**
+         * 文件类别名称
+         */
+        private String fileCategoryName;
+
+        /**
+         * 公开访问URL
+         */
+        private String fileUrl;
+
+        /**
+         * 缩略图访问URL
+         */
+        private String thUrl;
+
+        /**
+         * 文件大小（字节）
+         */
+        private Long fileSize;
+
+        /**
+         * 格式化文件大小（如 2.35 MB）
+         */
+        private String fileSizeText;
+
+        /**
+         * 文件扩展名
+         */
+        private String fileExt;
     }
 }

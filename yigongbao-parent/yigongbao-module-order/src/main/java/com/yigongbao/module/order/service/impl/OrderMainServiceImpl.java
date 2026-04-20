@@ -700,7 +700,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             log.info("创建订单明细，orderId={}, itemCount={}", orderId, draftItems.size());
 
             // Step 4：复制文件关联关系（从草稿关联迁移至订单关联）
-            List<FileVO> draftFiles = fileService.listByBiz(FileBizTypeEnum.ORDER_DRAFT.getDictCode(), draft.getId());
+            List<FileVO> draftImageData = fileService.listByBiz(FileBizTypeEnum.IMAGE_DATA.getDictCode(), draft.getId());
+            List<FileVO> draftImageReport = fileService.listByBiz(FileBizTypeEnum.IMAGE_REPORT.getDictCode(), draft.getId());
+            List<FileVO> draftFiles = new java.util.ArrayList<>(draftImageData);
+            draftFiles.addAll(draftImageReport);
             for (FileVO file : draftFiles) {
                 OrderFileEntity orderFile = new OrderFileEntity();
                 orderFile.setOrderId(orderId);

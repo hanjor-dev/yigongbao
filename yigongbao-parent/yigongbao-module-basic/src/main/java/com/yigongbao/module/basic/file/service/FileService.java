@@ -59,6 +59,15 @@ public interface FileService {
     FileVO linkFile(String fileId, String bizType, Long bizId);
 
     /**
+     * 解除业务下某分类的所有文件关联（bizId 和 objectType 置 null）
+     * 用于更新场景下先清除旧关联，再建立新关联
+     *
+     * @param bizType 业务类型（字典 dict_code）
+     * @param bizId   业务ID
+     */
+    void unlinkByBiz(String bizType, Long bizId);
+
+    /**
      * 批量上传（不关联业务）
      *
      * @param files 文件列表

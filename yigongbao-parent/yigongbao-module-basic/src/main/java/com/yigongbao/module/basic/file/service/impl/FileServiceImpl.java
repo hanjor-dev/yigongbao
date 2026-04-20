@@ -154,6 +154,26 @@ public class FileServiceImpl implements FileService {
         }
     }
 
+    @Override
+    public void unlinkByBiz(String bizType, Long bizId) {
+        log.info("解除文件业务关联，bizType={}, bizId={}", bizType, bizId);
+        try {
+            LambdaQueryWrapper<FileDetail> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(FileDetail::getObjectType, bizType)
+                    .eq(FileDetail::getObjectId, bizId.toString());
+            List<FileDetail> details = fileRecorderService.list(wrapper);
+            for (FileDetail detail : details) {
+                detail.setObjectType(null);
+                detail.setObjectId(null);
+                fileRecorderService.updateById(detail);
+            }
+            log.info("解除文件业务关联成功，bizType={}, bizId={}, count={}", bizType, bizId, details.size());
+        } catch (Exception e) {
+            log.error("解除文件业务关联异常，bizType={}, bizId={}", bizType, bizId, e);
+            throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
+        }
+    }
+
     // ==================== 查询 ====================
 
     @Override
