@@ -2,8 +2,10 @@ package com.yigongbao.module.design.controller;
 
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.design.service.DesignDocService;
+import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.vo.DesignDocVersionVO;
 import com.yigongbao.module.design.vo.DocItemVO;
+import com.yigongbao.module.design.vo.ScreenshotVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ import java.util.List;
 public class DesignDocController {
 
     private final DesignDocService docService;
+    private final DesignScreenshotService screenshotService;
 
     /**
      * 生成指令单
@@ -90,5 +93,28 @@ public class DesignDocController {
                                               @RequestParam("file") MultipartFile file) {
         docService.uploadRevisedDrawing(orderId, packageId, id, file);
         return Result.success();
+    }
+
+    /**
+     * 上传数据包文件截图（upsert：有则覆盖，无则新增）
+     */
+    @Operation(summary = "上传数据包文件截图")
+    @PostMapping("/{orderId}/package/{packageId}/files/{packageFileId}/screenshot")
+    public Result<ScreenshotVO> saveScreenshot(@PathVariable Long orderId,
+                                               @PathVariable Long packageId,
+                                               @PathVariable Long packageFileId,
+                                               @RequestParam("file") MultipartFile file) {
+        return Result.success(screenshotService.saveScreenshot(packageId, packageFileId, file));
+    }
+
+    /**
+     * 查询数据包文件截图
+     */
+    @Operation(summary = "查询数据包文件截图")
+    @GetMapping("/{orderId}/package/{packageId}/files/{packageFileId}/screenshot")
+    public Result<ScreenshotVO> getScreenshot(@PathVariable Long orderId,
+                                              @PathVariable Long packageId,
+                                              @PathVariable Long packageFileId) {
+        return Result.success(screenshotService.getScreenshot(packageId, packageFileId));
     }
 }

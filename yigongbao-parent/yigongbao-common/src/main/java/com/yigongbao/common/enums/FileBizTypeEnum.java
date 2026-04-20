@@ -72,6 +72,11 @@ public enum FileBizTypeEnum {
     DRAWING_FILE("drawing_file", "10.7", "图纸文件", null),
 
     /**
+     * 图纸截图：设计师在 viewer 中标注后上传的截图，格式 PNG/JPG
+     */
+    IMAGE_SCREENSHOT("image_screenshot", "10.18", "图纸截图", null),
+
+    /**
      * 指令单文件：系统生成或上传的修订版指令单（无格式限制）
      */
     INSTRUCTION_FILE("instruction_file", "10.8", "指令单文件", null),

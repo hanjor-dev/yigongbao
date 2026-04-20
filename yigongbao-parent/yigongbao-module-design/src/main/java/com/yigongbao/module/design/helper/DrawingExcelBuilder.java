@@ -3,6 +3,9 @@ package com.yigongbao.module.design.helper;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
@@ -39,6 +42,8 @@ public class DrawingExcelBuilder {
         private String packageFileName;
         /** 产品名称 */
         private String productName;
+        /** 截图字节（PNG/JPG，null 表示该槽位无截图不嵌图） */
+        private byte[] screenshotBytes;
     }
 
     /**
@@ -129,7 +134,7 @@ public class DrawingExcelBuilder {
                 int from = page * SLOTS_PER_PAGE;
                 int to = Math.min(from + SLOTS_PER_PAGE, n);
 
-                // 填充槽位
+                // 填充槽位（文字 + 截图）
                 for (int slot = 0; slot < SLOTS_PER_PAGE; slot++) {
                     int rowIdx = from + slot;
                     int[] coord = SLOT_COORDS[slot];
@@ -137,6 +142,10 @@ public class DrawingExcelBuilder {
                         ProductRow row = rows.get(rowIdx);
                         setCell(sheet, coord[0], coord[1], stripExtension(row.getPackageFileName())); // 文件名（去后缀）
                         setCell(sheet, coord[2], coord[3], strOrEmpty(row.getProductName()));         // 产品名
+                        // 嵌入截图（如果有）
+                        if (row.getScreenshotBytes() != null && row.getScreenshotBytes().length > 0) {
+                            insertSlotImage((XSSFSheet) sheet, (XSSFWorkbook) wb, coord, row.getScreenshotBytes());
+                        }
                     } else {
                         // 清空多余槽位
                         setCell(sheet, coord[0], coord[1], "");
@@ -160,6 +169,50 @@ public class DrawingExcelBuilder {
             log.info("图纸生成完成，size={}", baos.size());
             return baos.toByteArray();
         }
+    }
+
+    /**
+     * 在槽位主体区域嵌入截图
+     * 图片占据槽位的列范围（productNameCol ~ productNameCol+3），
+     * 行范围从 productNameRow+1 到 productNameRow+10（槽位主体区域）
+     *
+     * @param sheet          目标 Sheet
+     * @param wb             工作簿（用于添加图片）
+     * @param coord          槽位坐标 {fileNameRow, fileNameCol, productNameRow, productNameCol}
+     * @param screenshotBytes 截图字节（PNG 或 JPG）
+     */
+    private void insertSlotImage(XSSFSheet sheet, XSSFWorkbook wb, int[] coord, byte[] screenshotBytes) {
+        try {
+            // 判断图片格式（PNG/JPG）
+            int pictureType = detectPictureType(screenshotBytes);
+            int pictureIdx = wb.addPicture(screenshotBytes, pictureType);
+
+            // 图片区域：产品名行下方，占槽位主体（高度约10行，宽度4列）
+            int colStart = coord[3];          // productNameCol
+            int colEnd = coord[1] + 1;        // fileNameCol + 1（含右边列）
+            int rowStart = coord[2] + 1;      // productNameRow + 1
+            int rowEnd = rowStart + 10;       // 向下10行（槽位主体）
+
+            XSSFDrawing drawing = sheet.createDrawingPatriarch();
+            XSSFClientAnchor anchor = new XSSFClientAnchor(0, 0, 0, 0,
+                    colStart, rowStart, colEnd, rowEnd);
+            anchor.setAnchorType(ClientAnchor.AnchorType.MOVE_AND_RESIZE);
+            drawing.createPicture(anchor, pictureIdx);
+        } catch (Exception e) {
+            log.warn("截图嵌入失败，coord={}, error={}", coord, e.getMessage());
+        }
+    }
+
+    /**
+     * 根据文件头字节判断图片格式（PNG 或 JPG）
+     */
+    private int detectPictureType(byte[] bytes) {
+        if (bytes.length >= 4
+                && bytes[0] == (byte) 0x89 && bytes[1] == (byte) 0x50
+                && bytes[2] == (byte) 0x4E && bytes[3] == (byte) 0x47) {
+            return Workbook.PICTURE_TYPE_PNG;
+        }
+        return Workbook.PICTURE_TYPE_JPEG;
     }
 
     private void setCell(Sheet sheet, int rowIdx, int colIdx, String value) {

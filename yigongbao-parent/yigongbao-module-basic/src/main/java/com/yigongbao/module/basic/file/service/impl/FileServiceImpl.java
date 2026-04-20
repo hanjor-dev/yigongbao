@@ -21,6 +21,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -263,6 +264,22 @@ public class FileServiceImpl implements FileService {
             }
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
+    }
+
+    // ==================== 删除 ====================
+
+    @Override
+    public byte[] downloadToBytes(String id) throws IOException {
+        log.info("下载文件到字节数组，id={}", id);
+        FileInfo fileInfo = fileRecorderService.getById(id);
+        if (fileInfo == null) {
+            log.warn("文件不存在，id={}", id);
+            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
+        }
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        fileStorageService.download(fileInfo).outputStream(baos);
+        log.info("下载文件到字节数组成功，id={}，size={}", id, baos.size());
+        return baos.toByteArray();
     }
 
     // ==================== 删除 ====================

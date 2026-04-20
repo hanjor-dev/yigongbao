@@ -6,10 +6,7 @@ import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.system.basedata.vo.SelectTreeVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,7 +30,7 @@ public class FlowSelectController {
      * @return 阶段列表（name=中文名称，value=阶段数值）
      */
     @Operation(summary = "获取流转阶段下拉列表")
-    @PostMapping("/phases")
+    @GetMapping("/phases")
     public Result<List<SelectTreeVO>> listPhases() {
         List<SelectTreeVO> result = new ArrayList<>();
         for (FlowPhaseEnum phase : FlowPhaseEnum.values()) {
@@ -53,7 +50,7 @@ public class FlowSelectController {
      * @return 状态列表（name=中文名称，value=状态数值）
      */
     @Operation(summary = "获取流转状态下拉列表")
-    @PostMapping("/statuses")
+    @GetMapping("/statuses")
     public Result<List<SelectTreeVO>> listStatuses(
             @RequestParam(required = false) Integer phase) {
         FlowPhaseEnum phaseEnum = FlowPhaseEnum.getByValue(phase);

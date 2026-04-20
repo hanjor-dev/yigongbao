@@ -121,6 +121,15 @@ public interface FileService {
     void download(String id, HttpServletResponse response) throws IOException;
 
     /**
+     * 下载文件内容到字节数组（供服务端内部使用，如嵌入 Excel）
+     *
+     * @param id 文件ID
+     * @return 文件字节数组
+     * @throws IOException IO异常
+     */
+    byte[] downloadToBytes(String id) throws IOException;
+
+    /**
      * 删除文件（同时从存储平台和数据库删除）
      *
      * @param id 文件ID

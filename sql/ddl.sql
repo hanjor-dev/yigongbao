@@ -1305,6 +1305,29 @@ CREATE TABLE design_package_file (
 
 
 -- ============================================================
+-- 数据包文件截图关联表（design_package_file_screenshot）
+-- 每个 design_package_file 最多一条有效截图，upsert 语义
+-- ============================================================
+DROP TABLE IF EXISTS design_package_file_screenshot;
+CREATE TABLE design_package_file_screenshot (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    package_file_id     BIGINT          NOT NULL COMMENT '关联 design_package_file.id',
+    file_id             VARCHAR(64)     NOT NULL COMMENT '截图文件ID（关联 file_detail.id）',
+    create_time         DATETIME        DEFAULT NULL COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT NULL COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    KEY idx_design_pkg_file_screenshot_file_id (package_file_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='数据包文件截图关联表';
+-- 每个 package_file 只允许一条有效截图（逻辑删除兼容函数索引）
+CREATE UNIQUE INDEX uk_design_pkg_file_screenshot_pkg_file_id
+    ON design_package_file_screenshot ((CASE WHEN is_deleted = 0 THEN package_file_id ELSE NULL END));
+
+
+-- ============================================================
 -- 打印产品信息表（design_product）
 -- 存储打印产品信息，一行对应一个打印文件（指令单中的一行）
 -- ============================================================

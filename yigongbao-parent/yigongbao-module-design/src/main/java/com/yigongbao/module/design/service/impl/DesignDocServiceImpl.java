@@ -25,6 +25,7 @@ import com.yigongbao.module.design.service.DesignInstructionService;
 import com.yigongbao.module.design.service.DesignPackageService;
 import com.yigongbao.module.design.service.DesignProductFileService;
 import com.yigongbao.module.design.service.DesignProductService;
+import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.vo.DesignDocVersionVO;
 import com.yigongbao.module.design.vo.DocItemVO;
 import com.yigongbao.module.order.service.OrderMainService;
@@ -38,6 +39,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -63,6 +65,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     private final DrawingExcelBuilder drawingBuilder;
     private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
+    private final DesignScreenshotService screenshotService;
 
     /**
      * 生成指令单
@@ -199,9 +202,18 @@ public class DesignDocServiceImpl implements DesignDocService {
                 new LambdaQueryWrapper<DesignProductEntity>()
                         .eq(DesignProductEntity::getPackageId, packageId)
                         .orderByAsc(DesignProductEntity::getSortOrder));
-        List<DrawingExcelBuilder.ProductRow> drawingRows = expandDrawingRows(products);
+        List<Long> productIds = products.stream().map(DesignProductEntity::getId).toList();
+        List<DesignProductFileEntity> allProductFiles = productFileService.listByProductIds(productIds);
 
-        // 5. 生成图纸 Excel
+        // 5. 批量查询截图（packageFileId → bytes），下载截图字节
+        List<Long> packageFileIds = allProductFiles.stream()
+                .map(DesignProductFileEntity::getPackageFileId).distinct().toList();
+        Map<Long, String> screenshotFileIdMap = screenshotService.listFileIdsByPackageFileIds(packageFileIds);
+        Map<Long, byte[]> screenshotBytesMap = loadScreenshotBytes(screenshotFileIdMap);
+
+        List<DrawingExcelBuilder.ProductRow> drawingRows = expandDrawingRows(products, allProductFiles, screenshotBytesMap);
+
+        // 6. 生成图纸 Excel
         LocalDateTime now = LocalDateTime.now();
         DrawingExcelBuilder.BuildContext drawCtx = buildDrawingContext(order, pkg, drawingRows, now);
         byte[] drawBytes;
@@ -212,11 +224,11 @@ public class DesignDocServiceImpl implements DesignDocService {
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
 
-        // 6. 上传文件（version 中含 / 不能直接用于文件名，替换为 -）
+        // 7. 上传文件（version 中含 / 不能直接用于文件名，替换为 -）
         String filename = pkg.getPackageCode() + "-图纸-" + version.replace("/", "-") + ".xlsx";
         FileVO drawFile = fileService.uploadBytes(drawBytes, filename, FileBizTypeEnum.DRAWING_FILE.getDictCode());
 
-        // 7. 新建记录或更新模板文件
+        // 8. 新建记录或更新模板文件
         DesignDrawingEntity drawEntity;
         if (isNewVersion) {
             drawEntity = new DesignDrawingEntity();
@@ -236,7 +248,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             drawEntity = latest;
         }
 
-        // 8. 构造返回值
+        // 9. 构造返回值
         DocItemVO vo = new DocItemVO();
         vo.setId(drawEntity.getId());
         vo.setVersion(version);
@@ -347,13 +359,13 @@ public class DesignDocServiceImpl implements DesignDocService {
     }
 
     /**
-     * 将产品行 + 文件关联展开为图纸行列表（一个文件=一行）
+     * 将产品行 + 文件关联展开为图纸行列表（一个文件=一行，附截图字节）
      */
     private List<DrawingExcelBuilder.ProductRow> expandDrawingRows(
-            List<DesignProductEntity> products) {
+            List<DesignProductEntity> products,
+            List<DesignProductFileEntity> allFiles,
+            Map<Long, byte[]> screenshotBytesMap) {
         if (products.isEmpty()) return List.of();
-        List<Long> productIds = products.stream().map(DesignProductEntity::getId).toList();
-        List<DesignProductFileEntity> allFiles = productFileService.listByProductIds(productIds);
         Map<Long, List<DesignProductFileEntity>> fileMap = allFiles.stream()
                 .collect(Collectors.groupingBy(DesignProductFileEntity::getDesignProductId));
 
@@ -364,10 +376,33 @@ public class DesignDocServiceImpl implements DesignDocService {
                 DrawingExcelBuilder.ProductRow row = new DrawingExcelBuilder.ProductRow();
                 row.setPackageFileName(f.getPackageFileName());
                 row.setProductName(p.getProductName());
+                // 填充截图字节（无截图时为 null，builder 忽略）
+                row.setScreenshotBytes(screenshotBytesMap.get(f.getPackageFileId()));
                 rows.add(row);
             }
         }
         return rows;
+    }
+
+    /**
+     * 批量下载截图文件字节（packageFileId → bytes）
+     * 下载失败时记录 warn 日志并跳过，不影响图纸生成
+     */
+    private Map<Long, byte[]> loadScreenshotBytes(Map<Long, String> screenshotFileIdMap) {
+        if (screenshotFileIdMap.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Long, byte[]> result = new java.util.HashMap<>();
+        for (Map.Entry<Long, String> entry : screenshotFileIdMap.entrySet()) {
+            try {
+                byte[] bytes = fileService.downloadToBytes(entry.getValue());
+                result.put(entry.getKey(), bytes);
+            } catch (Exception e) {
+                log.warn("截图文件下载失败，packageFileId={}，fileId={}，跳过嵌图",
+                        entry.getKey(), entry.getValue(), e);
+            }
+        }
+        return result;
     }
 
     /**
