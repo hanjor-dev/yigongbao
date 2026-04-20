@@ -2,6 +2,7 @@ package com.yigongbao.module.design.controller;
 
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.design.service.DesignFileService;
+import com.yigongbao.module.design.vo.DesignPackageFileVO;
 import com.yigongbao.module.design.vo.DesignPackageVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -61,5 +62,16 @@ public class DesignPackageController {
     public Result<List<DesignPackageVO>> listPackages(
             @Parameter(description = "订单ID") @RequestParam Long orderId) {
         return Result.success(designFileService.listPackages(orderId));
+    }
+
+    /**
+     * 获取数据包包内文件列表
+     */
+    @Operation(summary = "获取数据包包内文件列表")
+    @GetMapping("/package/{packageId}/files")
+    public Result<List<DesignPackageFileVO>> listPackageFiles(
+            @Parameter(description = "订单ID") @RequestParam Long orderId,
+            @Parameter(description = "数据包ID") @PathVariable Long packageId) {
+        return Result.success(designFileService.listPackageFiles(orderId, packageId));
     }
 }

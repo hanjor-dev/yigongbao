@@ -1,6 +1,7 @@
 package com.yigongbao.module.design.service;
 
 import com.yigongbao.module.design.vo.DesignModelVO;
+import com.yigongbao.module.design.vo.DesignPackageFileVO;
 import com.yigongbao.module.design.vo.DesignPackageVO;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import org.springframework.web.multipart.MultipartFile;
@@ -43,6 +44,15 @@ public interface DesignFileService {
      * @return 数据包列表
      */
     List<DesignPackageVO> listPackages(Long orderId);
+
+    /**
+     * 获取数据包的包内文件列表
+     *
+     * @param orderId   订单ID（校验数据包归属）
+     * @param packageId 数据包ID
+     * @return 包内文件列表
+     */
+    List<DesignPackageFileVO> listPackageFiles(Long orderId, Long packageId);
 
     // ==================== 可视化模型 ====================
 

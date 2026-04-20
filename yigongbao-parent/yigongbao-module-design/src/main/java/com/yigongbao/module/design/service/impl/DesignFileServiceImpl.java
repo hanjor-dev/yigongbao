@@ -246,6 +246,49 @@ public class DesignFileServiceImpl implements DesignFileService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 查询数据包包内文件列表
+     *
+     * @param orderId   订单ID（校验数据包归属）
+     * @param packageId 数据包ID
+     * @return 包内文件 VO 列表，按 sortOrder 升序
+     */
+    @Override
+    public List<DesignPackageFileVO> listPackageFiles(Long orderId, Long packageId) {
+        log.info("查询包内文件列表，orderId={}，packageId={}", orderId, packageId);
+
+        // 1. 校验数据包归属
+        DesignPackageEntity pkg = packageService.getById(packageId);
+        if (pkg == null || !pkg.getOrderId().equals(orderId)) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
+        }
+
+        // 2. 查询包内文件
+        List<DesignPackageFileEntity> files = packageFileService.list(
+                new LambdaQueryWrapper<DesignPackageFileEntity>()
+                        .eq(DesignPackageFileEntity::getPackageId, packageId)
+                        .orderByAsc(DesignPackageFileEntity::getSortOrder));
+
+        // 3. 查询已填写打印信息的文件ID集合
+        Set<Long> filledFileIds = getFilledFileIds(List.of(packageId));
+
+        // 4. 构建 VO
+        return files.stream()
+                .map(f -> {
+                    DesignPackageFileVO vo = new DesignPackageFileVO();
+                    vo.setId(f.getId());
+                    vo.setPackageId(f.getPackageId());
+                    vo.setFileName(f.getFileName());
+                    vo.setFileExt(f.getFileExt());
+                    vo.setFilePath(f.getFilePath());
+                    vo.setFileSize(f.getFileSize());
+                    vo.setSortOrder(f.getSortOrder());
+                    vo.setHasPrintInfo(filledFileIds.contains(f.getId()));
+                    return vo;
+                })
+                .collect(Collectors.toList());
+    }
+
     // ==================== 可视化模型 ====================
 
     @Override
