@@ -53,7 +53,6 @@ public class DrawingExcelBuilder {
     public static class BuildContext {
         private String orderCode;
         private String packageCode;
-        private String remark;
         /** 生成日期（yyyy-MM-dd，填入设计/日期和审核/日期列） */
         private String generateDate;
         /** 设计师名（填入设计/日期行姓名列） */

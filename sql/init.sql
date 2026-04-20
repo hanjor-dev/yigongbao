@@ -184,6 +184,11 @@ INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, so
 VALUES
 (67, 50, '10.17', '通用文件', NULL, 2, 17, 1);
 
+-- 截图文件（10.18）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
+VALUES
+(99, 50, '10.18', '图纸截图', NULL, 2, 18, 1);
+
 -- ------------------------------------------------------------
 -- 订单业务类型（父节点 id=68，dict_code=11）
 -- 用于区分订单的业务类型（业务/测试/试用/代理）
