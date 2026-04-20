@@ -263,16 +263,13 @@ public class DesignFileServiceImpl implements DesignFileService {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
         }
 
-        // 2. 查询包内文件
+        // 2. 查询包内文件（全量返回，按 sortOrder 升序）
         List<DesignPackageFileEntity> files = packageFileService.list(
                 new LambdaQueryWrapper<DesignPackageFileEntity>()
                         .eq(DesignPackageFileEntity::getPackageId, packageId)
                         .orderByAsc(DesignPackageFileEntity::getSortOrder));
 
-        // 3. 查询已填写打印信息的文件ID集合
-        Set<Long> filledFileIds = getFilledFileIds(List.of(packageId));
-
-        // 4. 构建 VO
+        // 3. 构建 VO
         return files.stream()
                 .map(f -> {
                     DesignPackageFileVO vo = new DesignPackageFileVO();
@@ -283,7 +280,6 @@ public class DesignFileServiceImpl implements DesignFileService {
                     vo.setFilePath(f.getFilePath());
                     vo.setFileSize(f.getFileSize());
                     vo.setSortOrder(f.getSortOrder());
-                    vo.setHasPrintInfo(filledFileIds.contains(f.getId()));
                     return vo;
                 })
                 .collect(Collectors.toList());
