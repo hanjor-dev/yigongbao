@@ -481,6 +481,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         DrawingExcelBuilder.BuildContext ctx = new DrawingExcelBuilder.BuildContext();
         ctx.setOrderCode(order.getOrderCode());
         ctx.setPackageCode(pkg.getPackageCode());
+        ctx.setRemark(pkg.getRemark());
         ctx.setRows(rows);
         ctx.setDesignerName(order.getDesignerName());
         ctx.setGenerateDate(generateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));

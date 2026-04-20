@@ -53,6 +53,8 @@ public class DrawingExcelBuilder {
     public static class BuildContext {
         private String orderCode;
         private String packageCode;
+        /** 备注（来自 design_package.remark，允许为 null） */
+        private String remark;
         /** 生成日期（yyyy-MM-dd，填入设计/日期和审核/日期列） */
         private String generateDate;
         /** 设计师名（填入设计/日期行姓名列） */
@@ -83,6 +85,8 @@ public class DrawingExcelBuilder {
 
     /** footer 行（0-indexed）：原模板行37=row36 */
     private static final int FOOTER_ROW = 36;
+    /** 备注值列：B37=col1（B37:H42 合并区域，写首格） */
+    private static final int REMARK_COL = 1;
     /** 数据包编号值列：J37=col9 */
     private static final int PKG_CODE_COL = 9;
     /** 订单编号值列：N37=col13 */
@@ -153,6 +157,7 @@ public class DrawingExcelBuilder {
                 }
 
                 // 填充 footer
+                setCell(sheet, FOOTER_ROW, REMARK_COL, strOrEmpty(ctx.getRemark()));
                 setCell(sheet, FOOTER_ROW, PKG_CODE_COL, strOrEmpty(ctx.getPackageCode()));
                 setCell(sheet, FOOTER_ROW, ORDER_CODE_COL, strOrEmpty(ctx.getOrderCode()));
                 setCell(sheet, PAGE_TEXT_ROW, PAGE_TEXT_COL,
