@@ -18,6 +18,7 @@
         <module>yigongbao-module-flow</module>
         <module>yigongbao-module-order</module>
         <module>yigongbao-module-design</module>
+        <module>yigongbao-module-imaging</module>
         <module>yigongbao-boot</module>
     </modules>
 
@@ -84,6 +85,11 @@
             <dependency>
                 <groupId>com.yigongbao</groupId>
                 <artifactId>yigongbao-module-design</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-module-imaging</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

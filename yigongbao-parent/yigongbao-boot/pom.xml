@@ -37,6 +37,10 @@
             <groupId>com.yigongbao</groupId>
             <artifactId>yigongbao-module-design</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-imaging</artifactId>
+        </dependency>
 
         <!-- spring boot -->
         <dependency>
