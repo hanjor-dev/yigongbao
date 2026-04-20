@@ -1,11 +1,12 @@
 package com.yigongbao.module.imaging.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.module.design.entity.DesignModelEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignPackageFileEntity;
-import com.yigongbao.module.design.mapper.DesignModelMapper;
-import com.yigongbao.module.design.mapper.DesignPackageFileMapper;
-import com.yigongbao.module.design.mapper.DesignPackageMapper;
+import com.yigongbao.module.design.service.DesignModelService;
+import com.yigongbao.module.design.service.DesignPackageFileService;
+import com.yigongbao.module.design.service.DesignPackageService;
 import com.yigongbao.module.imaging.entity.PartColorEntity;
 import com.yigongbao.module.imaging.mapper.PartColorMapper;
 import com.yigongbao.module.imaging.vo.DcmPackageVO;
@@ -13,7 +14,7 @@ import com.yigongbao.module.imaging.vo.ModelVO;
 import com.yigongbao.module.imaging.vo.PackageModelFileVO;
 import com.yigongbao.module.imaging.vo.PackageModelGroupVO;
 import com.yigongbao.module.order.entity.OrderFileEntity;
-import com.yigongbao.module.order.mapper.OrderFileMapper;
+import com.yigongbao.module.order.service.OrderFileService;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import org.junit.jupiter.api.*;
@@ -30,6 +31,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -43,13 +45,13 @@ import static org.mockito.Mockito.*;
 class ImagingServiceImplTest {
 
     @Mock
-    private OrderFileMapper orderFileMapper;
+    private OrderFileService orderFileService;
     @Mock
-    private DesignPackageMapper designPackageMapper;
+    private DesignPackageService designPackageService;
     @Mock
-    private DesignPackageFileMapper designPackageFileMapper;
+    private DesignPackageFileService designPackageFileService;
     @Mock
-    private DesignModelMapper designModelMapper;
+    private DesignModelService designModelService;
     @Mock
     private PartColorMapper partColorMapper;
     @Mock
@@ -81,7 +83,7 @@ class ImagingServiceImplTest {
             fileVO.setFileUrl("https://example.com/file001");
             fileVO.setFileSize(1024L);
 
-            when(orderFileMapper.selectList(any())).thenReturn(List.of(orderFile));
+            when(orderFileService.listByOrderIdAndCategory(eq(orderId), any())).thenReturn(List.of(orderFile));
             when(fileService.listByIds(List.of("file001"))).thenReturn(List.of(fileVO));
 
             // when
@@ -99,7 +101,7 @@ class ImagingServiceImplTest {
         @DisplayName("订单无影像文件时返回空列表")
         void shouldReturnEmptyListWhenNoFiles() {
             // given
-            when(orderFileMapper.selectList(any())).thenReturn(List.of());
+            when(orderFileService.listByOrderIdAndCategory(any(), any())).thenReturn(List.of());
 
             // when
             List<DcmPackageVO> result = imagingService.getDcmPackages(1L);
@@ -135,7 +137,7 @@ class ImagingServiceImplTest {
             color.setColorCode("170,255,0");
             color.setOpacity(new BigDecimal("0.80"));
 
-            when(designPackageFileMapper.selectList(any())).thenReturn(List.of(file));
+            when(designPackageFileService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(file));
             when(partColorMapper.selectList(any())).thenReturn(List.of(color));
 
             // when
@@ -159,7 +161,7 @@ class ImagingServiceImplTest {
             file.setFileName("未知部位.stl");
             file.setFileExt("stl");
 
-            when(designPackageFileMapper.selectList(any())).thenReturn(List.of(file));
+            when(designPackageFileService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(file));
             when(partColorMapper.selectList(any())).thenReturn(List.of());
 
             // when
@@ -174,7 +176,7 @@ class ImagingServiceImplTest {
         @Test
         @DisplayName("数据包无文件时返回空列表")
         void shouldReturnEmptyListWhenNoFiles() {
-            when(designPackageFileMapper.selectList(any())).thenReturn(List.of());
+            when(designPackageFileService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of());
 
             List<PackageModelFileVO> result = imagingService.getPackageModelFiles(1L);
 
@@ -207,8 +209,8 @@ class ImagingServiceImplTest {
             file.setFilePath("models/右肺上叶.stl");
             file.setFileSize(2048L);
 
-            when(designPackageMapper.selectList(any())).thenReturn(List.of(pkg));
-            when(designPackageFileMapper.selectList(any())).thenReturn(List.of(file));
+            when(designPackageService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(pkg));
+            when(designPackageFileService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(file));
             when(partColorMapper.selectList(any())).thenReturn(List.of());
 
             // when
@@ -224,7 +226,7 @@ class ImagingServiceImplTest {
         @Test
         @DisplayName("订单无数据包时返回空列表")
         void shouldReturnEmptyWhenNoPackages() {
-            when(designPackageMapper.selectList(any())).thenReturn(List.of());
+            when(designPackageService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of());
 
             List<PackageModelGroupVO> result = imagingService.getPackageModelFilesByOrder(1L);
 
@@ -259,7 +261,7 @@ class ImagingServiceImplTest {
             color.setColorCode("255,0,0");
             color.setOpacity(new BigDecimal("0.90"));
 
-            when(designModelMapper.selectList(any())).thenReturn(List.of(model));
+            when(designModelService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(model));
             when(fileService.listByIds(List.of("fileABC"))).thenReturn(List.of(fileVO));
             when(partColorMapper.selectList(any())).thenReturn(List.of(color));
 
@@ -279,7 +281,7 @@ class ImagingServiceImplTest {
         @Test
         @DisplayName("订单无模型时返回空列表")
         void shouldReturnEmptyWhenNoModels() {
-            when(designModelMapper.selectList(any())).thenReturn(List.of());
+            when(designModelService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of());
 
             List<ModelVO> result = imagingService.getModels(1L);
 

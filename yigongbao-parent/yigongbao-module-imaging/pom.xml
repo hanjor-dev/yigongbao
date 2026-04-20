@@ -14,13 +14,7 @@
     <description>影像阅览通用模块——提供DCM影像、3D模型文件查询接口</description>
 
     <dependencies>
-        <!-- 订单模块：查询 order_file -->
-        <dependency>
-            <groupId>com.yigongbao</groupId>
-            <artifactId>yigongbao-module-order</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <!-- 设计模块：查询 design_package_file、design_model -->
+        <!-- 设计模块：通过 design 传递引入 order 及其他基础模块 -->
         <dependency>
             <groupId>com.yigongbao</groupId>
             <artifactId>yigongbao-module-design</artifactId>

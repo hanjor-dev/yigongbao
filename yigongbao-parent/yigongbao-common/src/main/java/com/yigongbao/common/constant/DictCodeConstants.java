@@ -101,4 +101,22 @@ public final class DictCodeConstants {
      * 其他
      */
     public static final String PROJECT_CATEGORY_OTHER = "13.4";
+
+    // ==================== 订单文件分类 ====================
+
+    /**
+     * 订单文件分类（父节点 dict_code）
+     * 对应 order_file.file_category 字段
+     */
+    public static final String ORDER_FILE_CATEGORY = "10";
+
+    /**
+     * 影像数据（DCM 压缩包）
+     */
+    public static final String ORDER_FILE_CATEGORY_DCM = "10.1";
+
+    /**
+     * 影像报告
+     */
+    public static final String ORDER_FILE_CATEGORY_REPORT = "10.2";
 }
