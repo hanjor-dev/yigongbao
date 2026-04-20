@@ -77,6 +77,16 @@ public class DesignInstructionEntity extends BaseEntity {
     private LocalDateTime revisedUploadTime;
 
     /**
+     * 指令单是否已确认（0=未确认，1=已确认；在线模式下生成/重新生成时重置为0，手动确认后置1；离线模式下上传修订版时自动置1）
+     */
+    private Integer isConfirmed;
+
+    /**
+     * 确认时间
+     */
+    private LocalDateTime confirmTime;
+
+    /**
      * 指令人ID
      */
     private Long issuerId;

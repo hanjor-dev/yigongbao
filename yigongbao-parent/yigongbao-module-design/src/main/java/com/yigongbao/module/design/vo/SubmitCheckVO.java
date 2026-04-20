@@ -32,6 +32,12 @@ public class SubmitCheckVO {
     /** 是否已上传修订版指令单和图纸（所有数据包，仅线下模式时校验） */
     private Boolean hasRevisedDocs;
 
+    /** 是否已确认图纸（所有数据包，仅在线模式时校验） */
+    private Boolean hasDrawingConfirmed;
+
+    /** 是否已确认指令单（所有数据包，仅在线模式时校验） */
+    private Boolean hasInstructionConfirmed;
+
     /** 是否可以提交（全部为 true 时才为 true） */
     private Boolean canSubmit;
 

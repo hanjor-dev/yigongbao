@@ -96,6 +96,34 @@ public class DesignDocController {
     }
 
     /**
+     * 确认图纸（在线模式）
+     * 设计师预览生成结果满意后调用，is_confirmed 置为 1。
+     * 若之后重新生成图纸，确认状态自动重置，需再次确认。
+     */
+    @Operation(summary = "确认图纸（在线模式）")
+    @PostMapping("/{orderId}/package/{packageId}/drawing/confirm/{id}")
+    public Result<Void> confirmDrawing(@PathVariable Long orderId,
+                                       @PathVariable Long packageId,
+                                       @PathVariable Long id) {
+        docService.confirmDrawing(orderId, packageId, id);
+        return Result.success();
+    }
+
+    /**
+     * 确认指令单（在线模式）
+     * 设计师确认指令单内容无误后调用，is_confirmed 置为 1。
+     * 若之后重新生成指令单，确认状态自动重置，需再次确认。
+     */
+    @Operation(summary = "确认指令单（在线模式）")
+    @PostMapping("/{orderId}/package/{packageId}/instruction/confirm/{id}")
+    public Result<Void> confirmInstruction(@PathVariable Long orderId,
+                                            @PathVariable Long packageId,
+                                            @PathVariable Long id) {
+        docService.confirmInstruction(orderId, packageId, id);
+        return Result.success();
+    }
+
+    /**
      * 上传数据包文件截图（upsert：有则覆盖，无则新增）
      */
     @Operation(summary = "上传数据包文件截图")

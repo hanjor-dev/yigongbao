@@ -272,14 +272,18 @@ class DesignWorkorderServiceImplTest {
             product.setPackageId(1L);
             when(designProductMapper.selectList(any(Wrapper.class))).thenReturn(List.of(product));
 
-            // 指令单
+            // 指令单（在线模式下，指令单必须已确认）
             DesignInstructionEntity instruction = new DesignInstructionEntity();
             instruction.setPackageId(1L);
+            instruction.setVersionSeq(1);
+            instruction.setIsConfirmed(1);
             when(designInstructionMapper.selectList(any(Wrapper.class))).thenReturn(List.of(instruction));
 
-            // 图纸
+            // 图纸（在线模式下，图纸必须已确认）
             DesignDrawingEntity drawing = new DesignDrawingEntity();
             drawing.setPackageId(1L);
+            drawing.setVersionSeq(1);
+            drawing.setIsConfirmed(1);
             when(designDrawingMapper.selectList(any(Wrapper.class))).thenReturn(List.of(drawing));
 
             // 可视化模型
@@ -297,6 +301,8 @@ class DesignWorkorderServiceImplTest {
             assertTrue(check.getHasDrawing());
             assertTrue(check.getHasModel());
             assertTrue(check.getHasReport());
+            assertTrue(check.getHasDrawingConfirmed());
+            assertTrue(check.getHasInstructionConfirmed());
             assertTrue(check.getCanSubmit());
             assertNull(check.getBlockReason());
         }
@@ -315,6 +321,128 @@ class DesignWorkorderServiceImplTest {
 
             DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
             assertEquals("设计文件不符合规格", vo.getRejectReason());
+        }
+
+        @Test
+        @DisplayName("在线模式：图纸未确认时 canSubmit=false，blockReason=请确认图纸")
+        void getWorkorderDetail_submitCheck_onlineMode_drawingNotConfirmed() {
+            when(orderMainService.getById(10L)).thenReturn(buildOrder(10L));
+            when(configService.getConfigValue(any())).thenReturn(String.valueOf(DesignModeEnum.ONLINE.getCode()));
+
+            DesignPackageEntity pkg = new DesignPackageEntity();
+            pkg.setId(1L);
+            pkg.setOrderId(10L);
+            when(designPackageMapper.selectList(any(Wrapper.class))).thenReturn(List.of(pkg));
+
+            DesignProductEntity product = new DesignProductEntity();
+            product.setPackageId(1L);
+            when(designProductMapper.selectList(any(Wrapper.class))).thenReturn(List.of(product));
+
+            // 指令单已确认
+            DesignInstructionEntity instruction = new DesignInstructionEntity();
+            instruction.setPackageId(1L);
+            instruction.setVersionSeq(1);
+            instruction.setIsConfirmed(1);
+            when(designInstructionMapper.selectList(any(Wrapper.class))).thenReturn(List.of(instruction));
+
+            // 图纸未确认
+            DesignDrawingEntity drawing = new DesignDrawingEntity();
+            drawing.setPackageId(1L);
+            drawing.setVersionSeq(1);
+            drawing.setIsConfirmed(0);
+            when(designDrawingMapper.selectList(any(Wrapper.class))).thenReturn(List.of(drawing));
+
+            when(designModelMapper.selectCount(any(Wrapper.class))).thenReturn(1L);
+            when(fileService.listByBiz(eq("10.5"), eq(10L))).thenReturn(List.of(new FileVO()));
+
+            DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
+            SubmitCheckVO check = vo.getSubmitCheck();
+
+            assertFalse(check.getHasDrawingConfirmed());
+            assertFalse(check.getCanSubmit());
+            assertEquals("请确认图纸", check.getBlockReason());
+        }
+
+        @Test
+        @DisplayName("在线模式：指令单未确认时 canSubmit=false，blockReason=请确认指令单")
+        void getWorkorderDetail_submitCheck_onlineMode_instructionNotConfirmed() {
+            when(orderMainService.getById(10L)).thenReturn(buildOrder(10L));
+            when(configService.getConfigValue(any())).thenReturn(String.valueOf(DesignModeEnum.ONLINE.getCode()));
+
+            DesignPackageEntity pkg = new DesignPackageEntity();
+            pkg.setId(1L);
+            pkg.setOrderId(10L);
+            when(designPackageMapper.selectList(any(Wrapper.class))).thenReturn(List.of(pkg));
+
+            DesignProductEntity product = new DesignProductEntity();
+            product.setPackageId(1L);
+            when(designProductMapper.selectList(any(Wrapper.class))).thenReturn(List.of(product));
+
+            // 指令单未确认
+            DesignInstructionEntity instruction = new DesignInstructionEntity();
+            instruction.setPackageId(1L);
+            instruction.setVersionSeq(1);
+            instruction.setIsConfirmed(0);
+            when(designInstructionMapper.selectList(any(Wrapper.class))).thenReturn(List.of(instruction));
+
+            // 图纸已确认
+            DesignDrawingEntity drawing = new DesignDrawingEntity();
+            drawing.setPackageId(1L);
+            drawing.setVersionSeq(1);
+            drawing.setIsConfirmed(1);
+            when(designDrawingMapper.selectList(any(Wrapper.class))).thenReturn(List.of(drawing));
+
+            when(designModelMapper.selectCount(any(Wrapper.class))).thenReturn(1L);
+            when(fileService.listByBiz(eq("10.5"), eq(10L))).thenReturn(List.of(new FileVO()));
+
+            DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
+            SubmitCheckVO check = vo.getSubmitCheck();
+
+            assertFalse(check.getHasInstructionConfirmed());
+            assertFalse(check.getCanSubmit());
+            assertEquals("请确认指令单", check.getBlockReason());
+        }
+
+        @Test
+        @DisplayName("离线模式：跳过图纸和指令单确认校验（hasDrawingConfirmed=true, hasInstructionConfirmed=true）")
+        void getWorkorderDetail_submitCheck_offlineMode_ignoresDrawingConfirmed() {
+            when(orderMainService.getById(10L)).thenReturn(buildOrder(10L));
+            when(configService.getConfigValue(any())).thenReturn(String.valueOf(DesignModeEnum.OFFLINE.getCode()));
+
+            DesignPackageEntity pkg = new DesignPackageEntity();
+            pkg.setId(1L);
+            pkg.setOrderId(10L);
+            when(designPackageMapper.selectList(any(Wrapper.class))).thenReturn(List.of(pkg));
+
+            DesignProductEntity product = new DesignProductEntity();
+            product.setPackageId(1L);
+            when(designProductMapper.selectList(any(Wrapper.class))).thenReturn(List.of(product));
+
+            // 指令单有修订版，未确认（离线模式忽略）
+            DesignInstructionEntity instrWithRevised = new DesignInstructionEntity();
+            instrWithRevised.setPackageId(1L);
+            instrWithRevised.setVersionSeq(1);
+            instrWithRevised.setIsConfirmed(0);
+            instrWithRevised.setRevisedFileId("revised-002");
+            when(designInstructionMapper.selectList(any(Wrapper.class))).thenReturn(List.of(instrWithRevised));
+
+            // 图纸有修订版，未确认（离线模式忽略）
+            DesignDrawingEntity drawing = new DesignDrawingEntity();
+            drawing.setPackageId(1L);
+            drawing.setVersionSeq(1);
+            drawing.setIsConfirmed(0);
+            drawing.setRevisedFileId("revised-001");
+            when(designDrawingMapper.selectList(any(Wrapper.class))).thenReturn(List.of(drawing));
+
+            when(designModelMapper.selectCount(any(Wrapper.class))).thenReturn(1L);
+            when(fileService.listByBiz(eq("10.5"), eq(10L))).thenReturn(List.of(new FileVO()));
+
+            DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
+            SubmitCheckVO check = vo.getSubmitCheck();
+
+            assertTrue(check.getHasDrawingConfirmed());
+            assertTrue(check.getHasInstructionConfirmed());
+            assertTrue(check.getCanSubmit());
         }
     }
 

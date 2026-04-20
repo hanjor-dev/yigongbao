@@ -6,6 +6,7 @@ import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -17,6 +18,7 @@ import com.yigongbao.module.design.entity.DesignInstructionEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignProductFileEntity;
+import com.yigongbao.module.design.enums.DesignModeEnum;
 import com.yigongbao.module.design.helper.DrawingExcelBuilder;
 import com.yigongbao.module.design.helper.InstructionExcelBuilder;
 import com.yigongbao.module.design.service.DesignDocService;
@@ -29,6 +31,7 @@ import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.vo.DesignDocVersionVO;
 import com.yigongbao.module.design.vo.DocItemVO;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.system.config.service.ConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -66,6 +69,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
     private final DesignScreenshotService screenshotService;
+    private final ConfigService configService;
 
     /**
      * 生成指令单
@@ -140,11 +144,16 @@ public class DesignDocServiceImpl implements DesignDocService {
             instrEntity.setGenerateTime(now);
             instrEntity.setTemplateFileId(instrFile.getId());
             instrEntity.setTemplateFileUrl(instrFile.getFileUrl());
+            // 新版本初始为未确认状态，需设计师确认（在线模式）或上传修订版自动确认（离线模式）
+            instrEntity.setIsConfirmed(0);
             instructionService.save(instrEntity);
         } else {
             latest.setTemplateFileId(instrFile.getId());
             latest.setTemplateFileUrl(instrFile.getFileUrl());
             latest.setGenerateTime(now);
+            // 重新生成指令单时重置确认状态，强制重新确认
+            latest.setIsConfirmed(0);
+            latest.setConfirmTime(null);
             instructionService.updateById(latest);
             instrEntity = latest;
         }
@@ -239,11 +248,16 @@ public class DesignDocServiceImpl implements DesignDocService {
             drawEntity.setGenerateTime(now);
             drawEntity.setTemplateFileId(drawFile.getId());
             drawEntity.setTemplateFileUrl(drawFile.getFileUrl());
+            // 新版本初始为未确认状态，需设计师预览后手动确认（在线模式）或上传修订版自动确认（离线模式）
+            drawEntity.setIsConfirmed(0);
             drawingService.save(drawEntity);
         } else {
             latest.setTemplateFileId(drawFile.getId());
             latest.setTemplateFileUrl(drawFile.getFileUrl());
             latest.setGenerateTime(now);
+            // 重新生成图纸时重置确认状态，强制重新确认
+            latest.setIsConfirmed(0);
+            latest.setConfirmTime(null);
             drawingService.updateById(latest);
             drawEntity = latest;
         }
@@ -286,6 +300,10 @@ public class DesignDocServiceImpl implements DesignDocService {
 
     /**
      * 上传修订版指令单
+     * <p>
+     * 离线模式：上传即视为已确认（is_confirmed=1），无需额外操作。
+     * 在线模式：上传不改变确认状态，设计师仍需手动调用 confirmInstruction 确认。
+     * </p>
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -301,12 +319,22 @@ public class DesignDocServiceImpl implements DesignDocService {
         entity.setRevisedFileId(fileVO.getId());
         entity.setRevisedFileUrl(fileVO.getFileUrl());
         entity.setRevisedUploadTime(LocalDateTime.now());
+        // 离线模式：上传修订版即视为已确认；在线模式：需设计师手动确认
+        if (!DesignModeEnum.ONLINE.getCode().equals(getDesignMode())) {
+            entity.setIsConfirmed(1);
+            entity.setConfirmTime(LocalDateTime.now());
+            log.info("离线模式，上传修订版指令单自动确认，id={}", id);
+        }
         instructionService.updateById(entity);
         log.info("上传修订版指令单成功，id={}", id);
     }
 
     /**
      * 上传修订版图纸
+     * <p>
+     * 离线模式：上传即视为已确认（is_confirmed=1），无需额外操作。
+     * 在线模式：上传不改变确认状态，设计师仍需手动调用 confirmDrawing 确认。
+     * </p>
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -322,8 +350,60 @@ public class DesignDocServiceImpl implements DesignDocService {
         entity.setRevisedFileId(fileVO.getId());
         entity.setRevisedFileUrl(fileVO.getFileUrl());
         entity.setRevisedUploadTime(LocalDateTime.now());
+        // 离线模式：上传修订版即视为已确认；在线模式：需设计师手动确认
+        if (!DesignModeEnum.ONLINE.getCode().equals(getDesignMode())) {
+            entity.setIsConfirmed(1);
+            entity.setConfirmTime(LocalDateTime.now());
+            log.info("离线模式，上传修订版图纸自动确认，id={}", id);
+        }
         drawingService.updateById(entity);
         log.info("上传修订版图纸成功，id={}", id);
+    }
+
+    /**
+     * 确认图纸（在线模式专用）
+     * <p>
+     * 设计师预览生成的图纸满意后调用，将 is_confirmed 置为 1。
+     * 若之后重新生成图纸，is_confirmed 会被自动重置为 0。
+     * </p>
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void confirmDrawing(Long orderId, Long packageId, Long id) {
+        log.info("确认图纸，orderId={}, packageId={}, id={}", orderId, packageId, id);
+        checkOrderAndPermission(orderId);
+        validatePackage(orderId, packageId);
+        DesignDrawingEntity entity = drawingService.getById(id);
+        if (entity == null || !entity.getPackageId().equals(packageId)) {
+            throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
+        }
+        entity.setIsConfirmed(1);
+        entity.setConfirmTime(LocalDateTime.now());
+        drawingService.updateById(entity);
+        log.info("确认图纸成功，id={}", id);
+    }
+
+    /**
+     * 确认指令单（在线模式专用）
+     * <p>
+     * 设计师确认生成的指令单内容无误后调用，将 is_confirmed 置为 1。
+     * 若之后重新生成指令单，is_confirmed 会被自动重置为 0。
+     * </p>
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void confirmInstruction(Long orderId, Long packageId, Long id) {
+        log.info("确认指令单，orderId={}, packageId={}, id={}", orderId, packageId, id);
+        checkOrderAndPermission(orderId);
+        validatePackage(orderId, packageId);
+        DesignInstructionEntity entity = instructionService.getById(id);
+        if (entity == null || !entity.getPackageId().equals(packageId)) {
+            throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
+        }
+        entity.setIsConfirmed(1);
+        entity.setConfirmTime(LocalDateTime.now());
+        instructionService.updateById(entity);
+        log.info("确认指令单成功，id={}", id);
     }
 
     // ==================== 私有方法 ====================
@@ -403,6 +483,19 @@ public class DesignDocServiceImpl implements DesignDocService {
             }
         }
         return result;
+    }
+
+    /**
+     * 从系统配置读取当前设计模式，null 视为离线模式（保守处理）
+     */
+    private Integer getDesignMode() {
+        try {
+            String modeStr = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_MODE.getKey());
+            return modeStr != null ? Integer.parseInt(modeStr) : null;
+        } catch (Exception e) {
+            log.warn("读取设计模式配置失败，默认使用线下模式", e);
+            return null;
+        }
     }
 
     /**
@@ -499,6 +592,8 @@ public class DesignDocServiceImpl implements DesignDocService {
         vo.setRevisedFileUrl(entity.getRevisedFileUrl());
         vo.setGenerateTime(entity.getGenerateTime());
         vo.setRevisedUploadTime(entity.getRevisedUploadTime());
+        vo.setIsConfirmed(entity.getIsConfirmed());
+        vo.setConfirmTime(entity.getConfirmTime());
         return vo;
     }
 
@@ -513,6 +608,8 @@ public class DesignDocServiceImpl implements DesignDocService {
         vo.setRevisedFileUrl(entity.getRevisedFileUrl());
         vo.setGenerateTime(entity.getGenerateTime());
         vo.setRevisedUploadTime(entity.getRevisedUploadTime());
+        vo.setIsConfirmed(entity.getIsConfirmed());
+        vo.setConfirmTime(entity.getConfirmTime());
         return vo;
     }
 }

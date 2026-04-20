@@ -711,6 +711,49 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             check.setHasRevisedDocs(true);
         }
 
+        // 8. 图纸确认状态：在线模式下每个数据包的最新版图纸都必须已确认（is_confirmed=1）
+        if (DesignModeEnum.ONLINE.getCode().equals(designMode) && !packages.isEmpty()) {
+            // 复用已查询的最新版图纸（在线模式走 else 分支，需重新查询）
+            List<DesignDrawingEntity> allDrawingsForConfirm = designDrawingMapper.selectList(
+                    new LambdaQueryWrapper<DesignDrawingEntity>()
+                            .in(DesignDrawingEntity::getPackageId, packageIds)
+                            .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                            .orderByDesc(DesignDrawingEntity::getVersionSeq));
+            Map<Long, DesignDrawingEntity> latestDrawingByPkgForConfirm = new java.util.LinkedHashMap<>();
+            for (DesignDrawingEntity drawing : allDrawingsForConfirm) {
+                latestDrawingByPkgForConfirm.putIfAbsent(drawing.getPackageId(), drawing);
+            }
+            boolean allConfirmed = packageIds.stream().allMatch(pkgId -> {
+                DesignDrawingEntity drawing = latestDrawingByPkgForConfirm.get(pkgId);
+                return drawing != null && Integer.valueOf(1).equals(drawing.getIsConfirmed());
+            });
+            check.setHasDrawingConfirmed(allConfirmed);
+        } else {
+            // 离线模式或无数据包，跳过图纸确认校验
+            check.setHasDrawingConfirmed(true);
+        }
+
+        // 9. 指令单确认状态：在线模式下每个数据包的最新版指令单都必须已确认（is_confirmed=1）
+        if (DesignModeEnum.ONLINE.getCode().equals(designMode) && !packages.isEmpty()) {
+            List<DesignInstructionEntity> allInstructionsForConfirm = designInstructionMapper.selectList(
+                    new LambdaQueryWrapper<DesignInstructionEntity>()
+                            .in(DesignInstructionEntity::getPackageId, packageIds)
+                            .eq(DesignInstructionEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                            .orderByDesc(DesignInstructionEntity::getVersionSeq));
+            Map<Long, DesignInstructionEntity> latestInstructionByPkgForConfirm = new java.util.LinkedHashMap<>();
+            for (DesignInstructionEntity inst : allInstructionsForConfirm) {
+                latestInstructionByPkgForConfirm.putIfAbsent(inst.getPackageId(), inst);
+            }
+            boolean allInstructionConfirmed = packageIds.stream().allMatch(pkgId -> {
+                DesignInstructionEntity inst = latestInstructionByPkgForConfirm.get(pkgId);
+                return inst != null && Integer.valueOf(1).equals(inst.getIsConfirmed());
+            });
+            check.setHasInstructionConfirmed(allInstructionConfirmed);
+        } else {
+            // 离线模式或无数据包，跳过指令单确认校验
+            check.setHasInstructionConfirmed(true);
+        }
+
         // 计算 canSubmit 和 blockReason（按优先级顺序）
         if (!check.getHasPackage()) {
             check.setCanSubmit(false);
@@ -733,6 +776,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         } else if (!Boolean.TRUE.equals(check.getHasRevisedDocs())) {
             check.setCanSubmit(false);
             check.setBlockReason("请上传修订版指令单和图纸");
+        } else if (!Boolean.TRUE.equals(check.getHasDrawingConfirmed())) {
+            check.setCanSubmit(false);
+            check.setBlockReason("请确认图纸");
+        } else if (!Boolean.TRUE.equals(check.getHasInstructionConfirmed())) {
+            check.setCanSubmit(false);
+            check.setBlockReason("请确认指令单");
         } else {
             check.setCanSubmit(true);
             check.setBlockReason(null);

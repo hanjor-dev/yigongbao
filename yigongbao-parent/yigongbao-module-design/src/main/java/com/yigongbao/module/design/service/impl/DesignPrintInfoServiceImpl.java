@@ -3,6 +3,7 @@ package com.yigongbao.module.design.service.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -15,10 +16,14 @@ import com.yigongbao.module.basic.product.service.ProductSpecService;
 import com.yigongbao.module.basic.product.vo.ProductVO;
 import com.yigongbao.module.design.dto.SavePrintInfoDTO;
 import com.yigongbao.module.design.dto.SavePrintInfoItemDTO;
+import com.yigongbao.module.design.entity.DesignDrawingEntity;
+import com.yigongbao.module.design.entity.DesignInstructionEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignPackageFileEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignProductFileEntity;
+import com.yigongbao.module.design.mapper.DesignDrawingMapper;
+import com.yigongbao.module.design.mapper.DesignInstructionMapper;
 import com.yigongbao.module.design.service.DesignPackageFileService;
 import com.yigongbao.module.design.service.DesignPackageService;
 import com.yigongbao.module.design.service.DesignPrintInfoService;
@@ -65,6 +70,8 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
     private final DesignProductService designProductService;
     private final DesignProductFileService productFileService;
     private final DictService dictService;
+    private final DesignInstructionMapper instructionMapper;
+    private final DesignDrawingMapper drawingMapper;
 
     /**
      * 获取打印信息选项数据以及包级已保存回显字段
@@ -323,6 +330,9 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
         pkgUpdate.setRemark(dto.getRemark());
         packageService.updateById(pkgUpdate);
 
+        // 10. 打印信息变化，重置该数据包的指令单和图纸确认状态（is_confirmed=0）
+        resetConfirmedStatus(packageId);
+
         log.info("保存打印信息成功，orderId={}, packageId={}", orderId, packageId);
     }
 
@@ -353,10 +363,33 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
         // 3. 先删关联文件行，再删产品行
         productFileService.removeByProductId(printInfoId);
         designProductService.removeById(printInfoId);
+
+        // 4. 打印信息变化，重置该数据包的指令单和图纸确认状态（is_confirmed=0）
+        resetConfirmedStatus(packageId);
+
         log.info("删除打印信息成功，printInfoId={}", printInfoId);
     }
 
     // ==================== 私有方法 ====================
+
+    /**
+     * 重置数据包下所有指令单和图纸的确认状态（打印信息变化时调用）
+     *
+     * @param packageId 数据包ID
+     */
+    private void resetConfirmedStatus(Long packageId) {
+        instructionMapper.update(null,
+                new LambdaUpdateWrapper<DesignInstructionEntity>()
+                        .eq(DesignInstructionEntity::getPackageId, packageId)
+                        .set(DesignInstructionEntity::getIsConfirmed, 0)
+                        .set(DesignInstructionEntity::getConfirmTime, null));
+        drawingMapper.update(null,
+                new LambdaUpdateWrapper<DesignDrawingEntity>()
+                        .eq(DesignDrawingEntity::getPackageId, packageId)
+                        .set(DesignDrawingEntity::getIsConfirmed, 0)
+                        .set(DesignDrawingEntity::getConfirmTime, null));
+        log.info("重置数据包确认状态成功，packageId={}", packageId);
+    }
 
     /**
      * 校验订单状态和操作权限（当前登录用户必须是该订单的设计师）

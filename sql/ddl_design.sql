@@ -148,6 +148,8 @@ CREATE TABLE design_instruction (
     revised_file_url    VARCHAR(512)    DEFAULT NULL COMMENT '修订版文件URL',
     generate_time       DATETIME        DEFAULT NULL COMMENT '生成时间',
     revised_upload_time DATETIME        DEFAULT NULL COMMENT '修订版上传时间',
+    is_confirmed        TINYINT         DEFAULT 0 COMMENT '指令单是否已确认（0=未确认，1=已确认；在线模式下生成/重新生成时重置为0，手动确认后置1；离线模式下上传修订版时自动置1）',
+    confirm_time        DATETIME        DEFAULT NULL COMMENT '确认时间',
     issuer_id           BIGINT          DEFAULT NULL COMMENT '指令人ID',
     issuer_name         VARCHAR(64)     DEFAULT NULL COMMENT '指令人姓名（冗余）',
     issue_date          DATE            DEFAULT NULL COMMENT '指令日期',

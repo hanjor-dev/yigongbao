@@ -18,8 +18,12 @@ import com.yigongbao.module.design.dto.SavePrintInfoDTO;
 import com.yigongbao.module.design.dto.SavePrintInfoItemDTO;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignPackageFileEntity;
+import com.yigongbao.module.design.entity.DesignDrawingEntity;
+import com.yigongbao.module.design.entity.DesignInstructionEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignProductFileEntity;
+import com.yigongbao.module.design.mapper.DesignDrawingMapper;
+import com.yigongbao.module.design.mapper.DesignInstructionMapper;
 import com.yigongbao.module.design.service.DesignPackageFileService;
 import com.yigongbao.module.design.service.DesignPackageService;
 import com.yigongbao.module.design.service.DesignProductFileService;
@@ -72,6 +76,8 @@ class DesignPrintInfoServiceImplTest {
     @Mock private DesignProductService designProductService;
     @Mock private DesignProductFileService productFileService;
     @Mock private DictService dictService;
+    @Mock private DesignInstructionMapper instructionMapper;
+    @Mock private DesignDrawingMapper drawingMapper;
 
     @InjectMocks
     private DesignPrintInfoServiceImpl printInfoService;
@@ -96,6 +102,8 @@ class DesignPrintInfoServiceImplTest {
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "");
         TableInfoHelper.initTableInfo(assistant, DesignProductEntity.class);
         TableInfoHelper.initTableInfo(assistant, DesignPackageFileEntity.class);
+        TableInfoHelper.initTableInfo(assistant, DesignInstructionEntity.class);
+        TableInfoHelper.initTableInfo(assistant, DesignDrawingEntity.class);
     }
 
     @BeforeEach
@@ -282,6 +290,30 @@ class DesignPrintInfoServiceImplTest {
                 verify(designProductService, times(1)).saveBatch(any());
                 verify(productFileService, times(1)).saveBatch(any());
                 verify(packageService, times(1)).updateById(any());
+                verify(instructionMapper, times(1)).update(isNull(), any(Wrapper.class));
+                verify(drawingMapper, times(1)).update(isNull(), any(Wrapper.class));
+            }
+        }
+
+        @Test
+        @DisplayName("保存打印信息后重置指令单和图纸的确认状态")
+        void savePrintInfo_shouldResetConfirmedStatus() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(DESIGNER_ID);
+                when(orderMainService.getById(ORDER_ID)).thenReturn(designInProgressOrder);
+                when(packageService.getById(PACKAGE_ID)).thenReturn(testPackage);
+                when(designProductService.list(any(Wrapper.class))).thenReturn(List.of());
+                when(designProductService.remove(any(Wrapper.class))).thenReturn(true);
+                when(packageService.updateById(any())).thenReturn(true);
+
+                SavePrintInfoDTO dto = new SavePrintInfoDTO();
+                dto.setProductMark("LGC");
+                dto.setItems(Collections.emptyList());
+                printInfoService.savePrintInfo(ORDER_ID, PACKAGE_ID, dto);
+
+                // 确认状态被重置
+                verify(instructionMapper, times(1)).update(isNull(), any(Wrapper.class));
+                verify(drawingMapper, times(1)).update(isNull(), any(Wrapper.class));
             }
         }
 
@@ -398,6 +430,30 @@ class DesignPrintInfoServiceImplTest {
                 // 验证先删文件关联，再删产品行
                 verify(productFileService, times(1)).removeByProductId(1L);
                 verify(designProductService, times(1)).removeById(1L);
+                verify(instructionMapper, times(1)).update(isNull(), any(Wrapper.class));
+                verify(drawingMapper, times(1)).update(isNull(), any(Wrapper.class));
+            }
+        }
+
+        @Test
+        @DisplayName("删除打印信息后重置指令单和图纸的确认状态")
+        void deletePrintInfo_shouldResetConfirmedStatus() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(DESIGNER_ID);
+                when(orderMainService.getById(ORDER_ID)).thenReturn(designInProgressOrder);
+
+                DesignProductEntity entity = new DesignProductEntity();
+                entity.setId(2L);
+                entity.setOrderId(ORDER_ID);
+                entity.setPackageId(PACKAGE_ID);
+                when(designProductService.getById(2L)).thenReturn(entity);
+                when(designProductService.removeById(2L)).thenReturn(true);
+                doNothing().when(productFileService).removeByProductId(2L);
+
+                printInfoService.deletePrintInfo(ORDER_ID, PACKAGE_ID, 2L);
+
+                verify(instructionMapper, times(1)).update(isNull(), any(Wrapper.class));
+                verify(drawingMapper, times(1)).update(isNull(), any(Wrapper.class));
             }
         }
     }

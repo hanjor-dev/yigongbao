@@ -69,4 +69,30 @@ public interface DesignDocService {
      * @param file      修订版文件
      */
     void uploadRevisedDrawing(Long orderId, Long packageId, Long id, MultipartFile file);
+
+    /**
+     * 确认图纸（在线模式专用）
+     * <p>
+     * 在线模式下，设计师预览生成的图纸满意后调用此接口，将 is_confirmed 置为 1。
+     * 离线模式下无需调用（上传修订版时自动确认）。
+     * </p>
+     *
+     * @param orderId   订单ID
+     * @param packageId 数据包ID
+     * @param id        图纸记录ID
+     */
+    void confirmDrawing(Long orderId, Long packageId, Long id);
+
+    /**
+     * 确认指令单（在线模式专用）
+     * <p>
+     * 在线模式下，设计师确认生成的指令单内容无误后调用此接口，将 is_confirmed 置为 1。
+     * 离线模式下无需调用（上传修订版时自动确认）。
+     * </p>
+     *
+     * @param orderId   订单ID
+     * @param packageId 数据包ID
+     * @param id        指令单记录ID
+     */
+    void confirmInstruction(Long orderId, Long packageId, Long id);
 }

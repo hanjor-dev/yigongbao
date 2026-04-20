@@ -105,4 +105,16 @@ public class DesignDrawingEntity extends BaseEntity {
      * 审核日期
      */
     private LocalDate auditDate;
+
+    /**
+     * 图纸是否已确认（0=未确认，1=已确认）
+     * 在线模式：生成/重新生成时重置为0，设计师手动确认后置1
+     * 离线模式：上传修订版时自动置1
+     */
+    private Integer isConfirmed;
+
+    /**
+     * 确认时间
+     */
+    private LocalDateTime confirmTime;
 }
