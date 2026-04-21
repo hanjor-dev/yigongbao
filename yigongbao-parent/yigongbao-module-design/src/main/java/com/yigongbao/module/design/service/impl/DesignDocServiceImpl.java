@@ -6,7 +6,6 @@ import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
-import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -18,7 +17,6 @@ import com.yigongbao.module.design.entity.DesignInstructionEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignProductFileEntity;
-import com.yigongbao.module.design.enums.DesignModeEnum;
 import com.yigongbao.module.design.helper.DrawingExcelBuilder;
 import com.yigongbao.module.design.helper.InstructionExcelBuilder;
 import com.yigongbao.module.design.service.DesignDocService;
@@ -31,7 +29,6 @@ import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.vo.DesignDocVersionVO;
 import com.yigongbao.module.design.vo.DocItemVO;
 import com.yigongbao.module.order.service.OrderMainService;
-import com.yigongbao.module.system.config.service.ConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -69,7 +66,6 @@ public class DesignDocServiceImpl implements DesignDocService {
     private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
     private final DesignScreenshotService screenshotService;
-    private final ConfigService configService;
 
     /**
      * 生成指令单
@@ -129,7 +125,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         }
 
         // 6. 上传文件
-        String filename = instructionCode + ".xlsx";
+        String filename = "指令单-" + pkg.getPackageCode() + ".xlsx";
         FileVO instrFile = fileService.uploadBytes(instrBytes, filename, FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
 
         // 7. 新建记录或更新模板文件
@@ -233,8 +229,8 @@ public class DesignDocServiceImpl implements DesignDocService {
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
 
-        // 7. 上传文件（version 中含 / 不能直接用于文件名，替换为 -）
-        String filename = pkg.getPackageCode() + "-图纸-" + version.replace("/", "-") + ".xlsx";
+        // 7. 上传文件
+        String filename = "图纸-" + pkg.getPackageCode() + ".xlsx";
         FileVO drawFile = fileService.uploadBytes(drawBytes, filename, FileBizTypeEnum.DRAWING_FILE.getDictCode());
 
         // 8. 新建记录或更新模板文件
@@ -316,17 +312,15 @@ public class DesignDocServiceImpl implements DesignDocService {
             throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
         }
         FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
+        LocalDateTime uploadTime = LocalDateTime.now();
         entity.setRevisedFileId(fileVO.getId());
         entity.setRevisedFileUrl(fileVO.getFileUrl());
-        entity.setRevisedUploadTime(LocalDateTime.now());
-        // 离线模式：上传修订版即视为已确认；在线模式：需设计师手动确认
-        if (!DesignModeEnum.ONLINE.getCode().equals(getDesignMode())) {
-            entity.setIsConfirmed(1);
-            entity.setConfirmTime(LocalDateTime.now());
-            log.info("离线模式，上传修订版指令单自动确认，id={}", id);
-        }
+        entity.setRevisedUploadTime(uploadTime);
+        // 上传修订版本身即代表设计师已审阅，无论在线/离线模式均自动确认
+        entity.setIsConfirmed(1);
+        entity.setConfirmTime(uploadTime);
         instructionService.updateById(entity);
-        log.info("上传修订版指令单成功，id={}", id);
+        log.info("上传修订版指令单成功，已自动确认，id={}", id);
     }
 
     /**
@@ -347,17 +341,15 @@ public class DesignDocServiceImpl implements DesignDocService {
             throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
         }
         FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.DRAWING_FILE.getDictCode());
+        LocalDateTime uploadTime = LocalDateTime.now();
         entity.setRevisedFileId(fileVO.getId());
         entity.setRevisedFileUrl(fileVO.getFileUrl());
-        entity.setRevisedUploadTime(LocalDateTime.now());
-        // 离线模式：上传修订版即视为已确认；在线模式：需设计师手动确认
-        if (!DesignModeEnum.ONLINE.getCode().equals(getDesignMode())) {
-            entity.setIsConfirmed(1);
-            entity.setConfirmTime(LocalDateTime.now());
-            log.info("离线模式，上传修订版图纸自动确认，id={}", id);
-        }
+        entity.setRevisedUploadTime(uploadTime);
+        // 上传修订版本身即代表设计师已审阅，无论在线/离线模式均自动确认
+        entity.setIsConfirmed(1);
+        entity.setConfirmTime(uploadTime);
         drawingService.updateById(entity);
-        log.info("上传修订版图纸成功，id={}", id);
+        log.info("上传修订版图纸成功，已自动确认，id={}", id);
     }
 
     /**
@@ -483,19 +475,6 @@ public class DesignDocServiceImpl implements DesignDocService {
             }
         }
         return result;
-    }
-
-    /**
-     * 从系统配置读取当前设计模式，null 视为离线模式（保守处理）
-     */
-    private Integer getDesignMode() {
-        try {
-            String modeStr = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_MODE.getKey());
-            return modeStr != null ? Integer.parseInt(modeStr) : null;
-        } catch (Exception e) {
-            log.warn("读取设计模式配置失败，默认使用线下模式", e);
-            return null;
-        }
     }
 
     /**

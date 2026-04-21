@@ -29,13 +29,13 @@ public class SubmitCheckVO {
     /** 是否已上传设计报告 */
     private Boolean hasReport;
 
-    /** 是否已上传修订版指令单和图纸（所有数据包，仅线下模式时校验） */
+    /** 是否已上传修订版指令单和图纸（保留字段，提交校验已改为检查 isConfirmed，此字段始终为 true） */
     private Boolean hasRevisedDocs;
 
-    /** 是否已确认图纸（所有数据包，仅在线模式时校验） */
+    /** 是否已确认图纸（所有数据包最新版图纸 is_confirmed=1，上传修订版或手动确认均可满足） */
     private Boolean hasDrawingConfirmed;
 
-    /** 是否已确认指令单（所有数据包，仅在线模式时校验） */
+    /** 是否已确认指令单（所有数据包最新版指令单 is_confirmed=1，上传修订版或手动确认均可满足） */
     private Boolean hasInstructionConfirmed;
 
     /** 是否可以提交（全部为 true 时才为 true） */

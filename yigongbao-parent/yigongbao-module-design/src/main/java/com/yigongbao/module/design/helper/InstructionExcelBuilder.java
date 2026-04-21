@@ -161,16 +161,23 @@ public class InstructionExcelBuilder {
             // 3. 清除产品数据区合并（row7-24，共18行）
             removeMergedRegionsInRows(sheet, DATA_ROW_START, DATA_ROW_END);
 
-            // 4. 若产品行数 > 18，需要下移后续行腾出空间
+            // 4. 行样式处理：超出原始18行时下移后续行，新建行复制模板样式；
+            //    原始区域内 row8-24（index 1-17）是模板合并占位行，也需应用 row7（index 0）的样式
             int lastRow = sheet.getLastRowNum();
+            Row templateRow = sheet.getRow(DATA_ROW_START);
             if (n > DATA_ROW_ORIGINAL_COUNT) {
                 int extra = n - DATA_ROW_ORIGINAL_COUNT;
                 sheet.shiftRows(DATA_ROW_END + 1, lastRow, extra);
-                Row templateRow = sheet.getRow(DATA_ROW_START);
                 for (int i = DATA_ROW_ORIGINAL_COUNT; i < n; i++) {
                     Row newRow = sheet.createRow(DATA_ROW_START + i);
                     copyRowFull(newRow, templateRow, 9);
                 }
+            }
+            // 原始区域内非首行（index 1 ~ min(n,18)-1）是合并占位行，无独立单元格样式，需应用首行样式
+            for (int i = 1; i < Math.min(n, DATA_ROW_ORIGINAL_COUNT); i++) {
+                Row r = sheet.getRow(DATA_ROW_START + i);
+                if (r == null) r = sheet.createRow(DATA_ROW_START + i);
+                copyRowFull(r, templateRow, 9);
             }
 
             // 5. 逐行写入产品数据（从 DATA_ROW_START 开始）

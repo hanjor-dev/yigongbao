@@ -1533,6 +1533,7 @@ CREATE TABLE design_review (
 -- ============================================================
 -- 部位颜色透明度配置表（从 image-3d-ai 迁移，新增 opacity 字段）
 -- ============================================================
+DROP TABLE IF EXISTS part_colors;
 CREATE TABLE part_colors
 (
     id          INT AUTO_INCREMENT PRIMARY KEY,

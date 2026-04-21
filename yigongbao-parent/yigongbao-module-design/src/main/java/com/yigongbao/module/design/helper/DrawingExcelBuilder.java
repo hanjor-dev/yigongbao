@@ -3,6 +3,7 @@ package com.yigongbao.module.design.helper;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -145,6 +146,10 @@ public class DrawingExcelBuilder {
                         ProductRow row = rows.get(rowIdx);
                         setCell(sheet, coord[0], coord[1], stripExtension(row.getPackageFileName())); // 文件名（去后缀）
                         setCell(sheet, coord[2], coord[3], strOrEmpty(row.getProductName()));         // 产品名
+                        // 槽2+ 的产品名单元格在模板中没有预设合并区域，需手动补充（与下一列合并，对齐槽1布局）
+                        if (slot > 0) {
+                            mergeIfAbsent(sheet, coord[2], coord[3], coord[2], coord[3] + 1);
+                        }
                         // 嵌入截图（如果有）
                         if (row.getScreenshotBytes() != null && row.getScreenshotBytes().length > 0) {
                             insertSlotImage((XSSFSheet) sheet, (XSSFWorkbook) wb, coord, row.getScreenshotBytes());
@@ -225,6 +230,18 @@ public class DrawingExcelBuilder {
         Cell cell = row.getCell(colIdx);
         if (cell == null) cell = row.createCell(colIdx);
         cell.setCellValue(value != null ? value : "");
+    }
+
+    /** 若指定区域尚未有合并区域则添加，避免重复合并报错（cloneSheet 会保留已有合并） */
+    private void mergeIfAbsent(Sheet sheet, int firstRow, int firstCol, int lastRow, int lastCol) {
+        for (int i = 0; i < sheet.getNumMergedRegions(); i++) {
+            CellRangeAddress r = sheet.getMergedRegion(i);
+            if (r.getFirstRow() == firstRow && r.getFirstColumn() == firstCol
+                    && r.getLastRow() == lastRow && r.getLastColumn() == lastCol) {
+                return; // 已存在
+            }
+        }
+        sheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, firstCol, lastCol));
     }
 
     private String strOrEmpty(String s) {

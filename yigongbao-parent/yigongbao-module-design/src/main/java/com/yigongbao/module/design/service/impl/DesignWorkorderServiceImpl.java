@@ -28,7 +28,6 @@ import com.yigongbao.module.design.entity.DesignModelEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignReviewEntity;
-import com.yigongbao.module.design.enums.DesignModeEnum;
 import com.yigongbao.module.design.helper.DesignQueryHelper;
 import com.yigongbao.module.design.mapper.DesignDrawingMapper;
 import com.yigongbao.module.design.mapper.DesignInstructionMapper;
@@ -604,10 +603,14 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
 
     /**
      * 构建提交校验状态
-     * 依次检查：数据包 → 打印信息 → 指令单 → 图纸 → 可视化模型 → 设计报告 → 修订版文件（线下模式）
+     * 依次检查：数据包 → 打印信息 → 指令单 → 图纸 → 可视化模型 → 设计报告 → 图纸确认 → 指令单确认
+     * <p>
+     * 确认可通过两种路径实现：手动调用 confirm 接口（在线），或上传修订版文件（自动确认）。
+     * 后端不区分模式，统一检查 is_confirmed 字段。
+     * </p>
      *
      * @param orderId    订单ID
-     * @param designMode 设计模式（1-线下修改，2-在线编辑，null 视为线下）
+     * @param designMode 设计模式（前端展示用，后端校验不依赖此值）
      */
     private SubmitCheckVO buildSubmitCheck(Long orderId, Integer designMode) {
         SubmitCheckVO check = new SubmitCheckVO();
@@ -671,86 +674,47 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         long reportCount = fileService.listByBiz(FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId).size();
         check.setHasReport(reportCount > 0);
 
-        // 7. 修订版文件：线下模式下每个数据包的指令单和图纸都必须有 revised_file_id
-        // designMode=null 视为线下模式（保守处理）
-        boolean isOfflineMode = !DesignModeEnum.ONLINE.getCode().equals(designMode);
-        if (isOfflineMode && !packages.isEmpty()) {
-            // 取每包的最新版指令单（按 version_seq 倒序，putIfAbsent 保留第一个即最新版本）
-            List<DesignInstructionEntity> allInstructions = designInstructionMapper.selectList(
-                    new LambdaQueryWrapper<DesignInstructionEntity>()
-                            .in(DesignInstructionEntity::getPackageId, packageIds)
-                            .eq(DesignInstructionEntity::getIsDeleted, StatusConstants.NOT_DELETED)
-                            .orderByDesc(DesignInstructionEntity::getVersionSeq));
-            Map<Long, DesignInstructionEntity> latestInstructionByPkg = new java.util.LinkedHashMap<>();
-            for (DesignInstructionEntity inst : allInstructions) {
-                latestInstructionByPkg.putIfAbsent(inst.getPackageId(), inst);
-            }
+        // 7. 修订版文件校验已废弃——上传修订版和手动确认两条路径均会置 is_confirmed=1，
+        //    提交校验直接检查 isConfirmed，不再单独检查 revisedFileId
+        check.setHasRevisedDocs(true);
 
-            // 取每包的最新版图纸
-            List<DesignDrawingEntity> allDrawings = designDrawingMapper.selectList(
-                    new LambdaQueryWrapper<DesignDrawingEntity>()
-                            .in(DesignDrawingEntity::getPackageId, packageIds)
-                            .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED)
-                            .orderByDesc(DesignDrawingEntity::getVersionSeq));
-            Map<Long, DesignDrawingEntity> latestDrawingByPkg = new java.util.LinkedHashMap<>();
-            for (DesignDrawingEntity drawing : allDrawings) {
-                latestDrawingByPkg.putIfAbsent(drawing.getPackageId(), drawing);
-            }
-
-            boolean allInstructionRevised = packageIds.stream().allMatch(pkgId -> {
-                DesignInstructionEntity inst = latestInstructionByPkg.get(pkgId);
-                return inst != null && StrUtil.isNotBlank(inst.getRevisedFileId());
-            });
-            boolean allDrawingRevised = packageIds.stream().allMatch(pkgId -> {
-                DesignDrawingEntity drawing = latestDrawingByPkg.get(pkgId);
-                return drawing != null && StrUtil.isNotBlank(drawing.getRevisedFileId());
-            });
-            check.setHasRevisedDocs(allInstructionRevised && allDrawingRevised);
-        } else {
-            // 在线模式或无数据包，跳过修订版校验
-            check.setHasRevisedDocs(true);
-        }
-
-        // 8. 图纸确认状态：在线模式下每个数据包的最新版图纸都必须已确认（is_confirmed=1）
-        if (DesignModeEnum.ONLINE.getCode().equals(designMode) && !packages.isEmpty()) {
-            // 复用已查询的最新版图纸（在线模式走 else 分支，需重新查询）
+        // 8. 图纸确认状态：所有数据包的最新版图纸都必须已确认（is_confirmed=1）
+        if (!packages.isEmpty()) {
             List<DesignDrawingEntity> allDrawingsForConfirm = designDrawingMapper.selectList(
                     new LambdaQueryWrapper<DesignDrawingEntity>()
                             .in(DesignDrawingEntity::getPackageId, packageIds)
                             .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED)
                             .orderByDesc(DesignDrawingEntity::getVersionSeq));
-            Map<Long, DesignDrawingEntity> latestDrawingByPkgForConfirm = new java.util.LinkedHashMap<>();
+            Map<Long, DesignDrawingEntity> latestDrawingByPkg = new java.util.LinkedHashMap<>();
             for (DesignDrawingEntity drawing : allDrawingsForConfirm) {
-                latestDrawingByPkgForConfirm.putIfAbsent(drawing.getPackageId(), drawing);
+                latestDrawingByPkg.putIfAbsent(drawing.getPackageId(), drawing);
             }
-            boolean allConfirmed = packageIds.stream().allMatch(pkgId -> {
-                DesignDrawingEntity drawing = latestDrawingByPkgForConfirm.get(pkgId);
+            boolean allDrawingConfirmed = packageIds.stream().allMatch(pkgId -> {
+                DesignDrawingEntity drawing = latestDrawingByPkg.get(pkgId);
                 return drawing != null && Integer.valueOf(1).equals(drawing.getIsConfirmed());
             });
-            check.setHasDrawingConfirmed(allConfirmed);
+            check.setHasDrawingConfirmed(allDrawingConfirmed);
         } else {
-            // 离线模式或无数据包，跳过图纸确认校验
             check.setHasDrawingConfirmed(true);
         }
 
-        // 9. 指令单确认状态：在线模式下每个数据包的最新版指令单都必须已确认（is_confirmed=1）
-        if (DesignModeEnum.ONLINE.getCode().equals(designMode) && !packages.isEmpty()) {
+        // 9. 指令单确认状态：所有数据包的最新版指令单都必须已确认（is_confirmed=1）
+        if (!packages.isEmpty()) {
             List<DesignInstructionEntity> allInstructionsForConfirm = designInstructionMapper.selectList(
                     new LambdaQueryWrapper<DesignInstructionEntity>()
                             .in(DesignInstructionEntity::getPackageId, packageIds)
                             .eq(DesignInstructionEntity::getIsDeleted, StatusConstants.NOT_DELETED)
                             .orderByDesc(DesignInstructionEntity::getVersionSeq));
-            Map<Long, DesignInstructionEntity> latestInstructionByPkgForConfirm = new java.util.LinkedHashMap<>();
+            Map<Long, DesignInstructionEntity> latestInstructionByPkg = new java.util.LinkedHashMap<>();
             for (DesignInstructionEntity inst : allInstructionsForConfirm) {
-                latestInstructionByPkgForConfirm.putIfAbsent(inst.getPackageId(), inst);
+                latestInstructionByPkg.putIfAbsent(inst.getPackageId(), inst);
             }
             boolean allInstructionConfirmed = packageIds.stream().allMatch(pkgId -> {
-                DesignInstructionEntity inst = latestInstructionByPkgForConfirm.get(pkgId);
+                DesignInstructionEntity inst = latestInstructionByPkg.get(pkgId);
                 return inst != null && Integer.valueOf(1).equals(inst.getIsConfirmed());
             });
             check.setHasInstructionConfirmed(allInstructionConfirmed);
         } else {
-            // 离线模式或无数据包，跳过指令单确认校验
             check.setHasInstructionConfirmed(true);
         }
 
@@ -791,8 +755,8 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     }
 
     /**
-     * 从系统配置中读取当前设计模式
-     * 返回 {@link DesignModeEnum#getCode()}，null 视为线下模式
+     * 从系统配置中读取当前设计模式，供前端展示 viewer 入口等 UI 决策使用
+     * 后端提交校验不依赖此值，返回 null 时前端降级为离线 UI
      */
     private Integer getDesignMode() {
         try {

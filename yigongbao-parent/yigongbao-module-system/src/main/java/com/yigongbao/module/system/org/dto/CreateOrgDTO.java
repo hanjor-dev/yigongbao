@@ -33,7 +33,7 @@ public class CreateOrgDTO {
     /**
      * 所属地区ID
      */
-    @NotBlank(message = "地区不能为空")
+    @NotNull(message = "地区不能为空")
     private Long areaId;
 
     /**
