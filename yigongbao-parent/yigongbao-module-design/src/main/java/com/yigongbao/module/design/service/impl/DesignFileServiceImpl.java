@@ -146,10 +146,17 @@ public class DesignFileServiceImpl implements DesignFileService {
         packageService.save(packageEntity);
         log.info("数据包记录保存成功, packageId={}, packageCode={}", packageEntity.getId(), packageCode);
 
-        // 11. 保存包内文件记录
+        // 11. 逐文件上传内部文件到 OSS，并保存包内文件记录
         List<DesignPackageFileEntity> fileEntities = new ArrayList<>();
         int sortOrder = 1;
         for (ArchiveFileInfo archiveFile : archiveFiles) {
+            // 将包内文件独立上传到 OSS，获取独立访问 URL
+            FileVO innerFileVO = fileService.uploadBytes(
+                    archiveFile.getFileContent(),
+                    archiveFile.getFileName(),
+                    FileBizTypeEnum.PACKAGE_FILE.getDictCode());
+            log.info("包内文件上传成功, fileName={}, fileId={}", archiveFile.getFileName(), innerFileVO.getId());
+
             DesignPackageFileEntity fileEntity = new DesignPackageFileEntity();
             fileEntity.setPackageId(packageEntity.getId());
             fileEntity.setFileName(archiveFile.getFileName());
@@ -157,6 +164,8 @@ public class DesignFileServiceImpl implements DesignFileService {
             fileEntity.setFilePath(archiveFile.getFilePath());
             fileEntity.setFileSize(archiveFile.getFileSize());
             fileEntity.setSortOrder(sortOrder++);
+            fileEntity.setFileId(innerFileVO.getId());
+            fileEntity.setFileUrl(innerFileVO.getFileUrl());
             fileEntities.add(fileEntity);
         }
         // 批量插入
@@ -198,15 +207,25 @@ public class DesignFileServiceImpl implements DesignFileService {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_HAS_DOCS);
         }
 
-        // 4. 删除包内文件记录
+        // 4. 删除包内文件的独立 OSS 存储（先查出文件ID，再批量删除）
+        List<DesignPackageFileEntity> innerFiles = packageFileService.list(
+                new LambdaQueryWrapper<DesignPackageFileEntity>()
+                        .eq(DesignPackageFileEntity::getPackageId, packageId)
+                        .isNotNull(DesignPackageFileEntity::getFileId));
+        for (DesignPackageFileEntity innerFile : innerFiles) {
+            fileService.deleteById(innerFile.getFileId());
+        }
+        log.info("包内文件 OSS 存储删除完成, count={}", innerFiles.size());
+
+        // 5. 删除包内文件记录
         packageFileService.remove(
                 new LambdaQueryWrapper<DesignPackageFileEntity>()
                         .eq(DesignPackageFileEntity::getPackageId, packageId));
 
-        // 5. 删除数据包记录
+        // 6. 删除数据包记录
         packageService.removeById(packageId);
 
-        // 6. 删除存储的压缩包文件
+        // 7. 删除存储的压缩包文件
         fileService.deleteById(packageEntity.getFileId());
 
         log.info("数据包删除成功, packageId={}", packageId);
@@ -280,6 +299,7 @@ public class DesignFileServiceImpl implements DesignFileService {
                     vo.setFilePath(f.getFilePath());
                     vo.setFileSize(f.getFileSize());
                     vo.setSortOrder(f.getSortOrder());
+                    vo.setFileUrl(f.getFileUrl());
                     return vo;
                 })
                 .collect(Collectors.toList());
@@ -532,6 +552,7 @@ public class DesignFileServiceImpl implements DesignFileService {
                     fileVO.setFileSize(f.getFileSize());
                     fileVO.setSortOrder(f.getSortOrder());
                     fileVO.setHasPrintInfo(filledFileIds.contains(f.getId()));
+                    fileVO.setFileUrl(f.getFileUrl());
                     return fileVO;
                 })
                 .collect(Collectors.toList());

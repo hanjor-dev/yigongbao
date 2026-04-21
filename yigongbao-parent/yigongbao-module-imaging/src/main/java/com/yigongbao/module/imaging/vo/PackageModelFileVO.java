@@ -27,6 +27,9 @@ public class PackageModelFileVO {
     @Schema(description = "包内相对路径")
     private String filePath;
 
+    @Schema(description = "包内文件独立 OSS 访问地址（可直接用于 3D 模型渲染，null 表示旧数据未迁移）")
+    private String fileUrl;
+
     @Schema(description = "文件大小（字节）")
     private Long fileSize;
 

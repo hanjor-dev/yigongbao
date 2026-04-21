@@ -78,4 +78,14 @@ public class DesignPackageVO implements Serializable {
      * 包内文件列表
      */
     private List<DesignPackageFileVO> files;
+
+    /**
+     * 最新版指令单（无则为 null）
+     */
+    private DesignDocVersionVO latestInstruction;
+
+    /**
+     * 最新版图纸（无则为 null）
+     */
+    private DesignDocVersionVO latestDrawing;
 }

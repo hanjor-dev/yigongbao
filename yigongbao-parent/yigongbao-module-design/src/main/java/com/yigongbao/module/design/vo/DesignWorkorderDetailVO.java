@@ -1,5 +1,7 @@
 package com.yigongbao.module.design.vo;
 
+import com.yigongbao.module.basic.file.vo.FileVO;
+import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -73,6 +75,23 @@ public class DesignWorkorderDetailVO {
 
     // ==================== 提交校验状态 ====================
     private SubmitCheckVO submitCheck;
+
+    // ==================== 订单影像文件（订单阶段上传） ====================
+    /** 影像数据文件列表（CT/MRI等，fileCategory=10.1） */
+    private List<OrderDetailVO.OrderFileVO> imageDataFiles;
+
+    /** 影像报告文件列表（fileCategory=10.2） */
+    private List<OrderDetailVO.OrderFileVO> imageReportFiles;
+
+    // ==================== 设计阶段文件 ====================
+    /** 打印文件数据包列表（含包内文件及最新版指令单/图纸） */
+    private List<DesignPackageVO> packageList;
+
+    /** 可视化模型列表 */
+    private List<DesignModelVO> modelList;
+
+    /** 设计报告（无则为 null） */
+    private FileVO report;
 
     @Data
     public static class RebuildProjectItemVO {

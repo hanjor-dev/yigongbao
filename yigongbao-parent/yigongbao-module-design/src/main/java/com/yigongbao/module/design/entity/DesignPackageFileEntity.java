@@ -47,4 +47,14 @@ public class DesignPackageFileEntity extends BaseEntity {
      * 排序序号
      */
     private Integer sortOrder;
+
+    /**
+     * 包内文件在 OSS 的文件ID（file_detail.id）
+     */
+    private String fileId;
+
+    /**
+     * 包内文件独立 OSS 访问地址
+     */
+    private String fileUrl;
 }

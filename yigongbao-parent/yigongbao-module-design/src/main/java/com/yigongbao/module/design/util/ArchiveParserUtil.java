@@ -25,7 +25,7 @@ import java.util.zip.ZipInputStream;
 
 /**
  * 压缩包解析工具类
- * 支持 ZIP/RAR/7Z 格式，仅读取文件列表元数据，不解压到磁盘
+ * 支持 ZIP/RAR/7Z/TAR 格式，读取文件列表元数据及文件内容，不解压到磁盘
  *
  * @author hanjor
  * @date 2026-04-15
@@ -88,7 +88,7 @@ public final class ArchiveParserUtil {
     }
 
     /**
-     * 解析 ZIP 格式
+     * 解析 ZIP 格式（同时读取文件内容，用于后续独立上传 OSS）
      */
     private static List<ArchiveFileInfo> parseZip(InputStream inputStream,
                                                    Set<String> allowedExtensions) throws IOException {
@@ -107,14 +107,19 @@ public final class ArchiveParserUtil {
                 // 按扩展名过滤
                 if (allowedExtensions != null && !allowedExtensions.isEmpty()
                         && !allowedExtensions.contains(ext)) {
+                    // 跳过此条目，但需要消费流，否则 getNextEntry 无法推进
+                    zis.transferTo(java.io.OutputStream.nullOutputStream());
                     continue;
                 }
 
+                // 读取文件内容（不调用 closeEntry，ZipInputStream.readAllBytes 不会关闭外层流）
+                byte[] content = zis.readAllBytes();
                 result.add(ArchiveFileInfo.builder()
                         .fileName(entryFileName)
                         .filePath(filePath)
-                        .fileSize(entry.getSize())
+                        .fileSize(entry.getSize() >= 0 ? entry.getSize() : (long) content.length)
                         .extension(ext)
+                        .fileContent(content)
                         .build());
             }
         }
@@ -122,7 +127,7 @@ public final class ArchiveParserUtil {
     }
 
     /**
-     * 解析 RAR 格式
+     * 解析 RAR 格式（同时读取文件内容，用于后续独立上传 OSS）
      */
     private static List<ArchiveFileInfo> parseRar(InputStream inputStream,
                                                    Set<String> allowedExtensions) throws Exception {
@@ -147,11 +152,17 @@ public final class ArchiveParserUtil {
                     continue;
                 }
 
+                // 直接从当前 Archive 实例提取当前条目内容，避免重复打开
+                ByteArrayOutputStream entryBaos = new ByteArrayOutputStream();
+                archive.extractFile(header, entryBaos);
+                byte[] content = entryBaos.toByteArray();
+
                 result.add(ArchiveFileInfo.builder()
                         .fileName(entryFileName)
                         .filePath(filePath)
                         .fileSize(header.getFullUnpackSize())
                         .extension(ext)
+                        .fileContent(content)
                         .build());
             }
         }
@@ -159,7 +170,7 @@ public final class ArchiveParserUtil {
     }
 
     /**
-     * 解析 7Z 格式
+     * 解析 7Z 格式（同时读取文件内容，用于后续独立上传 OSS）
      */
     private static List<ArchiveFileInfo> parse7z(InputStream inputStream,
                                                   Set<String> allowedExtensions) throws Exception {
@@ -183,14 +194,19 @@ public final class ArchiveParserUtil {
                 // 按扩展名过滤
                 if (allowedExtensions != null && !allowedExtensions.isEmpty()
                         && !allowedExtensions.contains(ext)) {
+                    // 跳过此条目，但需消费内容，否则流可能状态异常
+                    sevenZFile.getInputStream(entry).transferTo(java.io.OutputStream.nullOutputStream());
                     continue;
                 }
 
+                // 读取文件内容
+                byte[] content = sevenZFile.getInputStream(entry).readAllBytes();
                 result.add(ArchiveFileInfo.builder()
                         .fileName(entryFileName)
                         .filePath(filePath)
                         .fileSize(entry.getSize())
                         .extension(ext)
+                        .fileContent(content)
                         .build());
             }
         }
@@ -198,7 +214,7 @@ public final class ArchiveParserUtil {
     }
 
     /**
-     * 解析 TAR 格式
+     * 解析 TAR 格式（同时读取文件内容，用于后续独立上传 OSS）
      */
     private static List<ArchiveFileInfo> parseTar(InputStream inputStream,
                                                    Set<String> allowedExtensions) throws IOException {
@@ -217,14 +233,19 @@ public final class ArchiveParserUtil {
                 // 按扩展名过滤
                 if (allowedExtensions != null && !allowedExtensions.isEmpty()
                         && !allowedExtensions.contains(ext)) {
+                    // 跳过此条目，消费流内容以推进 TAR 读取位置
+                    tis.transferTo(java.io.OutputStream.nullOutputStream());
                     continue;
                 }
 
+                // 读取文件内容
+                byte[] content = tis.readAllBytes();
                 result.add(ArchiveFileInfo.builder()
                         .fileName(entryFileName)
                         .filePath(filePath)
                         .fileSize(entry.getRealSize())
                         .extension(ext)
+                        .fileContent(content)
                         .build());
             }
         }

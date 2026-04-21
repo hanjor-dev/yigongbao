@@ -20,6 +20,7 @@ import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.module.basic.file.service.FileService;
+import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
 import com.yigongbao.module.design.dto.SaveDesignColumnConfigDTO;
 import com.yigongbao.module.design.entity.DesignDrawingEntity;
@@ -35,14 +36,22 @@ import com.yigongbao.module.design.mapper.DesignModelMapper;
 import com.yigongbao.module.design.mapper.DesignPackageMapper;
 import com.yigongbao.module.design.mapper.DesignProductMapper;
 import com.yigongbao.module.design.mapper.DesignReviewMapper;
+import com.yigongbao.module.design.service.DesignDocService;
+import com.yigongbao.module.design.service.DesignFileService;
 import com.yigongbao.module.design.service.DesignWorkorderService;
 import com.yigongbao.module.design.vo.DesignColumnConfigVO;
+import com.yigongbao.module.design.vo.DesignDocVersionVO;
+import com.yigongbao.module.design.vo.DesignModelVO;
+import com.yigongbao.module.design.vo.DesignPackageVO;
 import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
 import com.yigongbao.module.design.vo.DesignWorkorderListVO;
 import com.yigongbao.module.design.vo.SubmitCheckVO;
+import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
+import com.yigongbao.module.order.mapper.OrderFileMapper;
 import com.yigongbao.module.order.service.OrderItemService;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserHospitalService;
@@ -53,6 +62,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -86,6 +96,9 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     private final ConfigService configService;
     private final ObjectMapper objectMapper;
     private final FlowFacade flowFacade;
+    private final DesignFileService designFileService;
+    private final DesignDocService designDocService;
+    private final OrderFileMapper orderFileMapper;
 
     /**
      * 分页查询设计工单列表
@@ -230,6 +243,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         Integer designMode = getDesignMode();
         vo.setDesignMode(designMode);
         vo.setSubmitCheck(buildSubmitCheck(orderId, designMode));
+
+        // 订单影像文件（订单阶段上传）
+        fillOrderImageFiles(vo, orderId);
+
+        // 设计阶段文件（数据包、模型、报告）
+        fillDesignFiles(vo, orderId);
 
         return vo;
     }
@@ -460,6 +479,94 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     }
 
     // ==================== 私有辅助方法 ====================
+
+    /**
+     * 填充订单影像文件（影像数据 10.1 和影像报告 10.2）
+     * 从 order_file 表查询关联记录，再通过 fileService 批量获取文件详情
+     *
+     * @param vo      工单详情 VO
+     * @param orderId 订单ID
+     */
+    private void fillOrderImageFiles(DesignWorkorderDetailVO vo, Long orderId) {
+        List<OrderFileEntity> orderFiles = orderFileMapper.selectList(
+                new LambdaQueryWrapper<OrderFileEntity>()
+                        .eq(OrderFileEntity::getOrderId, orderId)
+                        .eq(OrderFileEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                        .orderByAsc(OrderFileEntity::getId));
+        if (orderFiles.isEmpty()) {
+            vo.setImageDataFiles(Collections.emptyList());
+            vo.setImageReportFiles(Collections.emptyList());
+            return;
+        }
+        // 批量查询文件详情，避免 N+1
+        List<String> fileIds = orderFiles.stream().map(OrderFileEntity::getFileId).collect(Collectors.toList());
+        List<FileVO> fileVOs = fileService.listByIds(fileIds);
+        Map<String, FileVO> fileVOMap = fileVOs.stream().collect(Collectors.toMap(FileVO::getId, f -> f));
+
+        List<OrderDetailVO.OrderFileVO> imageDataFiles = new ArrayList<>();
+        List<OrderDetailVO.OrderFileVO> imageReportFiles = new ArrayList<>();
+        for (OrderFileEntity orderFile : orderFiles) {
+            FileVO fileVO = fileVOMap.get(orderFile.getFileId());
+            if (fileVO == null) {
+                continue;
+            }
+            OrderDetailVO.OrderFileVO item = toOrderFileVO(orderFile, fileVO);
+            if (FileBizTypeEnum.IMAGE_DATA.getDictCode().equals(orderFile.getFileCategory())) {
+                imageDataFiles.add(item);
+            } else if (FileBizTypeEnum.IMAGE_REPORT.getDictCode().equals(orderFile.getFileCategory())) {
+                imageReportFiles.add(item);
+            }
+        }
+        vo.setImageDataFiles(imageDataFiles);
+        vo.setImageReportFiles(imageReportFiles);
+    }
+
+    /**
+     * 填充设计阶段文件：数据包列表（含包内文件 + 最新版指令单/图纸）、可视化模型、设计报告
+     *
+     * @param vo      工单详情 VO
+     * @param orderId 订单ID
+     */
+    private void fillDesignFiles(DesignWorkorderDetailVO vo, Long orderId) {
+        // 数据包列表（含包内文件）
+        List<DesignPackageVO> packages = designFileService.listPackages(orderId);
+
+        if (!packages.isEmpty()) {
+            // 批量获取最新版指令单和图纸，填入各包
+            Set<Long> packageIds = packages.stream().map(DesignPackageVO::getId).collect(Collectors.toSet());
+            Map<Long, DesignDocVersionVO> latestInstructions = designDocService.getLatestInstructionMap(packageIds);
+            Map<Long, DesignDocVersionVO> latestDrawings = designDocService.getLatestDrawingMap(packageIds);
+            for (DesignPackageVO pkg : packages) {
+                pkg.setLatestInstruction(latestInstructions.get(pkg.getId()));
+                pkg.setLatestDrawing(latestDrawings.get(pkg.getId()));
+            }
+        }
+        vo.setPackageList(packages);
+
+        // 可视化模型列表
+        vo.setModelList(designFileService.listModels(orderId));
+
+        // 设计报告
+        vo.setReport(designFileService.getReport(orderId));
+    }
+
+    /**
+     * OrderFileEntity + FileVO 转 OrderDetailVO.OrderFileVO
+     */
+    private OrderDetailVO.OrderFileVO toOrderFileVO(OrderFileEntity orderFile, FileVO fileVO) {
+        OrderDetailVO.OrderFileVO item = new OrderDetailVO.OrderFileVO();
+        item.setFileId(orderFile.getFileId());
+        item.setFileName(fileVO.getFileName());
+        item.setFileCategory(orderFile.getFileCategory());
+        FileBizTypeEnum biz = FileBizTypeEnum.getByDictCode(orderFile.getFileCategory());
+        item.setFileCategoryName(biz != null ? biz.getName() : null);
+        item.setFileUrl(fileVO.getFileUrl());
+        item.setThUrl(fileVO.getThUrl());
+        item.setFileSize(fileVO.getFileSize());
+        item.setFileSizeText(fileVO.getFileSizeText());
+        item.setFileExt(fileVO.getFileExt());
+        return item;
+    }
 
     /**
      * 将订单主表实体转换为工单列表 VO（不含批量填充字段）

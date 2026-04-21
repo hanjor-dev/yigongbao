@@ -42,4 +42,9 @@ public class ArchiveFileInfo implements Serializable {
      * 扩展名（小写，含点号，如 .stl）
      */
     private String extension;
+
+    /**
+     * 解压后的文件内容（字节数组），用于后续独立上传到 OSS
+     */
+    private byte[] fileContent;
 }

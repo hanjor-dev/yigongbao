@@ -1291,6 +1291,8 @@ CREATE TABLE design_package_file (
     file_path       VARCHAR(512)    DEFAULT NULL COMMENT '包内相对路径',
     file_size       BIGINT          DEFAULT NULL COMMENT '文件大小（字节）',
     sort_order      INT             DEFAULT 0 COMMENT '排序序号',
+    file_id         VARCHAR(64)     DEFAULT NULL COMMENT '包内文件在 OSS 的文件ID（file_detail.id）',
+    file_url        VARCHAR(1024)   DEFAULT NULL COMMENT '包内文件独立 OSS 访问地址',
 
     -- 公共字段
     create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

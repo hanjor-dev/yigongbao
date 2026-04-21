@@ -5,6 +5,7 @@ import com.yigongbao.module.design.vo.DocItemVO;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 指令单/图纸生成与管理服务接口
@@ -95,4 +96,22 @@ public interface DesignDocService {
      * @param id        指令单记录ID
      */
     void confirmInstruction(Long orderId, Long packageId, Long id);
+
+    /**
+     * 批量查询数据包最新版指令单（packageId → DesignDocVersionVO）
+     * 无记录的包不出现在结果 map 中
+     *
+     * @param packageIds 数据包ID集合
+     * @return key=packageId，value=最新版指令单 VO
+     */
+    Map<Long, DesignDocVersionVO> getLatestInstructionMap(java.util.Collection<Long> packageIds);
+
+    /**
+     * 批量查询数据包最新版图纸（packageId → DesignDocVersionVO）
+     * 无记录的包不出现在结果 map 中
+     *
+     * @param packageIds 数据包ID集合
+     * @return key=packageId，value=最新版图纸 VO
+     */
+    Map<Long, DesignDocVersionVO> getLatestDrawingMap(java.util.Collection<Long> packageIds);
 }

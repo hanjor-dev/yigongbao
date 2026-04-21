@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -590,5 +591,52 @@ public class DesignDocServiceImpl implements DesignDocService {
         vo.setIsConfirmed(entity.getIsConfirmed());
         vo.setConfirmTime(entity.getConfirmTime());
         return vo;
+    }
+
+    /**
+     * 批量查询数据包最新版指令单，返回 packageId → DesignDocVersionVO 映射
+     * 无记录的包不出现在结果 map 中，用于工单详情一次性填充所有数据包的指令单状态
+     *
+     * @param packageIds 数据包ID集合
+     * @return key=packageId，value=最新版指令单 VO
+     */
+    @Override
+    public Map<Long, DesignDocVersionVO> getLatestInstructionMap(Collection<Long> packageIds) {
+        if (packageIds == null || packageIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        // 查询所有相关指令单，按 versionSeq 倒序，取各包最新一条
+        List<DesignInstructionEntity> all = instructionService.list(
+                new LambdaQueryWrapper<DesignInstructionEntity>()
+                        .in(DesignInstructionEntity::getPackageId, packageIds)
+                        .orderByDesc(DesignInstructionEntity::getVersionSeq));
+        Map<Long, DesignDocVersionVO> result = new java.util.LinkedHashMap<>();
+        for (DesignInstructionEntity entity : all) {
+            result.putIfAbsent(entity.getPackageId(), toInstructionVersionVO(entity));
+        }
+        return result;
+    }
+
+    /**
+     * 批量查询数据包最新版图纸，返回 packageId → DesignDocVersionVO 映射
+     * 无记录的包不出现在结果 map 中，用于工单详情一次性填充所有数据包的图纸状态
+     *
+     * @param packageIds 数据包ID集合
+     * @return key=packageId，value=最新版图纸 VO
+     */
+    @Override
+    public Map<Long, DesignDocVersionVO> getLatestDrawingMap(Collection<Long> packageIds) {
+        if (packageIds == null || packageIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<DesignDrawingEntity> all = drawingService.list(
+                new LambdaQueryWrapper<DesignDrawingEntity>()
+                        .in(DesignDrawingEntity::getPackageId, packageIds)
+                        .orderByDesc(DesignDrawingEntity::getVersionSeq));
+        Map<Long, DesignDocVersionVO> result = new java.util.LinkedHashMap<>();
+        for (DesignDrawingEntity entity : all) {
+            result.putIfAbsent(entity.getPackageId(), toDrawingVersionVO(entity));
+        }
+        return result;
     }
 }

@@ -131,7 +131,12 @@ public enum FileBizTypeEnum {
     /**
      * 通用文件（无格式限制）
      */
-    COMMON("common", "10.17", "通用文件", null);
+    COMMON("common", "10.17", "通用文件", null),
+
+    /**
+     * 数据包内文件：3D 模型等压缩包内的单个文件，独立上传到 OSS 供影像调阅使用
+     */
+    PACKAGE_FILE("package_file", "10.19", "数据包内文件", null);
 
     /**
      * 枚举标识，用于存储路径前缀（如 "image_data"）

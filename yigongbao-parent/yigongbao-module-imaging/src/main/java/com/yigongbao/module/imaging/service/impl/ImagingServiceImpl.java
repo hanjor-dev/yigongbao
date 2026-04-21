@@ -304,6 +304,7 @@ public class ImagingServiceImpl implements ImagingService {
         vo.setFileName(f.getFileName());
         vo.setFileExt(f.getFileExt());
         vo.setFilePath(f.getFilePath());
+        vo.setFileUrl(f.getFileUrl());
         vo.setFileSize(f.getFileSize());
         // 使用 Hutool FileUtil.mainName() 去扩展名后，精确匹配颜色配置
         String nameWithoutExt = FileUtil.mainName(f.getFileName());
