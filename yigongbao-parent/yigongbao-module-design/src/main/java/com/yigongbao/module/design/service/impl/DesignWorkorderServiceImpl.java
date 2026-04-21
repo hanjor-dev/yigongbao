@@ -805,9 +805,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         long reportCount = fileService.listByBiz(FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId).size();
         check.setHasReport(reportCount > 0);
 
-        // 7. 修订版文件校验已废弃——上传修订版和手动确认两条路径均会置 is_confirmed=1，
-        //    提交校验直接检查 isConfirmed，不再单独检查 revisedFileId
-        check.setHasRevisedDocs(true);
+        // 7. 修订版文件校验已废弃——提交校验直接检查 isConfirmed（见下方步骤8/9）
 
         // 8. 图纸确认状态：所有数据包的最新版图纸都必须已确认（is_confirmed=1）
         if (!packages.isEmpty()) {
@@ -868,9 +866,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         } else if (!check.getHasReport()) {
             check.setCanSubmit(false);
             check.setBlockReason("请上传设计报告");
-        } else if (!Boolean.TRUE.equals(check.getHasRevisedDocs())) {
-            check.setCanSubmit(false);
-            check.setBlockReason("请上传修订版指令单和图纸");
         } else if (!Boolean.TRUE.equals(check.getHasDrawingConfirmed())) {
             check.setCanSubmit(false);
             check.setBlockReason("请确认图纸");

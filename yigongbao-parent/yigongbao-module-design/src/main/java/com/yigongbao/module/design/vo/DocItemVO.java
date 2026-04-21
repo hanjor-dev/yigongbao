@@ -27,4 +27,7 @@ public class DocItemVO {
 
     /** 生成时间 */
     private LocalDateTime generateTime;
+
+    /** 是否已确认（0=未确认，1=已确认）；上传修订版或手动确认后置1，重新生成时自动重置为0 */
+    private Integer isConfirmed;
 }

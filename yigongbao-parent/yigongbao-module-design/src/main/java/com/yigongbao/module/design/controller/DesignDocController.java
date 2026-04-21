@@ -8,6 +8,7 @@ import com.yigongbao.module.design.vo.DocItemVO;
 import com.yigongbao.module.design.vo.ScreenshotVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -15,12 +16,17 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 /**
- * 指令单/图纸生成与管理 Controller
+ * 指令单/图纸管理 Controller
+ * <p>
+ * 生成逻辑已内化为"按需自动生成"：
+ * - 线下模式：调用 download 接口，后端检测数据变化后按需生成并流式返回文件
+ * - 在线模式：调用 preview-url 接口，后端按需生成后返回可访问的 URL
+ * </p>
  *
  * @author hanjor
  * @date 2026-04-16
  */
-@Tag(name = "指令单/图纸管理", description = "设计阶段指令单和图纸的生成、版本查询、修订版上传（下载通过 GET /basic/file/download/{fileId}）")
+@Tag(name = "指令单/图纸管理", description = "设计阶段指令单和图纸的下载/预览（按需自动生成）、版本查询、修订版上传")
 @RestController
 @RequestMapping("/design/workorder")
 @RequiredArgsConstructor
@@ -30,23 +36,49 @@ public class DesignDocController {
     private final DesignScreenshotService screenshotService;
 
     /**
-     * 生成指令单
+     * 下载指令单（线下模式）
+     * 按需自动生成：若打印信息发生变化则重新生成，否则复用已有文件
      */
-    @Operation(summary = "生成指令单")
-    @PostMapping("/{orderId}/package/{packageId}/instruction/generate")
-    public Result<DocItemVO> generateInstruction(@PathVariable Long orderId,
-                                                  @PathVariable Long packageId) {
-        return Result.success(docService.generateInstruction(orderId, packageId));
+    @Operation(summary = "下载指令单（线下模式，按需自动生成）")
+    @GetMapping("/{orderId}/package/{packageId}/instruction/download")
+    public void downloadInstruction(@PathVariable Long orderId,
+                                    @PathVariable Long packageId,
+                                    HttpServletResponse response) {
+        docService.downloadInstruction(orderId, packageId, response);
     }
 
     /**
-     * 生成图纸
+     * 下载图纸（线下模式）
+     * 按需自动生成：若打印信息发生变化则重新生成，否则复用已有文件
      */
-    @Operation(summary = "生成图纸")
-    @PostMapping("/{orderId}/package/{packageId}/drawing/generate")
-    public Result<DocItemVO> generateDrawing(@PathVariable Long orderId,
-                                              @PathVariable Long packageId) {
-        return Result.success(docService.generateDrawing(orderId, packageId));
+    @Operation(summary = "下载图纸（线下模式，按需自动生成）")
+    @GetMapping("/{orderId}/package/{packageId}/drawing/download")
+    public void downloadDrawing(@PathVariable Long orderId,
+                                @PathVariable Long packageId,
+                                HttpServletResponse response) {
+        docService.downloadDrawing(orderId, packageId, response);
+    }
+
+    /**
+     * 获取指令单预览 URL（在线模式）
+     * 按需自动生成：若打印信息发生变化则重新生成，否则复用已有文件
+     */
+    @Operation(summary = "获取指令单预览 URL（在线模式，按需自动生成）")
+    @GetMapping("/{orderId}/package/{packageId}/instruction/preview-url")
+    public Result<DocItemVO> getInstructionPreviewUrl(@PathVariable Long orderId,
+                                                       @PathVariable Long packageId) {
+        return Result.success(docService.getInstructionPreviewUrl(orderId, packageId));
+    }
+
+    /**
+     * 获取图纸预览 URL（在线模式）
+     * 按需自动生成：若打印信息发生变化则重新生成，否则复用已有文件
+     */
+    @Operation(summary = "获取图纸预览 URL（在线模式，按需自动生成）")
+    @GetMapping("/{orderId}/package/{packageId}/drawing/preview-url")
+    public Result<DocItemVO> getDrawingPreviewUrl(@PathVariable Long orderId,
+                                                   @PathVariable Long packageId) {
+        return Result.success(docService.getDrawingPreviewUrl(orderId, packageId));
     }
 
     /**
