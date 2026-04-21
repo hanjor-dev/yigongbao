@@ -366,8 +366,8 @@ public class OrderQueryHelper {
      */
     public OrderColumnConfigVO getColumnConfig() {
         Long currentUserId = getCurrentUserId();
+        // 未登录或用户不存在时，直接返回系统默认（getSystemDefaultColumnConfig 内部有兜底）
         if (currentUserId == null) {
-            // 未登录时无个人配置，直接返回系统默认
             return getSystemDefaultColumnConfig();
         }
         UserEntity user = userService.getById(currentUserId);

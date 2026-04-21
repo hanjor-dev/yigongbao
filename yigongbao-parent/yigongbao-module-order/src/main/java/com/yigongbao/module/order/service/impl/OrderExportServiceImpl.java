@@ -45,6 +45,8 @@ public class OrderExportServiceImpl implements OrderExportService {
     private static final int MAX_EXPORT_COUNT = 10000;
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
+    /** setCellValue 中未匹配到处理逻辑的列数量，由 buildExcel 读取并决定是否记录警告 */
+    private int unsupportedColumnCount = 0;
 
     private final OrderMainMapper orderMainMapper;
     private final UserHospitalService userHospitalService;
@@ -153,8 +155,9 @@ public class OrderExportServiceImpl implements OrderExportService {
             // 创建表头样式
             CellStyle headerStyle = createHeaderStyle(workbook);
 
-            // 创建表头行
+            // 构建表头行
             Row headerRow = sheet.createRow(0);
+            this.unsupportedColumnCount = 0;
             for (int i = 0; i < columns.size(); i++) {
                 OrderColumnConfigVO.ColumnItemVO col = columns.get(i);
                 Cell cell = headerRow.createCell(i);
@@ -171,6 +174,12 @@ public class OrderExportServiceImpl implements OrderExportService {
                     Cell cell = row.createCell(i);
                     setCellValue(cell, order, col.getField());
                 }
+            }
+
+            // 检测并记录未匹配到的列（辅助定位 Excel 导出字段遗漏问题）
+            if (this.unsupportedColumnCount > 0) {
+                log.warn("Excel 导出发现 {} 个字段未匹配到对应处理逻辑，请检查 setCellValue 方法",
+                        this.unsupportedColumnCount);
             }
 
             // 设置响应头
@@ -284,6 +293,7 @@ public class OrderExportServiceImpl implements OrderExportService {
                 cell.setCellValue(projects);
                 break;
             default:
+                this.unsupportedColumnCount++;
                 cell.setCellValue("");
         }
     }

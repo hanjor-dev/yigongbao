@@ -280,6 +280,8 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
                         itemEntity.setDraftId(draftId);
                         itemEntity.setBodyPartId(itemDTO.getBodyPartId());
                         itemEntity.setProjectId(itemDTO.getProjectId());
+                        // 用户填写的可编辑字段，直接从 DTO 取值保存
+                        itemEntity.setProjectDesc(itemDTO.getProjectDesc());
                         itemEntity.setFormingRequirement(itemDTO.getFormingRequirement());
                         itemEntity.setOtherRequirement(itemDTO.getOtherRequirement());
                         itemEntity.setSortOrder(itemDTO.getSortOrder() != null ? itemDTO.getSortOrder() : i + 1);

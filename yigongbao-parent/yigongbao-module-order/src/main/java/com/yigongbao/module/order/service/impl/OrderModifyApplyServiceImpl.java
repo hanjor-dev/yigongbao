@@ -325,7 +325,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void executeModification(Long applyId, ExecuteModifyDTO dto) {
-        log.info("执行订单修改，applyId={},参数={}", applyId, dto);
+        log.info("执行订单修改，applyId={}", applyId);
         // 将 DTO 中的 infoFields / items 转换为内部处理用的 Map
         Map<String, Object> modifications = new HashMap<>();
         if (dto != null) {
@@ -846,7 +846,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 .eq(OrderModifyApplyEntity::getApplicantId, currentUserId)
                 .eq(StrUtil.isNotBlank(dto.getStatus()), OrderModifyApplyEntity::getStatus, dto.getStatus())
                 .like(StrUtil.isNotBlank(dto.getOrderCode()), OrderModifyApplyEntity::getOrderCode, dto.getOrderCode())
-                .orderByDesc(OrderModifyApplyEntity::getCreateTime);
+                .orderByDesc(OrderModifyApplyEntity::getCreateTime)
+                .orderByDesc(OrderModifyApplyEntity::getId);
         IPage<OrderModifyApplyEntity> entityPage = orderModifyApplyMapper.selectPage(page, wrapper);
         return entityPage.convert(this::toListVO);
     }
@@ -866,7 +867,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 .like(StrUtil.isNotBlank(dto.getOrderCode()), OrderModifyApplyEntity::getOrderCode, dto.getOrderCode())
                 .like(StrUtil.isNotBlank(dto.getApplicantName()),
                         OrderModifyApplyEntity::getApplicantName, dto.getApplicantName())
-                .orderByAsc(OrderModifyApplyEntity::getCreateTime);
+                .orderByAsc(OrderModifyApplyEntity::getCreateTime)
+                .orderByDesc(OrderModifyApplyEntity::getId);
         IPage<OrderModifyApplyEntity> entityPage = orderModifyApplyMapper.selectPage(page, wrapper);
         return entityPage.convert(this::toListVO);
     }
@@ -1169,8 +1171,12 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             log.warn("订单存在待审核的修改申请，拒绝流转，orderId={}", orderId);
             throw new BusinessException(ErrorCodeEnum.ORDER_HAS_PENDING_MODIFY_APPLY);
         }
-        // 有已批准但未执行的申请时阻断
-        log.warn("订单存在已批准但未执行的修改申请，拒绝流转，orderId={}", orderId);
+        // 有已批准但未执行的申请时阻断（取第一条 APPROVED 申请的 ID 供排查）
+        OrderModifyApplyEntity approvedApply = blockingApplies.stream()
+                .filter(a -> ModifyApplyStatusEnum.APPROVED.getCode().equals(a.getStatus()))
+                .findFirst().orElse(null);
+        log.warn("订单存在已批准但未执行的修改申请，拒绝流转，orderId={}, applyId={}",
+                orderId, approvedApply != null ? approvedApply.getId() : null);
         throw new BusinessException(ErrorCodeEnum.ORDER_HAS_APPROVED_MODIFY_APPLY);
     }
 }

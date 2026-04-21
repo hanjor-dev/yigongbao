@@ -234,7 +234,10 @@ public class OrderDataValidator {
         item.setCategoryCode(project.getCategoryCode());
         item.setCategoryName(project.getCategoryName());
         item.setProjectEstimatedHours(project.getEstimatedHours());
-        item.setProjectDesc(project.getDescription());
+        // projectDesc 是可编辑字段：用户未填写时才使用主数据默认值
+        if (item.getProjectDesc() == null) {
+            item.setProjectDesc(project.getDescription());
+        }
     }
 
     // ==================== 明细校验（草稿版本）====================
@@ -297,7 +300,10 @@ public class OrderDataValidator {
         item.setCategoryCode(project.getCategoryCode());
         item.setCategoryName(project.getCategoryName());
         item.setProjectEstimatedHours(project.getEstimatedHours());
-        item.setProjectDesc(project.getDescription());
+        // projectDesc 是可编辑字段：用户未填写时才使用主数据默认值
+        if (item.getProjectDesc() == null) {
+            item.setProjectDesc(project.getDescription());
+        }
     }
 
     /**

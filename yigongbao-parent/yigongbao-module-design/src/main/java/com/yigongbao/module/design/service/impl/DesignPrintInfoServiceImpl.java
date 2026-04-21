@@ -262,18 +262,24 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                 throw new BusinessException(ErrorCodeEnum.ORDER_FILE_NOT_FOUND, "部分文件不属于该数据包");
             }
 
-            // 6. 校验 productId / specId，批量加载 spec 对象（用于覆盖 certNo）
+            // 6. 校验 productId / specId，批量加载产品和 spec 对象（用于覆盖 productName/certNo）
+            Set<Long> productIds = items.stream().map(SavePrintInfoItemDTO::getProductId).collect(Collectors.toSet());
             Set<Long> specIds = items.stream().map(SavePrintInfoItemDTO::getSpecId).collect(Collectors.toSet());
             List<ProductSpecEntity> specList = productSpecService.listByIds(specIds);
             Map<Long, ProductSpecEntity> specMap = specList.stream()
                     .collect(Collectors.toMap(ProductSpecEntity::getId, s -> s));
 
-            for (SavePrintInfoItemDTO item : items) {
-                // 校验 productId 存在且 status=1
-                ProductVO product = productService.getById(item.getProductId());
+            // 批量加载产品信息，避免下方插入循环中 N+1 查询
+            Map<Long, ProductVO> productMap = new java.util.HashMap<>();
+            for (Long productId : productIds) {
+                ProductVO product = productService.getById(productId);
                 if (product == null || product.getStatus() == null || product.getStatus() != StatusConstants.NORMAL) {
                     throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
                 }
+                productMap.put(productId, product);
+            }
+
+            for (SavePrintInfoItemDTO item : items) {
                 // 校验 specId 存在、status=1，且 spec.productId == productId
                 ProductSpecEntity spec = specMap.get(item.getSpecId());
                 if (spec == null || spec.getStatus() == null || spec.getStatus() != StatusConstants.NORMAL) {
@@ -292,7 +298,9 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                 BeanUtils.copyProperties(item, entity);
                 entity.setOrderId(orderId);
                 entity.setPackageId(packageId);
-                // certNo 从 spec 对象中取，覆盖前端传值
+                // productName/certNo 均从主数据取，覆盖前端传值，保证 Excel 填充时不为空
+                ProductVO product = productMap.get(item.getProductId());
+                entity.setProductName(product != null ? product.getProductName() : null);
                 ProductSpecEntity spec = specMap.get(item.getSpecId());
                 entity.setCertNo(spec.getCertNo());
                 // sortOrder 由服务端按提交顺序赋值（0-based），不信任前端传值
