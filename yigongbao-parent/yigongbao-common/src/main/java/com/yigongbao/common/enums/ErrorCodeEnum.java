@@ -247,28 +247,30 @@ public enum ErrorCodeEnum {
     // ==================== 修改执行校验（732）====================
     ORDER_MODIFY_INCOMPLETE(732, "申请类型 {0} 未提供修改内容，请补充后重新提交"),
 
-    // ==================== 设计阶段（733-750）====================
-    DESIGN_PACKAGE_NOT_FOUND(733, "数据包不存在"),
-    DESIGN_PACKAGE_HAS_PRODUCTS(734, "数据包已关联打印产品，无法删除"),
-    DESIGN_PACKAGE_HAS_DOCS(735, "数据包已生成指令单或图纸，无法删除"),
-    DESIGN_MODEL_NOT_FOUND(736, "可视化模型不存在"),
-    DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED(737, "不支持的压缩包格式，仅支持 ZIP/RAR/7Z"),
-    DESIGN_ARCHIVE_PARSE_FAILED(738, "压缩包解析失败：%s"),
-    DESIGN_ARCHIVE_EMPTY(739, "压缩包中无有效文件"),
-    DESIGN_ORDER_STATUS_NOT_ALLOWED(740, "当前工单状态不允许此操作"),
-    DESIGN_OPERATOR_NOT_ALLOWED(741, "非当前设计师，无权操作此工单"),
+    // ==================== 产品规格相关 754-756 ====================
+    PRODUCT_HAS_SPECS(754, "产品下存在规格，无法删除"),
+    PRODUCT_SPEC_NOT_FOUND(755, "产品规格不存在"),
+    PRODUCT_SPEC_EXISTS(756, "同一产品下规格名称已存在"),
+    PRODUCT_SPEC_IN_USE(757, "规格已被打印信息引用，无法删除"),
 
-    // ==================== 产品规格相关 741-744 ====================
-    PRODUCT_HAS_SPECS(741, "产品下存在规格，无法删除"),
-    PRODUCT_SPEC_NOT_FOUND(742, "产品规格不存在"),
-    PRODUCT_SPEC_EXISTS(743, "同一产品下规格名称已存在"),
-    PRODUCT_SPEC_IN_USE(744, "规格已被打印信息引用，无法删除"),
+    // ==================== 设计阶段（758-762）====================
+    DESIGN_PACKAGE_NOT_FOUND(758, "数据包不存在"),
+    DESIGN_PACKAGE_HAS_PRODUCTS(759, "数据包已关联打印产品，无法删除"),
+    DESIGN_PACKAGE_HAS_DOCS(760, "数据包已生成指令单或图纸，无法删除"),
+    DESIGN_MODEL_NOT_FOUND(761, "可视化模型不存在"),
+    DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED(762, "不支持的压缩包格式，仅支持 ZIP/RAR/7Z"),
 
-    // ==================== 设计文档生成（750-753）====================
-    PRINT_INFO_REQUIRED(750, "请先填写数据包的打印信息，再生成指令单和图纸"),
-    DOC_VERSION_NOT_FOUND(751, "指定版本的文档不存在"),
-    DESIGN_PACKAGE_FILE_NOT_FOUND(752, "数据包文件不存在"),
-    DESIGN_PACKAGE_FILE_WRONG_PACKAGE(753, "数据包文件不属于指定数据包");
+    // ==================== 设计文档生成（763-769）====================
+    DESIGN_ARCHIVE_PARSE_FAILED(763, "压缩包解析失败：%s"),
+    DESIGN_ARCHIVE_EMPTY(764, "压缩包中无有效文件"),
+    DESIGN_ORDER_STATUS_NOT_ALLOWED(765, "当前工单状态不允许此操作"),
+    DESIGN_OPERATOR_NOT_ALLOWED(766, "非当前设计师，无权操作此工单"),
+    PRINT_INFO_REQUIRED(767, "请先填写数据包的打印信息，再生成指令单和图纸"),
+    DOC_VERSION_NOT_FOUND(768, "指定版本的文档不存在"),
+    DESIGN_PACKAGE_FILE_NOT_FOUND(769, "数据包文件不存在"),
+    DESIGN_PACKAGE_FILE_WRONG_PACKAGE(770, "数据包文件不属于指定数据包"),
+    DESIGN_SUBMIT_CHECK_FAILED(771, "提交校验未通过：%s"),
+    DESIGNER_NOT_ASSIGNED(772, "订单未分配设计师，无法进行此操作");
 
     /**
      * 错误码

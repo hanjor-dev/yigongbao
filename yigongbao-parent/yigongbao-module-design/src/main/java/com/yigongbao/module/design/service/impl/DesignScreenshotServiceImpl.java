@@ -62,8 +62,7 @@ public class DesignScreenshotServiceImpl
         // 3. upsert：查询是否已有截图记录（含逻辑删除过滤）
         DesignPackageFileScreenshotEntity existing = lambdaQuery()
                 .eq(DesignPackageFileScreenshotEntity::getPackageFileId, packageFileId)
-                .oneOpt()
-                .orElse(null);
+                .one();
 
         if (existing != null) {
             // 有则更新 fileId
@@ -99,8 +98,7 @@ public class DesignScreenshotServiceImpl
         // 查询截图记录
         DesignPackageFileScreenshotEntity screenshot = lambdaQuery()
                 .eq(DesignPackageFileScreenshotEntity::getPackageFileId, packageFileId)
-                .oneOpt()
-                .orElse(null);
+                .one();
 
         if (screenshot == null) {
             log.info("截图不存在，packageFileId={}", packageFileId);
@@ -136,7 +134,8 @@ public class DesignScreenshotServiceImpl
         return screenshots.stream()
                 .collect(Collectors.toMap(
                         DesignPackageFileScreenshotEntity::getPackageFileId,
-                        DesignPackageFileScreenshotEntity::getFileId
+                        DesignPackageFileScreenshotEntity::getFileId,
+                        (v1, v2) -> v1
                 ));
     }
 

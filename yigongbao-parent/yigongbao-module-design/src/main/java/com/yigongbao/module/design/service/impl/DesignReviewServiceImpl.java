@@ -81,6 +81,10 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
 
         // 1. 获取工单详情（复用现有逻辑）
         DesignWorkorderDetailVO workorderDetail = designWorkorderService.getWorkorderDetail(orderId);
+        if (workorderDetail == null) {
+            log.warn("订单不存在，orderId={}", orderId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
 
         // 2. 构建审核详情 VO，复制工单详情字段
         DesignReviewDetailVO detailVO = new DesignReviewDetailVO();
@@ -129,30 +133,37 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
         // 3. 先执行状态流转：DESIGN_REVIEWING → (2050 不可见) → 3010 或 7010
         // 优先流转：确保状态已变更后再写审核记录，防止并发重复审核写入多条记录
         // flow 模块内部根据 order.needsPhysicalDelivery 自动完成分支跳转
-        TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.DESIGN_REVIEW_PASS,
-                FlowOperator.of(reviewerId, reviewerName));
+        try {
+            TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.DESIGN_REVIEW_PASS,
+                    FlowOperator.of(reviewerId, reviewerName));
 
-        // 4. 写入审核记录（result=1 通过）
-        DesignReviewEntity reviewRecord = new DesignReviewEntity();
-        reviewRecord.setOrderId(orderId);
-        reviewRecord.setReviewerId(reviewerId);
-        reviewRecord.setReviewerName(reviewerName);
-        reviewRecord.setReviewResult(1);
-        reviewRecord.setComment(dto != null ? dto.getComment() : null);
-        reviewRecord.setReviewTime(LocalDateTime.now());
-        save(reviewRecord);
+            // 4. 写入审核记录（result=1 通过）
+            DesignReviewEntity reviewRecord = new DesignReviewEntity();
+            reviewRecord.setOrderId(orderId);
+            reviewRecord.setReviewerId(reviewerId);
+            reviewRecord.setReviewerName(reviewerName);
+            reviewRecord.setReviewResult(1);
+            reviewRecord.setComment(dto != null ? dto.getComment() : null);
+            reviewRecord.setReviewTime(LocalDateTime.now());
+            save(reviewRecord);
 
-        // 5. 回写订单表（最终状态，清空当前处理人）
-        OrderMainEntity update = new OrderMainEntity();
-        update.setId(orderId);
-        update.setPhase(result.getTargetPhase());
-        update.setStatus(result.getFinalStatus());
-        update.setCurrentHandlerId(null);
-        update.setCurrentHandlerName(null);
-        orderMainService.updateById(update);
+            // 5. 回写订单表（最终状态，清空当前处理人）
+            OrderMainEntity update = new OrderMainEntity();
+            update.setId(orderId);
+            update.setPhase(result.getTargetPhase());
+            update.setStatus(result.getFinalStatus());
+            update.setCurrentHandlerId(null);
+            update.setCurrentHandlerName(null);
+            orderMainService.updateById(update);
 
-        log.info("审核通过成功，orderId={}, finalPhase={}, finalStatus={}",
-                orderId, result.getTargetPhase(), result.getFinalStatus());
+            log.info("审核通过成功，orderId={}, finalPhase={}, finalStatus={}",
+                    orderId, result.getTargetPhase(), result.getFinalStatus());
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("审核通过异常，orderId={}", orderId, e);
+            throw e;
+        }
     }
 
     /**
@@ -181,7 +192,7 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
         // 2. 校验设计师已分配（驳回后需恢复处理人，若设计师为空则无法恢复）
         if (order.getDesignerId() == null) {
             log.warn("订单未分配设计师，无法驳回，orderId={}", orderId);
-            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR, "订单未分配设计师，无法驳回");
+            throw new BusinessException(ErrorCodeEnum.DESIGNER_NOT_ASSIGNED);
         }
 
         // 3. 获取当前审核人信息
@@ -193,30 +204,37 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
         // 优先流转：确保状态已变更后再写审核记录，防止并发重复驳回写入多条记录
         FlowOperator operator = FlowOperator.of(reviewerId, reviewerName);
         operator.setRemark(dto.getRejectReason());
-        TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.DESIGN_REVIEW_REJECT, operator);
+        try {
+            TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.DESIGN_REVIEW_REJECT, operator);
 
-        // 5. 写入审核记录（result=0 驳回）
-        DesignReviewEntity reviewRecord = new DesignReviewEntity();
-        reviewRecord.setOrderId(orderId);
-        reviewRecord.setReviewerId(reviewerId);
-        reviewRecord.setReviewerName(reviewerName);
-        reviewRecord.setReviewResult(0);
-        reviewRecord.setRejectReason(dto.getRejectReason());
-        reviewRecord.setReviewTime(LocalDateTime.now());
-        save(reviewRecord);
+            // 5. 写入审核记录（result=0 驳回）
+            DesignReviewEntity reviewRecord = new DesignReviewEntity();
+            reviewRecord.setOrderId(orderId);
+            reviewRecord.setReviewerId(reviewerId);
+            reviewRecord.setReviewerName(reviewerName);
+            reviewRecord.setReviewResult(0);
+            reviewRecord.setRejectReason(dto.getRejectReason());
+            reviewRecord.setReviewTime(LocalDateTime.now());
+            save(reviewRecord);
 
-        // 6. 回写订单表（含驳回原因快照，恢复分配设计师为当前处理人）
-        OrderMainEntity update = new OrderMainEntity();
-        update.setId(orderId);
-        update.setPhase(result.getTargetPhase());
-        update.setStatus(result.getFinalStatus());
-        update.setDesignReviewRemark(dto.getRejectReason());
-        update.setCurrentHandlerId(order.getDesignerId());
-        update.setCurrentHandlerName(order.getDesignerName());
-        orderMainService.updateById(update);
+            // 6. 回写订单表（含驳回原因快照，恢复分配设计师为当前处理人）
+            OrderMainEntity update = new OrderMainEntity();
+            update.setId(orderId);
+            update.setPhase(result.getTargetPhase());
+            update.setStatus(result.getFinalStatus());
+            update.setDesignReviewRemark(dto.getRejectReason());
+            update.setCurrentHandlerId(order.getDesignerId());
+            update.setCurrentHandlerName(order.getDesignerName());
+            orderMainService.updateById(update);
 
-        log.info("审核驳回成功，orderId={}, phase={}, status={}",
-                orderId, result.getTargetPhase(), result.getFinalStatus());
+            log.info("审核驳回成功，orderId={}, phase={}, status={}",
+                    orderId, result.getTargetPhase(), result.getFinalStatus());
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("审核驳回异常，orderId={}", orderId, e);
+            throw e;
+        }
     }
 
     // ==================== 私有辅助方法 ====================
@@ -230,7 +248,17 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
         vo.setId(entity.getId());
         vo.setReviewerName(entity.getReviewerName());
         vo.setReviewResult(entity.getReviewResult());
-        vo.setReviewResultName(Integer.valueOf(1).equals(entity.getReviewResult()) ? "通过" : "驳回");
+        // 明确判断三个分支：1=通过，0=驳回，null=未知（避免 null 时默认显示"驳回"的逻辑错误）
+        Integer reviewResult = entity.getReviewResult();
+        String resultName;
+        if (Integer.valueOf(1).equals(reviewResult)) {
+            resultName = "通过";
+        } else if (Integer.valueOf(0).equals(reviewResult)) {
+            resultName = "驳回";
+        } else {
+            resultName = "未知";
+        }
+        vo.setReviewResultName(resultName);
         vo.setComment(entity.getComment());
         vo.setRejectReason(entity.getRejectReason());
         vo.setReviewTime(entity.getReviewTime());

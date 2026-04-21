@@ -282,19 +282,21 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
 
         // 将列配置序列化为 JSON 写入 design_column_settings 字段
         DesignColumnConfigVO configVO = new DesignColumnConfigVO();
-        List<DesignColumnConfigVO.ColumnItemVO> columnItems = dto.getColumns().stream()
-                .map(item -> {
-                    DesignColumnConfigVO.ColumnItemVO colVO = new DesignColumnConfigVO.ColumnItemVO();
-                    colVO.setField(item.getField());
-                    colVO.setLabel(item.getLabel());
-                    colVO.setVisible(item.getVisible());
-                    colVO.setSort(item.getSort());
-                    colVO.setWidth(item.getWidth());
-                    colVO.setFixed(item.getFixed());
-                    return colVO;
-                })
-                .collect(Collectors.toList());
-        configVO.setColumns(columnItems);
+        if (dto.getColumns() != null) {
+            List<DesignColumnConfigVO.ColumnItemVO> columnItems = dto.getColumns().stream()
+                    .map(item -> {
+                        DesignColumnConfigVO.ColumnItemVO colVO = new DesignColumnConfigVO.ColumnItemVO();
+                        colVO.setField(item.getField());
+                        colVO.setLabel(item.getLabel());
+                        colVO.setVisible(item.getVisible());
+                        colVO.setSort(item.getSort());
+                        colVO.setWidth(item.getWidth());
+                        colVO.setFixed(item.getFixed());
+                        return colVO;
+                    })
+                    .collect(Collectors.toList());
+            configVO.setColumns(columnItems);
+        }
 
         try {
             String configJson = objectMapper.writeValueAsString(configVO);
@@ -305,7 +307,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             log.info("用户设计列配置保存成功，userId={}", currentUserId);
         } catch (JsonProcessingException e) {
             log.error("序列化列配置失败，userId={}", currentUserId, e);
-            throw new BusinessException(500, "列配置保存失败");
+            throw new BusinessException(ErrorCodeEnum.SERVER_ERROR, "列配置保存失败");
         }
     }
 
@@ -348,20 +350,27 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         String currentUserName = currentUser != null ? currentUser.getRealName() : null;
 
         // 5. 通过 FlowFacade 执行状态流转（PENDING_DESIGN → DESIGN_IN_PROGRESS）
-        TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.START_DESIGN,
-                FlowOperator.of(currentUserId, currentUserName));
+        try {
+            TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.START_DESIGN,
+                    FlowOperator.of(currentUserId, currentUserName));
 
-        // 6. 将流转结果和设计开始时间写回订单表
-        OrderMainEntity update = new OrderMainEntity();
-        update.setId(orderId);
-        update.setPhase(result.getTargetPhase());
-        update.setStatus(result.getFinalStatus());
-        update.setDesignStartTime(LocalDateTime.now());
-        update.setCurrentHandlerId(currentUserId);
-        update.setCurrentHandlerName(currentUserName);
-        orderMainService.updateById(update);
+            // 6. 将流转结果和设计开始时间写回订单表
+            OrderMainEntity update = new OrderMainEntity();
+            update.setId(orderId);
+            update.setPhase(result.getTargetPhase());
+            update.setStatus(result.getFinalStatus());
+            update.setDesignStartTime(LocalDateTime.now());
+            update.setCurrentHandlerId(currentUserId);
+            update.setCurrentHandlerName(currentUserName);
+            orderMainService.updateById(update);
 
-        log.info("开始设计成功，orderId={}, phase={}, status={}", orderId, result.getTargetPhase(), result.getFinalStatus());
+            log.info("开始设计成功，orderId={}, phase={}, status={}", orderId, result.getTargetPhase(), result.getFinalStatus());
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("开始设计异常，orderId={}", orderId, e);
+            throw e;
+        }
     }
 
     /**
@@ -400,20 +409,27 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         String currentUserName = currentUser != null ? currentUser.getRealName() : null;
 
         // 5. 执行状态流转：DESIGN_REVIEW_REJECTED → DESIGN_IN_PROGRESS
-        TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.CONTINUE_DESIGN,
-                FlowOperator.of(currentUserId, currentUserName));
+        try {
+            TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.CONTINUE_DESIGN,
+                    FlowOperator.of(currentUserId, currentUserName));
 
-        // 6. 回写订单表
-        OrderMainEntity update = new OrderMainEntity();
-        update.setId(orderId);
-        update.setPhase(result.getTargetPhase());
-        update.setStatus(result.getFinalStatus());
-        update.setCurrentHandlerId(currentUserId);
-        update.setCurrentHandlerName(currentUserName);
-        orderMainService.updateById(update);
+            // 6. 回写订单表
+            OrderMainEntity update = new OrderMainEntity();
+            update.setId(orderId);
+            update.setPhase(result.getTargetPhase());
+            update.setStatus(result.getFinalStatus());
+            update.setCurrentHandlerId(currentUserId);
+            update.setCurrentHandlerName(currentUserName);
+            orderMainService.updateById(update);
 
-        log.info("继续修改成功，orderId={}, phase={}, status={}",
-                orderId, result.getTargetPhase(), result.getFinalStatus());
+            log.info("继续修改成功，orderId={}, phase={}, status={}",
+                    orderId, result.getTargetPhase(), result.getFinalStatus());
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("继续修改异常，orderId={}", orderId, e);
+            throw e;
+        }
     }
 
     /**
@@ -453,7 +469,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         SubmitCheckVO check = buildSubmitCheck(orderId, designMode);
         if (!Boolean.TRUE.equals(check.getCanSubmit())) {
             log.warn("提交设计校验未通过，orderId={}, blockReason={}", orderId, check.getBlockReason());
-            throw new BusinessException(400, check.getBlockReason());
+            throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, check.getBlockReason());
         }
 
         // 5. 查询当前用户姓名
@@ -461,21 +477,28 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         String currentUserName = currentUser != null ? currentUser.getRealName() : null;
 
         // 6. 执行状态流转：DESIGN_IN_PROGRESS → DESIGN_REVIEWING(2040)
-        TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.SUBMIT_DESIGN,
-                FlowOperator.of(currentUserId, currentUserName));
+        try {
+            TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.SUBMIT_DESIGN,
+                    FlowOperator.of(currentUserId, currentUserName));
 
-        // 7. 回写订单表（含设计提交时间）
-        OrderMainEntity update = new OrderMainEntity();
-        update.setId(orderId);
-        update.setPhase(result.getTargetPhase());
-        update.setStatus(result.getFinalStatus());
-        update.setDesignSubmitTime(LocalDateTime.now());
-        update.setCurrentHandlerId(currentUserId);
-        update.setCurrentHandlerName(currentUserName);
-        orderMainService.updateById(update);
+            // 7. 回写订单表（含设计提交时间）
+            OrderMainEntity update = new OrderMainEntity();
+            update.setId(orderId);
+            update.setPhase(result.getTargetPhase());
+            update.setStatus(result.getFinalStatus());
+            update.setDesignSubmitTime(LocalDateTime.now());
+            update.setCurrentHandlerId(currentUserId);
+            update.setCurrentHandlerName(currentUserName);
+            orderMainService.updateById(update);
 
-        log.info("提交设计审核成功，orderId={}, phase={}, status={}",
-                orderId, result.getTargetPhase(), result.getFinalStatus());
+            log.info("提交设计审核成功，orderId={}, phase={}, status={}",
+                    orderId, result.getTargetPhase(), result.getFinalStatus());
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("提交设计审核异常，orderId={}", orderId, e);
+            throw e;
+        }
     }
 
     // ==================== 私有辅助方法 ====================
@@ -501,7 +524,8 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         // 批量查询文件详情，避免 N+1
         List<String> fileIds = orderFiles.stream().map(OrderFileEntity::getFileId).collect(Collectors.toList());
         List<FileVO> fileVOs = fileService.listByIds(fileIds);
-        Map<String, FileVO> fileVOMap = fileVOs.stream().collect(Collectors.toMap(FileVO::getId, f -> f));
+        Map<String, FileVO> fileVOMap = fileVOs.stream()
+                .collect(Collectors.toMap(FileVO::getId, f -> f, (v1, v2) -> v1));
 
         List<OrderDetailVO.OrderFileVO> imageDataFiles = new ArrayList<>();
         List<OrderDetailVO.OrderFileVO> imageReportFiles = new ArrayList<>();

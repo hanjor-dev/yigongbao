@@ -271,12 +271,12 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
             for (SavePrintInfoItemDTO item : items) {
                 // 校验 productId 存在且 status=1
                 ProductVO product = productService.getById(item.getProductId());
-                if (product == null || !Integer.valueOf(StatusConstants.NORMAL).equals(product.getStatus())) {
+                if (product == null || product.getStatus() == null || product.getStatus() != StatusConstants.NORMAL) {
                     throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
                 }
                 // 校验 specId 存在、status=1，且 spec.productId == productId
                 ProductSpecEntity spec = specMap.get(item.getSpecId());
-                if (spec == null || !Integer.valueOf(StatusConstants.NORMAL).equals(spec.getStatus())) {
+                if (spec == null || spec.getStatus() == null || spec.getStatus() != StatusConstants.NORMAL) {
                     throw new BusinessException(ErrorCodeEnum.PRODUCT_SPEC_NOT_FOUND);
                 }
                 if (!spec.getProductId().equals(item.getProductId())) {

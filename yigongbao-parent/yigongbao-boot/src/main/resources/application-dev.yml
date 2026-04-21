@@ -118,7 +118,7 @@ dromara:
         # 启用本地文件访问（生产环境建议使用 Nginx）
         enable-access: true
         # 文件访问基础路径（用于拼装 fileUrl），/api 前缀与 context-path 保持一致
-        domain: http://localhost:8080/api/files/public/
+        domain: http://yigongbao.hanjor.top/api/files/public/
         # 基础路径
         base-path:
         # URL 路径匹配模式（SaToken 中需放行此路径）
