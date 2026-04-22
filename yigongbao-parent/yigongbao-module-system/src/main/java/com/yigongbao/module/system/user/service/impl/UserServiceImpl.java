@@ -280,6 +280,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 log.warn("手机号已存在，phone={}", maskPhone(dto.getPhone()));
                 throw new BusinessException(ErrorCodeEnum.USER_PHONE_EXISTS);
             }
+            // 校验邮箱是否已存在
+            if (StrUtil.isNotBlank(dto.getEmail()) && isEmailExists(dto.getEmail())) {
+                log.warn("邮箱已存在，email={}", dto.getEmail());
+                throw new BusinessException(ErrorCodeEnum.USER_EMAIL_EXISTS);
+            }
             // 校验所属机构是否存在，并获取名称设置到冗余字段
             OrgEntity orgEntity = null;
             if (dto.getOrgId() != null) {
@@ -382,6 +387,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 if (isPhoneExistsExcludingId(dto.getPhone(), id)) {
                     log.warn("手机号已存在，phone={}", maskPhone(dto.getPhone()));
                     throw new BusinessException(ErrorCodeEnum.USER_PHONE_EXISTS);
+                }
+            }
+            // 校验邮箱是否与其他用户重复
+            if (StrUtil.isNotBlank(dto.getEmail()) && !dto.getEmail().equals(entity.getEmail())) {
+                if (isEmailExistsExcludingId(dto.getEmail(), id)) {
+                    log.warn("邮箱已存在，email={}", dto.getEmail());
+                    throw new BusinessException(ErrorCodeEnum.USER_EMAIL_EXISTS);
                 }
             }
             // 校验所属机构是否存在
@@ -800,7 +812,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     }
 
     /**
-     * 根据部门ID查询用户ID列表
+     * 校验邮箱是否存在
+     */
+    private boolean isEmailExists(String email) {
+        return count(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getEmail, email)) > 0;
+    }
+
+    /**
+     * 校验邮箱是否存在（排除指定ID）
+     */
+    private boolean isEmailExistsExcludingId(String email, Long excludeId) {
+        return count(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getEmail, email)
+                .ne(UserEntity::getId, excludeId)) > 0;
+    }
+
+    /**
      *
      * @param deptId 部门ID
      * @return 用户ID列表

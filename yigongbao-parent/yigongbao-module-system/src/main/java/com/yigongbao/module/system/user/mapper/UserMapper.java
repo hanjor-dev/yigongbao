@@ -45,7 +45,24 @@ public interface UserMapper extends BaseMapper<UserEntity> {
     UserEntity selectByUsername(String username);
 
     /**
-     * 统计机构下的用户数量
+     * 根据手机号查询用户
+     *
+     * @param phone 手机号
+     * @return 用户实体
+     */
+    @Select("SELECT * FROM sys_user WHERE phone = #{phone} AND is_deleted = 0 LIMIT 1")
+    UserEntity selectByPhone(String phone);
+
+    /**
+     * 根据邮箱查询用户
+     *
+     * @param email 邮箱
+     * @return 用户实体
+     */
+    @Select("SELECT * FROM sys_user WHERE email = #{email} AND is_deleted = 0 LIMIT 1")
+    UserEntity selectByEmail(String email);
+
+    /**
      *
      * @param orgId 机构ID
      * @return 用户数量

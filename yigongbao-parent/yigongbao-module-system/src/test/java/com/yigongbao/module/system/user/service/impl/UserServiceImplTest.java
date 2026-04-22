@@ -315,6 +315,50 @@ class UserServiceImplTest {
     }
 
     @Test
+    @DisplayName("createUser: 邮箱已存在时抛出异常")
+    void createUser_whenEmailExists_shouldThrowException() {
+        // 准备：用户名不存在，手机号不存在，邮箱存在
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class)))
+                .thenReturn(0L)  // 用户名检查
+                .thenReturn(0L)  // 手机号检查
+                .thenReturn(1L); // 邮箱检查
+        CreateUserDTO dto = new CreateUserDTO();
+        dto.setUsername("newuser");
+        dto.setPhone("13900000000");
+        dto.setEmail("exists@example.com");
+        dto.setAccountType(1);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.createUser(dto)
+        );
+        assertEquals(ErrorCodeEnum.USER_EMAIL_EXISTS.getCode(), exception.getCode());
+    }
+
+    @Test
+    @DisplayName("updateUser: 邮箱已存在时抛出异常")
+    void updateUser_whenEmailExists_shouldThrowException() {
+        // 准备：被更新的用户邮箱不同，且邮箱已被其他用户使用
+        UserEntity existing = new UserEntity();
+        existing.setId(1L);
+        existing.setEmail("old@example.com");
+        existing.setPhone("13800000000");
+        existing.setRoleId(1L);
+        when(userMapper.selectById(1L)).thenReturn(existing);
+        // email check — returns 1L meaning exists
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+
+        UpdateUserDTO dto = new UpdateUserDTO();
+        dto.setEmail("new@example.com");
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.updateUser(1L, dto)
+        );
+        assertEquals(ErrorCodeEnum.USER_EMAIL_EXISTS.getCode(), exception.getCode());
+    }
+
+    @Test
     @DisplayName("createUser: 所属机构不存在时抛出异常")
     void createUser_whenOrgNotExists_shouldThrowException() {
         // 准备：用户名和手机号不存在，但机构不存在
