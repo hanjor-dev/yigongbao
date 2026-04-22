@@ -493,6 +493,7 @@ CREATE TABLE sys_login_log (
     id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     user_id         BIGINT          COMMENT '用户ID',
     username        VARCHAR(64)     COMMENT '用户名',
+    login_type      VARCHAR(16)     COMMENT '登录方式（PASSWORD/PHONE/EMAIL）',
     ip              VARCHAR(64)     COMMENT '登录IP',
     user_agent      VARCHAR(512)    COMMENT 'User-Agent（浏览器/设备信息）',
     login_time      TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '登录时间',

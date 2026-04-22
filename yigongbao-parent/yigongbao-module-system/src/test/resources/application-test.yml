@@ -33,6 +33,11 @@ yigongbao:
     login-max-failures: 5
     login-lock-duration: 15
     sms-send-interval: 60
+    # 验证码配置
+    captcha-expire-seconds: 300
+    captcha-cooldown-seconds: 60
+    captcha-daily-limit: 10
+    mail-from: "test@example.com"
     # 系统配置
     system-name: "医工宝测试"
     max-upload-size: 524288000

@@ -309,6 +309,13 @@ VALUES
 ('login.lock.duration', '登录锁定时长', '15', 'number', 'security', '自动解锁时间（分钟）', 1, 0, 3, 1),
 ('sms.send.interval', '短信发送间隔', '60', 'number', 'security', '同一手机号发送间隔（秒）', 1, 0, 4, 1);
 
+INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
+VALUES
+('captcha.expire.seconds',   '验证码有效期',           '300',  'number',  'security', '验证码有效期（秒）',                           1, 0, 5, 1),
+('captcha.cooldown.seconds', '验证码发送冷却',          '60',   'number',  'security', '同一目标发送冷却（秒）',                       1, 0, 6, 1),
+('captcha.daily.limit',      '验证码每日发送上限',      '10',   'number',  'security', '同一目标每日最大发送次数',                     1, 0, 7, 1),
+('mail.from',                '发件人邮箱地址',          '',     'string',  'security', '发件人邮箱地址（必填，否则邮件发送失败）',     1, 0, 8, 1);
+
 -- ------------------------------------------------------------
 -- 系统配置（group=system）
 -- ------------------------------------------------------------
@@ -322,7 +329,7 @@ VALUES
 ('flow.max.rework', '最大允许的返工次数', '2', 'number', 'system', '返工超过此次数后不再允许继续', 1, 0, 6, 1),
 ('flow.max.design.reject', '最大允许的设计审核驳回次数', '3', 'number', 'system', '设计审核驳回超过此次数后不再允许提交', 1, 0, 7, 1),
 ('design.assign.mode', '设计师分配模式', 'auto', 'string', 'system', 'auto-自动分配，manual-手动分配', 1, 0, 8, 1),
-('design.mode', '设计模式', '1', 'number', 'system', '设计模式：1=线下修改（需上传修订版），2=在线编辑', 1, 1, 9, 1);
+('design.mode', '设计模式', '2', 'number', 'system', '设计模式：1=线下修改（需上传修订版），2=在线编辑', 1, 1, 9, 1);
 
 -- 订单列表默认列配置（独立 INSERT，避免 JSON 跨行问题）
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)

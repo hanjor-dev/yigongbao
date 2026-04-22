@@ -200,6 +200,14 @@ CREATE TABLE sys_user (
 CREATE UNIQUE INDEX uk_username ON sys_user ((CASE WHEN is_deleted = 0 THEN username ELSE NULL END));
 CREATE UNIQUE INDEX uk_phone ON sys_user ((CASE WHEN is_deleted = 0 THEN phone ELSE NULL END));
 
+-- email 唯一（逻辑删除兼容）
+CREATE UNIQUE INDEX uk_email
+    ON sys_user ((CASE WHEN is_deleted = 0 THEN email ELSE NULL END));
+
+-- employee_no 唯一（本期不作登录凭据，同步补上约束）
+CREATE UNIQUE INDEX uk_employee_no
+    ON sys_user ((CASE WHEN is_deleted = 0 THEN employee_no ELSE NULL END));
+
 -- ------------------------------------------------------------
 -- 系统配置表
 -- ------------------------------------------------------------
@@ -295,6 +303,7 @@ CREATE TABLE sys_login_log (
     id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     user_id         BIGINT          COMMENT '用户ID',
     username        VARCHAR(64)     COMMENT '用户名',
+    login_type      VARCHAR(16)     COMMENT '登录方式（PASSWORD/PHONE/EMAIL）',
     ip              VARCHAR(64)     COMMENT '登录IP',
     user_agent      VARCHAR(512)    COMMENT 'User-Agent（浏览器/设备信息）',
     login_time      DATETIME        NOT NULL COMMENT '登录时间',
