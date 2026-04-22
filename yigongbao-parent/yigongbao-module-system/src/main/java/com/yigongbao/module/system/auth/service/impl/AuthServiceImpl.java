@@ -115,8 +115,10 @@ public class AuthServiceImpl implements AuthService {
      * 账号密码登录
      */
     private LoginVO resolveByPassword(LoginDTO dto, String ip, String userAgent) {
-        // 1. 校验图形验证码
-        verifyGraphicCaptcha(dto.getCaptchaId(), dto.getCaptchaCode());
+        // 1. 校验图形验证码（前端传入时才校验，兼容前端未接入验证码的过渡阶段）
+        if (StrUtil.isNotBlank(dto.getCaptchaId()) && StrUtil.isNotBlank(dto.getCaptchaCode())) {
+            verifyGraphicCaptcha(dto.getCaptchaId(), dto.getCaptchaCode());
+        }
 
         try {
             // 2. 查询用户

@@ -5,3 +5,7 @@
 spring:
   profiles:
     active: dev
+  config:
+    # 加载本地 .env 文件（optional: 表示文件不存在时不报错，生产环境直接用系统环境变量）
+    # .env 文件已加入 .gitignore，不提交到代码库；参考 .env.example 创建本地副本
+    import: "optional:file:./.env[.properties]"

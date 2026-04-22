@@ -60,3 +60,8 @@ uploads/
 /implementation_checklist.md
 /progress.md
 /task_plan.md
+
+### Environment Variables（敏感配置，不提交到代码库）###
+.env
+.env.local
+.env.*.local
