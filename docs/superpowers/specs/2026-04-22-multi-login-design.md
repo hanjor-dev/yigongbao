@@ -43,9 +43,9 @@
 }
 ```
 
-- `loginType`：`PASSWORD` / `PHONE` / `EMAIL`
-- `principal`：用户名 / 手机号 / 邮箱
-- `credential`：密码 / 验证码
+- `loginType`：`@NotNull`，合法值为 `LoginTypeEnum`（`PASSWORD` / `PHONE` / `EMAIL`），Jackson 枚举反序列化，非法值返回 400
+- `principal`：`@NotBlank`，用户名 / 手机号 / 邮箱
+- `credential`：`@NotBlank`，密码 / 验证码
 
 ### SendCaptchaDTO
 
@@ -55,6 +55,9 @@
   "target": "13800138000"
 }
 ```
+
+- `captchaType`：合法值为 `CaptchaTypeEnum`（`PHONE` / `EMAIL`），使用 `@NotNull` + Jackson 枚举反序列化校验，非法值直接返回 400
+- `target`：`@NotBlank`，手机号格式或邮箱格式由 Service 层按 captchaType 二次校验
 
 ### ForgotPasswordResetDTO
 
@@ -76,6 +79,14 @@
 ```java
 PASSWORD, PHONE, EMAIL
 ```
+
+### CaptchaTypeEnum（独立枚举，不含 PASSWORD）
+
+```java
+PHONE, EMAIL
+```
+
+用于 `SendCaptchaDTO.captchaType`、`ForgotPasswordResetDTO.captchaType` 的合法值约束。与 `LoginTypeEnum` 分离，语义更清晰，避免将 `PASSWORD` 误传为验证码类型。
 
 ### CaptchaSceneEnum
 
@@ -120,7 +131,7 @@ ALTER TABLE sys_login_log
 | `captcha.expire.seconds` | `300` | 验证码有效期（秒） |
 | `captcha.cooldown.seconds` | `60` | 同一目标发送冷却（秒） |
 | `captcha.daily.limit` | `10` | 同一目标每日最大发送次数 |
-| `mail.from` | — | 发件人邮箱地址（必填） |
+| `mail.from` | — | 发件人邮箱地址（必填，启动时 `SpringMailServiceImpl` 读取，若为空则抛 `BusinessException` fail-fast） |
 
 > `sms.send.interval` 保留向后兼容，新代码统一读 `captcha.cooldown.seconds`。
 
@@ -168,13 +179,14 @@ void verifyCaptcha(String captchaType, String target, String scene, String code)
 1. 冷却检查：Redis `captcha:cooldown:*` 存在 → 抛 `CAPTCHA_TOO_FREQUENT`
 2. 每日次数检查：计数 ≥ `captcha.daily.limit` → 抛 `CAPTCHA_DAILY_LIMIT`
 3. 生成 6 位数字验证码（`RandomUtil.randomNumbers(6)`）
-4. 写入 Redis：验证码 key（TTL=有效期）+ 冷却 key（TTL=冷却时间）+ 每日计数 +1
+4. 写入 Redis：验证码 key（TTL=有效期）+ 冷却 key（TTL=冷却时间）+ 每日计数原子自增（`redisTemplate.opsForValue().increment()`，首次写入后立即设置 TTL 至当天结束）
 5. 分发：`PHONE` → `SmsService.send()`，`EMAIL` → `MailService.send()`
 
 **verifyCaptcha 流程：**
 1. 读取 Redis 验证码 key，不存在 → 抛 `CAPTCHA_EXPIRED`
-2. 不匹配 → 抛 `CAPTCHA_ERROR`
-3. 匹配 → 删除 key（一次性消费）
+2. 读取错误次数 key `captcha:attempts:{scene}:{type}:{target}`，≥ 5 次 → 删除验证码 key，抛 `CAPTCHA_EXPIRED`（强制重新发送）
+3. 不匹配 → 错误次数原子自增（`INCR`，TTL 与验证码 key 保持一致），抛 `CAPTCHA_ERROR`
+4. 匹配 → 删除验证码 key + 错误次数 key（一次性消费）
 
 ### 7.2 SmsService / MailService
 
@@ -185,7 +197,7 @@ auth/service/impl/MockSmsServiceImpl.java    ← log.info 模拟，@Primary
 auth/service/impl/SpringMailServiceImpl.java ← JavaMailSender 真实发送
 ```
 
-**短信 Mock**：`log.info("【短信模拟】手机号={}，验证码={}", phone, content)`。后续接入服务商只需新增实现类并切换 `@Primary`，无需改动调用方。
+**短信 Mock**：`log.info("【短信模拟】手机号={}，验证码={}", phone, content)`。标注 `@Profile("!prod")`（仅非生产环境生效），后续接入服务商只需新增实现类并切换，无需改动调用方。生产环境未配置真实实现时启动会因无 Bean 而 fail-fast，强迫显式配置。
 
 **邮件实现**：注入 `JavaMailSender`，发件人从 `ConfigService.getConfigValue(MAIL_FROM)` 读取。
 
@@ -227,9 +239,8 @@ UserEntity selectByEmail(String email);
 ### POST /forgot-password/captcha
 
 1. 按 `captchaType` 查找用户（`selectByPhone` / `selectByEmail`）
-2. 用户不存在 → 抛 `USER_NOT_FOUND`
-3. 用户已禁用 → 抛 `USER_DISABLED`
-4. `captchaService.sendCaptcha(type, target, "forgot")`
+2. 用户不存在或已禁用 → **统一静默处理**，返回成功响应（不暴露账号注册状态，防止用户枚举攻击），但内部不发送验证码
+3. 用户正常 → `captchaService.sendCaptcha(type, target, "forgot")`
 
 ### POST /forgot-password/reset
 
@@ -290,24 +301,26 @@ spring:
 | `UserServiceImplTest` | createUser email 重复、updateUser email 排除自身 |
 
 > `CaptchaServiceImplTest` 中 `RedisTemplate` 使用 Mockito Mock，不依赖真实 Redis。
+> `AuthControllerTest`（`@SpringBootTest`）需用 `@MockBean` 替换 `SmsService`、`MailService`、`JavaMailSender`，避免发送真实短信/邮件或因 SMTP 配置缺失启动失败。
 
 ---
 
 ## 十四、改动文件清单
 
-### 新增（10 个）
+### 新增（11 个）
 
 | 文件 | 说明 |
 |---|---|
 | `auth/dto/SendCaptchaDTO` | 发送验证码请求 |
 | `auth/dto/ForgotPasswordResetDTO` | 忘记密码重置请求 |
 | `auth/enums/LoginTypeEnum` | PASSWORD / PHONE / EMAIL |
+| `auth/enums/CaptchaTypeEnum` | PHONE / EMAIL（与 LoginTypeEnum 分离） |
 | `auth/enums/CaptchaSceneEnum` | LOGIN / FORGOT |
 | `auth/service/CaptchaService` | 验证码服务接口 |
 | `auth/service/impl/CaptchaServiceImpl` | 验证码服务实现 |
 | `auth/service/SmsService` | 短信服务接口 |
 | `auth/service/MailService` | 邮件服务接口 |
-| `auth/service/impl/MockSmsServiceImpl` | 短信 Mock（@Primary） |
+| `auth/service/impl/MockSmsServiceImpl` | 短信 Mock（@Profile("!prod")） |
 | `auth/service/impl/SpringMailServiceImpl` | 邮件真实实现 |
 
 ### 修改（9 个）
