@@ -41,6 +41,26 @@ public enum SystemConfigKeyEnum {
      */
     SMS_SEND_INTERVAL("sms.send.interval", "短信发送间隔"),
 
+    /**
+     * 验证码有效期（秒）
+     */
+    CAPTCHA_EXPIRE_SECONDS("captcha.expire.seconds", "验证码有效期（秒）"),
+
+    /**
+     * 同一目标发送冷却（秒）
+     */
+    CAPTCHA_COOLDOWN_SECONDS("captcha.cooldown.seconds", "验证码发送冷却时间（秒）"),
+
+    /**
+     * 同一目标每日最大发送次数
+     */
+    CAPTCHA_DAILY_LIMIT("captcha.daily.limit", "验证码每日最大发送次数"),
+
+    /**
+     * 发件人邮箱地址
+     */
+    MAIL_FROM("mail.from", "发件人邮箱地址"),
+
     // ==================== 系统配置 ====================
     /**
      * 系统名称

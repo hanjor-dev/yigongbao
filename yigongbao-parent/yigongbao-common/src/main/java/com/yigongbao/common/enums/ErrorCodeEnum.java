@@ -82,6 +82,16 @@ public enum ErrorCodeEnum {
     USER_SPECIALTY_INVALID(634, "专业方向无效，请重新选择：%s"),
     USER_PASSWORD_WEAK(635, "密码必须包含字母和数字，长度6-20位"),
 
+    // ==================== 邮箱相关 636 ====================
+    USER_EMAIL_EXISTS(636, "邮箱已存在"),
+
+    // ==================== 验证码相关 637-641 ====================
+    CAPTCHA_TOO_FREQUENT(637, "发送过于频繁，请稍后再试"),
+    CAPTCHA_DAILY_LIMIT(638, "今日发送次数已达上限"),
+    CAPTCHA_EXPIRED(639, "验证码已过期或不存在"),
+    CAPTCHA_ERROR(640, "验证码错误"),
+    CAPTCHA_TYPE_INVALID(641, "不支持的验证码类型"),
+
     // ==================== 资源相关 631-634 ====================
     RESOURCE_NOT_FOUND(631, "资源不存在"),
     RESOURCE_EXISTS(632, "资源编码已存在"),
@@ -270,7 +280,11 @@ public enum ErrorCodeEnum {
     DESIGN_PACKAGE_FILE_NOT_FOUND(769, "数据包文件不存在"),
     DESIGN_PACKAGE_FILE_WRONG_PACKAGE(770, "数据包文件不属于指定数据包"),
     DESIGN_SUBMIT_CHECK_FAILED(771, "提交校验未通过：%s"),
-    DESIGNER_NOT_ASSIGNED(772, "订单未分配设计师，无法进行此操作");
+    DESIGNER_NOT_ASSIGNED(772, "订单未分配设计师，无法进行此操作"),
+
+    // ==================== 图形验证码 773-774 ====================
+    CAPTCHA_GRAPHIC_EXPIRED(773, "图形验证码已过期，请刷新"),
+    CAPTCHA_GRAPHIC_ERROR(774, "图形验证码错误");
 
     /**
      * 错误码
