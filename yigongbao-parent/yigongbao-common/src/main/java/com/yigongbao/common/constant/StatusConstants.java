@@ -161,4 +161,16 @@ public final class StatusConstants {
         }
         return sex == SEX_MALE ? SEX_MALE_NAME : SEX_FEMALE_NAME;
     }
+
+    // ==================== 设计确认状态 ====================
+
+    /**
+     * 设计文档确认状态-未确认
+     */
+    public static final int NOT_CONFIRMED = 0;
+
+    /**
+     * 设计文档确认状态-已确认
+     */
+    public static final int CONFIRMED = 1;
 }

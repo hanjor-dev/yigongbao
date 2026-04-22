@@ -67,6 +67,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -820,7 +821,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             }
             boolean allDrawingConfirmed = packageIds.stream().allMatch(pkgId -> {
                 DesignDrawingEntity drawing = latestDrawingByPkg.get(pkgId);
-                return drawing != null && Integer.valueOf(1).equals(drawing.getIsConfirmed());
+                return drawing != null && Objects.equals(StatusConstants.CONFIRMED, drawing.getIsConfirmed());
             });
             check.setHasDrawingConfirmed(allDrawingConfirmed);
         } else {
@@ -840,7 +841,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             }
             boolean allInstructionConfirmed = packageIds.stream().allMatch(pkgId -> {
                 DesignInstructionEntity inst = latestInstructionByPkg.get(pkgId);
-                return inst != null && Integer.valueOf(1).equals(inst.getIsConfirmed());
+                return inst != null && Objects.equals(StatusConstants.CONFIRMED, inst.getIsConfirmed());
             });
             check.setHasInstructionConfirmed(allInstructionConfirmed);
         } else {

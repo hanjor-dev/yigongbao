@@ -1,5 +1,6 @@
 package com.yigongbao.module.system.auth.dto;
 
+import cloud.tianai.captcha.validator.common.model.dto.ImageCaptchaTrack;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.yigongbao.module.system.auth.enums.LoginTypeEnum;
 import jakarta.validation.constraints.NotBlank;
@@ -10,7 +11,6 @@ import lombok.Data;
  * 统一登录 DTO
  * loginType=PASSWORD 时 principal=用户名，credential=密码
  * loginType=PHONE    时 principal=手机号，credential=短信验证码
- * loginType=EMAIL    时 principal=邮箱，  credential=邮箱验证码
  * <p>
  * 兼容旧格式：username + password（自动映射为 principal + credential + loginType=PASSWORD）
  *
@@ -21,7 +21,7 @@ import lombok.Data;
 public class LoginDTO {
 
     /**
-     * 登录类型（PASSWORD/PHONE/EMAIL）
+     * 登录类型（PASSWORD/PHONE）
      */
     @NotNull(message = "登录类型不能为空")
     private LoginTypeEnum loginType;
@@ -39,14 +39,14 @@ public class LoginDTO {
     private String credential;
 
     /**
-     * 图形验证码 ID（仅 PASSWORD 类型必传）
+     * 滑动验证码 key（仅 PASSWORD 类型必传，由 GET /captcha/get 返回的 id）
      */
-    private String captchaId;
+    private String captchaKey;
 
     /**
-     * 图形验证码内容（仅 PASSWORD 类型必传）
+     * 滑动验证码轨迹数据（仅 PASSWORD 类型必传，由前端滑动组件生成）
      */
-    private String captchaCode;
+    private ImageCaptchaTrack captchaTrack;
 
     // ==================== 兼容旧格式（username + password）====================
 

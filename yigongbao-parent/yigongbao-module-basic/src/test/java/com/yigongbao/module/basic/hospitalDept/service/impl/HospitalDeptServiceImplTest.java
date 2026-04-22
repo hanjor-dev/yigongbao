@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.hospitalDept.dto.CreateHospitalDeptDTO;
+import com.yigongbao.module.basic.hospitalDept.dto.HospitalDeptListDTO;
+import com.yigongbao.module.basic.hospitalDept.dto.HospitalDeptPageDTO;
 import com.yigongbao.module.basic.hospitalDept.dto.UpdateHospitalDeptDTO;
 import com.yigongbao.module.basic.hospitalDept.entity.HospitalDeptEntity;
 import com.yigongbao.module.basic.hospitalDept.mapper.HospitalDeptMapper;
@@ -205,7 +207,7 @@ class HospitalDeptServiceImplTest {
         when(hospitalDeptMapper.selectList(any(LambdaQueryWrapper.class)))
                 .thenReturn(Collections.singletonList(testEntity));
 
-        List<HospitalDeptVO> list = hospitalDeptService.listAll(null, null);
+        List<HospitalDeptVO> list = hospitalDeptService.listAll(new HospitalDeptListDTO());
 
         assertNotNull(list);
         assertEquals(1, list.size());
@@ -217,7 +219,7 @@ class HospitalDeptServiceImplTest {
         when(hospitalDeptMapper.selectList(any(LambdaQueryWrapper.class)))
                 .thenReturn(Collections.emptyList());
 
-        List<HospitalDeptVO> list = hospitalDeptService.listAll(null, null);
+        List<HospitalDeptVO> list = hospitalDeptService.listAll(new HospitalDeptListDTO());
 
         assertNotNull(list);
         assertTrue(list.isEmpty());
@@ -234,7 +236,7 @@ class HospitalDeptServiceImplTest {
         when(hospitalDeptMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
                 .thenReturn(page);
 
-        IPage<HospitalDeptVO> result = hospitalDeptService.listDepts(1, 10, null, null);
+        IPage<HospitalDeptVO> result = hospitalDeptService.listDepts(new HospitalDeptPageDTO());
 
         assertNotNull(result);
         assertEquals(1, result.getTotal());
@@ -250,7 +252,7 @@ class HospitalDeptServiceImplTest {
         when(hospitalDeptMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
                 .thenReturn(page);
 
-        IPage<HospitalDeptVO> result = hospitalDeptService.listDepts(1, 10, null, null);
+        IPage<HospitalDeptVO> result = hospitalDeptService.listDepts(new HospitalDeptPageDTO());
 
         assertNotNull(result);
         assertEquals(0, result.getTotal());

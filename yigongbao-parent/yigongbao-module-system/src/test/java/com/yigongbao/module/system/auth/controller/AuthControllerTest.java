@@ -1,9 +1,9 @@
 package com.yigongbao.module.system.auth.controller;
 
+import cloud.tianai.captcha.application.ImageCaptchaApplication;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.module.system.SystemTestApplication;
 import com.yigongbao.module.system.auth.service.AuthService;
-import com.yigongbao.module.system.auth.vo.GraphicCaptchaVO;
 import com.yigongbao.module.system.auth.vo.LoginVO;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -57,20 +56,8 @@ class AuthControllerTest {
     @MockBean
     private FileStorageService fileStorageService;
 
-    // ==================== getGraphicCaptcha 测试 ====================
-
-    @Test
-    @DisplayName("getGraphicCaptcha: 返回图形验证码 VO")
-    void getGraphicCaptcha_shouldReturnVO() throws Exception {
-        when(authService.getGraphicCaptcha()).thenReturn(
-                new GraphicCaptchaVO("test-id", "data:image/png;base64,abc"));
-
-        mockMvc.perform(get("/system/auth/graphic-captcha"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.captchaId").value("test-id"))
-                .andExpect(jsonPath("$.data.imageBase64").exists());
-    }
+    @MockBean
+    private ImageCaptchaApplication imageCaptchaApplication;
 
     // ==================== login 测试 ====================
 
@@ -85,8 +72,7 @@ class AuthControllerTest {
         body.put("loginType", "PASSWORD");
         body.put("principal", "admin");
         body.put("credential", "123456");
-        body.put("captchaId", "test-id");
-        body.put("captchaCode", "abcd");
+        body.put("captchaKey", "test-captcha-key");
 
         mockMvc.perform(post("/system/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -111,8 +97,8 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("login: 图形验证码错误时返回 CAPTCHA_GRAPHIC_ERROR")
-    void login_whenGraphicCaptchaError_shouldReturnError() throws Exception {
+    @DisplayName("login: 滑动验证码校验失败时返回 CAPTCHA_GRAPHIC_ERROR")
+    void login_whenSliderCaptchaError_shouldReturnError() throws Exception {
         when(authService.login(any()))
                 .thenThrow(new BusinessException(ErrorCodeEnum.CAPTCHA_GRAPHIC_ERROR));
 
@@ -120,8 +106,7 @@ class AuthControllerTest {
         body.put("loginType", "PASSWORD");
         body.put("principal", "admin");
         body.put("credential", "123456");
-        body.put("captchaId", "test-id");
-        body.put("captchaCode", "wrong");
+        body.put("captchaKey", "test-captcha-key");
 
         mockMvc.perform(post("/system/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

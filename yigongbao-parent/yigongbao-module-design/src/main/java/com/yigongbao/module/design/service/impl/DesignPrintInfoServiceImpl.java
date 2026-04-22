@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -115,20 +116,20 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
         }).toList();
         vo.setProducts(products);
 
-        // 3. 查材质列表（dict typeCode="15"），15.1=树脂 标 isDefault=true
-        List<DictVO> materialDicts = dictService.listByTypeCode("15");
+        // 3. 查材质列表（dict typeCode=MATERIAL_TYPE），MATERIAL_TYPE_RESIN=树脂 标 isDefault=true
+        List<DictVO> materialDicts = dictService.listByTypeCode(DictCodeConstants.MATERIAL_TYPE);
         List<DictOptionVO> materials = materialDicts.stream().map(d -> {
             DictOptionVO opt = new DictOptionVO();
             opt.setCode(d.getDictCode());
             opt.setName(d.getDictName());
-            opt.setIsDefault("15.1".equals(d.getDictCode()));
+            opt.setIsDefault(DictCodeConstants.MATERIAL_TYPE_RESIN.equals(d.getDictCode()));
             return opt;
         }).toList();
         vo.setMaterials(materials);
 
-        // 4. 查颜色二级节点（dict typeCode="16"）
+        // 4. 查颜色二级节点（dict typeCode=COLOR_TYPE）
         // 二级节点 dictValue 存产品大类 dict_code（如 17.1），供前端按产品分类过滤颜色
-        List<DictVO> colorTree = dictService.listTreeByTypeCode("16");
+        List<DictVO> colorTree = dictService.listTreeByTypeCode(DictCodeConstants.COLOR_TYPE);
         List<ColorGroupVO> colorGroups = new ArrayList<>();
         if (CollUtil.isNotEmpty(colorTree)) {
             DictVO root = colorTree.get(0);
@@ -389,12 +390,12 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
         instructionMapper.update(null,
                 new LambdaUpdateWrapper<DesignInstructionEntity>()
                         .eq(DesignInstructionEntity::getPackageId, packageId)
-                        .set(DesignInstructionEntity::getIsConfirmed, 0)
+                        .set(DesignInstructionEntity::getIsConfirmed, StatusConstants.NOT_CONFIRMED)
                         .set(DesignInstructionEntity::getConfirmTime, null));
         drawingMapper.update(null,
                 new LambdaUpdateWrapper<DesignDrawingEntity>()
                         .eq(DesignDrawingEntity::getPackageId, packageId)
-                        .set(DesignDrawingEntity::getIsConfirmed, 0)
+                        .set(DesignDrawingEntity::getIsConfirmed, StatusConstants.NOT_CONFIRMED)
                         .set(DesignDrawingEntity::getConfirmTime, null));
         log.info("重置数据包确认状态成功，packageId={}", packageId);
     }

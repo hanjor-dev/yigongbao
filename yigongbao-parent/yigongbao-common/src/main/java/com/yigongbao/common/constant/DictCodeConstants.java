@@ -119,4 +119,24 @@ public final class DictCodeConstants {
      * 影像报告
      */
     public static final String ORDER_FILE_CATEGORY_REPORT = "10.2";
+
+    // ==================== 设计模块字典编码 ====================
+
+    /**
+     * 材质类型（父节点 dict_code）
+     * 用于打印信息-材质选择
+     */
+    public static final String MATERIAL_TYPE = "15";
+
+    /**
+     * 材质类型-树脂（默认材质）
+     * dict_code = "15.1"
+     */
+    public static final String MATERIAL_TYPE_RESIN = "15.1";
+
+    /**
+     * 颜色类型（父节点 dict_code）
+     * 用于打印信息-颜色选择
+     */
+    public static final String COLOR_TYPE = "16";
 }

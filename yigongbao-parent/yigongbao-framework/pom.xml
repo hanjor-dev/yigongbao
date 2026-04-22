@@ -97,6 +97,12 @@
             <artifactId>ip2region</artifactId>
         </dependency>
 
+        <!-- tianai-captcha 滑动验证码 -->
+        <dependency>
+            <groupId>cloud.tianai.captcha</groupId>
+            <artifactId>tianai-captcha-springboot-starter</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

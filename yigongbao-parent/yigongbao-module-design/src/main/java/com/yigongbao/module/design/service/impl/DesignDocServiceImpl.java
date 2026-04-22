@@ -3,6 +3,7 @@ package com.yigongbao.module.design.service.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.constant.CodeRuleConstants;
+import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
@@ -555,7 +556,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             toOverride.setTemplateFileUrl(fileVO.getFileUrl());
             toOverride.setGenerateTime(now);
             // 数据已变，重置确认状态，强制重新确认
-            toOverride.setIsConfirmed(0);
+            toOverride.setIsConfirmed(StatusConstants.NOT_CONFIRMED);
             toOverride.setConfirmTime(null);
             instructionService.updateById(toOverride);
             log.info("指令单覆盖完成，packageId={}, version={}", packageId, version);
@@ -572,7 +573,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             entity.setTemplateFileId(fileVO.getId());
             entity.setTemplateFileUrl(fileVO.getFileUrl());
             // 新版本初始为未确认状态
-            entity.setIsConfirmed(0);
+            entity.setIsConfirmed(StatusConstants.NOT_CONFIRMED);
             instructionService.save(entity);
             log.info("指令单新建完成，packageId={}, version={}", packageId, version);
             return entity;
@@ -634,7 +635,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             toOverride.setTemplateFileUrl(fileVO.getFileUrl());
             toOverride.setGenerateTime(now);
             // 数据已变，重置确认状态，强制重新确认
-            toOverride.setIsConfirmed(0);
+            toOverride.setIsConfirmed(StatusConstants.NOT_CONFIRMED);
             toOverride.setConfirmTime(null);
             drawingService.updateById(toOverride);
             log.info("图纸覆盖完成，packageId={}, version={}", packageId, version);
@@ -650,7 +651,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             entity.setTemplateFileId(fileVO.getId());
             entity.setTemplateFileUrl(fileVO.getFileUrl());
             // 新版本初始为未确认状态
-            entity.setIsConfirmed(0);
+            entity.setIsConfirmed(StatusConstants.NOT_CONFIRMED);
             drawingService.save(entity);
             log.info("图纸新建完成，packageId={}, version={}", packageId, version);
             return entity;

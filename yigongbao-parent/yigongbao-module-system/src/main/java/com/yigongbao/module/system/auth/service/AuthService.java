@@ -4,7 +4,6 @@ import com.yigongbao.module.system.auth.dto.ChangePasswordDTO;
 import com.yigongbao.module.system.auth.dto.ForgotPasswordResetDTO;
 import com.yigongbao.module.system.auth.dto.LoginDTO;
 import com.yigongbao.module.system.auth.dto.SendCaptchaDTO;
-import com.yigongbao.module.system.auth.vo.GraphicCaptchaVO;
 import com.yigongbao.module.system.auth.vo.LoginVO;
 
 /**
@@ -14,13 +13,6 @@ import com.yigongbao.module.system.auth.vo.LoginVO;
  * @date 2026-03-19
  */
 public interface AuthService {
-
-    /**
-     * 获取图形验证码（仅 PASSWORD 登录类型使用）
-     *
-     * @return 验证码 ID 和 Base64 图片
-     */
-    GraphicCaptchaVO getGraphicCaptcha();
 
     /**
      * 用户登录（支持 PASSWORD / PHONE / EMAIL 三种方式）

@@ -14,6 +14,8 @@ import com.yigongbao.module.basic.product.mapper.ProductMapper;
 import com.yigongbao.module.basic.product.mapper.ProductSpecMapper;
 import com.yigongbao.module.basic.product.service.ProductSpecService;
 import com.yigongbao.module.basic.product.vo.ProductSpecVO;
+import com.yigongbao.module.basic.registrationCert.service.RegistrationCertService;
+import com.yigongbao.module.basic.registrationCert.vo.RegistrationCertVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -37,6 +39,9 @@ public class ProductSpecServiceImpl extends ServiceImpl<ProductSpecMapper, Produ
         implements ProductSpecService {
 
     private final ProductMapper productMapper;
+
+    @Autowired(required = false)
+    private RegistrationCertService registrationCertService;
 
     /**
      * 规格引用检查器，由 design 模块实现并注入（Optional，允许不存在）
@@ -94,6 +99,11 @@ public class ProductSpecServiceImpl extends ServiceImpl<ProductSpecMapper, Produ
             ProductSpecEntity entity = new ProductSpecEntity();
             BeanUtils.copyProperties(dto, entity);
             entity.setProductId(productId);
+            // 根据 certId 查询注册证号并写入冗余字段
+            if (dto.getCertId() != null && registrationCertService != null) {
+                RegistrationCertVO cert = registrationCertService.getById(dto.getCertId());
+                entity.setCertNo(cert != null ? cert.getCertCode() : null);
+            }
             if (entity.getStatus() == null) {
                 entity.setStatus(StatusConstants.NORMAL);
             }
@@ -144,7 +154,19 @@ public class ProductSpecServiceImpl extends ServiceImpl<ProductSpecMapper, Produ
             }
 
             // 3. 更新
-            BeanUtils.copyProperties(dto, entity, "id", "productId", "createTime", "updateTime", "createBy", "updateBy");
+            Long oldCertId = entity.getCertId();
+            BeanUtils.copyProperties(dto, entity, "id", "productId", "createTime", "updateTime", "createBy", "updateBy", "certNo");
+            // 若 certId 有变化或 certNo 为空，则重新查询 certNo；否则保留原值
+            if (dto.getCertId() != null) {
+                if (!dto.getCertId().equals(oldCertId) || entity.getCertNo() == null) {
+                    RegistrationCertVO cert = registrationCertService != null
+                            ? registrationCertService.getById(dto.getCertId()) : null;
+                    entity.setCertNo(cert != null ? cert.getCertCode() : null);
+                }
+            } else if (dto.getCertId() == null && oldCertId != null) {
+                // certId 被清空，同步清空 certNo
+                entity.setCertNo(null);
+            }
             updateById(entity);
             log.info("更新产品规格成功，specId={}", specId);
         } catch (BusinessException e) {

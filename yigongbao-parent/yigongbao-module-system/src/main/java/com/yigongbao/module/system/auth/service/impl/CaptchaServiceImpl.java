@@ -52,9 +52,9 @@ public class CaptchaServiceImpl implements CaptchaService {
 
         // 2. 每日次数检测
         String dailyKey = buildDailyKey(scene, captchaType, target);
-        String dailyCountStr = (String) redisTemplate.opsForValue().get(dailyKey);
+        Object dailyCountObj = redisTemplate.opsForValue().get(dailyKey);
         int dailyLimit = getDailyLimit();
-        if (dailyCountStr != null && Integer.parseInt(dailyCountStr) >= dailyLimit) {
+        if (dailyCountObj != null && toInt(dailyCountObj) >= dailyLimit) {
             log.warn("验证码每日发送次数已达上限，type={}, target={}", captchaType, target);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_DAILY_LIMIT);
         }
@@ -96,8 +96,8 @@ public class CaptchaServiceImpl implements CaptchaService {
         }
 
         // 2. 错误次数是否已达上限
-        String attemptsStr = (String) redisTemplate.opsForValue().get(attemptsKey);
-        int attempts = attemptsStr == null ? 0 : Integer.parseInt(attemptsStr);
+        Object attemptsObj = redisTemplate.opsForValue().get(attemptsKey);
+        int attempts = attemptsObj == null ? 0 : toInt(attemptsObj);
         if (attempts >= MAX_ATTEMPTS) {
             log.warn("验证码错误次数已达上限，强制删除，type={}, target={}", captchaType, target);
             redisTemplate.delete(captchaKey);
@@ -164,5 +164,15 @@ public class CaptchaServiceImpl implements CaptchaService {
     private int getDailyLimit() {
         String val = configService.getConfigValue(SystemConfigKeyEnum.CAPTCHA_DAILY_LIMIT.getKey());
         return val != null ? Integer.parseInt(val) : 10;
+    }
+
+    /**
+     * Redis 中通过 INCR 写入的计数值，反序列化后可能为 Integer/Long/String，统一转为 int
+     */
+    private int toInt(Object obj) {
+        if (obj instanceof Number) {
+            return ((Number) obj).intValue();
+        }
+        return Integer.parseInt(obj.toString());
     }
 }

@@ -346,6 +346,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             }
             entity.setPassword(passwordEncoder.encode(rawPassword));
             entity.setStatus(StatusConstants.NORMAL);
+            // 空字符串字段统一置 null，避免触发唯一索引冲突
+            if (StrUtil.isBlank(entity.getEmployeeNo())) {
+                entity.setEmployeeNo(null);
+            }
+            if (StrUtil.isBlank(entity.getEmail())) {
+                entity.setEmail(null);
+            }
             // 插入数据库
             save(entity);
 
@@ -451,6 +458,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             // 更新用户信息（排除不允许通过此接口修改的字段）
             BeanUtils.copyProperties(dto, entity, "id", "username", "password", "status",
                     "createTime", "updateTime", "createBy", "updateBy");
+            // 空字符串工号统一置 null，避免触发唯一索引冲突
+            if (StrUtil.isBlank(entity.getEmployeeNo())) {
+                entity.setEmployeeNo(null);
+            }
+            if (StrUtil.isBlank(entity.getEmail())) {
+                entity.setEmail(null);
+            }
             updateById(entity);
             log.info("更新用户成功，id={}", id);
         } catch (BusinessException e) {

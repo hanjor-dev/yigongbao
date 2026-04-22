@@ -633,27 +633,23 @@ UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM sys_org)         
 -- -- 重建部位数据初始化（rebuild_body_part）
 -- -- 平级结构，直接列出所有具体部位
 -- -- ============================================================
--- INSERT INTO rebuild_body_part (id, name, code, sort, status)
--- VALUES
--- (1, '颅骨', 'BP-0001', 1, 1),
--- (2, '颌面', 'BP-0002', 2, 1),
--- (3, '眼眶', 'BP-0003', 3, 1),
--- (4, '颈椎', 'BP-0004', 4, 1);
+INSERT INTO rebuild_body_part (id, name, code, sort, status, remark, scope, create_time, update_time, create_by, update_by, is_deleted)
+VALUES
+(1, '头颈', 'BP-0001', 0, 1, NULL, '{"x":0.3807583867458058,"y":0.03811484718472379,"w":0.28001296039804896,"h":0.16117593298799132}', NOW(), NOW(), 1, 1, 0),
+(2, '腹部', 'BP-0002', 1, 1, NULL, '{"x":0.2840872456560032,"y":0.3577329175973382,"w":0.49668965594415837,"h":0.165454940058469}', NOW(), NOW(), 1, 1, 0);
 
 
 -- -- ============================================================
 -- -- 重建项目数据初始化（rebuild_project）
 -- -- 层级结构：部位（body_part_id） → 重建项目（level=1） → 子重建项目（level=2）
 -- -- ============================================================
--- INSERT INTO rebuild_project (id, body_part_id, parent_id, name, code, level, standard_price, urgent_price, category_code, category_name, estimated_hours, sort, status, specialty)
--- VALUES
--- -- 颅骨重建（body_part_id=1）
--- (1, 1, 0, '颅骨缺损修补',       'RP-0001', 1, 15000.00, 22000.00, '13.1', '模型', 48.0, 1, 1, '7.1'),
--- (2, 1, 1, '3D钛网修补',         'RP-0002', 2,  8000.00, 12000.00, '13.2', '导板',  8.0, 1, 1, '7.1'),
--- (3, 1, 1, 'PEEK材料修补',       'RP-0003', 2, 12000.00, 18000.00, '13.2', '导板', 12.0, 2, 1, '7.1'),
--- -- 颌面重建（body_part_id=2）
--- (4, 2, 0, '颌面部骨折复位',     'RP-0004', 1, 20000.00, 30000.00, '13.1', '模型', 72.0, 2, 1, '7.2'),
--- (5, 2, 4, '下颌骨骨折复位导板', 'RP-0005', 2,  6000.00,  9000.00, '13.2', '导板',  6.0, 1, 1, '7.2');
+INSERT INTO rebuild_project (id, body_part_id, parent_id, name, code, level, standard_price, urgent_price, category_code, category_name, estimated_hours, description, forming_requirements, sort, status, specialty, remark, create_time, update_time, create_by, update_by, is_deleted)
+VALUES
+-- 头颈重建（body_part_id=1）
+(1, 1, 0, '头部测试项目1', 'RP-0001', 1, NULL, NULL, '13.1', '模型', NULL, '头部测试项目1项目说明1111111', '头部测试项目1成型需求2222222', 0, 1, '7.1', NULL, NOW(), NOW(), 1, 1, 0),
+(2, 1, 0, '颈部测试项目1', 'RP-0002', 1, NULL, NULL, '13.2', '导板', NULL, '颈部测试项目1项目说明1111111', '颈部测试项目1成型续期2222', 1, 1, '7.2', NULL, NOW(), NOW(), 1, 1, 0),
+-- 腹部重建（body_part_id=2）
+(3, 2, 0, '腹部项目A', 'RP-0003', 1, NULL, NULL, '13.1', '模型', NULL, NULL, NULL, 0, 1, '7.4', NULL, NOW(), NOW(), 1, 1, 0);
 
 
 -- ============================================================

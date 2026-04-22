@@ -85,7 +85,7 @@ class HospitalControllerTest {
         IPage<HospitalVO> page = new Page<>(1, 10);
         page.setRecords(List.of(buildTestVO(1L, "北京协和医院"), buildTestVO(2L, "上海市第一人民医院")));
         page.setTotal(2);
-        when(hospitalService.listHospital(anyInt(), anyInt(), any(), any(), any(), any(), any()))
+        when(hospitalService.listHospital(any()))
                 .thenReturn(page);
 
         mockMvc.perform(get("/basic/hospital/list")
@@ -108,7 +108,7 @@ class HospitalControllerTest {
         IPage<HospitalVO> page = new Page<>(1, 10);
         page.setRecords(List.of(buildTestVO(1L, "北京协和医院")));
         page.setTotal(1);
-        when(hospitalService.listHospital(eq(1), eq(10), eq("协和"), any(), any(), any(), any()))
+        when(hospitalService.listHospital(any()))
                 .thenReturn(page);
 
         mockMvc.perform(get("/basic/hospital/list")
@@ -163,7 +163,7 @@ class HospitalControllerTest {
     @Test
     @DisplayName("create: 创建成功返回200")
     void create_shouldSuccess() throws Exception {
-        when(hospitalService.listHospital(anyInt(), anyInt(), any(), any(), any(), any(), any()))
+        when(hospitalService.listHospital(any()))
                 .thenReturn(new Page<>(1, 10));
 
         mockMvc.perform(post("/basic/hospital")

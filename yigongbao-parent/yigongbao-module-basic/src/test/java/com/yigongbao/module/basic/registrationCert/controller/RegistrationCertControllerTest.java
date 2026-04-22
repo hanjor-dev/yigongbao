@@ -73,7 +73,7 @@ class RegistrationCertControllerTest {
             var page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<RegistrationCertVO>(1, 10);
             page.setRecords(List.of(vo));
             page.setTotal(1);
-            when(registrationCertService.listCerts(eq(1), eq(10), any(), any(), any()))
+            when(registrationCertService.listCerts(any()))
                     .thenReturn(page);
 
             mockMvc.perform(get("/basic/registration-cert/list"))
@@ -89,7 +89,7 @@ class RegistrationCertControllerTest {
             var page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<RegistrationCertVO>(1, 10);
             page.setRecords(new ArrayList<>());
             page.setTotal(0);
-            when(registrationCertService.listCerts(eq(1), eq(10), any(), any(), any()))
+            when(registrationCertService.listCerts(any()))
                     .thenReturn(page);
 
             mockMvc.perform(get("/basic/registration-cert/list"))

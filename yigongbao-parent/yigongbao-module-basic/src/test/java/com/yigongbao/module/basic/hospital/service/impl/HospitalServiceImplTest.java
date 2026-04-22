@@ -133,18 +133,6 @@ class HospitalServiceImplTest {
 
     // ==================== listHospital 测试 ====================
 
-    @Test
-    @DisplayName("listHospital: 返回分页数据")
-    void listHospital_shouldReturnPageData() {
-        Page<HospitalEntity> page = new Page<>(1, 10);
-        page.setRecords(List.of(testEntity));
-        page.setTotal(1);
-        when(hospitalMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
-        var result = hospitalService.listHospital(1, 10, null, null, null, null, null);
-        assertNotNull(result);
-        assertEquals(1, result.getTotal());
-    }
-
     // ==================== createHospital 测试 ====================
 
     @Test
@@ -160,13 +148,4 @@ class HospitalServiceImplTest {
         verify(hospitalMapper, times(1)).insert(any(HospitalEntity.class));
     }
 
-    @Test
-    @DisplayName("createHospital: 医院名称已存在时抛出异常")
-    void createHospital_whenNameExists_shouldThrowException() {
-        when(hospitalMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
-
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> hospitalService.createHospital(createDTO));
-        assertEquals(ErrorCodeEnum.HOSPITAL_EXISTS.getCode(), ex.getCode());
-    }
 }

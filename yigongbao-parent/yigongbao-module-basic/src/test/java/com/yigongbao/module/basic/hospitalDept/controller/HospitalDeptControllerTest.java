@@ -71,7 +71,7 @@ class HospitalDeptControllerTest {
             var page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<HospitalDeptVO>(1, 10);
             page.setRecords(List.of(vo));
             page.setTotal(1);
-            when(hospitalDeptService.listDepts(eq(1), eq(10), any(), any()))
+            when(hospitalDeptService.listDepts(any()))
                     .thenReturn(page);
 
             mockMvc.perform(get("/basic/hospital-dept/page"))
@@ -87,7 +87,7 @@ class HospitalDeptControllerTest {
             var page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<HospitalDeptVO>(1, 10);
             page.setRecords(new ArrayList<>());
             page.setTotal(0);
-            when(hospitalDeptService.listDepts(eq(1), eq(10), any(), any()))
+            when(hospitalDeptService.listDepts(any()))
                     .thenReturn(page);
 
             mockMvc.perform(get("/basic/hospital-dept/page"))
@@ -104,7 +104,7 @@ class HospitalDeptControllerTest {
             var page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<HospitalDeptVO>(1, 10);
             page.setRecords(List.of(vo));
             page.setTotal(1);
-            when(hospitalDeptService.listDepts(eq(1), eq(10), eq("骨科"), any()))
+            when(hospitalDeptService.listDepts(any()))
                     .thenReturn(page);
 
             mockMvc.perform(get("/basic/hospital-dept/page")
@@ -120,7 +120,7 @@ class HospitalDeptControllerTest {
             var page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<HospitalDeptVO>(1, 10);
             page.setRecords(new ArrayList<>());
             page.setTotal(0);
-            when(hospitalDeptService.listDepts(eq(1), eq(10), any(), eq(0)))
+            when(hospitalDeptService.listDepts(any()))
                     .thenReturn(page);
 
             mockMvc.perform(get("/basic/hospital-dept/page")
@@ -139,7 +139,7 @@ class HospitalDeptControllerTest {
         @Test
         @DisplayName("list: 返回所有科室")
         void list_shouldReturnAll() throws Exception {
-            when(hospitalDeptService.listAll(any(), any()))
+            when(hospitalDeptService.listAll(any()))
                     .thenReturn(List.of(buildTestVO(1L, "骨科"), buildTestVO(2L, "口腔科")));
 
             mockMvc.perform(get("/basic/hospital-dept/list"))

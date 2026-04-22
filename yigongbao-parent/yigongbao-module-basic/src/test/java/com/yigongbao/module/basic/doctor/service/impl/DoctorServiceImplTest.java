@@ -6,6 +6,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.doctor.dto.CreateDoctorDTO;
+import com.yigongbao.module.basic.doctor.dto.DoctorListDTO;
+import com.yigongbao.module.basic.doctor.dto.DoctorPageDTO;
+import com.yigongbao.module.basic.doctor.dto.DoctorSuggestDTO;
 import com.yigongbao.module.basic.doctor.dto.QuickAddDoctorDTO;
 import com.yigongbao.module.basic.doctor.dto.UpdateDoctorDTO;
 import com.yigongbao.module.basic.doctor.entity.DoctorEntity;
@@ -118,7 +121,7 @@ class DoctorServiceImplTest {
         dto.setHospitalId(1L);
         dto.setHospitalDeptId(1L);
 
-        doctorService.create(dto, 1L);
+        doctorService.create(dto);
 
         verify(doctorMapper, times(1)).insert(any(DoctorEntity.class));
     }
@@ -134,7 +137,7 @@ class DoctorServiceImplTest {
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> doctorService.create(dto, 1L)
+                () -> doctorService.create(dto)
         );
         assertEquals(ErrorCodeEnum.HOSPITAL_NOT_FOUND.getCode(), exception.getCode());
     }
@@ -189,7 +192,7 @@ class DoctorServiceImplTest {
 
         when(doctorMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
-        DoctorVO vo = doctorService.quickAdd(dto, 1L);
+        DoctorVO vo = doctorService.quickAdd(dto);
 
         assertNotNull(vo);
         verify(doctorMapper, times(1)).insert(any(DoctorEntity.class));
@@ -204,7 +207,7 @@ class DoctorServiceImplTest {
 
         when(doctorMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(testEntity);
 
-        DoctorVO vo = doctorService.quickAdd(dto, 1L);
+        DoctorVO vo = doctorService.quickAdd(dto);
 
         assertNotNull(vo);
         assertEquals("张三", vo.getDoctorName());
@@ -218,7 +221,7 @@ class DoctorServiceImplTest {
         when(doctorMapper.selectList(any(LambdaQueryWrapper.class)))
                 .thenReturn(Collections.singletonList(testEntity));
 
-        List<DoctorVO> list = doctorService.listAll(null, null, null);
+        List<DoctorVO> list = doctorService.listAll(new DoctorListDTO());
 
         assertNotNull(list);
         assertEquals(1, list.size());
@@ -230,7 +233,7 @@ class DoctorServiceImplTest {
         when(doctorMapper.selectList(any(LambdaQueryWrapper.class)))
                 .thenReturn(Collections.emptyList());
 
-        List<DoctorVO> list = doctorService.listAll(null, null, null);
+        List<DoctorVO> list = doctorService.listAll(new DoctorListDTO());
 
         assertNotNull(list);
         assertTrue(list.isEmpty());
@@ -247,7 +250,7 @@ class DoctorServiceImplTest {
         when(doctorMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
                 .thenReturn(page);
 
-        IPage<DoctorVO> result = doctorService.listDoctors(1, 10, null, null, null, null);
+        IPage<DoctorVO> result = doctorService.listDoctors(new DoctorPageDTO());
 
         assertNotNull(result);
         assertEquals(1, result.getTotal());
@@ -263,7 +266,7 @@ class DoctorServiceImplTest {
         when(doctorMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
                 .thenReturn(page);
 
-        IPage<DoctorVO> result = doctorService.listDoctors(1, 10, null, null, null, null);
+        IPage<DoctorVO> result = doctorService.listDoctors(new DoctorPageDTO());
 
         assertNotNull(result);
         assertEquals(0, result.getTotal());
@@ -319,7 +322,7 @@ class DoctorServiceImplTest {
         when(doctorMapper.selectList(any(LambdaQueryWrapper.class)))
                 .thenReturn(Collections.singletonList(testEntity));
 
-        List<DoctorVO> result = doctorService.listByCreatorAndHospital(1L, 1L, null);
+        List<DoctorVO> result = doctorService.listByCreatorAndHospital(new DoctorSuggestDTO());
 
         assertNotNull(result);
         assertEquals(1, result.size());

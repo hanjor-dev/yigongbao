@@ -1,13 +1,10 @@
 package com.yigongbao.module.system.auth.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
-import cn.hutool.captcha.CaptchaUtil;
-import cn.hutool.captcha.LineCaptcha;
-import cn.hutool.core.codec.Base64;
-import cn.hutool.core.util.IdUtil;
+import cloud.tianai.captcha.application.ImageCaptchaApplication;
+import cloud.tianai.captcha.validator.common.model.dto.ImageCaptchaTrack;
+import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.StrUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
@@ -22,9 +19,7 @@ import com.yigongbao.module.system.auth.enums.LoginTypeEnum;
 import com.yigongbao.module.system.auth.mapper.LoginLogMapper;
 import com.yigongbao.module.system.auth.service.AuthService;
 import com.yigongbao.module.system.auth.service.CaptchaService;
-import com.yigongbao.module.system.auth.vo.GraphicCaptchaVO;
 import com.yigongbao.module.system.auth.vo.LoginVO;
-import com.yigongbao.module.system.auth.vo.LoginLogVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.resource.service.ResourceService;
 import com.yigongbao.module.system.user.convert.UserConvert;
@@ -33,18 +28,15 @@ import com.yigongbao.module.system.user.mapper.UserMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 认证 Service 实现类
- * 支持账号密码、手机验证码、邮箱验证码三种登录方式，以及忘记密码重置
+ * 支持账号密码、手机验证码两种登录方式，以及忘记密码重置（手机/邮箱二选一验证）
  *
  * @author hanjor
  * @date 2026-03-19
@@ -60,35 +52,7 @@ public class AuthServiceImpl implements AuthService {
     private final ConfigService configService;
     private final PasswordEncoder passwordEncoder;
     private final CaptchaService captchaService;
-    private final RedisTemplate<String, Object> redisTemplate;
-
-    /** 图形验证码 Redis key 前缀 */
-    private static final String GRAPHIC_CAPTCHA_PREFIX = "graphic:captcha:";
-    /** 图形验证码有效期（秒） */
-    private static final int GRAPHIC_CAPTCHA_TTL = 300;
-
-    // ==================== 图形验证码 ====================
-
-    /**
-     * 生成图形验证码（仅 PASSWORD 登录时需要）
-     */
-    @Override
-    public GraphicCaptchaVO getGraphicCaptcha() {
-        // 生成 4 位行干扰验证码
-        LineCaptcha captcha = CaptchaUtil.createLineCaptcha(120, 40, 4, 20);
-        String code = captcha.getCode().toLowerCase();
-        String captchaId = IdUtil.fastSimpleUUID();
-
-        // 将图片写入 Base64
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        captcha.write(out);
-        String imageBase64 = "data:image/png;base64," + Base64.encode(out.toByteArray());
-
-        // 存入 Redis
-        redisTemplate.opsForValue().set(GRAPHIC_CAPTCHA_PREFIX + captchaId, code, GRAPHIC_CAPTCHA_TTL, TimeUnit.SECONDS);
-        log.info("图形验证码已生成，captchaId={}", captchaId);
-        return new GraphicCaptchaVO(captchaId, imageBase64);
-    }
+    private final ImageCaptchaApplication imageCaptchaApplication;
 
     // ==================== 登录 ====================
 
@@ -105,8 +69,6 @@ public class AuthServiceImpl implements AuthService {
             return resolveByPassword(dto, ip, userAgent);
         } else if (LoginTypeEnum.PHONE == dto.getLoginType()) {
             return resolveByPhone(dto, ip, userAgent);
-        } else if (LoginTypeEnum.EMAIL == dto.getLoginType()) {
-            return resolveByEmail(dto, ip, userAgent);
         }
         throw new BusinessException(ErrorCodeEnum.PARAM_ERROR);
     }
@@ -115,16 +77,19 @@ public class AuthServiceImpl implements AuthService {
      * 账号密码登录
      */
     private LoginVO resolveByPassword(LoginDTO dto, String ip, String userAgent) {
-        // 1. 校验图形验证码（前端传入时才校验，兼容前端未接入验证码的过渡阶段）
-        if (StrUtil.isNotBlank(dto.getCaptchaId()) && StrUtil.isNotBlank(dto.getCaptchaCode())) {
-            verifyGraphicCaptcha(dto.getCaptchaId(), dto.getCaptchaCode());
+        // 1. 校验滑动验证码（前端传入时才校验，兼容前端未接入验证码的过渡阶段）
+        if (StrUtil.isNotBlank(dto.getCaptchaKey()) && dto.getCaptchaTrack() != null) {
+            verifySliderCaptcha(dto.getCaptchaKey(), dto.getCaptchaTrack());
         }
 
         try {
-            // 2. 查询用户
-            UserEntity user = userMapper.selectByUsername(dto.getPrincipal());
+            // 2. 查询用户（principal 支持用户名或邮箱，自动识别）
+            boolean isEmail = Validator.isEmail(dto.getPrincipal());
+            UserEntity user = isEmail
+                    ? userMapper.selectByEmail(dto.getPrincipal())
+                    : userMapper.selectByUsername(dto.getPrincipal());
             if (user == null) {
-                log.warn("用户不存在，username={}", dto.getPrincipal());
+                log.warn("用户不存在，principal={}", dto.getPrincipal());
                 saveLoginLog(null, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户不存在");
                 throw new BusinessException(ErrorCodeEnum.USERNAME_OR_PASSWORD_ERROR);
             }
@@ -201,57 +166,15 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 邮箱验证码登录
+     * 校验滑动验证码（PASSWORD 登录专用）
+     *
+     * @param captchaKey   由 GET /captcha/get 返回的验证码 id
+     * @param captchaTrack 前端滑动组件生成的轨迹数据
      */
-    private LoginVO resolveByEmail(LoginDTO dto, String ip, String userAgent) {
-        try {
-            // 1. 校验验证码
-            captchaService.verifyCaptcha(
-                    com.yigongbao.module.system.auth.enums.CaptchaTypeEnum.EMAIL.getValue(),
-                    dto.getPrincipal(), CaptchaSceneEnum.LOGIN.getScene(), dto.getCredential()
-            );
-
-            // 2. 查询用户
-            UserEntity user = userMapper.selectByEmail(dto.getPrincipal());
-            if (user == null) {
-                log.warn("邮箱对应用户不存在，email={}", dto.getPrincipal());
-                saveLoginLog(null, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户不存在");
-                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
-            }
-
-            // 3. 校验用户状态
-            if (Integer.valueOf(StatusConstants.DISABLED).equals(user.getStatus())) {
-                log.warn("用户已禁用，email={}", dto.getPrincipal());
-                saveLoginLog(user.getId(), dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户已禁用");
-                throw new BusinessException(ErrorCodeEnum.USER_DISABLED);
-            }
-
-            return buildLoginSuccess(user, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent);
-
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("邮箱验证码登录异常，email={}", dto.getPrincipal(), e);
-            saveLoginLog(null, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "系统异常");
-            throw e;
-        }
-    }
-
-    /**
-     * 校验图形验证码（PASSWORD 登录专用）
-     */
-    private void verifyGraphicCaptcha(String captchaId, String captchaCode) {
-        if (StrUtil.isBlank(captchaId) || StrUtil.isBlank(captchaCode)) {
-            throw new BusinessException(ErrorCodeEnum.CAPTCHA_GRAPHIC_EXPIRED);
-        }
-        String key = GRAPHIC_CAPTCHA_PREFIX + captchaId;
-        String stored = (String) redisTemplate.opsForValue().get(key);
-        if (stored == null) {
-            throw new BusinessException(ErrorCodeEnum.CAPTCHA_GRAPHIC_EXPIRED);
-        }
-        // 一次性使用：无论对错立即删除
-        redisTemplate.delete(key);
-        if (!stored.equals(captchaCode.toLowerCase())) {
+    private void verifySliderCaptcha(String captchaKey, ImageCaptchaTrack captchaTrack) {
+        boolean passed = imageCaptchaApplication.matching(captchaKey, captchaTrack).isSuccess();
+        if (!passed) {
+            log.warn("滑动验证码校验失败，captchaKey={}", captchaKey);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_GRAPHIC_ERROR);
         }
     }

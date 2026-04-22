@@ -4,6 +4,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.file.config.FileStorageProperties;
 import com.yigongbao.module.basic.file.entity.FileDetail;
+import com.yigongbao.module.basic.file.provider.FileUploadConfigProvider;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import org.dromara.x.file.storage.core.FileInfo;
@@ -55,6 +56,9 @@ class FileServiceImplTest {
     @Mock
     private FileStorageProperties fileStorageProperties;
 
+    @Mock
+    private FileUploadConfigProvider fileUploadConfigProvider;
+
     @InjectMocks
     private FileServiceImpl fileService;
 
@@ -94,8 +98,6 @@ class FileServiceImplTest {
         testVO.setCreateTime(now);
 
         when(fileStorageProperties.getMaxFileSize()).thenReturn(524288000L);
-        when(fileStorageProperties.getAllowedExtensions()).thenReturn(
-                new String[]{"jpg", "jpeg", "png", "pdf", "doc", "docx"});
     }
 
     // ==================== uploadFile 测试 ====================
@@ -388,56 +390,24 @@ class FileServiceImplTest {
                     MultipartFile.class);
             method.setAccessible(true);
 
-            when(fileStorageProperties.getAllowedExtensions()).thenReturn(
-                    new String[]{"jpg", "png"});
             when(fileStorageProperties.getMaxFileSize()).thenReturn(524288000L);
-            FileServiceImpl svc = new FileServiceImpl(
-                    fileStorageService, fileRecorderService, fileStorageProperties);
 
             org.springframework.mock.web.MockMultipartFile badFile =
                     new org.springframework.mock.web.MockMultipartFile(
                             "file", "test.exe", "application/octet-stream", "virus".getBytes());
 
-            InvocationTargetException ite = assertThrows(
-                    InvocationTargetException.class,
-                    () -> method.invoke(svc, badFile));
-            assertTrue(ite.getCause() instanceof BusinessException);
-        }
-    }
-
-    // ==================== getFileExt 私有方法测试 ====================
-
-    @Nested
-    @DisplayName("getFileExt 私有方法测试")
-    class GetFileExtTests {
-
-        @Test
-        @DisplayName("getFileExt: 正常文件名应返回扩展名")
-        void getFileExt_shouldReturnExtension() throws Exception {
-            Method method = FileServiceImpl.class.getDeclaredMethod("getFileExt", String.class);
-            method.setAccessible(true);
-
-            assertEquals("jpg", method.invoke(fileService, "test.jpg"));
-            assertEquals("png", method.invoke(fileService, "test.file.png"));
-            assertEquals("jpeg", method.invoke(fileService, "test.JPEG"));
-        }
-
-        @Test
-        @DisplayName("getFileExt: 无扩展名应返回空字符串")
-        void getFileExt_whenNoExtension_shouldReturnEmpty() throws Exception {
-            Method method = FileServiceImpl.class.getDeclaredMethod("getFileExt", String.class);
-            method.setAccessible(true);
-
-            assertEquals("", method.invoke(fileService, "testfile"));
-        }
-
-        @Test
-        @DisplayName("getFileExt: null 应返回空字符串")
-        void getFileExt_whenNull_shouldReturnEmpty() throws Exception {
-            Method method = FileServiceImpl.class.getDeclaredMethod("getFileExt", String.class);
-            method.setAccessible(true);
-
-            assertEquals("", method.invoke(fileService, (String) null));
+            // validateFile 只校验空文件、大小、文件名安全性，不校验扩展名（扩展名由 bizType 层处理）
+            // 此文件名合法，不应抛出异常
+            assertDoesNotThrow(() -> {
+                try {
+                    method.invoke(fileService, badFile);
+                } catch (java.lang.reflect.InvocationTargetException e) {
+                    if (e.getCause() instanceof BusinessException) {
+                        throw (BusinessException) e.getCause();
+                    }
+                    throw e;
+                }
+            });
         }
     }
 

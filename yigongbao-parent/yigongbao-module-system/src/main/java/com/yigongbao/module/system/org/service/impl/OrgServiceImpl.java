@@ -8,6 +8,8 @@ import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.basic.area.entity.AreaEntity;
+import com.yigongbao.module.basic.area.service.AreaService;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
@@ -31,7 +33,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import java.util.stream.Collectors;
 
 /**
  * 机构 Service 实现类
@@ -48,6 +49,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     private final DictService dictService;
     private final UserMapper userMapper;
     private final CodeGeneratorService codeGeneratorService;
+    private final AreaService areaService;
 
     /**
      * 分页查询机构列表
@@ -134,6 +136,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             OrgEntity entity = OrgConvert.toEntity(dto);
             entity.setOrgCode(orgCode);
             entity.setStatus(StatusConstants.NORMAL);
+            // 根据 areaId 查询地区名称并写入冗余字段
+            if (dto.getAreaId() != null) {
+                AreaEntity areaEntity = areaService.getById(dto.getAreaId());
+                entity.setAreaName(areaEntity != null ? areaEntity.getName() : null);
+            }
             // 插入数据库
             save(entity);
             log.info("创建机构成功，id={}, orgCode={}", entity.getId(), orgCode);
@@ -171,6 +178,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             }
             // 更新机构信息
             BeanUtils.copyProperties(dto, entity, "id", "orgCode", "createTime", "updateTime", "createBy", "updateBy");
+            // 根据 areaId 刷新地区名称冗余字段
+            if (dto.getAreaId() != null) {
+                AreaEntity areaEntity = areaService.getById(dto.getAreaId());
+                entity.setAreaName(areaEntity != null ? areaEntity.getName() : null);
+            }
             // 更新数据库
             updateById(entity);
             log.info("更新机构成功，id={}", id);

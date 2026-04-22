@@ -11,7 +11,6 @@ import com.yigongbao.module.system.auth.dto.ForgotPasswordResetDTO;
 import com.yigongbao.module.system.auth.dto.LoginDTO;
 import com.yigongbao.module.system.auth.dto.SendCaptchaDTO;
 import com.yigongbao.module.system.auth.service.AuthService;
-import com.yigongbao.module.system.auth.vo.GraphicCaptchaVO;
 import com.yigongbao.module.system.auth.vo.LoginVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -84,15 +83,6 @@ public class AuthController {
         Long userId = StpUtil.getLoginIdAsLong();
         authService.changePassword(userId, dto);
         return Result.success();
-    }
-
-    /**
-     * 获取图形验证码（PASSWORD 登录时使用）
-     */
-    @Operation(summary = "获取图形验证码")
-    @GetMapping("/graphic-captcha")
-    public Result<GraphicCaptchaVO> getGraphicCaptcha() {
-        return Result.success(authService.getGraphicCaptcha());
     }
 
     /**

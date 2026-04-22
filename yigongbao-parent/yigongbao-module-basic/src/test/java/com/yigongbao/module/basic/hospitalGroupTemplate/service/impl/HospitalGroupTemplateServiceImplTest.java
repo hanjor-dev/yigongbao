@@ -10,6 +10,7 @@ import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
 import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
 import com.yigongbao.module.basic.hospital.service.HospitalService;
 import com.yigongbao.module.basic.hospitalGroupTemplate.dto.CreateHospitalGroupTemplateDTO;
+import com.yigongbao.module.basic.hospitalGroupTemplate.dto.HospitalGroupTemplatePageDTO;
 import com.yigongbao.module.basic.hospitalGroupTemplate.entity.HospitalGroupTemplateDetailEntity;
 import com.yigongbao.module.basic.hospitalGroupTemplate.entity.HospitalGroupTemplateEntity;
 import com.yigongbao.module.basic.hospitalGroupTemplate.mapper.HospitalGroupTemplateDetailMapper;
@@ -144,7 +145,7 @@ class HospitalGroupTemplateServiceImplTest {
         page.setTotal(1);
         when(templateMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
         when(detailMapper.countByTemplateId(1L)).thenReturn(2L);
-        var result = templateService.listTemplate(1, 10, null, null);
+        var result = templateService.listTemplate(new HospitalGroupTemplatePageDTO());
         assertNotNull(result);
         assertEquals(1, result.getTotal());
     }

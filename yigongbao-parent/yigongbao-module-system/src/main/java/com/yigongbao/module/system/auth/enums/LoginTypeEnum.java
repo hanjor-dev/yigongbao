@@ -17,10 +17,7 @@ public enum LoginTypeEnum {
     PASSWORD("PASSWORD"),
 
     /** 手机验证码登录 */
-    PHONE("PHONE"),
-
-    /** 邮箱验证码登录 */
-    EMAIL("EMAIL");
+    PHONE("PHONE");
 
     private final String value;
 }

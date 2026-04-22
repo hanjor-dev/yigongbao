@@ -7,6 +7,7 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.registrationCert.dto.CreateRegistrationCertDTO;
+import com.yigongbao.module.basic.registrationCert.dto.RegistrationCertPageDTO;
 import com.yigongbao.module.basic.registrationCert.dto.UpdateRegistrationCertDTO;
 import com.yigongbao.module.basic.registrationCert.entity.RegistrationCertEntity;
 import com.yigongbao.module.basic.registrationCert.mapper.RegistrationCertMapper;
@@ -230,7 +231,7 @@ class RegistrationCertServiceImplTest {
         when(registrationCertMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
                 .thenReturn(page);
 
-        IPage<RegistrationCertVO> result = registrationCertService.listCerts(1, 10, null, null, null);
+        IPage<RegistrationCertVO> result = registrationCertService.listCerts(new RegistrationCertPageDTO());
 
         assertNotNull(result);
         assertEquals(1, result.getTotal());
@@ -246,7 +247,7 @@ class RegistrationCertServiceImplTest {
         when(registrationCertMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
                 .thenReturn(page);
 
-        IPage<RegistrationCertVO> result = registrationCertService.listCerts(1, 10, null, null, null);
+        IPage<RegistrationCertVO> result = registrationCertService.listCerts(new RegistrationCertPageDTO());
 
         assertNotNull(result);
         assertEquals(0, result.getTotal());

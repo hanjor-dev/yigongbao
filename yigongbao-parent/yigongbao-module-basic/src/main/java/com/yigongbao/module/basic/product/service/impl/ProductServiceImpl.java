@@ -26,6 +26,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import cn.hutool.core.util.StrUtil;
 
 import java.util.Collections;
 import java.util.List;
@@ -198,7 +199,11 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, ProductEntity
                 throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
             }
 
-            BeanUtils.copyProperties(dto, entity, "id", "createTime", "updateTime", "createBy", "updateBy");
+            BeanUtils.copyProperties(dto, entity, "id", "createTime", "updateTime", "createBy", "updateBy", "categoryName");
+            // categoryName 是冗余字段，不允许被 null 覆盖；若 DTO 中有值则更新
+            if (StrUtil.isNotBlank(dto.getCategoryName())) {
+                entity.setCategoryName(dto.getCategoryName());
+            }
             updateById(entity);
             log.info("更新产品成功，id={}", id);
         } catch (BusinessException e) {

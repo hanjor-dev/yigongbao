@@ -1,6 +1,9 @@
 package com.yigongbao.module.system.auth.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
+import cloud.tianai.captcha.application.ImageCaptchaApplication;
+import cloud.tianai.captcha.common.response.ApiResponse;
+import cloud.tianai.captcha.validator.common.model.dto.ImageCaptchaTrack;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -12,13 +15,10 @@ import com.yigongbao.module.system.auth.entity.LoginLogEntity;
 import com.yigongbao.module.system.auth.enums.CaptchaTypeEnum;
 import com.yigongbao.module.system.auth.enums.LoginTypeEnum;
 import com.yigongbao.module.system.auth.mapper.LoginLogMapper;
-import com.yigongbao.module.system.auth.service.AuthService;
 import com.yigongbao.module.system.auth.service.CaptchaService;
-import com.yigongbao.module.system.auth.vo.GraphicCaptchaVO;
 import com.yigongbao.module.system.auth.vo.LoginVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.resource.service.ResourceService;
-import com.yigongbao.module.system.resource.vo.ResourceVO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -32,8 +32,6 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
@@ -49,7 +47,7 @@ import static org.mockito.Mockito.*;
  * 使用 Mockito 进行单元测试，不依赖真实数据库
  *
  * @author hanjor
- * @date 2026-03-19
+ * @date 2026-04-22
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -75,10 +73,7 @@ class AuthServiceImplTest {
     private CaptchaService captchaService;
 
     @Mock
-    private RedisTemplate<String, Object> redisTemplate;
-
-    @Mock
-    private ValueOperations<String, Object> valueOps;
+    private ImageCaptchaApplication imageCaptchaApplication;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -86,6 +81,7 @@ class AuthServiceImplTest {
     private MockedStatic<StpUtil> stpUtilMockedStatic;
 
     private UserEntity testUser;
+    /** 不带滑动验证码的 PASSWORD 登录 DTO（兼容过渡期） */
     private LoginDTO loginDTO;
 
     @BeforeEach
@@ -93,10 +89,6 @@ class AuthServiceImplTest {
         // Mock Sa-Token 静态方法
         stpUtilMockedStatic = mockStatic(StpUtil.class);
 
-        // Mock Redis valueOps（图形验证码使用）
-        when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        // 默认：图形验证码存在且匹配（PASSWORD 登录测试公共前提）
-        when(valueOps.get(startsWith("graphic:captcha:"))).thenReturn("abcd");
         // Mock StpUtil.getSession()
         cn.dev33.satoken.session.SaSession mockSession = mock(cn.dev33.satoken.session.SaSession.class);
         stpUtilMockedStatic.when(StpUtil::getSession).thenReturn(mockSession);
@@ -113,29 +105,26 @@ class AuthServiceImplTest {
         testUser.setRoleId(1L);
         testUser.setRoleName("超级管理员");
 
-        // 初始化登录DTO（PASSWORD 类型）
+        // 不带验证码的基础 PASSWORD 登录 DTO（过渡期跳过验证码校验）
         loginDTO = new LoginDTO();
         loginDTO.setLoginType(LoginTypeEnum.PASSWORD);
         loginDTO.setPrincipal("admin");
         loginDTO.setCredential("123456");
-        loginDTO.setCaptchaId("test-captcha-id");
-        loginDTO.setCaptchaCode("abcd");
+        // captchaKey 和 captchaTrack 均不设置，过渡期跳过滑动验证码校验
     }
 
     @AfterEach
     void tearDown() {
-        // 关闭静态方法 Mock
         if (stpUtilMockedStatic != null) {
             stpUtilMockedStatic.close();
         }
     }
 
-    // ==================== login 测试 ====================
+    // ==================== login - PASSWORD 基础流程 ====================
 
     @Test
-    @DisplayName("login: 用户名密码正确时登录成功")
+    @DisplayName("login(PASSWORD): 用户名密码正确时登录成功")
     void login_whenSuccess_shouldReturnToken() {
-        // 准备
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
         when(configService.getConfigValue("login.max.failures")).thenReturn("5");
@@ -143,56 +132,43 @@ class AuthServiceImplTest {
         stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
 
-        // 执行
         LoginVO result = authService.login(loginDTO);
 
-        // 断言
         assertNotNull(result);
         assertEquals("mock-token", result.getToken());
-        verify(userMapper, times(1)).selectByUsername("admin");
-        verify(passwordEncoder, times(1)).matches("123456", testUser.getPassword());
-        verify(loginLogMapper, times(1)).insert(any(LoginLogEntity.class));
+        verify(userMapper).selectByUsername("admin");
+        verify(passwordEncoder).matches("123456", testUser.getPassword());
+        verify(loginLogMapper).insert(any(LoginLogEntity.class));
     }
 
     @Test
-    @DisplayName("login: 用户名不存在时抛出异常")
+    @DisplayName("login(PASSWORD): 用户名不存在时抛出 USERNAME_OR_PASSWORD_ERROR")
     void login_whenUsernameNotExists_shouldThrowException() {
-        // 准备
+        loginDTO.setPrincipal("not_exists_user");
         when(userMapper.selectByUsername("not_exists_user")).thenReturn(null);
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
 
-        loginDTO.setPrincipal("not_exists_user");
-
-        // 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> authService.login(loginDTO)
-        );
-        assertEquals(ErrorCodeEnum.USERNAME_OR_PASSWORD_ERROR.getCode(), exception.getCode());
-        verify(loginLogMapper, times(1)).insert(any(LoginLogEntity.class));
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(loginDTO));
+        assertEquals(ErrorCodeEnum.USERNAME_OR_PASSWORD_ERROR.getCode(), ex.getCode());
+        verify(loginLogMapper).insert(any(LoginLogEntity.class));
     }
 
     @Test
-    @DisplayName("login: 用户已禁用时抛出异常")
+    @DisplayName("login(PASSWORD): 用户已禁用时抛出 USER_DISABLED")
     void login_whenUserDisabled_shouldThrowException() {
-        // 准备
-        testUser.setStatus(StatusConstants.DISABLED); // 已禁用
+        testUser.setStatus(StatusConstants.DISABLED);
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
 
-        // 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> authService.login(loginDTO)
-        );
-        assertEquals(ErrorCodeEnum.USER_DISABLED.getCode(), exception.getCode());
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(loginDTO));
+        assertEquals(ErrorCodeEnum.USER_DISABLED.getCode(), ex.getCode());
         verify(passwordEncoder, never()).matches(any(), any());
     }
 
     @Test
-    @DisplayName("login: 密码错误时抛出异常")
+    @DisplayName("login(PASSWORD): 密码错误时抛出 PASSWORD_ERROR")
     void login_whenPasswordWrong_shouldThrowException() {
-        // 准备
+        loginDTO.setCredential("wrong_password");
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(passwordEncoder.matches("wrong_password", testUser.getPassword())).thenReturn(false);
         when(configService.getConfigValue("login.max.failures")).thenReturn("5");
@@ -200,348 +176,168 @@ class AuthServiceImplTest {
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
-        loginDTO.setCredential("wrong_password");
-
-        // 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> authService.login(loginDTO)
-        );
-        assertEquals(ErrorCodeEnum.PASSWORD_ERROR.getCode(), exception.getCode());
-        verify(loginLogMapper, times(1)).insert(any(LoginLogEntity.class));
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(loginDTO));
+        assertEquals(ErrorCodeEnum.PASSWORD_ERROR.getCode(), ex.getCode());
     }
 
     @Test
-    @DisplayName("login: 登录成功后返回 token")
-    void login_shouldReturnToken() {
-        // 准备
-        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
-        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
-        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
-        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
-        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
-        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-
-        // 执行
-        LoginVO result = authService.login(loginDTO);
-
-        // 断言
-        assertNotNull(result.getToken());
-        assertEquals("mock-token", result.getToken());
-    }
-
-    @Test
-    @DisplayName("login: 账户已锁定时拒绝登录")
+    @DisplayName("login(PASSWORD): 账户已锁定时拒绝登录")
     void login_whenAccountLocked_shouldThrowException() {
-        // 准备：用户已锁定
         testUser.setLoginFailCount(5);
         testUser.setLockTime(LocalDateTime.now()); // 刚刚锁定
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(configService.getConfigValue("login.max.failures")).thenReturn("5");
         when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
-
-        // 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> authService.login(loginDTO)
-        );
-        assertEquals(ErrorCodeEnum.ACCOUNT_LOCKED.getCode(), exception.getCode());
-        verify(passwordEncoder, never()).matches(any(), any()); // 不应校验密码
-        verify(loginLogMapper, times(1)).insert(any(LoginLogEntity.class)); // 记录锁定日志
-    }
-
-    @Test
-    @DisplayName("login: 密码错误时递增失败计数")
-    void login_whenPasswordWrong_shouldIncrementFailCount() {
-        // 准备：当前失败计数为3
-        testUser.setLoginFailCount(3);
-        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
-        when(passwordEncoder.matches("wrong_password", testUser.getPassword())).thenReturn(false);
-        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
-        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
-        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
-
-        loginDTO.setCredential("wrong_password");
-
-        // 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> authService.login(loginDTO)
-        );
-        assertEquals(ErrorCodeEnum.PASSWORD_ERROR.getCode(), exception.getCode());
-        // 验证失败计数从3增加到4，但未达到阈值5，未触发锁定
-        verify(userMapper, times(1)).updateById(argThat((UserEntity user) ->
-                user.getLoginFailCount() != null && user.getLoginFailCount() == 4 &&
-                        user.getLockTime() == null
-        ));
-    }
-
-    @Test
-    @DisplayName("login: 密码连续错误达到阈值时锁定账户")
-    void login_whenFailCountReachesMax_shouldLockAccount() {
-        // 准备：当前失败计数为4，再错1次就达到阈值5
-        testUser.setLoginFailCount(4);
-        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
-        when(passwordEncoder.matches("wrong_password", testUser.getPassword())).thenReturn(false);
-        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
-        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
-        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
-
-        loginDTO.setCredential("wrong_password");
-
-        // 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> authService.login(loginDTO)
-        );
-        assertEquals(ErrorCodeEnum.PASSWORD_ERROR.getCode(), exception.getCode());
-        // 验证失败计数增加到5，且 lockTime 被设置为当前时间（账户锁定）
-        verify(userMapper, times(1)).updateById(argThat((UserEntity user) ->
-                user.getLoginFailCount() != null && user.getLoginFailCount() == 5 &&
-                        user.getLockTime() != null
-        ));
-    }
-
-    @Test
-    @DisplayName("login: 账户锁定超时后自动解锁可正常登录")
-    void login_whenLockExpired_shouldAllowLogin() {
-        // 准备：lockTime 已超时（30分钟前锁定，锁定时长15分钟）
-        testUser.setLoginFailCount(5);
-        testUser.setLockTime(LocalDateTime.now().minusMinutes(30)); // 已超时
-        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
-        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
-        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
-        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
-        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
 
-        // 执行：锁定已超时，可正常登录
-        LoginVO result = authService.login(loginDTO);
-
-        // 断言：登录成功
-        assertNotNull(result);
-        assertNotNull(result.getToken());
-    }
-
-    @Test
-    @DisplayName("login: 登录成功后重置失败计数")
-    void login_whenSuccess_shouldResetFailCount() {
-        // 准备：当前有失败计数（未锁定）
-        testUser.setLoginFailCount(3);
-        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
-        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
-        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
-        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
-        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
-        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-
-        // 执行
-        LoginVO result = authService.login(loginDTO);
-
-        // 断言：登录成功
-        assertNotNull(result);
-        // 验证失败计数被重置为0，lockTime被清空
-        verify(userMapper, times(1)).updateById(argThat((UserEntity user) ->
-                user.getLoginFailCount() != null && user.getLoginFailCount() == 0 &&
-                        user.getLockTime() == null
-        ));
-    }
-
-    @Test
-    @DisplayName("login: 配置参数为空时使用默认值")
-    void login_whenConfigEmpty_shouldUseDefaultValue() {
-        // 准备：ConfigService 直接返回默认值（已内置兜底逻辑）
-        testUser.setLoginFailCount(4);
-        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
-        when(passwordEncoder.matches("wrong_password", testUser.getPassword())).thenReturn(false);
-        // ConfigService 在数据库无值时直接返回 yigongbao.config 的兜底值
-        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
-        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
-        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
-
-        loginDTO.setCredential("wrong_password");
-
-        // 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> authService.login(loginDTO)
-        );
-        assertEquals(ErrorCodeEnum.PASSWORD_ERROR.getCode(), exception.getCode());
-        // 验证 ConfigService 被调用获取最大失败次数
-        verify(configService, atLeast(1)).getConfigValue("login.max.failures");
-    }
-
-    // ==================== logout 测试 ====================
-
-    @Test
-    @DisplayName("logout: 登录后登出成功")
-    void logout_whenLoggedIn_shouldSuccess() {
-        // 准备：模拟已登录
-        stpUtilMockedStatic.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
-
-        // 执行
-        assertDoesNotThrow(() -> authService.logout());
-
-        // 验证
-        stpUtilMockedStatic.verify(StpUtil::logout, times(1));
-    }
-
-    // ==================== changePassword 测试 ====================
-
-    @Test
-    @DisplayName("changePassword: 旧密码正确时修改成功")
-    void changePassword_whenOldPasswordCorrect_shouldSuccess() {
-        // 准备
-        stpUtilMockedStatic.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
-        when(userMapper.selectById(1L)).thenReturn(testUser);
-        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
-        when(passwordEncoder.encode("new_password")).thenReturn("encoded_new_password");
-        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
-
-        ChangePasswordDTO dto = new ChangePasswordDTO();
-        dto.setOldPassword("123456");
-        dto.setNewPassword("new_password");
-
-        // 执行
-        assertDoesNotThrow(() -> authService.changePassword(1L, dto));
-
-        // 验证
-        verify(userMapper, times(1)).updateById(any(UserEntity.class));
-    }
-
-    @Test
-    @DisplayName("changePassword: 旧密码错误时抛出异常")
-    void changePassword_whenOldPasswordWrong_shouldThrowException() {
-        // 准备
-        stpUtilMockedStatic.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
-        when(userMapper.selectById(1L)).thenReturn(testUser);
-        when(passwordEncoder.matches("wrong_password", testUser.getPassword())).thenReturn(false);
-
-        ChangePasswordDTO dto = new ChangePasswordDTO();
-        dto.setOldPassword("wrong_password");
-        dto.setNewPassword("new_password");
-
-        // 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> authService.changePassword(1L, dto)
-        );
-        assertEquals(ErrorCodeEnum.OLD_PASSWORD_ERROR.getCode(), exception.getCode());
-        verify(userMapper, never()).updateById(any(UserEntity.class));
-    }
-
-    @Test
-    @DisplayName("changePassword: 用户不存在时抛出异常")
-    void changePassword_whenUserNotExists_shouldThrowException() {
-        // 准备
-        when(userMapper.selectById(999999L)).thenReturn(null);
-
-        ChangePasswordDTO dto = new ChangePasswordDTO();
-        dto.setOldPassword("123456");
-        dto.setNewPassword("new_password");
-
-        // 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> authService.changePassword(999999L, dto)
-        );
-        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(loginDTO));
+        assertEquals(ErrorCodeEnum.ACCOUNT_LOCKED.getCode(), ex.getCode());
         verify(passwordEncoder, never()).matches(any(), any());
     }
 
     @Test
-    @DisplayName("changePassword: 新旧密码相同时抛出异常")
-    void changePassword_whenSameAsOld_shouldThrowException() {
-        // 准备
-        stpUtilMockedStatic.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
-        when(userMapper.selectById(1L)).thenReturn(testUser);
-        // 旧密码校验通过，但新旧密码相同也会通过 matches
+    @DisplayName("login(PASSWORD): 账户锁定超时后自动解锁可正常登录")
+    void login_whenLockExpired_shouldAllowLogin() {
+        testUser.setLoginFailCount(5);
+        testUser.setLockTime(LocalDateTime.now().minusMinutes(30)); // 已超时（锁定15分钟）
+        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
-
-        ChangePasswordDTO dto = new ChangePasswordDTO();
-        dto.setOldPassword("123456");
-        dto.setNewPassword("123456"); // 与旧密码相同
-
-        // 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> authService.changePassword(1L, dto)
-        );
-        assertEquals(ErrorCodeEnum.NEW_PASSWORD_SAME_AS_OLD.getCode(), exception.getCode());
-        verify(userMapper, never()).updateById(any(UserEntity.class));
-    }
-
-    // ==================== getCurrentUserInfo 测试 ====================
-
-    @Test
-    @DisplayName("getCurrentUserInfo: 用户存在时返回用户信息")
-    void getCurrentUserInfo_whenUserExists_shouldReturnUserInfo() {
-        // 准备
-        stpUtilMockedStatic.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
-        when(userMapper.selectById(1L)).thenReturn(testUser);
+        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
+        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
         stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
-        when(resourceService.getUserMenuTree(1L)).thenReturn(new ArrayList<>());
-        when(resourceService.getUserPermissions(1L)).thenReturn(List.of("system:user:list"));
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
 
-        // 执行
-        LoginVO result = authService.getCurrentUserInfo();
+        LoginVO result = authService.login(loginDTO);
 
-        // 断言
-        assertNotNull(result);
         assertNotNull(result.getToken());
-        assertNotNull(result.getUser());
-        assertEquals("mock-token", result.getToken());
     }
 
     @Test
-    @DisplayName("getCurrentUserInfo: 用户不存在时抛出异常")
-    void getCurrentUserInfo_whenUserNotExists_shouldThrowException() {
-        // 准备
-        stpUtilMockedStatic.when(StpUtil::getLoginIdAsLong).thenReturn(999999L);
-        when(userMapper.selectById(999999L)).thenReturn(null);
+    @DisplayName("login(PASSWORD): 密码错误时递增失败计数但未达阈值不锁定")
+    void login_whenPasswordWrong_shouldIncrementFailCount() {
+        testUser.setLoginFailCount(3);
+        loginDTO.setCredential("wrong_password");
+        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
+        when(passwordEncoder.matches("wrong_password", testUser.getPassword())).thenReturn(false);
+        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
+        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
-        // 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> authService.getCurrentUserInfo()
-        );
-        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
-    }
+        assertThrows(BusinessException.class, () -> authService.login(loginDTO));
 
-    // ==================== 图形验证码测试 ====================
-
-    @Test
-    @DisplayName("getGraphicCaptcha: 返回非空 captchaId 和 imageBase64")
-    void getGraphicCaptcha_shouldReturnValidVO() {
-        GraphicCaptchaVO vo = authService.getGraphicCaptcha();
-        assertNotNull(vo.getCaptchaId());
-        assertNotNull(vo.getImageBase64());
-        assertTrue(vo.getImageBase64().startsWith("data:image/png;base64,"));
-        verify(valueOps, times(1)).set(startsWith("graphic:captcha:"), anyString(), anyLong(), any());
+        // 失败计数 3 → 4，未达阈值 5，不应设置 lockTime
+        verify(userMapper).updateById(argThat((UserEntity u) ->
+                u.getLoginFailCount() == 4 && u.getLockTime() == null
+        ));
     }
 
     @Test
-    @DisplayName("login(PASSWORD): 图形验证码已过期时抛出 CAPTCHA_GRAPHIC_EXPIRED")
-    void login_whenGraphicCaptchaExpired_shouldThrowExpired() {
-        when(valueOps.get(startsWith("graphic:captcha:"))).thenReturn(null);
+    @DisplayName("login(PASSWORD): 密码错误达阈值时锁定账户")
+    void login_whenFailCountReachesMax_shouldLockAccount() {
+        testUser.setLoginFailCount(4); // 再错一次即达到阈值 5
+        loginDTO.setCredential("wrong_password");
+        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
+        when(passwordEncoder.matches("wrong_password", testUser.getPassword())).thenReturn(false);
+        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
+        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
-        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(loginDTO));
-        assertEquals(ErrorCodeEnum.CAPTCHA_GRAPHIC_EXPIRED.getCode(), ex.getCode());
+        assertThrows(BusinessException.class, () -> authService.login(loginDTO));
+
+        // 失败计数 4 → 5，应设置 lockTime
+        verify(userMapper).updateById(argThat((UserEntity u) ->
+                u.getLoginFailCount() == 5 && u.getLockTime() != null
+        ));
     }
 
     @Test
-    @DisplayName("login(PASSWORD): 图形验证码错误时抛出 CAPTCHA_GRAPHIC_ERROR")
-    void login_whenGraphicCaptchaWrong_shouldThrowError() {
-        when(valueOps.get(startsWith("graphic:captcha:"))).thenReturn("xxxx");
+    @DisplayName("login(PASSWORD): 登录成功后重置失败计数")
+    void login_whenSuccess_shouldResetFailCount() {
+        testUser.setLoginFailCount(3);
+        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
+        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
+        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
+        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
+        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
 
-        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(loginDTO));
+        authService.login(loginDTO);
+
+        verify(userMapper).updateById(argThat((UserEntity u) ->
+                u.getLoginFailCount() == 0 && u.getLockTime() == null
+        ));
+    }
+
+    // ==================== login - 滑动验证码 ====================
+
+    @Test
+    @DisplayName("login(PASSWORD): 携带有效滑动验证码时校验通过后登录成功")
+    void login_withValidSliderCaptcha_shouldLoginSuccess() {
+        // 构造带验证码的 DTO
+        LoginDTO dto = new LoginDTO();
+        dto.setLoginType(LoginTypeEnum.PASSWORD);
+        dto.setPrincipal("admin");
+        dto.setCredential("123456");
+        dto.setCaptchaKey("captcha-key-001");
+        dto.setCaptchaTrack(new ImageCaptchaTrack());
+
+        // 滑动验证码校验通过
+        when(imageCaptchaApplication.matching(eq("captcha-key-001"), any(ImageCaptchaTrack.class)))
+                .thenReturn(ApiResponse.ofSuccess());
+        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
+        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
+        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
+        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
+        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
+
+        LoginVO result = authService.login(dto);
+
+        assertNotNull(result.getToken());
+        verify(imageCaptchaApplication).matching(eq("captcha-key-001"), any(ImageCaptchaTrack.class));
+    }
+
+    @Test
+    @DisplayName("login(PASSWORD): 滑动验证码校验失败时抛出 CAPTCHA_GRAPHIC_ERROR")
+    void login_whenSliderCaptchaFailed_shouldThrowError() {
+        LoginDTO dto = new LoginDTO();
+        dto.setLoginType(LoginTypeEnum.PASSWORD);
+        dto.setPrincipal("admin");
+        dto.setCredential("123456");
+        dto.setCaptchaKey("captcha-key-001");
+        dto.setCaptchaTrack(new ImageCaptchaTrack());
+
+        // 滑动验证码校验失败
+        when(imageCaptchaApplication.matching(eq("captcha-key-001"), any(ImageCaptchaTrack.class)))
+                .thenReturn(ApiResponse.ofError("验证失败"));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(dto));
         assertEquals(ErrorCodeEnum.CAPTCHA_GRAPHIC_ERROR.getCode(), ex.getCode());
+        // 验证码失败时不应继续查询用户
+        verify(userMapper, never()).selectByUsername(any());
     }
 
-    // ==================== PHONE/EMAIL 登录测试 ====================
+    @Test
+    @DisplayName("login(PASSWORD): 不传验证码时跳过滑动验证码校验（过渡期兼容）")
+    void login_withoutCaptcha_shouldSkipSliderVerify() {
+        // loginDTO 未设置 captchaKey 和 captchaTrack
+        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
+        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
+        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
+        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
+        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
+
+        LoginVO result = authService.login(loginDTO);
+
+        assertNotNull(result.getToken());
+        // 不应调用 imageCaptchaApplication
+        verify(imageCaptchaApplication, never()).matching(any(), any(ImageCaptchaTrack.class));
+    }
+
+    // ==================== login - PHONE ====================
 
     @Test
     @DisplayName("login(PHONE): 手机验证码正确时登录成功")
@@ -557,8 +353,9 @@ class AuthServiceImplTest {
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
 
         LoginVO result = authService.login(dto);
+
         assertNotNull(result.getToken());
-        verify(captchaService, times(1)).verifyCaptcha(anyString(), eq("13800000001"), anyString(), anyString());
+        verify(captchaService).verifyCaptcha(anyString(), eq("13800000001"), anyString(), anyString());
     }
 
     @Test
@@ -578,35 +375,194 @@ class AuthServiceImplTest {
     }
 
     @Test
-    @DisplayName("login(EMAIL): 邮箱验证码正确时登录成功")
-    void login_byEmail_whenSuccess_shouldReturnToken() {
+    @DisplayName("login(PHONE): 手机号对应用户已禁用时抛出 USER_DISABLED")
+    void login_byPhone_whenUserDisabled_shouldThrow() {
+        testUser.setStatus(StatusConstants.DISABLED);
         LoginDTO dto = new LoginDTO();
-        dto.setLoginType(LoginTypeEnum.EMAIL);
+        dto.setLoginType(LoginTypeEnum.PHONE);
+        dto.setPrincipal("13800000001");
+        dto.setCredential("123456");
+
+        doNothing().when(captchaService).verifyCaptcha(anyString(), anyString(), anyString(), anyString());
+        when(userMapper.selectByPhone("13800000001")).thenReturn(testUser);
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(dto));
+        assertEquals(ErrorCodeEnum.USER_DISABLED.getCode(), ex.getCode());
+    }
+
+    // ==================== login - PASSWORD by email ====================
+
+    @Test
+    @DisplayName("login(PASSWORD): 用邮箱作为账号时自动匹配邮箱字段登录成功")
+    void login_byEmail_asPassword_whenSuccess_shouldReturnToken() {
+        LoginDTO dto = new LoginDTO();
+        dto.setLoginType(LoginTypeEnum.PASSWORD);
         dto.setPrincipal("admin@example.com");
         dto.setCredential("123456");
 
-        doNothing().when(captchaService).verifyCaptcha(anyString(), eq("admin@example.com"), anyString(), anyString());
         when(userMapper.selectByEmail("admin@example.com")).thenReturn(testUser);
+        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
+        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
+        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
         stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
 
         LoginVO result = authService.login(dto);
+
         assertNotNull(result.getToken());
+        // 应走邮箱查询路径，不调用 selectByUsername
+        verify(userMapper).selectByEmail("admin@example.com");
+        verify(userMapper, never()).selectByUsername(any());
     }
 
-    // ==================== 发送验证码测试 ====================
+    @Test
+    @DisplayName("login(PASSWORD): 用户名方式不走邮箱查询路径")
+    void login_byUsername_shouldNotQueryByEmail() {
+        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
+        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
+        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
+        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
+        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
+
+        authService.login(loginDTO);
+
+        verify(userMapper).selectByUsername("admin");
+        verify(userMapper, never()).selectByEmail(any());
+    }
 
     @Test
-    @DisplayName("sendLoginCaptcha: 调用 CaptchaService.sendCaptcha（LOGIN 场景）")
+    @DisplayName("login(PASSWORD): 邮箱格式但未注册时抛出 USERNAME_OR_PASSWORD_ERROR")
+    void login_byEmail_asPassword_whenNotFound_shouldThrow() {
+        LoginDTO dto = new LoginDTO();
+        dto.setLoginType(LoginTypeEnum.PASSWORD);
+        dto.setPrincipal("notexist@example.com");
+        dto.setCredential("123456");
+
+        when(userMapper.selectByEmail("notexist@example.com")).thenReturn(null);
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(dto));
+        assertEquals(ErrorCodeEnum.USERNAME_OR_PASSWORD_ERROR.getCode(), ex.getCode());
+    }
+
+    // ==================== logout ====================
+
+    @Test
+    @DisplayName("logout: 已登录时登出成功")
+    void logout_whenLoggedIn_shouldSuccess() {
+        stpUtilMockedStatic.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+
+        assertDoesNotThrow(() -> authService.logout());
+
+        stpUtilMockedStatic.verify(StpUtil::logout);
+    }
+
+    // ==================== getCurrentUserInfo ====================
+
+    @Test
+    @DisplayName("getCurrentUserInfo: 用户存在时返回完整 VO")
+    void getCurrentUserInfo_whenUserExists_shouldReturnUserInfo() {
+        stpUtilMockedStatic.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+        when(userMapper.selectById(1L)).thenReturn(testUser);
+        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
+        when(resourceService.getUserMenuTree(1L)).thenReturn(new ArrayList<>());
+        when(resourceService.getUserPermissions(1L)).thenReturn(List.of("system:user:list"));
+
+        LoginVO result = authService.getCurrentUserInfo();
+
+        assertNotNull(result);
+        assertEquals("mock-token", result.getToken());
+        assertNotNull(result.getUser());
+    }
+
+    @Test
+    @DisplayName("getCurrentUserInfo: 用户不存在时抛出 USER_NOT_FOUND")
+    void getCurrentUserInfo_whenUserNotExists_shouldThrowException() {
+        stpUtilMockedStatic.when(StpUtil::getLoginIdAsLong).thenReturn(999999L);
+        when(userMapper.selectById(999999L)).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.getCurrentUserInfo());
+        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), ex.getCode());
+    }
+
+    // ==================== changePassword ====================
+
+    @Test
+    @DisplayName("changePassword: 旧密码正确时修改成功")
+    void changePassword_whenOldPasswordCorrect_shouldSuccess() {
+        when(userMapper.selectById(1L)).thenReturn(testUser);
+        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
+        when(passwordEncoder.encode("new_password")).thenReturn("encoded_new_password");
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        ChangePasswordDTO dto = new ChangePasswordDTO();
+        dto.setOldPassword("123456");
+        dto.setNewPassword("new_password");
+
+        assertDoesNotThrow(() -> authService.changePassword(1L, dto));
+        verify(userMapper).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("changePassword: 旧密码错误时抛出 OLD_PASSWORD_ERROR")
+    void changePassword_whenOldPasswordWrong_shouldThrowException() {
+        when(userMapper.selectById(1L)).thenReturn(testUser);
+        when(passwordEncoder.matches("wrong_password", testUser.getPassword())).thenReturn(false);
+
+        ChangePasswordDTO dto = new ChangePasswordDTO();
+        dto.setOldPassword("wrong_password");
+        dto.setNewPassword("new_password");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.changePassword(1L, dto));
+        assertEquals(ErrorCodeEnum.OLD_PASSWORD_ERROR.getCode(), ex.getCode());
+        verify(userMapper, never()).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("changePassword: 用户不存在时抛出 USER_NOT_FOUND")
+    void changePassword_whenUserNotExists_shouldThrowException() {
+        when(userMapper.selectById(999999L)).thenReturn(null);
+
+        ChangePasswordDTO dto = new ChangePasswordDTO();
+        dto.setOldPassword("123456");
+        dto.setNewPassword("new_password");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.changePassword(999999L, dto));
+        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), ex.getCode());
+        verify(passwordEncoder, never()).matches(any(), any());
+    }
+
+    @Test
+    @DisplayName("changePassword: 新旧密码相同时抛出 NEW_PASSWORD_SAME_AS_OLD")
+    void changePassword_whenSameAsOld_shouldThrowException() {
+        when(userMapper.selectById(1L)).thenReturn(testUser);
+        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
+
+        ChangePasswordDTO dto = new ChangePasswordDTO();
+        dto.setOldPassword("123456");
+        dto.setNewPassword("123456");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.changePassword(1L, dto));
+        assertEquals(ErrorCodeEnum.NEW_PASSWORD_SAME_AS_OLD.getCode(), ex.getCode());
+        verify(userMapper, never()).updateById(any(UserEntity.class));
+    }
+
+    // ==================== 发送验证码 ====================
+
+    @Test
+    @DisplayName("sendLoginCaptcha: 调用 CaptchaService（LOGIN 场景）")
     void sendLoginCaptcha_shouldCallSendCaptcha() {
         SendCaptchaDTO dto = new SendCaptchaDTO();
         dto.setCaptchaType(CaptchaTypeEnum.PHONE);
         dto.setTarget("13800000001");
 
         doNothing().when(captchaService).sendCaptcha(anyString(), anyString(), anyString());
+
         authService.sendLoginCaptcha(dto);
 
-        verify(captchaService, times(1)).sendCaptcha("PHONE", "13800000001", "login");
+        verify(captchaService).sendCaptcha("PHONE", "13800000001", "login");
     }
 
     @Test
@@ -617,13 +573,14 @@ class AuthServiceImplTest {
         dto.setTarget("13999999999");
 
         when(userMapper.selectByPhone("13999999999")).thenReturn(null);
+
         authService.sendForgotPasswordCaptcha(dto);
 
         verify(captchaService, never()).sendCaptcha(anyString(), anyString(), anyString());
     }
 
     @Test
-    @DisplayName("sendForgotPasswordCaptcha: target 已注册时调用 CaptchaService")
+    @DisplayName("sendForgotPasswordCaptcha: target 已注册时调用 CaptchaService（FORGOT 场景）")
     void sendForgotPasswordCaptcha_whenTargetExists_shouldSendCaptcha() {
         SendCaptchaDTO dto = new SendCaptchaDTO();
         dto.setCaptchaType(CaptchaTypeEnum.PHONE);
@@ -631,21 +588,25 @@ class AuthServiceImplTest {
 
         when(userMapper.selectByPhone("13800000001")).thenReturn(testUser);
         doNothing().when(captchaService).sendCaptcha(anyString(), anyString(), anyString());
+
         authService.sendForgotPasswordCaptcha(dto);
 
-        verify(captchaService, times(1)).sendCaptcha("PHONE", "13800000001", "forgot");
+        verify(captchaService).sendCaptcha("PHONE", "13800000001", "forgot");
     }
 
-    // ==================== 重置密码测试 ====================
+    // ==================== 重置密码 ====================
 
     @Test
-    @DisplayName("resetPassword: 验证码正确且用户存在时重置成功")
-    void resetPassword_whenValid_shouldUpdatePassword() {
+    @DisplayName("resetPassword: 验证码正确且用户存在时重置成功并解除锁定")
+    void resetPassword_whenValid_shouldUpdatePasswordAndUnlock() {
         ForgotPasswordResetDTO dto = new ForgotPasswordResetDTO();
         dto.setCaptchaType(CaptchaTypeEnum.PHONE);
         dto.setTarget("13800000001");
         dto.setCaptcha("123456");
         dto.setNewPassword("newPass123");
+
+        testUser.setLoginFailCount(5);
+        testUser.setLockTime(LocalDateTime.now());
 
         doNothing().when(captchaService).verifyCaptcha(anyString(), anyString(), anyString(), anyString());
         when(userMapper.selectByPhone("13800000001")).thenReturn(testUser);
@@ -653,7 +614,13 @@ class AuthServiceImplTest {
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
         assertDoesNotThrow(() -> authService.resetPassword(dto));
-        verify(userMapper, times(1)).updateById(argThat((UserEntity u) -> "encoded".equals(u.getPassword())));
+
+        // 验证密码更新且锁定状态被清除
+        verify(userMapper).updateById(argThat((UserEntity u) ->
+                "encoded".equals(u.getPassword()) &&
+                u.getLoginFailCount() == 0 &&
+                u.getLockTime() == null
+        ));
     }
 
     @Test
@@ -670,5 +637,23 @@ class AuthServiceImplTest {
 
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.resetPassword(dto));
         assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), ex.getCode());
+    }
+
+    @Test
+    @DisplayName("resetPassword(EMAIL): 邮箱场景重置密码成功")
+    void resetPassword_byEmail_whenValid_shouldSuccess() {
+        ForgotPasswordResetDTO dto = new ForgotPasswordResetDTO();
+        dto.setCaptchaType(CaptchaTypeEnum.EMAIL);
+        dto.setTarget("admin@example.com");
+        dto.setCaptcha("654321");
+        dto.setNewPassword("newPass456");
+
+        doNothing().when(captchaService).verifyCaptcha(anyString(), anyString(), anyString(), anyString());
+        when(userMapper.selectByEmail("admin@example.com")).thenReturn(testUser);
+        when(passwordEncoder.encode("newPass456")).thenReturn("encoded2");
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        assertDoesNotThrow(() -> authService.resetPassword(dto));
+        verify(userMapper).updateById(argThat((UserEntity u) -> "encoded2".equals(u.getPassword())));
     }
 }

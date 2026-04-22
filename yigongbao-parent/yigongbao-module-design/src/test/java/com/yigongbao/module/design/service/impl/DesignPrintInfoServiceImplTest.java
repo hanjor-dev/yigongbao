@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.core.toolkit.GlobalConfigUtils;
+import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -162,22 +163,22 @@ class DesignPrintInfoServiceImplTest {
             product.setSpecs(specs);
             when(productService.listAllWithSpecs()).thenReturn(List.of(product));
 
-            // 材质（dictCode="15"）
+            // 材质（dictCode=MATERIAL_TYPE_RESIN）
             DictVO material = new DictVO();
-            material.setDictCode("15.1");
+            material.setDictCode(DictCodeConstants.MATERIAL_TYPE_RESIN);
             material.setDictName("树脂");
-            when(dictService.listByTypeCode("15")).thenReturn(List.of(material));
+            when(dictService.listByTypeCode(DictCodeConstants.MATERIAL_TYPE)).thenReturn(List.of(material));
 
-            // 颜色树（dictCode="16"），二级节点直接作为颜色选项，dictValue 存产品大类码
+            // 颜色树（dictCode=COLOR_TYPE），二级节点直接作为颜色选项，dictValue 存产品大类码
             DictVO colorLevel2 = new DictVO();
             colorLevel2.setDictCode("16.1");
             colorLevel2.setDictName("白色");
             colorLevel2.setDictValue("17.1");
             DictVO colorRoot = new DictVO();
-            colorRoot.setDictCode("16");
+            colorRoot.setDictCode(DictCodeConstants.COLOR_TYPE);
             colorRoot.setDictName("打印颜色");
             colorRoot.setChildren(List.of(colorLevel2));
-            when(dictService.listTreeByTypeCode("16")).thenReturn(List.of(colorRoot));
+            when(dictService.listTreeByTypeCode(DictCodeConstants.COLOR_TYPE)).thenReturn(List.of(colorRoot));
 
             PrintInfoOptionsVO result = printInfoService.getOptions(ORDER_ID, PACKAGE_ID);
 
@@ -205,8 +206,8 @@ class DesignPrintInfoServiceImplTest {
             product.setStatus(1);
             product.setSpecs(Collections.emptyList()); // 无可用规格
             when(productService.listAllWithSpecs()).thenReturn(List.of(product));
-            when(dictService.listByTypeCode("15")).thenReturn(Collections.emptyList());
-            when(dictService.listTreeByTypeCode("16")).thenReturn(Collections.emptyList());
+            when(dictService.listByTypeCode(DictCodeConstants.MATERIAL_TYPE)).thenReturn(Collections.emptyList());
+            when(dictService.listTreeByTypeCode(DictCodeConstants.COLOR_TYPE)).thenReturn(Collections.emptyList());
 
             PrintInfoOptionsVO result = printInfoService.getOptions(ORDER_ID, PACKAGE_ID);
 

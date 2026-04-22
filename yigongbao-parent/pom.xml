@@ -37,6 +37,7 @@
         <spring-security-crypto.version>6.2.4</spring-security-crypto.version>
         <openapi.version>2.3.0</openapi.version>
         <ip2region.version>2.7.0</ip2region.version>
+        <tianai-captcha.version>1.5.5</tianai-captcha.version>
         <junrar.version>7.5.5</junrar.version>
         <commons-compress.version>1.26.1</commons-compress.version>
         <xz.version>1.9</xz.version>
@@ -192,6 +193,13 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
                 <version>${openapi.version}</version>
+            </dependency>
+
+            <!-- tianai-captcha 滑动验证码（支持 Spring Boot 3） -->
+            <dependency>
+                <groupId>cloud.tianai.captcha</groupId>
+                <artifactId>tianai-captcha-springboot-starter</artifactId>
+                <version>${tianai-captcha.version}</version>
             </dependency>
 
             <!-- ip2region 离线 IP 归属地解析 -->

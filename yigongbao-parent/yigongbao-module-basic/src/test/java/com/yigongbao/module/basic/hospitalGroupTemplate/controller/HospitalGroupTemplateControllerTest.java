@@ -90,7 +90,7 @@ class HospitalGroupTemplateControllerTest {
         IPage<HospitalGroupTemplateVO> page = new Page<>(1, 10);
         page.setRecords(List.of(buildTemplateVO(1L, "北京市医院联盟"), buildTemplateVO(2L, "华东地区医院群")));
         page.setTotal(2);
-        when(templateService.listTemplate(anyInt(), anyInt(), any(), any())).thenReturn(page);
+        when(templateService.listTemplate(any())).thenReturn(page);
 
         mockMvc.perform(get("/basic/hospital-group-template/list")
                         .param("pageNum", "1")
@@ -112,7 +112,7 @@ class HospitalGroupTemplateControllerTest {
         IPage<HospitalGroupTemplateVO> page = new Page<>(1, 10);
         page.setRecords(List.of(buildTemplateVO(1L, "北京市医院联盟")));
         page.setTotal(1);
-        when(templateService.listTemplate(eq(1), eq(10), eq("北京"), any())).thenReturn(page);
+        when(templateService.listTemplate(any())).thenReturn(page);
 
         mockMvc.perform(get("/basic/hospital-group-template/list")
                         .param("pageNum", "1")

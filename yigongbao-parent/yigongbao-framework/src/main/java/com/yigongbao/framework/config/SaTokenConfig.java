@@ -55,9 +55,10 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 "/system/auth/logout",
                 "/system/auth/info",
                 "/system/auth/password",
-                "/system/auth/graphic-captcha",
                 "/system/auth/captcha",
                 "/system/auth/forgot-password/**",
+                // 图形验证码接口（无需登录）
+                "/image-captch/**",
                 // Swagger/OpenAPI 文档（用于导入 Apifox）
                 "/doc.html",
                 "/swagger-ui/**",

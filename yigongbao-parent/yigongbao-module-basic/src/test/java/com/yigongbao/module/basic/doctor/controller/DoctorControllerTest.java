@@ -78,7 +78,7 @@ class DoctorControllerTest {
             var page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<DoctorVO>(1, 10);
             page.setRecords(List.of(vo));
             page.setTotal(1);
-            when(doctorService.listDoctors(eq(1), eq(10), any(), any(), any(), any()))
+            when(doctorService.listDoctors(any()))
                     .thenReturn(page);
 
             mockMvc.perform(get("/basic/doctor/page"))
@@ -94,7 +94,7 @@ class DoctorControllerTest {
             var page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<DoctorVO>(1, 10);
             page.setRecords(new ArrayList<>());
             page.setTotal(0);
-            when(doctorService.listDoctors(eq(1), eq(10), any(), any(), any(), any()))
+            when(doctorService.listDoctors(any()))
                     .thenReturn(page);
 
             mockMvc.perform(get("/basic/doctor/page"))
@@ -114,7 +114,7 @@ class DoctorControllerTest {
         @Test
         @DisplayName("list: 返回所有医生")
         void list_shouldReturnAll() throws Exception {
-            when(doctorService.listAll(any(), any(), any()))
+            when(doctorService.listAll(any()))
                     .thenReturn(List.of(buildTestVO(1L, "张三"), buildTestVO(2L, "李四")));
 
             mockMvc.perform(get("/basic/doctor/list"))
@@ -300,7 +300,7 @@ class DoctorControllerTest {
         @Test
         @DisplayName("suggest: 返回联想列表")
         void suggest_shouldReturnList() throws Exception {
-            when(doctorService.listByCreatorAndHospital(eq(1L), eq(1L), any()))
+            when(doctorService.listByCreatorAndHospital(any()))
                     .thenReturn(List.of(buildTestVO(1L, "张三")));
 
             mockMvc.perform(get("/basic/doctor/suggest")
@@ -314,7 +314,7 @@ class DoctorControllerTest {
         @Test
         @DisplayName("suggest: 无数据时返回空列表")
         void suggest_whenEmpty_shouldReturnEmptyList() throws Exception {
-            when(doctorService.listByCreatorAndHospital(eq(1L), eq(1L), any()))
+            when(doctorService.listByCreatorAndHospital(any()))
                     .thenReturn(new ArrayList<>());
 
             mockMvc.perform(get("/basic/doctor/suggest")
@@ -337,7 +337,7 @@ class DoctorControllerTest {
         @DisplayName("quick-add: 不存在时创建成功")
         void quickAdd_whenNotExists_shouldCreate() throws Exception {
             DoctorVO newVo = buildTestVO(1L, "新医生");
-            when(doctorService.quickAdd(any(), any())).thenReturn(newVo);
+            when(doctorService.quickAdd(any())).thenReturn(newVo);
 
             Map<String, Object> requestBody = Map.of(
                     "doctorName", "新医生",
@@ -357,7 +357,7 @@ class DoctorControllerTest {
         @DisplayName("quick-add: 已存在时返回现有医生")
         void quickAdd_whenExists_shouldReturnExisting() throws Exception {
             DoctorVO existingVo = buildTestVO(1L, "张三");
-            when(doctorService.quickAdd(any(), any())).thenReturn(existingVo);
+            when(doctorService.quickAdd(any())).thenReturn(existingVo);
 
             Map<String, Object> requestBody = Map.of(
                     "doctorName", "张三",
