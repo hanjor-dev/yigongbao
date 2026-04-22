@@ -18,6 +18,12 @@
             <artifactId>yigongbao-module-basic</artifactId>
         </dependency>
 
+        <!-- Spring Mail（邮件发送） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- 测试依赖 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
