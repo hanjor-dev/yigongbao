@@ -37,6 +37,11 @@ public class LoginLogEntity implements Serializable {
     private String username;
 
     /**
+     * 登录方式（PASSWORD/PHONE/EMAIL）
+     */
+    private String loginType;
+
+    /**
      * 登录IP
      */
     private String ip;
