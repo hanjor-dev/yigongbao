@@ -7,8 +7,11 @@ import com.yigongbao.framework.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.auth.dto.ChangePasswordDTO;
+import com.yigongbao.module.system.auth.dto.ForgotPasswordResetDTO;
 import com.yigongbao.module.system.auth.dto.LoginDTO;
+import com.yigongbao.module.system.auth.dto.SendCaptchaDTO;
 import com.yigongbao.module.system.auth.service.AuthService;
+import com.yigongbao.module.system.auth.vo.GraphicCaptchaVO;
 import com.yigongbao.module.system.auth.vo.LoginVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -80,6 +83,45 @@ public class AuthController {
     public Result<Void> changePassword(@Validated @RequestBody ChangePasswordDTO dto) {
         Long userId = StpUtil.getLoginIdAsLong();
         authService.changePassword(userId, dto);
+        return Result.success();
+    }
+
+    /**
+     * 获取图形验证码（PASSWORD 登录时使用）
+     */
+    @Operation(summary = "获取图形验证码")
+    @GetMapping("/graphic-captcha")
+    public Result<GraphicCaptchaVO> getGraphicCaptcha() {
+        return Result.success(authService.getGraphicCaptcha());
+    }
+
+    /**
+     * 发送登录验证码（PHONE/EMAIL 登录时使用）
+     */
+    @Operation(summary = "发送登录验证码")
+    @PostMapping("/captcha")
+    public Result<Void> sendLoginCaptcha(@Validated @RequestBody SendCaptchaDTO dto) {
+        authService.sendLoginCaptcha(dto);
+        return Result.success();
+    }
+
+    /**
+     * 发送忘记密码验证码
+     */
+    @Operation(summary = "发送忘记密码验证码")
+    @PostMapping("/forgot-password/captcha")
+    public Result<Void> sendForgotPasswordCaptcha(@Validated @RequestBody SendCaptchaDTO dto) {
+        authService.sendForgotPasswordCaptcha(dto);
+        return Result.success();
+    }
+
+    /**
+     * 忘记密码：校验验证码并重置密码
+     */
+    @Operation(summary = "忘记密码重置")
+    @PostMapping("/forgot-password/reset")
+    public Result<Void> resetPassword(@Validated @RequestBody ForgotPasswordResetDTO dto) {
+        authService.resetPassword(dto);
         return Result.success();
     }
 }
