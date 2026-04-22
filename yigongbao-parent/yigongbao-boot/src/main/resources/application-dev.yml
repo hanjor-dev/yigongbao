@@ -56,6 +56,22 @@ spring:
       # 忽略 Map 中的 null 值
       write-null-map-values: false
 
+  # 邮件配置（开发环境，发件邮箱和密码通过环境变量注入）
+  mail:
+    host: ${MAIL_HOST:smtp.example.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    protocol: smtp
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
   # 文件上传配置
   servlet:
     multipart:
