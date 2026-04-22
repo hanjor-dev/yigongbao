@@ -1,38 +1,50 @@
 package com.yigongbao.module.system.auth.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.captcha.CaptchaUtil;
+import cn.hutool.captcha.LineCaptcha;
+import cn.hutool.core.codec.Base64;
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.auth.dto.ChangePasswordDTO;
+import com.yigongbao.module.system.auth.dto.ForgotPasswordResetDTO;
 import com.yigongbao.module.system.auth.dto.LoginDTO;
+import com.yigongbao.module.system.auth.dto.SendCaptchaDTO;
 import com.yigongbao.module.system.auth.entity.LoginLogEntity;
+import com.yigongbao.module.system.auth.enums.CaptchaSceneEnum;
+import com.yigongbao.module.system.auth.enums.LoginTypeEnum;
 import com.yigongbao.module.system.auth.mapper.LoginLogMapper;
 import com.yigongbao.module.system.auth.service.AuthService;
+import com.yigongbao.module.system.auth.service.CaptchaService;
+import com.yigongbao.module.system.auth.vo.GraphicCaptchaVO;
 import com.yigongbao.module.system.auth.vo.LoginVO;
 import com.yigongbao.module.system.auth.vo.LoginLogVO;
 import com.yigongbao.module.system.config.service.ConfigService;
-import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.module.system.resource.service.ResourceService;
-import com.yigongbao.module.system.resource.vo.ResourceVO;
 import com.yigongbao.module.system.user.convert.UserConvert;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
-import com.yigongbao.module.system.user.vo.UserVO;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import cn.hutool.core.util.StrUtil;
 
+import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 认证 Service 实现类
+ * 支持账号密码、手机验证码、邮箱验证码三种登录方式，以及忘记密码重置
  *
  * @author hanjor
  * @date 2026-03-19
@@ -46,80 +58,219 @@ public class AuthServiceImpl implements AuthService {
     private final LoginLogMapper loginLogMapper;
     private final ResourceService resourceService;
     private final ConfigService configService;
-
     private final PasswordEncoder passwordEncoder;
+    private final CaptchaService captchaService;
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    /** 图形验证码 Redis key 前缀 */
+    private static final String GRAPHIC_CAPTCHA_PREFIX = "graphic:captcha:";
+    /** 图形验证码有效期（秒） */
+    private static final int GRAPHIC_CAPTCHA_TTL = 300;
+
+    // ==================== 图形验证码 ====================
 
     /**
-     * 用户登录
+     * 生成图形验证码（仅 PASSWORD 登录时需要）
+     */
+    @Override
+    public GraphicCaptchaVO getGraphicCaptcha() {
+        // 生成 4 位行干扰验证码
+        LineCaptcha captcha = CaptchaUtil.createLineCaptcha(120, 40, 4, 20);
+        String code = captcha.getCode().toLowerCase();
+        String captchaId = IdUtil.fastSimpleUUID();
+
+        // 将图片写入 Base64
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        captcha.write(out);
+        String imageBase64 = "data:image/png;base64," + Base64.encode(out.toByteArray());
+
+        // 存入 Redis
+        redisTemplate.opsForValue().set(GRAPHIC_CAPTCHA_PREFIX + captchaId, code, GRAPHIC_CAPTCHA_TTL, TimeUnit.SECONDS);
+        log.info("图形验证码已生成，captchaId={}", captchaId);
+        return new GraphicCaptchaVO(captchaId, imageBase64);
+    }
+
+    // ==================== 登录 ====================
+
+    /**
+     * 用户登录（派发到三种登录实现）
      */
     @Override
     public LoginVO login(LoginDTO dto) {
-        log.info("用户登录，principal={}", dto.getPrincipal());
+        log.info("用户登录，loginType={}, principal={}", dto.getLoginType(), dto.getPrincipal());
         String ip = getClientIp();
         String userAgent = getUserAgent();
 
+        if (LoginTypeEnum.PASSWORD == dto.getLoginType()) {
+            return resolveByPassword(dto, ip, userAgent);
+        } else if (LoginTypeEnum.PHONE == dto.getLoginType()) {
+            return resolveByPhone(dto, ip, userAgent);
+        } else if (LoginTypeEnum.EMAIL == dto.getLoginType()) {
+            return resolveByEmail(dto, ip, userAgent);
+        }
+        throw new BusinessException(ErrorCodeEnum.PARAM_ERROR);
+    }
+
+    /**
+     * 账号密码登录
+     */
+    private LoginVO resolveByPassword(LoginDTO dto, String ip, String userAgent) {
+        // 1. 校验图形验证码
+        verifyGraphicCaptcha(dto.getCaptchaId(), dto.getCaptchaCode());
+
         try {
-            // 查询用户
+            // 2. 查询用户
             UserEntity user = userMapper.selectByUsername(dto.getPrincipal());
             if (user == null) {
-                log.warn("用户不存在，principal={}", dto.getPrincipal());
-                saveLoginLog(null, dto.getPrincipal(), ip, userAgent, 0, "用户不存在");
+                log.warn("用户不存在，username={}", dto.getPrincipal());
+                saveLoginLog(null, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户不存在");
                 throw new BusinessException(ErrorCodeEnum.USERNAME_OR_PASSWORD_ERROR);
             }
 
-            // 校验用户状态
+            // 3. 校验用户状态
             if (Integer.valueOf(StatusConstants.DISABLED).equals(user.getStatus())) {
-                log.warn("用户已禁用，principal={}", dto.getPrincipal());
-                saveLoginLog(user.getId(), dto.getPrincipal(), ip, userAgent, 0, "用户已禁用");
+                log.warn("用户已禁用，username={}", dto.getPrincipal());
+                saveLoginLog(user.getId(), dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户已禁用");
                 throw new BusinessException(ErrorCodeEnum.USER_DISABLED);
             }
 
-            // 校验账户是否已锁定（自动解锁：lockTime + lockDuration <= now）
+            // 4. 校验账户是否锁定
             if (isAccountLocked(user)) {
                 int remainingMinutes = calculateRemainingLockMinutes(user);
-                log.warn("账户已锁定，principal={}，剩余锁定时间={}分钟", dto.getPrincipal(), remainingMinutes);
-                saveLoginLog(user.getId(), dto.getPrincipal(), ip, userAgent, 0, "账户已锁定");
+                log.warn("账户已锁定，username={}，剩余{}分钟", dto.getPrincipal(), remainingMinutes);
+                saveLoginLog(user.getId(), dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "账户已锁定");
                 throw new BusinessException(ErrorCodeEnum.ACCOUNT_LOCKED, remainingMinutes);
             }
 
-            // 校验密码
+            // 5. 校验密码
             if (!passwordEncoder.matches(dto.getCredential(), user.getPassword())) {
-                // 处理登录失败：计数+判断是否达到锁定阈值
-                handleLoginFailure(user, dto.getPrincipal(), ip, userAgent);
+                handleLoginFailure(user, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent);
                 throw new BusinessException(ErrorCodeEnum.PASSWORD_ERROR);
             }
 
-            // 登录成功：重置失败计数
+            // 6. 登录成功
             resetLoginFailCount(user);
-
-            // 执行登录（Sa-Token）
-            StpUtil.login(user.getId());
-            // 将会话信息写入 Session，供操作日志等模块使用
-            StpUtil.getSession().set("username", user.getUsername());
-            StpUtil.getSession().set("realName", user.getRealName());
-            String token = StpUtil.getTokenValue();
-
-            // 记录登录成功日志
-            saveLoginLog(user.getId(), dto.getPrincipal(), ip, userAgent, 1, null);
-
-            // 构建返回结果
-            LoginVO loginVO = new LoginVO();
-            loginVO.setToken(token);
-//            loginVO.setUser(UserConvert.toVO(user));
-//            loginVO.setMenus(resourceService.getUserMenuTree(user.getId()));
-//            loginVO.setPermissions(resourceService.getUserPermissions(user.getId()));
-
-            log.info("用户登录成功，principal={}", dto.getPrincipal());
-            return loginVO;
+            return buildLoginSuccess(user, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent);
 
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("用户登录异常，principal={}", dto.getPrincipal(), e);
-            saveLoginLog(null, dto.getPrincipal(), ip, userAgent, 0, "系统异常");
+            log.error("账号密码登录异常，principal={}", dto.getPrincipal(), e);
+            saveLoginLog(null, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "系统异常");
             throw e;
         }
     }
+
+    /**
+     * 手机验证码登录
+     */
+    private LoginVO resolveByPhone(LoginDTO dto, String ip, String userAgent) {
+        try {
+            // 1. 校验验证码
+            captchaService.verifyCaptcha(
+                    com.yigongbao.module.system.auth.enums.CaptchaTypeEnum.PHONE.getValue(),
+                    dto.getPrincipal(), CaptchaSceneEnum.LOGIN.getScene(), dto.getCredential()
+            );
+
+            // 2. 查询用户
+            UserEntity user = userMapper.selectByPhone(dto.getPrincipal());
+            if (user == null) {
+                log.warn("手机号对应用户不存在，phone={}", dto.getPrincipal());
+                saveLoginLog(null, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户不存在");
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+            }
+
+            // 3. 校验用户状态
+            if (Integer.valueOf(StatusConstants.DISABLED).equals(user.getStatus())) {
+                log.warn("用户已禁用，phone={}", dto.getPrincipal());
+                saveLoginLog(user.getId(), dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户已禁用");
+                throw new BusinessException(ErrorCodeEnum.USER_DISABLED);
+            }
+
+            return buildLoginSuccess(user, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent);
+
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("手机验证码登录异常，phone={}", dto.getPrincipal(), e);
+            saveLoginLog(null, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "系统异常");
+            throw e;
+        }
+    }
+
+    /**
+     * 邮箱验证码登录
+     */
+    private LoginVO resolveByEmail(LoginDTO dto, String ip, String userAgent) {
+        try {
+            // 1. 校验验证码
+            captchaService.verifyCaptcha(
+                    com.yigongbao.module.system.auth.enums.CaptchaTypeEnum.EMAIL.getValue(),
+                    dto.getPrincipal(), CaptchaSceneEnum.LOGIN.getScene(), dto.getCredential()
+            );
+
+            // 2. 查询用户
+            UserEntity user = userMapper.selectByEmail(dto.getPrincipal());
+            if (user == null) {
+                log.warn("邮箱对应用户不存在，email={}", dto.getPrincipal());
+                saveLoginLog(null, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户不存在");
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+            }
+
+            // 3. 校验用户状态
+            if (Integer.valueOf(StatusConstants.DISABLED).equals(user.getStatus())) {
+                log.warn("用户已禁用，email={}", dto.getPrincipal());
+                saveLoginLog(user.getId(), dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户已禁用");
+                throw new BusinessException(ErrorCodeEnum.USER_DISABLED);
+            }
+
+            return buildLoginSuccess(user, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent);
+
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("邮箱验证码登录异常，email={}", dto.getPrincipal(), e);
+            saveLoginLog(null, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "系统异常");
+            throw e;
+        }
+    }
+
+    /**
+     * 校验图形验证码（PASSWORD 登录专用）
+     */
+    private void verifyGraphicCaptcha(String captchaId, String captchaCode) {
+        if (StrUtil.isBlank(captchaId) || StrUtil.isBlank(captchaCode)) {
+            throw new BusinessException(ErrorCodeEnum.CAPTCHA_GRAPHIC_EXPIRED);
+        }
+        String key = GRAPHIC_CAPTCHA_PREFIX + captchaId;
+        String stored = (String) redisTemplate.opsForValue().get(key);
+        if (stored == null) {
+            throw new BusinessException(ErrorCodeEnum.CAPTCHA_GRAPHIC_EXPIRED);
+        }
+        // 一次性使用：无论对错立即删除
+        redisTemplate.delete(key);
+        if (!stored.equals(captchaCode.toLowerCase())) {
+            throw new BusinessException(ErrorCodeEnum.CAPTCHA_GRAPHIC_ERROR);
+        }
+    }
+
+    /**
+     * 构建登录成功响应并执行 Sa-Token 登录
+     */
+    private LoginVO buildLoginSuccess(UserEntity user, String principal, String loginType, String ip, String userAgent) {
+        StpUtil.login(user.getId());
+        StpUtil.getSession().set("username", user.getUsername());
+        StpUtil.getSession().set("realName", user.getRealName());
+        String token = StpUtil.getTokenValue();
+        saveLoginLog(user.getId(), principal, loginType, ip, userAgent, 1, null);
+
+        LoginVO loginVO = new LoginVO();
+        loginVO.setToken(token);
+        log.info("用户登录成功，userId={}, loginType={}", user.getId(), loginType);
+        return loginVO;
+    }
+
+    // ==================== 登出 / 当前用户信息 / 改密 ====================
 
     /**
      * 用户登出
@@ -165,87 +316,95 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
         }
 
-        // 校验旧密码
         if (!passwordEncoder.matches(dto.getOldPassword(), user.getPassword())) {
             log.warn("旧密码错误，userId={}", userId);
             throw new BusinessException(ErrorCodeEnum.OLD_PASSWORD_ERROR);
         }
 
-        // 校验新旧密码不能相同
         if (passwordEncoder.matches(dto.getNewPassword(), user.getPassword())) {
             log.warn("新旧密码不能相同，userId={}", userId);
             throw new BusinessException(ErrorCodeEnum.NEW_PASSWORD_SAME_AS_OLD);
         }
 
-        // 更新密码
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
         userMapper.updateById(user);
         log.info("修改密码成功，userId={}", userId);
     }
 
+    // ==================== 验证码发送 ====================
+
     /**
-     * 获取客户端IP
+     * 发送登录验证码（PHONE/EMAIL 登录场景）
      */
-    private String getClientIp() {
-        try {
-            HttpServletRequest request = getHttpServletRequest();
-            if (request == null) {
-                return "unknown";
-            }
-            String ip = request.getHeader("X-Forwarded-For");
-            if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-                ip = request.getHeader("X-Real-IP");
-            }
-            if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-                ip = request.getRemoteAddr();
-            }
-            // 多级代理时取第一个IP
-            if (ip != null && ip.contains(",")) {
-                ip = ip.split(",")[0].trim();
-            }
-            return ip;
-        } catch (Exception e) {
-            return "unknown";
-        }
+    @Override
+    public void sendLoginCaptcha(SendCaptchaDTO dto) {
+        log.info("发送登录验证码，type={}, target={}", dto.getCaptchaType(), dto.getTarget());
+        captchaService.sendCaptcha(dto.getCaptchaType().getValue(), dto.getTarget(), CaptchaSceneEnum.LOGIN.getScene());
     }
 
     /**
-     * 获取User-Agent
+     * 发送忘记密码验证码
+     * 防反枚举攻击：无论 target 是否注册，接口始终返回成功
      */
-    private String getUserAgent() {
-        try {
-            HttpServletRequest request = getHttpServletRequest();
-            if (request == null) {
-                return "unknown";
-            }
-            return request.getHeader("User-Agent");
-        } catch (Exception e) {
-            return "unknown";
+    @Override
+    public void sendForgotPasswordCaptcha(SendCaptchaDTO dto) {
+        log.info("发送忘记密码验证码，type={}, target={}", dto.getCaptchaType(), dto.getTarget());
+        // 检查 target 是否存在（防止滥用，但不对外暴露结果）
+        UserEntity user = null;
+        if (com.yigongbao.module.system.auth.enums.CaptchaTypeEnum.PHONE == dto.getCaptchaType()) {
+            user = userMapper.selectByPhone(dto.getTarget());
+        } else if (com.yigongbao.module.system.auth.enums.CaptchaTypeEnum.EMAIL == dto.getCaptchaType()) {
+            user = userMapper.selectByEmail(dto.getTarget());
         }
+        if (user == null) {
+            // 静默成功，防止枚举用户
+            log.info("忘记密码：target 未注册，静默成功，target={}", dto.getTarget());
+            return;
+        }
+        captchaService.sendCaptcha(dto.getCaptchaType().getValue(), dto.getTarget(), CaptchaSceneEnum.FORGOT.getScene());
     }
 
     /**
-     * 获取HttpServletRequest
+     * 忘记密码：校验验证码并重置密码
      */
-    private HttpServletRequest getHttpServletRequest() {
-        try {
-            org.springframework.web.context.request.ServletRequestAttributes attributes =
-                    (org.springframework.web.context.request.ServletRequestAttributes)
-                            org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
-            return attributes != null ? attributes.getRequest() : null;
-        } catch (Exception e) {
-            return null;
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetPassword(ForgotPasswordResetDTO dto) {
+        log.info("忘记密码重置，type={}, target={}", dto.getCaptchaType(), dto.getTarget());
+
+        // 1. 校验验证码（匹配后自动删除）
+        captchaService.verifyCaptcha(dto.getCaptchaType().getValue(), dto.getTarget(),
+                CaptchaSceneEnum.FORGOT.getScene(), dto.getCaptcha());
+
+        // 2. 查询用户
+        UserEntity user = null;
+        if (com.yigongbao.module.system.auth.enums.CaptchaTypeEnum.PHONE == dto.getCaptchaType()) {
+            user = userMapper.selectByPhone(dto.getTarget());
+        } else if (com.yigongbao.module.system.auth.enums.CaptchaTypeEnum.EMAIL == dto.getCaptchaType()) {
+            user = userMapper.selectByEmail(dto.getTarget());
         }
+        if (user == null) {
+            log.warn("忘记密码：用户不存在，target={}", dto.getTarget());
+            throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+        }
+
+        // 3. 更新密码
+        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+        // 解锁账户
+        user.setLoginFailCount(0);
+        user.setLockTime(null);
+        userMapper.updateById(user);
+        log.info("忘记密码重置成功，userId={}", user.getId());
     }
 
-    /**
-     * 保存登录日志
-     */
-    private void saveLoginLog(Long userId, String username, String ip, String userAgent, Integer status, String failReason) {
+    // ==================== 私有工具方法 ====================
+
+    private void saveLoginLog(Long userId, String principal, String loginType, String ip, String userAgent, Integer status, String failReason) {
         try {
             LoginLogEntity logEntity = new LoginLogEntity();
             logEntity.setUserId(userId);
-            logEntity.setUsername(username);
+            logEntity.setUsername(principal);
+            logEntity.setLoginType(loginType);
             logEntity.setIp(ip);
             logEntity.setUserAgent(userAgent);
             logEntity.setLoginTime(LocalDateTime.now());
@@ -253,18 +412,10 @@ public class AuthServiceImpl implements AuthService {
             logEntity.setFailReason(failReason);
             loginLogMapper.insert(logEntity);
         } catch (Exception e) {
-            // 日志记录失败不影响业务
             log.error("保存登录日志异常", e);
         }
     }
 
-    /**
-     * 判断账户是否已锁定
-     * 锁定条件：lockTime 不为空，且 (lockTime + lockDuration分钟) > 当前时间
-     *
-     * @param user 用户实体
-     * @return true-已锁定，false-未锁定
-     */
     private boolean isAccountLocked(UserEntity user) {
         if (user.getLockTime() == null) {
             return false;
@@ -273,12 +424,6 @@ public class AuthServiceImpl implements AuthService {
         return user.getLockTime().plusMinutes(lockDuration).isAfter(LocalDateTime.now());
     }
 
-    /**
-     * 计算账户剩余锁定时间（分钟）
-     *
-     * @param user 用户实体
-     * @return 剩余分钟数（向上取整，最小为1）
-     */
     private int calculateRemainingLockMinutes(UserEntity user) {
         if (user.getLockTime() == null) {
             return 0;
@@ -292,43 +437,21 @@ public class AuthServiceImpl implements AuthService {
         return (int) Math.max(1, (remainingSeconds + 59) / 60);
     }
 
-    /**
-     * 处理登录失败
-     * 递增失败计数，达到阈值时锁定账户
-     *
-     * @param user 用户实体
-     * @param username 用户名
-     * @param ip IP地址
-     * @param userAgent User-Agent
-     */
-    private void handleLoginFailure(UserEntity user, String username, String ip, String userAgent) {
-        log.warn("密码错误，username={}", username);
+    private void handleLoginFailure(UserEntity user, String principal, String loginType, String ip, String userAgent) {
+        log.warn("密码错误，principal={}", principal);
+        saveLoginLog(user.getId(), principal, loginType, ip, userAgent, 0, "密码错误");
 
-        // 记录失败日志
-        saveLoginLog(user.getId(), username, ip, userAgent, 0, "密码错误");
-
-        // 递增失败计数
         int maxFailures = getMaxLoginFailures();
         int newFailCount = (user.getLoginFailCount() == null ? 0 : user.getLoginFailCount()) + 1;
 
+        user.setLoginFailCount(newFailCount);
         if (newFailCount >= maxFailures) {
-            // 达到锁定阈值，锁定账户
-            user.setLoginFailCount(newFailCount);
             user.setLockTime(LocalDateTime.now());
-            userMapper.updateById(user);
-            log.warn("账户已被锁定，username={}，失败次数={}", username, newFailCount);
-        } else {
-            // 未达到阈值，仅更新失败计数
-            user.setLoginFailCount(newFailCount);
-            userMapper.updateById(user);
+            log.warn("账户已被锁定，principal={}，失败次数={}", principal, newFailCount);
         }
+        userMapper.updateById(user);
     }
 
-    /**
-     * 重置登录失败计数（登录成功时调用）
-     *
-     * @param user 用户实体
-     */
     private void resetLoginFailCount(UserEntity user) {
         if (user.getLoginFailCount() != null && user.getLoginFailCount() > 0) {
             user.setLoginFailCount(0);
@@ -337,41 +460,72 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    /**
-     * 获取最大登录失败次数
-     *
-     * @return 最大失败次数
-     */
     private int getMaxLoginFailures() {
-        String configValue = configService.getConfigValue(SystemConfigKeyEnum.LOGIN_MAX_FAILURES.getKey());
-        if (StrUtil.isNotBlank(configValue)) {
+        String val = configService.getConfigValue(SystemConfigKeyEnum.LOGIN_MAX_FAILURES.getKey());
+        if (StrUtil.isNotBlank(val)) {
             try {
-                return Integer.parseInt(configValue);
+                return Integer.parseInt(val);
             } catch (NumberFormatException e) {
-                log.warn("login.max.failures 配置值无效，configValue={}", configValue);
+                log.warn("login.max.failures 配置值无效，val={}", val);
             }
         }
-        // ConfigService 已内置兜底逻辑，此处理论上不会到达
-        log.error("login.max.failures 配置获取异常，返回默认值 5");
         return 5;
     }
 
-    /**
-     * 获取登录锁定时长（分钟）
-     *
-     * @return 锁定时长（分钟）
-     */
     private int getLockDurationMinutes() {
-        String configValue = configService.getConfigValue(SystemConfigKeyEnum.LOGIN_LOCK_DURATION.getKey());
-        if (StrUtil.isNotBlank(configValue)) {
+        String val = configService.getConfigValue(SystemConfigKeyEnum.LOGIN_LOCK_DURATION.getKey());
+        if (StrUtil.isNotBlank(val)) {
             try {
-                return Integer.parseInt(configValue);
+                return Integer.parseInt(val);
             } catch (NumberFormatException e) {
-                log.warn("login.lock.duration 配置值无效，configValue={}", configValue);
+                log.warn("login.lock.duration 配置值无效，val={}", val);
             }
         }
-        // ConfigService 已内置兜底逻辑，此处理论上不会到达
-        log.error("login.lock.duration 配置获取异常，返回默认值 15");
         return 15;
+    }
+
+    private String getClientIp() {
+        try {
+            HttpServletRequest request = getHttpServletRequest();
+            if (request == null) {
+                return "unknown";
+            }
+            String ip = request.getHeader("X-Forwarded-For");
+            if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+                ip = request.getHeader("X-Real-IP");
+            }
+            if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+                ip = request.getRemoteAddr();
+            }
+            if (ip != null && ip.contains(",")) {
+                ip = ip.split(",")[0].trim();
+            }
+            return ip;
+        } catch (Exception e) {
+            return "unknown";
+        }
+    }
+
+    private String getUserAgent() {
+        try {
+            HttpServletRequest request = getHttpServletRequest();
+            if (request == null) {
+                return "unknown";
+            }
+            return request.getHeader("User-Agent");
+        } catch (Exception e) {
+            return "unknown";
+        }
+    }
+
+    private HttpServletRequest getHttpServletRequest() {
+        try {
+            org.springframework.web.context.request.ServletRequestAttributes attributes =
+                    (org.springframework.web.context.request.ServletRequestAttributes)
+                            org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+            return attributes != null ? attributes.getRequest() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

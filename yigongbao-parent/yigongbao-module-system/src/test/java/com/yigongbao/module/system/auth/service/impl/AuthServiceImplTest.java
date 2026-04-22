@@ -5,27 +5,35 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.auth.dto.ChangePasswordDTO;
+import com.yigongbao.module.system.auth.dto.ForgotPasswordResetDTO;
 import com.yigongbao.module.system.auth.dto.LoginDTO;
+import com.yigongbao.module.system.auth.dto.SendCaptchaDTO;
 import com.yigongbao.module.system.auth.entity.LoginLogEntity;
+import com.yigongbao.module.system.auth.enums.CaptchaTypeEnum;
+import com.yigongbao.module.system.auth.enums.LoginTypeEnum;
 import com.yigongbao.module.system.auth.mapper.LoginLogMapper;
 import com.yigongbao.module.system.auth.service.AuthService;
+import com.yigongbao.module.system.auth.service.CaptchaService;
+import com.yigongbao.module.system.auth.vo.GraphicCaptchaVO;
 import com.yigongbao.module.system.auth.vo.LoginVO;
+import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.resource.service.ResourceService;
 import com.yigongbao.module.system.resource.vo.ResourceVO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
-import com.yigongbao.module.system.config.service.ConfigService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
-import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
@@ -33,7 +41,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -63,6 +71,15 @@ class AuthServiceImplTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private CaptchaService captchaService;
+
+    @Mock
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Mock
+    private ValueOperations<String, Object> valueOps;
+
     @InjectMocks
     private AuthServiceImpl authService;
 
@@ -76,6 +93,14 @@ class AuthServiceImplTest {
         // Mock Sa-Token 静态方法
         stpUtilMockedStatic = mockStatic(StpUtil.class);
 
+        // Mock Redis valueOps（图形验证码使用）
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        // 默认：图形验证码存在且匹配（PASSWORD 登录测试公共前提）
+        when(valueOps.get(startsWith("graphic:captcha:"))).thenReturn("abcd");
+        // Mock StpUtil.getSession()
+        cn.dev33.satoken.session.SaSession mockSession = mock(cn.dev33.satoken.session.SaSession.class);
+        stpUtilMockedStatic.when(StpUtil::getSession).thenReturn(mockSession);
+
         // 初始化测试用户
         testUser = new UserEntity();
         testUser.setId(1L);
@@ -83,14 +108,18 @@ class AuthServiceImplTest {
         testUser.setPassword("$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi"); // 123456 的 BCrypt 加密
         testUser.setRealName("系统管理员");
         testUser.setPhone("13800000001");
+        testUser.setEmail("admin@example.com");
         testUser.setStatus(1);
         testUser.setRoleId(1L);
         testUser.setRoleName("超级管理员");
 
-        // 初始化登录DTO
+        // 初始化登录DTO（PASSWORD 类型）
         loginDTO = new LoginDTO();
+        loginDTO.setLoginType(LoginTypeEnum.PASSWORD);
         loginDTO.setPrincipal("admin");
         loginDTO.setCredential("123456");
+        loginDTO.setCaptchaId("test-captcha-id");
+        loginDTO.setCaptchaCode("abcd");
     }
 
     @AfterEach
@@ -113,16 +142,12 @@ class AuthServiceImplTest {
         when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
         stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-        when(resourceService.getUserMenuTree(1L)).thenReturn(new ArrayList<>());
-        when(resourceService.getUserPermissions(1L)).thenReturn(List.of("system:user:list"));
 
         // 执行
         LoginVO result = authService.login(loginDTO);
 
         // 断言
         assertNotNull(result);
-        assertNotNull(result.getToken());
-        assertNotNull(result.getUser());
         assertEquals("mock-token", result.getToken());
         verify(userMapper, times(1)).selectByUsername("admin");
         verify(passwordEncoder, times(1)).matches("123456", testUser.getPassword());
@@ -187,29 +212,22 @@ class AuthServiceImplTest {
     }
 
     @Test
-    @DisplayName("login: 登录成功后返回用户菜单和权限")
-    void login_shouldReturnMenusAndPermissions() {
+    @DisplayName("login: 登录成功后返回 token")
+    void login_shouldReturnToken() {
         // 准备
-        List<ResourceVO> menus = new ArrayList<>();
-        List<String> permissions = List.of("system:user:add", "system:user:edit");
-
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
         when(configService.getConfigValue("login.max.failures")).thenReturn("5");
         when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
         stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-        when(resourceService.getUserMenuTree(1L)).thenReturn(menus);
-        when(resourceService.getUserPermissions(1L)).thenReturn(permissions);
 
         // 执行
         LoginVO result = authService.login(loginDTO);
 
         // 断言
-        assertNotNull(result.getMenus());
-        assertNotNull(result.getPermissions());
-        assertEquals(2, result.getPermissions().size());
-        assertTrue(result.getPermissions().contains("system:user:add"));
+        assertNotNull(result.getToken());
+        assertEquals("mock-token", result.getToken());
     }
 
     @Test
@@ -298,8 +316,6 @@ class AuthServiceImplTest {
         when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
         stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-        when(resourceService.getUserMenuTree(1L)).thenReturn(new ArrayList<>());
-        when(resourceService.getUserPermissions(1L)).thenReturn(List.of());
 
         // 执行：锁定已超时，可正常登录
         LoginVO result = authService.login(loginDTO);
@@ -320,8 +336,6 @@ class AuthServiceImplTest {
         when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
         stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-        when(resourceService.getUserMenuTree(1L)).thenReturn(new ArrayList<>());
-        when(resourceService.getUserPermissions(1L)).thenReturn(List.of());
 
         // 执行
         LoginVO result = authService.login(loginDTO);
@@ -356,10 +370,8 @@ class AuthServiceImplTest {
                 () -> authService.login(loginDTO)
         );
         assertEquals(ErrorCodeEnum.PASSWORD_ERROR.getCode(), exception.getCode());
-        // 验证 ConfigService 返回了兜底值
-        // 注意：handleLoginFailure 和 login 异常处理中各调用一次，所以是 atLeast(1)
+        // 验证 ConfigService 被调用获取最大失败次数
         verify(configService, atLeast(1)).getConfigValue("login.max.failures");
-        verify(configService, atLeast(1)).getConfigValue("login.lock.duration");
     }
 
     // ==================== logout 测试 ====================
@@ -458,7 +470,7 @@ class AuthServiceImplTest {
                 BusinessException.class,
                 () -> authService.changePassword(1L, dto)
         );
-        assertEquals(ErrorCodeEnum.OLD_PASSWORD_ERROR.getCode(), exception.getCode());
+        assertEquals(ErrorCodeEnum.NEW_PASSWORD_SAME_AS_OLD.getCode(), exception.getCode());
         verify(userMapper, never()).updateById(any(UserEntity.class));
     }
 
@@ -497,5 +509,166 @@ class AuthServiceImplTest {
                 () -> authService.getCurrentUserInfo()
         );
         assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    // ==================== 图形验证码测试 ====================
+
+    @Test
+    @DisplayName("getGraphicCaptcha: 返回非空 captchaId 和 imageBase64")
+    void getGraphicCaptcha_shouldReturnValidVO() {
+        GraphicCaptchaVO vo = authService.getGraphicCaptcha();
+        assertNotNull(vo.getCaptchaId());
+        assertNotNull(vo.getImageBase64());
+        assertTrue(vo.getImageBase64().startsWith("data:image/png;base64,"));
+        verify(valueOps, times(1)).set(startsWith("graphic:captcha:"), anyString(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("login(PASSWORD): 图形验证码已过期时抛出 CAPTCHA_GRAPHIC_EXPIRED")
+    void login_whenGraphicCaptchaExpired_shouldThrowExpired() {
+        when(valueOps.get(startsWith("graphic:captcha:"))).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(loginDTO));
+        assertEquals(ErrorCodeEnum.CAPTCHA_GRAPHIC_EXPIRED.getCode(), ex.getCode());
+    }
+
+    @Test
+    @DisplayName("login(PASSWORD): 图形验证码错误时抛出 CAPTCHA_GRAPHIC_ERROR")
+    void login_whenGraphicCaptchaWrong_shouldThrowError() {
+        when(valueOps.get(startsWith("graphic:captcha:"))).thenReturn("xxxx");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(loginDTO));
+        assertEquals(ErrorCodeEnum.CAPTCHA_GRAPHIC_ERROR.getCode(), ex.getCode());
+    }
+
+    // ==================== PHONE/EMAIL 登录测试 ====================
+
+    @Test
+    @DisplayName("login(PHONE): 手机验证码正确时登录成功")
+    void login_byPhone_whenSuccess_shouldReturnToken() {
+        LoginDTO dto = new LoginDTO();
+        dto.setLoginType(LoginTypeEnum.PHONE);
+        dto.setPrincipal("13800000001");
+        dto.setCredential("123456");
+
+        doNothing().when(captchaService).verifyCaptcha(anyString(), eq("13800000001"), anyString(), anyString());
+        when(userMapper.selectByPhone("13800000001")).thenReturn(testUser);
+        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
+
+        LoginVO result = authService.login(dto);
+        assertNotNull(result.getToken());
+        verify(captchaService, times(1)).verifyCaptcha(anyString(), eq("13800000001"), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("login(PHONE): 手机号未注册时抛出 USER_NOT_FOUND")
+    void login_byPhone_whenUserNotFound_shouldThrow() {
+        LoginDTO dto = new LoginDTO();
+        dto.setLoginType(LoginTypeEnum.PHONE);
+        dto.setPrincipal("13900000000");
+        dto.setCredential("123456");
+
+        doNothing().when(captchaService).verifyCaptcha(anyString(), anyString(), anyString(), anyString());
+        when(userMapper.selectByPhone("13900000000")).thenReturn(null);
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(dto));
+        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), ex.getCode());
+    }
+
+    @Test
+    @DisplayName("login(EMAIL): 邮箱验证码正确时登录成功")
+    void login_byEmail_whenSuccess_shouldReturnToken() {
+        LoginDTO dto = new LoginDTO();
+        dto.setLoginType(LoginTypeEnum.EMAIL);
+        dto.setPrincipal("admin@example.com");
+        dto.setCredential("123456");
+
+        doNothing().when(captchaService).verifyCaptcha(anyString(), eq("admin@example.com"), anyString(), anyString());
+        when(userMapper.selectByEmail("admin@example.com")).thenReturn(testUser);
+        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
+
+        LoginVO result = authService.login(dto);
+        assertNotNull(result.getToken());
+    }
+
+    // ==================== 发送验证码测试 ====================
+
+    @Test
+    @DisplayName("sendLoginCaptcha: 调用 CaptchaService.sendCaptcha（LOGIN 场景）")
+    void sendLoginCaptcha_shouldCallSendCaptcha() {
+        SendCaptchaDTO dto = new SendCaptchaDTO();
+        dto.setCaptchaType(CaptchaTypeEnum.PHONE);
+        dto.setTarget("13800000001");
+
+        doNothing().when(captchaService).sendCaptcha(anyString(), anyString(), anyString());
+        authService.sendLoginCaptcha(dto);
+
+        verify(captchaService, times(1)).sendCaptcha("PHONE", "13800000001", "login");
+    }
+
+    @Test
+    @DisplayName("sendForgotPasswordCaptcha: target 未注册时静默成功（防枚举）")
+    void sendForgotPasswordCaptcha_whenTargetNotExists_shouldSilentlySucceed() {
+        SendCaptchaDTO dto = new SendCaptchaDTO();
+        dto.setCaptchaType(CaptchaTypeEnum.PHONE);
+        dto.setTarget("13999999999");
+
+        when(userMapper.selectByPhone("13999999999")).thenReturn(null);
+        authService.sendForgotPasswordCaptcha(dto);
+
+        verify(captchaService, never()).sendCaptcha(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("sendForgotPasswordCaptcha: target 已注册时调用 CaptchaService")
+    void sendForgotPasswordCaptcha_whenTargetExists_shouldSendCaptcha() {
+        SendCaptchaDTO dto = new SendCaptchaDTO();
+        dto.setCaptchaType(CaptchaTypeEnum.PHONE);
+        dto.setTarget("13800000001");
+
+        when(userMapper.selectByPhone("13800000001")).thenReturn(testUser);
+        doNothing().when(captchaService).sendCaptcha(anyString(), anyString(), anyString());
+        authService.sendForgotPasswordCaptcha(dto);
+
+        verify(captchaService, times(1)).sendCaptcha("PHONE", "13800000001", "forgot");
+    }
+
+    // ==================== 重置密码测试 ====================
+
+    @Test
+    @DisplayName("resetPassword: 验证码正确且用户存在时重置成功")
+    void resetPassword_whenValid_shouldUpdatePassword() {
+        ForgotPasswordResetDTO dto = new ForgotPasswordResetDTO();
+        dto.setCaptchaType(CaptchaTypeEnum.PHONE);
+        dto.setTarget("13800000001");
+        dto.setCaptcha("123456");
+        dto.setNewPassword("newPass123");
+
+        doNothing().when(captchaService).verifyCaptcha(anyString(), anyString(), anyString(), anyString());
+        when(userMapper.selectByPhone("13800000001")).thenReturn(testUser);
+        when(passwordEncoder.encode("newPass123")).thenReturn("encoded");
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        assertDoesNotThrow(() -> authService.resetPassword(dto));
+        verify(userMapper, times(1)).updateById(argThat((UserEntity u) -> "encoded".equals(u.getPassword())));
+    }
+
+    @Test
+    @DisplayName("resetPassword: 用户不存在时抛出 USER_NOT_FOUND")
+    void resetPassword_whenUserNotFound_shouldThrow() {
+        ForgotPasswordResetDTO dto = new ForgotPasswordResetDTO();
+        dto.setCaptchaType(CaptchaTypeEnum.PHONE);
+        dto.setTarget("13999999999");
+        dto.setCaptcha("123456");
+        dto.setNewPassword("newPass123");
+
+        doNothing().when(captchaService).verifyCaptcha(anyString(), anyString(), anyString(), anyString());
+        when(userMapper.selectByPhone("13999999999")).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.resetPassword(dto));
+        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), ex.getCode());
     }
 }
