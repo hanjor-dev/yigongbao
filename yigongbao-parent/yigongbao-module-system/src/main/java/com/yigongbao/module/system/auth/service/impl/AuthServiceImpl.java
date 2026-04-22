@@ -54,38 +54,38 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     public LoginVO login(LoginDTO dto) {
-        log.info("用户登录，username={}", dto.getUsername());
+        log.info("用户登录，principal={}", dto.getPrincipal());
         String ip = getClientIp();
         String userAgent = getUserAgent();
 
         try {
             // 查询用户
-            UserEntity user = userMapper.selectByUsername(dto.getUsername());
+            UserEntity user = userMapper.selectByUsername(dto.getPrincipal());
             if (user == null) {
-                log.warn("用户不存在，username={}", dto.getUsername());
-                saveLoginLog(null, dto.getUsername(), ip, userAgent, 0, "用户不存在");
+                log.warn("用户不存在，principal={}", dto.getPrincipal());
+                saveLoginLog(null, dto.getPrincipal(), ip, userAgent, 0, "用户不存在");
                 throw new BusinessException(ErrorCodeEnum.USERNAME_OR_PASSWORD_ERROR);
             }
 
             // 校验用户状态
             if (Integer.valueOf(StatusConstants.DISABLED).equals(user.getStatus())) {
-                log.warn("用户已禁用，username={}", dto.getUsername());
-                saveLoginLog(user.getId(), dto.getUsername(), ip, userAgent, 0, "用户已禁用");
+                log.warn("用户已禁用，principal={}", dto.getPrincipal());
+                saveLoginLog(user.getId(), dto.getPrincipal(), ip, userAgent, 0, "用户已禁用");
                 throw new BusinessException(ErrorCodeEnum.USER_DISABLED);
             }
 
             // 校验账户是否已锁定（自动解锁：lockTime + lockDuration <= now）
             if (isAccountLocked(user)) {
                 int remainingMinutes = calculateRemainingLockMinutes(user);
-                log.warn("账户已锁定，username={}，剩余锁定时间={}分钟", dto.getUsername(), remainingMinutes);
-                saveLoginLog(user.getId(), dto.getUsername(), ip, userAgent, 0, "账户已锁定");
+                log.warn("账户已锁定，principal={}，剩余锁定时间={}分钟", dto.getPrincipal(), remainingMinutes);
+                saveLoginLog(user.getId(), dto.getPrincipal(), ip, userAgent, 0, "账户已锁定");
                 throw new BusinessException(ErrorCodeEnum.ACCOUNT_LOCKED, remainingMinutes);
             }
 
             // 校验密码
-            if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+            if (!passwordEncoder.matches(dto.getCredential(), user.getPassword())) {
                 // 处理登录失败：计数+判断是否达到锁定阈值
-                handleLoginFailure(user, dto.getUsername(), ip, userAgent);
+                handleLoginFailure(user, dto.getPrincipal(), ip, userAgent);
                 throw new BusinessException(ErrorCodeEnum.PASSWORD_ERROR);
             }
 
@@ -100,7 +100,7 @@ public class AuthServiceImpl implements AuthService {
             String token = StpUtil.getTokenValue();
 
             // 记录登录成功日志
-            saveLoginLog(user.getId(), dto.getUsername(), ip, userAgent, 1, null);
+            saveLoginLog(user.getId(), dto.getPrincipal(), ip, userAgent, 1, null);
 
             // 构建返回结果
             LoginVO loginVO = new LoginVO();
@@ -109,14 +109,14 @@ public class AuthServiceImpl implements AuthService {
 //            loginVO.setMenus(resourceService.getUserMenuTree(user.getId()));
 //            loginVO.setPermissions(resourceService.getUserPermissions(user.getId()));
 
-            log.info("用户登录成功，username={}", dto.getUsername());
+            log.info("用户登录成功，principal={}", dto.getPrincipal());
             return loginVO;
 
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("用户登录异常，username={}", dto.getUsername(), e);
-            saveLoginLog(null, dto.getUsername(), ip, userAgent, 0, "系统异常");
+            log.error("用户登录异常，principal={}", dto.getPrincipal(), e);
+            saveLoginLog(null, dto.getPrincipal(), ip, userAgent, 0, "系统异常");
             throw e;
         }
     }

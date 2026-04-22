@@ -89,8 +89,8 @@ class AuthServiceImplTest {
 
         // 初始化登录DTO
         loginDTO = new LoginDTO();
-        loginDTO.setUsername("admin");
-        loginDTO.setPassword("123456");
+        loginDTO.setPrincipal("admin");
+        loginDTO.setCredential("123456");
     }
 
     @AfterEach
@@ -136,7 +136,7 @@ class AuthServiceImplTest {
         when(userMapper.selectByUsername("not_exists_user")).thenReturn(null);
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
 
-        loginDTO.setUsername("not_exists_user");
+        loginDTO.setPrincipal("not_exists_user");
 
         // 断言
         BusinessException exception = assertThrows(
@@ -175,7 +175,7 @@ class AuthServiceImplTest {
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
-        loginDTO.setPassword("wrong_password");
+        loginDTO.setCredential("wrong_password");
 
         // 断言
         BusinessException exception = assertThrows(
@@ -244,7 +244,7 @@ class AuthServiceImplTest {
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
-        loginDTO.setPassword("wrong_password");
+        loginDTO.setCredential("wrong_password");
 
         // 断言
         BusinessException exception = assertThrows(
@@ -271,7 +271,7 @@ class AuthServiceImplTest {
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
-        loginDTO.setPassword("wrong_password");
+        loginDTO.setCredential("wrong_password");
 
         // 断言
         BusinessException exception = assertThrows(
@@ -348,7 +348,7 @@ class AuthServiceImplTest {
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
-        loginDTO.setPassword("wrong_password");
+        loginDTO.setCredential("wrong_password");
 
         // 断言
         BusinessException exception = assertThrows(
