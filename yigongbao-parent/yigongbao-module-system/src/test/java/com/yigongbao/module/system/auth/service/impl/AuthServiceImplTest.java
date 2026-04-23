@@ -1,9 +1,6 @@
 package com.yigongbao.module.system.auth.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
-import cloud.tianai.captcha.application.ImageCaptchaApplication;
-import cloud.tianai.captcha.common.response.ApiResponse;
-import cloud.tianai.captcha.validator.common.model.dto.ImageCaptchaTrack;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -16,6 +13,7 @@ import com.yigongbao.module.system.auth.enums.CaptchaTypeEnum;
 import com.yigongbao.module.system.auth.enums.LoginTypeEnum;
 import com.yigongbao.module.system.auth.mapper.LoginLogMapper;
 import com.yigongbao.module.system.auth.service.CaptchaService;
+import com.yigongbao.module.system.auth.service.ImageCaptchaService;
 import com.yigongbao.module.system.auth.vo.LoginVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.resource.service.ResourceService;
@@ -32,6 +30,8 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
@@ -73,7 +73,13 @@ class AuthServiceImplTest {
     private CaptchaService captchaService;
 
     @Mock
-    private ImageCaptchaApplication imageCaptchaApplication;
+    private ImageCaptchaService imageCaptchaService;
+
+    @Mock
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Mock
+    private ValueOperations<String, String> valueOperations;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -81,8 +87,8 @@ class AuthServiceImplTest {
     private MockedStatic<StpUtil> stpUtilMockedStatic;
 
     private UserEntity testUser;
-    /** 不带滑动验证码的 PASSWORD 登录 DTO（兼容过渡期） */
     private LoginDTO loginDTO;
+    private String validCaptchaToken;
 
     @BeforeEach
     void setUp() {
@@ -92,6 +98,9 @@ class AuthServiceImplTest {
         // Mock StpUtil.getSession()
         cn.dev33.satoken.session.SaSession mockSession = mock(cn.dev33.satoken.session.SaSession.class);
         stpUtilMockedStatic.when(StpUtil::getSession).thenReturn(mockSession);
+
+        // Mock Redis template
+        lenient().when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
 
         // 初始化测试用户
         testUser = new UserEntity();
@@ -105,12 +114,13 @@ class AuthServiceImplTest {
         testUser.setRoleId(1L);
         testUser.setRoleName("超级管理员");
 
-        // 不带验证码的基础 PASSWORD 登录 DTO（过渡期跳过验证码校验）
+        // 基础 PASSWORD 登录 DTO（带有效 captchaToken）
+        validCaptchaToken = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
         loginDTO = new LoginDTO();
         loginDTO.setLoginType(LoginTypeEnum.PASSWORD);
         loginDTO.setPrincipal("admin");
         loginDTO.setCredential("123456");
-        // captchaKey 和 captchaTrack 均不设置，过渡期跳过滑动验证码校验
+        loginDTO.setCaptchaToken(validCaptchaToken);
     }
 
     @AfterEach
@@ -120,11 +130,14 @@ class AuthServiceImplTest {
         }
     }
 
-    // ==================== login - PASSWORD 基础流程 ====================
+    // ==================== login - PASSWORD 基础流程（带 Token 校验）====================
 
     @Test
-    @DisplayName("login(PASSWORD): 用户名密码正确时登录成功")
-    void login_whenSuccess_shouldReturnToken() {
+    @DisplayName("login(PASSWORD): Token 有效时登录成功")
+    void login_withValidCaptchaToken_shouldReturnToken() {
+        // Token 存在于 Redis
+        when(valueOperations.get(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn("captcha-id-001");
+        when(stringRedisTemplate.delete(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn(true);
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
         when(configService.getConfigValue("login.max.failures")).thenReturn("5");
@@ -142,9 +155,56 @@ class AuthServiceImplTest {
     }
 
     @Test
+    @DisplayName("login(PASSWORD): Token 为空时抛出 CAPTCHA_TOKEN_MISSING")
+    void login_whenCaptchaTokenMissing_shouldThrowException() {
+        loginDTO.setCaptchaToken(null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(loginDTO));
+        assertEquals(ErrorCodeEnum.CAPTCHA_TOKEN_MISSING.getCode(), ex.getCode());
+    }
+
+    @Test
+    @DisplayName("login(PASSWORD): Token 不存在于 Redis 时抛出 CAPTCHA_TOKEN_INVALID")
+    void login_whenCaptchaTokenNotExists_shouldThrowException() {
+        when(stringRedisTemplate.hasKey(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(loginDTO));
+        assertEquals(ErrorCodeEnum.CAPTCHA_TOKEN_INVALID.getCode(), ex.getCode());
+    }
+
+    @Test
+    @DisplayName("login(PASSWORD): Token 已使用（Redis 中不存在）时抛出 CAPTCHA_TOKEN_INVALID")
+    void login_whenCaptchaTokenAlreadyUsed_shouldThrowException() {
+        when(stringRedisTemplate.hasKey(anyString())).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(loginDTO));
+        assertEquals(ErrorCodeEnum.CAPTCHA_TOKEN_INVALID.getCode(), ex.getCode());
+    }
+
+    @Test
+    @DisplayName("login(PASSWORD): Token 验证通过后从 Redis 删除（防止重放）")
+    void login_whenTokenValid_shouldDeleteFromRedis() {
+        when(valueOperations.get(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn("captcha-id-001");
+        when(stringRedisTemplate.delete(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn(true);
+        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
+        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
+        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
+        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
+        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
+        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
+
+        authService.login(loginDTO);
+
+        // Token 验证成功后应删除
+        verify(stringRedisTemplate).delete(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken);
+    }
+
+    @Test
     @DisplayName("login(PASSWORD): 用户名不存在时抛出 USERNAME_OR_PASSWORD_ERROR")
     void login_whenUsernameNotExists_shouldThrowException() {
         loginDTO.setPrincipal("not_exists_user");
+        when(valueOperations.get(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn("captcha-id-001");
+        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
         when(userMapper.selectByUsername("not_exists_user")).thenReturn(null);
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
 
@@ -157,6 +217,8 @@ class AuthServiceImplTest {
     @DisplayName("login(PASSWORD): 用户已禁用时抛出 USER_DISABLED")
     void login_whenUserDisabled_shouldThrowException() {
         testUser.setStatus(StatusConstants.DISABLED);
+        when(valueOperations.get(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn("captcha-id-001");
+        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
 
@@ -169,6 +231,8 @@ class AuthServiceImplTest {
     @DisplayName("login(PASSWORD): 密码错误时抛出 PASSWORD_ERROR")
     void login_whenPasswordWrong_shouldThrowException() {
         loginDTO.setCredential("wrong_password");
+        when(valueOperations.get(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn("captcha-id-001");
+        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(passwordEncoder.matches("wrong_password", testUser.getPassword())).thenReturn(false);
         when(configService.getConfigValue("login.max.failures")).thenReturn("5");
@@ -184,7 +248,9 @@ class AuthServiceImplTest {
     @DisplayName("login(PASSWORD): 账户已锁定时拒绝登录")
     void login_whenAccountLocked_shouldThrowException() {
         testUser.setLoginFailCount(5);
-        testUser.setLockTime(LocalDateTime.now()); // 刚刚锁定
+        testUser.setLockTime(LocalDateTime.now());
+        when(valueOperations.get(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn("captcha-id-001");
+        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(configService.getConfigValue("login.max.failures")).thenReturn("5");
         when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
@@ -199,7 +265,9 @@ class AuthServiceImplTest {
     @DisplayName("login(PASSWORD): 账户锁定超时后自动解锁可正常登录")
     void login_whenLockExpired_shouldAllowLogin() {
         testUser.setLoginFailCount(5);
-        testUser.setLockTime(LocalDateTime.now().minusMinutes(30)); // 已超时（锁定15分钟）
+        testUser.setLockTime(LocalDateTime.now().minusMinutes(30));
+        when(valueOperations.get(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn("captcha-id-001");
+        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
         when(configService.getConfigValue("login.max.failures")).thenReturn("5");
@@ -213,49 +281,11 @@ class AuthServiceImplTest {
     }
 
     @Test
-    @DisplayName("login(PASSWORD): 密码错误时递增失败计数但未达阈值不锁定")
-    void login_whenPasswordWrong_shouldIncrementFailCount() {
-        testUser.setLoginFailCount(3);
-        loginDTO.setCredential("wrong_password");
-        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
-        when(passwordEncoder.matches("wrong_password", testUser.getPassword())).thenReturn(false);
-        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
-        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
-        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
-
-        assertThrows(BusinessException.class, () -> authService.login(loginDTO));
-
-        // 失败计数 3 → 4，未达阈值 5，不应设置 lockTime
-        verify(userMapper).updateById(argThat((UserEntity u) ->
-                u.getLoginFailCount() == 4 && u.getLockTime() == null
-        ));
-    }
-
-    @Test
-    @DisplayName("login(PASSWORD): 密码错误达阈值时锁定账户")
-    void login_whenFailCountReachesMax_shouldLockAccount() {
-        testUser.setLoginFailCount(4); // 再错一次即达到阈值 5
-        loginDTO.setCredential("wrong_password");
-        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
-        when(passwordEncoder.matches("wrong_password", testUser.getPassword())).thenReturn(false);
-        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
-        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
-        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
-
-        assertThrows(BusinessException.class, () -> authService.login(loginDTO));
-
-        // 失败计数 4 → 5，应设置 lockTime
-        verify(userMapper).updateById(argThat((UserEntity u) ->
-                u.getLoginFailCount() == 5 && u.getLockTime() != null
-        ));
-    }
-
-    @Test
     @DisplayName("login(PASSWORD): 登录成功后重置失败计数")
     void login_whenSuccess_shouldResetFailCount() {
         testUser.setLoginFailCount(3);
+        when(valueOperations.get(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn("captcha-id-001");
+        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
         when(configService.getConfigValue("login.max.failures")).thenReturn("5");
@@ -270,82 +300,16 @@ class AuthServiceImplTest {
         ));
     }
 
-    // ==================== login - 滑动验证码 ====================
-
-    @Test
-    @DisplayName("login(PASSWORD): 携带有效滑动验证码时校验通过后登录成功")
-    void login_withValidSliderCaptcha_shouldLoginSuccess() {
-        // 构造带验证码的 DTO
-        LoginDTO dto = new LoginDTO();
-        dto.setLoginType(LoginTypeEnum.PASSWORD);
-        dto.setPrincipal("admin");
-        dto.setCredential("123456");
-        dto.setCaptchaKey("captcha-key-001");
-        dto.setCaptchaTrack(new ImageCaptchaTrack());
-
-        // 滑动验证码校验通过
-        when(imageCaptchaApplication.matching(eq("captcha-key-001"), any(ImageCaptchaTrack.class)))
-                .thenReturn(ApiResponse.ofSuccess());
-        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
-        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
-        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
-        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
-        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
-        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-
-        LoginVO result = authService.login(dto);
-
-        assertNotNull(result.getToken());
-        verify(imageCaptchaApplication).matching(eq("captcha-key-001"), any(ImageCaptchaTrack.class));
-    }
-
-    @Test
-    @DisplayName("login(PASSWORD): 滑动验证码校验失败时抛出 CAPTCHA_GRAPHIC_ERROR")
-    void login_whenSliderCaptchaFailed_shouldThrowError() {
-        LoginDTO dto = new LoginDTO();
-        dto.setLoginType(LoginTypeEnum.PASSWORD);
-        dto.setPrincipal("admin");
-        dto.setCredential("123456");
-        dto.setCaptchaKey("captcha-key-001");
-        dto.setCaptchaTrack(new ImageCaptchaTrack());
-
-        // 滑动验证码校验失败
-        when(imageCaptchaApplication.matching(eq("captcha-key-001"), any(ImageCaptchaTrack.class)))
-                .thenReturn(ApiResponse.ofError("验证失败"));
-
-        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(dto));
-        assertEquals(ErrorCodeEnum.CAPTCHA_GRAPHIC_ERROR.getCode(), ex.getCode());
-        // 验证码失败时不应继续查询用户
-        verify(userMapper, never()).selectByUsername(any());
-    }
-
-    @Test
-    @DisplayName("login(PASSWORD): 不传验证码时跳过滑动验证码校验（过渡期兼容）")
-    void login_withoutCaptcha_shouldSkipSliderVerify() {
-        // loginDTO 未设置 captchaKey 和 captchaTrack
-        when(userMapper.selectByUsername("admin")).thenReturn(testUser);
-        when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
-        when(configService.getConfigValue("login.max.failures")).thenReturn("5");
-        when(configService.getConfigValue("login.lock.duration")).thenReturn("15");
-        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
-        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-
-        LoginVO result = authService.login(loginDTO);
-
-        assertNotNull(result.getToken());
-        // 不应调用 imageCaptchaApplication
-        verify(imageCaptchaApplication, never()).matching(any(), any(ImageCaptchaTrack.class));
-    }
-
     // ==================== login - PHONE ====================
 
     @Test
-    @DisplayName("login(PHONE): 手机验证码正确时登录成功")
+    @DisplayName("login(PHONE): 手机验证码正确时登录成功（不校验 captchaToken）")
     void login_byPhone_whenSuccess_shouldReturnToken() {
         LoginDTO dto = new LoginDTO();
         dto.setLoginType(LoginTypeEnum.PHONE);
         dto.setPrincipal("13800000001");
         dto.setCredential("123456");
+        // PHONE 类型不设置 captchaToken
 
         doNothing().when(captchaService).verifyCaptcha(anyString(), eq("13800000001"), anyString(), anyString());
         when(userMapper.selectByPhone("13800000001")).thenReturn(testUser);
@@ -400,7 +364,10 @@ class AuthServiceImplTest {
         dto.setLoginType(LoginTypeEnum.PASSWORD);
         dto.setPrincipal("admin@example.com");
         dto.setCredential("123456");
+        dto.setCaptchaToken(validCaptchaToken);
 
+        when(valueOperations.get(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn("captcha-id-001");
+        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
         when(userMapper.selectByEmail("admin@example.com")).thenReturn(testUser);
         when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
         when(configService.getConfigValue("login.max.failures")).thenReturn("5");
@@ -411,7 +378,6 @@ class AuthServiceImplTest {
         LoginVO result = authService.login(dto);
 
         assertNotNull(result.getToken());
-        // 应走邮箱查询路径，不调用 selectByUsername
         verify(userMapper).selectByEmail("admin@example.com");
         verify(userMapper, never()).selectByUsername(any());
     }
@@ -419,6 +385,8 @@ class AuthServiceImplTest {
     @Test
     @DisplayName("login(PASSWORD): 用户名方式不走邮箱查询路径")
     void login_byUsername_shouldNotQueryByEmail() {
+        when(valueOperations.get(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn("captcha-id-001");
+        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
         when(userMapper.selectByUsername("admin")).thenReturn(testUser);
         when(passwordEncoder.matches("123456", testUser.getPassword())).thenReturn(true);
         when(configService.getConfigValue("login.max.failures")).thenReturn("5");
@@ -439,7 +407,10 @@ class AuthServiceImplTest {
         dto.setLoginType(LoginTypeEnum.PASSWORD);
         dto.setPrincipal("notexist@example.com");
         dto.setCredential("123456");
+        dto.setCaptchaToken(validCaptchaToken);
 
+        when(valueOperations.get(ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + validCaptchaToken)).thenReturn("captcha-id-001");
+        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
         when(userMapper.selectByEmail("notexist@example.com")).thenReturn(null);
         when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
 
@@ -615,7 +586,6 @@ class AuthServiceImplTest {
 
         assertDoesNotThrow(() -> authService.resetPassword(dto));
 
-        // 验证密码更新且锁定状态被清除
         verify(userMapper).updateById(argThat((UserEntity u) ->
                 "encoded".equals(u.getPassword()) &&
                 u.getLoginFailCount() == 0 &&

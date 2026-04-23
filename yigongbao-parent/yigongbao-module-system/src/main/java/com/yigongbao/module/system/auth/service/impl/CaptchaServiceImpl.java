@@ -153,17 +153,38 @@ public class CaptchaServiceImpl implements CaptchaService {
 
     private int getExpireSeconds() {
         String val = configService.getConfigValue(SystemConfigKeyEnum.CAPTCHA_EXPIRE_SECONDS.getKey());
-        return val != null ? Integer.parseInt(val) : 300;
+        if (StrUtil.isNotBlank(val)) {
+            try {
+                return Integer.parseInt(val);
+            } catch (NumberFormatException e) {
+                log.warn("captcha.expire.seconds 配置值无效，val={}", val);
+            }
+        }
+        return 300;
     }
 
     private int getCooldownSeconds() {
         String val = configService.getConfigValue(SystemConfigKeyEnum.CAPTCHA_COOLDOWN_SECONDS.getKey());
-        return val != null ? Integer.parseInt(val) : 60;
+        if (StrUtil.isNotBlank(val)) {
+            try {
+                return Integer.parseInt(val);
+            } catch (NumberFormatException e) {
+                log.warn("captcha.cooldown.seconds 配置值无效，val={}", val);
+            }
+        }
+        return 60;
     }
 
     private int getDailyLimit() {
         String val = configService.getConfigValue(SystemConfigKeyEnum.CAPTCHA_DAILY_LIMIT.getKey());
-        return val != null ? Integer.parseInt(val) : 10;
+        if (StrUtil.isNotBlank(val)) {
+            try {
+                return Integer.parseInt(val);
+            } catch (NumberFormatException e) {
+                log.warn("captcha.daily.limit 配置值无效，val={}", val);
+            }
+        }
+        return 10;
     }
 
     /**

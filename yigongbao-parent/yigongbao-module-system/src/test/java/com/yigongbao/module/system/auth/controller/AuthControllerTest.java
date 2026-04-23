@@ -1,6 +1,5 @@
 package com.yigongbao.module.system.auth.controller;
 
-import cloud.tianai.captcha.application.ImageCaptchaApplication;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.module.system.SystemTestApplication;
 import com.yigongbao.module.system.auth.service.AuthService;
@@ -14,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
@@ -57,7 +57,7 @@ class AuthControllerTest {
     private FileStorageService fileStorageService;
 
     @MockBean
-    private ImageCaptchaApplication imageCaptchaApplication;
+    private StringRedisTemplate stringRedisTemplate;
 
     // ==================== login 测试 ====================
 
@@ -72,7 +72,7 @@ class AuthControllerTest {
         body.put("loginType", "PASSWORD");
         body.put("principal", "admin");
         body.put("credential", "123456");
-        body.put("captchaKey", "test-captcha-key");
+        body.put("captchaToken", "a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
         mockMvc.perform(post("/system/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -97,22 +97,41 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("login: 滑动验证码校验失败时返回 CAPTCHA_GRAPHIC_ERROR")
-    void login_whenSliderCaptchaError_shouldReturnError() throws Exception {
+    @DisplayName("login: captchaToken 为空时返回 CAPTCHA_TOKEN_MISSING")
+    void login_whenCaptchaTokenMissing_shouldReturnError() throws Exception {
         when(authService.login(any()))
-                .thenThrow(new BusinessException(ErrorCodeEnum.CAPTCHA_GRAPHIC_ERROR));
+                .thenThrow(new BusinessException(ErrorCodeEnum.CAPTCHA_TOKEN_MISSING));
 
         Map<String, Object> body = new HashMap<>();
         body.put("loginType", "PASSWORD");
         body.put("principal", "admin");
         body.put("credential", "123456");
-        body.put("captchaKey", "test-captcha-key");
+        // 不传 captchaToken
 
         mockMvc.perform(post("/system/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(774));
+                .andExpect(jsonPath("$.code").value(775));
+    }
+
+    @Test
+    @DisplayName("login: captchaToken 无效时返回 CAPTCHA_TOKEN_INVALID")
+    void login_whenCaptchaTokenInvalid_shouldReturnError() throws Exception {
+        when(authService.login(any()))
+                .thenThrow(new BusinessException(ErrorCodeEnum.CAPTCHA_TOKEN_INVALID));
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("loginType", "PASSWORD");
+        body.put("principal", "admin");
+        body.put("credential", "123456");
+        body.put("captchaToken", "invalid-token");
+
+        mockMvc.perform(post("/system/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(776));
     }
 
     // ==================== sendLoginCaptcha 测试 ====================

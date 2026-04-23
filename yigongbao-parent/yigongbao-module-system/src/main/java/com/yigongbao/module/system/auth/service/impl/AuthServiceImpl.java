@@ -1,10 +1,9 @@
 package com.yigongbao.module.system.auth.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
-import cloud.tianai.captcha.application.ImageCaptchaApplication;
-import cloud.tianai.captcha.validator.common.model.dto.ImageCaptchaTrack;
 import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.StrUtil;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
@@ -19,6 +18,7 @@ import com.yigongbao.module.system.auth.enums.LoginTypeEnum;
 import com.yigongbao.module.system.auth.mapper.LoginLogMapper;
 import com.yigongbao.module.system.auth.service.AuthService;
 import com.yigongbao.module.system.auth.service.CaptchaService;
+import com.yigongbao.module.system.auth.service.ImageCaptchaService;
 import com.yigongbao.module.system.auth.vo.LoginVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.resource.service.ResourceService;
@@ -52,7 +52,8 @@ public class AuthServiceImpl implements AuthService {
     private final ConfigService configService;
     private final PasswordEncoder passwordEncoder;
     private final CaptchaService captchaService;
-    private final ImageCaptchaApplication imageCaptchaApplication;
+    private final ImageCaptchaService imageCaptchaService;
+    private final StringRedisTemplate stringRedisTemplate;
 
     // ==================== 登录 ====================
 
@@ -77,10 +78,8 @@ public class AuthServiceImpl implements AuthService {
      * 账号密码登录
      */
     private LoginVO resolveByPassword(LoginDTO dto, String ip, String userAgent) {
-        // 1. 校验滑动验证码（前端传入时才校验，兼容前端未接入验证码的过渡阶段）
-        if (StrUtil.isNotBlank(dto.getCaptchaKey()) && dto.getCaptchaTrack() != null) {
-            verifySliderCaptcha(dto.getCaptchaKey(), dto.getCaptchaTrack());
-        }
+        // 1. 校验滑动验证码 Token（PASSWORD 登录必须通过二次验证）
+        verifyCaptchaToken(dto.getCaptchaToken());
 
         try {
             // 2. 查询用户（principal 支持用户名或邮箱，自动识别）
@@ -166,17 +165,27 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 校验滑动验证码（PASSWORD 登录专用）
+     * 校验滑动验证码 Token（PASSWORD 登录专用）
+     * <p>
+     * Token 由 POST /image-captch/check 校验成功后颁发，存入 Redis（2 分钟有效期）。
+     * 验证通过后立即从 Redis 删除，防止重放攻击。
      *
-     * @param captchaKey   由 GET /captcha/get 返回的验证码 id
-     * @param captchaTrack 前端滑动组件生成的轨迹数据
+     * @param captchaToken 验证码 Token（由 /check 接口返回的 id 字段）
      */
-    private void verifySliderCaptcha(String captchaKey, ImageCaptchaTrack captchaTrack) {
-        boolean passed = imageCaptchaApplication.matching(captchaKey, captchaTrack).isSuccess();
-        if (!passed) {
-            log.warn("滑动验证码校验失败，captchaKey={}", captchaKey);
-            throw new BusinessException(ErrorCodeEnum.CAPTCHA_GRAPHIC_ERROR);
+    private void verifyCaptchaToken(String captchaToken) {
+        if (StrUtil.isBlank(captchaToken)) {
+            log.warn("滑动验证码 Token 为空，PASSWORD 登录必须先完成滑动验证");
+            throw new BusinessException(ErrorCodeEnum.CAPTCHA_TOKEN_MISSING);
         }
+        String redisKey = ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + captchaToken;
+        Boolean exists = stringRedisTemplate.hasKey(redisKey);
+        if (!Boolean.TRUE.equals(exists)) {
+            log.warn("滑动验证码 Token 无效或已过期，captchaToken={}", captchaToken);
+            throw new BusinessException(ErrorCodeEnum.CAPTCHA_TOKEN_INVALID);
+        }
+        // 验证通过，删除 token（一次性）
+        stringRedisTemplate.delete(redisKey);
+        log.info("滑动验证码 Token 校验通过");
     }
 
     /**

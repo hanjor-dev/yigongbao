@@ -36,12 +36,6 @@ public enum SystemConfigKeyEnum {
     LOGIN_LOCK_DURATION("login.lock.duration", "登录锁定时长"),
 
     /**
-     * 短信发送间隔（秒）
-     * 同一手机号发送间隔
-     */
-    SMS_SEND_INTERVAL("sms.send.interval", "短信发送间隔"),
-
-    /**
      * 验证码有效期（秒）
      */
     CAPTCHA_EXPIRE_SECONDS("captcha.expire.seconds", "验证码有效期（秒）"),

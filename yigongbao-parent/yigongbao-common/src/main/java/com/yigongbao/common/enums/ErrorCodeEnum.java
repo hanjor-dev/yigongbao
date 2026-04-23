@@ -282,9 +282,11 @@ public enum ErrorCodeEnum {
     DESIGN_SUBMIT_CHECK_FAILED(771, "提交校验未通过：%s"),
     DESIGNER_NOT_ASSIGNED(772, "订单未分配设计师，无法进行此操作"),
 
-    // ==================== 图形验证码 773-774 ====================
+    // ==================== 图形验证码 773-776 ====================
     CAPTCHA_GRAPHIC_EXPIRED(773, "图形验证码已过期，请刷新"),
-    CAPTCHA_GRAPHIC_ERROR(774, "图形验证码错误");
+    CAPTCHA_GRAPHIC_ERROR(774, "图形验证码错误"),
+    CAPTCHA_TOKEN_MISSING(775, "请先完成行为验证"),
+    CAPTCHA_TOKEN_INVALID(776, "验证码已失效，请重新验证");
 
     /**
      * 错误码

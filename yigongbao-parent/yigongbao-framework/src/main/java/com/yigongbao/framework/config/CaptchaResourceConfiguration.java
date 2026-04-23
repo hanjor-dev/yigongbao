@@ -29,12 +29,13 @@ public class CaptchaResourceConfiguration {
         // arg1: 验证码类型(SLIDER、ROTATE、CONCAT、WORD_IMAGE_CLICK)
         // arg2: Resource对象，包含: 资源类型(calsspath、file、url)、文件路径、tag标签
 
-        resourceStore.addResource(CaptchaTypeConstant.SLIDER, new Resource("classpath", "bgimages/a.jpg", "default"));
-        resourceStore.addResource(CaptchaTypeConstant.SLIDER, new Resource("classpath", "bgimages/b.jpg", "default"));
-        resourceStore.addResource(CaptchaTypeConstant.SLIDER, new Resource("classpath", "bgimages/c.jpg", "default"));
-        resourceStore.addResource(CaptchaTypeConstant.ROTATE, new Resource("classpath", "bgimages/48.jpg", "default"));
-        resourceStore.addResource(CaptchaTypeConstant.CONCAT, new Resource("classpath", "bgimages/48.jpg", "default"));
-        resourceStore.addResource(CaptchaTypeConstant.WORD_IMAGE_CLICK, new Resource("classpath", "bgimages/c.jpg", "default"));
+        resourceStore.addResource(CaptchaTypeConstant.SLIDER, new Resource("classpath", "bgimages/slider1.jpg", "default"));
+        resourceStore.addResource(CaptchaTypeConstant.SLIDER, new Resource("classpath", "bgimages/slider2.jpg", "default"));
+        resourceStore.addResource(CaptchaTypeConstant.SLIDER, new Resource("classpath", "bgimages/slider3.jpg", "default"));
+        resourceStore.addResource(CaptchaTypeConstant.SLIDER, new Resource("classpath", "bgimages/slider4.jpg", "default"));
+        resourceStore.addResource(CaptchaTypeConstant.SLIDER, new Resource("classpath", "bgimages/slider5.jpg", "default"));
+        resourceStore.addResource(CaptchaTypeConstant.SLIDER, new Resource("classpath", "bgimages/slider6.jpg", "default"));
+
         return resourceStore;
     }
 

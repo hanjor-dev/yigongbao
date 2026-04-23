@@ -197,8 +197,8 @@ captcha:
   font-path:
     - classpath:font/SimHei.ttf
   secondary:
-    # 二次验证， 默认false 不开启
-    enabled: false
+    # 二次验证，默认开启（验证码校验成功后生成 token，登录时必须验证 token）
+    enabled: true
     # 二次验证过期时间， 默认 2分钟
     expire: 120000
     # 二次验证缓存key前缀，默认是 captcha:secondary

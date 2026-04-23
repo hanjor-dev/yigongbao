@@ -1,7 +1,5 @@
 package com.yigongbao.module.system.auth.dto;
 
-import cloud.tianai.captcha.validator.common.model.dto.ImageCaptchaTrack;
-import com.fasterxml.jackson.annotation.JsonSetter;
 import com.yigongbao.module.system.auth.enums.LoginTypeEnum;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -12,7 +10,7 @@ import lombok.Data;
  * loginType=PASSWORD 时 principal=用户名，credential=密码
  * loginType=PHONE    时 principal=手机号，credential=短信验证码
  * <p>
- * 兼容旧格式：username + password（自动映射为 principal + credential + loginType=PASSWORD）
+ * PASSWORD 登录必须先通过 /image-captch/check 验证滑动轨迹，获取 captchaToken 后再提交登录
  *
  * @author hanjor
  * @date 2026-04-22
@@ -39,37 +37,8 @@ public class LoginDTO {
     private String credential;
 
     /**
-     * 滑动验证码 key（仅 PASSWORD 类型必传，由 GET /captcha/get 返回的 id）
+     * 滑动验证码 Token（PASSWORD 类型必填，由 POST /image-captch/check 返回的 id）
+     * PHONE 类型无需此字段
      */
-    private String captchaKey;
-
-    /**
-     * 滑动验证码轨迹数据（仅 PASSWORD 类型必传，由前端滑动组件生成）
-     */
-    private ImageCaptchaTrack captchaTrack;
-
-    // ==================== 兼容旧格式（username + password）====================
-
-    /**
-     * 兼容旧字段 username，自动填充 principal 和 loginType
-     */
-    @JsonSetter("username")
-    public void setUsername(String username) {
-        if (this.principal == null) {
-            this.principal = username;
-        }
-        if (this.loginType == null) {
-            this.loginType = LoginTypeEnum.PASSWORD;
-        }
-    }
-
-    /**
-     * 兼容旧字段 password，自动填充 credential
-     */
-    @JsonSetter("password")
-    public void setPassword(String password) {
-        if (this.credential == null) {
-            this.credential = password;
-        }
-    }
+    private String captchaToken;
 }
