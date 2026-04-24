@@ -313,7 +313,7 @@ VALUES
 ('captcha.expire.seconds',   '验证码有效期',           '300',  'number',  'security', '验证码有效期（秒）',                           1, 0, 5, 1),
 ('captcha.cooldown.seconds', '验证码发送冷却',          '60',   'number',  'security', '同一目标发送冷却（秒）',                       1, 0, 6, 1),
 ('captcha.daily.limit',      '验证码每日发送上限',      '10',   'number',  'security', '同一目标每日最大发送次数',                     1, 0, 7, 1),
-('mail.from',                '发件人邮箱地址',          '',     'string',  'security', '发件人邮箱地址（必填，否则邮件发送失败）',     1, 0, 8, 1);
+('mail.from',                '发件人邮箱地址',          'hanjor666@qq.com',     'string',  'security', '发件人邮箱地址（必填，否则邮件发送失败）',     1, 0, 8, 1);
 
 -- ------------------------------------------------------------
 -- 系统配置（group=system）

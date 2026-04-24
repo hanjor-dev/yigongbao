@@ -1,6 +1,7 @@
 package com.yigongbao.module.system.auth.controller;
 
 import cloud.tianai.captcha.application.vo.ImageCaptchaVO;
+import cloud.tianai.captcha.validator.common.model.dto.ImageCaptchaTrack;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.system.auth.service.ImageCaptchaService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -45,22 +46,21 @@ public class ImageCaptchController {
      * 前端需将返回的 token 传入登录接口完成二次验证。
      * token 验证成功后立即失效，不可重复使用。
      *
-     * @param captchaId 验证码 id（由 genCaptcha 返回）
-     * @param trackData 滑动轨迹数据
+     * @param data 滑动轨迹数据
      * @return 校验成功后返回 token
      */
     @Operation(summary = "校验验证码并颁发二次验证 Token")
     @PostMapping("/check")
-    public Result<Map<String, String>> checkCaptcha(
-            @RequestParam String captchaId,
-            @RequestBody ImageCaptchaTrackDto trackData) {
-        String token = imageCaptchaService.verifyAndGenerateToken(captchaId, trackData.getData());
-        return Result.success(Map.of("token", token));
+    public Result<Map<String, String>> checkCaptcha(@RequestBody Data data) {
+        String token = imageCaptchaService.verifyAndGenerateToken(data.getId(), data.getData());
+        return Result.success(Map.of("id", token));
     }
 
     @lombok.Data
-    public static class ImageCaptchaTrackDto {
-        /** 验证码轨迹数据 */
-        private cloud.tianai.captcha.validator.common.model.dto.ImageCaptchaTrack data;
+    public static class Data {
+        // 验证码id,前端回传的验证码ID
+        private String  id;
+        // 验证码数据,前端回传的验证码轨迹数据
+        private ImageCaptchaTrack data;
     }
 }

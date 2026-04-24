@@ -247,7 +247,7 @@ public enum ErrorCodeEnum {
     DESIGNER_NOT_FOUND(723, "设计师不存在"),
     DESIGNER_ROLE_INVALID(724, "用户角色不是设计师或设计师管理员"),
     DESIGNER_DISABLED(725, "设计师已被禁用"),
-    DESIGNER_SPECIALTY_MISMATCH(726, "设计师专业方向与订单项目专业方向不一致"),
+    DESIGNER_SPECIALTY_MISMATCH(726, "设计师专业方向与订单项目不一致"),
     ORDER_DESIGNER_MISMATCH(727, "非分配设计师，无权操作此订单"),
 
     // ==================== 修改申请阻断（730-731）====================
@@ -268,7 +268,7 @@ public enum ErrorCodeEnum {
     DESIGN_PACKAGE_HAS_PRODUCTS(759, "数据包已关联打印产品，无法删除"),
     DESIGN_PACKAGE_HAS_DOCS(760, "数据包已生成指令单或图纸，无法删除"),
     DESIGN_MODEL_NOT_FOUND(761, "可视化模型不存在"),
-    DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED(762, "不支持的压缩包格式，仅支持 ZIP/RAR/7Z"),
+    DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED(762, "不支持的压缩包格式"),
 
     // ==================== 设计文档生成（763-769）====================
     DESIGN_ARCHIVE_PARSE_FAILED(763, "压缩包解析失败：%s"),
@@ -283,10 +283,10 @@ public enum ErrorCodeEnum {
     DESIGNER_NOT_ASSIGNED(772, "订单未分配设计师，无法进行此操作"),
 
     // ==================== 图形验证码 773-776 ====================
-    CAPTCHA_GRAPHIC_EXPIRED(773, "图形验证码已过期，请刷新"),
-    CAPTCHA_GRAPHIC_ERROR(774, "图形验证码错误"),
+    CAPTCHA_GRAPHIC_EXPIRED(773, "行为验证已过期，请刷新重试"),
+    CAPTCHA_GRAPHIC_ERROR(774, "行为验证失败"),
     CAPTCHA_TOKEN_MISSING(775, "请先完成行为验证"),
-    CAPTCHA_TOKEN_INVALID(776, "验证码已失效，请重新验证");
+    CAPTCHA_TOKEN_INVALID(776, "请重新进行行为验证");
 
     /**
      * 错误码

@@ -71,6 +71,32 @@ yigongbao-parent/
 
 `yigongbao-module-flow` is a reusable state-machine engine. Business modules (like `order`) must not implement their own status transitions — use `FlowFacade` to drive state changes. The flow module uses `FlowContext` to hold runtime state and delegates to `FlowStatusEnum`/`FlowPhaseEnum` for state definitions.
 
+`FlowFacade` is the **only** public interface — never call flow services directly. Actions are defined in `FlowActionEnum` (25+ actions: CREATE, SUBMIT_ORDER, DATA_AUDIT_PASS, START_DESIGN, QC_PASS, REWORK, etc.). `TransitionResult` carries `targetPhase`, `targetStatus`, `initialStatus`, and a `phaseChanged` boolean — phase-advancing transitions are distinct from status-only transitions.
+
+## Auth & Captcha
+
+Login endpoint: `POST /system/auth/login` supports `PASSWORD`, `PHONE`, and `EMAIL` modes. Token is Bearer, stored in `Authorization` header (30-day timeout, concurrent login enabled).
+
+Behavior verification uses **Tianai Captcha** (SLIDER default) with a two-stage flow:
+1. `/image-captch/genCaptcha` → validate track → issue UUID token (2-min Redis TTL, prefix `captcha:secondary:`)
+2. Login endpoint validates and invalidates the token (one-time use)
+
+SaToken excluded paths (must stay in sync in both Filter and MVC Interceptor): static resources, auth endpoints, captcha, Swagger/OpenAPI, `/files/public/**`.
+
+## Conversion & Validation
+
+**Converters** (`*Convert` classes in each module's `convert/` package) use `BeanUtils.copyProperties()` — not MapStruct. Exclude nested collections explicitly: `BeanUtils.copyProperties(dto, entity, "items")`.
+
+**Validators** (`*Validator` components) are reusable Spring components, not inline logic. They support validation modes (DRAFT / DIRECT / SUBMIT) and enforce "never trust frontend" — all name fields are overwritten from DB. Hospital scope is checked via `UserHospitalService`.
+
+## Cross-Cutting Infrastructure
+
+**Operation logs** (`@OperationLog`): async (`@Async`), auto-masks password/token/secret fields, captures IP, User-Agent, execution time. User info is pulled from SaToken session — the login endpoint is handled specially since the user isn't authenticated until after the method returns.
+
+**Slow request detection**: `ResultInterceptor` warns (log level WARN) on requests exceeding 1 second.
+
+**`@RequirePermission`**: annotation is wired but permission validation is not yet fully implemented (TODO in `PermissionAspect`).
+
 ## Testing
 
 Tests use JUnit 5 + Mockito. Unit tests use `@ExtendWith(MockitoExtension.class)`. Integration tests use H2 via `application-test.yml` (SaToken interceptor is disabled in test profile).
@@ -81,7 +107,14 @@ Tests use JUnit 5 + Mockito. Unit tests use `@ExtendWith(MockitoExtension.class)
 class FooServiceImplTest {
     @Mock private FooMapper fooMapper;
     @InjectMocks private FooServiceImpl fooService;
-    // ...
+
+    @BeforeEach
+    void setUp() throws Exception {
+        // Required when service extends ServiceImpl — inject baseMapper via reflection
+        Field baseMapperField = ServiceImpl.class.getDeclaredField("baseMapper");
+        baseMapperField.setAccessible(true);
+        baseMapperField.set(fooService, fooMapper);
+    }
 }
 ```
 

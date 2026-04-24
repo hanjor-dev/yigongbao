@@ -179,7 +179,7 @@ public class AuthServiceImpl implements AuthService {
         }
         String redisKey = ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + captchaToken;
         Boolean exists = stringRedisTemplate.hasKey(redisKey);
-        if (!Boolean.TRUE.equals(exists)) {
+        if (!exists) {
             log.warn("滑动验证码 Token 无效或已过期，captchaToken={}", captchaToken);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_TOKEN_INVALID);
         }

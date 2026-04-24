@@ -1,6 +1,7 @@
 package com.yigongbao.module.system.auth.service.impl;
 
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -45,7 +46,7 @@ public class CaptchaServiceImpl implements CaptchaService {
 
         // 1. 冷却检测
         String cooldownKey = buildCooldownKey(scene, captchaType, target);
-        if (Boolean.TRUE.equals(redisTemplate.hasKey(cooldownKey))) {
+        if (redisTemplate.hasKey(cooldownKey)) {
             log.warn("验证码发送过于频繁，type={}, target={}", captchaType, target);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_TOO_FREQUENT);
         }
@@ -127,7 +128,7 @@ public class CaptchaServiceImpl implements CaptchaService {
         if (CaptchaTypeEnum.PHONE.getValue().equals(captchaType)) {
             smsService.send(target, message);
         } else if (CaptchaTypeEnum.EMAIL.getValue().equals(captchaType)) {
-            mailService.send(target, "医工宝验证码", message);
+            mailService.send(target, "医工宝", message);
         } else {
             log.error("不支持的验证码类型，type={}", captchaType);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_TYPE_INVALID);
