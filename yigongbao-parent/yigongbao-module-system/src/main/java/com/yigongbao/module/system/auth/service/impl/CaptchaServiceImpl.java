@@ -107,8 +107,15 @@ public class CaptchaServiceImpl implements CaptchaService {
 
         // 3. 校验验证码
         if (!storedCode.equals(code)) {
-            redisTemplate.opsForValue().increment(attemptsKey);
-            log.warn("验证码不匹配，type={}, target={}, attempts={}", captchaType, target, attempts + 1);
+            Long newAttempts = redisTemplate.opsForValue().increment(attemptsKey);
+            // attemptsKey 首次写入时对齐验证码的剩余 TTL，防止验证码过期后旧计数影响新验证码
+            if (newAttempts != null && newAttempts == 1) {
+                Long ttl = redisTemplate.getExpire(captchaKey, TimeUnit.SECONDS);
+                if (ttl != null && ttl > 0) {
+                    redisTemplate.expire(attemptsKey, ttl, TimeUnit.SECONDS);
+                }
+            }
+            log.warn("验证码不匹配，type={}, target={}, attempts={}", captchaType, target, newAttempts);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_ERROR);
         }
 

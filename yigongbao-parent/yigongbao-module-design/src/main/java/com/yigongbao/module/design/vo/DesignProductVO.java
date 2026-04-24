@@ -30,6 +30,16 @@ public class DesignProductVO {
     private Integer sortOrder;
 
     /**
+     * 产品分类 dict_code（如 17.1）
+     */
+    private String category;
+
+    /**
+     * 产品分类名称（冗余）
+     */
+    private String categoryName;
+
+    /**
      * 关联文件列表
      */
     private List<ProductFileVO> files;

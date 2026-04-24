@@ -153,6 +153,14 @@ public class AuthServiceImpl implements AuthService {
                 throw new BusinessException(ErrorCodeEnum.USER_DISABLED);
             }
 
+            // 4. 校验账户是否锁定
+            if (isAccountLocked(user)) {
+                int remainingMinutes = calculateRemainingLockMinutes(user);
+                log.warn("账户已锁定，phone={}，剩余{}分钟", dto.getPrincipal(), remainingMinutes);
+                saveLoginLog(user.getId(), dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "账户已锁定");
+                throw new BusinessException(ErrorCodeEnum.ACCOUNT_LOCKED, remainingMinutes);
+            }
+
             return buildLoginSuccess(user, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent);
 
         } catch (BusinessException e) {
@@ -179,7 +187,7 @@ public class AuthServiceImpl implements AuthService {
         }
         String redisKey = ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + captchaToken;
         Boolean exists = stringRedisTemplate.hasKey(redisKey);
-        if (!exists) {
+        if (!Boolean.TRUE.equals(exists)) {
             log.warn("滑动验证码 Token 无效或已过期，captchaToken={}", captchaToken);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_TOKEN_INVALID);
         }
@@ -262,6 +270,8 @@ public class AuthServiceImpl implements AuthService {
 
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
         userMapper.updateById(user);
+        // 踢出该用户所有在线 Session，旧 token 立即失效
+        StpUtil.logout(userId);
         log.info("修改密码成功，userId={}", userId);
     }
 

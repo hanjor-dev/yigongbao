@@ -201,14 +201,15 @@ public class InstructionExcelBuilder {
                 setCell(sheet, rowIdx, 8, strOrEmpty(row.getColorName()));           // I：颜色
             }
 
-            // 6. 未使用的余量行重新合并（产品行之后 ~ DATA_ROW_END）
-            int mergeStart = DATA_ROW_START + Math.max(n, 1);
-            if (mergeStart <= DATA_ROW_END) {
+            // 6. 未使用的余量行清空内容，保持模板样式（不重新合并，合并会覆盖边框样式）
+            for (int i = Math.max(n, 1); i < DATA_ROW_ORIGINAL_COUNT; i++) {
+                int rowIdx = DATA_ROW_START + i;
+                Row r = sheet.getRow(rowIdx);
+                if (r == null) r = sheet.createRow(rowIdx);
                 for (int col = 0; col < 9; col++) {
-                    sheet.addMergedRegion(new CellRangeAddress(mergeStart, DATA_ROW_END, col, col));
-                    for (int r = mergeStart; r <= DATA_ROW_END; r++) {
-                        setCell(sheet, r, col, "");
-                    }
+                    Cell cell = r.getCell(col);
+                    if (cell == null) cell = r.createCell(col);
+                    cell.setCellValue("");
                 }
             }
 
@@ -276,13 +277,13 @@ public class InstructionExcelBuilder {
         }
     }
 
-    /** 向指定行列写入字符串值 */
+    /** 向指定行列写入字符串值（复用已有 Cell，避免 createCell 覆盖模板样式） */
     private void setCell(Sheet sheet, int rowIdx, int colIdx, String value) {
         Row row = sheet.getRow(rowIdx);
         if (row == null) {
             row = sheet.createRow(rowIdx);
         }
-        Cell cell = row.getCell(colIdx);
+        Cell cell = row.getCell(colIdx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
         if (cell == null) {
             cell = row.createCell(colIdx);
         }

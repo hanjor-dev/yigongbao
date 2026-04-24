@@ -33,6 +33,7 @@ import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.vo.ColorGroupVO;
 import com.yigongbao.module.design.vo.DesignProductVO;
 import com.yigongbao.module.design.vo.DictOptionVO;
+import com.yigongbao.module.design.vo.PrintInfoListVO;
 import com.yigongbao.module.design.vo.PrintInfoOptionsVO;
 import com.yigongbao.module.design.vo.PrintInfoProductVO;
 import com.yigongbao.module.design.vo.PrintInfoSpecVO;
@@ -168,36 +169,59 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
      *
      * @param orderId   订单ID
      * @param packageId 数据包ID
-     * @return 打印信息列表
+     * @return 打印信息列表（包含数据包级别字段和产品列表）
      */
     @Override
-    public List<DesignProductVO> listPrintInfo(Long orderId, Long packageId) {
+    public PrintInfoListVO listPrintInfo(Long orderId, Long packageId) {
         log.info("查询打印信息列表，orderId={}, packageId={}", orderId, packageId);
 
-        // 校验 packageId 属于 orderId
+        // 1. 校验 packageId 属于 orderId，并回填包级字段
         DesignPackageEntity pkg = packageService.getById(packageId);
         if (pkg == null || !pkg.getOrderId().equals(orderId)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
         }
 
+        PrintInfoListVO result = new PrintInfoListVO();
+        result.setProductMark(pkg.getProductMark());
+        result.setPackQuantity(pkg.getPackQuantity());
+        result.setRemark(pkg.getRemark());
+
+        // 2. 查询产品列表
         List<DesignProductEntity> entities = designProductService.list(
                 new LambdaQueryWrapper<DesignProductEntity>()
                         .eq(DesignProductEntity::getPackageId, packageId)
                         .orderByAsc(DesignProductEntity::getSortOrder));
 
         if (entities.isEmpty()) {
-            return Collections.emptyList();
+            result.setItems(Collections.emptyList());
+            return result;
         }
 
-        // 批量查关联文件，按 designProductId 分组
-        List<Long> productIds = entities.stream().map(DesignProductEntity::getId).toList();
-        List<DesignProductFileEntity> allFiles = productFileService.listByProductIds(productIds);
+        // 3. 批量加载 product 的 category/categoryName（按方案B：查询时关联获取）
+        List<Long> productIds = entities.stream().map(DesignProductEntity::getProductId).distinct().toList();
+        Map<Long, ProductVO> productMap = new java.util.HashMap<>();
+        for (Long pid : productIds) {
+            ProductVO product = productService.getById(pid);
+            if (product != null) {
+                productMap.put(pid, product);
+            }
+        }
+
+        // 4. 批量查关联文件，按 designProductId 分组
+        List<Long> designProductIds = entities.stream().map(DesignProductEntity::getId).toList();
+        List<DesignProductFileEntity> allFiles = productFileService.listByProductIds(designProductIds);
         Map<Long, List<DesignProductFileEntity>> fileMap = allFiles.stream()
                 .collect(Collectors.groupingBy(DesignProductFileEntity::getDesignProductId));
 
-        // 组装 VO
-        return entities.stream().map(e -> {
+        // 5. 组装 VO
+        List<DesignProductVO> items = entities.stream().map(e -> {
             DesignProductVO vo = toVO(e);
+            // 补充 product 的 category/categoryName
+            ProductVO product = productMap.get(e.getProductId());
+            if (product != null) {
+                vo.setCategory(product.getCategory());
+                vo.setCategoryName(product.getCategoryName());
+            }
             List<DesignProductFileEntity> files = fileMap.getOrDefault(e.getId(), List.of());
             vo.setFiles(files.stream().map(f -> {
                 DesignProductVO.ProductFileVO fvo = new DesignProductVO.ProductFileVO();
@@ -208,6 +232,10 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
             }).toList());
             return vo;
         }).toList();
+
+        result.setItems(items);
+        log.info("查询打印信息列表成功，orderId={}, packageId={}, itemCount={}", orderId, packageId, items.size());
+        return result;
     }
 
     /**
@@ -304,6 +332,7 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                 entity.setProductName(product != null ? product.getProductName() : null);
                 ProductSpecEntity spec = specMap.get(item.getSpecId());
                 entity.setCertNo(spec.getCertNo());
+                entity.setSpecName(spec.getSpecName());
                 // sortOrder 由服务端按提交顺序赋值（0-based），不信任前端传值
                 entity.setSortOrder(i);
                 entities.add(entity);

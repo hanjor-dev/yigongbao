@@ -3,15 +3,13 @@ package com.yigongbao.module.design.controller;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.design.dto.SavePrintInfoDTO;
 import com.yigongbao.module.design.service.DesignPrintInfoService;
-import com.yigongbao.module.design.vo.DesignProductVO;
+import com.yigongbao.module.design.vo.PrintInfoListVO;
 import com.yigongbao.module.design.vo.PrintInfoOptionsVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /**
  * 打印信息管理 Controller
@@ -42,8 +40,8 @@ public class DesignPrintInfoController {
      */
     @Operation(summary = "查询打印信息列表")
     @GetMapping("/{orderId}/package/{packageId}/print-info")
-    public Result<List<DesignProductVO>> listPrintInfo(@PathVariable Long orderId,
-                                                        @PathVariable Long packageId) {
+    public Result<PrintInfoListVO> listPrintInfo(@PathVariable Long orderId,
+                                                @PathVariable Long packageId) {
         return Result.success(printInfoService.listPrintInfo(orderId, packageId));
     }
 

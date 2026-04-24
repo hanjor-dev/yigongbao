@@ -1,10 +1,8 @@
 package com.yigongbao.module.design.service;
 
 import com.yigongbao.module.design.dto.SavePrintInfoDTO;
-import com.yigongbao.module.design.vo.DesignProductVO;
+import com.yigongbao.module.design.vo.PrintInfoListVO;
 import com.yigongbao.module.design.vo.PrintInfoOptionsVO;
-
-import java.util.List;
 
 /**
  * 打印信息管理 Service 接口
@@ -28,9 +26,9 @@ public interface DesignPrintInfoService {
      *
      * @param orderId   订单ID
      * @param packageId 数据包ID
-     * @return 打印信息列表，按 sort_order 升序
+     * @return 打印信息列表（包含数据包级别字段和产品列表），按 sort_order 升序
      */
-    List<DesignProductVO> listPrintInfo(Long orderId, Long packageId);
+    PrintInfoListVO listPrintInfo(Long orderId, Long packageId);
 
     /**
      * 保存打印信息（整包替换）
