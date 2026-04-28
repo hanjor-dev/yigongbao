@@ -62,6 +62,7 @@ public enum ErrorCodeEnum {
     ORG_TYPE_MUST_BE_DEALER(624, "外部用户所属机构必须为经销商"),
     ORG_QUALIFICATION_LIMIT(625, "当前机构资质仅支持非医疗器械订单"),
     EMPLOYEE_NO_REQUIRED(626, "内部用户工号不能为空"),
+    SYSTEM_CONFIG_MISSING(627, "系统配置缺失，请联系管理员"),
 
     // ==================== 部门相关 630-634 ====================
     DEPT_NOT_FOUND(630, "部门不存在"),

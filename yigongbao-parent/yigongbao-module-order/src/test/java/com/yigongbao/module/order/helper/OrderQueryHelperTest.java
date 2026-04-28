@@ -383,8 +383,6 @@ class OrderQueryHelperTest {
             assertThat(vo.getAreaId()).isEqualTo(300L);
             assertThat(vo.getAreaName()).isEqualTo("朝阳区");
             assertThat(vo.getFullAreaName()).isEqualTo("中国,北京,北京市,朝阳区");
-            assertThat(vo.getHospitalDeptId()).isEqualTo(400L);
-            assertThat(vo.getHospitalDeptName()).isEqualTo("骨科");
             assertThat(vo.getDoctorId()).isEqualTo(500L);
             assertThat(vo.getDoctorName()).isEqualTo("张医生");
             assertThat(vo.getDoctorPhone()).isEqualTo("13800000002");

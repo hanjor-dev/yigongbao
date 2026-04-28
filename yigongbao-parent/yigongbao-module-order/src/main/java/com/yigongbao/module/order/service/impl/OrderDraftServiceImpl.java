@@ -226,14 +226,13 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             // 显式赋值允许前端设置的纯业务字段（白名单）
             // 以下字段不在此处赋值，原因：
             //   id/items/imageDataFileIds/imageReportFileIds — 独立处理
-            //   orgName/hospitalName/hospitalDeptName/doctorName/doctorPhone — 由 OrderDataValidator 从数据库覆盖
+            //   orgName/hospitalName/doctorName/doctorPhone — 由 OrderDataValidator 从数据库覆盖
             //   operatorName/operatorPhone — 新建时已从当前登录用户填充，更新时不允许前端修改
             entity.setOrderType(dto.getOrderType());
             entity.setNeedsPhysicalDelivery(dto.getNeedsPhysicalDelivery());
             entity.setBusinessType(dto.getBusinessType());
             entity.setOrgId(dto.getOrgId());
             entity.setHospitalId(dto.getHospitalId());
-            entity.setHospitalDeptId(dto.getHospitalDeptId());
             entity.setDoctorId(dto.getDoctorId());
             entity.setPatientName(dto.getPatientName());
             entity.setPatientAge(dto.getPatientAge());
@@ -246,7 +245,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             // 校验关联数据并覆盖所有冗余名称字段（DRAFT 模式：仅校验已填写的字段）
             orderDataValidator.validateAndFillMaster(
                     entity,
-                    dto.getOrgId(), dto.getHospitalId(), dto.getHospitalDeptId(),
+                    dto.getOrgId(), dto.getHospitalId(),
                     dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone(),
                     currentUserId, OrderDataValidator.ValidateMode.DRAFT);
 
@@ -552,8 +551,6 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         vo.setOperatorPhone(entity.getOperatorPhone());
         vo.setHospitalId(entity.getHospitalId());
         vo.setHospitalName(entity.getHospitalName());
-        vo.setHospitalDeptId(entity.getHospitalDeptId());
-        vo.setHospitalDeptName(entity.getHospitalDeptName());
         vo.setDoctorId(entity.getDoctorId());
         vo.setDoctorName(entity.getDoctorName());
         vo.setDoctorPhone(entity.getDoctorPhone());

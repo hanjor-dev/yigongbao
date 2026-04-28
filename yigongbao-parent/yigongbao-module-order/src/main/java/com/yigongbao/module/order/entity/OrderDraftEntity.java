@@ -94,16 +94,6 @@ public class OrderDraftEntity extends BaseEntity implements Serializable {
      */
     private String fullAreaName;
 
-    /**
-     * 医院科室ID
-     */
-    private Long hospitalDeptId;
-
-    /**
-     * 医院科室名称
-     */
-    private String hospitalDeptName;
-
     // ==================== 医生/患者信息 ====================
     /**
      * 医生ID

@@ -528,14 +528,13 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             }
             if (!groupValues.isEmpty()) {
                 Long hospitalId = Convert.convert(Long.class, groupValues.get("hospitalId"));
-                Long hospitalDeptId = Convert.convert(Long.class, groupValues.get("hospitalDeptId"));
                 Long doctorId = Convert.convert(Long.class, groupValues.get("doctorId"));
                 String doctorName = Convert.convert(String.class, groupValues.get("doctorName"));
                 String doctorPhone = Convert.convert(String.class, groupValues.get("doctorPhone"));
                 boolean hasDoctorChange = doctorId != null || StrUtil.isNotBlank(doctorName);
-                if (hospitalId != null || hospitalDeptId != null || hasDoctorChange) {
+                if (hospitalId != null || hasDoctorChange) {
                     orderDataValidator.validateAndFillForModify(
-                            order, hospitalId, hospitalDeptId, doctorId, doctorName, doctorPhone);
+                            order, hospitalId, doctorId, doctorName, doctorPhone);
                 }
             }
         }
@@ -893,11 +892,10 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         if (statusEnum != null) {
             vo.setStatusText(statusEnum.getName());
         }
-        // 填充订单冗余信息（医院名、科室、阶段等）
+        // 填充订单冗余信息（医院名、阶段等）
         OrderMainEntity order = orderMainMapper.selectById(apply.getOrderId());
         if (order != null) {
             vo.setHospitalName(order.getHospitalName());
-            vo.setHospitalDeptName(order.getHospitalDeptName());
             vo.setPatientName(order.getPatientName());
             vo.setDoctorName(order.getDoctorName());
             vo.setCurrentPhase(order.getPhase());

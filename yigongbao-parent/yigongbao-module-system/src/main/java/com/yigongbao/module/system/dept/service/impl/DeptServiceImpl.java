@@ -206,6 +206,8 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                 log.warn("该部门下存在用户，无法删除，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DEPT_HAS_USERS);
             }
+            // 清理部门-机构关联记录
+            deptOrgMapper.delete(new LambdaQueryWrapper<DeptOrgEntity>().eq(DeptOrgEntity::getDeptId, id));
             // 逻辑删除
             removeById(id);
             log.info("删除部门成功，id={}", id);

@@ -118,16 +118,6 @@ public class OrderDetailVO implements Serializable {
      */
     private String fullAreaName;
 
-    /**
-     * 医院科室ID
-     */
-    private Long hospitalDeptId;
-
-    /**
-     * 医院科室名称（冗余）
-     */
-    private String hospitalDeptName;
-
     // ==================== 医生信息 ====================
     /**
      * 医生ID

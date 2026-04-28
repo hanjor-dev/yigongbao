@@ -735,7 +735,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      *    - orgName: 从机构表查询覆盖
      *    - operatorId/operatorName/operatorPhone: 从当前登录用户填充，不信任前端传入值
      *    - hospitalName/areaId/areaName/fullAreaName: 从医院表查询覆盖
-     *    - deptName: 从医院科室表查询覆盖（hospitalDeptName）
+     *    - deptName: 科室字段已清理
      *    - doctorId/doctorName/doctorPhone: 已有 doctorId 则查询覆盖；仅有 doctorName 则 quickAdd 后填充
      *    - currentHandlerId/currentHandlerName: 设置为当前登录用户
      * 4. 保存重建项目明细，通过 OrderDataValidator 校验并覆盖 bodyPartName/projectName 等
@@ -782,10 +782,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             order.setOperatorDeptId(currentUser.getDeptId());
             order.setOperatorDeptName(currentUser.getDeptName());
 
-            // 校验关联数据并覆盖所有冗余名称字段（orgName/hospitalName/area/hospitalDeptName/doctorId+Name+Phone）
+            // 校验关联数据并覆盖所有冗余名称字段（orgName/hospitalName/area/doctorId+Name+Phone）
             orderDataValidator.validateAndFillMasterForOrder(
                     order,
-                    dto.getOrgId(), dto.getHospitalId(), dto.getHospitalDeptId(),
+                    dto.getOrgId(), dto.getHospitalId(),
                     dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone(),
                     currentUserId, OrderDataValidator.ValidateMode.DIRECT);
             // 校验订单类型与机构资质是否匹配

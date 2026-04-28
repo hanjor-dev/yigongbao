@@ -309,11 +309,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 if (Integer.valueOf(1).equals(deptType)) {
                     // 内部部门：强制使用生产企业 orgId，校验工号非空
                     String manufacturerOrgIdStr = configService.getConfigValue(SystemConfigKeyEnum.MANUFACTURER_ORG_ID.getKey());
-                    if (StrUtil.isNotBlank(manufacturerOrgIdStr)) {
-                        Long manufacturerOrgId = Long.valueOf(manufacturerOrgIdStr);
-                        dto.setOrgId(manufacturerOrgId);
-                        orgEntity = orgService.getById(manufacturerOrgId);
+                    if (StrUtil.isBlank(manufacturerOrgIdStr)) {
+                        log.error("系统配置缺失：{}，无法创建内部用户", SystemConfigKeyEnum.MANUFACTURER_ORG_ID.getKey());
+                        throw new BusinessException(ErrorCodeEnum.SYSTEM_CONFIG_MISSING);
                     }
+                    Long manufacturerOrgId = Long.valueOf(manufacturerOrgIdStr);
+                    dto.setOrgId(manufacturerOrgId);
+                    orgEntity = orgService.getById(manufacturerOrgId);
                     if (StrUtil.isBlank(dto.getEmployeeNo())) {
                         throw new BusinessException(ErrorCodeEnum.EMPLOYEE_NO_REQUIRED);
                     }

@@ -262,6 +262,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                 log.warn("该机构下存在用户，无法删除，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORG_HAS_USERS);
             }
+            // 清理经销商-医疗机构关联记录（作为经销商或医疗机构均需清理）
+            orgHospitalMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
+                    .eq(OrgHospitalEntity::getDistributorOrgId, id)
+                    .or()
+                    .eq(OrgHospitalEntity::getHospitalOrgId, id));
             // 逻辑删除
             removeById(id);
             log.info("删除机构成功，id={}", id);

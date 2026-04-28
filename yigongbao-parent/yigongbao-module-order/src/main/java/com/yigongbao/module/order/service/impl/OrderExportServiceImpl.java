@@ -228,9 +228,6 @@ public class OrderExportServiceImpl implements OrderExportService {
             case "areaName":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getAreaName()));
                 break;
-            case "hospitalDeptName":
-                cell.setCellValue(StrUtil.nullToEmpty(order.getHospitalDeptName()));
-                break;
             case "doctorName":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getDoctorName()));
                 break;

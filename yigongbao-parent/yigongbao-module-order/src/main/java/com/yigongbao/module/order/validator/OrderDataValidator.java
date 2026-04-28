@@ -85,7 +85,6 @@ public class OrderDataValidator {
      * @param entity     草稿实体（待填充 Name）
      * @param orgId      机构ID
      * @param hospitalId 医院ID
-     * @param hospitalDeptId 医院科室ID
      * @param doctorId   医生ID
      * @param doctorName 医生姓名（快速创建时传入）
      * @param doctorPhone 医生电话（快速创建时传入）
@@ -93,7 +92,7 @@ public class OrderDataValidator {
      * @param mode       校验模式
      */
     public void validateAndFillMaster(OrderDraftEntity entity,
-            Long orgId, Long hospitalId, Long hospitalDeptId,
+            Long orgId, Long hospitalId,
             Long doctorId, String doctorName, String doctorPhone, Long creatorId,
             ValidateMode mode) {
         boolean required = (mode != ValidateMode.DRAFT);
@@ -128,7 +127,6 @@ public class OrderDataValidator {
      * @param entity     订单主表实体（待填充 Name）
      * @param orgId      机构ID
      * @param hospitalId 医院ID
-     * @param hospitalDeptId 医院科室ID
      * @param doctorId   医生ID
      * @param doctorName 医生姓名（快速创建时传入）
      * @param doctorPhone 医生电话（快速创建时传入）
@@ -136,7 +134,7 @@ public class OrderDataValidator {
      * @param mode       校验模式
      */
     public void validateAndFillMasterForOrder(OrderMainEntity entity,
-            Long orgId, Long hospitalId, Long hospitalDeptId,
+            Long orgId, Long hospitalId,
             Long doctorId, String doctorName, String doctorPhone, Long creatorId,
             ValidateMode mode) {
         boolean required = (mode != ValidateMode.DRAFT);
@@ -303,13 +301,12 @@ public class OrderDataValidator {
      *
      * @param entity      订单主表实体（直接修改字段）
      * @param hospitalId  新医院ID（null 表示不改）
-     * @param hospitalDeptId  新科室ID（null 表示不改）
      * @param doctorId    新医生ID（null 表示不选已有医生）
      * @param doctorName  新医生姓名（doctorId 为 null 时触发 quickAdd）
      * @param doctorPhone 新医生电话
      */
     public void validateAndFillForModify(OrderMainEntity entity,
-            Long hospitalId, Long hospitalDeptId,
+            Long hospitalId,
             Long doctorId, String doctorName, String doctorPhone) {
         // 校验医院并同步冗余字段
         if (hospitalId != null) {
