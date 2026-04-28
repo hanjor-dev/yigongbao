@@ -245,3 +245,30 @@ CREATE TABLE sys_dept_org (
 ## 七、不在本次范围内
 
 - 前端页面改造
+
+---
+
+## 八、实现变更记录（相对原设计的调整）
+
+### 8.1 模块归属调整
+- `doctor` 和 `hospitalGroupTemplate` 模块从 `module-basic` 迁移到 `module-system`，解决循环依赖问题
+- 接口路由变更：`/basic/doctor` → `/system/doctor`，`/basic/hospital-group-template` → `/system/hospital-group-template`
+
+### 8.2 新增常量和枚举
+- `DictCodeConstants` 新增：`ORG_TYPE_PRODUCER("1.1")`、`ORG_TYPE_DEALER("1.2")`、`ORG_TYPE_HOSPITAL("1.3")`、`SETTLEMENT_TYPE("8")`
+- `ErrorCodeEnum` 新增：`ORG_CERT_FILE_REQUIRED(621)`、`ORG_DEPT_TYPE_MISMATCH(622)`、`ORG_NOT_BELONG_TO_DEPT(623)`、`ORG_TYPE_MUST_BE_DEALER(624)`、`ORG_QUALIFICATION_LIMIT(625)`、`EMPLOYEE_NO_REQUIRED(626)`
+- 修复 `ErrorCodeEnum` 中 `ORG_TYPE_NOT_ALLOWED` 与 `DEPT_NOT_FOUND` 编码冲突（619→620）
+
+### 8.3 Service 层调用规范修复
+- `UserHospitalService` 新增 `getAssignedHospitalIds(List<Long>)` 方法
+- `UserService` 新增 `countByDeptId(Long)` 方法
+- `DeptServiceImpl` 改用 `UserService` 替代直接注入 `UserMapper`
+- `UserHospitalServiceImpl` 改用 `OrgService` 替代直接注入 `OrgMapper`
+- `HospitalGroupTemplateServiceImpl` 改用 `UserHospitalService` 替代直接注入 `UserHospitalMapper`
+- `OrderDataValidator` 改用 `UserService` 替代直接注入 `UserMapper`
+
+### 8.4 业务逻辑完善
+- `OrgServiceImpl`：经销商关联医疗机构时校验 `hospitalOrgIds` 必须为医疗机构类型
+- `UserServiceImpl`：外部部门用户创建时 `orgId` 强制必填
+- `OrderDataValidator`：修复 `validateAndFillMasterForOrder` 与草稿版本 hospitalScope 校验不对称问题
+- `HospitalGroupTemplateDetailVO`：`fullAreaName` 改从 `OrgEntity.areaName` 填充（不再为 null）
