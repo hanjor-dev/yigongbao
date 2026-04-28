@@ -261,7 +261,9 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             List<DeptEntity> entityList;
             if (orgId != null) {
                 // 查询关联了指定机构的所有部门
-                List<Long> deptIds = deptOrgMapper.selectDeptIdsByOrgId(orgId);
+                List<Long> deptIds = deptOrgMapper.selectList(
+                        new LambdaQueryWrapper<DeptOrgEntity>().eq(DeptOrgEntity::getOrgId, orgId))
+                        .stream().map(DeptOrgEntity::getDeptId).collect(Collectors.toList());
                 if (deptIds.isEmpty()) return List.of();
                 entityList = listByIds(deptIds);
             } else {
@@ -286,7 +288,9 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
         DeptVO vo = DeptConvert.toVO(entity);
         if (vo == null) return null;
         // 填充关联机构
-        List<Long> orgIds = deptOrgMapper.selectOrgIdsByDeptId(entity.getId());
+        List<Long> orgIds = deptOrgMapper.selectList(
+                new LambdaQueryWrapper<DeptOrgEntity>().eq(DeptOrgEntity::getDeptId, entity.getId()))
+                .stream().map(DeptOrgEntity::getOrgId).collect(Collectors.toList());
         vo.setOrgIds(orgIds);
         if (!orgIds.isEmpty()) {
             List<OrgEntity> orgs = orgService.listByIds(orgIds);

@@ -104,7 +104,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             OrgVO vo = toVOWithDictNames(entity);
             // 填充经销商关联的医疗机构
             if (DictCodeConstants.ORG_TYPE_DEALER.equals(entity.getOrgType())) {
-                List<Long> hospitalOrgIds = orgHospitalMapper.selectHospitalOrgIdsByDistributorId(id);
+                List<Long> hospitalOrgIds = orgHospitalMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
+                                .eq(OrgHospitalEntity::getDistributorOrgId, id))
+                        .stream().map(OrgHospitalEntity::getHospitalOrgId).collect(Collectors.toList());
                 vo.setHospitalOrgIds(hospitalOrgIds);
                 if (!hospitalOrgIds.isEmpty()) {
                     List<OrgEntity> hospitals = listByIds(hospitalOrgIds);

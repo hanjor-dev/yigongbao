@@ -19,6 +19,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.config.service.ConfigService;
+import com.yigongbao.module.system.dept.entity.DeptOrgEntity;
 import com.yigongbao.module.system.dept.mapper.DeptOrgMapper;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.service.DeptService;
@@ -324,7 +325,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     if (dto.getOrgId() == null) {
                         throw new BusinessException(ErrorCodeEnum.ORG_NOT_BELONG_TO_DEPT);
                     }
-                    List<Long> deptOrgIds = deptOrgMapper.selectOrgIdsByDeptId(dto.getDeptId());
+                    List<Long> deptOrgIds = deptOrgMapper.selectList(
+                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DeptOrgEntity>()
+                                    .eq(DeptOrgEntity::getDeptId, dto.getDeptId()))
+                            .stream().map(DeptOrgEntity::getOrgId).collect(java.util.stream.Collectors.toList());
                     if (!deptOrgIds.contains(dto.getOrgId())) {
                         log.warn("机构不属于该部门，deptId={}, orgId={}", dto.getDeptId(), dto.getOrgId());
                         throw new BusinessException(ErrorCodeEnum.ORG_NOT_BELONG_TO_DEPT);
