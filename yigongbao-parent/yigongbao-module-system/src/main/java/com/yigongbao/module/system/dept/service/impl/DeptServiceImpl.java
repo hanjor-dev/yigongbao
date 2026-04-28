@@ -14,6 +14,8 @@ import com.yigongbao.module.system.dept.dto.CreateDeptDTO;
 import com.yigongbao.module.system.dept.dto.DeptPageDTO;
 import com.yigongbao.module.system.dept.dto.UpdateDeptDTO;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
+import com.yigongbao.module.system.dept.entity.DeptOrgEntity;
+import com.yigongbao.module.system.dept.mapper.DeptOrgMapper;
 import com.yigongbao.module.system.dept.mapper.DeptMapper;
 import com.yigongbao.module.system.dept.service.DeptService;
 import com.yigongbao.module.system.dept.vo.DeptVO;
@@ -47,6 +49,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
     private final OrgService orgService;
     private final UserMapper userMapper;
     private final CodeGeneratorService codeGeneratorService;
+    private final DeptOrgMapper deptOrgMapper;
 
     /**
      * 分页查询部门列表
@@ -63,7 +66,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
             Page<DeptEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<DeptEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(Objects.nonNull(dto.getOrgId()), DeptEntity::getOrgId, dto.getOrgId())
+            wrapper.eq(Objects.nonNull(dto.getDeptType()), DeptEntity::getDeptType, dto.getDeptType())
                     .like(StrUtil.isNotBlank(dto.getDeptName()), DeptEntity::getDeptName, dto.getDeptName())
                     .eq(Objects.nonNull(dto.getStatus()), DeptEntity::getStatus, dto.getStatus())
                     .orderByDesc(DeptEntity::getCreateTime);
@@ -111,27 +114,25 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createDept(CreateDeptDTO dto) {
-        log.info("创建部门，deptName={}, orgId={}", dto.getDeptName(), dto.getOrgId());
+        log.info("创建部门，deptName={}, deptType={}", dto.getDeptName(), dto.getDeptType());
         try {
-            // 校验所属机构是否存在
-            OrgEntity orgEntity = orgService.getById(dto.getOrgId());
-            if (orgEntity == null) {
-                log.warn("所属机构不存在，orgId={}", dto.getOrgId());
-                throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
-            }
-            // 校验部门名称是否已存在（同一机构下唯一）
-            if (isDeptNameExists(dto.getDeptName(), dto.getOrgId())) {
-                log.warn("部门名称已存在，deptName={}, orgId={}", dto.getDeptName(), dto.getOrgId());
+            // 校验部门名称全局唯一
+            if (isDeptNameExists(dto.getDeptName())) {
                 throw new BusinessException(ErrorCodeEnum.DEPT_EXISTS);
             }
-            // 生成部门编码
+            // 校验关联机构类型与 deptType 一致
+            if (dto.getOrgIds() != null && !dto.getOrgIds().isEmpty()) {
+                validateOrgTypeMatchDeptType(dto.getOrgIds(), dto.getDeptType());
+            }
             String deptCode = codeGeneratorService.generate(CodeRuleConstants.DEPT_NO);
-            // DTO转换为实体对象
             DeptEntity entity = DeptConvert.toEntity(dto);
             entity.setDeptCode(deptCode);
             entity.setStatus(StatusConstants.NORMAL);
-            // 插入数据库
             save(entity);
+            // 写入 sys_dept_org 关联
+            if (dto.getOrgIds() != null && !dto.getOrgIds().isEmpty()) {
+                saveDeptOrgRelations(entity.getId(), dto.getOrgIds());
+            }
             log.info("创建部门成功，id={}, deptCode={}", entity.getId(), deptCode);
         } catch (BusinessException e) {
             throw e;
@@ -152,23 +153,28 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
     public void updateDept(Long id, UpdateDeptDTO dto) {
         log.info("更新部门，id={}", id);
         try {
-            // 校验部门是否存在
             DeptEntity entity = getById(id);
             if (entity == null) {
-                log.warn("部门不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DEPT_NOT_FOUND);
             }
-            // 校验部门名称是否与其他部门重复（同一机构下唯一）
             if (StrUtil.isNotBlank(dto.getDeptName()) && !dto.getDeptName().equals(entity.getDeptName())) {
-                if (isDeptNameExistsExcludingId(dto.getDeptName(), entity.getOrgId(), id)) {
-                    log.warn("部门名称已存在，deptName={}", dto.getDeptName());
+                if (isDeptNameExistsExcludingId(dto.getDeptName(), id)) {
                     throw new BusinessException(ErrorCodeEnum.DEPT_EXISTS);
                 }
             }
-            // 更新部门信息
-            BeanUtils.copyProperties(dto, entity, "id", "deptCode", "orgId", "createTime", "updateTime", "createBy", "updateBy");
-            // 更新数据库
+            Integer deptType = dto.getDeptType() != null ? dto.getDeptType() : entity.getDeptType();
+            if (dto.getOrgIds() != null && !dto.getOrgIds().isEmpty()) {
+                validateOrgTypeMatchDeptType(dto.getOrgIds(), deptType);
+            }
+            BeanUtils.copyProperties(dto, entity, "id", "deptCode", "createTime", "updateTime", "createBy", "updateBy", "orgIds");
             updateById(entity);
+            // 更新关联机构（先删后插）
+            if (dto.getOrgIds() != null) {
+                deptOrgMapper.delete(new LambdaQueryWrapper<DeptOrgEntity>().eq(DeptOrgEntity::getDeptId, id));
+                if (!dto.getOrgIds().isEmpty()) {
+                    saveDeptOrgRelations(id, dto.getOrgIds());
+                }
+            }
             log.info("更新部门成功，id={}", id);
         } catch (BusinessException e) {
             throw e;
@@ -249,15 +255,16 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
     public List<DeptVO> listAllDept(Long orgId) {
         log.info("全量查询部门列表，orgId={}", orgId);
         try {
-            LambdaQueryWrapper<DeptEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(Objects.nonNull(orgId), DeptEntity::getOrgId, orgId)
-                    .orderByAsc(DeptEntity::getDeptName);
-            List<DeptEntity> entityList = list(wrapper);
-            List<DeptVO> voList = entityList.stream()
-                    .map(this::toVOWithNames)
-                    .collect(Collectors.toList());
-            log.info("全量查询部门列表成功，总数={}", voList.size());
-            return voList;
+            List<DeptEntity> entityList;
+            if (orgId != null) {
+                // 查询关联了指定机构的所有部门
+                List<Long> deptIds = deptOrgMapper.selectDeptIdsByOrgId(orgId);
+                if (deptIds.isEmpty()) return List.of();
+                entityList = listByIds(deptIds);
+            } else {
+                entityList = list(new LambdaQueryWrapper<DeptEntity>().orderByAsc(DeptEntity::getDeptName));
+            }
+            return entityList.stream().map(this::toVOWithNames).collect(Collectors.toList());
         } catch (Exception e) {
             log.error("全量查询部门列表异常", e);
             throw e;
@@ -274,65 +281,54 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
      */
     private DeptVO toVOWithNames(DeptEntity entity) {
         DeptVO vo = DeptConvert.toVO(entity);
-        if (vo == null) {
-            return null;
+        if (vo == null) return null;
+        // 填充关联机构
+        List<Long> orgIds = deptOrgMapper.selectOrgIdsByDeptId(entity.getId());
+        vo.setOrgIds(orgIds);
+        if (!orgIds.isEmpty()) {
+            List<OrgEntity> orgs = orgService.listByIds(orgIds);
+            vo.setOrgNames(orgs.stream().map(OrgEntity::getOrgName).collect(Collectors.toList()));
         }
-        // 填充机构名称
-        if (vo.getOrgId() != null) {
-            OrgEntity orgEntity = orgService.getById(vo.getOrgId());
-            if (orgEntity != null) {
-                vo.setOrgName(orgEntity.getOrgName());
-            }
-        }
-        // 填充状态名称
         if (vo.getStatus() != null) {
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
-        // 填充部门负责人姓名
         if (vo.getLeaderUserId() != null) {
             UserEntity userEntity = userMapper.selectById(vo.getLeaderUserId());
-            if (userEntity != null) {
-                vo.setLeaderUserName(userEntity.getRealName());
-            }
+            if (userEntity != null) vo.setLeaderUserName(userEntity.getRealName());
         }
         return vo;
     }
 
-    /**
-     * 校验部门名称是否存在
-     *
-     * @param deptName 部门名称
-     * @param orgId    所属机构ID
-     * @return true-存在，false-不存在
-     */
-    private boolean isDeptNameExists(String deptName, Long orgId) {
-        return count(new LambdaQueryWrapper<DeptEntity>()
-                .eq(DeptEntity::getDeptName, deptName)
-                .eq(DeptEntity::getOrgId, orgId)) > 0;
+    private boolean isDeptNameExists(String deptName) {
+        return count(new LambdaQueryWrapper<DeptEntity>().eq(DeptEntity::getDeptName, deptName)) > 0;
     }
 
-    /**
-     * 校验部门名称是否存在（排除指定ID）
-     *
-     * @param deptName  部门名称
-     * @param orgId     所属机构ID
-     * @param excludeId 排除的部门ID
-     * @return true-存在，false-不存在
-     */
-    private boolean isDeptNameExistsExcludingId(String deptName, Long orgId, Long excludeId) {
+    private boolean isDeptNameExistsExcludingId(String deptName, Long excludeId) {
         return count(new LambdaQueryWrapper<DeptEntity>()
                 .eq(DeptEntity::getDeptName, deptName)
-                .eq(DeptEntity::getOrgId, orgId)
                 .ne(DeptEntity::getId, excludeId)) > 0;
     }
 
-    /**
-     * 校验该部门下是否有用户
-     *
-     * @param deptId 部门ID
-     * @return true-有用户，false-无用户
-     */
     private boolean hasUsers(Long deptId) {
         return userMapper.countByDeptId(deptId) > 0;
+    }
+
+    private void validateOrgTypeMatchDeptType(List<Long> orgIds, Integer deptType) {
+        // 内部部门(1)只能关联生产企业(1.1)，外部部门(2)只能关联经销商(1.2)
+        String expectedOrgType = deptType == 1 ? "1.1" : "1.2";
+        List<OrgEntity> orgs = orgService.listByIds(orgIds);
+        boolean mismatch = orgs.stream().anyMatch(o -> !expectedOrgType.equals(o.getOrgType()));
+        if (mismatch) {
+            throw new BusinessException(400, "关联机构类型与部门类型不匹配");
+        }
+    }
+
+    private void saveDeptOrgRelations(Long deptId, List<Long> orgIds) {
+        orgIds.forEach(orgId -> {
+            DeptOrgEntity rel = new DeptOrgEntity();
+            rel.setDeptId(deptId);
+            rel.setOrgId(orgId);
+            deptOrgMapper.insert(rel);
+        });
     }
 }

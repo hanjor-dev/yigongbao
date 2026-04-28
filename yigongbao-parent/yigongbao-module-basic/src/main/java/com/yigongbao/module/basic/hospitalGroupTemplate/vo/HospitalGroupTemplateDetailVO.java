@@ -62,6 +62,11 @@ public class HospitalGroupTemplateDetailVO implements Serializable {
     private String phone;
 
     /**
+     * 是否已被至少一个用户关联
+     */
+    private Boolean assigned;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

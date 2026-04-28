@@ -3,6 +3,7 @@ package com.yigongbao.module.system.dept.vo;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 部门 VO（视图对象）
@@ -30,14 +31,19 @@ public class DeptVO {
     private String deptCode;
 
     /**
-     * 所属机构ID
+     * 部门类型（1=内部，2=外部）
      */
-    private Long orgId;
+    private Integer deptType;
 
     /**
-     * 所属机构名称
+     * 关联机构ID列表
      */
-    private String orgName;
+    private List<Long> orgIds;
+
+    /**
+     * 关联机构名称列表
+     */
+    private List<String> orgNames;
 
     /**
      * 部门负责人用户ID

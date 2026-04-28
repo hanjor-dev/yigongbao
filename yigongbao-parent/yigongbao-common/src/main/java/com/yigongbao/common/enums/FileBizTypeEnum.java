@@ -100,9 +100,9 @@ public enum FileBizTypeEnum {
 
     // ==================== 医院/机构相关 ====================
     /**
-     * 医院资质文件（无格式限制）
+     * 机构资质文件（zip/rar/tar/7z，最大500MB）
      */
-    HOSPITAL_CERT("hospital_cert", "10.12", "医院资质文件", null),
+    ORG_CERT("org_cert", "10.12", "机构资质文件", "org.cert"),
 
     /**
      * 医院图片（无格式限制）

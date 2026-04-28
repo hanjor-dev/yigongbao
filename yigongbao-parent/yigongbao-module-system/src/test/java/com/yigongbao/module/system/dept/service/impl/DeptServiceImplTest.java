@@ -82,7 +82,7 @@ class DeptServiceImplTest {
         testEntity.setId(1L);
         testEntity.setDeptName("研发部");
         testEntity.setDeptCode("DEPT-001");
-        testEntity.setOrgId(1L);
+        testEntity.setDeptType(1);
         testEntity.setLeaderUserId(null);
         testEntity.setStatus(1);
         testEntity.setCreateTime(now);
@@ -91,7 +91,8 @@ class DeptServiceImplTest {
         // 初始化创建DTO
         createDTO = new CreateDeptDTO();
         createDTO.setDeptName("市场部");
-        createDTO.setOrgId(1L);
+        createDTO.setDeptType(1);
+        createDTO.setOrgIds(List.of(1L));
         createDTO.setLeaderUserId(null);
         createDTO.setRemark("市场部门");
 
@@ -119,7 +120,7 @@ class DeptServiceImplTest {
         DeptPageDTO pageDTO = new DeptPageDTO();
         pageDTO.setPageNum(1);
         pageDTO.setPageSize(10);
-        pageDTO.setOrgId(1L);
+        pageDTO.setDeptType(1);
         IPage<DeptVO> result = deptService.listDept(pageDTO);
 
         // 断言
@@ -167,7 +168,7 @@ class DeptServiceImplTest {
         assertNotNull(result);
         assertEquals(1L, result.getId());
         assertEquals("研发部", result.getDeptName());
-        assertEquals("测试机构", result.getOrgName());
+        assertNotNull(result.getOrgNames());
     }
 
     @Test
@@ -211,7 +212,8 @@ class DeptServiceImplTest {
         // 设置一个不存在的机构ID
         CreateDeptDTO dto = new CreateDeptDTO();
         dto.setDeptName("测试部门");
-        dto.setOrgId(999L);
+        dto.setDeptType(2);
+        dto.setOrgIds(List.of(999L));
 
         // 执行 & 断言
         BusinessException exception = assertThrows(

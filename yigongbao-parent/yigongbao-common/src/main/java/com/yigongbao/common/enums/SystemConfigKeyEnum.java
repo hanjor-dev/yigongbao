@@ -194,7 +194,25 @@ public enum SystemConfigKeyEnum {
     /**
      * 设计工单列表默认列配置（JSON 格式）
      */
-    DESIGN_COLUMN_CONFIG("design.column.config", "设计工单列表默认列配置");
+    DESIGN_COLUMN_CONFIG("design.column.config", "设计工单列表默认列配置"),
+
+    // ==================== 机构配置 ====================
+    /**
+     * 机构资质文件允许的文件扩展名（逗号分隔）
+     * 默认：zip,rar,tar,7z
+     */
+    ORG_CERT_ALLOWED_EXTENSIONS("org.cert.allowed_extensions", "资质文件允许格式"),
+
+    /**
+     * 机构资质文件最大大小（MB）
+     * 默认：500 MB
+     */
+    ORG_CERT_MAX_SIZE_MB("org.cert.max_size_mb", "资质文件最大大小(MB)"),
+
+    /**
+     * 生产企业机构ID（系统预设唯一生产企业）
+     */
+    MANUFACTURER_ORG_ID("manufacturer.org.id", "生产企业机构ID");
 
     /**
      * 配置键

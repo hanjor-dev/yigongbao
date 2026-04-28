@@ -2,9 +2,9 @@ package com.yigongbao.module.system.user.service.impl;
 
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
-import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
-import com.yigongbao.module.basic.hospital.vo.HospitalVO;
+import com.yigongbao.module.system.org.vo.OrgVO;
+import com.yigongbao.module.system.org.entity.OrgEntity;
+import com.yigongbao.module.system.org.mapper.OrgMapper;
 import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -51,7 +51,7 @@ class UserHospitalServiceImplTest {
     private UserHospitalMapper userHospitalMapper;
 
     @Mock
-    private HospitalMapper hospitalMapper;
+    private OrgMapper orgMapper;
 
     @Mock
     private UserMapper userMapper;
@@ -63,8 +63,8 @@ class UserHospitalServiceImplTest {
     private UserHospitalServiceImpl userHospitalService;
 
     private UserEntity testUser;
-    private HospitalEntity enabledHospital;
-    private HospitalEntity disabledHospital;
+    private OrgEntity enabledHospital;
+    private OrgEntity disabledHospital;
     private RoleEntity enabledRole;
     private RoleEntity disabledRole;
 
@@ -75,16 +75,14 @@ class UserHospitalServiceImplTest {
         testUser.setUsername("testuser");
         testUser.setRoleId(1L);
 
-        enabledHospital = new HospitalEntity();
+        enabledHospital = new OrgEntity();
         enabledHospital.setId(1L);
-        enabledHospital.setHospitalName("Test Hospital 1");
-        enabledHospital.setHospitalCode("HOS-001");
+        enabledHospital.setOrgName("Test Hospital 1");
         enabledHospital.setStatus(1);
 
-        disabledHospital = new HospitalEntity();
+        disabledHospital = new OrgEntity();
         disabledHospital.setId(2L);
-        disabledHospital.setHospitalName("Test Hospital 2");
-        disabledHospital.setHospitalCode("HOS-002");
+        disabledHospital.setOrgName("Test Hospital 2");
         disabledHospital.setStatus(0);
 
         enabledRole = new RoleEntity();
@@ -142,14 +140,14 @@ class UserHospitalServiceImplTest {
     void getHospitalsByUserId_whenHasHospitals_shouldReturnList() {
         List<Long> ids = List.of(1L);
         when(userHospitalMapper.selectHospitalIdsByUserId(1L)).thenReturn(ids);
-        List<HospitalEntity> hospitals = List.of(enabledHospital);
-        when(hospitalMapper.selectBatchIds(ids)).thenReturn(hospitals);
+        List<OrgEntity> hospitals = List.of(enabledHospital);
+        when(orgMapper.selectBatchIds(ids)).thenReturn(hospitals);
 
-        List<HospitalVO> result = userHospitalService.getHospitalsByUserId(1L);
+        List<OrgVO> result = userHospitalService.getHospitalsByUserId(1L);
 
         assertNotNull(result);
         assertEquals(1, result.size());
-        assertEquals("Test Hospital 1", result.get(0).getHospitalName());
+        assertEquals("Test Hospital 1", result.get(0).getOrgName());
     }
 
     @Test
@@ -157,7 +155,7 @@ class UserHospitalServiceImplTest {
     void getHospitalsByUserId_whenNoHospitals_shouldReturnEmptyList() {
         when(userHospitalMapper.selectHospitalIdsByUserId(1L)).thenReturn(List.of());
 
-        List<HospitalVO> result = userHospitalService.getHospitalsByUserId(1L);
+        List<OrgVO> result = userHospitalService.getHospitalsByUserId(1L);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -168,7 +166,7 @@ class UserHospitalServiceImplTest {
     void getHospitalsByUserId_whenUserNotExists_shouldReturnEmptyList() {
         when(userHospitalMapper.selectHospitalIdsByUserId(999L)).thenReturn(null);
 
-        List<HospitalVO> result = userHospitalService.getHospitalsByUserId(999L);
+        List<OrgVO> result = userHospitalService.getHospitalsByUserId(999L);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -181,13 +179,13 @@ class UserHospitalServiceImplTest {
     void assignHospitals_shouldAssignHospitals() {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         List<Long> ids = List.of(1L);
-        when(hospitalMapper.selectBatchIds(ids)).thenReturn(List.of(enabledHospital));
+        when(orgMapper.selectBatchIds(ids)).thenReturn(List.of(enabledHospital));
         doNothing().when(userHospitalMapper).deleteByUserId(1L);
 
         userHospitalService.assignHospitals(1L, ids);
 
         verify(userMapper, times(1)).selectById(1L);
-        verify(hospitalMapper, times(1)).selectBatchIds(ids);
+        verify(orgMapper, times(1)).selectBatchIds(ids);
         verify(userHospitalMapper, times(1)).deleteByUserId(1L);
         verify(userHospitalMapper, times(1)).insert(any(UserHospitalEntity.class));
     }
@@ -209,7 +207,7 @@ class UserHospitalServiceImplTest {
     void assignHospitals_whenInvalidHospitalId_shouldThrowException() {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         List<Long> idsWithInvalid = List.of(1L, 2L);
-        when(hospitalMapper.selectBatchIds(idsWithInvalid)).thenReturn(List.of(enabledHospital));
+        when(orgMapper.selectBatchIds(idsWithInvalid)).thenReturn(List.of(enabledHospital));
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> userHospitalService.assignHospitals(1L, idsWithInvalid));
@@ -223,7 +221,7 @@ class UserHospitalServiceImplTest {
     void assignHospitals_whenHospitalDisabled_shouldThrowException() {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         List<Long> ids = List.of(2L);
-        when(hospitalMapper.selectBatchIds(ids)).thenReturn(List.of(disabledHospital));
+        when(orgMapper.selectBatchIds(ids)).thenReturn(List.of(disabledHospital));
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> userHospitalService.assignHospitals(1L, ids));
@@ -262,16 +260,15 @@ class UserHospitalServiceImplTest {
     @Test
     @DisplayName("getHospitalOptionsByUserId: Returns all enabled hospitals")
     void getHospitalOptionsByUserId_shouldReturnAllEnabledHospitals() {
-        HospitalEntity hospital2 = new HospitalEntity();
+        OrgEntity hospital2 = new OrgEntity();
         hospital2.setId(2L);
-        hospital2.setHospitalName("Test Hospital 2");
-        hospital2.setHospitalCode("HOS-002");
+        hospital2.setOrgName("Test Hospital 2");
         hospital2.setStatus(1);
 
-        List<HospitalEntity> allHospitals = Arrays.asList(enabledHospital, hospital2);
-        when(hospitalMapper.selectList(any())).thenReturn(allHospitals);
+        List<OrgEntity> allHospitals = Arrays.asList(enabledHospital, hospital2);
+        when(orgMapper.selectList(any())).thenReturn(allHospitals);
 
-        List<HospitalVO> result = userHospitalService.getHospitalOptionsByUserId(1L);
+        List<OrgVO> result = userHospitalService.getHospitalOptionsByUserId(1L);
 
         assertNotNull(result);
         assertEquals(2, result.size());
@@ -280,9 +277,9 @@ class UserHospitalServiceImplTest {
     @Test
     @DisplayName("getHospitalOptionsByUserId: Returns empty list when no enabled hospitals")
     void getHospitalOptionsByUserId_whenNoEnabledHospitals_shouldReturnEmptyList() {
-        when(hospitalMapper.selectList(any())).thenReturn(List.of());
+        when(orgMapper.selectList(any())).thenReturn(List.of());
 
-        List<HospitalVO> result = userHospitalService.getHospitalOptionsByUserId(1L);
+        List<OrgVO> result = userHospitalService.getHospitalOptionsByUserId(1L);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -297,13 +294,13 @@ class UserHospitalServiceImplTest {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         when(roleService.getById(1L)).thenReturn(enabledRole);
         when(userHospitalMapper.selectHospitalIdsByUserId(1L)).thenReturn(hospitalIds);
-        when(hospitalMapper.selectBatchIds(hospitalIds)).thenReturn(List.of(enabledHospital));
+        when(orgMapper.selectBatchIds(hospitalIds)).thenReturn(List.of(enabledHospital));
 
-        List<HospitalVO> result = userHospitalService.getMyHospitalOptions(1L);
+        List<OrgVO> result = userHospitalService.getMyHospitalOptions(1L);
 
         assertNotNull(result);
         assertEquals(1, result.size());
-        assertEquals("Test Hospital 1", result.get(0).getHospitalName());
+        assertEquals("Test Hospital 1", result.get(0).getOrgName());
     }
 
     @Test
@@ -313,7 +310,7 @@ class UserHospitalServiceImplTest {
         when(userMapper.selectById(1L)).thenReturn(testUser);
         when(roleService.getById(2L)).thenReturn(disabledRole);
 
-        List<HospitalVO> result = userHospitalService.getMyHospitalOptions(1L);
+        List<OrgVO> result = userHospitalService.getMyHospitalOptions(1L);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -325,7 +322,7 @@ class UserHospitalServiceImplTest {
         testUser.setRoleId(null);
         when(userMapper.selectById(1L)).thenReturn(testUser);
 
-        List<HospitalVO> result = userHospitalService.getMyHospitalOptions(1L);
+        List<OrgVO> result = userHospitalService.getMyHospitalOptions(1L);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());

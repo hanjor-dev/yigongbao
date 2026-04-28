@@ -5,6 +5,7 @@ import lombok.Data;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 
 /**
  * 创建部门 DTO
@@ -23,10 +24,15 @@ public class CreateDeptDTO {
     private String deptName;
 
     /**
-     * 所属机构ID
+     * 部门类型（1=内部，2=外部）
      */
-    @NotNull(message = "所属机构不能为空")
-    private Long orgId;
+    @NotNull(message = "部门类型不能为空")
+    private Integer deptType;
+
+    /**
+     * 关联机构ID列表
+     */
+    private List<Long> orgIds;
 
     /**
      * 部门负责人用户ID

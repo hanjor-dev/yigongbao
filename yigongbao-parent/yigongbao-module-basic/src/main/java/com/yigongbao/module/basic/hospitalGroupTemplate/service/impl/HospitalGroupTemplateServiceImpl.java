@@ -17,9 +17,7 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
-import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
-import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
-import com.yigongbao.module.basic.hospital.service.HospitalService;
+import com.yigongbao.module.basic.common.mapper.OrgQueryMapper;
 import com.yigongbao.module.basic.hospitalGroupTemplate.convert.HospitalGroupTemplateConvert;
 import com.yigongbao.module.basic.hospitalGroupTemplate.dto.CreateHospitalGroupTemplateDTO;
 import com.yigongbao.module.basic.hospitalGroupTemplate.dto.HospitalGroupTemplatePageDTO;
@@ -41,7 +39,9 @@ import cn.hutool.core.util.StrUtil;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -58,8 +58,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
         implements HospitalGroupTemplateService {
 
     private final HospitalGroupTemplateDetailMapper detailMapper;
-    private final HospitalMapper hospitalMapper;
-    private final HospitalService hospitalService;
+    private final OrgQueryMapper orgQueryMapper;
     private final CodeGeneratorService codeGeneratorService;
 
     /**
@@ -273,9 +272,6 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
 
     /**
      * 转换为VO并填充医院数量
-     *
-     * @param entity 模板实体
-     * @return 模板VO
      */
     private HospitalGroupTemplateVO toVOWithCount(HospitalGroupTemplateEntity entity) {
         HospitalGroupTemplateVO vo = new HospitalGroupTemplateVO();
@@ -290,9 +286,6 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
 
     /**
      * 转换为简洁VO（用于下拉选项）
-     *
-     * @param entity 模板实体
-     * @return 简洁模板VO
      */
     private HospitalGroupTemplateSimpleVO toSimpleVO(HospitalGroupTemplateEntity entity) {
         HospitalGroupTemplateSimpleVO vo = new HospitalGroupTemplateSimpleVO();
@@ -305,7 +298,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     }
 
     /**
-     * 查询模板医院明细并填充医院详细信息
+     * 查询模板医院明细并填充机构详细信息和 assigned 状态
      *
      * @param templateId 模板ID
      * @return 明细VO列表
@@ -320,25 +313,32 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
         List<Long> hospitalIds = details.stream()
                 .map(HospitalGroupTemplateDetailEntity::getHospitalId)
                 .collect(Collectors.toList());
-        List<HospitalEntity> hospitals = hospitalMapper.selectBatchIds(hospitalIds);
+
+        // 批量查询机构信息（1次 IN 查询）
+        List<Map<String, Object>> orgList = orgQueryMapper.selectOrgByIds(hospitalIds);
+        Map<Long, Map<String, Object>> orgMap = orgList.stream()
+                .collect(Collectors.toMap(o -> ((Number) o.get("id")).longValue(), o -> o));
+
+        // 批量查询 sys_user_hospital，统计已关联的 hospitalId
+        List<Long> assignedIds = orgQueryMapper.selectAssignedHospitalIds(hospitalIds);
+        Set<Long> assignedHospitalIds = new java.util.HashSet<>(assignedIds);
+
         return details.stream().map(d -> {
             HospitalGroupTemplateDetailVO detailVO = new HospitalGroupTemplateDetailVO();
             detailVO.setId(d.getId());
             detailVO.setTemplateId(d.getTemplateId());
             detailVO.setHospitalId(d.getHospitalId());
             detailVO.setCreateTime(d.getCreateTime());
-            hospitals.stream()
-                    .filter(h -> Objects.equals(h.getId(), d.getHospitalId()))
-                    .findFirst()
-                    .ifPresent(h -> {
-                        detailVO.setHospitalName(h.getHospitalName());
-                        detailVO.setHospitalCode(h.getHospitalCode());
-                        detailVO.setFullAreaName(h.getFullAreaName());
-                        // hospitalLevelName 需通过字典服务获取（字典服务在 system 模块，basic 不依赖），由 Controller 层负责填充
-                        detailVO.setHospitalLevelName(null);
-                        detailVO.setContact(h.getContact());
-                        detailVO.setPhone(h.getPhone());
-                    });
+            detailVO.setAssigned(assignedHospitalIds.contains(d.getHospitalId()));
+            Map<String, Object> org = orgMap.get(d.getHospitalId());
+            if (org != null) {
+                detailVO.setHospitalName((String) org.get("org_name"));
+                detailVO.setHospitalCode((String) org.get("org_code"));
+                detailVO.setFullAreaName(null);
+                detailVO.setHospitalLevelName(null);
+                detailVO.setContact(null);
+                detailVO.setPhone(null);
+            }
             return detailVO;
         }).collect(Collectors.toList());
     }
@@ -366,9 +366,6 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
 
     /**
      * 校验模板名称是否存在
-     *
-     * @param templateName 模板名称
-     * @return true-存在，false-不存在
      */
     private boolean isTemplateNameExists(String templateName) {
         return count(new LambdaQueryWrapper<HospitalGroupTemplateEntity>()
@@ -377,10 +374,6 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
 
     /**
      * 校验模板名称是否存在（排除指定ID）
-     *
-     * @param templateName 模板名称
-     * @param excludeId 排除的模板ID
-     * @return true-存在，false-不存在
      */
     private boolean isTemplateNameExistsExcludingId(String templateName, Long excludeId) {
         return count(new LambdaQueryWrapper<HospitalGroupTemplateEntity>()

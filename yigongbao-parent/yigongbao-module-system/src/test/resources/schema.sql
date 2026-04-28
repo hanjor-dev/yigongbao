@@ -132,9 +132,8 @@ CREATE TABLE sys_org (
     phone               VARCHAR(32)     NOT NULL COMMENT '联系电话',
     email               VARCHAR(64)     COMMENT '联系邮箱',
     credit_code         VARCHAR(32)     COMMENT '统一社会信用代码',
-    business_license    VARCHAR(512)    COMMENT '营业执照',
-    agent_area          VARCHAR(64)     COMMENT '代理区域',
-    agent_product_line  VARCHAR(256)    COMMENT '代理产品线',
+    qualification_file  VARCHAR(512)    COMMENT '资质文件',
+    qualification_type  TINYINT         COMMENT '1=医疗器械,2=非医疗器械',
     hospital_level      VARCHAR(16)      COMMENT '医院等级（字典：dict_code=3，值如 3.1/3.2）',
     hospital_type       VARCHAR(16)      COMMENT '医院类型（字典：dict_code=4，值如 4.1/4.2）',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
@@ -159,6 +158,30 @@ INSERT INTO sys_org (id, org_name, org_code, org_type, area_id, area_name, addre
 (2, '测试生产企业', 'ORG-P-001', '1.1', 2, '上海市', '浦东新区工业园1号', '李经理', '13800138002', 'test@factory.com', 1, '测试工厂', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
 (3, '测试经销商', 'ORG-D-001', '1.2', 3, '广州市', '天河区商业街88号', '王总', '13800138003', 'test@distributor.com', 0, '已禁用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
+-- ------------------------------------------------------------
+-- 机构-医院关联表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_org_hospital;
+CREATE TABLE IF NOT EXISTS sys_org_hospital (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    distributor_org_id BIGINT NOT NULL,
+    hospital_org_id BIGINT NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_distributor_hospital (distributor_org_id, hospital_org_id)
+);
+
+-- ------------------------------------------------------------
+-- 部门-机构关联表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_dept_org;
+CREATE TABLE IF NOT EXISTS sys_dept_org (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    dept_id BIGINT NOT NULL,
+    org_id BIGINT NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dept_org (dept_id, org_id)
+);
+
 -- ============================================================
 -- 部门表
 -- ------------------------------------------------------------
@@ -167,7 +190,7 @@ CREATE TABLE sys_dept (
     id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     dept_name           VARCHAR(128)    NOT NULL COMMENT '部门名称',
     dept_code           VARCHAR(32)     NOT NULL COMMENT '部门编码',
-    org_id              BIGINT          NOT NULL COMMENT '所属机构ID',
+    dept_type           TINYINT         NOT NULL DEFAULT 1 COMMENT '1=内部,2=外部',
     leader_user_id      BIGINT          COMMENT '部门负责人用户ID',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark              VARCHAR(512)    COMMENT '备注说明',
@@ -180,15 +203,15 @@ CREATE TABLE sys_dept (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    KEY idx_dept_org_id (org_id),
+    UNIQUE KEY uk_dept_name (dept_name),
     KEY idx_dept_status (status)
 );
 
 -- 插入部门测试数据
-INSERT INTO sys_dept (id, dept_name, dept_code, org_id, leader_user_id, status, remark, create_time, update_time, is_deleted) VALUES
+INSERT INTO sys_dept (id, dept_name, dept_code, dept_type, leader_user_id, status, remark, create_time, update_time, is_deleted) VALUES
 (1, '研发部', 'DEPT-001', 1, NULL, 1, '研发部门', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
 (2, '市场部', 'DEPT-002', 1, NULL, 1, '市场部门', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(3, '销售部', 'DEPT-003', 2, NULL, 1, '销售部门', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, '销售部', 'DEPT-003', 1, NULL, 1, '销售部门', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
 (4, '已禁用部门', 'DEPT-004', 1, NULL, 0, '已禁用', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ------------------------------------------------------------

@@ -23,8 +23,8 @@ import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
-import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
-import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
+import com.yigongbao.module.system.org.entity.OrgEntity;
+import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.order.validator.OrderDataValidator;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
@@ -98,7 +98,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderFileMapper orderFileMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
-    private final HospitalMapper hospitalMapper;
+    private final OrgService orgService;
     private final FlowFacade flowFacade;
     private final ConfigService configService;
     private final UserService userService;
@@ -788,6 +788,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     dto.getOrgId(), dto.getHospitalId(), dto.getHospitalDeptId(),
                     dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone(),
                     currentUserId, OrderDataValidator.ValidateMode.DIRECT);
+            // 校验订单类型与机构资质是否匹配
+            orderDataValidator.validateOrderType(currentUserId, dto.getOrderType());
 
             save(order);
             Long orderId = order.getId();
@@ -846,11 +848,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (hospitalId == null) {
             return;
         }
-        HospitalEntity hospital = hospitalMapper.selectById(hospitalId);
-        if (hospital != null) {
-            order.setAreaId(hospital.getAreaId());
-            order.setAreaName(hospital.getAreaName());
-            order.setFullAreaName(hospital.getFullAreaName());
+        OrgEntity org = orgService.getById(hospitalId);
+        if (org != null) {
+            order.setAreaId(org.getAreaId());
+            order.setAreaName(org.getAreaName());
         }
     }
 

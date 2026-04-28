@@ -55,8 +55,6 @@ class DoctorControllerTest {
         vo.setDoctorPhone("13800138" + String.format("%03d", id));
         vo.setHospitalId(1L);
         vo.setHospitalName("测试医院");
-        vo.setHospitalDeptId(1L);
-        vo.setHospitalDeptName("骨科");
         vo.setCreatorId(1L);
         vo.setOrderCount(0);
         vo.setStatus(1);
@@ -168,8 +166,7 @@ class DoctorControllerTest {
         void create_shouldSuccess() throws Exception {
             Map<String, Object> requestBody = Map.of(
                     "doctorName", "新医生",
-                    "hospitalId", 1,
-                    "hospitalDeptId", 1
+                    "hospitalId", 1
             );
 
             mockMvc.perform(post("/basic/doctor")

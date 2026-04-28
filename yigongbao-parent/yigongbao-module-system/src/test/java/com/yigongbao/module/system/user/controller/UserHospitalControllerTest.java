@@ -1,7 +1,7 @@
 package com.yigongbao.module.system.user.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.yigongbao.module.basic.hospital.vo.HospitalVO;
+import com.yigongbao.module.system.org.vo.OrgVO;
 import com.yigongbao.module.basic.hospitalGroupTemplate.service.HospitalGroupTemplateService;
 import com.yigongbao.module.basic.hospitalGroupTemplate.vo.HospitalGroupTemplateVO;
 import com.yigongbao.module.system.user.dto.AssignHospitalsDTO;
@@ -58,20 +58,20 @@ class UserHospitalControllerTest {
     @MockBean
     private HospitalGroupTemplateService hospitalGroupTemplateService;
 
-    private HospitalVO testHospital1;
-    private HospitalVO testHospital2;
+    private OrgVO testHospital1;
+    private OrgVO testHospital2;
 
     @BeforeEach
     void setUp() {
-        testHospital1 = new HospitalVO();
+        testHospital1 = new OrgVO();
         testHospital1.setId(1L);
-        testHospital1.setHospitalName("北京协和医院");
-        testHospital1.setHospitalCode("HOS-001");
+        testHospital1.setOrgName("北京协和医院");
+        testHospital1.setOrgCode("HOS-001");
 
-        testHospital2 = new HospitalVO();
+        testHospital2 = new OrgVO();
         testHospital2.setId(2L);
-        testHospital2.setHospitalName("上海市第一人民医院");
-        testHospital2.setHospitalCode("HOS-002");
+        testHospital2.setOrgName("上海市第一人民医院");
+        testHospital2.setOrgCode("HOS-002");
     }
 
     // ==================== getHospitals 测试 ====================

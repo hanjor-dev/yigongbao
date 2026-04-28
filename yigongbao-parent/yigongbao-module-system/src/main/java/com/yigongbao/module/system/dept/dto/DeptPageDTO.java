@@ -26,9 +26,9 @@ public class DeptPageDTO implements Serializable {
     private Integer pageSize = 10;
 
     /**
-     * 所属机构ID
+     * 部门类型（1=内部，2=外部，可选过滤）
      */
-    private Long orgId;
+    private Integer deptType;
 
     /**
      * 部门名称（模糊查询）

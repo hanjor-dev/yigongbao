@@ -18,9 +18,8 @@ import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
-import com.yigongbao.module.basic.hospital.service.HospitalService;
 import com.yigongbao.module.system.config.service.ConfigService;
+import com.yigongbao.module.system.dept.mapper.DeptOrgMapper;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.service.DeptService;
 import com.yigongbao.module.system.dict.entity.DictEntity;
@@ -77,10 +76,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     private final DeptService deptService;
     private final RoleService roleService;
     private final DictService dictService;
-    private final HospitalService hospitalService;
     private final PasswordEncoder passwordEncoder;
     private final ConfigService configService;
     private final UserHospitalService userHospitalService;
+    private final DeptOrgMapper deptOrgMapper;
 
     /**
      * 分页查询用户列表
@@ -151,8 +150,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         Map<Long, String> hospitalNameMap = allHospitalIds.isEmpty() ? Collections.emptyMap()
-                : hospitalService.listByIds(allHospitalIds).stream()
-                        .collect(Collectors.toMap(HospitalEntity::getId, HospitalEntity::getHospitalName));
+                : orgService.listByIds(allHospitalIds).stream()
+                        .collect(Collectors.toMap(OrgEntity::getId, OrgEntity::getOrgName));
         // 转换后再填充 VO 中需要名称的字段和医院ID列表
         for (UserVO vo : voPage.getRecords()) {
             if (vo.getStatus() != null) {
@@ -301,6 +300,37 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 if (deptEntity == null) {
                     log.warn("所属部门不存在，deptId={}", dto.getDeptId());
                     throw new BusinessException(ErrorCodeEnum.USER_DEPT_NOT_FOUND);
+                }
+            }
+            // 根据部门类型分支处理
+            if (deptEntity != null) {
+                Integer deptType = deptEntity.getDeptType();
+                if (Integer.valueOf(1).equals(deptType)) {
+                    // 内部部门：强制使用生产企业 orgId，校验工号非空
+                    String manufacturerOrgIdStr = configService.getConfigValue(SystemConfigKeyEnum.MANUFACTURER_ORG_ID.getKey());
+                    if (StrUtil.isNotBlank(manufacturerOrgIdStr)) {
+                        Long manufacturerOrgId = Long.valueOf(manufacturerOrgIdStr);
+                        dto.setOrgId(manufacturerOrgId);
+                        orgEntity = orgService.getById(manufacturerOrgId);
+                    }
+                    if (StrUtil.isBlank(dto.getEmployeeNo())) {
+                        throw new BusinessException(400, "内部用户工号不能为空");
+                    }
+                } else if (Integer.valueOf(2).equals(deptType)) {
+                    // 外部部门：校验 orgId 属于该部门，且机构类型为经销商（1.2）
+                    if (dto.getOrgId() != null) {
+                        List<Long> deptOrgIds = deptOrgMapper.selectOrgIdsByDeptId(dto.getDeptId());
+                        if (!deptOrgIds.contains(dto.getOrgId())) {
+                            log.warn("机构不属于该部门，deptId={}, orgId={}", dto.getDeptId(), dto.getOrgId());
+                            throw new BusinessException(400, "所选机构不属于该部门");
+                        }
+                        OrgEntity extOrg = orgService.getById(dto.getOrgId());
+                        if (extOrg == null || !"1.2".equals(extOrg.getOrgType())) {
+                            log.warn("机构类型不是经销商，orgId={}", dto.getOrgId());
+                            throw new BusinessException(400, "外部用户所属机构必须为经销商");
+                        }
+                    }
+                    // hospitalIds 已由前端传入，后续统一由 userHospitalService 处理
                 }
             }
             // 校验角色是否存在
@@ -616,9 +646,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             log.warn("角色数据权限为医院范围，但未指定医院，roleId={}", role.getId());
             throw new BusinessException(ErrorCodeEnum.USER_ROLE_HOSPITAL_SCOPE_REQUIRED);
         }
-        // 批量校验医院ID是否真实存在
-        Set<Long> existingIds = hospitalService.listByIds(hospitalIds).stream()
-                .map(h -> h.getId())
+        // 批量校验医院ID是否真实存在（orgType=1.3 的机构）
+        Set<Long> existingIds = orgService.listByIds(hospitalIds).stream()
+                .filter(org -> "1.3".equals(org.getOrgType()))
+                .map(OrgEntity::getId)
                 .collect(Collectors.toSet());
         List<Long> invalidIds = hospitalIds.stream()
                 .filter(hid -> !existingIds.contains(hid))
@@ -767,8 +798,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         List<Long> hospitalIds = userHospitalService.getHospitalIdsByUserId(vo.getId());
         vo.setHospitalIds(hospitalIds);
         if (!hospitalIds.isEmpty()) {
-            List<String> hospitalNames = hospitalService.listByIds(hospitalIds).stream()
-                    .map(HospitalEntity::getHospitalName)
+            List<String> hospitalNames = orgService.listByIds(hospitalIds).stream()
+                    .map(OrgEntity::getOrgName)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
             vo.setHospitalNames(hospitalNames);

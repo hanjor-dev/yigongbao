@@ -48,11 +48,10 @@ CREATE TABLE sys_org (
     phone              VARCHAR(32)     COMMENT '联系电话',
     email              VARCHAR(64)     COMMENT '联系邮箱',
     credit_code        VARCHAR(32)     COMMENT '统一社会信用代码',
-    business_license   VARCHAR(512)    COMMENT '营业执照（存储路径/URL）',
+    qualification_file VARCHAR(512)    COMMENT '资质文件（存储压缩包路径/URL）',
 
     -- 经销商额外字段
-    agent_area         VARCHAR(64)     COMMENT '代理区域',
-    agent_product_line VARCHAR(256)    COMMENT '代理产品线（多个用逗号分隔，关联字典编码=5，子节点dict_code=5.1/5.2/5.3/5.4）',
+    qualification_type TINYINT         COMMENT '资质类型（1=医疗器械，2=非医疗器械）',
 
     -- 医疗机构额外字段
     hospital_level      VARCHAR(16)      COMMENT '医院等级（关联字典编码=3，子节点dict_code=3.1/3.2/3.3/3.4/3.5）',
@@ -86,7 +85,7 @@ CREATE TABLE sys_dept (
     id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     dept_name           VARCHAR(128)    NOT NULL COMMENT '部门名称',
     dept_code           VARCHAR(32)     NOT NULL COMMENT '部门编码',
-    org_id              BIGINT          NOT NULL COMMENT '所属机构ID（关联sys_org表）',
+    dept_type           TINYINT         NOT NULL COMMENT '部门类型（1=内部，2=外部）',
     leader_user_id      BIGINT          COMMENT '部门负责人用户ID（关联sys_user表）',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark              VARCHAR(512)    COMMENT '备注说明',
@@ -99,11 +98,11 @@ CREATE TABLE sys_dept (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     PRIMARY KEY (id),
-    KEY idx_dept_org_id (org_id),
+    KEY idx_dept_type (dept_type),
     KEY idx_dept_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='部门表';
 CREATE UNIQUE INDEX uk_dept_code ON sys_dept ((CASE WHEN is_deleted = 0 THEN dept_code ELSE NULL END));
-CREATE UNIQUE INDEX uk_dept_name_org ON sys_dept ((CASE WHEN is_deleted = 0 THEN dept_name ELSE NULL END), org_id);
+CREATE UNIQUE INDEX uk_dept_name ON sys_dept ((CASE WHEN is_deleted = 0 THEN dept_name ELSE NULL END));
 
 
 -- ------------------------------------------------------------
@@ -344,43 +343,31 @@ CREATE TABLE sys_area (
 
 
 -- ============================================================
--- 医院表（hospital）
--- 用于存储客户医院基础信息，作为订单等核心业务的客户数据来源
+-- 经销商-医疗机构关联表（sys_org_hospital）
 -- ============================================================
-DROP TABLE IF EXISTS hospital;
-CREATE TABLE hospital (
-    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    hospital_name       VARCHAR(128)    NOT NULL COMMENT '医院名称',
-    hospital_code       VARCHAR(32)     NOT NULL COMMENT '医院编码（HOS-XXX 格式）',
-    area_id             BIGINT          NOT NULL COMMENT '所属地区ID（关联sys_area表）',
-    area_name           VARCHAR(64)     COMMENT '地区名称（冗余存储）',
-    full_area_name     VARCHAR(256)    COMMENT '完整地区路径（冗余存储，如：中国,北京,北京市,朝阳区）',
-    hospital_level      VARCHAR(16)      COMMENT '医院等级（关联字典编码=3，子节点dict_code=3.1/3.2/3.3/3.4/3.5）',
-    hospital_type       VARCHAR(16)      COMMENT '医院类型（关联字典编码=4，子节点dict_code=4.1/4.2）',
-    contact             VARCHAR(32)      COMMENT '联系人',
-    phone               VARCHAR(32)     COMMENT '联系电话',
-    email               VARCHAR(64)     COMMENT '电子邮箱',
-    address             VARCHAR(256)    COMMENT '详细地址',
-    credit_code         VARCHAR(32)     COMMENT '统一社会信用代码',
-    business_license     VARCHAR(512)    COMMENT '营业执照（存储路径/URL）',
-    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
-    remark              VARCHAR(512)    COMMENT '备注说明',
+DROP TABLE IF EXISTS sys_org_hospital;
+CREATE TABLE sys_org_hospital (
+    id                 BIGINT AUTO_INCREMENT PRIMARY KEY,
+    distributor_org_id BIGINT NOT NULL COMMENT '经销商机构ID（关联sys_org表，orgType=1.2）',
+    hospital_org_id    BIGINT NOT NULL COMMENT '医疗机构org_id（关联sys_org表，orgType=1.3）',
+    create_time        DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_distributor_hospital (distributor_org_id, hospital_org_id),
+    KEY idx_hospital (hospital_org_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='经销商-医疗机构关联表';
 
-    -- 通用字段
-    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
-    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
-    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
-    PRIMARY KEY (id),
-    KEY idx_hospital_area_id (area_id),
-    KEY idx_hospital_level (hospital_level),
-    KEY idx_hospital_type (hospital_type),
-    KEY idx_hospital_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院表';
-CREATE UNIQUE INDEX uk_hospital_code ON hospital ((CASE WHEN is_deleted = 0 THEN hospital_code ELSE NULL END));
-CREATE UNIQUE INDEX uk_hospital_name ON hospital ((CASE WHEN is_deleted = 0 THEN hospital_name ELSE NULL END));
+-- ============================================================
+-- 部门-机构关联表（sys_dept_org）
+-- ============================================================
+DROP TABLE IF EXISTS sys_dept_org;
+CREATE TABLE sys_dept_org (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    dept_id     BIGINT NOT NULL COMMENT '部门ID（关联sys_dept表）',
+    org_id      BIGINT NOT NULL COMMENT '机构ID（关联sys_org表）',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dept_org (dept_id, org_id),
+    KEY idx_org (org_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='部门-机构关联表';
 
 
 -- ============================================================
@@ -418,7 +405,7 @@ DROP TABLE IF EXISTS hospital_group_template_detail;
 CREATE TABLE hospital_group_template_detail (
     id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     template_id         BIGINT          NOT NULL COMMENT '模板ID（关联hospital_group_template表）',
-    hospital_id         BIGINT          NOT NULL COMMENT '医院ID（关联hospital表）',
+    hospital_id         BIGINT          NOT NULL COMMENT '医疗机构org_id（关联sys_org表，orgType=1.3）',
     create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
 
     PRIMARY KEY (id),
@@ -437,7 +424,7 @@ DROP TABLE IF EXISTS sys_user_hospital;
 CREATE TABLE sys_user_hospital (
     id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     user_id             BIGINT          NOT NULL COMMENT '用户ID（关联sys_user表）',
-    hospital_id         BIGINT          NOT NULL COMMENT '医院ID（关联hospital表）',
+    hospital_id         BIGINT          NOT NULL COMMENT '医疗机构org_id（关联sys_org表，orgType=1.3）',
     create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
 
     PRIMARY KEY (id),
@@ -670,32 +657,6 @@ CREATE TABLE file_part_detail (
 
 
 -- ============================================================
--- 医院科室表（hospital_dept）
--- 独立科室表，与医院无关，作为通用字典供订单等业务模块使用
--- ============================================================
-DROP TABLE IF EXISTS hospital_dept;
-CREATE TABLE hospital_dept (
-    id                   BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    hospital_dept_code   VARCHAR(32)     NOT NULL COMMENT '科室编码（系统唯一，如 HDEPT-0001）',
-    hospital_dept_name   VARCHAR(100)   NOT NULL COMMENT '科室名称',
-    sort                 INT             DEFAULT 0 COMMENT '排序',
-    status               TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
-    remark               VARCHAR(512)   COMMENT '备注',
-
-    -- 通用字段
-    create_time          DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time          DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    create_by            BIGINT          DEFAULT NULL COMMENT '创建人ID',
-    update_by            BIGINT          DEFAULT NULL COMMENT '更新人ID',
-    is_deleted           TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
-
-    PRIMARY KEY (id),
-    KEY idx_hospital_dept_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院科室表';
-CREATE UNIQUE INDEX uk_hospital_dept_code ON hospital_dept ((CASE WHEN is_deleted = 0 THEN hospital_dept_code ELSE NULL END));
-
-
--- ============================================================
 -- 医生表（doctor）
 -- 用于管理医生基础信息，关联业务员（创建人）和医院
 -- ============================================================
@@ -704,8 +665,7 @@ CREATE TABLE doctor (
     id                BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     doctor_name       VARCHAR(64)     NOT NULL COMMENT '医生姓名',
     doctor_phone      VARCHAR(32)    COMMENT '医生电话',
-    hospital_id       BIGINT          COMMENT '所属医院ID',
-    hospital_dept_id  BIGINT          COMMENT '所属医院科室ID（关联hospital_dept表）',
+    hospital_id       BIGINT          COMMENT '所属医疗机构ID（关联sys_org表，orgType=1.3）',
     creator_id        BIGINT          COMMENT '创建该医生记录的业务员ID',
     order_count       INT             DEFAULT 0 COMMENT '关联订单数量',
     status            TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
@@ -720,7 +680,6 @@ CREATE TABLE doctor (
 
     PRIMARY KEY (id),
     KEY idx_doctor_hospital (hospital_id),
-    KEY idx_doctor_hospital_dept (hospital_dept_id),
     KEY idx_doctor_creator (creator_id),
     KEY idx_doctor_name (doctor_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医生表';

@@ -9,8 +9,6 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
-import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
-import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.module.order.dto.modify.AuditModifyApplyDTO;
@@ -76,7 +74,6 @@ class OrderModifyApplyServiceImplTest {
     @Mock private OrderMainMapper orderMainMapper;
     @Mock private OrderItemMapper orderItemMapper;
     @Mock private OrderFileMapper orderFileMapper;
-    @Mock private HospitalMapper hospitalMapper;
     @Mock private OrderDataValidator orderDataValidator;
     @Mock private FileService fileService;
     @Mock private ConfigService configService;

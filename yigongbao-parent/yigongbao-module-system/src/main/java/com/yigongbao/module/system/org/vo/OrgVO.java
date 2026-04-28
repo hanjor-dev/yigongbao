@@ -3,6 +3,7 @@ package com.yigongbao.module.system.org.vo;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 机构 VO（视图对象）
@@ -75,24 +76,24 @@ public class OrgVO {
     private String creditCode;
 
     /**
-     * 营业执照
+     * 资质文件路径
      */
-    private String businessLicense;
+    private String qualificationFile;
 
     /**
-     * 代理区域（经销商）
+     * 资质类型（1=医疗器械，2=非医疗器械）
      */
-    private String agentArea;
+    private Integer qualificationType;
 
     /**
-     * 代理产品线（经销商）
+     * 关联医院机构ID列表（经销商）
      */
-    private String agentProductLine;
+    private List<Long> hospitalOrgIds;
 
     /**
-     * 代理产品线名称（逗号分隔）
+     * 关联医院机构名称列表（经销商）
      */
-    private String agentProductLineNames;
+    private List<String> hospitalOrgNames;
 
     /**
      * 医院等级（医疗机构，关联字典编码=3，值如 3.1/3.2/3.3/3.4/3.5）

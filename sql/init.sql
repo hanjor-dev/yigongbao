@@ -16,10 +16,9 @@ VALUES (1, 0, '1', '机构类型', NULL, 1, 1, 1);
 
 INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
 VALUES
-(2, 1, '1.1', '生产企业', 'production', 2, 1, 1),
+(2, 1, '1.1', '生产企业', 'production', 2, 1, 0),
 (3, 1, '1.2', '经销商', 'distributor', 2, 2, 1),
-(4, 1, '1.3', '医疗机构', 'medical', 2, 3, 1),
-(5, 1, '1.4', '其他', 'other', 2, 4, 1);
+(4, 1, '1.3', '医疗机构', 'medical', 2, 3, 1);
 
 -- ------------------------------------------------------------
 -- 机构编码前缀（父节点 id=6）
@@ -161,7 +160,7 @@ VALUES
 -- 医院/机构相关（10.12-10.13）
 INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
 VALUES
-(62, 50, '10.12', '医院资质文件', NULL, 2, 12, 1),
+(62, 50, '10.12', '机构资质文件', 'org.cert', 2, 12, 1),
 (63, 50, '10.13', '医院图片',     NULL, 2, 13, 1);
 
 -- 产品相关（10.14）
@@ -358,7 +357,20 @@ VALUES
 ('design.report.allowed_extensions', '设计报告允许的文件扩展名', '.pdf,.doc,.docx,.xls,.xlsx', 'string', 'file', '设计报告允许的文件扩展名，逗号分隔（word/pdf/excel）', 0, 0, 9, 1),
 ('design.report.max_size_mb', '设计报告最大文件大小', '50', 'number', 'file', '设计报告上传时的最大文件大小（MB）', 0, 0, 10, 1),
 ('design.model.allowed_extensions', '可视化模型允许的文件扩展名', '.stl,.obj,.ply,.3mf', 'string', 'file', '可视化模型允许的文件扩展名，逗号分隔', 0, 0, 11, 1),
-('design.model.max_size_mb', '可视化模型最大文件大小', '200', 'number', 'file', '可视化模型上传时的最大文件大小（MB）', 0, 0, 12, 1);
+('design.model.max_size_mb', '可视化模型最大文件大小', '200', 'number', 'file', '可视化模型上传时的最大文件大小（MB）', 0, 0, 12, 1),
+('org.cert.allowed_extensions', '资质文件允许格式', 'zip,rar,tar,7z', 'string', 'file', '机构资质文件允许的压缩包格式，逗号分隔', 0, 0, 13, 1),
+('org.cert.max_size_mb', '资质文件最大大小', '500', 'number', 'file', '机构资质文件上传时的最大文件大小（MB）', 0, 0, 14, 1);
+
+INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
+VALUES
+('manufacturer.org.id', '生产企业机构ID', '1', 'number', 'system', '系统预设唯一生产企业机构ID，不可动态创建', 1, 0, 10, 1);
+
+
+-- ============================================================
+-- 生产企业预设机构（sys_org）
+-- ============================================================
+INSERT INTO sys_org (id, org_name, org_code, org_type, status)
+VALUES (1, '医工宝（生产企业）', 'ORG-P-00001', '1.1', 1);
 
 
 -- ============================================================

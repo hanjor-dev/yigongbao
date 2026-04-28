@@ -78,9 +78,8 @@ CREATE TABLE sys_org (
     phone              VARCHAR(32)     NOT NULL COMMENT '联系电话',
     email              VARCHAR(64)     COMMENT '联系邮箱',
     credit_code        VARCHAR(32)     COMMENT '统一社会信用代码',
-    business_license   VARCHAR(512)    COMMENT '营业执照',
-    agent_area         VARCHAR(64)     COMMENT '代理区域',
-    agent_product_line VARCHAR(256)    COMMENT '代理产品线',
+    qualification_file VARCHAR(512)    COMMENT '资质文件',
+    qualification_type TINYINT         COMMENT '1=医疗器械,2=非医疗器械',
     hospital_level      VARCHAR(16)      COMMENT '医院等级（字典：dict_code=3，值如 3.1/3.2）',
     hospital_type       VARCHAR(16)      COMMENT '医院类型（字典：dict_code=4，值如 4.1/4.2）',
     status             TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
@@ -216,30 +215,6 @@ INSERT INTO rebuild_project (id, body_part_id, parent_id, name, code, level, sta
 (3, 1, 0, '面部轮廓', 'RP_1_002', 1, 8000.00, 12000.00, '模型', 12.0, '7.2', 2, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ============================================================
--- 医院科室表（hospital_dept）
--- ============================================================
-DROP TABLE IF EXISTS hospital_dept;
-CREATE TABLE hospital_dept (
-    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    hospital_dept_code  VARCHAR(50)     NOT NULL COMMENT '科室编码',
-    hospital_dept_name  VARCHAR(100)    NOT NULL COMMENT '科室名称',
-    sort                INT             DEFAULT 0 COMMENT '排序',
-    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
-    remark              VARCHAR(500)    DEFAULT NULL COMMENT '备注说明',
-    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
-    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
-    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
-    PRIMARY KEY (id),
-    KEY idx_hdept_code (hospital_dept_code)
-);
-
-INSERT INTO hospital_dept (id, hospital_dept_code, hospital_dept_name, sort, status, remark, create_time, update_time, is_deleted) VALUES
-(1, 'HDEPT-0001', '骨科', 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, 'HDEPT-0002', '口腔科', 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
-
--- ============================================================
 -- 医生表（doctor）
 -- ============================================================
 DROP TABLE IF EXISTS doctor;
@@ -248,7 +223,6 @@ CREATE TABLE doctor (
     doctor_name         VARCHAR(50)     NOT NULL COMMENT '医生姓名',
     doctor_phone       VARCHAR(20)     DEFAULT NULL COMMENT '医生电话',
     hospital_id        BIGINT          NOT NULL COMMENT '所属医院ID',
-    hospital_dept_id    BIGINT          DEFAULT NULL COMMENT '所属科室ID',
     creator_id          BIGINT          DEFAULT NULL COMMENT '创建该医生记录的业务员ID',
     order_count         INT             DEFAULT 0 COMMENT '关联订单数量',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
@@ -260,13 +234,12 @@ CREATE TABLE doctor (
     is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
     PRIMARY KEY (id),
     KEY idx_doctor_hospital (hospital_id),
-    KEY idx_doctor_dept (hospital_dept_id),
     KEY idx_doctor_creator (creator_id)
 );
 
-INSERT INTO doctor (id, doctor_name, doctor_phone, hospital_id, hospital_dept_id, creator_id, order_count, status, remark, create_time, update_time, is_deleted) VALUES
-(1, '张三', '13800138001', 1, 1, 1, 5, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, '李四', '13800138002', 1, 2, 1, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO doctor (id, doctor_name, doctor_phone, hospital_id, creator_id, order_count, status, remark, create_time, update_time, is_deleted) VALUES
+(1, '张三', '13800138001', 1, 1, 5, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, '李四', '13800138002', 1, 1, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ============================================================
 -- 产品型号表（product）
@@ -381,3 +354,27 @@ INSERT INTO sys_code_sequence (id, rule_code, biz_key, current_seq, last_date, v
 (1, 'BODY_PART_CODE', NULL, 0, NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (2, 'REBUILD_PROJECT_CODE', NULL, 0, NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (3, 'PRODUCT_CODE', NULL, 0, NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+-- ------------------------------------------------------------
+-- 机构-医院关联表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_org_hospital;
+CREATE TABLE IF NOT EXISTS sys_org_hospital (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    distributor_org_id BIGINT NOT NULL,
+    hospital_org_id BIGINT NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_distributor_hospital (distributor_org_id, hospital_org_id)
+);
+
+-- ------------------------------------------------------------
+-- 部门-机构关联表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_dept_org;
+CREATE TABLE IF NOT EXISTS sys_dept_org (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    dept_id BIGINT NOT NULL,
+    org_id BIGINT NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dept_org (dept_id, org_id)
+);

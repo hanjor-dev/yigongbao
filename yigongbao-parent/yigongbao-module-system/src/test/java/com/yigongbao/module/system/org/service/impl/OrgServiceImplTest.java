@@ -95,7 +95,7 @@ class OrgServiceImplTest {
         createDTO.setPhone("13900139000");
         createDTO.setAreaName("北京市");
         createDTO.setAddress("朝阳区xxx");
-        createDTO.setAgentArea("华东区");
+        createDTO.setQualificationType(2);
 
         // 初始化更新DTO
         updateDTO = new UpdateOrgDTO();

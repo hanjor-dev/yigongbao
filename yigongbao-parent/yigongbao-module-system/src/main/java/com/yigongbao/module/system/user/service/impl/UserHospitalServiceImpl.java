@@ -5,9 +5,9 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
-import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
-import com.yigongbao.module.basic.hospital.vo.HospitalVO;
+import com.yigongbao.module.system.org.entity.OrgEntity;
+import com.yigongbao.module.system.org.mapper.OrgMapper;
+import com.yigongbao.module.system.org.vo.OrgVO;
 import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 /**
  * 用户-医院关联 Service 实现类
- * 处理用户与医院之间的关联关系，用于数据范围权限控制
+ * hospital_id 语义已变更为 sys_org.id（医疗机构类型，orgType=1.3）
  *
  * @author hanjor
  * @date 2026-03-19
@@ -41,296 +41,121 @@ import java.util.stream.Collectors;
 public class UserHospitalServiceImpl implements UserHospitalService {
 
     private final UserHospitalMapper userHospitalMapper;
-    private final HospitalMapper hospitalMapper;
+    private final OrgMapper orgMapper;
     private final UserMapper userMapper;
     private final RoleService roleService;
 
-    /**
-     * 查询用户的医院ID列表
-     *
-     * @param userId 用户ID
-     * @return 医院ID列表
-     */
     @Override
     public List<Long> getHospitalIdsByUserId(Long userId) {
-        log.info("查询用户的医院ID列表，userId={}", userId);
-        try {
-            List<Long> hospitalIds = userHospitalMapper.selectHospitalIdsByUserId(userId);
-            log.info("查询用户的医院ID列表成功，数量={}", hospitalIds != null ? hospitalIds.size() : 0);
-            return hospitalIds != null ? hospitalIds : new ArrayList<>();
-        } catch (Exception e) {
-            log.error("查询用户的医院ID列表异常，userId={}", userId, e);
-            throw e;
-        }
+        List<Long> ids = userHospitalMapper.selectHospitalIdsByUserId(userId);
+        return ids != null ? ids : new ArrayList<>();
     }
 
-    /**
-     * 批量查询用户的医院ID列表
-     *
-     * @param userIds 用户ID列表
-     * @return Map<用户ID, 医院ID列表>
-     */
     @Override
     public Map<Long, List<Long>> listHospitalIdsByUserIds(List<Long> userIds) {
-        if (userIds == null || userIds.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        log.info("批量查询用户的医院ID列表，userIds数量={}", userIds.size());
-        try {
-            // 批量查询所有用户-医院关联
-            LambdaQueryWrapper<UserHospitalEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.in(UserHospitalEntity::getUserId, userIds);
-            List<UserHospitalEntity> userHospitalList = userHospitalMapper.selectList(wrapper);
-
-            // 按用户ID分组
-            Map<Long, List<Long>> result = userHospitalList.stream()
-                    .collect(Collectors.groupingBy(
-                            UserHospitalEntity::getUserId,
-                            Collectors.mapping(UserHospitalEntity::getHospitalId, Collectors.toList())
-                    ));
-
-            log.info("批量查询用户的医院ID列表成功，userIds数量={}", result.size());
-            return result;
-        } catch (Exception e) {
-            log.error("批量查询用户的医院ID列表异常，userIds数量={}", userIds.size(), e);
-            throw e;
-        }
+        if (userIds == null || userIds.isEmpty()) return Collections.emptyMap();
+        List<UserHospitalEntity> list = userHospitalMapper.selectList(
+                new LambdaQueryWrapper<UserHospitalEntity>().in(UserHospitalEntity::getUserId, userIds));
+        return list.stream().collect(Collectors.groupingBy(
+                UserHospitalEntity::getUserId,
+                Collectors.mapping(UserHospitalEntity::getHospitalId, Collectors.toList())));
     }
 
-    /**
-     * 查询用户的医院列表
-     *
-     * @param userId 用户ID
-     * @return 医院列表
-     */
     @Override
-    public List<HospitalVO> getHospitalsByUserId(Long userId) {
-        log.info("查询用户的医院列表，userId={}", userId);
-        try {
-            List<Long> hospitalIds = userHospitalMapper.selectHospitalIdsByUserId(userId);
-            if (hospitalIds == null || hospitalIds.isEmpty()) {
-                return new ArrayList<>();
-            }
-            List<HospitalEntity> hospitals = hospitalMapper.selectBatchIds(hospitalIds);
-            List<HospitalVO> voList = hospitals.stream()
-                    .filter(h -> h != null)
-                    .map(this::toVO)
-                    .collect(Collectors.toList());
-            log.info("查询用户的医院列表成功，数量={}", voList.size());
-            return voList;
-        } catch (Exception e) {
-            log.error("查询用户的医院列表异常，userId={}", userId, e);
-            throw e;
-        }
+    public List<OrgVO> getHospitalsByUserId(Long userId) {
+        List<Long> ids = getHospitalIdsByUserId(userId);
+        if (ids.isEmpty()) return new ArrayList<>();
+        return orgMapper.selectBatchIds(ids).stream()
+                .filter(Objects::nonNull)
+                .map(this::toOrgVO)
+                .collect(Collectors.toList());
     }
 
-    /**
-     * 分配用户医院范围（覆盖式）
-     * 仅当用户角色的 dataScopeType=hospitals 时才调用此方法
-     *
-     * @param userId      用户ID
-     * @param hospitalIds 医院ID列表
-     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void assignHospitals(Long userId, List<Long> hospitalIds) {
-        log.info("分配用户医院范围，userId={}, 医院数量={}", userId, hospitalIds != null ? hospitalIds.size() : 0);
-        try {
-            // 1. 校验用户是否存在
-            UserEntity user = userMapper.selectById(userId);
-            if (user == null) {
-                log.warn("用户不存在，userId={}", userId);
-                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+        log.info("分配用户医疗机构范围，userId={}, 数量={}", userId, hospitalIds != null ? hospitalIds.size() : 0);
+        UserEntity user = userMapper.selectById(userId);
+        if (user == null) throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+
+        // 校验 hospitalIds 均为有效医疗机构（orgType=1.3）
+        if (hospitalIds != null && !hospitalIds.isEmpty()) {
+            List<OrgEntity> orgs = orgMapper.selectBatchIds(hospitalIds);
+            List<OrgEntity> valid = orgs.stream().filter(Objects::nonNull)
+                    .filter(o -> "1.3".equals(o.getOrgType())).collect(Collectors.toList());
+            if (valid.size() != hospitalIds.size()) {
+                throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
             }
-
-            // 2. 校验医院ID是否有效（是否存在、是否启用）
-            if (hospitalIds != null && !hospitalIds.isEmpty()) {
-                List<HospitalEntity> rawHospitals = hospitalMapper.selectBatchIds(hospitalIds);
-                // 过滤掉不存在的医院（仅保留非 null 的记录）
-                List<HospitalEntity> validHospitals = rawHospitals.stream()
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
-
-                // 检查是否有无效的医院ID（数据库中不存在的ID）
-                if (validHospitals.size() != hospitalIds.size()) {
-                    List<Long> invalidIds = hospitalIds.stream()
-                            .filter(id -> validHospitals.stream().noneMatch(h -> h.getId().equals(id)))
-                            .collect(Collectors.toList());
-                    log.warn("部分医院不存在，userId={}, 无效ID={}", userId, invalidIds);
-                    throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND.getCode(),
-                            "医院不存在，id=" + invalidIds);
-                }
-
-                // 检查是否有禁用的医院
-                for (HospitalEntity hospital : validHospitals) {
-                    if (hospital.getStatus() != null && hospital.getStatus() == StatusConstants.DISABLED) {
-                        log.warn("医院已停用，hospitalId={}, hospitalName={}",
-                                hospital.getId(), hospital.getHospitalName());
-                        throw new BusinessException(ErrorCodeEnum.HOSPITAL_DISABLED.getCode(),
-                                "医院【" + hospital.getHospitalName() + "】已停用，请先启用");
-                    }
+            for (OrgEntity org : valid) {
+                if (Integer.valueOf(StatusConstants.DISABLED).equals(org.getStatus())) {
+                    throw new BusinessException(ErrorCodeEnum.HOSPITAL_DISABLED.getCode(),
+                            "医疗机构【" + org.getOrgName() + "】已停用");
                 }
             }
-
-            // 3. 删除旧关联（覆盖式）
-            userHospitalMapper.deleteByUserId(userId);
-
-            // 4. 插入新关联
-            if (hospitalIds != null && !hospitalIds.isEmpty()) {
-                for (Long hospitalId : hospitalIds) {
-                    UserHospitalEntity entity = new UserHospitalEntity();
-                    entity.setUserId(userId);
-                    entity.setHospitalId(hospitalId);
-                    userHospitalMapper.insert(entity);
-                }
-            }
-            log.info("分配用户医院范围成功，userId={}, 医院数量={}", userId,
-                    hospitalIds != null ? hospitalIds.size() : 0);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("分配用户医院范围异常，userId={}", userId, e);
-            throw e;
         }
+
+        userHospitalMapper.deleteByUserId(userId);
+        if (hospitalIds != null && !hospitalIds.isEmpty()) {
+            for (Long hospitalId : hospitalIds) {
+                UserHospitalEntity entity = new UserHospitalEntity();
+                entity.setUserId(userId);
+                entity.setHospitalId(hospitalId);
+                userHospitalMapper.insert(entity);
+            }
+        }
+        log.info("分配用户医疗机构范围成功，userId={}", userId);
     }
 
-    /**
-     * 获取当前用户可操作医院（下拉选项）
-     * 根据用户角色的 dataScopeType 配置决定返回范围：
-     * - dataScopeType == 'hospitals'：返回用户关联的医院列表
-     * - 其他类型或无角色：返回空列表
-     *
-     * @param userId 用户ID
-     * @return 医院列表
-     * @throws BusinessException 用户不存在
-     */
     @Override
-    public List<HospitalVO> getMyHospitalOptions(Long userId) {
-        log.info("获取当前用户可操作医院列表，userId={}", userId);
-        try {
-            // 1. 校验用户是否存在
-            UserEntity user = userMapper.selectById(userId);
-            if (user == null) {
-                log.warn("用户不存在，userId={}", userId);
-                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+    public List<OrgVO> getMyHospitalOptions(Long userId) {
+        UserEntity user = userMapper.selectById(userId);
+        if (user == null) throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+        boolean isHospitalsScope = false;
+        if (user.getRoleId() != null) {
+            RoleEntity role = roleService.getById(user.getRoleId());
+            if (role != null && DataScopeTypeEnum.HOSPITALS.getCode().equals(role.getDataScopeType())) {
+                isHospitalsScope = true;
             }
-
-            // 2. 检查角色的 dataScopeType 是否为 hospitals
-            boolean isHospitalsScope = false;
-            if (user.getRoleId() != null) {
-                RoleEntity role = roleService.getById(user.getRoleId());
-                if (role != null && DataScopeTypeEnum.HOSPITALS.getCode().equals(role.getDataScopeType())) {
-                    isHospitalsScope = true;
-                }
-            }
-
-            // 3. 根据 dataScopeType 决定查询范围
-            List<HospitalVO> result;
-            if (isHospitalsScope) {
-                result = getHospitalsByUserId(userId);
-            } else {
-                result = new ArrayList<>();
-            }
-
-            log.info("获取当前用户可操作医院列表成功，userId={}, 数量={}", userId, result.size());
-            return result;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("获取当前用户可操作医院列表异常，userId={}", userId, e);
-            throw e;
         }
+        return isHospitalsScope ? getHospitalsByUserId(userId) : new ArrayList<>();
     }
 
-    /**
-     * 获取可分配给用户的医院列表（管理员分配时使用）
-     * 返回所有状态正常的医院，供管理员选择分配
-     *
-     * @param userId 用户ID（预留参数，当前返回所有正常医院）
-     * @return 可分配的医院列表
-     */
     @Override
-    public List<HospitalVO> getHospitalOptionsByUserId(Long userId) {
-        log.info("获取可分配给用户的医院列表，userId={}", userId);
-        try {
-            // 返回所有状态正常的医院，供管理员选择分配
-            LambdaQueryWrapper<HospitalEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(HospitalEntity::getStatus, StatusConstants.NORMAL)
-                    .orderByAsc(HospitalEntity::getHospitalName);
-            List<HospitalEntity> list = hospitalMapper.selectList(wrapper);
-            List<HospitalVO> voList = list.stream()
-                    .filter(Objects::nonNull)
-                    .map(this::toVO)
-                    .collect(Collectors.toList());
-            log.info("获取可分配医院列表成功，数量={}", voList.size());
-            return voList;
-        } catch (Exception e) {
-            log.error("获取可分配医院列表异常，userId={}", userId, e);
-            throw e;
-        }
+    public List<OrgVO> getHospitalOptionsByUserId(Long userId) {
+        List<OrgEntity> list = orgMapper.selectList(new LambdaQueryWrapper<OrgEntity>()
+                .eq(OrgEntity::getOrgType, "1.3")
+                .eq(OrgEntity::getStatus, StatusConstants.NORMAL)
+                .orderByAsc(OrgEntity::getOrgName));
+        return list.stream().map(this::toOrgVO).collect(Collectors.toList());
     }
 
-    /**
-     * 获取用户的数据范围类型
-     * 直接读取用户关联角色的 dataScopeType 字段，不再依赖 accountType 硬推断。
-     * 高频调用场景（如订单列表查询），建议后续引入 Redis 缓存以降低 DB 压力。
-     *
-     * @param userId 用户ID
-     * @return 数据范围类型枚举
-     */
     @Override
     public DataScopeTypeEnum getDataScopeType(Long userId) {
-        if (userId == null) {
-            return DataScopeTypeEnum.ORG;
-        }
+        if (userId == null) return DataScopeTypeEnum.ORG;
         UserEntity user = userMapper.selectById(userId);
-        if (user == null) {
-            return DataScopeTypeEnum.ORG;
-        }
+        if (user == null) return DataScopeTypeEnum.ORG;
         if (user.getRoleId() != null) {
             RoleEntity role = roleService.getById(user.getRoleId());
             if (role != null && role.getDataScopeType() != null) {
                 return DataScopeTypeEnum.getByCodeOrDefault(role.getDataScopeType());
             }
         }
-        // 用户无角色或角色未配置 dataScopeType 时，默认 ORG（最保守权限，不暴露他人数据）
         return DataScopeTypeEnum.ORG;
     }
 
-    /**
-     * 判断用户是否有权操作指定医院
-     *
-     * @param userId     用户ID
-     * @param hospitalId 医院ID
-     * @return true 表示有权限
-     */
     @Override
     public boolean hasPermissionOnHospital(Long userId, Long hospitalId) {
-        if (userId == null || hospitalId == null) {
-            return false;
-        }
+        if (userId == null || hospitalId == null) return false;
         DataScopeTypeEnum scopeType = getDataScopeType(userId);
-        if (scopeType == DataScopeTypeEnum.ALL || scopeType == DataScopeTypeEnum.ORG) {
-            return true;
-        }
+        if (scopeType == DataScopeTypeEnum.ALL || scopeType == DataScopeTypeEnum.ORG) return true;
         if (scopeType == DataScopeTypeEnum.HOSPITALS) {
-            List<Long> hospitalIds = getHospitalIdsByUserId(userId);
-            return hospitalIds.contains(hospitalId);
+            return getHospitalIdsByUserId(userId).contains(hospitalId);
         }
         return false;
     }
 
-    /**
-     * 实体转换为VO
-     *
-     * @param entity 医院实体
-     * @return 医院VO
-     */
-    private HospitalVO toVO(HospitalEntity entity) {
-        if (entity == null) {
-            return null;
-        }
-        HospitalVO vo = new HospitalVO();
+    private OrgVO toOrgVO(OrgEntity entity) {
+        OrgVO vo = new OrgVO();
         BeanUtils.copyProperties(entity, vo);
         return vo;
     }

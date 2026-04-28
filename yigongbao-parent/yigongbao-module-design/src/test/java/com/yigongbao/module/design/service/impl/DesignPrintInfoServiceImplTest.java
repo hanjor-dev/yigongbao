@@ -31,6 +31,7 @@ import com.yigongbao.module.design.service.DesignProductFileService;
 import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.vo.ColorGroupVO;
 import com.yigongbao.module.design.vo.DesignProductVO;
+import com.yigongbao.module.design.vo.PrintInfoListVO;
 import com.yigongbao.module.design.vo.PrintInfoOptionsVO;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.system.dict.service.DictService;
@@ -241,13 +242,13 @@ class DesignPrintInfoServiceImplTest {
             fileEntity.setPackageFileName("左髋骨.stl");
             when(productFileService.listByProductIds(List.of(1L))).thenReturn(List.of(fileEntity));
 
-            List<DesignProductVO> result = printInfoService.listPrintInfo(ORDER_ID, PACKAGE_ID);
+            PrintInfoListVO result = printInfoService.listPrintInfo(ORDER_ID, PACKAGE_ID);
 
             assertNotNull(result);
-            assertEquals(1, result.size());
-            assertEquals(1L, result.get(0).getId());
-            assertEquals(1, result.get(0).getFiles().size());
-            assertEquals("左髋骨.stl", result.get(0).getFiles().get(0).getPackageFileName());
+            assertEquals(1, result.getItems().size());
+            assertEquals(1L, result.getItems().get(0).getId());
+            assertEquals(1, result.getItems().get(0).getFiles().size());
+            assertEquals("左髋骨.stl", result.getItems().get(0).getFiles().get(0).getPackageFileName());
         }
 
         @Test

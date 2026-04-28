@@ -55,6 +55,7 @@ public enum ErrorCodeEnum {
     ORG_CODE_EXISTS(616, "机构编码已存在"),
     ORG_HAS_USERS(617, "该机构下存在用户，无法删除"),
     ORG_TYPE_NOT_FOUND(618, "机构类型不存在"),
+    ORG_TYPE_NOT_ALLOWED(619, "不允许创建该类型机构"),
 
     // ==================== 部门相关 619-621 ====================
     DEPT_NOT_FOUND(619, "部门不存在"),

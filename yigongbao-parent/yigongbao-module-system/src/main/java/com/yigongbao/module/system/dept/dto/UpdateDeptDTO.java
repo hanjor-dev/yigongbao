@@ -3,6 +3,7 @@ package com.yigongbao.module.system.dept.dto;
 import lombok.Data;
 
 import jakarta.validation.constraints.Size;
+import java.util.List;
 
 /**
  * 更新部门 DTO
@@ -18,6 +19,16 @@ public class UpdateDeptDTO {
      */
     @Size(max = 128, message = "部门名称长度不能超过128个字符")
     private String deptName;
+
+    /**
+     * 部门类型（1=内部，2=外部）
+     */
+    private Integer deptType;
+
+    /**
+     * 关联机构ID列表
+     */
+    private List<Long> orgIds;
 
     /**
      * 部门负责人用户ID

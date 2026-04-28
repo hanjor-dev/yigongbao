@@ -26,11 +26,6 @@ public class UpdateDoctorDTO implements Serializable {
     private String doctorPhone;
 
     /**
-     * 所属科室ID
-     */
-    private Long hospitalDeptId;
-
-    /**
      * 状态
      */
     private Integer status;

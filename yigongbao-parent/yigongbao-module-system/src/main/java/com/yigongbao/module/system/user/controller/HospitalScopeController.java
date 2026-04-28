@@ -2,7 +2,7 @@ package com.yigongbao.module.system.user.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.common.result.Result;
-import com.yigongbao.module.basic.hospital.vo.HospitalVO;
+import com.yigongbao.module.system.org.vo.OrgVO;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,7 +37,7 @@ public class HospitalScopeController {
      */
     @Operation(summary = "获取指定用户可操作的医院列表")
     @GetMapping("/my-hospitals/{userId}")
-    public Result<List<HospitalVO>> getMyHospitals(@PathVariable Long userId) {
+    public Result<List<OrgVO>> getMyHospitals(@PathVariable Long userId) {
         return Result.success(userHospitalService.getMyHospitalOptions(userId));
     }
 
@@ -48,7 +48,7 @@ public class HospitalScopeController {
      */
     @Operation(summary = "获取当前登录用户可操作的医院列表")
     @GetMapping("/my-hospitals")
-    public Result<List<HospitalVO>> getMyHospitalsByLogin() {
+    public Result<List<OrgVO>> getMyHospitalsByLogin() {
         Long currentUserId = StpUtil.getLoginIdAsLong();
         return Result.success(userHospitalService.getMyHospitalOptions(currentUserId));
     }

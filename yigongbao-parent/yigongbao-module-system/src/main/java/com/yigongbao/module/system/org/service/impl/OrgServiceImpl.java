@@ -18,6 +18,8 @@ import com.yigongbao.module.system.org.dto.CreateOrgDTO;
 import com.yigongbao.module.system.org.dto.OrgPageDTO;
 import com.yigongbao.module.system.org.dto.UpdateOrgDTO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
+import com.yigongbao.module.system.org.entity.OrgHospitalEntity;
+import com.yigongbao.module.system.org.mapper.OrgHospitalMapper;
 import com.yigongbao.module.system.org.mapper.OrgMapper;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.org.vo.OrgVO;
@@ -50,6 +52,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     private final UserMapper userMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final AreaService areaService;
+    private final OrgHospitalMapper orgHospitalMapper;
 
     /**
      * 分页查询机构列表
@@ -95,11 +98,18 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
         try {
             OrgEntity entity = getById(id);
             if (entity == null) {
-                log.warn("机构不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
             }
             OrgVO vo = toVOWithDictNames(entity);
-            log.info("查询机构详情成功，id={}", id);
+            // 填充经销商关联的医疗机构
+            if ("1.2".equals(entity.getOrgType())) {
+                List<Long> hospitalOrgIds = orgHospitalMapper.selectHospitalOrgIdsByDistributorId(id);
+                vo.setHospitalOrgIds(hospitalOrgIds);
+                if (!hospitalOrgIds.isEmpty()) {
+                    List<OrgEntity> hospitals = listByIds(hospitalOrgIds);
+                    vo.setHospitalOrgNames(hospitals.stream().map(OrgEntity::getOrgName).collect(Collectors.toList()));
+                }
+            }
             return vo;
         } catch (BusinessException e) {
             throw e;
@@ -119,6 +129,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     public void createOrg(CreateOrgDTO dto) {
         log.info("创建机构，orgName={}", dto.getOrgName());
         try {
+            // 禁止创建生产企业类型
+            if ("1.1".equals(dto.getOrgType())) {
+                throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_ALLOWED);
+            }
             // 校验机构名称是否已存在
             if (isOrgNameExists(dto.getOrgName())) {
                 log.warn("机构名称已存在，orgName={}", dto.getOrgName());
@@ -128,6 +142,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             if (!isOrgTypeValid(dto.getOrgType())) {
                 log.warn("机构类型不存在，orgType={}", dto.getOrgType());
                 throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_FOUND);
+            }
+            // 医疗器械资质时资质文件必填
+            if (Integer.valueOf(1).equals(dto.getQualificationType()) && StrUtil.isBlank(dto.getQualificationFile())) {
+                throw new BusinessException(400, "医疗器械资质类型时资质文件必填");
             }
             // 生成机构编码
             String prefix = getOrgPrefixByType(dto.getOrgType());
@@ -143,6 +161,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             }
             // 插入数据库
             save(entity);
+            // 经销商类型：保存关联医疗机构
+            if ("1.2".equals(dto.getOrgType()) && dto.getHospitalOrgIds() != null && !dto.getHospitalOrgIds().isEmpty()) {
+                saveOrgHospitalRelations(entity.getId(), dto.getHospitalOrgIds());
+            }
             log.info("创建机构成功，id={}, orgCode={}", entity.getId(), orgCode);
         } catch (BusinessException e) {
             throw e;
@@ -163,28 +185,40 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     public void updateOrg(Long id, UpdateOrgDTO dto) {
         log.info("更新机构，id={}", id);
         try {
-            // 校验机构是否存在
             OrgEntity entity = getById(id);
             if (entity == null) {
-                log.warn("机构不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
             }
-            // 校验机构名称是否与其他机构重复
+            // 禁止将机构类型改为生产企业
+            if (dto.getOrgType() != null && "1.1".equals(dto.getOrgType())) {
+                throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_ALLOWED);
+            }
             if (StrUtil.isNotBlank(dto.getOrgName()) && !dto.getOrgName().equals(entity.getOrgName())) {
                 if (isOrgNameExistsExcludingId(dto.getOrgName(), id)) {
-                    log.warn("机构名称已存在，orgName={}", dto.getOrgName());
                     throw new BusinessException(ErrorCodeEnum.ORG_EXISTS);
                 }
             }
-            // 更新机构信息
-            BeanUtils.copyProperties(dto, entity, "id", "orgCode", "createTime", "updateTime", "createBy", "updateBy");
-            // 根据 areaId 刷新地区名称冗余字段
+            // 医疗器械资质时资质文件必填
+            Integer qualType = dto.getQualificationType() != null ? dto.getQualificationType() : entity.getQualificationType();
+            String qualFile = StrUtil.isNotBlank(dto.getQualificationFile()) ? dto.getQualificationFile() : entity.getQualificationFile();
+            if (Integer.valueOf(1).equals(qualType) && StrUtil.isBlank(qualFile)) {
+                throw new BusinessException(400, "医疗器械资质类型时资质文件必填");
+            }
+            BeanUtils.copyProperties(dto, entity, "id", "orgCode", "createTime", "updateTime", "createBy", "updateBy", "hospitalOrgIds");
             if (dto.getAreaId() != null) {
                 AreaEntity areaEntity = areaService.getById(dto.getAreaId());
                 entity.setAreaName(areaEntity != null ? areaEntity.getName() : null);
             }
-            // 更新数据库
             updateById(entity);
+            // 经销商类型：更新关联医疗机构（先删后插）
+            String orgType = entity.getOrgType();
+            if ("1.2".equals(orgType) && dto.getHospitalOrgIds() != null) {
+                orgHospitalMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
+                        .eq(OrgHospitalEntity::getDistributorOrgId, id));
+                if (!dto.getHospitalOrgIds().isEmpty()) {
+                    saveOrgHospitalRelations(id, dto.getHospitalOrgIds());
+                }
+            }
             log.info("更新机构成功，id={}", id);
         } catch (BusinessException e) {
             throw e;
@@ -288,52 +322,33 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      */
     private OrgVO toVOWithDictNames(OrgEntity entity) {
         OrgVO vo = OrgConvert.toVO(entity);
-        if (vo == null) {
-            return null;
-        }
-        // 填充机构类型名称（基于 dictCode 关联）
+        if (vo == null) return null;
         if (vo.getOrgType() != null) {
             DictVO dict = dictService.getByDictCode(vo.getOrgType());
             vo.setOrgTypeName(dict != null ? dict.getDictName() : null);
         }
-        // 填充状态名称
         if (vo.getStatus() != null) {
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
-        // 填充医院等级名称
         if (vo.getHospitalLevel() != null) {
             DictVO dict = dictService.getByDictCode(vo.getHospitalLevel());
             vo.setHospitalLevelName(dict != null ? dict.getDictName() : null);
         }
-        // 填充医院类型名称
         if (vo.getHospitalType() != null) {
             DictVO dict = dictService.getByDictCode(vo.getHospitalType());
             vo.setHospitalTypeName(dict != null ? dict.getDictName() : null);
         }
-        // 填充代理产品线名称
-        if (StrUtil.isNotBlank(vo.getAgentProductLine())) {
-            vo.setAgentProductLineNames(getDictNamesByDictCodes(vo.getAgentProductLine()));
-        }
         return vo;
     }
 
-    /**
-     * 根据字典编码列表获取字典名称列表
-     *
-     * @param dictCodes 字典编码（逗号分隔）
-     * @return 字典名称（逗号分隔）
-     */
-    private String getDictNamesByDictCodes(String dictCodes) {
-        if (StrUtil.isBlank(dictCodes)) {
-            return null;
-        }
-        return Arrays.stream(dictCodes.split(","))
-                .map(code -> {
-                    DictVO dict = dictService.getByDictCode(code.trim());
-                    return dict != null ? dict.getDictName() : null;
-                })
-                .filter(Objects::nonNull)
-                .collect(Collectors.joining(","));
+    private void saveOrgHospitalRelations(Long distributorOrgId, List<Long> hospitalOrgIds) {
+        List<OrgHospitalEntity> relations = hospitalOrgIds.stream().map(hospitalOrgId -> {
+            OrgHospitalEntity rel = new OrgHospitalEntity();
+            rel.setDistributorOrgId(distributorOrgId);
+            rel.setHospitalOrgId(hospitalOrgId);
+            return rel;
+        }).collect(Collectors.toList());
+        relations.forEach(orgHospitalMapper::insert);
     }
 
     /**

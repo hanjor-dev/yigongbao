@@ -6,9 +6,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
-import com.yigongbao.module.basic.hospital.mapper.HospitalMapper;
-import com.yigongbao.module.basic.hospital.service.HospitalService;
+import com.yigongbao.module.basic.common.mapper.OrgQueryMapper;
 import com.yigongbao.module.basic.hospitalGroupTemplate.dto.CreateHospitalGroupTemplateDTO;
 import com.yigongbao.module.basic.hospitalGroupTemplate.dto.HospitalGroupTemplatePageDTO;
 import com.yigongbao.module.basic.hospitalGroupTemplate.entity.HospitalGroupTemplateDetailEntity;
@@ -49,10 +47,7 @@ class HospitalGroupTemplateServiceImplTest {
     private HospitalGroupTemplateDetailMapper detailMapper;
 
     @Mock
-    private HospitalMapper hospitalMapper;
-
-    @Mock
-    private HospitalService hospitalService;
+    private OrgQueryMapper orgQueryMapper;
 
     @InjectMocks
     private HospitalGroupTemplateServiceImpl templateService;

@@ -35,11 +35,6 @@ public class CreateDoctorDTO implements Serializable {
     private Long hospitalId;
 
     /**
-     * 所属科室ID
-     */
-    private Long hospitalDeptId;
-
-    /**
      * 备注
      */
     private String remark;

@@ -46,47 +46,6 @@ INSERT INTO sys_area (id, level, parent_code, area_code, zip_code, city_code, na
 (411, 3, 440100, 440103, 510145, '020', '荔湾区', '荔湾', '中国,广东,广州市,荔湾区', 'liwan', 113.244261, 23.125981);
 
 -- ------------------------------------------------------------
--- 医院表
--- ------------------------------------------------------------
-DROP TABLE IF EXISTS hospital;
-CREATE TABLE hospital (
-    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    hospital_name       VARCHAR(128)    NOT NULL COMMENT '医院名称',
-    hospital_code       VARCHAR(32)     NOT NULL COMMENT '医院编码',
-    area_id             BIGINT          NOT NULL COMMENT '所属地区ID',
-    area_name           VARCHAR(64)     COMMENT '地区名称',
-    full_area_name      VARCHAR(256)    COMMENT '完整地区路径',
-    hospital_level      VARCHAR(16)      COMMENT '医院等级（字典：dict_code=3，值如3.1/3.2）',
-    hospital_type       VARCHAR(16)      COMMENT '医院类型（字典：dict_code=4，值如4.1/4.2）',
-    contact             VARCHAR(32)     NOT NULL COMMENT '联系人',
-    phone               VARCHAR(32)     NOT NULL COMMENT '联系电话',
-    email               VARCHAR(64)     COMMENT '电子邮箱',
-    address             VARCHAR(256)    COMMENT '详细地址',
-    credit_code         VARCHAR(32)     COMMENT '统一社会信用代码',
-    business_license    VARCHAR(512)   COMMENT '营业执照路径',
-    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
-    remark              VARCHAR(512)   COMMENT '备注说明',
-
-    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
-    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
-    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
-
-    PRIMARY KEY (id),
-    KEY idx_hospital_area_id (area_id),
-    KEY idx_hospital_level (hospital_level),
-    KEY idx_hospital_type (hospital_type),
-    KEY idx_hospital_status (status)
-);
-
--- 插入医院测试数据
-INSERT INTO hospital (id, hospital_name, hospital_code, area_id, area_name, full_area_name, hospital_level, hospital_type, contact, phone, email, address, status, create_time, update_time, is_deleted) VALUES
-(1, '北京协和医院', 'HOS-001', 111, '东城区', '中国,北京,北京市,东城区', '3.1', '4.1', '张主任', '13800138001', 'info@pekingunion.com', '北京市东城区帅府园1号', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, '上海市第一人民医院', 'HOS-002', 21, '上海市', '中国,上海,上海市', '3.2', '4.1', '李医生', '13800138002', 'info@shfirsthospital.com', '上海市虹口区武进路85号', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(3, '浙江大学医学院附属第一医院', 'HOS-003', 311, '上城区', '中国,浙江,杭州市,上城区', 1, 1, '王医生', '13800138003', 'info@hzdu1hospital.com', '杭州市上城区庆春路79号', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
-
--- ------------------------------------------------------------
 -- 医院组合模板表
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS hospital_group_template;
@@ -162,7 +121,6 @@ CREATE TABLE doctor (
     doctor_name         VARCHAR(100)    NOT NULL COMMENT '医生姓名',
     doctor_phone        VARCHAR(32)     COMMENT '医生电话',
     hospital_id         BIGINT          NOT NULL COMMENT '所属医院ID',
-    hospital_dept_id    BIGINT          COMMENT '所属医院科室ID',
     creator_id          BIGINT          COMMENT '创建该医生记录的业务员ID',
     order_count         INT             DEFAULT 0 COMMENT '关联订单数量',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
@@ -176,44 +134,14 @@ CREATE TABLE doctor (
 
     PRIMARY KEY (id),
     KEY idx_doctor_hospital (hospital_id),
-    KEY idx_doctor_dept (hospital_dept_id),
     KEY idx_doctor_status (status)
 );
 
 -- 插入医生测试数据
-INSERT INTO doctor (id, doctor_name, doctor_phone, hospital_id, hospital_dept_id, creator_id, order_count, status, remark, create_time, update_time, is_deleted) VALUES
-(1, '张主任', '13800001111', 1, NULL, NULL, 0, 1, '骨科主任医师', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, '李医生', '13800001112', 1, NULL, NULL, 0, 1, '神经外科医生', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(3, '王医生', '13800001113', 2, NULL, NULL, 0, 1, '口腔科医生', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
-
--- ------------------------------------------------------------
--- 医院科室表（对应 HospitalDeptEntity）
--- 注意：表名保持与 Entity @TableName 一致（hospital_dept），以兼容现有代码
--- ------------------------------------------------------------
-DROP TABLE IF EXISTS hospital_dept;
-CREATE TABLE hospital_dept (
-    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    hospital_dept_code  VARCHAR(32)     NOT NULL COMMENT '科室编码（如：HDEPT-0001）',
-    hospital_dept_name  VARCHAR(100)    NOT NULL COMMENT '科室名称',
-    sort                INT             DEFAULT 0 COMMENT '排序',
-    status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
-    remark              VARCHAR(512)    COMMENT '备注说明',
-
-    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
-    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
-    is_deleted          TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
-
-    PRIMARY KEY (id),
-    KEY idx_hdept_status (status)
-);
-
--- 插入科室测试数据
-INSERT INTO hospital_dept (id, hospital_dept_code, hospital_dept_name, sort, status, remark, create_time, update_time, is_deleted) VALUES
-(1, 'HDEPT-001', '骨科', 1, 1, '骨科', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(2, 'HDEPT-002', '神经外科', 2, 1, '神经外科', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-(3, 'HDEPT-003', '口腔科', 3, 1, '口腔科', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO doctor (id, doctor_name, doctor_phone, hospital_id, creator_id, order_count, status, remark, create_time, update_time, is_deleted) VALUES
+(1, '张主任', '13800001111', 1, NULL, 0, 1, '骨科主任医师', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, '李医生', '13800001112', 1, NULL, 0, 1, '神经外科医生', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, '王医生', '13800001113', 2, NULL, 0, 1, '口腔科医生', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ------------------------------------------------------------
 -- 产品表（对应 ProductEntity）
@@ -521,3 +449,27 @@ INSERT INTO sys_operation_log (id, module, business_type, business_type_name, op
 (1, '医院管理', 1, '新增', '创建医院', '创建医院：测试医院', 'POST', '/api/basic/hospital', '127.0.0.1', 1, 'admin', '系统管理员', 1, 150, CURRENT_TIMESTAMP),
 (2, '医院管理', 2, '修改', '更新医院', '更新医院：北京协和医院', 'PUT', '/api/basic/hospital/1', '127.0.0.1', 1, 'admin', '系统管理员', 1, 120, DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
 (3, '产品管理', 1, '新增', '创建产品', '创建产品：膝关节假体', 'POST', '/api/basic/product', '127.0.0.1', 1, 'admin', '系统管理员', 1, 80, DATEADD('DAY', -2, CURRENT_TIMESTAMP));
+
+-- ------------------------------------------------------------
+-- 机构-医院关联表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_org_hospital;
+CREATE TABLE IF NOT EXISTS sys_org_hospital (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    distributor_org_id BIGINT NOT NULL,
+    hospital_org_id BIGINT NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_distributor_hospital (distributor_org_id, hospital_org_id)
+);
+
+-- ------------------------------------------------------------
+-- 部门-机构关联表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_dept_org;
+CREATE TABLE IF NOT EXISTS sys_dept_org (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    dept_id BIGINT NOT NULL,
+    org_id BIGINT NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dept_org (dept_id, org_id)
+);

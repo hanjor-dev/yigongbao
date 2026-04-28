@@ -1,7 +1,7 @@
 package com.yigongbao.module.system.user.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
-import com.yigongbao.module.basic.hospital.vo.HospitalVO;
+import com.yigongbao.module.system.org.vo.OrgVO;
 import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -51,7 +51,7 @@ class HospitalScopeControllerTest {
 
     private UserEntity testUser;
     private RoleEntity testRole;
-    private HospitalVO testHospital;
+    private OrgVO testHospital;
 
     @BeforeEach
     void setUp() {
@@ -71,10 +71,10 @@ class HospitalScopeControllerTest {
         testRole.setDataScopeType("hospitals"); // 医院范围权限
 
         // 准备测试医院
-        testHospital = new HospitalVO();
+        testHospital = new OrgVO();
         testHospital.setId(1L);
-        testHospital.setHospitalName("测试医院");
-        testHospital.setHospitalCode("HOS-001");
+        testHospital.setOrgName("测试医院");
+        testHospital.setOrgCode("HOS-001");
     }
 
     /**

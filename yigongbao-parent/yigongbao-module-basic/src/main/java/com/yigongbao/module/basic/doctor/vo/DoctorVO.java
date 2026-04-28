@@ -42,16 +42,6 @@ public class DoctorVO implements Serializable {
     private String hospitalName;
 
     /**
-     * 所属科室ID
-     */
-    private Long hospitalDeptId;
-
-    /**
-     * 所属科室名称
-     */
-    private String hospitalDeptName;
-
-    /**
      * 创建该医生记录的业务员ID
      */
     private Long creatorId;

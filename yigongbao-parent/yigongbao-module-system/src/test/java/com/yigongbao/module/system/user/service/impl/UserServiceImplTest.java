@@ -8,7 +8,6 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.module.basic.hospital.service.HospitalService;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.service.DeptService;
@@ -40,10 +39,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -83,9 +80,6 @@ class UserServiceImplTest {
     private UserHospitalService userHospitalService;
 
     @Mock
-    private HospitalService hospitalService;
-
-    @Mock
     private DictService dictService;
 
     @InjectMocks
@@ -106,19 +100,6 @@ class UserServiceImplTest {
         baseMapperField.setAccessible(true);
         baseMapperField.set(userService, userMapper);
 
-        // 设置 hospitalService.listByIds 的默认 mock：将传入的 ID 集合转换为带相同 ID 的医院实体列表
-        lenient().doAnswer(invocation -> {
-            Collection<?> ids = invocation.getArgument(0);
-            if (ids == null || ids.isEmpty()) {
-                return Collections.emptyList();
-            }
-            return ids.stream().map(id -> {
-                com.yigongbao.module.basic.hospital.entity.HospitalEntity h = new com.yigongbao.module.basic.hospital.entity.HospitalEntity();
-                h.setId((Long) id);
-                return h;
-            }).collect(Collectors.toList());
-        }).when(hospitalService).listByIds(any());
-
         LocalDateTime now = LocalDateTime.now();
 
         // 初始化测试机构实体
@@ -133,7 +114,7 @@ class UserServiceImplTest {
         testDept.setId(1L);
         testDept.setDeptName("研发部");
         testDept.setDeptCode("DEPT-001");
-        testDept.setOrgId(1L);
+        testDept.setDeptType(2);
         testDept.setStatus(1);
 
         // 初始化测试角色实体
@@ -801,9 +782,6 @@ class UserServiceImplTest {
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(orgService.getById(1L)).thenReturn(testOrg);
         when(roleService.getById(3L)).thenReturn(roleWithoutHospitalScope);
-        doReturn(List.of(
-                new com.yigongbao.module.basic.hospital.entity.HospitalEntity(),
-                new com.yigongbao.module.basic.hospital.entity.HospitalEntity())).when(hospitalService).listByIds(any());
         when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("$2a$10$encrypted");
         when(userMapper.insert(any(UserEntity.class))).thenAnswer(invocation -> {
             UserEntity entity = invocation.getArgument(0);
@@ -884,9 +862,6 @@ class UserServiceImplTest {
         when(userMapper.selectById(1L)).thenReturn(existingUser);
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(roleService.getById(2L)).thenReturn(newRoleWithHospitalScope);
-        doReturn(List.of(
-                new com.yigongbao.module.basic.hospital.entity.HospitalEntity(),
-                new com.yigongbao.module.basic.hospital.entity.HospitalEntity())).when(hospitalService).listByIds(any());
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
         // 执行
@@ -923,9 +898,6 @@ class UserServiceImplTest {
         when(userMapper.selectById(1L)).thenReturn(existingUser);
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(roleService.getById(2L)).thenReturn(currentRole);
-        doReturn(List.of(
-                new com.yigongbao.module.basic.hospital.entity.HospitalEntity(),
-                new com.yigongbao.module.basic.hospital.entity.HospitalEntity())).when(hospitalService).listByIds(any());
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
         // 执行

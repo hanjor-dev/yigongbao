@@ -71,19 +71,14 @@ public class OrgEntity extends BaseEntity implements Serializable {
     private String creditCode;
 
     /**
-     * 营业执照（存储路径/URL）
+     * 资质文件路径
      */
-    private String businessLicense;
+    private String qualificationFile;
 
     /**
-     * 代理区域（经销商）
+     * 资质类型（1=医疗器械，2=非医疗器械）
      */
-    private String agentArea;
-
-    /**
-     * 代理产品线（多个用逗号分隔，关联字典编码=5）
-     */
-    private String agentProductLine;
+    private Integer qualificationType;
 
     /**
      * 医院等级（医疗机构，关联字典编码=3，值如 3.1/3.2/3.3/3.4/3.5）

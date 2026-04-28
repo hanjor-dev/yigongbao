@@ -15,8 +15,7 @@ import com.yigongbao.module.basic.doctor.entity.DoctorEntity;
 import com.yigongbao.module.basic.doctor.mapper.DoctorMapper;
 import com.yigongbao.module.basic.doctor.service.DoctorService;
 import com.yigongbao.module.basic.doctor.vo.DoctorVO;
-import com.yigongbao.module.basic.hospital.service.HospitalService;
-import com.yigongbao.module.basic.hospitalDept.service.HospitalDeptService;
+import com.yigongbao.module.basic.common.mapper.OrgQueryMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,10 +55,7 @@ class DoctorServiceImplTest {
     private DoctorMapper doctorMapper;
 
     @Mock
-    private HospitalService hospitalService;
-
-    @Mock
-    private HospitalDeptService hospitalDeptService;
+    private OrgQueryMapper orgQueryMapper;
 
     @InjectMocks
     private DoctorServiceImpl doctorService;
@@ -77,7 +73,6 @@ class DoctorServiceImplTest {
         testEntity.setDoctorName("张三");
         testEntity.setDoctorPhone("13800138000");
         testEntity.setHospitalId(1L);
-        testEntity.setHospitalDeptId(1L);
         testEntity.setCreatorId(1L);
         testEntity.setOrderCount(0);
         testEntity.setStatus(1);
@@ -119,7 +114,10 @@ class DoctorServiceImplTest {
         dto.setDoctorName("李四");
         dto.setDoctorPhone("13900139000");
         dto.setHospitalId(1L);
-        dto.setHospitalDeptId(1L);
+
+        java.util.Map<String, Object> org = new java.util.HashMap<>();
+        org.put("org_type", "1.3");
+        when(orgQueryMapper.selectOrgById(1L)).thenReturn(org);
 
         doctorService.create(dto);
 
@@ -133,7 +131,7 @@ class DoctorServiceImplTest {
         dto.setDoctorName("李四");
         dto.setHospitalId(999L);
 
-        doThrow(new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND)).when(hospitalService).getById(999L);
+        when(orgQueryMapper.selectOrgById(999L)).thenReturn(null);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,

@@ -18,10 +18,7 @@ import com.yigongbao.module.basic.doctor.entity.DoctorEntity;
 import com.yigongbao.module.basic.doctor.mapper.DoctorMapper;
 import com.yigongbao.module.basic.doctor.service.DoctorService;
 import com.yigongbao.module.basic.doctor.vo.DoctorVO;
-import com.yigongbao.module.basic.hospital.service.HospitalService;
-import com.yigongbao.module.basic.hospitalDept.service.HospitalDeptService;
-import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
-import com.yigongbao.module.basic.hospitalDept.entity.HospitalDeptEntity;
+import com.yigongbao.module.basic.common.mapper.OrgQueryMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -48,8 +45,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> implements DoctorService {
 
-    private final HospitalService hospitalService;
-    private final HospitalDeptService hospitalDeptService;
+    private final OrgQueryMapper orgQueryMapper;
 
     /**
      * 分页查询医生列表
@@ -64,13 +60,12 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             LambdaQueryWrapper<DoctorEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.like(StrUtil.isNotBlank(dto.getDoctorName()), DoctorEntity::getDoctorName, dto.getDoctorName())
                     .eq(Objects.nonNull(dto.getHospitalId()), DoctorEntity::getHospitalId, dto.getHospitalId())
-                    .eq(Objects.nonNull(dto.getHospitalDeptId()), DoctorEntity::getHospitalDeptId, dto.getHospitalDeptId())
                     .eq(Objects.nonNull(dto.getStatus()), DoctorEntity::getStatus, dto.getStatus())
                     .orderByDesc(DoctorEntity::getCreateTime);
 
             IPage<DoctorEntity> pageResult = page(page, wrapper);
 
-            // 批量填充医院名称和科室名称，避免 N+1 查询
+            // 批量填充医院名称，避免 N+1 查询
             List<DoctorEntity> records = pageResult.getRecords();
             List<DoctorVO> voList = records.stream().map(DoctorConvert::toVO).collect(Collectors.toList());
             fillExtraFieldsBatch(voList, records);
@@ -100,7 +95,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
 
             List<DoctorEntity> list = list(wrapper);
             List<DoctorVO> voList = list.stream().map(DoctorConvert::toVO).collect(Collectors.toList());
-            // 批量填充医院名称和科室名称，避免 N+1 查询
+            // 批量填充医院名称，避免 N+1 查询
             fillExtraFieldsBatch(voList, list);
 
             log.info("查询所有医生列表成功，数量={}", voList.size());
@@ -143,13 +138,12 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
     public void create(CreateDoctorDTO dto) {
         log.info("创建医生，doctorName={}, hospitalId={}", dto.getDoctorName(), dto.getHospitalId());
         try {
-            // 校验医院是否存在
+            // 校验医疗机构是否存在且类型正确
             if (dto.getHospitalId() != null) {
-                hospitalService.getById(dto.getHospitalId());
-            }
-            // 校验科室是否存在
-            if (dto.getHospitalDeptId() != null) {
-                hospitalDeptService.getById(dto.getHospitalDeptId());
+                java.util.Map<String, Object> org = orgQueryMapper.selectOrgById(dto.getHospitalId());
+                if (org == null || !"1.3".equals(org.get("org_type"))) {
+                    throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
+                }
             }
 
             DoctorEntity entity = DoctorConvert.toEntity(dto);
@@ -185,11 +179,6 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             if (entity == null) {
                 log.warn("医生不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
-            }
-
-            // 校验科室是否存在
-            if (dto.getHospitalDeptId() != null && !dto.getHospitalDeptId().equals(entity.getHospitalDeptId())) {
-                hospitalDeptService.getById(dto.getHospitalDeptId());
             }
 
             BeanUtils.copyProperties(dto, entity, "id", "hospitalId", "creatorId", "orderCount",
@@ -241,7 +230,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             wrapper.orderByDesc(DoctorEntity::getCreateTime);
             List<DoctorEntity> list = baseMapper.selectList(wrapper);
             List<DoctorVO> voList = list.stream().map(DoctorConvert::toVO).collect(Collectors.toList());
-            // 批量填充医院名称和科室名称，避免 N+1 查询
+            // 批量填充医院名称，避免 N+1 查询
             fillExtraFieldsBatch(voList, list);
             log.info("查询历史医生列表成功，数量={}", voList.size());
             return voList;
@@ -259,9 +248,12 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
     public DoctorVO quickAdd(QuickAddDoctorDTO dto) {
         log.info("快速添加医生，doctorName={}, hospitalId={}", dto.getDoctorName(), dto.getHospitalId());
         try {
-            // 校验医院是否存在
+            // 校验医疗机构是否存在且类型正确
             if (dto.getHospitalId() != null) {
-                hospitalService.getById(dto.getHospitalId());
+                java.util.Map<String, Object> org = orgQueryMapper.selectOrgById(dto.getHospitalId());
+                if (org == null || !"1.3".equals(org.get("org_type"))) {
+                    throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
+                }
             }
 
             // 从 Sa-Token 会话获取当前登录用户ID
@@ -279,8 +271,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
                 return vo;
             }
 
-            // 检查是否存在已删除的同名医生记录（函数索引跳过 is_deleted=1 的记录）
-            // 如有则物理删除，避免历史垃圾数据残留
+            // 检查是否存在已删除的同名医生记录，如有则物理删除，避免历史垃圾数据残留
             LambdaQueryWrapper<DoctorEntity> deletedWrapper = new LambdaQueryWrapper<>();
             deletedWrapper.eq(DoctorEntity::getDoctorName, dto.getDoctorName())
                     .eq(DoctorEntity::getHospitalId, dto.getHospitalId())
@@ -288,7 +279,6 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             DoctorEntity deletedDoctor = getOne(deletedWrapper, false);
             if (deletedDoctor != null) {
                 log.info("发现已删除的医生记录，物理删除后重新创建，deletedId={}", deletedDoctor.getId());
-                // 物理删除已删除的医生记录（@TableLogic 只影响查询，删除为物理删除）
                 baseMapper.deleteById(deletedDoctor.getId());
             }
 
@@ -297,13 +287,12 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             entity.setDoctorName(dto.getDoctorName());
             entity.setDoctorPhone(dto.getDoctorPhone());
             entity.setHospitalId(dto.getHospitalId());
-            entity.setHospitalDeptId(dto.getHospitalDeptId());
             entity.setCreatorId(creatorId);
             entity.setStatus(StatusConstants.NORMAL);
             entity.setOrderCount(0);
 
             save(entity);
-            log.info("快速添加医生成功，id={}", entity.getId());
+            log.info("快速添加医生成功，id=", entity.getId());
 
             DoctorVO vo = DoctorConvert.toVO(entity);
             fillExtraFields(vo, entity);
@@ -349,51 +338,35 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
         }
         if (entity.getHospitalId() != null) {
             try {
-                var hospital = hospitalService.getById(entity.getHospitalId());
-                if (hospital != null) {
-                    vo.setHospitalName(hospital.getHospitalName());
+                java.util.Map<String, Object> org = orgQueryMapper.selectOrgById(entity.getHospitalId());
+                if (org != null) {
+                    vo.setHospitalName((String) org.get("org_name"));
                 }
             } catch (Exception e) {
-                log.debug("获取医院信息失败，hospitalId={}", entity.getHospitalId());
-            }
-        }
-        if (entity.getHospitalDeptId() != null) {
-            try {
-                var dept = hospitalDeptService.getById(entity.getHospitalDeptId());
-                if (dept != null) {
-                    vo.setHospitalDeptName(dept.getHospitalDeptName());
-                }
-            } catch (Exception e) {
-                log.debug("获取科室信息失败，hospitalDeptId={}", entity.getHospitalDeptId());
+                log.debug("获取医疗机构信息失败，hospitalId={}", entity.getHospitalId());
             }
         }
     }
 
     /**
      * 批量填充额外字段（列表场景，避免 N+1 查询）
-     * 对医院和科室各执行一次 IN 查询，替代原来对每条记录的单独查询
      */
     private void fillExtraFieldsBatch(List<DoctorVO> voList, List<DoctorEntity> entities) {
         if (voList == null || voList.isEmpty()) {
             return;
         }
-        // 收集所有需要查询的医院ID和科室ID
+        // 收集所有需要查询的医疗机构ID
         Set<Long> hospitalIds = entities.stream()
                 .map(DoctorEntity::getHospitalId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        Set<Long> deptIds = entities.stream()
-                .map(DoctorEntity::getHospitalDeptId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
 
-        // 批量查询医院和科室（各1次 IN 查询）
-        Map<Long, String> hospitalNameMap = hospitalIds.isEmpty() ? Collections.emptyMap() :
-                hospitalService.listByIds(hospitalIds).stream()
-                        .collect(Collectors.toMap(HospitalEntity::getId, HospitalEntity::getHospitalName));
-        Map<Long, String> deptNameMap = deptIds.isEmpty() ? Collections.emptyMap() :
-                hospitalDeptService.listByIds(deptIds).stream()
-                        .collect(Collectors.toMap(HospitalDeptEntity::getId, HospitalDeptEntity::getHospitalDeptName));
+        // 批量查询医疗机构（1次 IN 查询）
+        Map<Long, String> orgNameMap = hospitalIds.isEmpty() ? Collections.emptyMap() :
+                orgQueryMapper.selectOrgByIds(new java.util.ArrayList<>(hospitalIds)).stream()
+                        .collect(Collectors.toMap(
+                                o -> ((Number) ((java.util.Map<String, Object>) o).get("id")).longValue(),
+                                o -> (String) ((java.util.Map<String, Object>) o).get("org_name")));
 
         // 批量填充 VO
         for (int i = 0; i < voList.size(); i++) {
@@ -403,10 +376,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
                 vo.setStatusName(StatusConstants.getStatusName(entity.getStatus()));
             }
             if (entity.getHospitalId() != null) {
-                vo.setHospitalName(hospitalNameMap.get(entity.getHospitalId()));
-            }
-            if (entity.getHospitalDeptId() != null) {
-                vo.setHospitalDeptName(deptNameMap.get(entity.getHospitalDeptId()));
+                vo.setHospitalName(orgNameMap.get(entity.getHospitalId()));
             }
         }
     }

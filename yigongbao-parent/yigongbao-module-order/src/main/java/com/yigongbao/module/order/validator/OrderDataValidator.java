@@ -10,10 +10,7 @@ import com.yigongbao.module.basic.bodyPart.vo.BodyPartDetailVO;
 import com.yigongbao.module.basic.doctor.dto.QuickAddDoctorDTO;
 import com.yigongbao.module.basic.doctor.service.DoctorService;
 import com.yigongbao.module.basic.doctor.vo.DoctorVO;
-import com.yigongbao.module.basic.hospital.entity.HospitalEntity;
-import com.yigongbao.module.basic.hospital.service.HospitalService;
-import com.yigongbao.module.basic.hospitalDept.service.HospitalDeptService;
-import com.yigongbao.module.basic.hospitalDept.vo.HospitalDeptVO;
+import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
 import com.yigongbao.module.order.entity.OrderItemEntity;
@@ -50,8 +47,7 @@ import java.util.List;
 public class OrderDataValidator {
 
     private final OrgService orgService;
-    private final HospitalService hospitalService;
-    private final HospitalDeptService hospitalDeptService;
+    private final UserMapper userMapper;
     private final DoctorService doctorService;
     private final BodyPartService bodyPartService;
     private final RebuildProjectService rebuildProjectService;
@@ -106,18 +102,13 @@ public class OrderDataValidator {
         if (org != null) {
             entity.setOrgName(org.getOrgName());
         }
-        // 校验医院（含权限校验）
-        HospitalEntity hospital = lookupHospital(hospitalId, required);
+        // 校验医院（用 OrgService 替代已删除的 HospitalService，含权限校验）
+        OrgEntity hospital = lookupHospitalOrg(hospitalId, required);
         if (hospital != null) {
-            entity.setHospitalName(hospital.getHospitalName());
+            entity.setHospitalName(hospital.getOrgName());
         }
         if (required && hospitalId != null) {
             validateHospitalScope(creatorId, hospitalId);
-        }
-        // 校验医院科室
-        HospitalDeptVO dept = lookupHospitalDept(hospitalDeptId);
-        if (dept != null) {
-            entity.setHospitalDeptName(dept.getHospitalDeptName());
         }
         // 校验并填充医生（支持 quickAdd）
         applyDoctorInfo(entity::setDoctorId, entity::setDoctorName, entity::setDoctorPhone,
@@ -154,21 +145,15 @@ public class OrderDataValidator {
         if (org != null) {
             entity.setOrgName(org.getOrgName());
         }
-        // 校验医院，并覆盖地区冗余字段
-        HospitalEntity hospital = lookupHospital(hospitalId, required);
+        // 校验医院（用 OrgService），并覆盖地区冗余字段
+        OrgEntity hospital = lookupHospitalOrg(hospitalId, required);
         if (hospital != null) {
-            entity.setHospitalName(hospital.getHospitalName());
+            entity.setHospitalName(hospital.getOrgName());
             entity.setAreaId(hospital.getAreaId());
             entity.setAreaName(hospital.getAreaName());
-            entity.setFullAreaName(hospital.getFullAreaName());
         }
         if (required) {
             validateHospitalScope(creatorId, hospitalId);
-        }
-        // 校验医院科室
-        HospitalDeptVO dept = lookupHospitalDept(hospitalDeptId);
-        if (dept != null) {
-            entity.setHospitalDeptName(dept.getHospitalDeptName());
         }
         // 校验并填充医生（支持 quickAdd）
         applyDoctorInfo(entity::setDoctorId, entity::setDoctorName, entity::setDoctorPhone,
@@ -328,18 +313,10 @@ public class OrderDataValidator {
             Long doctorId, String doctorName, String doctorPhone) {
         // 校验医院并同步冗余字段
         if (hospitalId != null) {
-            HospitalEntity hospital = lookupHospital(hospitalId, true);
-            entity.setHospitalName(hospital.getHospitalName());
+            OrgEntity hospital = lookupHospitalOrg(hospitalId, true);
+            entity.setHospitalName(hospital.getOrgName());
             entity.setAreaId(hospital.getAreaId());
             entity.setAreaName(hospital.getAreaName());
-            entity.setFullAreaName(hospital.getFullAreaName());
-        }
-        // 校验科室并同步冗余字段
-        if (hospitalDeptId != null) {
-            HospitalDeptVO dept = lookupHospitalDept(hospitalDeptId);
-            if (dept != null) {
-                entity.setHospitalDeptName(dept.getHospitalDeptName());
-            }
         }
         // 校验并填充医生（支持 quickAdd，hospitalId 取实体上的最新值）
         Long effectiveHospitalId = hospitalId != null ? hospitalId : entity.getHospitalId();
@@ -392,52 +369,56 @@ public class OrderDataValidator {
     }
 
     /**
-     * 查找并校验医院
+     * 查找并校验医院（通过 OrgService，替代已删除的 HospitalService）
      *
-     * @param hospitalId 医院ID
+     * @param hospitalId 医院ID（对应 sys_org 中 org_type="1.3" 的机构）
      * @param required   是否必填
-     * @return 医院实体，hospitalId 为 null 且 required=false 时返回 null
+     * @return OrgEntity，hospitalId 为 null 且 required=false 时返回 null
      */
-    private HospitalEntity lookupHospital(Long hospitalId, boolean required) {
+    private OrgEntity lookupHospitalOrg(Long hospitalId, boolean required) {
         if (hospitalId == null) {
             if (required) {
                 throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
             }
             return null;
         }
-        HospitalEntity hospital = hospitalService.getById(hospitalId);
-        if (hospital == null) {
+        OrgEntity org = orgService.getById(hospitalId);
+        if (org == null) {
             log.warn("医院不存在，hospitalId={}", hospitalId);
             throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
         }
-        if (hospital.getStatus() != null && hospital.getStatus().equals(StatusConstants.DISABLED)) {
+        if (org.getStatus() != null && org.getStatus().equals(StatusConstants.DISABLED)) {
             log.warn("医院已禁用，hospitalId={}", hospitalId);
             throw new BusinessException(ErrorCodeEnum.HOSPITAL_DISABLED);
         }
-        return hospital;
+        return org;
     }
 
     /**
-     * 查找并校验医院科室
-     * 科室为非必填，deptId 为 null 时直接返回 null
+     * 校验订单类型与机构资质是否匹配
+     * qualification_type=2（非医疗器械资质）时，orderType 必须为 2
      *
-     * @param deptId 医院科室ID
-     * @return 科室 VO，deptId 为 null 时返回 null
+     * @param userId    用户ID
+     * @param orderType 订单类型（1=医疗器械，2=非医疗器械）
      */
-    private HospitalDeptVO lookupHospitalDept(Long deptId) {
-        if (deptId == null) {
-            return null;
+    public void validateOrderType(Long userId, Integer orderType) {
+        if (userId == null || orderType == null) {
+            return;
         }
-        HospitalDeptVO dept = hospitalDeptService.getById(deptId);
-        if (dept == null) {
-            log.warn("医院科室不存在，deptId={}", deptId);
-            throw new BusinessException(ErrorCodeEnum.HOSPITAL_DEPT_NOT_FOUND);
+        com.yigongbao.module.system.user.entity.UserEntity user = userMapper.selectById(userId);
+        if (user == null || user.getOrgId() == null) {
+            return;
         }
-        if (dept.getStatus() != null && dept.getStatus().equals(StatusConstants.DISABLED)) {
-            log.warn("医院科室已禁用，deptId={}", deptId);
-            throw new BusinessException(ErrorCodeEnum.HOSPITAL_DEPT_DISABLED);
+        OrgEntity org = orgService.getById(user.getOrgId());
+        if (org == null) {
+            return;
         }
-        return dept;
+        // qualification_type=2 表示仅支持非医疗器械订单
+        if (Integer.valueOf(2).equals(org.getQualificationType()) && !Integer.valueOf(2).equals(orderType)) {
+            log.warn("机构资质不支持该订单类型，userId={}, orgId={}, qualificationType={}, orderType={}",
+                    userId, org.getId(), org.getQualificationType(), orderType);
+            throw new BusinessException(400, "当前机构资质仅支持非医疗器械订单");
+        }
     }
 
     /**

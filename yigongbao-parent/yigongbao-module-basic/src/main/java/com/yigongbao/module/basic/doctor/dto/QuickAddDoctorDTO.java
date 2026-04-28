@@ -34,8 +34,5 @@ public class QuickAddDoctorDTO implements Serializable {
     @NotNull(message = "所属医院不能为空")
     private Long hospitalId;
 
-    /**
-     * 所属科室ID
-     */
-    private Long hospitalDeptId;
+
 }

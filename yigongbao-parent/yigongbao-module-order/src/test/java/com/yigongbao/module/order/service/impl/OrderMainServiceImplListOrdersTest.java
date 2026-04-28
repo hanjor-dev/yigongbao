@@ -61,7 +61,6 @@ class OrderMainServiceImplListOrdersTest {
     @Mock private com.yigongbao.flow.facade.FlowFacade flowFacade;
     @Mock private com.yigongbao.module.system.config.service.ConfigService configService;
     @Mock private com.yigongbao.module.system.user.service.UserService userService;
-    @Mock private com.yigongbao.module.basic.hospital.service.HospitalService hospitalService;
     @Mock private com.yigongbao.module.system.org.service.OrgService orgService;
     @Mock private com.yigongbao.module.system.dept.service.DeptService deptService;
     @Mock private com.yigongbao.module.system.dict.service.DictService dictService;

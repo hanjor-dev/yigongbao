@@ -31,9 +31,9 @@ public class DeptEntity extends BaseEntity implements Serializable {
     private String deptCode;
 
     /**
-     * 所属机构ID
+     * 部门类型（1=内部，2=外部）
      */
-    private Long orgId;
+    private Integer deptType;
 
     /**
      * 部门负责人用户ID

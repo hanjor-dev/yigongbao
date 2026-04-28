@@ -7,7 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.basic.hospitalGroupTemplate.service.HospitalGroupTemplateService;
 import com.yigongbao.module.basic.hospitalGroupTemplate.vo.HospitalGroupTemplateVO;
-import com.yigongbao.module.basic.hospital.vo.HospitalVO;
+import com.yigongbao.module.system.org.vo.OrgVO;
 import com.yigongbao.module.system.user.dto.AssignHospitalsDTO;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import jakarta.validation.Valid;
@@ -38,7 +38,7 @@ public class UserHospitalController {
      */
     @Operation(summary = "查询用户的医院列表")
     @GetMapping
-    public Result<List<HospitalVO>> getHospitals(@PathVariable Long userId) {
+    public Result<List<OrgVO>> getHospitals(@PathVariable Long userId) {
         return Result.success(userHospitalService.getHospitalsByUserId(userId));
     }
 
@@ -62,7 +62,7 @@ public class UserHospitalController {
      */
     @Operation(summary = "获取可分配给用户的医院列表（管理员分配时使用）")
     @PostMapping("/options")
-    public Result<List<HospitalVO>> getHospitalOptions(@PathVariable Long userId) {
+    public Result<List<OrgVO>> getHospitalOptions(@PathVariable Long userId) {
         return Result.success(userHospitalService.getHospitalOptionsByUserId(userId));
     }
 

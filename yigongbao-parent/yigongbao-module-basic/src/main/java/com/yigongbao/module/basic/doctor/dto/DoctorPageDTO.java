@@ -36,11 +36,6 @@ public class DoctorPageDTO implements Serializable {
     private Long hospitalId;
 
     /**
-     * 科室ID
-     */
-    private Long hospitalDeptId;
-
-    /**
      * 状态（0=禁用，1=正常）
      */
     private Integer status;

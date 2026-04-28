@@ -31,14 +31,9 @@ public class DoctorEntity extends BaseEntity implements Serializable {
     private String doctorPhone;
 
     /**
-     * 所属医院ID
+     * 所属医疗机构ID（关联sys_org表，orgType=1.3）
      */
     private Long hospitalId;
-
-    /**
-     * 所属医院科室ID
-     */
-    private Long hospitalDeptId;
 
     /**
      * 创建该医生记录的业务员ID

@@ -41,7 +41,7 @@ public class DeptConvert {
             return null;
         }
         DeptEntity entity = new DeptEntity();
-        BeanUtils.copyProperties(dto, entity);
+        BeanUtils.copyProperties(dto, entity, "orgIds");
         return entity;
     }
 
@@ -56,7 +56,7 @@ public class DeptConvert {
             return null;
         }
         DeptEntity entity = new DeptEntity();
-        BeanUtils.copyProperties(dto, entity);
+        BeanUtils.copyProperties(dto, entity, "orgIds");
         return entity;
     }
 }
