@@ -2,8 +2,8 @@ package com.yigongbao.module.system.user.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.module.system.org.vo.OrgVO;
-import com.yigongbao.module.basic.hospitalGroupTemplate.service.HospitalGroupTemplateService;
-import com.yigongbao.module.basic.hospitalGroupTemplate.vo.HospitalGroupTemplateVO;
+import com.yigongbao.module.system.hospitalGroupTemplate.service.HospitalGroupTemplateService;
+import com.yigongbao.module.system.hospitalGroupTemplate.vo.HospitalGroupTemplateVO;
 import com.yigongbao.module.system.user.dto.AssignHospitalsDTO;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import org.junit.jupiter.api.BeforeEach;

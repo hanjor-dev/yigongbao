@@ -7,10 +7,10 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.bodyPart.service.BodyPartService;
 import com.yigongbao.module.basic.bodyPart.vo.BodyPartDetailVO;
-import com.yigongbao.module.basic.doctor.dto.QuickAddDoctorDTO;
-import com.yigongbao.module.basic.doctor.service.DoctorService;
-import com.yigongbao.module.basic.doctor.vo.DoctorVO;
-import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.system.doctor.dto.QuickAddDoctorDTO;
+import com.yigongbao.module.system.doctor.service.DoctorService;
+import com.yigongbao.module.system.doctor.vo.DoctorVO;
+import com.yigongbao.module.system.user.service.UserService;
 import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
 import com.yigongbao.module.order.entity.OrderItemEntity;
@@ -47,7 +47,7 @@ import java.util.List;
 public class OrderDataValidator {
 
     private final OrgService orgService;
-    private final UserMapper userMapper;
+    private final UserService userService;
     private final DoctorService doctorService;
     private final BodyPartService bodyPartService;
     private final RebuildProjectService rebuildProjectService;
@@ -152,7 +152,7 @@ public class OrderDataValidator {
             entity.setAreaId(hospital.getAreaId());
             entity.setAreaName(hospital.getAreaName());
         }
-        if (required) {
+        if (required && hospitalId != null) {
             validateHospitalScope(creatorId, hospitalId);
         }
         // 校验并填充医生（支持 quickAdd）
@@ -405,7 +405,7 @@ public class OrderDataValidator {
         if (userId == null || orderType == null) {
             return;
         }
-        com.yigongbao.module.system.user.entity.UserEntity user = userMapper.selectById(userId);
+        com.yigongbao.module.system.user.entity.UserEntity user = userService.getById(userId);
         if (user == null || user.getOrgId() == null) {
             return;
         }
@@ -417,7 +417,7 @@ public class OrderDataValidator {
         if (Integer.valueOf(2).equals(org.getQualificationType()) && !Integer.valueOf(2).equals(orderType)) {
             log.warn("机构资质不支持该订单类型，userId={}, orgId={}, qualificationType={}, orderType={}",
                     userId, org.getId(), org.getQualificationType(), orderType);
-            throw new BusinessException(400, "当前机构资质仅支持非医疗器械订单");
+            throw new BusinessException(ErrorCodeEnum.ORG_QUALIFICATION_LIMIT);
         }
     }
 

@@ -91,6 +91,14 @@ public interface UserService extends IService<UserEntity> {
     void updateUserBySelf(Long id, com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO dto);
 
     /**
+     * 统计指定部门下的用户数量
+     *
+     * @param deptId 部门ID
+     * @return 用户数量
+     */
+    long countByDeptId(Long deptId);
+
+    /**
      * 根据部门ID查询用户ID列表
      * 用于设计工单数据权限过滤（DEPT 类型）
      *

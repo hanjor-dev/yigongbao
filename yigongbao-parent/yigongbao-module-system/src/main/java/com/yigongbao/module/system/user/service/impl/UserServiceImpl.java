@@ -195,8 +195,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             // 填充结算类型名称
             if (vo.getSettlementType() != null) {
                 // settlementType 存储的是整数值 1/2/3，对应字典 8.1/8.2/8.3
+                // 结算类型父节点 dict_code=DictCodeConstants.SETTLEMENT_TYPE("8")，其数据库 id=36
                 DictEntity dictEntity = dictService.lambdaQuery()
-                        .eq(DictEntity::getParentId, 36L) // 结算类型字典的父节点ID
+                        .eq(DictEntity::getParentId, 36L)
                         .eq(DictEntity::getDictValue, vo.getSettlementType().toString())
                         .one();
                 vo.setSettlementTypeName(dictEntity != null ? dictEntity.getDictName() : null);
@@ -314,21 +315,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                         orgEntity = orgService.getById(manufacturerOrgId);
                     }
                     if (StrUtil.isBlank(dto.getEmployeeNo())) {
-                        throw new BusinessException(400, "内部用户工号不能为空");
+                        throw new BusinessException(ErrorCodeEnum.EMPLOYEE_NO_REQUIRED);
                     }
                 } else if (Integer.valueOf(2).equals(deptType)) {
-                    // 外部部门：校验 orgId 属于该部门，且机构类型为经销商（1.2）
-                    if (dto.getOrgId() != null) {
-                        List<Long> deptOrgIds = deptOrgMapper.selectOrgIdsByDeptId(dto.getDeptId());
-                        if (!deptOrgIds.contains(dto.getOrgId())) {
-                            log.warn("机构不属于该部门，deptId={}, orgId={}", dto.getDeptId(), dto.getOrgId());
-                            throw new BusinessException(400, "所选机构不属于该部门");
-                        }
-                        OrgEntity extOrg = orgService.getById(dto.getOrgId());
-                        if (extOrg == null || !"1.2".equals(extOrg.getOrgType())) {
-                            log.warn("机构类型不是经销商，orgId={}", dto.getOrgId());
-                            throw new BusinessException(400, "外部用户所属机构必须为经销商");
-                        }
+                    // 外部部门：orgId 必填
+                    if (dto.getOrgId() == null) {
+                        throw new BusinessException(ErrorCodeEnum.ORG_NOT_BELONG_TO_DEPT);
+                    }
+                    List<Long> deptOrgIds = deptOrgMapper.selectOrgIdsByDeptId(dto.getDeptId());
+                    if (!deptOrgIds.contains(dto.getOrgId())) {
+                        log.warn("机构不属于该部门，deptId={}, orgId={}", dto.getDeptId(), dto.getOrgId());
+                        throw new BusinessException(ErrorCodeEnum.ORG_NOT_BELONG_TO_DEPT);
+                    }
+                    OrgEntity extOrg = orgService.getById(dto.getOrgId());
+                    if (extOrg == null || !DictCodeConstants.ORG_TYPE_DEALER.equals(extOrg.getOrgType())) {
+                        log.warn("机构类型不是经销商，orgId={}", dto.getOrgId());
+                        throw new BusinessException(ErrorCodeEnum.ORG_TYPE_MUST_BE_DEALER);
                     }
                     // hospitalIds 已由前端传入，后续统一由 userHospitalService 处理
                 }
@@ -648,7 +650,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         }
         // 批量校验医院ID是否真实存在（orgType=1.3 的机构）
         Set<Long> existingIds = orgService.listByIds(hospitalIds).stream()
-                .filter(org -> "1.3".equals(org.getOrgType()))
+                .filter(org -> DictCodeConstants.ORG_TYPE_HOSPITAL.equals(org.getOrgType()))
                 .map(OrgEntity::getId)
                 .collect(Collectors.toSet());
         List<Long> invalidIds = hospitalIds.stream()
@@ -822,8 +824,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         }
         // 填充结算类型名称
         if (vo.getSettlementType() != null) {
+            // 结算类型父节点 dict_code=DictCodeConstants.SETTLEMENT_TYPE("8")，其数据库 id=36
             DictEntity dictEntity = dictService.lambdaQuery()
-                    .eq(DictEntity::getParentId, 36L) // 结算类型字典的父节点ID
+                    .eq(DictEntity::getParentId, 36L)
                     .eq(DictEntity::getDictValue, vo.getSettlementType().toString())
                     .one();
             vo.setSettlementTypeName(dictEntity != null ? dictEntity.getDictName() : null);
@@ -871,6 +874,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         return count(new LambdaQueryWrapper<UserEntity>()
                 .eq(UserEntity::getEmail, email)
                 .ne(UserEntity::getId, excludeId)) > 0;
+    }
+
+    /**
+     * 统计指定部门下的用户数量
+     *
+     * @param deptId 部门ID
+     * @return 用户数量
+     */
+    @Override
+    public long countByDeptId(Long deptId) {
+        return baseMapper.countByDeptId(deptId);
     }
 
     /**

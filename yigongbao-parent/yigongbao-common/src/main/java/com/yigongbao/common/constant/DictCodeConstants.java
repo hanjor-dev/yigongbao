@@ -14,17 +14,19 @@ public final class DictCodeConstants {
 
     // ==================== 机构相关字典编码 ====================
 
-    /**
-     * 机构类型父级字典code
-     * dict_code = "1"
-     */
+    /** 机构类型父级 dict_code = "1" */
     public static final String ORG_TYPE = "1";
 
-    /**
-     * 代理产品线
-     * dict_code = "5"
-     * 字典值：逗号分隔的多选值
-     */
+    /** 生产企业 dict_code = "1.1" */
+    public static final String ORG_TYPE_PRODUCER = "1.1";
+
+    /** 经销商 dict_code = "1.2" */
+    public static final String ORG_TYPE_DEALER = "1.2";
+
+    /** 医疗机构 dict_code = "1.3" */
+    public static final String ORG_TYPE_HOSPITAL = "1.3";
+
+    /** 代理产品线 dict_code = "5" */
     public static final String AGENT_PRODUCT_LINE = "5";
 
     // ==================== 订单业务类型 ====================
@@ -68,6 +70,10 @@ public final class DictCodeConstants {
      * 女
      */
     public static final String PATIENT_GENDER_FEMALE = "12.2";
+
+    // ==================== 结算类型 ====================
+    /** 结算类型父级 dict_code = "8" */
+    public static final String SETTLEMENT_TYPE = "8";
 
     // ==================== 用户专业方向 ====================
     /**

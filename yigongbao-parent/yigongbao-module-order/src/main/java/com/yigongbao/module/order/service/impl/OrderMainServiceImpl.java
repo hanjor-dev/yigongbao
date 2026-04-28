@@ -1061,7 +1061,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             log.info("保存用户列配置成功，userId={}", currentUserId);
         } catch (JsonProcessingException e) {
             log.error("序列化列配置失败，userId={}", currentUserId, e);
-            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "列配置格式非法");
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER);
         }
     }
 

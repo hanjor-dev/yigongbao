@@ -48,20 +48,26 @@ public enum ErrorCodeEnum {
     TOKEN_INVALID(611, "Token无效或已过期"),
     PERMISSION_DENIED(612, "没有权限执行该操作"),
 
-    // ==================== 机构相关 613-618 ====================
+    // ==================== 机构相关 613-620 ====================
     ORG_NOT_FOUND(613, "机构不存在"),
     ORG_DISABLED(614, "机构已禁用"),
     ORG_EXISTS(615, "机构名称已存在"),
     ORG_CODE_EXISTS(616, "机构编码已存在"),
     ORG_HAS_USERS(617, "该机构下存在用户，无法删除"),
     ORG_TYPE_NOT_FOUND(618, "机构类型不存在"),
-    ORG_TYPE_NOT_ALLOWED(619, "不允许创建该类型机构"),
+    ORG_TYPE_NOT_ALLOWED(620, "不允许创建该类型机构"),
+    ORG_CERT_FILE_REQUIRED(621, "医疗器械资质类型时资质文件必填"),
+    ORG_DEPT_TYPE_MISMATCH(622, "关联机构类型与部门类型不匹配"),
+    ORG_NOT_BELONG_TO_DEPT(623, "所选机构不属于该部门"),
+    ORG_TYPE_MUST_BE_DEALER(624, "外部用户所属机构必须为经销商"),
+    ORG_QUALIFICATION_LIMIT(625, "当前机构资质仅支持非医疗器械订单"),
+    EMPLOYEE_NO_REQUIRED(626, "内部用户工号不能为空"),
 
-    // ==================== 部门相关 619-621 ====================
-    DEPT_NOT_FOUND(619, "部门不存在"),
-    DEPT_EXISTS(620, "部门名称已存在"),
-    DEPT_HAS_USERS(621, "该部门下存在用户，无法删除"),
-    DEPT_DISABLED(6190, "部门已停用"),
+    // ==================== 部门相关 630-634 ====================
+    DEPT_NOT_FOUND(630, "部门不存在"),
+    DEPT_EXISTS(631, "部门名称已存在"),
+    DEPT_HAS_USERS(632, "该部门下存在用户，无法删除"),
+    DEPT_DISABLED(633, "部门已停用"),
 
     // ==================== 角色相关 622-627 ====================
     USER_ROLE_NOT_FOUND(622, "角色不存在"),

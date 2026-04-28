@@ -1,12 +1,13 @@
 package com.yigongbao.module.system.user.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.org.entity.OrgEntity;
-import com.yigongbao.module.system.org.mapper.OrgMapper;
+import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.org.vo.OrgVO;
 import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.service.RoleService;
@@ -26,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -41,7 +43,7 @@ import java.util.stream.Collectors;
 public class UserHospitalServiceImpl implements UserHospitalService {
 
     private final UserHospitalMapper userHospitalMapper;
-    private final OrgMapper orgMapper;
+    private final OrgService orgService;
     private final UserMapper userMapper;
     private final RoleService roleService;
 
@@ -65,7 +67,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
     public List<OrgVO> getHospitalsByUserId(Long userId) {
         List<Long> ids = getHospitalIdsByUserId(userId);
         if (ids.isEmpty()) return new ArrayList<>();
-        return orgMapper.selectBatchIds(ids).stream()
+        return orgService.listByIds(ids).stream()
                 .filter(Objects::nonNull)
                 .map(this::toOrgVO)
                 .collect(Collectors.toList());
@@ -80,16 +82,15 @@ public class UserHospitalServiceImpl implements UserHospitalService {
 
         // 校验 hospitalIds 均为有效医疗机构（orgType=1.3）
         if (hospitalIds != null && !hospitalIds.isEmpty()) {
-            List<OrgEntity> orgs = orgMapper.selectBatchIds(hospitalIds);
+            List<OrgEntity> orgs = orgService.listByIds(hospitalIds);
             List<OrgEntity> valid = orgs.stream().filter(Objects::nonNull)
-                    .filter(o -> "1.3".equals(o.getOrgType())).collect(Collectors.toList());
+                    .filter(o -> DictCodeConstants.ORG_TYPE_HOSPITAL.equals(o.getOrgType())).collect(Collectors.toList());
             if (valid.size() != hospitalIds.size()) {
                 throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
             }
             for (OrgEntity org : valid) {
                 if (Integer.valueOf(StatusConstants.DISABLED).equals(org.getStatus())) {
-                    throw new BusinessException(ErrorCodeEnum.HOSPITAL_DISABLED.getCode(),
-                            "医疗机构【" + org.getOrgName() + "】已停用");
+                    throw new BusinessException(ErrorCodeEnum.HOSPITAL_DISABLED);
                 }
             }
         }
@@ -122,8 +123,8 @@ public class UserHospitalServiceImpl implements UserHospitalService {
 
     @Override
     public List<OrgVO> getHospitalOptionsByUserId(Long userId) {
-        List<OrgEntity> list = orgMapper.selectList(new LambdaQueryWrapper<OrgEntity>()
-                .eq(OrgEntity::getOrgType, "1.3")
+        List<OrgEntity> list = orgService.list(new LambdaQueryWrapper<OrgEntity>()
+                .eq(OrgEntity::getOrgType, DictCodeConstants.ORG_TYPE_HOSPITAL)
                 .eq(OrgEntity::getStatus, StatusConstants.NORMAL)
                 .orderByAsc(OrgEntity::getOrgName));
         return list.stream().map(this::toOrgVO).collect(Collectors.toList());
@@ -152,6 +153,14 @@ public class UserHospitalServiceImpl implements UserHospitalService {
             return getHospitalIdsByUserId(userId).contains(hospitalId);
         }
         return false;
+    }
+
+    @Override
+    public Set<Long> getAssignedHospitalIds(List<Long> hospitalIds) {
+        if (hospitalIds == null || hospitalIds.isEmpty()) return Collections.emptySet();
+        List<UserHospitalEntity> list = userHospitalMapper.selectList(
+                new LambdaQueryWrapper<UserHospitalEntity>().in(UserHospitalEntity::getHospitalId, hospitalIds));
+        return list.stream().map(UserHospitalEntity::getHospitalId).collect(Collectors.toSet());
     }
 
     private OrgVO toOrgVO(OrgEntity entity) {

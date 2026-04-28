@@ -5,6 +5,7 @@ import com.yigongbao.module.system.org.vo.OrgVO;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 用户-医院关联 Service 接口
@@ -30,4 +31,6 @@ public interface UserHospitalService {
     DataScopeTypeEnum getDataScopeType(Long userId);
 
     boolean hasPermissionOnHospital(Long userId, Long hospitalId);
+
+    Set<Long> getAssignedHospitalIds(List<Long> hospitalIds);
 }

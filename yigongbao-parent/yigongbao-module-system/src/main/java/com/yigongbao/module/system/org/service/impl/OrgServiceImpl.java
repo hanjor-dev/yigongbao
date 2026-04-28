@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.CodeRuleConstants;
+import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -102,7 +103,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             }
             OrgVO vo = toVOWithDictNames(entity);
             // 填充经销商关联的医疗机构
-            if ("1.2".equals(entity.getOrgType())) {
+            if (DictCodeConstants.ORG_TYPE_DEALER.equals(entity.getOrgType())) {
                 List<Long> hospitalOrgIds = orgHospitalMapper.selectHospitalOrgIdsByDistributorId(id);
                 vo.setHospitalOrgIds(hospitalOrgIds);
                 if (!hospitalOrgIds.isEmpty()) {
@@ -130,7 +131,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
         log.info("创建机构，orgName={}", dto.getOrgName());
         try {
             // 禁止创建生产企业类型
-            if ("1.1".equals(dto.getOrgType())) {
+            if (DictCodeConstants.ORG_TYPE_PRODUCER.equals(dto.getOrgType())) {
                 throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_ALLOWED);
             }
             // 校验机构名称是否已存在
@@ -145,7 +146,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             }
             // 医疗器械资质时资质文件必填
             if (Integer.valueOf(1).equals(dto.getQualificationType()) && StrUtil.isBlank(dto.getQualificationFile())) {
-                throw new BusinessException(400, "医疗器械资质类型时资质文件必填");
+                throw new BusinessException(ErrorCodeEnum.ORG_CERT_FILE_REQUIRED);
             }
             // 生成机构编码
             String prefix = getOrgPrefixByType(dto.getOrgType());
@@ -162,7 +163,13 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             // 插入数据库
             save(entity);
             // 经销商类型：保存关联医疗机构
-            if ("1.2".equals(dto.getOrgType()) && dto.getHospitalOrgIds() != null && !dto.getHospitalOrgIds().isEmpty()) {
+            if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType()) && dto.getHospitalOrgIds() != null && !dto.getHospitalOrgIds().isEmpty()) {
+                // 校验 hospitalOrgIds 中的机构必须是医疗机构类型
+                List<OrgEntity> hospitals = listByIds(dto.getHospitalOrgIds());
+                boolean hasInvalid = hospitals.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_HOSPITAL.equals(o.getOrgType()));
+                if (hasInvalid || hospitals.size() != dto.getHospitalOrgIds().size()) {
+                    throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
+                }
                 saveOrgHospitalRelations(entity.getId(), dto.getHospitalOrgIds());
             }
             log.info("创建机构成功，id={}, orgCode={}", entity.getId(), orgCode);
@@ -190,7 +197,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                 throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
             }
             // 禁止将机构类型改为生产企业
-            if (dto.getOrgType() != null && "1.1".equals(dto.getOrgType())) {
+            if (dto.getOrgType() != null && DictCodeConstants.ORG_TYPE_PRODUCER.equals(dto.getOrgType())) {
                 throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_ALLOWED);
             }
             if (StrUtil.isNotBlank(dto.getOrgName()) && !dto.getOrgName().equals(entity.getOrgName())) {
@@ -202,7 +209,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             Integer qualType = dto.getQualificationType() != null ? dto.getQualificationType() : entity.getQualificationType();
             String qualFile = StrUtil.isNotBlank(dto.getQualificationFile()) ? dto.getQualificationFile() : entity.getQualificationFile();
             if (Integer.valueOf(1).equals(qualType) && StrUtil.isBlank(qualFile)) {
-                throw new BusinessException(400, "医疗器械资质类型时资质文件必填");
+                throw new BusinessException(ErrorCodeEnum.ORG_CERT_FILE_REQUIRED);
             }
             BeanUtils.copyProperties(dto, entity, "id", "orgCode", "createTime", "updateTime", "createBy", "updateBy", "hospitalOrgIds");
             if (dto.getAreaId() != null) {
@@ -212,10 +219,16 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             updateById(entity);
             // 经销商类型：更新关联医疗机构（先删后插）
             String orgType = entity.getOrgType();
-            if ("1.2".equals(orgType) && dto.getHospitalOrgIds() != null) {
+            if (DictCodeConstants.ORG_TYPE_DEALER.equals(orgType) && dto.getHospitalOrgIds() != null) {
                 orgHospitalMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
                         .eq(OrgHospitalEntity::getDistributorOrgId, id));
                 if (!dto.getHospitalOrgIds().isEmpty()) {
+                    // 校验 hospitalOrgIds 中的机构必须是医疗机构类型
+                    List<OrgEntity> hospitals = listByIds(dto.getHospitalOrgIds());
+                    boolean hasInvalid = hospitals.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_HOSPITAL.equals(o.getOrgType()));
+                    if (hasInvalid || hospitals.size() != dto.getHospitalOrgIds().size()) {
+                        throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
+                    }
                     saveOrgHospitalRelations(id, dto.getHospitalOrgIds());
                 }
             }
@@ -396,9 +409,9 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      */
     private String getOrgPrefixByType(String orgType) {
         return switch (orgType) {
-            case "1.1" -> "ORG-P-";  // 生产企业
-            case "1.2" -> "ORG-D-";  // 经销商
-            case "1.3" -> "ORG-H-";  // 医疗机构
+            case DictCodeConstants.ORG_TYPE_PRODUCER -> "ORG-P-";  // 生产企业
+            case DictCodeConstants.ORG_TYPE_DEALER -> "ORG-D-";  // 经销商
+            case DictCodeConstants.ORG_TYPE_HOSPITAL -> "ORG-H-";  // 医疗机构
             default -> "ORG-O-";       // 其他
         };
     }

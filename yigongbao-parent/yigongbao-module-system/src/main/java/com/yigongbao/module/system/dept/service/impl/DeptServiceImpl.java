@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.CodeRuleConstants;
+import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -22,7 +23,7 @@ import com.yigongbao.module.system.dept.vo.DeptVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.user.entity.UserEntity;
-import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -47,7 +48,7 @@ import java.util.stream.Collectors;
 public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> implements DeptService {
 
     private final OrgService orgService;
-    private final UserMapper userMapper;
+    private final UserService userService;
     private final CodeGeneratorService codeGeneratorService;
     private final DeptOrgMapper deptOrgMapper;
 
@@ -293,7 +294,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
         if (vo.getLeaderUserId() != null) {
-            UserEntity userEntity = userMapper.selectById(vo.getLeaderUserId());
+            UserEntity userEntity = userService.getById(vo.getLeaderUserId());
             if (userEntity != null) vo.setLeaderUserName(userEntity.getRealName());
         }
         return vo;
@@ -310,16 +311,16 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
     }
 
     private boolean hasUsers(Long deptId) {
-        return userMapper.countByDeptId(deptId) > 0;
+        return userService.countByDeptId(deptId) > 0;
     }
 
     private void validateOrgTypeMatchDeptType(List<Long> orgIds, Integer deptType) {
         // 内部部门(1)只能关联生产企业(1.1)，外部部门(2)只能关联经销商(1.2)
-        String expectedOrgType = deptType == 1 ? "1.1" : "1.2";
+        String expectedOrgType = deptType == 1 ? DictCodeConstants.ORG_TYPE_PRODUCER : DictCodeConstants.ORG_TYPE_DEALER;
         List<OrgEntity> orgs = orgService.listByIds(orgIds);
         boolean mismatch = orgs.stream().anyMatch(o -> !expectedOrgType.equals(o.getOrgType()));
         if (mismatch) {
-            throw new BusinessException(400, "关联机构类型与部门类型不匹配");
+            throw new BusinessException(ErrorCodeEnum.ORG_DEPT_TYPE_MISMATCH);
         }
     }
 
