@@ -17,14 +17,10 @@ public class UpdateUserBySelfDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 手机号
-     */
+    /** 手机号，格式：1开头的11位手机号 */
     @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
     private String phone;
 
-    /**
-     * 头像路径
-     */
+    /** 头像文件路径 */
     private String avatar;
 }

@@ -40,4 +40,11 @@ public interface DesignScreenshotService {
      * @return packageFileId → fileId 的映射（无截图的 packageFileId 不包含在结果中）
      */
     Map<Long, String> listFileIdsByPackageFileIds(List<Long> packageFileIds);
+
+    /**
+     * 按 packageFileId 列表批量删除截图记录（不删除 OSS 文件，由调用方负责）
+     *
+     * @param packageFileIds 数据包文件ID列表
+     */
+    void deleteByPackageFileIds(List<Long> packageFileIds);
 }

@@ -13,8 +13,16 @@ import java.time.LocalDateTime;
 @Data
 @TableName("sys_org_hospital")
 public class OrgHospitalEntity {
+
+    /** 主键ID */
     private Long id;
+
+    /** 经销商机构ID */
     private Long distributorOrgId;
+
+    /** 医院机构ID */
     private Long hospitalOrgId;
+
+    /** 创建时间 */
     private LocalDateTime createTime;
 }

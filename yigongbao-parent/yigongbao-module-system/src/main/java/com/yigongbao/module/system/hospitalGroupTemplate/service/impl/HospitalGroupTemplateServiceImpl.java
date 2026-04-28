@@ -58,6 +58,9 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
 
     /**
      * 分页查询医院组合模板列表
+     *
+     * @param dto 分页查询条件，支持模板名称模糊搜索和状态过滤
+     * @return 分页结果，每条记录包含模板基本信息及关联医院数量
      */
     @Override
     public IPage<HospitalGroupTemplateVO> listTemplate(HospitalGroupTemplatePageDTO dto) {
@@ -81,11 +84,17 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     }
 
     /**
-     * 根据ID查询医院组合模板详情
+     * 根据ID查询医院组合模板详情（含明细列表）
+     *
+     * @param id     模板ID
+     * @param userId 用户ID（可选）：传入时 assigned 表示该用户是否已分配该医院；
+     *               不传时 assigned 表示全系统任意用户是否已分配
+     * @return 模板详情VO，包含基本信息、医院数量及明细列表
+     * @throws BusinessException 模板不存在时抛出 TEMPLATE_NOT_FOUND
      */
     @Override
-    public HospitalGroupTemplateVO getTemplateById(Long id) {
-        log.info("根据ID查询医院组合模板详情，id={}", id);
+    public HospitalGroupTemplateVO getTemplateById(Long id, Long userId) {
+        log.info("根据ID查询医院组合模板详情，id={}, userId={}", id, userId);
         try {
             HospitalGroupTemplateEntity entity = getById(id);
             if (entity == null) {
@@ -93,7 +102,8 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                 throw new BusinessException(ErrorCodeEnum.TEMPLATE_NOT_FOUND);
             }
             HospitalGroupTemplateVO vo = toVOWithCount(entity);
-            List<HospitalGroupTemplateDetailVO> details = getDetails(id);
+            // 填充明细列表（含机构信息和已分配状态）
+            List<HospitalGroupTemplateDetailVO> details = getDetails(id, userId);
             vo.setDetails(details);
             log.info("查询医院组合模板详情成功，id={}", id);
             return vo;
@@ -107,6 +117,9 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
 
     /**
      * 创建医院组合模板
+     *
+     * @param dto 创建参数，包含模板名称和关联医院ID列表
+     * @throws BusinessException 模板名称已存在时抛出 TEMPLATE_EXISTS
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -118,9 +131,11 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                 throw new BusinessException(ErrorCodeEnum.TEMPLATE_EXISTS);
             }
             HospitalGroupTemplateEntity entity = HospitalGroupTemplateConvert.toEntity(dto);
+            // 生成唯一模板编号
             entity.setTemplateCode(codeGeneratorService.generate(CodeRuleConstants.TEMPLATE_NO));
             entity.setStatus(StatusConstants.NORMAL);
             save(entity);
+            // 批量保存模板关联的医院明细
             saveDetails(entity.getId(), dto.getHospitalIds());
             log.info("创建医院组合模板成功，id={}, templateCode={}, 包含医院数量={}",
                     entity.getId(), entity.getTemplateCode(),
@@ -134,7 +149,11 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     }
 
     /**
-     * 更新医院组合模板
+     * 更新医院组合模板（含医院明细的先删后插）
+     *
+     * @param id  模板ID
+     * @param dto 更新参数；hospitalIds 不为 null 时触发明细全量替换
+     * @throws BusinessException 模板不存在时抛出 TEMPLATE_NOT_FOUND；名称重复时抛出 TEMPLATE_EXISTS
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -155,6 +174,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
             BeanUtils.copyProperties(dto, entity, "id", "templateCode", "createTime", "updateTime", "createBy", "updateBy");
             updateById(entity);
             if (dto.getHospitalIds() != null) {
+                // 先删除旧明细，再批量插入新明细（全量替换策略）
                 detailMapper.deleteByTemplateId(id);
                 saveDetails(id, dto.getHospitalIds());
             }
@@ -168,7 +188,10 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     }
 
     /**
-     * 删除医院组合模板
+     * 删除医院组合模板（同步删除关联明细）
+     *
+     * @param id 模板ID
+     * @throws BusinessException 模板不存在时抛出 TEMPLATE_NOT_FOUND
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -180,6 +203,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                 log.warn("医院组合模板不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.TEMPLATE_NOT_FOUND);
             }
+            // 先删除明细，再删除主记录，保证数据一致性
             detailMapper.deleteByTemplateId(id);
             removeById(id);
             log.info("删除医院组合模板成功，id={}", id);
@@ -192,7 +216,11 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     }
 
     /**
-     * 修改医院组合模板状态
+     * 修改医院组合模板启用/禁用状态
+     *
+     * @param id     模板ID
+     * @param status 目标状态（StatusConstants.NORMAL=1 启用，StatusConstants.DISABLED=0 禁用）
+     * @throws BusinessException 状态值非法时抛出 PARAM_ERROR；模板不存在时抛出 TEMPLATE_NOT_FOUND
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -220,7 +248,10 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     }
 
     /**
-     * 获取医院组合模板下拉选项
+     * 获取医院组合模板下拉选项列表
+     *
+     * @param status 状态过滤（null 表示不过滤）
+     * @return 简化VO列表，包含id、名称、编号和医院数量，按名称升序排列
      */
     @Override
     public List<HospitalGroupTemplateSimpleVO> listOptions(Integer status) {
@@ -231,7 +262,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                     .orderByAsc(HospitalGroupTemplateEntity::getTemplateName);
             List<HospitalGroupTemplateEntity> list = list(wrapper);
             List<HospitalGroupTemplateSimpleVO> voList = list.stream().map(this::toSimpleVO).collect(Collectors.toList());
-            log.info("获取医院组合模板下拉选项成功，数量={}", voList.size());
+            log.info("获取医院组合模板下拉选项成功，数量=", voList.size());
             return voList;
         } catch (Exception e) {
             log.error("获取医院组合模板下拉选项异常", e);
@@ -241,31 +272,54 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
 
     // ==================== 私有方法 ====================
 
+    /**
+     * 将模板实体转换为VO，并附加关联医院数量和状态名称
+     *
+     * @param entity 模板实体
+     * @return 包含医院数量和状态名称的VO
+     */
     private HospitalGroupTemplateVO toVOWithCount(HospitalGroupTemplateEntity entity) {
         HospitalGroupTemplateVO vo = new HospitalGroupTemplateVO();
         BeanUtils.copyProperties(entity, vo);
         if (vo.getStatus() != null) {
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
-        Long count = detailMapper.countByTemplateId(entity.getId());
-        vo.setHospitalCount(count != null ? count.intValue() : 0);
-        return vo;
-    }
-
-    private HospitalGroupTemplateSimpleVO toSimpleVO(HospitalGroupTemplateEntity entity) {
-        HospitalGroupTemplateSimpleVO vo = new HospitalGroupTemplateSimpleVO();
-        vo.setId(entity.getId());
-        vo.setTemplateName(entity.getTemplateName());
-        vo.setTemplateCode(entity.getTemplateCode());
+        // 查询该模板关联的医院数量
         Long count = detailMapper.countByTemplateId(entity.getId());
         vo.setHospitalCount(count != null ? count.intValue() : 0);
         return vo;
     }
 
     /**
-     * 查询模板医院明细并填充机构详细信息和 assigned 状态
+     * 将模板实体转换为简化VO（用于下拉选项）
+     *
+     * @param entity 模板实体
+     * @return 简化VO，仅含id、名称、编号和医院数量
      */
-    private List<HospitalGroupTemplateDetailVO> getDetails(Long templateId) {
+    private HospitalGroupTemplateSimpleVO toSimpleVO(HospitalGroupTemplateEntity entity) {
+        HospitalGroupTemplateSimpleVO vo = new HospitalGroupTemplateSimpleVO();
+        vo.setId(entity.getId());
+        vo.setTemplateName(entity.getTemplateName());
+        vo.setTemplateCode(entity.getTemplateCode());
+        // 查询该模板关联的医院数量
+        Long count = detailMapper.countByTemplateId(entity.getId());
+        vo.setHospitalCount(count != null ? count.intValue() : 0);
+        return vo;
+    }
+
+    /**
+     * 查询模板医院明细列表，并填充机构详细信息和已分配状态
+     * <p>
+     * assigned 字段语义：
+     * - userId 为 null：表示该医院已被全系统任意用户分配（模板管理场景）
+     * - userId 不为 null：表示该医院已被指定用户分配（用户分配预览场景）
+     * </p>
+     *
+     * @param templateId 模板ID
+     * @param userId     用户ID（可选）
+     * @return 明细VO列表，每条记录包含机构信息和 assigned 标志
+     */
+    private List<HospitalGroupTemplateDetailVO> getDetails(Long templateId, Long userId) {
         List<HospitalGroupTemplateDetailEntity> details = detailMapper.selectList(
                 new LambdaQueryWrapper<HospitalGroupTemplateDetailEntity>()
                         .eq(HospitalGroupTemplateDetailEntity::getTemplateId, templateId));
@@ -276,12 +330,20 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                 .map(HospitalGroupTemplateDetailEntity::getHospitalId)
                 .collect(Collectors.toList());
 
-        // 批量查询机构信息（1次 IN 查询）
+        // 批量查询机构信息（1次 IN 查询，避免 N+1）
         Map<Long, OrgEntity> orgMap = orgService.listByIds(hospitalIds).stream()
                 .collect(Collectors.toMap(OrgEntity::getId, o -> o));
 
-        // 批量查询 sys_user_hospital，统计已关联的 hospitalId
-        Set<Long> assignedHospitalIds = userHospitalService.getAssignedHospitalIds(hospitalIds);
+        // 根据 userId 参数选择查询策略
+        Set<Long> assignedHospitalIds;
+        if (userId != null) {
+            // 用户分配场景：查询该用户已分配的医院ID集合
+            List<Long> userHospitalIds = userHospitalService.getHospitalIdsByUserId(userId);
+            assignedHospitalIds = userHospitalIds.stream().collect(Collectors.toSet());
+        } else {
+            // 模板管理场景：查询全系统任意用户已分配的医院ID集合
+            assignedHospitalIds = userHospitalService.getAssignedHospitalIds(hospitalIds);
+        }
 
         return details.stream().map(d -> {
             HospitalGroupTemplateDetailVO detailVO = new HospitalGroupTemplateDetailVO();
@@ -289,6 +351,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
             detailVO.setTemplateId(d.getTemplateId());
             detailVO.setHospitalId(d.getHospitalId());
             detailVO.setCreateTime(d.getCreateTime());
+            // 若该医院ID存在于已分配集合中，则标记为已分配
             detailVO.setAssigned(assignedHospitalIds.contains(d.getHospitalId()));
             OrgEntity org = orgMap.get(d.getHospitalId());
             if (org != null) {
@@ -304,7 +367,13 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     }
 
     /**
-     * 批量保存模板医院明细
+     * 批量保存模板医院明细记录
+     * <p>
+     * 使用 insertBatch 替代逐条 insert，消除 N+1 写入问题。
+     * </p>
+     *
+     * @param templateId  模板ID
+     * @param hospitalIds 关联的医院ID列表；为空时直接返回
      */
     private void saveDetails(Long templateId, List<Long> hospitalIds) {
         if (hospitalIds == null || hospitalIds.isEmpty()) {
@@ -317,15 +386,28 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
             detail.setHospitalId(hospitalId);
             details.add(detail);
         }
-        // 使用批量插入替代逐条 insert，消除 N+1 查询
+        // 批量插入所有明细，单条 SQL 替代多次 insert
         detailMapper.insertBatch(details);
     }
 
+    /**
+     * 检查模板名称是否已存在
+     *
+     * @param templateName 待检查的模板名称
+     * @return true 表示名称已被占用
+     */
     private boolean isTemplateNameExists(String templateName) {
         return count(new LambdaQueryWrapper<HospitalGroupTemplateEntity>()
                 .eq(HospitalGroupTemplateEntity::getTemplateName, templateName)) > 0;
     }
 
+    /**
+     * 检查模板名称是否已被其他模板占用（排除自身）
+     *
+     * @param templateName 待检查的模板名称
+     * @param excludeId    排除的模板ID（即当前正在更新的模板）
+     * @return true 表示名称已被其他模板占用
+     */
     private boolean isTemplateNameExistsExcludingId(String templateName, Long excludeId) {
         return count(new LambdaQueryWrapper<HospitalGroupTemplateEntity>()
                 .eq(HospitalGroupTemplateEntity::getTemplateName, templateName)

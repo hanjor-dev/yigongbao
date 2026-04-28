@@ -65,9 +65,14 @@ public class DesignScreenshotServiceImpl
                 .one();
 
         if (existing != null) {
-            // 有则更新 fileId
+            // 有则更新 fileId，先记录旧文件ID以便删除
+            String oldFileId = existing.getFileId();
             existing.setFileId(fileVO.getId());
             updateById(existing);
+            // 删除旧截图文件，避免 OSS 泄漏
+            if (oldFileId != null) {
+                fileService.deleteById(oldFileId);
+            }
             log.info("截图记录已更新，id={}，新 fileId={}", existing.getId(), fileVO.getId());
         } else {
             // 无则插入
@@ -140,6 +145,21 @@ public class DesignScreenshotServiceImpl
     }
 
     // ==================== 私有方法 ====================
+
+    /**
+     * 按 packageFileId 列表批量删除截图记录（不删除 OSS 文件，由调用方负责）
+     *
+     * @param packageFileIds 数据包文件ID列表
+     */
+    @Override
+    public void deleteByPackageFileIds(List<Long> packageFileIds) {
+        if (packageFileIds == null || packageFileIds.isEmpty()) {
+            return;
+        }
+        lambdaUpdate()
+                .in(DesignPackageFileScreenshotEntity::getPackageFileId, packageFileIds)
+                .remove();
+    }
 
     /**
      * 校验 packageFileId 存在且归属指定 packageId

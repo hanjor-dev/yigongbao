@@ -32,7 +32,7 @@ public interface UserService extends IService<UserEntity> {
      * 根据ID查询用户详情
      *
      * @param id 用户ID
-     * @return 用户详情
+     * @return 用户详情VO
      */
     UserVO getUserById(Long id);
 
@@ -44,7 +44,7 @@ public interface UserService extends IService<UserEntity> {
     void createUser(CreateUserDTO dto);
 
     /**
-     * 更新用户
+     * 更新用户信息
      *
      * @param id  用户ID
      * @param dto 更新参数
@@ -52,7 +52,7 @@ public interface UserService extends IService<UserEntity> {
     void updateUser(Long id, UpdateUserDTO dto);
 
     /**
-     * 删除用户
+     * 删除用户（逻辑删除）
      *
      * @param id 用户ID
      */
@@ -67,8 +67,7 @@ public interface UserService extends IService<UserEntity> {
     void updateStatus(Long id, Integer status);
 
     /**
-     * 重置密码
-     * 将用户密码重置为系统默认密码
+     * 重置密码，将用户密码重置为系统默认密码
      *
      * @param userId 用户ID
      */
@@ -88,7 +87,7 @@ public interface UserService extends IService<UserEntity> {
      * @param id  用户ID
      * @param dto 更新参数（仅手机号和头像）
      */
-    void updateUserBySelf(Long id, com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO dto);
+    void updateUserBySelf(Long id, UpdateUserBySelfDTO dto);
 
     /**
      * 统计指定部门下的用户数量
@@ -99,8 +98,7 @@ public interface UserService extends IService<UserEntity> {
     long countByDeptId(Long deptId);
 
     /**
-     * 根据部门ID查询用户ID列表
-     * 用于设计工单数据权限过滤（DEPT 类型）
+     * 根据部门ID查询用户ID列表，用于设计工单数据权限过滤（DEPT 类型）
      *
      * @param deptId 部门ID
      * @return 该部门下所有正常状态用户的ID列表，deptId 为 null 时返回空列表
@@ -108,8 +106,7 @@ public interface UserService extends IService<UserEntity> {
     List<Long> listUserIdsByDeptId(Long deptId);
 
     /**
-     * 根据机构ID查询用户ID列表
-     * 用于设计工单数据权限过滤（ORG 类型）
+     * 根据机构ID查询用户ID列表，用于设计工单数据权限过滤（ORG 类型）
      *
      * @param orgId 机构ID
      * @return 该机构下所有正常状态用户的ID列表，orgId 为 null 时返回空列表

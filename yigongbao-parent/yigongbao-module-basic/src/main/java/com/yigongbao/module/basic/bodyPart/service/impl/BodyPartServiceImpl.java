@@ -6,6 +6,8 @@ import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.basic.rebuildProject.entity.RebuildProjectEntity;
+import com.yigongbao.module.basic.rebuildProject.mapper.RebuildProjectMapper;
 import com.yigongbao.module.basic.bodyPart.convert.BodyPartConvert;
 import com.yigongbao.module.basic.bodyPart.dto.CreateBodyPartDTO;
 import com.yigongbao.module.basic.bodyPart.dto.UpdateBodyPartDTO;
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 public class BodyPartServiceImpl extends ServiceImpl<BodyPartMapper, BodyPartEntity> implements BodyPartService {
 
     private final CodeGeneratorService codeGeneratorService;
+    private final RebuildProjectMapper rebuildProjectMapper;
 
     /**
      * 获取所有部位平级列表
@@ -163,6 +166,14 @@ public class BodyPartServiceImpl extends ServiceImpl<BodyPartMapper, BodyPartEnt
             if (entity == null) {
                 log.warn("部位不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND);
+            }
+            // 校验该部位下是否有关联的重建项目，有则拒绝删除
+            boolean hasProjects = rebuildProjectMapper.selectCount(
+                    new LambdaQueryWrapper<RebuildProjectEntity>()
+                            .eq(RebuildProjectEntity::getBodyPartId, id)) > 0;
+            if (hasProjects) {
+                log.warn("该部位下存在重建项目，无法删除，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.DATA_HAS_CHILDREN);
             }
             removeById(id);
             log.info("删除部位成功，id={}", id);

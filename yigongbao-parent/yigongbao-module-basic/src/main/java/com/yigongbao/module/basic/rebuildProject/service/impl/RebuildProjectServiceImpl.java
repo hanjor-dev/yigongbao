@@ -241,6 +241,7 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
             entity.setCategoryName(resolveCategoryName(dto.getCategoryCode()));
             entity.setSpecialty(dto.getSpecialty());
             save(entity);
+            clearCaches();
             log.info("创建项目成功，id={}", entity.getId());
         } catch (BusinessException e) {
             throw e;
@@ -285,6 +286,7 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
             entity.setCategoryName(resolveCategoryName(dto.getCategoryCode()));
             entity.setSpecialty(dto.getSpecialty());
             updateById(entity);
+            clearCaches();
             log.info("更新项目成功，id={}", id);
         } catch (BusinessException e) {
             throw e;
@@ -313,7 +315,14 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
                 log.warn("该项目存在子项目，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_HAS_CHILDREN);
             }
+            // 校验该项目是否被订单明细引用，有则拒绝删除
+            Long orderRefCount = baseMapper.countOrderItemReferences(id);
+            if (orderRefCount != null && orderRefCount > 0) {
+                log.warn("该项目已被订单引用，无法删除，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.DATA_HAS_CHILDREN);
+            }
             removeById(id);
+            clearCaches();
             log.info("删除项目成功，id={}", id);
         } catch (BusinessException e) {
             throw e;
@@ -345,6 +354,7 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
             }
             entity.setStatus(status);
             updateById(entity);
+            clearCaches();
             log.info("修改项目状态成功，id={}, status={}", id, status);
         } catch (BusinessException e) {
             throw e;
@@ -482,6 +492,14 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
                 .eq(RebuildProjectEntity::getName, name)
                 .eq(RebuildProjectEntity::getParentId, parentId)
                 .ne(RebuildProjectEntity::getId, excludeId)) > 0;
+    }
+
+    /**
+     * 清空本地缓存，确保写操作后下次查询获取最新数据
+     */
+    private void clearCaches() {
+        bodyPartNameCache.clear();
+        projectNameCache.clear();
     }
 
     /**

@@ -84,6 +84,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
     /**
      * 分页查询用户列表
+     * <p>
+     * 采用批量查询模式消除 N+1 问题：先分页查出用户实体，再一次性批量拉取
+     * 角色、机构、部门、医院关联数据，最后在内存中完成 VO 填充。
+     *
+     * @param dto 分页查询条件
+     * @return 分页用户 VO 列表
      */
     @Override
     public IPage<UserVO> listUser(UserPageDTO dto) {
@@ -102,12 +108,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 .orderByDesc(UserEntity::getCreateTime);
         IPage<UserEntity> pageResult = page(page, wrapper);
 
-        // 批量查询关联数据，避免 N+1 问题
+        // 批量查询关联数据，避免 N+1 问题：若逐条查询，每页10条会产生 10×4 次额外查询
         Map<Long, List<Long>> userHospitalMap = Collections.emptyMap();
         Map<Long, RoleEntity> roleMap = Collections.emptyMap();
         List<UserEntity> records = pageResult.getRecords();
         if (!records.isEmpty()) {
-            // 收集所有需要查询的 ID
+            // 从当前页所有用户中收集去重后的关联 ID，用于后续批量 IN 查询
             Set<Long> roleIds = records.stream()
                     .map(UserEntity::getRoleId)
                     .filter(Objects::nonNull)
@@ -121,31 +127,31 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
 
-            // 批量查询角色信息
+            // 批量查询角色信息，转为 Map 供 O(1) 查找
             roleMap = roleIds.isEmpty() ? Collections.emptyMap()
                     : roleService.listByIds(roleIds).stream()
                             .collect(Collectors.toMap(RoleEntity::getId, Function.identity()));
-            // 批量查询机构信息
+            // 批量查询机构信息，转为 Map 供 O(1) 查找
             Map<Long, OrgEntity> orgMap = orgIds.isEmpty() ? Collections.emptyMap()
                     : orgService.listByIds(orgIds).stream()
                             .collect(Collectors.toMap(OrgEntity::getId, Function.identity()));
-            // 批量查询部门信息
+            // 批量查询部门信息，转为 Map 供 O(1) 查找
             Map<Long, DeptEntity> deptMap = deptIds.isEmpty() ? Collections.emptyMap()
                     : deptService.listByIds(deptIds).stream()
                             .collect(Collectors.toMap(DeptEntity::getId, Function.identity()));
 
-            // 批量查询用户医院关联
+            // 批量查询用户-医院关联（一次 IN 查询替代逐用户查询）
             userHospitalMap = userHospitalService.listHospitalIdsByUserIds(
                     records.stream().map(UserEntity::getId).filter(Objects::nonNull).collect(Collectors.toList()));
 
-            // 填充关联数据到 VO
+            // 将批量查询结果填充到实体冗余字段，避免 VO 转换后再单条查询
             for (UserEntity entity : records) {
                 fillEntityWithNames(entity, roleMap, orgMap, deptMap);
             }
         }
 
         IPage<UserVO> voPage = pageResult.convert(UserConvert::toVO);
-        // 收集所有医院ID，批量查询医院名称
+        // 收集本页所有用户关联的医院 ID，再批量查一次医院名称（避免逐医院查询）
         Set<Long> allHospitalIds = userHospitalMap.values().stream()
                 .flatMap(List::stream)
                 .filter(Objects::nonNull)
@@ -210,6 +216,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
     /**
      * 根据ID查询用户详情
+     *
+     * @param id 用户ID
+     * @return 用户 VO（含关联名称、医院列表、专业方向等）
      */
     @Override
     public UserVO getUserById(Long id) {
@@ -226,11 +235,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
     /**
      * 填充实体关联名称（使用批量查询的 Map 数据）
+     * <p>
+     * 由 listUser 调用，传入已批量查好的 Map，避免在循环内单条查询数据库。
+     * 冗余字段写入 Entity 而非 VO，是因为 UserConvert.toVO 会一并复制这些字段。
      *
-     * @param entity 用户实体
-     * @param roleMap 角色Map
-     * @param orgMap 机构Map
-     * @param deptMap 部门Map
+     * @param entity  用户实体
+     * @param roleMap 角色 Map（key=roleId）
+     * @param orgMap  机构 Map（key=orgId）
+     * @param deptMap 部门 Map（key=deptId）
      */
     private void fillEntityWithNames(UserEntity entity, Map<Long, RoleEntity> roleMap,
                                     Map<Long, OrgEntity> orgMap, Map<Long, DeptEntity> deptMap) {
@@ -263,7 +275,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
     /**
      * 创建用户
-     * 配置键：default.password
+     * <p>
+     * 核心流程：唯一性校验 → 机构/部门存在性校验 → 部门类型分支处理 →
+     * 角色校验 → 业务规则校验（医院范围/专业方向）→ 密码加密 → 持久化 → 医院权限分配。
+     * <p>
+     * 配置键：{@link SystemConfigKeyEnum#DEFAULT_PASSWORD}（默认密码），
+     * {@link SystemConfigKeyEnum#MANUFACTURER_ORG_ID}（生产企业机构ID）。
+     *
+     * @param dto 创建用户请求 DTO
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -271,17 +290,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         String maskedUsername = maskUsername(dto.getUsername());
         log.info("创建用户，username={}, orgId={}", maskedUsername, dto.getOrgId());
         try {
-            // 校验用户名是否已存在
+            // 校验用户名全局唯一（函数索引保障 DB 层，此处提前拦截给出友好提示）
             if (isUsernameExists(dto.getUsername())) {
                 log.warn("用户名已存在，username={}", maskedUsername);
                 throw new BusinessException(ErrorCodeEnum.USER_EXISTS);
             }
-            // 校验手机号是否已存在
+            // 校验手机号全局唯一
             if (isPhoneExists(dto.getPhone())) {
                 log.warn("手机号已存在，phone={}", maskPhone(dto.getPhone()));
                 throw new BusinessException(ErrorCodeEnum.USER_PHONE_EXISTS);
             }
-            // 校验邮箱是否已存在
+            // 邮箱为选填字段，非空时才做唯一性校验
             if (StrUtil.isNotBlank(dto.getEmail()) && isEmailExists(dto.getEmail())) {
                 log.warn("邮箱已存在，email={}", dto.getEmail());
                 throw new BusinessException(ErrorCodeEnum.USER_EMAIL_EXISTS);
@@ -295,7 +314,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     throw new BusinessException(ErrorCodeEnum.USER_ORG_NOT_FOUND);
                 }
             }
-            // 校验所属部门是否存在
+            // 校验所属部门是否存在（部门类型决定后续机构归属分支，必须先查出实体）
             DeptEntity deptEntity = null;
             if (dto.getDeptId() != null) {
                 deptEntity = deptService.getById(dto.getDeptId());
@@ -304,27 +323,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     throw new BusinessException(ErrorCodeEnum.USER_DEPT_NOT_FOUND);
                 }
             }
-            // 根据部门类型分支处理
+            // 根据部门类型走不同的机构归属校验分支（内部部门强制绑定生产企业，外部部门校验 orgId 属于该部门）
             if (deptEntity != null) {
                 Integer deptType = deptEntity.getDeptType();
                 if (Integer.valueOf(1).equals(deptType)) {
-                    // 内部部门：强制使用生产企业 orgId，校验工号非空
+                    // 内部部门（deptType=1）：强制覆盖 orgId 为生产企业，防止前端伪造归属；同时要求工号非空
                     String manufacturerOrgIdStr = configService.getConfigValue(SystemConfigKeyEnum.MANUFACTURER_ORG_ID.getKey());
                     if (StrUtil.isBlank(manufacturerOrgIdStr)) {
                         log.error("系统配置缺失：{}，无法创建内部用户", SystemConfigKeyEnum.MANUFACTURER_ORG_ID.getKey());
                         throw new BusinessException(ErrorCodeEnum.SYSTEM_CONFIG_MISSING);
                     }
                     Long manufacturerOrgId = Long.valueOf(manufacturerOrgIdStr);
+                    // 强制将 orgId 设为生产企业，忽略前端传入值
                     dto.setOrgId(manufacturerOrgId);
                     orgEntity = orgService.getById(manufacturerOrgId);
                     if (StrUtil.isBlank(dto.getEmployeeNo())) {
                         throw new BusinessException(ErrorCodeEnum.EMPLOYEE_NO_REQUIRED);
                     }
                 } else if (Integer.valueOf(2).equals(deptType)) {
-                    // 外部部门：orgId 必填
+                    // 外部部门（deptType=2）：orgId 必填，且该机构必须已关联到此部门
                     if (dto.getOrgId() == null) {
                         throw new BusinessException(ErrorCodeEnum.ORG_NOT_BELONG_TO_DEPT);
                     }
+                    // 查询该部门下所有关联机构 ID，校验前端传入的 orgId 是否在其中
                     List<Long> deptOrgIds = deptOrgMapper.selectList(
                             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DeptOrgEntity>()
                                     .eq(DeptOrgEntity::getDeptId, dto.getDeptId()))
@@ -333,6 +354,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                         log.warn("机构不属于该部门，deptId={}, orgId={}", dto.getDeptId(), dto.getOrgId());
                         throw new BusinessException(ErrorCodeEnum.ORG_NOT_BELONG_TO_DEPT);
                     }
+                    // 外部部门仅允许经销商类型机构，防止将医院直接挂到外部部门
                     OrgEntity extOrg = orgService.getById(dto.getOrgId());
                     if (extOrg == null || !DictCodeConstants.ORG_TYPE_DEALER.equals(extOrg.getOrgType())) {
                         log.warn("机构类型不是经销商，orgId={}", dto.getOrgId());
@@ -360,7 +382,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             validateSpecialty(roleEntity, dto.getSpecialtyList());
             // DTO转换为实体对象
             UserEntity entity = UserConvert.toEntity(dto);
-            // specialty List → 逗号拼接存储
+            // specialty 在 DB 中以逗号分隔字符串存储，前端传 List 需在此转换
             if (CollUtil.isNotEmpty(dto.getSpecialtyList())) {
                 entity.setSpecialty(CollUtil.join(dto.getSpecialtyList(), ","));
             } else {
@@ -372,7 +394,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             String rawPassword;
             if (StrUtil.isNotBlank(dto.getPassword())) {
                 rawPassword = dto.getPassword();
-                // 密码强度校验：必须包含字母和数字
+                // 密码强度校验：必须包含字母和数字，长度 6-20 位
                 if (!isPasswordStrong(rawPassword)) {
                     log.warn("密码强度不足，username={}", maskedUsername);
                     throw new BusinessException(ErrorCodeEnum.USER_PASSWORD_WEAK);
@@ -384,7 +406,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             }
             entity.setPassword(passwordEncoder.encode(rawPassword));
             entity.setStatus(StatusConstants.NORMAL);
-            // 空字符串字段统一置 null，避免触发唯一索引冲突
+            // 空字符串字段统一置 null，避免触发唯一函数索引冲突（NULL 不参与唯一约束）
             if (StrUtil.isBlank(entity.getEmployeeNo())) {
                 entity.setEmployeeNo(null);
             }
@@ -394,7 +416,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             // 插入数据库
             save(entity);
 
-            // 处理医院范围权限分配（当角色的 dataScopeType=hospitals 时才分配）
+            // 仅当角色 dataScopeType=HOSPITALS 时才写入医院权限关联，其他数据范围类型无需此表
             if (dto.getHospitalIds() != null && !dto.getHospitalIds().isEmpty()) {
                 if (roleEntity != null && DataScopeTypeEnum.HOSPITALS.getCode().equals(roleEntity.getDataScopeType())) {
                     userHospitalService.assignHospitals(entity.getId(), dto.getHospitalIds());
@@ -415,6 +437,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
     /**
      * 更新用户
+     * <p>
+     * 角色生效规则：若本次传入了新 roleId 则以新角色为准，否则沿用用户当前角色。
+     * 医院权限采用覆盖式更新：只要传入 hospitalIds 且生效角色为 HOSPITALS 范围，即全量替换。
+     *
+     * @param id  用户ID
+     * @param dto 更新用户请求 DTO
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -470,7 +498,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     throw new BusinessException(ErrorCodeEnum.USER_ROLE_NOT_FOUND);
                 }
             }
-            // 确定本次操作生效的角色（新角色优先，否则沿用当前角色）
+            // 确定本次操作生效的角色：新角色优先，否则沿用当前角色（避免因未传 roleId 而跳过业务规则校验）
             RoleEntity effectiveRole = newRole != null ? newRole
                     : (entity.getRoleId() != null ? roleService.getById(entity.getRoleId()) : null);
             if (effectiveRole != null) {
@@ -486,7 +514,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             if (dto.getHospitalIds() != null && !dto.getHospitalIds().isEmpty()
                     && effectiveRole != null
                     && DataScopeTypeEnum.HOSPITALS.getCode().equals(effectiveRole.getDataScopeType())) {
-                // 覆盖式分配医院权限（角色变更或编辑页微调均走此路径）
+                // 覆盖式分配医院权限：先清空再写入，保证与前端选择完全一致
                 userHospitalService.assignHospitals(id, dto.getHospitalIds());
             }
             if (dto.getSpecialtyList() != null) {
@@ -496,7 +524,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             // 更新用户信息（排除不允许通过此接口修改的字段）
             BeanUtils.copyProperties(dto, entity, "id", "username", "password", "status",
                     "createTime", "updateTime", "createBy", "updateBy");
-            // 空字符串工号统一置 null，避免触发唯一索引冲突
+            // 空字符串工号统一置 null，避免触发唯一函数索引冲突（NULL 不参与唯一约束）
             if (StrUtil.isBlank(entity.getEmployeeNo())) {
                 entity.setEmployeeNo(null);
             }
@@ -532,6 +560,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         }
         // 删除用户前先清理医院关联
         userHospitalService.assignHospitals(id, List.of());
+        // 清空以该用户为负责人的部门记录，避免悬空引用
+        deptService.lambdaUpdate()
+                .eq(DeptEntity::getLeaderUserId, id)
+                .set(DeptEntity::getLeaderUserId, null)
+                .update();
         removeById(id);
         log.info("删除用户成功，id={}", id);
     }
@@ -550,6 +583,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         }
         entity.setStatus(status);
         updateById(entity);
+        // 禁用用户时，强制踢出其当前会话，使 token 立即失效
+        if (StatusConstants.DISABLED == status) {
+            try {
+                cn.dev33.satoken.stp.StpUtil.kickout(id);
+                log.info("已强制踢出用户会话，userId={}", id);
+            } catch (Exception ex) {
+                log.warn("踢出用户会话失败（用户可能未登录），userId={}", id);
+            }
+        }
         log.info("修改用户状态成功，id={}, status={}", id, status);
     }
 
@@ -641,20 +683,25 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     // ==================== 私有方法 ====================
 
     /**
-     * 校验角色医院范围权限：当角色 dataScopeType=hospitals 时，hospitalIds 必填且每个ID真实存在
+     * 校验角色医院范围权限
+     * <p>
+     * 当角色 dataScopeType=HOSPITALS 时，hospitalIds 必填且每个 ID 必须是真实存在的医院机构
+     * （orgType=ORG_TYPE_HOSPITAL）。其他数据范围类型直接跳过，无需传医院列表。
      *
-     * @param role        生效角色（null时跳过校验）
-     * @param hospitalIds 前端传入的医院ID列表
+     * @param role        生效角色（null 时跳过校验）
+     * @param hospitalIds 前端传入的医院 ID 列表
      */
     private void validateHospitalScope(RoleEntity role, List<Long> hospitalIds) {
+        // 非医院范围角色无需校验，直接返回
         if (role == null || !DataScopeTypeEnum.HOSPITALS.getCode().equals(role.getDataScopeType())) {
             return;
         }
+        // 医院范围角色必须指定至少一家医院
         if (hospitalIds == null || hospitalIds.isEmpty()) {
             log.warn("角色数据权限为医院范围，但未指定医院，roleId={}", role.getId());
             throw new BusinessException(ErrorCodeEnum.USER_ROLE_HOSPITAL_SCOPE_REQUIRED);
         }
-        // 批量校验医院ID是否真实存在（orgType=1.3 的机构）
+        // 批量查询并过滤出真实医院（orgType=ORG_TYPE_HOSPITAL），与传入列表取差集得到无效 ID
         Set<Long> existingIds = orgService.listByIds(hospitalIds).stream()
                 .filter(org -> DictCodeConstants.ORG_TYPE_HOSPITAL.equals(org.getOrgType()))
                 .map(OrgEntity::getId)
@@ -669,26 +716,34 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     }
 
     /**
-     * 校验设计师专业方向：当角色为 designer/designer-manager 时，至少选择一个方向且全部合法
+     * 校验设计师专业方向
+     * <p>
+     * 仅对 designer / designer-manager 角色生效：至少选择一个方向，且每个字典编码必须以
+     * {@link com.yigongbao.common.constant.DictCodeConstants#USER_SPECIALTY} 为前缀并在字典表中存在。
+     * 其他角色直接跳过，无需传专业方向。
      *
      * @param role          生效角色（null 时跳过校验）
      * @param specialtyList 专业方向字典编码列表
      */
     private void validateSpecialty(RoleEntity role, List<String> specialtyList) {
+        // 非设计师角色无需专业方向，直接跳过
         if (role == null || role.getRoleCode() == null
                 || !SPECIALTY_REQUIRED_ROLES.contains(role.getRoleCode())) {
             return;
         }
+        // 设计师/设计师管理员必须至少选择一个专业方向
         if (CollUtil.isEmpty(specialtyList)) {
             log.warn("角色为设计师/设计师管理员，但未指定专业方向，roleId={}", role.getId());
             throw new BusinessException(ErrorCodeEnum.USER_ROLE_SPECIALTY_REQUIRED);
         }
         String prefix = DictCodeConstants.USER_SPECIALTY + ".";
         for (String specialty : specialtyList) {
+            // 校验编码格式：必须以 USER_SPECIALTY 前缀开头，防止传入非专业方向字典值
             if (StrUtil.isBlank(specialty) || !specialty.startsWith(prefix)) {
                 log.warn("专业方向字典编码无效，specialty={}", specialty);
                 throw new BusinessException(ErrorCodeEnum.USER_SPECIALTY_INVALID, prefix);
             }
+            // 校验编码在字典表中真实存在，防止传入已废弃或伪造的编码
             if (dictService.getByDictCode(specialty) == null) {
                 log.warn("专业方向字典编码不存在，specialty={}", specialty);
                 throw new BusinessException(ErrorCodeEnum.USER_SPECIALTY_INVALID, specialty);
@@ -697,23 +752,26 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     }
 
     /**
-     * 填充冗余字段（复用已查询的实体，避免重复查询）
+     * 填充用户实体冗余字段
+     * <p>
+     * 冗余字段（orgName/deptName/roleName/roleCode）存储在用户表中，目的是避免列表查询时
+     * 每行都 JOIN 三张关联表，以空间换时间。复用调用方已查询的实体对象，不再重复查库。
      *
-     * @param entity 用户实体
-     * @param orgEntity 已查询的机构实体（可为空）
-     * @param deptEntity 已查询的部门实体（可为空）
-     * @param roleEntity 已查询的角色实体（可为空）
+     * @param entity     用户实体
+     * @param orgEntity  已查询的机构实体（可为 null）
+     * @param deptEntity 已查询的部门实体（可为 null）
+     * @param roleEntity 已查询的角色实体（可为 null）
      */
     private void fillRedundantFields(UserEntity entity, OrgEntity orgEntity, DeptEntity deptEntity, RoleEntity roleEntity) {
-        // 填充机构名称
+        // 冗余机构名称，避免查询时 JOIN sys_org
         if (entity.getOrgId() != null && orgEntity != null) {
             entity.setOrgName(orgEntity.getOrgName());
         }
-        // 填充部门名称
+        // 冗余部门名称，避免查询时 JOIN sys_dept
         if (entity.getDeptId() != null && deptEntity != null) {
             entity.setDeptName(deptEntity.getDeptName());
         }
-        // 填充角色名称和编码
+        // 冗余角色名称和编码，roleCode 用于前端权限判断，避免查询时 JOIN sys_role
         if (entity.getRoleId() != null && roleEntity != null) {
             entity.setRoleName(roleEntity.getRoleName());
             entity.setRoleCode(roleEntity.getRoleCode());
@@ -894,6 +952,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     }
 
     /**
+     * 查询指定部门下所有启用状态的用户ID列表
      *
      * @param deptId 部门ID
      * @return 用户ID列表

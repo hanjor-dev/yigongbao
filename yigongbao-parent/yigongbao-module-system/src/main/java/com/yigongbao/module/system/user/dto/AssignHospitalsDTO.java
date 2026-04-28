@@ -17,6 +17,7 @@ public class AssignHospitalsDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    /** 要分配的医院ID列表，不能为空 */
     @NotEmpty(message = "医院列表不能为空")
     private List<Long> hospitalIds;
 }

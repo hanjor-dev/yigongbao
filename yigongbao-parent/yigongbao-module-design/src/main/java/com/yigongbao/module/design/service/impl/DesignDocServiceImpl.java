@@ -209,6 +209,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         if (entity == null || !entity.getPackageId().equals(packageId)) {
             throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
         }
+        String oldRevisedFileId = entity.getRevisedFileId();
         FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
         LocalDateTime uploadTime = LocalDateTime.now();
         entity.setRevisedFileId(fileVO.getId());
@@ -218,6 +219,10 @@ public class DesignDocServiceImpl implements DesignDocService {
         entity.setIsConfirmed(1);
         entity.setConfirmTime(uploadTime);
         instructionService.updateById(entity);
+        // 删除旧修订版文件，避免 OSS 泄漏
+        if (oldRevisedFileId != null) {
+            fileService.deleteById(oldRevisedFileId);
+        }
         log.info("上传修订版指令单成功，已自动确认，id={}", id);
     }
 
@@ -237,6 +242,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         if (entity == null || !entity.getPackageId().equals(packageId)) {
             throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
         }
+        String oldRevisedFileId = entity.getRevisedFileId();
         FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.DRAWING_FILE.getDictCode());
         LocalDateTime uploadTime = LocalDateTime.now();
         entity.setRevisedFileId(fileVO.getId());
@@ -246,6 +252,10 @@ public class DesignDocServiceImpl implements DesignDocService {
         entity.setIsConfirmed(1);
         entity.setConfirmTime(uploadTime);
         drawingService.updateById(entity);
+        // 删除旧修订版文件，避免 OSS 泄漏
+        if (oldRevisedFileId != null) {
+            fileService.deleteById(oldRevisedFileId);
+        }
         log.info("上传修订版图纸成功，已自动确认，id={}", id);
     }
 
@@ -551,7 +561,8 @@ public class DesignDocServiceImpl implements DesignDocService {
 
         // 持久化
         if (toOverride != null) {
-            // 覆盖现有版本
+            // 覆盖现有版本，先记录旧文件ID以便删除
+            String oldTemplateFileId = toOverride.getTemplateFileId();
             toOverride.setTemplateFileId(fileVO.getId());
             toOverride.setTemplateFileUrl(fileVO.getFileUrl());
             toOverride.setGenerateTime(now);
@@ -559,6 +570,10 @@ public class DesignDocServiceImpl implements DesignDocService {
             toOverride.setIsConfirmed(StatusConstants.NOT_CONFIRMED);
             toOverride.setConfirmTime(null);
             instructionService.updateById(toOverride);
+            // 删除旧模板文件，避免 OSS 泄漏
+            if (oldTemplateFileId != null) {
+                fileService.deleteById(oldTemplateFileId);
+            }
             log.info("指令单覆盖完成，packageId={}, version={}", packageId, version);
             return toOverride;
         } else {
@@ -630,7 +645,8 @@ public class DesignDocServiceImpl implements DesignDocService {
 
         // 持久化
         if (toOverride != null) {
-            // 覆盖现有版本
+            // 覆盖现有版本，先记录旧文件ID以便删除
+            String oldTemplateFileId = toOverride.getTemplateFileId();
             toOverride.setTemplateFileId(fileVO.getId());
             toOverride.setTemplateFileUrl(fileVO.getFileUrl());
             toOverride.setGenerateTime(now);
@@ -638,6 +654,10 @@ public class DesignDocServiceImpl implements DesignDocService {
             toOverride.setIsConfirmed(StatusConstants.NOT_CONFIRMED);
             toOverride.setConfirmTime(null);
             drawingService.updateById(toOverride);
+            // 删除旧模板文件，避免 OSS 泄漏
+            if (oldTemplateFileId != null) {
+                fileService.deleteById(oldTemplateFileId);
+            }
             log.info("图纸覆盖完成，packageId={}, version={}", packageId, version);
             return toOverride;
         } else {

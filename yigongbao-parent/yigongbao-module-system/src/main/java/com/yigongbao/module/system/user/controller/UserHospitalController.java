@@ -77,7 +77,7 @@ public class UserHospitalController {
     @Operation(summary = "预览模板包含的医院列表")
     @GetMapping("/template/{templateId}")
     public Result<HospitalGroupTemplateVO> previewTemplate(@PathVariable Long userId, @PathVariable Long templateId) {
-        HospitalGroupTemplateVO template = hospitalGroupTemplateService.getTemplateById(templateId);
-        return Result.success(template);
+        // 用户分配场景：传入 userId，assigned 表示该用户是否已分配该医院
+        return Result.success(hospitalGroupTemplateService.getTemplateById(templateId, userId));
     }
 }

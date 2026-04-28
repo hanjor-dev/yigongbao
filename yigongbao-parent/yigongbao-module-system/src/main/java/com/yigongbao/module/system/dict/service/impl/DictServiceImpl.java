@@ -84,9 +84,10 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
                 log.warn("字典类型不存在，typeCode={}", typeCode);
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
-            // 筛选子节点
+            // 筛选子节点（仅返回启用状态的字典项）
             List<DictEntity> list = allList.stream()
-                    .filter(e -> Objects.equals(e.getParentId(), typeEntity.getId()))
+                    .filter(e -> Objects.equals(e.getParentId(), typeEntity.getId())
+                            && StatusConstants.NORMAL == e.getStatus())
                     .sorted(Comparator.comparing(DictEntity::getSort, Comparator.nullsLast(Comparator.naturalOrder())))
                     .sorted(Comparator.comparing(DictEntity::getId, Comparator.nullsLast(Comparator.naturalOrder())))
                     .collect(Collectors.toList());
@@ -350,7 +351,13 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
                 log.warn("字典存在子节点，无法删除，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_HAS_CHILDREN);
             }
-            // 逻辑删除
+            // 叶子节点可能被业务表（sys_org.org_type、sys_user.specialty 等）引用，
+            // 禁止物理/逻辑删除，只允许通过 updateStatus 禁用
+            if (!ROOT_PARENT_ID.equals(entity.getParentId())) {
+                log.warn("字典叶子节点可能被业务数据引用，禁止删除，请使用禁用操作，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "字典数据项不允许删除，请使用禁用操作");
+            }
+            // 根节点（字典类型）：无子节点时允许删除
             super.removeById(id);
             log.info("删除字典成功，id={}", id);
         } catch (BusinessException e) {

@@ -11,7 +11,7 @@ import com.yigongbao.module.system.dept.vo.DeptVO;
 import java.util.List;
 
 /**
- * 部门 Service 接口
+ * 部门 Service 接口，定义部门管理相关业务操作
  *
  * @author hanjor
  * @date 2026-03-17

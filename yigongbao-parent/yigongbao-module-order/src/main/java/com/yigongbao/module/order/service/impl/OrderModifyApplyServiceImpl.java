@@ -750,6 +750,15 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                     "item_" + deletedItem.getId(), "删除重建项目",
                     deletedItem.getProjectName(), null, modifierId, modifierName);
         }
+
+        // 校验执行后订单明细数量不能为0
+        long remainingCount = orderItemMapper.selectCount(
+                new LambdaQueryWrapper<OrderItemEntity>()
+                        .eq(OrderItemEntity::getOrderId, order.getId())
+                        .eq(OrderItemEntity::getIsDeleted, 0));
+        if (remainingCount == 0) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_ITEM_REQUIRED);
+        }
     }
 
     // ==================== 辅助方法：影像文件修改 ====================

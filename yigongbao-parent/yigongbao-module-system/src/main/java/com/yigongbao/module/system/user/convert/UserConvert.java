@@ -7,8 +7,8 @@ import com.yigongbao.module.system.user.vo.UserVO;
 import org.springframework.beans.BeanUtils;
 
 /**
- * 用户转换器
- * 用于 Entity/VO/DTO 之间的转换
+ * 用户对象转换器
+ * 负责 UserEntity、UserVO、CreateUserDTO、UpdateUserDTO 之间的属性拷贝
  *
  * @author hanjor
  * @date 2026-03-17
@@ -16,7 +16,10 @@ import org.springframework.beans.BeanUtils;
 public class UserConvert {
 
     /**
-     * Entity 转 VO
+     * 将用户实体转换为视图对象
+     *
+     * @param entity 用户实体
+     * @return 用户VO，entity 为 null 时返回 null
      */
     public static UserVO toVO(UserEntity entity) {
         if (entity == null) {
@@ -28,7 +31,10 @@ public class UserConvert {
     }
 
     /**
-     * DTO 转 Entity
+     * 将创建用户 DTO 转换为实体
+     *
+     * @param dto 创建用户请求参数
+     * @return 用户实体，dto 为 null 时返回 null
      */
     public static UserEntity toEntity(CreateUserDTO dto) {
         if (dto == null) {
@@ -40,7 +46,10 @@ public class UserConvert {
     }
 
     /**
-     * DTO 转 Entity（更新）
+     * 将更新用户 DTO 转换为实体
+     *
+     * @param dto 更新用户请求参数
+     * @return 用户实体，dto 为 null 时返回 null
      */
     public static UserEntity toEntity(UpdateUserDTO dto) {
         if (dto == null) {

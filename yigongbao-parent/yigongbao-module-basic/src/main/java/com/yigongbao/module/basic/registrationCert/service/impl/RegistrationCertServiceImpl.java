@@ -1,6 +1,7 @@
 package com.yigongbao.module.basic.registrationCert.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -16,6 +17,9 @@ import com.yigongbao.module.basic.registrationCert.entity.RegistrationCertEntity
 import com.yigongbao.module.basic.registrationCert.mapper.RegistrationCertMapper;
 import com.yigongbao.module.basic.registrationCert.service.RegistrationCertService;
 import com.yigongbao.module.basic.registrationCert.vo.RegistrationCertVO;
+import com.yigongbao.module.basic.product.entity.ProductSpecEntity;
+import com.yigongbao.module.basic.product.mapper.ProductSpecMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -35,8 +39,11 @@ import java.util.Objects;
      */
     @Service
     @Slf4j
+    @RequiredArgsConstructor
     public class RegistrationCertServiceImpl extends ServiceImpl<RegistrationCertMapper, RegistrationCertEntity>
             implements RegistrationCertService {
+
+    private final ProductSpecMapper productSpecMapper;
 
     /**
      * 分页查询注册证列表
@@ -174,12 +181,27 @@ import java.util.Objects;
                 log.warn("注册证号已存在，certCode={}", dto.getCertCode());
                 throw new BusinessException(ErrorCodeEnum.CERT_EXISTS);
             }
+            String oldCertCode = entity.getCertCode();
             BeanUtils.copyProperties(dto, entity, "id", "createTime", "updateTime", "createBy", "updateBy");
             if (entity.getStatus() == null) {
                 entity.setStatus(isExpired(entity.getValidTo()) ? StatusConstants.DISABLED : StatusConstants.NORMAL);
                 log.info("注册证有效期已过，更新时自动设为禁用状态，id={}", id);
             }
             updateById(entity);
+            // 注册证号变更时，同步更新 product_spec 中的冗余字段 cert_no
+            if (StringUtils.hasText(dto.getCertCode()) && !dto.getCertCode().equals(oldCertCode)) {
+                productSpecMapper.update(null, new LambdaUpdateWrapper<ProductSpecEntity>()
+                        .eq(ProductSpecEntity::getCertId, id)
+                        .set(ProductSpecEntity::getCertNo, dto.getCertCode()));
+            }
+            // 注册证状态变为禁用时，级联禁用关联的产品规格（合规要求）
+            if (StatusConstants.DISABLED == entity.getStatus()) {
+                productSpecMapper.update(null, new LambdaUpdateWrapper<ProductSpecEntity>()
+                        .eq(ProductSpecEntity::getCertId, id)
+                        .eq(ProductSpecEntity::getStatus, StatusConstants.NORMAL)
+                        .set(ProductSpecEntity::getStatus, StatusConstants.DISABLED));
+                log.info("注册证禁用，已级联禁用关联规格，certId={}", id);
+            }
             log.info("更新注册证成功，id={}", id);
         } catch (BusinessException e) {
             throw e;
@@ -235,6 +257,13 @@ import java.util.Objects;
                 if (!Objects.equals(entity.getStatus(), targetStatus)) {
                     entity.setStatus(targetStatus);
                     updateById(entity);
+                    // 注册证过期自动禁用时，级联禁用关联的产品规格
+                    if (StatusConstants.DISABLED == targetStatus) {
+                        productSpecMapper.update(null, new LambdaUpdateWrapper<ProductSpecEntity>()
+                                .eq(ProductSpecEntity::getCertId, entity.getId())
+                                .eq(ProductSpecEntity::getStatus, StatusConstants.NORMAL)
+                                .set(ProductSpecEntity::getStatus, StatusConstants.DISABLED));
+                    }
                     updatedCount++;
                 }
             }

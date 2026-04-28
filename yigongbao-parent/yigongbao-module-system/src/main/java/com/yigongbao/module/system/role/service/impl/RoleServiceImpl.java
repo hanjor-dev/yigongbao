@@ -18,6 +18,7 @@ import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.role.vo.RoleVO;
 import com.yigongbao.module.system.resource.mapper.RoleResourceMapper;
 import com.yigongbao.module.system.resource.service.ResourceService;
+import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -156,10 +157,17 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
                     throw new BusinessException(ErrorCodeEnum.ROLE_EXISTS);
                 }
             }
-            // 更新角色信息
+            // 更新角色信息（先记录旧名称，用于后续同步冗余字段）
+            String oldRoleName = entity.getRoleName();
             BeanUtils.copyProperties(dto, entity, "id", "roleCode", "createTime", "updateTime", "createBy", "updateBy");
             // 更新数据库
             updateById(entity);
+            // 角色名称变更时，同步更新 sys_user 中的冗余字段 role_name
+            if (StrUtil.isNotBlank(dto.getRoleName()) && !dto.getRoleName().equals(oldRoleName)) {
+                userMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UserEntity>()
+                        .eq(UserEntity::getRoleId, id)
+                        .set(UserEntity::getRoleName, dto.getRoleName()));
+            }
             log.info("更新角色成功，id={}", id);
         } catch (BusinessException e) {
             throw e;
@@ -190,10 +198,9 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
                 log.warn("该角色下存在用户，无法删除，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ROLE_HAS_USERS);
             }
-            // 逻辑删除
-            removeById(id);
-            // 清理角色资源关联表
+            // 先清理角色资源关联表，再逻辑删除角色
             roleResourceMapper.deleteByRoleId(id);
+            removeById(id);
             log.info("删除角色成功，id={}", id);
         } catch (BusinessException e) {
             throw e;

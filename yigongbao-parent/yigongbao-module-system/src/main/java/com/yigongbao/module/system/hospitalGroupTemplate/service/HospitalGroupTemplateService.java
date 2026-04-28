@@ -21,7 +21,14 @@ public interface HospitalGroupTemplateService extends IService<HospitalGroupTemp
 
     IPage<HospitalGroupTemplateVO> listTemplate(HospitalGroupTemplatePageDTO dto);
 
-    HospitalGroupTemplateVO getTemplateById(Long id);
+    /**
+     * 根据ID查询模板详情
+     *
+     * @param id     模板ID
+     * @param userId 用户ID（可选，传入时 assigned 字段表示该用户是否已分配；不传时表示全系统任意用户是否已分配）
+     * @return 模板详情VO
+     */
+    HospitalGroupTemplateVO getTemplateById(Long id, Long userId);
 
     void createTemplate(CreateHospitalGroupTemplateDTO dto);
 

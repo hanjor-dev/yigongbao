@@ -5,7 +5,7 @@ import lombok.Data;
 import java.io.Serializable;
 
 /**
- * 部门分页查询 DTO
+ * 部门分页查询请求参数
  *
  * @author hanjor
  * @date 2026-04-01
@@ -15,28 +15,18 @@ public class DeptPageDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 页码
-     */
+    /** 页码，默认第1页 */
     private Integer pageNum = 1;
 
-    /**
-     * 每页条数
-     */
+    /** 每页条数，默认10条 */
     private Integer pageSize = 10;
 
-    /**
-     * 部门类型（1=内部，2=外部，可选过滤）
-     */
+    /** 部门类型（1=内部，2=外部，可选过滤） */
     private Integer deptType;
 
-    /**
-     * 部门名称（模糊查询）
-     */
+    /** 部门名称（模糊查询） */
     private String deptName;
 
-    /**
-     * 状态（0=禁用，1=正常）
-     */
+    /** 状态（0=禁用，1=正常） */
     private Integer status;
 }

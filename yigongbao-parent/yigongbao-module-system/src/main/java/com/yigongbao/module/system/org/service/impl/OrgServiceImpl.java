@@ -22,8 +22,15 @@ import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.entity.OrgHospitalEntity;
 import com.yigongbao.module.system.org.mapper.OrgHospitalMapper;
 import com.yigongbao.module.system.org.mapper.OrgMapper;
+import com.yigongbao.module.system.hospitalGroupTemplate.mapper.HospitalGroupTemplateDetailMapper;
+import com.yigongbao.module.system.hospitalGroupTemplate.entity.HospitalGroupTemplateDetailEntity;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.org.vo.OrgVO;
+import com.yigongbao.module.system.dept.entity.DeptOrgEntity;
+import com.yigongbao.module.system.dept.mapper.DeptOrgMapper;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.entity.UserHospitalEntity;
+import com.yigongbao.module.system.user.mapper.UserHospitalMapper;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,9 +58,12 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
 
     private final DictService dictService;
     private final UserMapper userMapper;
+    private final UserHospitalMapper userHospitalMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final AreaService areaService;
     private final OrgHospitalMapper orgHospitalMapper;
+    private final HospitalGroupTemplateDetailMapper templateDetailMapper;
+    private final DeptOrgMapper deptOrgMapper;
 
     /**
      * 分页查询机构列表
@@ -203,30 +213,43 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             if (dto.getOrgType() != null && DictCodeConstants.ORG_TYPE_PRODUCER.equals(dto.getOrgType())) {
                 throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_ALLOWED);
             }
+            // 机构名称有变更时才校验唯一性，避免与自身冲突
             if (StrUtil.isNotBlank(dto.getOrgName()) && !dto.getOrgName().equals(entity.getOrgName())) {
                 if (isOrgNameExistsExcludingId(dto.getOrgName(), id)) {
                     throw new BusinessException(ErrorCodeEnum.ORG_EXISTS);
                 }
             }
-            // 医疗器械资质时资质文件必填
+            // 资质类型以入参为准，入参为空则沿用原值，防止局部更新时误清空
             Integer qualType = dto.getQualificationType() != null ? dto.getQualificationType() : entity.getQualificationType();
             String qualFile = StrUtil.isNotBlank(dto.getQualificationFile()) ? dto.getQualificationFile() : entity.getQualificationFile();
+            // 医疗器械资质时资质文件必填
             if (Integer.valueOf(1).equals(qualType) && StrUtil.isBlank(qualFile)) {
                 throw new BusinessException(ErrorCodeEnum.ORG_CERT_FILE_REQUIRED);
             }
+            // 记录原机构名称，用于后续判断是否需要同步 sys_user.org_name
+            String originalOrgName = entity.getOrgName();
+            // 排除不可变字段，将DTO属性覆盖到实体（orgCode、审计字段、关联ID不参与更新）
             BeanUtils.copyProperties(dto, entity, "id", "orgCode", "createTime", "updateTime", "createBy", "updateBy", "hospitalOrgIds");
+            // areaId变更时同步刷新冗余的地区名称字段
             if (dto.getAreaId() != null) {
                 AreaEntity areaEntity = areaService.getById(dto.getAreaId());
                 entity.setAreaName(areaEntity != null ? areaEntity.getName() : null);
             }
             updateById(entity);
-            // 经销商类型：更新关联医疗机构（先删后插）
+            // 机构名称变更时，同步更新 sys_user 中的冗余字段 org_name
+            if (StrUtil.isNotBlank(dto.getOrgName()) && !dto.getOrgName().equals(originalOrgName)) {
+                userMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UserEntity>()
+                        .eq(UserEntity::getOrgId, id)
+                        .set(UserEntity::getOrgName, dto.getOrgName()));
+            }
+            // 经销商类型且前端传入了 hospitalOrgIds 时，全量替换关联关系（先删后插）
             String orgType = entity.getOrgType();
             if (DictCodeConstants.ORG_TYPE_DEALER.equals(orgType) && dto.getHospitalOrgIds() != null) {
+                // 删除该经销商的全部旧关联
                 orgHospitalMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
                         .eq(OrgHospitalEntity::getDistributorOrgId, id));
                 if (!dto.getHospitalOrgIds().isEmpty()) {
-                    // 校验 hospitalOrgIds 中的机构必须是医疗机构类型
+                    // 校验 hospitalOrgIds 中的机构必须是医疗机构类型，且全部存在
                     List<OrgEntity> hospitals = listByIds(dto.getHospitalOrgIds());
                     boolean hasInvalid = hospitals.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_HOSPITAL.equals(o.getOrgType()));
                     if (hasInvalid || hospitals.size() != dto.getHospitalOrgIds().size()) {
@@ -266,10 +289,19 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                 throw new BusinessException(ErrorCodeEnum.ORG_HAS_USERS);
             }
             // 清理经销商-医疗机构关联记录（作为经销商或医疗机构均需清理）
-            orgHospitalMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
+            orgHospitalMapper.delete(new LambdaQueryWrapper<OrgHospitalEntity>()
                     .eq(OrgHospitalEntity::getDistributorOrgId, id)
                     .or()
                     .eq(OrgHospitalEntity::getHospitalOrgId, id));
+            // 清理用户-医院关联记录（该机构作为医疗机构被分配给用户的记录）
+            userHospitalMapper.delete(new LambdaQueryWrapper<UserHospitalEntity>()
+                    .eq(UserHospitalEntity::getHospitalId, id));
+            // 清理医院组合模板明细记录（该机构作为医院被加入模板的记录）
+            templateDetailMapper.delete(new LambdaQueryWrapper<HospitalGroupTemplateDetailEntity>()
+                    .eq(HospitalGroupTemplateDetailEntity::getHospitalId, id));
+            // 清理部门-机构关联记录（该机构被部门关联的记录）
+            deptOrgMapper.delete(new LambdaQueryWrapper<DeptOrgEntity>()
+                    .eq(DeptOrgEntity::getOrgId, id));
             // 逻辑删除
             removeById(id);
             log.info("删除机构成功，id={}", id);
@@ -362,7 +394,15 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
         return vo;
     }
 
+    /**
+     * 保存经销商与医疗机构的关联关系
+     * <p>将经销商ID与多个医疗机构ID逐条写入关联表</p>
+     *
+     * @param distributorOrgId 经销商机构ID
+     * @param hospitalOrgIds   关联的医疗机构ID列表
+     */
     private void saveOrgHospitalRelations(Long distributorOrgId, List<Long> hospitalOrgIds) {
+        // 将每个医疗机构ID构建为关联实体，逐条插入
         List<OrgHospitalEntity> relations = hospitalOrgIds.stream().map(hospitalOrgId -> {
             OrgHospitalEntity rel = new OrgHospitalEntity();
             rel.setDistributorOrgId(distributorOrgId);

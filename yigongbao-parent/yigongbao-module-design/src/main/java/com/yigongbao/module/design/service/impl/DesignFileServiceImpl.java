@@ -25,8 +25,10 @@ import com.yigongbao.module.design.service.DesignDrawingService;
 import com.yigongbao.module.design.service.DesignModelService;
 import com.yigongbao.module.design.service.DesignPackageFileService;
 import com.yigongbao.module.design.service.DesignPackageService;
+import com.yigongbao.module.design.entity.DesignPackageFileScreenshotEntity;
 import com.yigongbao.module.design.service.DesignProductFileService;
 import com.yigongbao.module.design.service.DesignProductService;
+import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.util.ArchiveParserUtil;
 import com.yigongbao.module.design.vo.DesignModelVO;
 import com.yigongbao.module.design.vo.DesignPackageFileVO;
@@ -61,6 +63,7 @@ public class DesignFileServiceImpl implements DesignFileService {
     private final DesignModelService modelService;
     private final DesignProductService productService;
     private final DesignProductFileService productFileService;
+    private final DesignScreenshotService screenshotService;
     private final DesignInstructionService instructionService;
     private final DesignDrawingService drawingService;
     private final FileService fileService;
@@ -212,6 +215,21 @@ public class DesignFileServiceImpl implements DesignFileService {
                 new LambdaQueryWrapper<DesignPackageFileEntity>()
                         .eq(DesignPackageFileEntity::getPackageId, packageId)
                         .isNotNull(DesignPackageFileEntity::getFileId));
+
+        // 4.1 删除包内文件关联的截图（OSS文件 + DB记录）
+        if (!innerFiles.isEmpty()) {
+            List<Long> packageFileIds = innerFiles.stream().map(DesignPackageFileEntity::getId).toList();
+            Map<Long, String> screenshotFileIds = screenshotService.listFileIdsByPackageFileIds(packageFileIds);
+            for (String fileId : screenshotFileIds.values()) {
+                fileService.deleteById(fileId);
+            }
+            if (!screenshotFileIds.isEmpty()) {
+                screenshotService.deleteByPackageFileIds(packageFileIds);
+            }
+            log.info("包内文件截图删除完成, count={}", screenshotFileIds.size());
+        }
+
+        // 4.2 删除包内文件本身的 OSS 存储
         for (DesignPackageFileEntity innerFile : innerFiles) {
             fileService.deleteById(innerFile.getFileId());
         }

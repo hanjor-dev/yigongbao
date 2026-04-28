@@ -34,6 +34,8 @@ import com.yigongbao.module.order.entity.OrderDraftEntity;
 import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
+import com.yigongbao.module.order.entity.OrderModificationLogEntity;
+import com.yigongbao.module.order.entity.OrderModifyApplyEntity;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.service.DesignerAssignmentService;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
@@ -42,6 +44,8 @@ import com.yigongbao.module.order.mapper.OrderFileMapper;
 import com.yigongbao.module.order.mapper.OrderItemDraftMapper;
 import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
+import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
+import com.yigongbao.module.order.mapper.OrderModifyApplyMapper;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
@@ -96,6 +100,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderDraftMapper orderDraftMapper;
     private final OrderItemDraftMapper orderItemDraftMapper;
     private final OrderFileMapper orderFileMapper;
+    private final OrderModifyApplyMapper orderModifyApplyMapper;
+    private final OrderModificationLogMapper orderModificationLogMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
     private final OrgService orgService;
@@ -434,6 +440,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             orderItemMapper.delete(new LambdaQueryWrapper<OrderItemEntity>().eq(OrderItemEntity::getOrderId, id));
             // 清理关联文件记录（软删除）
             orderFileMapper.delete(new LambdaQueryWrapper<OrderFileEntity>().eq(OrderFileEntity::getOrderId, id));
+            // 清理修改申请记录（软删除）
+            orderModifyApplyMapper.delete(new LambdaQueryWrapper<OrderModifyApplyEntity>().eq(OrderModifyApplyEntity::getOrderId, id));
+            // 清理修改留痕日志（硬删除，不继承 BaseEntity）
+            orderModificationLogMapper.delete(new LambdaQueryWrapper<OrderModificationLogEntity>().eq(OrderModificationLogEntity::getOrderId, id));
+            // TODO: 流程历史记录清理需 FlowFacade 提供接口支持
             log.info("删除订单成功，id={}", id);
         } catch (BusinessException e) {
             throw e;
