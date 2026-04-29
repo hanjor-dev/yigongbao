@@ -12,6 +12,9 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.area.entity.AreaEntity;
 import com.yigongbao.module.basic.area.service.AreaService;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
+import com.yigongbao.module.basic.file.service.FileService;
+import com.yigongbao.module.basic.file.vo.FileVO;
+import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.system.org.convert.OrgConvert;
@@ -64,6 +67,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     private final OrgHospitalMapper orgHospitalMapper;
     private final HospitalGroupTemplateDetailMapper templateDetailMapper;
     private final DeptOrgMapper deptOrgMapper;
+    private final FileService fileService;
 
     /**
      * 分页查询机构列表
@@ -157,9 +161,15 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                 log.warn("机构类型不存在，orgType={}", dto.getOrgType());
                 throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_FOUND);
             }
-            // 医疗器械资质时资质文件必填
+            // 医疗器械资质时资质文件必填，且校验文件真实存在
             if (Integer.valueOf(1).equals(dto.getQualificationType()) && StrUtil.isBlank(dto.getQualificationFile())) {
                 throw new BusinessException(ErrorCodeEnum.ORG_CERT_FILE_REQUIRED);
+            }
+            if (StrUtil.isNotBlank(dto.getQualificationFile())) {
+                FileVO fileVO = fileService.getById(dto.getQualificationFile());
+                if (fileVO == null) {
+                    throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
+                }
             }
             // 生成机构编码
             String prefix = getOrgPrefixByType(dto.getOrgType());
@@ -175,6 +185,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             }
             // 插入数据库
             save(entity);
+            // 资质文件关联到机构
+            if (StrUtil.isNotBlank(dto.getQualificationFile())) {
+                fileService.linkFile(dto.getQualificationFile(), FileBizTypeEnum.ORG_CERT.getDictCode(), entity.getId());
+            }
             // 经销商类型：保存关联医疗机构
             if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType()) && dto.getHospitalOrgIds() != null && !dto.getHospitalOrgIds().isEmpty()) {
                 // 校验 hospitalOrgIds 中的机构必须是医疗机构类型
@@ -222,9 +236,15 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             // 资质类型以入参为准，入参为空则沿用原值，防止局部更新时误清空
             Integer qualType = dto.getQualificationType() != null ? dto.getQualificationType() : entity.getQualificationType();
             String qualFile = StrUtil.isNotBlank(dto.getQualificationFile()) ? dto.getQualificationFile() : entity.getQualificationFile();
-            // 医疗器械资质时资质文件必填
+            // 医疗器械资质时资质文件必填，且校验文件真实存在
             if (Integer.valueOf(1).equals(qualType) && StrUtil.isBlank(qualFile)) {
                 throw new BusinessException(ErrorCodeEnum.ORG_CERT_FILE_REQUIRED);
+            }
+            if (StrUtil.isNotBlank(dto.getQualificationFile())) {
+                FileVO fileVO = fileService.getById(dto.getQualificationFile());
+                if (fileVO == null) {
+                    throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
+                }
             }
             // 记录原机构名称，用于后续判断是否需要同步 sys_user.org_name
             String originalOrgName = entity.getOrgName();
@@ -236,6 +256,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                 entity.setAreaName(areaEntity != null ? areaEntity.getName() : null);
             }
             updateById(entity);
+            // 资质文件有变更时重新关联
+            if (StrUtil.isNotBlank(dto.getQualificationFile())) {
+                fileService.linkFile(dto.getQualificationFile(), FileBizTypeEnum.ORG_CERT.getDictCode(), id);
+            }
             // 机构名称变更时，同步更新 sys_user 中的冗余字段 org_name
             if (StrUtil.isNotBlank(dto.getOrgName()) && !dto.getOrgName().equals(originalOrgName)) {
                 userMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UserEntity>()
