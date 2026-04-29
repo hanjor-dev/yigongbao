@@ -27,6 +27,8 @@ import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.hutool.core.util.StrUtil;
@@ -48,9 +50,12 @@ import java.util.stream.Collectors;
 public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> implements DeptService {
 
     private final OrgService orgService;
-    private final UserService userService;
     private final CodeGeneratorService codeGeneratorService;
     private final DeptOrgMapper deptOrgMapper;
+
+    @Autowired
+    @Lazy
+    private UserService userService;
 
     /**
      * 分页查询部门列表
