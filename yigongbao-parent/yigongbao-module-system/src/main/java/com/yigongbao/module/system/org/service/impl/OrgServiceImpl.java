@@ -386,15 +386,17 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             updateById(entity);
             // 禁用机构时踢出其下所有用户的登录会话
             if (StatusConstants.DISABLED == status) {
-                userMapper.selectList(new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id))
-                        .forEach(u -> {
-                            try {
-                                cn.dev33.satoken.stp.StpUtil.kickout(u.getId());
-                            } catch (Exception ex) {
-                                log.warn("踢出用户会话失败，userId={}", u.getId());
-                            }
-                        });
-                log.info("禁用机构，已踢出所有用户会话，orgId={}", id);
+                List<UserEntity> users = userMapper.selectList(
+                        new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id));
+                users.forEach(u -> {
+                    try {
+                        cn.dev33.satoken.stp.StpUtil.kickout(u.getId());
+                        log.info("已踢出用户会话，userId={}", u.getId());
+                    } catch (Exception ex) {
+                        log.warn("踢出用户会话失败（用户可能未登录），userId={}", u.getId());
+                    }
+                });
+                log.info("禁用机构完成，共踢出 {} 个用户会话，orgId={}", users.size(), id);
             }
             log.info("修改机构状态成功，id={}, status={}", id, status);
         } catch (BusinessException e) {
@@ -539,13 +541,17 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
 
     /**
      * 预检查删除机构的影响
+     * 返回该机构下的用户列表，以及（医疗机构时）关联的医生列表
+     *
+     * @param id 机构ID
+     * @return 检查结果，affected=true 时需前端提示用户确认
      */
     @Override
     public OrgOperationCheckVO checkRemove(Long id) {
+        log.info("预检查删除机构影响，id={}", id);
         OrgEntity entity = getById(id);
         if (entity == null) throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
 
-        OrgOperationCheckVO result = new OrgOperationCheckVO();
         List<UserEntity> users = userMapper.selectList(new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id));
         List<OrgOperationCheckVO.AffectedUserVO> affectedUsers = users.stream().map(u -> {
             OrgOperationCheckVO.AffectedUserVO vo = new OrgOperationCheckVO.AffectedUserVO();
@@ -556,6 +562,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
 
         List<OrgOperationCheckVO.AffectedDoctorVO> affectedDoctors = new java.util.ArrayList<>();
         if (DictCodeConstants.ORG_TYPE_HOSPITAL.equals(entity.getOrgType())) {
+            // 医疗机构：查询关联医生，删除后 doctor.hospital_id 将悬空
             affectedDoctors = doctorService.listByHospitalId(id).stream().map(d -> {
                 OrgOperationCheckVO.AffectedDoctorVO vo = new OrgOperationCheckVO.AffectedDoctorVO();
                 vo.setId(d.getId());
@@ -564,21 +571,28 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             }).collect(Collectors.toList());
         }
 
+        OrgOperationCheckVO result = new OrgOperationCheckVO();
         result.setAffectedUsers(affectedUsers);
         result.setAffectedDoctors(affectedDoctors);
         result.setAffected(!affectedUsers.isEmpty() || !affectedDoctors.isEmpty());
+        log.info("预检查删除机构完成，id={}, affectedUsers={}, affectedDoctors={}",
+                id, affectedUsers.size(), affectedDoctors.size());
         return result;
     }
 
     /**
      * 预检查禁用机构的影响
+     * 返回该机构下的用户列表（禁用后这些用户将被踢出会话且无法再登录）
+     *
+     * @param id 机构ID
+     * @return 检查结果，affected=true 时需前端提示用户确认
      */
     @Override
     public OrgOperationCheckVO checkDisable(Long id) {
+        log.info("预检查禁用机构影响，id={}", id);
         OrgEntity entity = getById(id);
         if (entity == null) throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
 
-        OrgOperationCheckVO result = new OrgOperationCheckVO();
         List<UserEntity> users = userMapper.selectList(new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id));
         List<OrgOperationCheckVO.AffectedUserVO> affectedUsers = users.stream().map(u -> {
             OrgOperationCheckVO.AffectedUserVO vo = new OrgOperationCheckVO.AffectedUserVO();
@@ -587,9 +601,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             return vo;
         }).collect(Collectors.toList());
 
+        OrgOperationCheckVO result = new OrgOperationCheckVO();
         result.setAffectedUsers(affectedUsers);
         result.setAffectedDoctors(java.util.Collections.emptyList());
         result.setAffected(!affectedUsers.isEmpty());
+        log.info("预检查禁用机构完成，id={}, affectedUsers={}", id, affectedUsers.size());
         return result;
     }
 
