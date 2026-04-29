@@ -9,6 +9,7 @@ import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.vo.OrgVO;
 
 import com.yigongbao.module.system.org.vo.OrgHospitalChangeCheckVO;
+import com.yigongbao.module.system.org.vo.OrgOperationCheckVO;
 
 import java.util.List;
 
@@ -81,4 +82,20 @@ public interface OrgService extends IService<OrgEntity> {
      * @return 检查结果（affected=true 时需用户确认）
      */
     OrgHospitalChangeCheckVO checkHospitalChange(Long id, List<Long> newHospitalIds);
+
+    /**
+     * 预检查删除机构的影响（受影响用户、关联医生）
+     *
+     * @param id 机构ID
+     * @return 检查结果
+     */
+    OrgOperationCheckVO checkRemove(Long id);
+
+    /**
+     * 预检查禁用机构的影响（受影响用户）
+     *
+     * @param id 机构ID
+     * @return 检查结果
+     */
+    OrgOperationCheckVO checkDisable(Long id);
 }

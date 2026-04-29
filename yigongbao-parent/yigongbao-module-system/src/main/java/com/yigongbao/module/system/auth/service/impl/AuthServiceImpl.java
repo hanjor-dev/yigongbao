@@ -25,6 +25,8 @@ import com.yigongbao.module.system.resource.service.ResourceService;
 import com.yigongbao.module.system.user.convert.UserConvert;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.system.org.service.OrgService;
+import com.yigongbao.module.system.org.entity.OrgEntity;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +56,7 @@ public class AuthServiceImpl implements AuthService {
     private final CaptchaService captchaService;
     private final ImageCaptchaService imageCaptchaService;
     private final StringRedisTemplate stringRedisTemplate;
+    private final OrgService orgService;
 
     // ==================== 登录 ====================
 
@@ -99,8 +102,8 @@ public class AuthServiceImpl implements AuthService {
                 saveLoginLog(user.getId(), dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户已禁用");
                 throw new BusinessException(ErrorCodeEnum.USER_DISABLED);
             }
-
-            // 4. 校验账户是否锁定
+            // 校验用户所属机构状态
+            validateOrgStatus(user, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent);
             if (isAccountLocked(user)) {
                 int remainingMinutes = calculateRemainingLockMinutes(user);
                 log.warn("账户已锁定，username={}，剩余{}分钟", dto.getPrincipal(), remainingMinutes);
@@ -152,8 +155,8 @@ public class AuthServiceImpl implements AuthService {
                 saveLoginLog(user.getId(), dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户已禁用");
                 throw new BusinessException(ErrorCodeEnum.USER_DISABLED);
             }
-
-            // 4. 校验账户是否锁定
+            // 校验用户所属机构状态
+            validateOrgStatus(user, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent);
             if (isAccountLocked(user)) {
                 int remainingMinutes = calculateRemainingLockMinutes(user);
                 log.warn("账户已锁定，phone={}，剩余{}分钟", dto.getPrincipal(), remainingMinutes);
@@ -342,6 +345,19 @@ public class AuthServiceImpl implements AuthService {
     }
 
     // ==================== 私有工具方法 ====================
+
+    /**
+     * 校验用户所属机构状态，禁用时拒绝登录
+     */
+    private void validateOrgStatus(UserEntity user, String principal, String loginType, String ip, String userAgent) {
+        if (user.getOrgId() == null) return;
+        OrgEntity org = orgService.getById(user.getOrgId());
+        if (org != null && StatusConstants.DISABLED == org.getStatus()) {
+            log.warn("用户所属机构已禁用，principal={}, orgId={}", principal, user.getOrgId());
+            saveLoginLog(user.getId(), principal, loginType, ip, userAgent, 0, "所属机构已禁用");
+            throw new BusinessException(ErrorCodeEnum.ORG_DISABLED);
+        }
+    }
 
     private void saveLoginLog(Long userId, String principal, String loginType, String ip, String userAgent, Integer status, String failReason) {
         try {

@@ -31,6 +31,9 @@ import com.yigongbao.module.system.hospitalGroupTemplate.entity.HospitalGroupTem
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.org.vo.OrgVO;
 import com.yigongbao.module.system.org.vo.OrgHospitalChangeCheckVO;
+import com.yigongbao.module.system.org.vo.OrgOperationCheckVO;
+import com.yigongbao.module.system.doctor.entity.DoctorEntity;
+import com.yigongbao.module.system.doctor.mapper.DoctorMapper;
 import com.yigongbao.module.system.dept.entity.DeptOrgEntity;
 import com.yigongbao.module.system.dept.mapper.DeptOrgMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -71,6 +74,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     private final HospitalGroupTemplateDetailMapper templateDetailMapper;
     private final DeptOrgMapper deptOrgMapper;
     private final FileService fileService;
+    private final DoctorMapper doctorMapper;
 
     /**
      * 分页查询机构列表
@@ -380,6 +384,18 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             // 更新状态
             entity.setStatus(status);
             updateById(entity);
+            // 禁用机构时踢出其下所有用户的登录会话
+            if (StatusConstants.DISABLED == status) {
+                userMapper.selectList(new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id))
+                        .forEach(u -> {
+                            try {
+                                cn.dev33.satoken.stp.StpUtil.kickout(u.getId());
+                            } catch (Exception ex) {
+                                log.warn("踢出用户会话失败，userId={}", u.getId());
+                            }
+                        });
+                log.info("禁用机构，已踢出所有用户会话，orgId={}", id);
+            }
             log.info("修改机构状态成功，id={}, status={}", id, status);
         } catch (BusinessException e) {
             throw e;
@@ -519,6 +535,62 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      */
     private boolean hasUsers(Long orgId) {
         return userMapper.countByOrgId(orgId) > 0;
+    }
+
+    /**
+     * 预检查删除机构的影响
+     */
+    @Override
+    public OrgOperationCheckVO checkRemove(Long id) {
+        OrgEntity entity = getById(id);
+        if (entity == null) throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
+
+        OrgOperationCheckVO result = new OrgOperationCheckVO();
+        List<UserEntity> users = userMapper.selectList(new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id));
+        List<OrgOperationCheckVO.AffectedUserVO> affectedUsers = users.stream().map(u -> {
+            OrgOperationCheckVO.AffectedUserVO vo = new OrgOperationCheckVO.AffectedUserVO();
+            vo.setId(u.getId());
+            vo.setRealName(u.getRealName());
+            return vo;
+        }).collect(Collectors.toList());
+
+        List<OrgOperationCheckVO.AffectedDoctorVO> affectedDoctors = new java.util.ArrayList<>();
+        if (DictCodeConstants.ORG_TYPE_HOSPITAL.equals(entity.getOrgType())) {
+            affectedDoctors = doctorMapper.selectByHospitalId(id).stream().map(d -> {
+                OrgOperationCheckVO.AffectedDoctorVO vo = new OrgOperationCheckVO.AffectedDoctorVO();
+                vo.setId(d.getId());
+                vo.setDoctorName(d.getDoctorName());
+                return vo;
+            }).collect(Collectors.toList());
+        }
+
+        result.setAffectedUsers(affectedUsers);
+        result.setAffectedDoctors(affectedDoctors);
+        result.setAffected(!affectedUsers.isEmpty() || !affectedDoctors.isEmpty());
+        return result;
+    }
+
+    /**
+     * 预检查禁用机构的影响
+     */
+    @Override
+    public OrgOperationCheckVO checkDisable(Long id) {
+        OrgEntity entity = getById(id);
+        if (entity == null) throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
+
+        OrgOperationCheckVO result = new OrgOperationCheckVO();
+        List<UserEntity> users = userMapper.selectList(new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id));
+        List<OrgOperationCheckVO.AffectedUserVO> affectedUsers = users.stream().map(u -> {
+            OrgOperationCheckVO.AffectedUserVO vo = new OrgOperationCheckVO.AffectedUserVO();
+            vo.setId(u.getId());
+            vo.setRealName(u.getRealName());
+            return vo;
+        }).collect(Collectors.toList());
+
+        result.setAffectedUsers(affectedUsers);
+        result.setAffectedDoctors(java.util.Collections.emptyList());
+        result.setAffected(!affectedUsers.isEmpty());
+        return result;
     }
 
     /**

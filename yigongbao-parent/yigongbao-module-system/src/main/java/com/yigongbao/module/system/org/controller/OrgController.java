@@ -16,6 +16,7 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import com.yigongbao.module.system.org.vo.OrgHospitalChangeCheckVO;
+import com.yigongbao.module.system.org.vo.OrgOperationCheckVO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -157,5 +158,23 @@ public class OrgController {
             @PathVariable Long id,
             @RequestBody List<Long> newHospitalIds) {
         return Result.success(orgService.checkHospitalChange(id, newHospitalIds));
+    }
+
+    /**
+     * 预检查删除机构的影响
+     */
+    @GetMapping("/{id}/check-remove")
+    @Operation(summary = "预检查删除机构影响")
+    public Result<OrgOperationCheckVO> checkRemove(@PathVariable Long id) {
+        return Result.success(orgService.checkRemove(id));
+    }
+
+    /**
+     * 预检查禁用机构的影响
+     */
+    @GetMapping("/{id}/check-disable")
+    @Operation(summary = "预检查禁用机构影响")
+    public Result<OrgOperationCheckVO> checkDisable(@PathVariable Long id) {
+        return Result.success(orgService.checkDisable(id));
     }
 }
