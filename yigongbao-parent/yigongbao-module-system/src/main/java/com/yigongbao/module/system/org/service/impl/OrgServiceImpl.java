@@ -15,6 +15,7 @@ import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.common.enums.FileBizTypeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.system.org.convert.OrgConvert;
@@ -61,6 +62,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
 
     private final DictService dictService;
     private final UserMapper userMapper;
+    private final com.yigongbao.module.system.config.service.ConfigService configService;
     private final UserHospitalMapper userHospitalMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final AreaService areaService;
@@ -84,6 +86,12 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
             Page<OrgEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
+            // 固定排除生产企业（内置，不对外展示）和未知医院（占位，不对外展示）
+            String unknownHospitalIdStr = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
+            wrapper.ne(OrgEntity::getOrgType, DictCodeConstants.ORG_TYPE_PRODUCER);
+            if (unknownHospitalIdStr != null) {
+                wrapper.ne(OrgEntity::getId, Long.parseLong(unknownHospitalIdStr));
+            }
             wrapper.like(StrUtil.isNotBlank(dto.getOrgName()), OrgEntity::getOrgName, dto.getOrgName())
                     .eq(StrUtil.isNotBlank(dto.getOrgType()), OrgEntity::getOrgType, dto.getOrgType())
                     .eq(Objects.nonNull(dto.getAreaId()), OrgEntity::getAreaId, dto.getAreaId())
