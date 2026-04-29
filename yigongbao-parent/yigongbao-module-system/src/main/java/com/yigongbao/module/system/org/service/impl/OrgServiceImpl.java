@@ -231,8 +231,8 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             if (entity == null) {
                 throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
             }
-            // 禁止将机构类型改为生产企业
-            if (dto.getOrgType() != null && DictCodeConstants.ORG_TYPE_PRODUCER.equals(dto.getOrgType())) {
+            // 禁止修改机构类型
+            if (dto.getOrgType() != null && !dto.getOrgType().equals(entity.getOrgType())) {
                 throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_ALLOWED);
             }
             // 机构名称有变更时才校验唯一性，避免与自身冲突
