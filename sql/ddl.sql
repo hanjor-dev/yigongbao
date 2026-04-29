@@ -1189,26 +1189,6 @@ CREATE TABLE order_modification_log (
     KEY idx_order_modification_log_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单信息修改留痕表';
 
--- ============================================================
--- 迁移脚本：DEPT 数据权限扩展字段变更（2026-04-09）
--- 仅对已存在的生产库执行，新建环境直接使用上方建表语句
--- ============================================================
--- ALTER TABLE order_draft
---     CHANGE COLUMN dept_id    hospital_dept_id   BIGINT          COMMENT '医院科室ID',
---     CHANGE COLUMN dept_name  hospital_dept_name VARCHAR(100)    COMMENT '医院科室名称（冗余）';
---
--- ALTER TABLE order_main
---     CHANGE COLUMN dept_id    hospital_dept_id   BIGINT          COMMENT '医院科室ID',
---     CHANGE COLUMN dept_name  hospital_dept_name VARCHAR(100)    COMMENT '医院科室名称（冗余）',
---     ADD COLUMN operator_dept_id   BIGINT         COMMENT '提单人所属部门ID（冗余自 sys_user.dept_id）' AFTER hospital_dept_name,
---     ADD COLUMN operator_dept_name VARCHAR(128)   COMMENT '提单人所属部门名称（冗余自 sys_user.dept_name）' AFTER operator_dept_id;
-
-
--- ============================================================
--- 设计阶段 DDL（2026-04-15）
--- 表名统一使用 design_ 前缀
--- ============================================================
-
 
 -- ============================================================
 -- 打印文件数据包表（design_package）

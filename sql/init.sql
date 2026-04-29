@@ -377,6 +377,14 @@ VALUES
 INSERT INTO sys_org (id, org_name, org_code, org_type, status)
 VALUES (1, '医工宝（生产企业）', 'ORG-P-00001', '1.1', 1);
 
+-- 医疗机构种子数据（orgType=1.3，对应原 hospital 表）
+INSERT INTO sys_org (id, org_name, org_code, org_type, area_id, area_name, status)
+VALUES
+(2, '北京协和医院',              'ORG-H-0001', '1.3', 111, '东城区', 1),
+(3, '上海市第一人民医院',        'ORG-H-0002', '1.3', 21,  '上海市', 1),
+(4, '浙江大学医学院附属第一医院', 'ORG-H-0003', '1.3', 311, '上城区', 1),
+(5, '广东省人民医院',            'ORG-H-0004', '1.3', 411, '荔湾区', 1);
+
 
 -- ============================================================
 -- 资源数据初始化（sys_resource）
@@ -415,8 +423,7 @@ VALUES
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
 VALUES
 (201, 3, '医生管理', 'Doctor', 2, '&#xe813;', '/doctor', 'customer/doctor/index.vue', 1, 1, 1),
-(202, 3, '科室管理', 'Department', 2, '&#xe69f;', '/department', 'customer/department/index.vue', 2, 1, 1),
-(203, 3, '医院管理', 'Hospital', 2, '&#xe811;', '/hospital', 'customer/hospital/index.vue', 3, 1, 1);
+(202, 3, '科室管理', 'Department', 2, '&#xe69f;', '/department', 'customer/department/index.vue', 2, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：模块管理（parent_id=4）
@@ -465,11 +472,6 @@ VALUES
 (1007, 402, '状态', 'role:Status', 3, 3, 1),
 (1008, 402, '删除', 'role:Delete', 3, 4, 1),
 (1009, 402, '配置权限', 'role:config', 3, 5, 1),
--- 医院管理（parent_id=203）
-(1010, 203, '添加', 'hospital:Add', 3, 1, 1),
-(1011, 203, '编辑', 'hospital:Edit', 3, 2, 1),
-(1012, 203, '状态', 'hospital:Status', 3, 3, 1),
-(1013, 203, '删除', 'hospital:Delete', 3, 4, 1),
 -- 科室管理（parent_id=202）
 (1014, 202, '添加', 'hospital-dept:Add', 3, 1, 1),
 (1015, 202, '编辑', 'hospital-dept:Edit', 3, 2, 1),
@@ -565,17 +567,6 @@ SELECT 1, id FROM sys_resource;
 
 
 -- ============================================================
--- 医院数据初始化（hospital）
--- ============================================================
-INSERT INTO hospital (id, hospital_name, hospital_code, area_id, area_name, full_area_name, hospital_level, hospital_type, contact, phone, email, address, status)
-VALUES
-(1, '北京协和医院',             'HOS-0001', 111, '东城区', '中国,北京,北京市,东城区',   '3.1', '4.1', '张主任', '13800138001', 'info@pekingunion.com',      '北京市东城区帅府园1号',         1),
-(2, '上海市第一人民医院',       'HOS-0002', 21,  '上海市', '中国,上海,上海市',           '3.2', '4.1', '李医生', '13800138002', 'info@shfirsthospital.com',  '上海市虹口区武进路85号',         1),
-(3, '浙江大学医学院附属第一医院','HOS-0003', 311, '上城区', '中国,浙江,杭州市,上城区',   '3.1', '4.1', '王医生', '13800138003', 'info@hzdu1hospital.com',    '杭州市上城区庆春路79号',         1),
-(4, '广东省人民医院',           'HOS-0004', 411, '荔湾区', '中国,广东,广州市,荔湾区',   '3.1', '4.1', '陈医生', '13800138004', 'info@gdhospital.com',       '广州市荔湾区岭南大道123号',       1);
-
-
--- ============================================================
 -- 医院组合模板数据初始化（hospital_group_template）
 -- ============================================================
 INSERT INTO hospital_group_template (id, template_name, template_code, template_desc, status, remark)
@@ -590,10 +581,10 @@ VALUES
 -- ============================================================
 INSERT INTO hospital_group_template_detail (id, template_id, hospital_id)
 VALUES
-(1, 1, 1),
-(2, 2, 2),
-(3, 2, 3),
-(4, 3, 4);
+(1, 1, 2),
+(2, 2, 3),
+(3, 2, 4),
+(4, 3, 5);
 
 
 -- ============================================================
@@ -608,7 +599,6 @@ VALUES
 ('DATA_PACKAGE_NO','数据包编号',     NULL,     NULL,             4, 'NEVER', 1),  -- DesignFileServiceImpl（generateWithSeqSuffix，格式：{orderCode}-1/-2/-N，prefix/dateFormat 不参与生成）
 -- 基础数据编码
 ('ORG_NO',         '机构编码',       NULL,     NULL,             4, 'NEVER', 1),  -- OrgServiceImpl（generateWithCustomPrefix，运行时拼接前缀）
-('HOSPITAL_NO',    '医院编码',       'HOS-',   NULL,             4, 'NEVER', 1),  -- HospitalServiceImpl
 ('HDEPT_NO',       '医院科室编码',   'HDEPT-', NULL,             4, 'NEVER', 1),  -- HospitalDeptServiceImpl
 ('TEMPLATE_NO',    '医院组合模板编码','TPL-',  NULL,             4, 'NEVER', 1),  -- HospitalGroupTemplateServiceImpl
 ('BODYPART_NO',    '重建部位编码',   'BP-',    NULL,             4, 'NEVER', 1),  -- BodyPartServiceImpl
@@ -637,7 +627,6 @@ VALUES
 -- 编码生成器首次调用时以此值为初始序号，确保新生成的编码不与已有种子数据冲突
 -- 注意：必须在对应业务表数据插入之后执行
 -- ============================================================
-UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital)               WHERE rule_code = 'HOSPITAL_NO';
 UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_group_template) WHERE rule_code = 'TEMPLATE_NO';
 UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_dept)          WHERE rule_code = 'HDEPT_NO';
 UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM rebuild_body_part)      WHERE rule_code = 'BODYPART_NO';
