@@ -111,9 +111,8 @@ public class SelectController {
     public Result<List<SelectTreeVO>> getOptions(@RequestBody SelectOptionsDTO dto) {
 
         if ("area".equals(dto.getType())) {
-            // 地区下拉选项
-            Long parentId = dto.getParentId() == null ? 0L : dto.getParentId();
-            List<AreaVO> areaList = areaService.listByParentId(parentId);
+            // 地区下拉选项（仅返回省级）
+            List<AreaVO> areaList = areaService.listProvinces();
             return Result.success(convertAreaToSelectTree(areaList));
         } else if ("dict".equals(dto.getType())) {
             // 字典下拉选项（叶子节点）

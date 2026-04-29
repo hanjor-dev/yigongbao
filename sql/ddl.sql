@@ -657,6 +657,29 @@ CREATE TABLE file_part_detail (
 
 
 -- ============================================================
+-- 医院科室表（hospital_dept）
+-- 全系统通用科室字典，如内科/外科/骨科等，与 sys_dept（机构组织部门）是不同概念
+-- ============================================================
+DROP TABLE IF EXISTS hospital_dept;
+CREATE TABLE hospital_dept (
+    id                   BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    hospital_dept_code   VARCHAR(32)     NOT NULL COMMENT '科室编码（系统唯一，如 HDEPT-0001）',
+    hospital_dept_name   VARCHAR(100)    NOT NULL COMMENT '科室名称',
+    sort                 INT             DEFAULT 0 COMMENT '排序',
+    status               TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+    remark               VARCHAR(512)    COMMENT '备注',
+    create_time          DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time          DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by            BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by            BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted           TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+    PRIMARY KEY (id),
+    KEY idx_hospital_dept_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院科室表（全系统通用科室字典）';
+CREATE UNIQUE INDEX uk_hospital_dept_code ON hospital_dept ((CASE WHEN is_deleted = 0 THEN hospital_dept_code ELSE NULL END));
+
+
+-- ============================================================
 -- 医生表（doctor）
 -- 用于管理医生基础信息，关联业务员（创建人）和医院
 -- ============================================================
