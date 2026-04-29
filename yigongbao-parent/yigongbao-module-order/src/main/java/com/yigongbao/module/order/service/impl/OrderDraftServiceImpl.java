@@ -262,6 +262,10 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
                 fileService.unlinkByBiz(FileBizTypeEnum.IMAGE_REPORT.getDictCode(), draftId);
                 linkDraftFiles(draftId, dto.getImageReportFileIds(), FileBizTypeEnum.IMAGE_REPORT.getDictCode());
             }
+            if (dto.getApprovalFileIds() != null) {
+                fileService.unlinkByBiz(FileBizTypeEnum.APPROVAL_FILE.getDictCode(), draftId);
+                linkDraftFiles(draftId, dto.getApprovalFileIds(), FileBizTypeEnum.APPROVAL_FILE.getDictCode());
+            }
 
             // 保存重建项目列表，校验并覆盖 bodyPartName/projectName 等
             // null 表示本次不操作明细（保留旧数据）；空列表表示清空明细
@@ -343,6 +347,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             // 清理文件关联（解绑，不删除物理文件）
             fileService.unlinkByBiz(FileBizTypeEnum.IMAGE_DATA.getDictCode(), id);
             fileService.unlinkByBiz(FileBizTypeEnum.IMAGE_REPORT.getDictCode(), id);
+            fileService.unlinkByBiz(FileBizTypeEnum.APPROVAL_FILE.getDictCode(), id);
             // 再删除草稿
             removeById(id);
             log.info("删除草稿成功，id={}", id);
@@ -477,6 +482,24 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             log.warn("草稿缺少影像报告，draftId={}", draftId);
             throw new BusinessException(ErrorCodeEnum.ORDER_FILE_REQUIRED, "影像报告");
         }
+
+        // ---- 审批文件（测试/试用业务类型必填）----
+        OrderDraftEntity draft = getById(draftId);
+        if (draft != null && isTrialOrTest(draft.getBusinessType())) {
+            List<FileVO> approvalFiles = fileService.listByBiz(FileBizTypeEnum.APPROVAL_FILE.getDictCode(), draftId);
+            if (approvalFiles.isEmpty()) {
+                log.warn("草稿缺少免费业务审批文件，draftId={}, businessType={}", draftId, draft.getBusinessType());
+                throw new BusinessException(ErrorCodeEnum.ORDER_FILE_REQUIRED, "免费业务审批文件");
+            }
+        }
+    }
+
+    /**
+     * 判断业务类型是否为测试或试用
+     */
+    private boolean isTrialOrTest(String businessType) {
+        return DictCodeConstants.ORDER_BUSINESS_TYPE_TEST.equals(businessType)
+                || DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(businessType);
     }
 
     /**
@@ -657,8 +680,10 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
     private void fillDraftFiles(OrderDraftDetailVO vo, Long draftId) {
         List<FileVO> imageDataFiles = fileService.listByBiz(FileBizTypeEnum.IMAGE_DATA.getDictCode(), draftId);
         List<FileVO> imageReportFiles = fileService.listByBiz(FileBizTypeEnum.IMAGE_REPORT.getDictCode(), draftId);
+        List<FileVO> approvalFiles = fileService.listByBiz(FileBizTypeEnum.APPROVAL_FILE.getDictCode(), draftId);
         vo.setImageDataFiles(imageDataFiles.stream().map(this::toDraftFileVO).collect(Collectors.toList()));
         vo.setImageReportFiles(imageReportFiles.stream().map(this::toDraftFileVO).collect(Collectors.toList()));
+        vo.setApprovalFiles(approvalFiles.stream().map(this::toDraftFileVO).collect(Collectors.toList()));
     }
 
     /**

@@ -190,6 +190,11 @@ public class OrderDraftDetailVO implements Serializable {
      */
     private List<DraftFileVO> imageReportFiles;
 
+    /**
+     * 免费业务审批文件列表（dict_code=10.20，业务类型为测试/试用时必填）
+     */
+    private List<DraftFileVO> approvalFiles;
+
     // ==================== 时间信息 ====================
     /**
      * 创建时间

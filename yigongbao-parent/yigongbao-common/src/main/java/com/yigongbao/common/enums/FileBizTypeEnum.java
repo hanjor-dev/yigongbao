@@ -136,7 +136,12 @@ public enum FileBizTypeEnum {
     /**
      * 数据包内文件：3D 模型等压缩包内的单个文件，独立上传到 OSS 供影像调阅使用
      */
-    PACKAGE_FILE("package_file", "10.19", "数据包内文件", null);
+    PACKAGE_FILE("package_file", "10.19", "数据包内文件", null),
+
+    /**
+     * 免费业务审批文件：业务类型为测试（11.2）或试用（11.3）时必须上传的审批凭证，格式不限
+     */
+    APPROVAL_FILE("approval_file", "10.20", "免费业务审批文件", null);
 
     /**
      * 枚举标识，用于存储路径前缀（如 "image_data"）

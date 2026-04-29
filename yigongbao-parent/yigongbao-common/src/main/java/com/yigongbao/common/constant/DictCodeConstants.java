@@ -126,6 +126,11 @@ public final class DictCodeConstants {
      */
     public static final String ORDER_FILE_CATEGORY_REPORT = "10.2";
 
+    /**
+     * 免费业务审批文件（业务类型为测试/试用时必须上传）
+     */
+    public static final String ORDER_FILE_CATEGORY_APPROVAL = "10.20";
+
     // ==================== 设计模块字典编码 ====================
 
     /**

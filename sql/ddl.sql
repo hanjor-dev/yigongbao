@@ -1053,7 +1053,7 @@ CREATE TABLE order_file (
 
     -- ==================== 文件关联 ====================
     file_id         VARCHAR(32)     NOT NULL COMMENT '文件ID（file_detail.id）',
-    file_category   VARCHAR(20)     NOT NULL COMMENT '文件类别（字典 dict_code：10.1-影像数据，10.2-影像报告，10.3-订单其他附件...）',
+    file_category   VARCHAR(20)     NOT NULL COMMENT '文件类别（字典 dict_code：10.1-影像数据，10.2-影像报告，10.3-订单其他附件，10.20-免费业务审批文件...）',
     package_no      VARCHAR(50)     COMMENT '数据包编号（用于关联同一订单下的多个数据包）',
 
     -- ==================== 关联明细 ====================

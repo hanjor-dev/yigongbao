@@ -163,4 +163,10 @@ public class CreateOrderDraftDTO implements Serializable {
      * 字典 dict_code=10.2，前端先上传文件再传入fileId
      */
     private List<String> imageReportFileIds;
+
+    /**
+     * 审批文件ID列表
+     * 业务类型为测试（11.2）或试用（11.3）时必填，字典 dict_code=10.20
+     */
+    private List<String> approvalFileIds;
 }

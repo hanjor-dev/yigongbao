@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.constant.CodeRuleConstants;
+import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -713,8 +714,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             // Step 4：复制文件关联关系（从草稿关联迁移至订单关联）
             List<FileVO> draftImageData = fileService.listByBiz(FileBizTypeEnum.IMAGE_DATA.getDictCode(), draft.getId());
             List<FileVO> draftImageReport = fileService.listByBiz(FileBizTypeEnum.IMAGE_REPORT.getDictCode(), draft.getId());
+            List<FileVO> draftApproval = fileService.listByBiz(FileBizTypeEnum.APPROVAL_FILE.getDictCode(), draft.getId());
             List<FileVO> draftFiles = new java.util.ArrayList<>(draftImageData);
             draftFiles.addAll(draftImageReport);
+            draftFiles.addAll(draftApproval);
             for (FileVO file : draftFiles) {
                 OrderFileEntity orderFile = new OrderFileEntity();
                 orderFile.setOrderId(orderId);
@@ -832,6 +835,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             // Step 5：保存影像文件关联
             saveOrderFiles(orderId, orderCode, dto.getImageDataFileIds(), FileBizTypeEnum.IMAGE_DATA.getDictCode());
             saveOrderFiles(orderId, orderCode, dto.getImageReportFileIds(), FileBizTypeEnum.IMAGE_REPORT.getDictCode());
+            saveOrderFiles(orderId, orderCode, dto.getApprovalFileIds(), FileBizTypeEnum.APPROVAL_FILE.getDictCode());
 
             // Step 6：记录状态历史（CREATE 动作仅记录历史，不改变 phase/status）
             flowFacade.executeFlow(orderId, FlowActionEnum.CREATE,
@@ -897,6 +901,18 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             assertFilesExist(fileService.listByIds(dto.getImageReportFileIds()), dto.getImageReportFileIds(), "影像报告");
         }
 
+        // ---- 免费业务审批文件（测试/试用业务类型必填）----
+        boolean isTrialOrTest = DictCodeConstants.ORDER_BUSINESS_TYPE_TEST.equals(dto.getBusinessType())
+                || DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(dto.getBusinessType());
+        boolean hasApproval = dto.getApprovalFileIds() != null && !dto.getApprovalFileIds().isEmpty();
+        if (isTrialOrTest && !hasApproval) {
+            log.warn("直提创建订单缺少免费业务审批文件，businessType={}", dto.getBusinessType());
+            throw new BusinessException(ErrorCodeEnum.ORDER_FILE_REQUIRED, "免费业务审批文件");
+        }
+        if (hasApproval) {
+            assertFilesExist(fileService.listByIds(dto.getApprovalFileIds()), dto.getApprovalFileIds(), "免费业务审批文件");
+        }
+
         log.info("直提创建订单影像文件校验通过，imageDataCount={}, imageReportCount={}",
                 hasImageData ? dto.getImageDataFileIds().size() : 0,
                 hasImageReport ? dto.getImageReportFileIds().size() : 0);
@@ -957,6 +973,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         // 按文件类别分组
         List<OrderDetailVO.OrderFileVO> imageDataFiles = new java.util.ArrayList<>();
         List<OrderDetailVO.OrderFileVO> imageReportFiles = new java.util.ArrayList<>();
+        List<OrderDetailVO.OrderFileVO> approvalFiles = new java.util.ArrayList<>();
         for (OrderFileEntity orderFile : orderFiles) {
             FileVO fileVO = fileService.getById(orderFile.getFileId());
             if (fileVO == null) {
@@ -967,10 +984,13 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 imageDataFiles.add(file);
             } else if (FileBizTypeEnum.IMAGE_REPORT.getDictCode().equals(orderFile.getFileCategory())) {
                 imageReportFiles.add(file);
+            } else if (FileBizTypeEnum.APPROVAL_FILE.getDictCode().equals(orderFile.getFileCategory())) {
+                approvalFiles.add(file);
             }
         }
         vo.setImageDataFiles(imageDataFiles);
         vo.setImageReportFiles(imageReportFiles);
+        vo.setApprovalFiles(approvalFiles);
     }
 
     /**

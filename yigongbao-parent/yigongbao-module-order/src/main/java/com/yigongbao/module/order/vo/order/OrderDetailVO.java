@@ -299,6 +299,11 @@ public class OrderDetailVO implements Serializable {
     private List<OrderFileVO> imageReportFiles;
 
     /**
+     * 免费业务审批文件列表（dict_code=10.20，业务类型为测试/试用时必填）
+     */
+    private List<OrderFileVO> approvalFiles;
+
+    /**
      * 订单明细 VO
      * 嵌套在 OrderDetailVO 中
      *
