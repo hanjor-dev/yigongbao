@@ -371,19 +371,9 @@ VALUES
 ('manufacturer.org.id', '生产企业机构ID', '1', 'number', 'system', '系统预设唯一生产企业机构ID，不可动态创建', 1, 0, 10, 1);
 
 
--- ============================================================
--- 生产企业预设机构（sys_org）
--- ============================================================
-INSERT INTO sys_org (id, org_name, org_code, org_type, status)
-VALUES (1, '医工宝（生产企业）', 'ORG-P-00001', '1.1', 1);
 
--- 医疗机构种子数据（orgType=1.3，对应原 hospital 表）
-INSERT INTO sys_org (id, org_name, org_code, org_type, area_id, area_name, status)
-VALUES
-(2, '北京协和医院',              'ORG-H-0001', '1.3', 111, '东城区', 1),
-(3, '上海市第一人民医院',        'ORG-H-0002', '1.3', 21,  '上海市', 1),
-(4, '浙江大学医学院附属第一医院', 'ORG-H-0003', '1.3', 311, '上城区', 1),
-(5, '广东省人民医院',            'ORG-H-0004', '1.3', 411, '荔湾区', 1);
+-- ============================================================
+-- 机构种子数据（sys_org）
 
 
 -- ============================================================
@@ -530,7 +520,46 @@ VALUES
 -- ============================================================
 INSERT INTO sys_org (id, org_name, org_code, org_type, contact, phone, status)
 VALUES
-(1, '系统默认机构', 'ORG-0001', '1.1', '管理员', '13800000000', 1);
+(1, '嘉一高科（内部）', 'ORG-0001', '1.1', '管理员', '13800000000', 1);
+
+
+-- ============================================================
+-- 机构种子数据（sys_org）
+-- area_id 通过子查询按省级 area_code 获取，避免硬编码自增 id
+-- 省级行政区划代码（area_code）：北京=110000，上海=310000，浙江=330000，广东=440000
+-- ============================================================
+
+-- 经销商（orgType=1.2）
+INSERT INTO sys_org (id, org_name, org_code, org_type, area_id, area_name, contact, phone, status)
+VALUES
+(2, '北京医疗器械经销有限公司', 'ORG-D-0001', '1.2',
+    (SELECT id FROM sys_area WHERE area_code = 110000 LIMIT 1), '北京市',
+    '张经理', '13800000002', 1),
+(3, '广东医疗科技经销有限公司', 'ORG-D-0002', '1.2',
+    (SELECT id FROM sys_area WHERE area_code = 440000 LIMIT 1), '广东省',
+    '李经理', '13800000003', 1);
+
+-- 医疗机构（orgType=1.3）
+INSERT INTO sys_org (id, org_name, org_code, org_type, area_id, area_name, contact, phone, status)
+VALUES
+(4, '北京协和医院',               'ORG-H-0001', '1.3',
+    (SELECT id FROM sys_area WHERE area_code = 110000 LIMIT 1), '北京市',
+    '张主任', '13800000004', 1),
+(5, '上海市第一人民医院',         'ORG-H-0002', '1.3',
+    (SELECT id FROM sys_area WHERE area_code = 310000 LIMIT 1), '上海市',
+    '李医生', '13800000005', 1),
+(6, '浙江大学医学院附属第一医院', 'ORG-H-0003', '1.3',
+    (SELECT id FROM sys_area WHERE area_code = 330000 LIMIT 1), '浙江省',
+    '王医生', '13800000006', 1),
+(7, '广东省人民医院',             'ORG-H-0004', '1.3',
+    (SELECT id FROM sys_area WHERE area_code = 440000 LIMIT 1), '广东省',
+    '陈医生', '13800000007', 1);
+
+-- 经销商-医疗机构关联（sys_org_hospital）
+INSERT INTO sys_org_hospital (org_id, hospital_org_id)
+VALUES
+(2, 4), (2, 5),
+(3, 6), (3, 7);
 
 
 -- ============================================================
@@ -581,10 +610,10 @@ VALUES
 -- ============================================================
 INSERT INTO hospital_group_template_detail (id, template_id, hospital_id)
 VALUES
-(1, 1, 2),
-(2, 2, 3),
-(3, 2, 4),
-(4, 3, 5);
+(1, 1, 4),
+(2, 2, 5),
+(3, 2, 6),
+(4, 3, 7);
 
 
 -- ============================================================
