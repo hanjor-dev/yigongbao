@@ -40,7 +40,7 @@ CREATE TABLE sys_org (
     id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     org_name            VARCHAR(128)    NOT NULL COMMENT '机构名称',
     org_code            VARCHAR(32)     NOT NULL COMMENT '机构编码',
-    org_type            TINYINT         NOT NULL COMMENT '机构类型（关联字典编码=1，子节点dict_code=1.1/1.2/1.3/1.4）',
+    org_type            VARCHAR(16)     NOT NULL COMMENT '机构类型（关联字典编码=1，子节点dict_code=1.1/1.2/1.3/1.4）',
     area_id            BIGINT          COMMENT '所属地区ID（关联sys_area表）',
     area_name          VARCHAR(64)     COMMENT '所属地区名称（冗余存储）',
     address            VARCHAR(256)    COMMENT '详细地址',
