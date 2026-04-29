@@ -42,4 +42,12 @@ public interface DoctorService extends IService<DoctorEntity> {
     DoctorVO quickAdd(QuickAddDoctorDTO dto);
 
     void updateStatus(Long id, Integer status);
+
+    /**
+     * 查询指定医院下的医生列表
+     *
+     * @param hospitalId 医院ID（sys_org.id，orgType=1.3）
+     * @return 医生列表
+     */
+    List<DoctorVO> listByHospitalId(Long hospitalId);
 }

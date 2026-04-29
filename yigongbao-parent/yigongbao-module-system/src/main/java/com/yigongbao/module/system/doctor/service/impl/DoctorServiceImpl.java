@@ -380,4 +380,14 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             }
         }
     }
+
+    @Override
+    public List<DoctorVO> listByHospitalId(Long hospitalId) {
+        List<DoctorEntity> entities = lambdaQuery()
+                .eq(DoctorEntity::getHospitalId, hospitalId)
+                .list();
+        List<DoctorVO> voList = entities.stream().map(DoctorConvert::toVO).collect(Collectors.toList());
+        fillExtraFieldsBatch(voList, entities);
+        return voList;
+    }
 }

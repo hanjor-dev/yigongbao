@@ -32,8 +32,8 @@ import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.org.vo.OrgVO;
 import com.yigongbao.module.system.org.vo.OrgHospitalChangeCheckVO;
 import com.yigongbao.module.system.org.vo.OrgOperationCheckVO;
-import com.yigongbao.module.system.doctor.entity.DoctorEntity;
-import com.yigongbao.module.system.doctor.mapper.DoctorMapper;
+import com.yigongbao.module.system.doctor.service.DoctorService;
+import com.yigongbao.module.system.doctor.vo.DoctorVO;
 import com.yigongbao.module.system.dept.entity.DeptOrgEntity;
 import com.yigongbao.module.system.dept.mapper.DeptOrgMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -74,7 +74,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     private final HospitalGroupTemplateDetailMapper templateDetailMapper;
     private final DeptOrgMapper deptOrgMapper;
     private final FileService fileService;
-    private final DoctorMapper doctorMapper;
+    private final DoctorService doctorService;
 
     /**
      * 分页查询机构列表
@@ -556,7 +556,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
 
         List<OrgOperationCheckVO.AffectedDoctorVO> affectedDoctors = new java.util.ArrayList<>();
         if (DictCodeConstants.ORG_TYPE_HOSPITAL.equals(entity.getOrgType())) {
-            affectedDoctors = doctorMapper.selectByHospitalId(id).stream().map(d -> {
+            affectedDoctors = doctorService.listByHospitalId(id).stream().map(d -> {
                 OrgOperationCheckVO.AffectedDoctorVO vo = new OrgOperationCheckVO.AffectedDoctorVO();
                 vo.setId(d.getId());
                 vo.setDoctorName(d.getDoctorName());
