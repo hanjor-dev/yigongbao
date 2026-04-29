@@ -34,6 +34,8 @@ import com.yigongbao.module.system.org.vo.OrgHospitalChangeCheckVO;
 import com.yigongbao.module.system.org.vo.OrgOperationCheckVO;
 import com.yigongbao.module.system.doctor.service.DoctorService;
 import com.yigongbao.module.system.doctor.vo.DoctorVO;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import com.yigongbao.module.system.dept.entity.DeptOrgEntity;
 import com.yigongbao.module.system.dept.mapper.DeptOrgMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -74,7 +76,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     private final HospitalGroupTemplateDetailMapper templateDetailMapper;
     private final DeptOrgMapper deptOrgMapper;
     private final FileService fileService;
-    private final DoctorService doctorService;
+
+    @Autowired
+    @Lazy
+    private DoctorService doctorService;
 
     /**
      * 分页查询机构列表
@@ -578,7 +583,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
         if (result.isAffected()) {
             StringBuilder msg = new StringBuilder("删除该机构将产生以下影响：");
             if (!affectedUsers.isEmpty()) msg.append("【").append(affectedUsers.size()).append(" 个用户账号将失去机构归属】");
-            if (!affectedDoctors.isEmpty()) msg.append("【").append(affectedDoctors.size()).append(" 位医生的所属医院将失效】");
+            if (!affectedDoctors.isEmpty()) msg.append("【").append(affectedDoctors.size()).append(" 位医生历史记录将失效】");
             msg.append("，请确认是否继续？");
             result.setMessage(msg.toString());
         }
