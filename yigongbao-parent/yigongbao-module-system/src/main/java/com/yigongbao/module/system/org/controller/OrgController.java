@@ -15,6 +15,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
+import com.yigongbao.module.system.org.vo.OrgHospitalChangeCheckVO;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -140,5 +141,21 @@ public class OrgController {
     @Operation(summary = "全量查询机构列表（用于下拉选择）")
     public Result<List<OrgVO>> listAll() {
         return Result.success(orgService.listAllOrg());
+    }
+
+    /**
+     * 预检查经销商关联医院变更对用户权限的影响
+     * 更新前调用，若 affected=true 需提示用户确认后再提交更新
+     *
+     * @param id             经销商机构ID
+     * @param newHospitalIds 新的关联医院ID列表
+     * @return 检查结果
+     */
+    @PostMapping("/{id}/hospital-change-check")
+    @Operation(summary = "预检查经销商关联医院变更影响")
+    public Result<OrgHospitalChangeCheckVO> checkHospitalChange(
+            @PathVariable Long id,
+            @RequestBody List<Long> newHospitalIds) {
+        return Result.success(orgService.checkHospitalChange(id, newHospitalIds));
     }
 }

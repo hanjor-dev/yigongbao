@@ -8,6 +8,8 @@ import com.yigongbao.module.system.org.dto.UpdateOrgDTO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.vo.OrgVO;
 
+import com.yigongbao.module.system.org.vo.OrgHospitalChangeCheckVO;
+
 import java.util.List;
 
 /**
@@ -70,4 +72,13 @@ public interface OrgService extends IService<OrgEntity> {
      * @return 机构列表（包含字典名称）
      */
     List<OrgVO> listAllOrg();
+
+    /**
+     * 预检查经销商关联医院变更对用户权限的影响
+     *
+     * @param id             经销商机构ID
+     * @param newHospitalIds 新的关联医院ID列表
+     * @return 检查结果（affected=true 时需用户确认）
+     */
+    OrgHospitalChangeCheckVO checkHospitalChange(Long id, List<Long> newHospitalIds);
 }

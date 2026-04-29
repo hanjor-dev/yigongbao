@@ -30,6 +30,7 @@ import com.yigongbao.module.system.hospitalGroupTemplate.mapper.HospitalGroupTem
 import com.yigongbao.module.system.hospitalGroupTemplate.entity.HospitalGroupTemplateDetailEntity;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.org.vo.OrgVO;
+import com.yigongbao.module.system.org.vo.OrgHospitalChangeCheckVO;
 import com.yigongbao.module.system.dept.entity.DeptOrgEntity;
 import com.yigongbao.module.system.dept.mapper.DeptOrgMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -289,6 +290,20 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                     }
                     saveOrgHospitalRelations(id, dto.getHospitalOrgIds());
                 }
+                // 同步清理该经销商下业务员中已失效的医院权限
+                java.util.Set<Long> newSet = new java.util.HashSet<>(dto.getHospitalOrgIds());
+                List<UserEntity> users = userMapper.selectList(
+                        new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id));
+                for (UserEntity user : users) {
+                    List<Long> toRemove = userHospitalMapper.selectHospitalIdsByUserId(user.getId())
+                            .stream().filter(hid -> !newSet.contains(hid)).collect(Collectors.toList());
+                    if (!toRemove.isEmpty()) {
+                        userHospitalMapper.delete(new LambdaQueryWrapper<UserHospitalEntity>()
+                                .eq(UserHospitalEntity::getUserId, user.getId())
+                                .in(UserHospitalEntity::getHospitalId, toRemove));
+                        log.info("清理用户失效医院权限，userId={}, removedHospitalIds={}", user.getId(), toRemove);
+                    }
+                }
             }
             log.info("更新机构成功，id={}", id);
         } catch (BusinessException e) {
@@ -504,5 +519,59 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      */
     private boolean hasUsers(Long orgId) {
         return userMapper.countByOrgId(orgId) > 0;
+    }
+
+    /**
+     * 预检查经销商关联医院变更对用户权限的影响
+     */
+    @Override
+    public OrgHospitalChangeCheckVO checkHospitalChange(Long id, List<Long> newHospitalIds) {
+        log.info("预检查经销商关联医院变更，id={}, newHospitalIds={}", id, newHospitalIds);
+        OrgHospitalChangeCheckVO result = new OrgHospitalChangeCheckVO();
+
+        // 查询当前关联的医院ID列表
+        List<Long> currentHospitalIds = orgHospitalMapper.selectList(
+                new LambdaQueryWrapper<OrgHospitalEntity>()
+                        .eq(OrgHospitalEntity::getDistributorOrgId, id))
+                .stream().map(OrgHospitalEntity::getHospitalOrgId).collect(Collectors.toList());
+
+        // 计算被移除的医院
+        java.util.Set<Long> newSet = newHospitalIds == null ? java.util.Collections.emptySet() : new java.util.HashSet<>(newHospitalIds);
+        List<Long> removedIds = currentHospitalIds.stream().filter(hid -> !newSet.contains(hid)).collect(Collectors.toList());
+
+        if (removedIds.isEmpty()) {
+            result.setAffected(false);
+            return result;
+        }
+
+        // 查询被移除医院的名称
+        List<OrgHospitalChangeCheckVO.RemovedHospitalVO> removedHospitals = listByIds(removedIds).stream().map(org -> {
+            OrgHospitalChangeCheckVO.RemovedHospitalVO vo = new OrgHospitalChangeCheckVO.RemovedHospitalVO();
+            vo.setId(org.getId());
+            vo.setOrgName(org.getOrgName());
+            return vo;
+        }).collect(Collectors.toList());
+
+        // 查询该经销商下所有用户，找出拥有被移除医院权限的用户
+        List<UserEntity> users = userMapper.selectList(
+                new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id));
+        List<OrgHospitalChangeCheckVO.AffectedUserVO> affectedUsers = new java.util.ArrayList<>();
+        for (UserEntity user : users) {
+            List<Long> userHospitalIds = userHospitalMapper.selectHospitalIdsByUserId(user.getId());
+            List<Long> affected = userHospitalIds.stream().filter(removedIds::contains).collect(Collectors.toList());
+            if (!affected.isEmpty()) {
+                OrgHospitalChangeCheckVO.AffectedUserVO vo = new OrgHospitalChangeCheckVO.AffectedUserVO();
+                vo.setId(user.getId());
+                vo.setRealName(user.getRealName());
+                vo.setRemovedHospitalIds(affected);
+                affectedUsers.add(vo);
+            }
+        }
+
+        result.setAffected(!affectedUsers.isEmpty());
+        result.setRemovedHospitals(removedHospitals);
+        result.setAffectedUsers(affectedUsers);
+        log.info("预检查完成，removedCount={}, affectedUserCount={}", removedIds.size(), affectedUsers.size());
+        return result;
     }
 }
