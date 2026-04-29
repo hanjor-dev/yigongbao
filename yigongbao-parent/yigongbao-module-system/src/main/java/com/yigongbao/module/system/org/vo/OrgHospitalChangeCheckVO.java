@@ -19,6 +19,11 @@ public class OrgHospitalChangeCheckVO {
     private boolean affected;
 
     /**
+     * 前端弹窗提示文案（affected=true 时有值）
+     */
+    private String message;
+
+    /**
      * 被移除的医院列表
      */
     private List<RemovedHospitalVO> removedHospitals;
