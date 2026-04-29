@@ -368,7 +368,8 @@ VALUES
 
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
 VALUES
-('manufacturer.org.id', '生产企业机构ID', '1', 'number', 'system', '系统预设唯一生产企业机构ID，不可动态创建', 1, 0, 10, 1);
+('manufacturer.org.id', '生产企业机构ID', '1', 'number', 'system', '系统预设唯一生产企业机构ID，不可动态创建', 1, 0, 10, 1),
+('unknown.hospital.org.id', '未知医院机构ID', '8', 'number', 'system', '提单时用于隐藏具体客户信息的占位医院ID，权限校验豁免', 1, 0, 11, 1);
 
 
 
@@ -553,7 +554,9 @@ VALUES
     '王医生', '13800000006', 1),
 (7, '广东省人民医院',             'ORG-H-0004', '1.3',
     (SELECT id FROM sys_area WHERE area_code = 440000 LIMIT 1), '广东省',
-    '陈医生', '13800000007', 1);
+    '陈医生', '13800000007', 1),
+(8, '未知医院',                   'ORG-H-0000', '1.3',
+    NULL, NULL, NULL, NULL, 1);
 
 -- 经销商-医疗机构关联（sys_org_hospital）
 INSERT INTO sys_org_hospital (org_id, hospital_org_id)

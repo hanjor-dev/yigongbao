@@ -4,7 +4,9 @@ import cn.hutool.core.util.StrUtil;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.basic.bodyPart.service.BodyPartService;
 import com.yigongbao.module.basic.bodyPart.vo.BodyPartDetailVO;
 import com.yigongbao.module.system.doctor.dto.QuickAddDoctorDTO;
@@ -52,6 +54,7 @@ public class OrderDataValidator {
     private final BodyPartService bodyPartService;
     private final RebuildProjectService rebuildProjectService;
     private final UserHospitalService userHospitalService;
+    private final ConfigService configService;
 
     /**
      * 校验模式
@@ -479,6 +482,11 @@ public class OrderDataValidator {
      */
     private void validateHospitalScope(Long userId, Long hospitalId) {
         if (userId == null || hospitalId == null) {
+            return;
+        }
+        // 未知医院（占位医院）豁免权限校验，任何用户均可选择
+        String unknownHospitalIdStr = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
+        if (unknownHospitalIdStr != null && hospitalId.equals(Long.parseLong(unknownHospitalIdStr))) {
             return;
         }
         if (!userHospitalService.hasPermissionOnHospital(userId, hospitalId)) {

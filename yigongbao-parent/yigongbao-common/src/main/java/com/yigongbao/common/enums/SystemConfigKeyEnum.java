@@ -212,7 +212,12 @@ public enum SystemConfigKeyEnum {
     /**
      * 生产企业机构ID（系统预设唯一生产企业）
      */
-    MANUFACTURER_ORG_ID("manufacturer.org.id", "生产企业机构ID");
+    MANUFACTURER_ORG_ID("manufacturer.org.id", "生产企业机构ID"),
+
+    /**
+     * 未知医院机构ID（提单时用于隐藏具体客户信息的占位医院）
+     */
+    UNKNOWN_HOSPITAL_ORG_ID("unknown.hospital.org.id", "未知医院机构ID");
 
     /**
      * 配置键
