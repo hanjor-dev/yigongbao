@@ -16,6 +16,17 @@ import java.util.List;
 public class DeptVO {
 
     /**
+     * 关联机构简要信息
+     */
+    @Data
+    public static class OrgSimpleVO {
+        private Long id;
+        private String orgName;
+        private String orgCode;
+        private String orgType;
+    }
+
+    /**
      * 主键ID
      */
     private Long id;
@@ -36,14 +47,9 @@ public class DeptVO {
     private Integer deptType;
 
     /**
-     * 关联机构ID列表
+     * 关联机构列表
      */
-    private List<Long> orgIds;
-
-    /**
-     * 关联机构名称列表
-     */
-    private List<String> orgNames;
+    private List<OrgSimpleVO> orgs;
 
     /**
      * 部门负责人用户ID

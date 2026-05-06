@@ -326,11 +326,16 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
         List<Long> orgIds = deptOrgMapper.selectList(
                 new LambdaQueryWrapper<DeptOrgEntity>().eq(DeptOrgEntity::getDeptId, entity.getId()))
                 .stream().map(DeptOrgEntity::getOrgId).collect(Collectors.toList());
-        vo.setOrgIds(orgIds);
         if (!orgIds.isEmpty()) {
-            // 批量查询机构实体，提取名称列表
             List<OrgEntity> orgs = orgService.listByIds(orgIds);
-            vo.setOrgNames(orgs.stream().map(OrgEntity::getOrgName).collect(Collectors.toList()));
+            vo.setOrgs(orgs.stream().map(o -> {
+                DeptVO.OrgSimpleVO s = new DeptVO.OrgSimpleVO();
+                s.setId(o.getId());
+                s.setOrgName(o.getOrgName());
+                s.setOrgCode(o.getOrgCode());
+                s.setOrgType(o.getOrgType());
+                return s;
+            }).collect(Collectors.toList()));
         }
         if (vo.getStatus() != null) {
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
