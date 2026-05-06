@@ -369,7 +369,8 @@ VALUES
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
 VALUES
 ('manufacturer.org.id', '生产企业机构ID', '1', 'number', 'system', '系统预设唯一生产企业机构ID，不可动态创建', 1, 0, 10, 1),
-('unknown.hospital.org.id', '未知医院机构ID', '8', 'number', 'system', '提单时用于隐藏具体客户信息的占位医院ID，权限校验豁免', 1, 0, 11, 1);
+('unknown.hospital.org.id', '未知医院机构ID', '8', 'number', 'system', '提单时用于隐藏具体客户信息的占位医院ID，权限校验豁免', 1, 0, 11, 1),
+('user.username.auto.generate', '用户名自动生成开关', 'false', 'boolean', 'system', 'true=后端按机构前缀+序号自动生成，false=前端手动输入', 1, 0, 21, 1);
 
 
 
@@ -519,9 +520,9 @@ VALUES
 -- ============================================================
 -- 机构基础数据初始化（sys_org）
 -- ============================================================
-INSERT INTO sys_org (id, org_name, org_code, org_type, contact, phone, status)
+INSERT INTO sys_org (id, org_name, org_code, org_type, username_prefix, contact, phone, status)
 VALUES
-(1, '嘉一高科（内部）', 'ORG-0001', '1.1', '管理员', '13800000000', 1);
+(1, '嘉一高科（内部）', 'ORG-0001', '1.1', 'jykg', '管理员', '13800000000', 1);
 
 
 -- ============================================================
@@ -531,10 +532,10 @@ VALUES
 -- ============================================================
 
 -- 经销商（orgType=1.2）
-INSERT INTO sys_org (id, org_name, org_code, org_type, area_id, area_name, contact, phone, status)
+INSERT INTO sys_org (id, org_name, org_code, org_type, username_prefix, area_id, area_name, contact, phone, status)
 VALUES
-(2, '北京医疗器械经销有限公司', 'ORG-D-0001', '1.2', 1, '北京市', '张经理', '13800000002', 1),
-(3, '广东医疗科技经销有限公司', 'ORG-D-0002', '1.2', 2233, '广东省', '李经理', '13800000003', 1);
+(2, '北京医疗器械经销有限公司', 'ORG-D-0001', '1.2', 'bjyq', 1, '北京市', '张经理', '13800000002', 1),
+(3, '广东医疗科技经销有限公司', 'ORG-D-0002', '1.2', 'gdyq', 2233, '广东省', '李经理', '13800000003', 1);
 
 -- 医疗机构（orgType=1.3）
 INSERT INTO sys_org (id, org_name, org_code, org_type, area_id, area_name, contact, phone, status)
@@ -623,7 +624,8 @@ VALUES
 ('BODYPART_NO',    '重建部位编码',   'BP-',    NULL,             4, 'NEVER', 1),  -- BodyPartServiceImpl
 ('PROJECT_NO',     '重建项目编码',   'RP-',    NULL,             4, 'NEVER', 1),  -- RebuildProjectServiceImpl
 -- 系统模块编码
-('DEPT_NO',        '部门编码',       'DEPT-',  NULL,             4, 'NEVER', 1);  -- DeptServiceImpl
+('DEPT_NO',        '部门编码',       'DEPT-',  NULL,             4, 'NEVER', 1),  -- DeptServiceImpl
+('USER_NO',        '用户名序号',     NULL,     NULL,             3, 'NEVER', 1);  -- UserServiceImpl（generateWithSeqSuffix，按机构前缀隔离序号池）
 
 
 -- ============================================================

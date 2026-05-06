@@ -57,6 +57,9 @@ CREATE TABLE sys_org (
     hospital_level      VARCHAR(16)      COMMENT '医院等级（关联字典编码=3，子节点dict_code=3.1/3.2/3.3/3.4/3.5）',
     hospital_type       VARCHAR(16)      COMMENT '医院类型（关联字典编码=4，子节点dict_code=4.1/4.2）',
 
+    -- 账号前缀（生产企业/经销商专用，用于自动生成用户名）
+    username_prefix     VARCHAR(16)      COMMENT '账号前缀（英文字母和数字，2-16位）',
+
     -- 状态
     status             TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark            VARCHAR(512)    COMMENT '备注说明',

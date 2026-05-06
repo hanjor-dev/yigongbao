@@ -99,4 +99,10 @@ public class OrgEntity extends BaseEntity implements Serializable {
      * 备注说明
      */
     private String remark;
+
+    /**
+     * 账号前缀（英文字母和数字，2-16位，用于自动生成用户名）
+     * 仅对 orgType=1.1（生产企业）和 orgType=1.2（经销商）有效
+     */
+    private String usernamePrefix;
 }

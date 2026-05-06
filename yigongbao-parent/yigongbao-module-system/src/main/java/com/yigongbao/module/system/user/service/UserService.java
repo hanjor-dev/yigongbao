@@ -112,4 +112,12 @@ public interface UserService extends IService<UserEntity> {
      * @return 该机构下所有正常状态用户的ID列表，orgId 为 null 时返回空列表
      */
     List<Long> listUserIdsByOrgId(Long orgId);
+
+    /**
+     * 预览用户名（自动生成模式，预占5分钟）
+     *
+     * @param orgId 机构ID
+     * @return 预占的用户名，手动模式返回 null
+     */
+    String previewUsername(Long orgId);
 }

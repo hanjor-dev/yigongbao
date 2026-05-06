@@ -19,6 +19,11 @@ public final class CodeRuleConstants {
      */
     public static final String DEPT_NO = "DEPT_NO";
 
+    /**
+     * 用户名序号（generateWithSeqSuffix 调用，按机构前缀隔离序号池）
+     */
+    public static final String USER_NO = "USER_NO";
+
     // ==================== 基础模块编码 ====================
 
     /**

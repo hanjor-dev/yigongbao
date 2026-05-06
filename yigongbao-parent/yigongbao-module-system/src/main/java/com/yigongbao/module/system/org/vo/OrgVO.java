@@ -139,4 +139,9 @@ public class OrgVO {
      * 更新时间
      */
     private LocalDateTime updateTime;
+
+    /**
+     * 账号前缀（英文字母和数字，2-16位）
+     */
+    private String usernamePrefix;
 }

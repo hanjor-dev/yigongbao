@@ -13,6 +13,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.DictCodeConstants;
+import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -39,13 +40,16 @@ import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.service.UserService;
 import com.yigongbao.module.system.user.vo.UserVO;
+import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 
@@ -55,6 +59,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -81,6 +86,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     private final ConfigService configService;
     private final UserHospitalService userHospitalService;
     private final DeptOrgMapper deptOrgMapper;
+    private final CodeGeneratorService codeGeneratorService;
+    private final StringRedisTemplate stringRedisTemplate;
 
     /**
      * 分页查询用户列表
@@ -287,12 +294,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createUser(CreateUserDTO dto) {
-        String maskedUsername = maskUsername(dto.getUsername());
-        log.info("创建用户，username={}, orgId={}", maskedUsername, dto.getOrgId());
+        log.info("创建用户，orgId={}", dto.getOrgId());
         try {
+            // 判断是否开启用户名自动生成（在所有校验之前，确定 username 来源）
+            boolean autoGenerate = Boolean.parseBoolean(
+                configService.getConfigValue(SystemConfigKeyEnum.USER_USERNAME_AUTO_GENERATE.getKey()));
+            if (!autoGenerate) {
+                // 手动模式：username 必填
+                if (StrUtil.isBlank(dto.getUsername())) {
+                    throw new BusinessException(ErrorCodeEnum.USER_USERNAME_REQUIRED);
+                }
+            }
             // 校验用户名全局唯一（函数索引保障 DB 层，此处提前拦截给出友好提示）
-            if (isUsernameExists(dto.getUsername())) {
-                log.warn("用户名已存在，username={}", maskedUsername);
+            if (StrUtil.isNotBlank(dto.getUsername()) && isUsernameExists(dto.getUsername())) {
+                log.warn("用户名已存在，username={}", maskUsername(dto.getUsername()));
                 throw new BusinessException(ErrorCodeEnum.USER_EXISTS);
             }
             // 校验手机号全局唯一
@@ -390,13 +405,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             }
             // 填充冗余字段（复用已查询的实体，避免重复查询）
             fillRedundantFields(entity, orgEntity, deptEntity, roleEntity);
+            // 自动生成模式：在 orgId 最终确定后生成 username
+            if (autoGenerate) {
+                Long currentUserId = StpUtil.getLoginIdAsLong();
+                String redisKey = "username:reserve:" + currentUserId + ":" + entity.getOrgId();
+                String reserved = stringRedisTemplate.opsForValue().get(redisKey);
+                if (StrUtil.isNotBlank(reserved)) {
+                    // 使用预占值，消费后删除
+                    entity.setUsername(reserved);
+                    stringRedisTemplate.delete(redisKey);
+                    log.info("使用预占用户名，username={}", reserved);
+                } else {
+                    // 无预占（超时或未预览），重新生成
+                    entity.setUsername(generateUsername(entity.getOrgId()));
+                    log.info("重新生成用户名，username={}", entity.getUsername());
+                }
+            }
             // 密码加密存储（如果未提供密码则从系统配置获取默认密码）
             String rawPassword;
             if (StrUtil.isNotBlank(dto.getPassword())) {
                 rawPassword = dto.getPassword();
                 // 密码强度校验：必须包含字母和数字，长度 6-20 位
                 if (!isPasswordStrong(rawPassword)) {
-                    log.warn("密码强度不足，username={}", maskedUsername);
+                    log.warn("密码强度不足，username={}", maskUsername(entity.getUsername()));
                     throw new BusinessException(ErrorCodeEnum.USER_PASSWORD_WEAK);
                 }
             } else {
@@ -423,14 +454,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 }
             }
 
-            log.info("创建用户成功，id={}, username={}", entity.getId(), maskedUsername);
+            log.info("创建用户成功，id={}, username={}", entity.getId(), maskUsername(entity.getUsername()));
         } catch (BusinessException e) {
             throw e;
         } catch (DuplicateKeyException e) {
-            log.warn("用户名或手机号冲突（并发），username={}", maskedUsername, e);
+            log.warn("用户名或手机号冲突（并发），username={}", maskUsername(dto.getUsername()), e);
             throw new BusinessException(ErrorCodeEnum.USER_EXISTS);
         } catch (Exception e) {
-            log.error("创建用户异常，username={}", maskedUsername, e);
+            log.error("创建用户异常，orgId={}", dto.getOrgId(), e);
             throw e;
         }
     }
@@ -992,5 +1023,44 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 .stream()
                 .map(UserEntity::getId)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 预览用户名（自动生成模式，预占5分钟）
+     *
+     * @param orgId 机构ID
+     * @return 预占的用户名，手动模式返回 null
+     */
+    @Override
+    public String previewUsername(Long orgId) {
+        boolean autoGenerate = Boolean.parseBoolean(
+            configService.getConfigValue(SystemConfigKeyEnum.USER_USERNAME_AUTO_GENERATE.getKey()));
+        if (!autoGenerate) return null;
+        // 生成真实序号并预占
+        String username = generateUsername(orgId);
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        String redisKey = "username:reserve:" + currentUserId + ":" + orgId;
+        stringRedisTemplate.opsForValue().set(redisKey, username, 5, TimeUnit.MINUTES);
+        log.info("预占用户名，orgId={}, username={}", orgId, username);
+        return username;
+    }
+
+    /**
+     * 按机构前缀生成用户名，格式为 {prefix}{seq3位补零}（如 ceshi001）
+     *
+     * @param orgId 机构ID
+     * @return 生成的用户名
+     */
+    private String generateUsername(Long orgId) {
+        OrgEntity org = orgService.getById(orgId);
+        if (org == null || StrUtil.isBlank(org.getUsernamePrefix())) {
+            throw new BusinessException(ErrorCodeEnum.ORG_USERNAME_PREFIX_MISSING);
+        }
+        // generateWithSeqSuffix 返回格式为 "prefix-N"，解析后格式化为 "prefixNNN"
+        String raw = codeGeneratorService.generateWithSeqSuffix(CodeRuleConstants.USER_NO, org.getUsernamePrefix());
+        int dashIdx = raw.lastIndexOf('-');
+        String prefix = raw.substring(0, dashIdx);
+        long seq = Long.parseLong(raw.substring(dashIdx + 1));
+        return prefix + String.format("%03d", seq);
     }
 }

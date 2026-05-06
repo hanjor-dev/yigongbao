@@ -296,7 +296,12 @@ public enum ErrorCodeEnum {
     CAPTCHA_GRAPHIC_EXPIRED(773, "行为验证已过期，请刷新重试"),
     CAPTCHA_GRAPHIC_ERROR(774, "行为验证失败"),
     CAPTCHA_TOKEN_MISSING(775, "请先完成行为验证"),
-    CAPTCHA_TOKEN_INVALID(776, "请重新进行行为验证");
+    CAPTCHA_TOKEN_INVALID(776, "请重新进行行为验证"),
+
+    // ==================== 用户名生成相关 777-778 ====================
+    ORG_USERNAME_PREFIX_MISSING(777, "机构未配置账号前缀，无法自动生成用户名"),
+    USER_USERNAME_REQUIRED(778, "手动输入模式下用户名不能为空"),
+    ORG_USERNAME_PREFIX_EXISTS(779, "账号前缀已存在");
 
     /**
      * 错误码

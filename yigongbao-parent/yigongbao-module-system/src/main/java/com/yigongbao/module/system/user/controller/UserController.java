@@ -165,4 +165,16 @@ public class UserController {
         userService.updateUserBySelf(currentUserId, dto);
         return Result.success();
     }
+
+    /**
+     * 预览用户名（自动生成模式，预占5分钟）
+     *
+     * @param orgId 机构ID
+     * @return 预占的用户名，手动模式返回 null
+     */
+    @GetMapping("/username/preview")
+    @Operation(summary = "预览用户名（自动生成模式，预占5分钟）")
+    public Result<String> previewUsername(@RequestParam Long orgId) {
+        return Result.success(userService.previewUsername(orgId));
+    }
 }

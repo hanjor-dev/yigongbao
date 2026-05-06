@@ -217,7 +217,14 @@ public enum SystemConfigKeyEnum {
     /**
      * 未知医院机构ID（提单时用于隐藏具体客户信息的占位医院）
      */
-    UNKNOWN_HOSPITAL_ORG_ID("unknown.hospital.org.id", "未知医院机构ID");
+    UNKNOWN_HOSPITAL_ORG_ID("unknown.hospital.org.id", "未知医院机构ID"),
+
+    // ==================== 用户配置 ====================
+    /**
+     * 用户名自动生成开关
+     * true=后端按机构前缀+序号自动生成，false=前端手动输入
+     */
+    USER_USERNAME_AUTO_GENERATE("user.username.auto.generate", "用户名自动生成开关");
 
     /**
      * 配置键

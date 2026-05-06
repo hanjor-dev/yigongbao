@@ -175,6 +175,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                 log.warn("机构名称已存在，orgName={}", dto.getOrgName());
                 throw new BusinessException(ErrorCodeEnum.ORG_EXISTS);
             }
+            // 校验账号前缀唯一性（生产企业/经销商专用）
+            if (StrUtil.isNotBlank(dto.getUsernamePrefix()) && isUsernamePrefixExists(dto.getUsernamePrefix())) {
+                log.warn("账号前缀已存在，usernamePrefix={}", dto.getUsernamePrefix());
+                throw new BusinessException(ErrorCodeEnum.ORG_USERNAME_PREFIX_EXISTS);
+            }
             // 校验机构类型是否存在
             if (!isOrgTypeValid(dto.getOrgType())) {
                 log.warn("机构类型不存在，orgType={}", dto.getOrgType());
@@ -267,8 +272,8 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             }
             // 记录原机构名称，用于后续判断是否需要同步 sys_user.org_name
             String originalOrgName = entity.getOrgName();
-            // 排除不可变字段，将DTO属性覆盖到实体（orgCode、审计字段、关联ID不参与更新）
-            BeanUtils.copyProperties(dto, entity, "id", "orgCode", "createTime", "updateTime", "createBy", "updateBy", "hospitalOrgIds");
+            // 排除不可变字段，将DTO属性覆盖到实体（orgCode、usernamePrefix 不可修改）
+            BeanUtils.copyProperties(dto, entity, "id", "orgCode", "usernamePrefix", "createTime", "updateTime", "createBy", "updateBy", "hospitalOrgIds");
             // areaId变更时同步刷新冗余的地区名称字段
             if (dto.getAreaId() != null) {
                 AreaEntity areaEntity = areaService.getById(dto.getAreaId());
@@ -499,6 +504,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     private boolean isOrgNameExists(String orgName) {
         return count(new LambdaQueryWrapper<OrgEntity>()
                 .eq(OrgEntity::getOrgName, orgName)) > 0;
+    }
+
+    private boolean isUsernamePrefixExists(String usernamePrefix) {
+        return count(new LambdaQueryWrapper<OrgEntity>()
+                .eq(OrgEntity::getUsernamePrefix, usernamePrefix)) > 0;
     }
 
     /**

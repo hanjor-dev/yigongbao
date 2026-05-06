@@ -102,4 +102,11 @@ public class CreateOrgDTO {
      */
     @Size(max = 512, message = "备注说明长度不能超过512个字符")
     private String remark;
+
+    /**
+     * 账号前缀（英文字母和数字，2-16位，用于自动生成用户名）
+     * 仅对经销商（1.2）和生产企业（1.1）有效
+     */
+    @Pattern(regexp = "^[a-zA-Z0-9]{2,16}$", message = "账号前缀只允许英文字母和数字，长度2-16位")
+    private String usernamePrefix;
 }

@@ -19,8 +19,8 @@ public class CreateUserDTO implements Serializable {
 
     /**
      * 用户名（登录账号）
+     * 自动生成模式下可不传，后端按机构前缀+序号生成；手动模式下必填
      */
-    @NotBlank(message = "用户名不能为空")
     @Size(min = 3, max = 32, message = "用户名长度必须在3-32个字符之间")
     private String username;
 
