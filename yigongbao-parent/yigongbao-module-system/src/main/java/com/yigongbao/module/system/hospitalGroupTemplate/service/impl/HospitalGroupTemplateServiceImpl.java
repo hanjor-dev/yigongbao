@@ -262,7 +262,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                     .orderByAsc(HospitalGroupTemplateEntity::getTemplateName);
             List<HospitalGroupTemplateEntity> list = list(wrapper);
             List<HospitalGroupTemplateSimpleVO> voList = list.stream().map(this::toSimpleVO).collect(Collectors.toList());
-            log.info("获取医院组合模板下拉选项成功，数量=", voList.size());
+            log.info("获取医院组合模板下拉选项成功，数量={}", voList.size());
             return voList;
         } catch (Exception e) {
             log.error("获取医院组合模板下拉选项异常", e);
@@ -370,6 +370,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
      * 批量保存模板医院明细记录
      * <p>
      * 使用 insertBatch 替代逐条 insert，消除 N+1 写入问题。
+     * 写入前校验所有 hospitalId 均为有效启用的医疗机构（orgType=1.3）。
      * </p>
      *
      * @param templateId  模板ID
@@ -378,6 +379,12 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     private void saveDetails(Long templateId, List<Long> hospitalIds) {
         if (hospitalIds == null || hospitalIds.isEmpty()) {
             return;
+        }
+        // 校验所有 hospitalId 均为有效医疗机构
+        List<OrgEntity> orgs = orgService.listByIds(hospitalIds);
+        boolean hasInvalid = orgs.stream().anyMatch(o -> !com.yigongbao.common.constant.DictCodeConstants.ORG_TYPE_HOSPITAL.equals(o.getOrgType()));
+        if (hasInvalid || orgs.size() != new java.util.HashSet<>(hospitalIds).size()) {
+            throw new com.yigongbao.common.exception.BusinessException(com.yigongbao.common.enums.ErrorCodeEnum.HOSPITAL_NOT_FOUND);
         }
         List<HospitalGroupTemplateDetailEntity> details = new ArrayList<>(hospitalIds.size());
         for (Long hospitalId : hospitalIds) {

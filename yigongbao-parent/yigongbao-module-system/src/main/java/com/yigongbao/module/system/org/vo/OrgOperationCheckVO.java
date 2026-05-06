@@ -33,6 +33,11 @@ public class OrgOperationCheckVO {
      */
     private List<AffectedDoctorVO> affectedDoctors;
 
+    /**
+     * 关联该机构的部门列表（删除时会解除关联）
+     */
+    private List<AffectedDeptVO> affectedDepts;
+
     @Data
     public static class AffectedUserVO {
         private Long id;
@@ -43,5 +48,11 @@ public class OrgOperationCheckVO {
     public static class AffectedDoctorVO {
         private Long id;
         private String doctorName;
+    }
+
+    @Data
+    public static class AffectedDeptVO {
+        private Long id;
+        private String deptName;
     }
 }

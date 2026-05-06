@@ -117,11 +117,11 @@ public class UserHospitalServiceImpl implements UserHospitalService {
 
         // 校验 hospitalIds 均为有效医疗机构（orgType=1.3）
         if (hospitalIds != null && !hospitalIds.isEmpty()) {
-            List<OrgEntity> orgs = orgService.listByIds(hospitalIds);
+            List<Long> distinctIds = hospitalIds.stream().distinct().collect(Collectors.toList());
+            List<OrgEntity> orgs = orgService.listByIds(distinctIds);
             List<OrgEntity> valid = orgs.stream().filter(Objects::nonNull)
                     .filter(o -> DictCodeConstants.ORG_TYPE_HOSPITAL.equals(o.getOrgType())).collect(Collectors.toList());
-            // 有效机构数量不匹配，说明存在非法ID
-            if (valid.size() != hospitalIds.size()) {
+            if (valid.size() != distinctIds.size()) {
                 throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
             }
             for (OrgEntity org : valid) {

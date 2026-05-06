@@ -178,7 +178,7 @@ class UserHospitalControllerTest {
         template.setTemplateCode("TPL-HOS-001");
         template.setHospitalCount(2);
 
-        when(hospitalGroupTemplateService.getTemplateById(1L))
+        when(hospitalGroupTemplateService.getTemplateById(1L, null))
                 .thenReturn(template);
 
         mockMvc.perform(get("/system/user/1/hospitals/template/1"))

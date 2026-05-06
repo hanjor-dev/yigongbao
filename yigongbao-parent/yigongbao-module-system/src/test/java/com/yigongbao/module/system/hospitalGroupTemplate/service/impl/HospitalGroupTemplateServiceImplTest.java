@@ -79,7 +79,7 @@ class HospitalGroupTemplateServiceImplTest {
         when(templateMapper.selectById(1L)).thenReturn(templateEntity);
         when(detailMapper.countByTemplateId(1L)).thenReturn(2L);
         when(detailMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
-        HospitalGroupTemplateVO result = templateService.getTemplateById(1L);
+        HospitalGroupTemplateVO result = templateService.getTemplateById(1L,null);
         assertNotNull(result);
         assertEquals(1L, result.getId());
         assertEquals("测试模板", result.getTemplateName());
@@ -89,7 +89,7 @@ class HospitalGroupTemplateServiceImplTest {
     @DisplayName("getTemplateById: 数据不存在时抛出异常")
     void getTemplateById_whenNotExists_shouldThrowException() {
         when(templateMapper.selectById(999L)).thenReturn(null);
-        BusinessException ex = assertThrows(BusinessException.class, () -> templateService.getTemplateById(999L));
+        BusinessException ex = assertThrows(BusinessException.class, () -> templateService.getTemplateById(999L, null));
         assertEquals(ErrorCodeEnum.TEMPLATE_NOT_FOUND.getCode(), ex.getCode());
     }
 

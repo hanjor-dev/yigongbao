@@ -363,7 +363,7 @@ VALUES
 ('design.report.max_size_mb', '设计报告最大文件大小', '50', 'number', 'file', '设计报告上传时的最大文件大小（MB）', 0, 0, 10, 1),
 ('design.model.allowed_extensions', '可视化模型允许的文件扩展名', '.stl,.obj,.ply,.3mf', 'string', 'file', '可视化模型允许的文件扩展名，逗号分隔', 0, 0, 11, 1),
 ('design.model.max_size_mb', '可视化模型最大文件大小', '200', 'number', 'file', '可视化模型上传时的最大文件大小（MB）', 0, 0, 12, 1),
-('org.cert.allowed_extensions', '资质文件允许格式', 'zip,rar,tar,7z', 'string', 'file', '机构资质文件允许的压缩包格式，逗号分隔', 0, 0, 13, 1),
+('org.cert.allowed_extensions', '资质文件允许格式', '.zip,.rar,.tar,.7z', 'string', 'file', '机构资质文件允许的压缩包格式，逗号分隔', 0, 0, 13, 1),
 ('org.cert.max_size_mb', '资质文件最大大小', '500', 'number', 'file', '机构资质文件上传时的最大文件大小（MB）', 0, 0, 14, 1);
 
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
@@ -533,33 +533,20 @@ VALUES
 -- 经销商（orgType=1.2）
 INSERT INTO sys_org (id, org_name, org_code, org_type, area_id, area_name, contact, phone, status)
 VALUES
-(2, '北京医疗器械经销有限公司', 'ORG-D-0001', '1.2',
-    (SELECT id FROM sys_area WHERE area_code = 110000 LIMIT 1), '北京市',
-    '张经理', '13800000002', 1),
-(3, '广东医疗科技经销有限公司', 'ORG-D-0002', '1.2',
-    (SELECT id FROM sys_area WHERE area_code = 440000 LIMIT 1), '广东省',
-    '李经理', '13800000003', 1);
+(2, '北京医疗器械经销有限公司', 'ORG-D-0001', '1.2', 1, '北京市', '张经理', '13800000002', 1),
+(3, '广东医疗科技经销有限公司', 'ORG-D-0002', '1.2', 2233, '广东省', '李经理', '13800000003', 1);
 
 -- 医疗机构（orgType=1.3）
 INSERT INTO sys_org (id, org_name, org_code, org_type, area_id, area_name, contact, phone, status)
 VALUES
-(4, '北京协和医院',               'ORG-H-0001', '1.3',
-    (SELECT id FROM sys_area WHERE area_code = 110000 LIMIT 1), '北京市',
-    '张主任', '13800000004', 1),
-(5, '上海市第一人民医院',         'ORG-H-0002', '1.3',
-    (SELECT id FROM sys_area WHERE area_code = 310000 LIMIT 1), '上海市',
-    '李医生', '13800000005', 1),
-(6, '浙江大学医学院附属第一医院', 'ORG-H-0003', '1.3',
-    (SELECT id FROM sys_area WHERE area_code = 330000 LIMIT 1), '浙江省',
-    '王医生', '13800000006', 1),
-(7, '广东省人民医院',             'ORG-H-0004', '1.3',
-    (SELECT id FROM sys_area WHERE area_code = 440000 LIMIT 1), '广东省',
-    '陈医生', '13800000007', 1),
-(8, '未知医院',                   'ORG-H-0000', '1.3',
-    NULL, NULL, NULL, NULL, 1);
+(4, '北京协和医院', 'ORG-H-0001', '1.3', 1, '北京市', '张主任', '13800000004', 1),
+(5, '上海市第一人民医院', 'ORG-H-0002', '1.3', 894, '上海市', '李医生', '13800000005', 1),
+(6, '浙江大学医学院附属第一医院', 'ORG-H-0003', '1.3', 1045, '浙江省', '王医生', '13800000006', 1),
+(7, '广东省人民医院', 'ORG-H-0004', '1.3', 2233, '广东省', '陈医生', '13800000007', 1),
+(8, '其他医院', 'ORG-H-0000', '1.3', NULL, NULL, NULL, NULL, 1);
 
 -- 经销商-医疗机构关联（sys_org_hospital）
-INSERT INTO sys_org_hospital (org_id, hospital_org_id)
+INSERT INTO sys_org_hospital (distributor_org_id, hospital_org_id)
 VALUES
 (2, 4), (2, 5),
 (3, 6), (3, 7);

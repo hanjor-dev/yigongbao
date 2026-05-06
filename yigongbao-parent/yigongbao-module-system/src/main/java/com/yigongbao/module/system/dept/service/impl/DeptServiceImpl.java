@@ -131,7 +131,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             }
             // 有关联机构时，校验机构类型与部门类型匹配（内部↔生产企业，外部↔经销商）
             if (dto.getOrgIds() != null && !dto.getOrgIds().isEmpty()) {
-                validateOrgTypeMatchDeptType(dto.getOrgIds(), dto.getDeptType());
+                validateOrgTypeMatchDeptType(dto.getOrgIds(), dto.getDeptType(), null);
             }
             // 通过编码规则生成唯一部门编号
             String deptCode = codeGeneratorService.generate(CodeRuleConstants.DEPT_NO);
@@ -179,7 +179,15 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             // 若未传入新 deptType，则沿用原值，用于后续机构类型匹配校验
             Integer deptType = dto.getDeptType() != null ? dto.getDeptType() : entity.getDeptType();
             if (dto.getOrgIds() != null && !dto.getOrgIds().isEmpty()) {
-                validateOrgTypeMatchDeptType(dto.getOrgIds(), deptType);
+                validateOrgTypeMatchDeptType(dto.getOrgIds(), deptType, id);
+            } else if (dto.getDeptType() != null && !dto.getDeptType().equals(entity.getDeptType()) && dto.getOrgIds() == null) {
+                // deptType 发生变更但未传 orgIds：校验现有关联机构与新类型是否兼容
+                List<Long> existingOrgIds = deptOrgMapper.selectList(
+                        new LambdaQueryWrapper<DeptOrgEntity>().eq(DeptOrgEntity::getDeptId, id))
+                        .stream().map(DeptOrgEntity::getOrgId).collect(Collectors.toList());
+                if (!existingOrgIds.isEmpty()) {
+                    validateOrgTypeMatchDeptType(existingOrgIds, dto.getDeptType(), id);
+                }
             }
             // 排除不可变字段及 orgIds（关联关系单独处理）
             BeanUtils.copyProperties(dto, entity, "id", "deptCode", "createTime", "updateTime", "createBy", "updateBy", "orgIds");
@@ -369,23 +377,43 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
     }
 
     /**
-     * 校验机构类型与部门类型的匹配关系。
-     * <p>
-     * 匹配规则：内部部门（deptType=1）只能关联生产企业（ORG_TYPE_PRODUCER），
-     * 外部部门（deptType=2）只能关联经销商（ORG_TYPE_DEALER）。
+     * 校验机构类型与部门类型的匹配关系，并附加以下约束：
+     * - 内部部门（deptType=1）：orgIds 只能传一个，且必须是生产企业
+     * - 外部部门（deptType=2）：每个经销商只能属于一个外部部门（排除 excludeDeptId 自身）
      *
-     * @param orgIds   待关联的机构ID列表
-     * @param deptType 部门类型（1=内部，2=外部）
-     * @throws BusinessException 存在类型不匹配的机构时抛出
+     * @param orgIds        待关联的机构ID列表
+     * @param deptType      部门类型（1=内部，2=外部）
+     * @param excludeDeptId 更新时排除自身，创建时传 null
      */
-    private void validateOrgTypeMatchDeptType(List<Long> orgIds, Integer deptType) {
-        // 内部部门(1) → 生产企业；外部部门(2) → 经销商
-        String expectedOrgType = deptType == 1 ? DictCodeConstants.ORG_TYPE_PRODUCER : DictCodeConstants.ORG_TYPE_DEALER;
-        List<OrgEntity> orgs = orgService.listByIds(orgIds);
-        // 只要有一个机构类型不符合预期，即视为不匹配
-        boolean mismatch = orgs.stream().anyMatch(o -> !expectedOrgType.equals(o.getOrgType()));
-        if (mismatch) {
-            throw new BusinessException(ErrorCodeEnum.ORG_DEPT_TYPE_MISMATCH);
+    private void validateOrgTypeMatchDeptType(List<Long> orgIds, Integer deptType, Long excludeDeptId) {
+        if (deptType == 1) {
+            // 内部部门只能关联一个生产企业
+            if (orgIds.size() > 1) {
+                throw new BusinessException(ErrorCodeEnum.DEPT_INTERNAL_ORG_LIMIT);
+            }
+            List<OrgEntity> orgs = orgService.listByIds(orgIds);
+            boolean mismatch = orgs.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_PRODUCER.equals(o.getOrgType()));
+            if (mismatch) {
+                throw new BusinessException(ErrorCodeEnum.ORG_DEPT_TYPE_MISMATCH);
+            }
+        } else {
+            // 外部部门：校验机构类型均为经销商
+            List<OrgEntity> orgs = orgService.listByIds(orgIds);
+            boolean mismatch = orgs.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_DEALER.equals(o.getOrgType()));
+            if (mismatch) {
+                throw new BusinessException(ErrorCodeEnum.ORG_DEPT_TYPE_MISMATCH);
+            }
+            // 校验每个经销商未被其他外部部门关联（一个经销商只属于一个外部部门）
+            for (Long orgId : orgIds) {
+                LambdaQueryWrapper<DeptOrgEntity> wrapper = new LambdaQueryWrapper<DeptOrgEntity>()
+                        .eq(DeptOrgEntity::getOrgId, orgId);
+                if (excludeDeptId != null) {
+                    wrapper.ne(DeptOrgEntity::getDeptId, excludeDeptId);
+                }
+                if (deptOrgMapper.selectCount(wrapper) > 0) {
+                    throw new BusinessException(ErrorCodeEnum.DEPT_ORG_ALREADY_BOUND);
+                }
+            }
         }
     }
 

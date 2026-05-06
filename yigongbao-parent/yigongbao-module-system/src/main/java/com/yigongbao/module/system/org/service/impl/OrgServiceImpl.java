@@ -76,6 +76,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     private final HospitalGroupTemplateDetailMapper templateDetailMapper;
     private final DeptOrgMapper deptOrgMapper;
     private final FileService fileService;
+    private final com.yigongbao.module.system.dept.mapper.DeptMapper deptMapper;
 
     @Autowired
     @Lazy
@@ -284,19 +285,21 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                         .eq(UserEntity::getOrgId, id)
                         .set(UserEntity::getOrgName, dto.getOrgName()));
             }
-            // 经销商类型且前端传入了 hospitalOrgIds 时，全量替换关联关系（先删后插）
+            // 经销商类型且前端传入了 hospitalOrgIds 时，全量替换关联关系（先校验后删插）
             String orgType = entity.getOrgType();
             if (DictCodeConstants.ORG_TYPE_DEALER.equals(orgType) && dto.getHospitalOrgIds() != null) {
-                // 删除该经销商的全部旧关联
-                orgHospitalMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
-                        .eq(OrgHospitalEntity::getDistributorOrgId, id));
+                // 先校验新列表合法性，再执行写操作
                 if (!dto.getHospitalOrgIds().isEmpty()) {
-                    // 校验 hospitalOrgIds 中的机构必须是医疗机构类型，且全部存在
                     List<OrgEntity> hospitals = listByIds(dto.getHospitalOrgIds());
                     boolean hasInvalid = hospitals.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_HOSPITAL.equals(o.getOrgType()));
                     if (hasInvalid || hospitals.size() != dto.getHospitalOrgIds().size()) {
                         throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
                     }
+                }
+                // 校验通过后再删除旧关联
+                orgHospitalMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
+                        .eq(OrgHospitalEntity::getDistributorOrgId, id));
+                if (!dto.getHospitalOrgIds().isEmpty()) {
                     saveOrgHospitalRelations(id, dto.getHospitalOrgIds());
                 }
                 // 同步清理该经销商下业务员中已失效的医院权限
@@ -422,6 +425,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
         log.info("全量查询机构列表，用于下拉选择");
         try {
             LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
+            wrapper.ne(OrgEntity::getOrgType, DictCodeConstants.ORG_TYPE_PRODUCER);
+            String unknownHospitalIdStr = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
+            if (unknownHospitalIdStr != null) {
+                wrapper.ne(OrgEntity::getId, Long.parseLong(unknownHospitalIdStr));
+            }
             wrapper.orderByAsc(OrgEntity::getOrgName);
             List<OrgEntity> entityList = list(wrapper);
             List<OrgVO> voList = entityList.stream()
@@ -567,7 +575,6 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
 
         List<OrgOperationCheckVO.AffectedDoctorVO> affectedDoctors = new java.util.ArrayList<>();
         if (DictCodeConstants.ORG_TYPE_HOSPITAL.equals(entity.getOrgType())) {
-            // 医疗机构：查询关联医生，删除后 doctor.hospital_id 将悬空
             affectedDoctors = doctorService.listByHospitalId(id).stream().map(d -> {
                 OrgOperationCheckVO.AffectedDoctorVO vo = new OrgOperationCheckVO.AffectedDoctorVO();
                 vo.setId(d.getId());
@@ -576,19 +583,34 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             }).collect(Collectors.toList());
         }
 
+        // 查询关联该机构的部门（删除机构时会解除关联）
+        List<Long> deptIds = deptOrgMapper.selectList(
+                new LambdaQueryWrapper<DeptOrgEntity>().eq(DeptOrgEntity::getOrgId, id))
+                .stream().map(DeptOrgEntity::getDeptId).collect(Collectors.toList());
+        List<OrgOperationCheckVO.AffectedDeptVO> affectedDepts = deptIds.isEmpty()
+                ? java.util.Collections.emptyList()
+                : deptMapper.selectBatchIds(deptIds).stream().map(d -> {
+                    OrgOperationCheckVO.AffectedDeptVO vo = new OrgOperationCheckVO.AffectedDeptVO();
+                    vo.setId(d.getId());
+                    vo.setDeptName(d.getDeptName());
+                    return vo;
+                }).collect(Collectors.toList());
+
         OrgOperationCheckVO result = new OrgOperationCheckVO();
         result.setAffectedUsers(affectedUsers);
         result.setAffectedDoctors(affectedDoctors);
-        result.setAffected(!affectedUsers.isEmpty() || !affectedDoctors.isEmpty());
+        result.setAffectedDepts(affectedDepts);
+        result.setAffected(!affectedUsers.isEmpty() || !affectedDoctors.isEmpty() || !affectedDepts.isEmpty());
         if (result.isAffected()) {
             StringBuilder msg = new StringBuilder("删除该机构将产生以下影响：");
             if (!affectedUsers.isEmpty()) msg.append("【").append(affectedUsers.size()).append(" 个用户账号将失去机构归属】");
             if (!affectedDoctors.isEmpty()) msg.append("【").append(affectedDoctors.size()).append(" 位医生历史记录将失效】");
+            if (!affectedDepts.isEmpty()) msg.append("【").append(affectedDepts.size()).append(" 个部门将解除与该机构的关联】");
             msg.append("，请确认是否继续？");
             result.setMessage(msg.toString());
         }
-        log.info("预检查删除机构完成，id={}, affectedUsers={}, affectedDoctors={}",
-                id, affectedUsers.size(), affectedDoctors.size());
+        log.info("预检查删除机构完成，id={}, affectedUsers={}, affectedDoctors={}, affectedDepts={}",
+                id, affectedUsers.size(), affectedDoctors.size(), affectedDepts.size());
         return result;
     }
 

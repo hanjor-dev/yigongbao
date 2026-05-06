@@ -511,11 +511,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 entity.setRoleName(newRole.getRoleName());
                 entity.setRoleCode(newRole.getRoleCode());
             }
-            if (dto.getHospitalIds() != null && !dto.getHospitalIds().isEmpty()
-                    && effectiveRole != null
-                    && DataScopeTypeEnum.HOSPITALS.getCode().equals(effectiveRole.getDataScopeType())) {
-                // 覆盖式分配医院权限：先清空再写入，保证与前端选择完全一致
-                userHospitalService.assignHospitals(id, dto.getHospitalIds());
+            if (effectiveRole != null && DataScopeTypeEnum.HOSPITALS.getCode().equals(effectiveRole.getDataScopeType())) {
+                if (dto.getHospitalIds() != null && !dto.getHospitalIds().isEmpty()) {
+                    // 覆盖式分配医院权限：先清空再写入，保证与前端选择完全一致
+                    userHospitalService.assignHospitals(id, dto.getHospitalIds());
+                }
+            } else if (newRole != null && !DataScopeTypeEnum.HOSPITALS.getCode().equals(newRole.getDataScopeType())) {
+                // 角色从 HOSPITALS 切换为其他类型时，清理旧的医院权限记录
+                userHospitalService.assignHospitals(id, java.util.Collections.emptyList());
             }
             if (dto.getSpecialtyList() != null) {
                 entity.setSpecialty(CollUtil.join(dto.getSpecialtyList(), ","));

@@ -69,6 +69,8 @@ public enum ErrorCodeEnum {
     DEPT_EXISTS(631, "部门名称已存在"),
     DEPT_HAS_USERS(632, "该部门下存在用户，无法删除"),
     DEPT_DISABLED(633, "部门已停用"),
+    DEPT_ORG_ALREADY_BOUND(634, "该经销商已被其他外部部门关联"),
+    DEPT_INTERNAL_ORG_LIMIT(635, "内部部门只能关联一个生产企业机构"),
 
     // ==================== 角色相关 622-627 ====================
     USER_ROLE_NOT_FOUND(622, "角色不存在"),
