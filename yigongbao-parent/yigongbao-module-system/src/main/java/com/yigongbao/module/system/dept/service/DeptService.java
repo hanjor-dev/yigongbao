@@ -71,4 +71,12 @@ public interface DeptService extends IService<DeptEntity> {
      * @return 部门列表（包含关联名称）
      */
     List<DeptVO> listAllDept(Long orgId);
+
+    /**
+     * 根据部门ID查询关联机构列表
+     *
+     * @param id 部门ID
+     * @return 关联机构列表
+     */
+    List<DeptVO.OrgSimpleVO> listOrgsByDeptId(Long id);
 }

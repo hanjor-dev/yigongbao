@@ -308,6 +308,32 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
         }
     }
 
+    /**
+     * 根据部门ID查询关联机构列表
+     *
+     * @param id 部门ID
+     * @return 关联机构列表
+     */
+    @Override
+    public List<DeptVO.OrgSimpleVO> listOrgsByDeptId(Long id) {
+        log.info("查询部门关联机构列表，deptId={}", id);
+        if (getById(id) == null) {
+            throw new BusinessException(ErrorCodeEnum.DEPT_NOT_FOUND);
+        }
+        List<Long> orgIds = deptOrgMapper.selectList(
+                new LambdaQueryWrapper<DeptOrgEntity>().eq(DeptOrgEntity::getDeptId, id))
+                .stream().map(DeptOrgEntity::getOrgId).collect(Collectors.toList());
+        if (orgIds.isEmpty()) return List.of();
+        return orgService.listByIds(orgIds).stream().map(o -> {
+            DeptVO.OrgSimpleVO s = new DeptVO.OrgSimpleVO();
+            s.setId(o.getId());
+            s.setOrgName(o.getOrgName());
+            s.setOrgCode(o.getOrgCode());
+            s.setOrgType(o.getOrgType());
+            return s;
+        }).collect(Collectors.toList());
+    }
+
     // ==================== 私有方法 ====================
 
     /**

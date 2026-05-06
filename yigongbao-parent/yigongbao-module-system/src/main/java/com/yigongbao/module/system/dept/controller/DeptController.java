@@ -142,4 +142,16 @@ public class DeptController {
     public Result<List<DeptVO>> listAll(@RequestParam(required = false) Long orgId) {
         return Result.success(deptService.listAllDept(orgId));
     }
+
+    /**
+     * 根据部门ID查询关联机构列表
+     *
+     * @param id 部门ID
+     * @return 关联机构列表
+     */
+    @GetMapping("/{id}/orgs")
+    @Operation(summary = "查询部门关联机构列表")
+    public Result<List<DeptVO.OrgSimpleVO>> listOrgs(@PathVariable Long id) {
+        return Result.success(deptService.listOrgsByDeptId(id));
+    }
 }
