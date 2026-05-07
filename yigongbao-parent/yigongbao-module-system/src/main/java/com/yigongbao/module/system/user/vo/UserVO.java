@@ -43,9 +43,9 @@ public class UserVO implements Serializable {
     private String email;
 
     /**
-     * 性别
+     * 性别（字典编码，如 2.1=男，2.2=女）
      */
-    private Integer sex;
+    private String sex;
 
     /**
      * 性别名称

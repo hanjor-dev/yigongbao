@@ -171,8 +171,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             if (vo.getStatus() != null) {
                 vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
             }
-            if (vo.getSex() != null) {
-                vo.setSexName(StatusConstants.getSexName(vo.getSex()));
+            if (StrUtil.isNotBlank(vo.getSex())) {
+                var sexDict = dictService.getByDictCode(vo.getSex());
+                vo.setSexName(sexDict != null ? sexDict.getDictName() : "");
             }
             if (vo.getAccountType() != null) {
                 vo.setAccountTypeName(StatusConstants.getAccountTypeName(vo.getAccountType()));
@@ -880,8 +881,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
         // 性别名称
-        if (vo.getSex() != null) {
-            vo.setSexName(StatusConstants.getSexName(vo.getSex()));
+        if (StrUtil.isNotBlank(vo.getSex())) {
+            var sexDict = dictService.getByDictCode(vo.getSex());
+            vo.setSexName(sexDict != null ? sexDict.getDictName() : "");
         }
         // 账户分类名称
         if (vo.getAccountType() != null) {
