@@ -68,11 +68,10 @@ public class ViewerController {
     @Operation(summary = "markPath - 提交标注截图")
     @PostMapping("/mark")
     public Result<Void> saveMark(
-            @RequestParam Long orderId,
             @RequestParam(required = false) String groupId,
             @RequestParam(required = false) String id,
             @RequestPart MultipartFile file) {
-        viewerService.saveMark(orderId, groupId, id, file);
+        viewerService.saveMark(groupId, id, file);
         return Result.success();
     }
 }

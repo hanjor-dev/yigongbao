@@ -24,5 +24,5 @@ public interface ViewerService {
     ViewerStlVO getStlData(Long orderId);
 
     /** markPath：保存标注截图（关联到数据包+模型文件） */
-    void saveMark(Long orderId, String groupId, String modelFileId, MultipartFile file);
+    void saveMark(String groupId, String modelFileId, MultipartFile file);
 }

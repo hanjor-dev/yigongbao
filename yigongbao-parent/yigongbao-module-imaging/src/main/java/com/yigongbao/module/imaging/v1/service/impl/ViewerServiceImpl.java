@@ -73,7 +73,7 @@ public class ViewerServiceImpl implements ViewerService {
         // markPath：查看器提交标注截图时调用，groupId/id 由查看器自动附带（对应 stlPath 返回的 groupId/id）
         ViewerConfigVO.PathItem markItem = new ViewerConfigVO.PathItem();
         markItem.setPath(MARK_PATH);
-        markItem.setParams(Map.of("orderId", orderId));
+        markItem.setParams(Map.of());
         markItem.setType("post");
 
         ViewerConfigVO.Paths paths = new ViewerConfigVO.Paths();
@@ -161,20 +161,19 @@ public class ViewerServiceImpl implements ViewerService {
     }
 
     @Override
-    public void saveMark(Long orderId, String groupId, String modelFileId, MultipartFile file) {
-        log.info("保存标注截图, orderId={}, groupId={}, modelFileId={}", orderId, groupId, modelFileId);
+    public void saveMark(String groupId, String modelFileId, MultipartFile file) {
+        log.info("保存标注截图, groupId={}, modelFileId={}", groupId, modelFileId);
         if (StrUtil.isBlank(groupId) || StrUtil.isBlank(modelFileId)) {
             log.warn("groupId 或 modelFileId 为空，无法关联截图");
             throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "groupId, modelFileId");
         }
-        // 通过 groupId(packageCode) 查询 packageId
+        // 通过 groupId(packageCode) 查询 packageId（packageCode 全局唯一）
         DesignPackageEntity pkg = designPackageService.getOne(
                 new LambdaQueryWrapper<DesignPackageEntity>()
                         .eq(DesignPackageEntity::getPackageCode, groupId)
-                        .eq(DesignPackageEntity::getOrderId, orderId)
                         .last("LIMIT 1"));
         if (pkg == null) {
-            log.warn("数据包不存在, groupId={}, orderId={}", groupId, orderId);
+            log.warn("数据包不存在, groupId={}", groupId);
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
         // 复用现有的截图服务（关联到 packageId + packageFileId）
