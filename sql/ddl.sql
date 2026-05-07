@@ -527,7 +527,7 @@ CREATE TABLE sys_operation_log (
     username       VARCHAR(64)    COMMENT '操作用户名',
     real_name      VARCHAR(64)    COMMENT '操作用户真实姓名',
     status         INT             COMMENT '响应状态（0=失败，1=成功）',
-    error_message  VARCHAR(512)   COMMENT '错误信息',
+    error_message  TEXT             COMMENT '错误信息',
     duration       BIGINT          COMMENT '执行时长（毫秒）',
     operation_time DATETIME       DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
 

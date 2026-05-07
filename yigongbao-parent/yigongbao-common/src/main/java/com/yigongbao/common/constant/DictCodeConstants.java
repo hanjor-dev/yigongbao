@@ -82,6 +82,12 @@ public final class DictCodeConstants {
      */
     public static final String USER_SPECIALTY = "7";
 
+    /**
+     * 通用专业方向（兜底编码）
+     * 当订单专业方向无匹配设计师时，使用此编码进行二次查询
+     */
+    public static final String USER_SPECIALTY_GENERAL = "7.99";
+
     // ==================== 重建项目分类 ====================
     /**
      * 重建项目分类（父节点 dict_code）

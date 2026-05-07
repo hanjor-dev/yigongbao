@@ -82,7 +82,7 @@ public class AuthServiceImpl implements AuthService {
      */
     private LoginVO resolveByPassword(LoginDTO dto, String ip, String userAgent) {
         // 1. 校验滑动验证码 Token（PASSWORD 登录必须通过二次验证）
-        verifyCaptchaToken(dto.getCaptchaToken());
+        // verifyCaptchaToken(dto.getCaptchaToken());
 
         try {
             // 2. 查询用户（principal 支持用户名或邮箱，自动识别）

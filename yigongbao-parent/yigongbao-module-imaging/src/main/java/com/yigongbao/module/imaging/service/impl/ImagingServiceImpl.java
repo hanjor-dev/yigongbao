@@ -2,8 +2,10 @@ package com.yigongbao.module.imaging.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.constant.DictCodeConstants;
+import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.design.entity.DesignModelEntity;
@@ -19,6 +21,7 @@ import com.yigongbao.module.imaging.vo.DcmPackageVO;
 import com.yigongbao.module.imaging.vo.ModelVO;
 import com.yigongbao.module.imaging.vo.PackageModelFileVO;
 import com.yigongbao.module.imaging.vo.PackageModelGroupVO;
+import org.springframework.web.multipart.MultipartFile;
 import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.service.OrderFileService;
 import lombok.RequiredArgsConstructor;

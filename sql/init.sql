@@ -96,7 +96,8 @@ VALUES
 (32, 28, '7.4', '腹部方向', '4', 2, 4, 1),
 (33, 28, '7.5', '四肢方向', '5', 2, 5, 1),
 (34, 28, '7.6', '背部方向', '6', 2, 6, 1),
-(35, 28, '7.7', '其他', '7', 2, 7, 1);
+(35, 28, '7.7', '其他', '7', 2, 7, 1),
+(101, 28, '7.99', '通用', '99', 2, 99, 1);
 
 -- ------------------------------------------------------------
 -- 结算类型（父节点 id=36）
@@ -308,7 +309,7 @@ VALUES
 -- ------------------------------------------------------------
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
 VALUES
-('default.password', '默认密码', '123456', 'string', 'security', '新用户初始密码', 1, 0, 1, 1),
+('default.password', '默认密码', '1234.com', 'string', 'security', '新用户初始密码', 1, 0, 1, 1),
 ('login.max.failures', '最大连续登录失败次数', '5', 'number', 'security', '连续失败后锁定账号', 1, 0, 2, 1),
 ('login.lock.duration', '登录锁定时长', '15', 'number', 'security', '自动解锁时间（分钟）', 1, 0, 3, 1);
 
@@ -370,7 +371,7 @@ INSERT INTO sys_config (config_key, config_name, config_value, config_type, conf
 VALUES
 ('manufacturer.org.id', '生产企业机构ID', '1', 'number', 'system', '系统预设唯一生产企业机构ID，不可动态创建', 1, 0, 10, 1),
 ('unknown.hospital.org.id', '未知医院机构ID', '8', 'number', 'system', '提单时用于隐藏具体客户信息的占位医院ID，权限校验豁免', 1, 0, 11, 1),
-('user.username.auto.generate', '用户名自动生成开关', 'false', 'boolean', 'system', 'true=后端按机构前缀+序号自动生成，false=前端手动输入', 1, 0, 21, 1);
+('user.username.auto.generate', '用户名自动生成开关', 'true', 'boolean', 'system', 'true=后端按机构前缀+序号自动生成，false=前端手动输入', 1, 0, 21, 1);
 
 
 

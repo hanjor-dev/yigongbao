@@ -99,13 +99,41 @@ class DesignerAssignmentServiceImplTest {
     }
 
     @Test
-    @DisplayName("autoAssign — 无候选设计师，返回 null")
+    @DisplayName("autoAssign — 精确匹配无结果，通用专业方向兜底成功")
+    void autoAssign_fallbackToGeneral_shouldAssign() {
+        // given
+        OrderItemEntity item = new OrderItemEntity();
+        item.setProjectId(10L);
+        when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
+        when(rebuildProjectService.getSpecialtyByProjectId(10L)).thenReturn("7.1");
+        // 精确匹配无结果
+        when(userMapper.selectAvailableDesigners("7.1")).thenReturn(List.of());
+        // 通用专业方向兜底成功
+        UserEntity generalDesigner = new UserEntity();
+        generalDesigner.setId(200L);
+        generalDesigner.setRealName("通用设计师");
+        when(userMapper.selectAvailableDesigners("7.99")).thenReturn(List.of(generalDesigner));
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(1L);
+        when(orderMainService.getById(1L)).thenReturn(order);
+        // when
+        Long result = service.autoAssignDesigner(1L);
+        // then
+        assertEquals(200L, result);
+        verify(userMapper).selectAvailableDesigners("7.1"); // 第一次查询
+        verify(userMapper).selectAvailableDesigners("7.99"); // 兜底查询
+        verify(orderMainService).updateById(argThat(o -> Long.valueOf(200L).equals(o.getDesignerId())));
+    }
+
+    @Test
+    @DisplayName("autoAssign — 精确匹配和通用兜底均无结果，返回 null")
     void autoAssign_noCandidate_shouldReturnNull() {
         OrderItemEntity item = new OrderItemEntity();
         item.setProjectId(10L);
         when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
         when(rebuildProjectService.getSpecialtyByProjectId(10L)).thenReturn("7.1");
         when(userMapper.selectAvailableDesigners("7.1")).thenReturn(List.of());
+        when(userMapper.selectAvailableDesigners("7.99")).thenReturn(List.of());
         assertNull(service.autoAssignDesigner(1L));
     }
 

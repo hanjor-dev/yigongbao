@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -101,6 +102,7 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
 
     /**
      * 自动分配设计师（专业方向匹配 + 负载均衡，取负载最低的第一位）
+     * 两级查询：1) 精确匹配订单专业方向；2) 兜底查询通用专业方向
      *
      * @param orderId 订单ID
      * @return 分配到的设计师用户ID，无可分配时返回 null
@@ -115,17 +117,24 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
             log.warn("订单无可用专业方向，跳过自动分配，orderId={}", orderId);
             return null;
         }
-        // 2. 查询候选设计师（FIND_IN_SET 匹配，按工单数 ASC）
+        // 2. 第一次查询：精确匹配订单专业方向
         List<UserEntity> candidates = userMapper.selectAvailableDesigners(specialty);
         if (CollUtil.isEmpty(candidates)) {
-            log.warn("无满足条件的设计师，specialty={}", specialty);
-            return null;
+            log.info("精确匹配无结果，尝试通用专业方向兜底，specialty={}", specialty);
+            // 3. 第二次查询：使用通用专业方向兜底
+            candidates = userMapper.selectAvailableDesigners(DictCodeConstants.USER_SPECIALTY_GENERAL);
+            if (CollUtil.isEmpty(candidates)) {
+                log.warn("通用专业方向兜底仍无结果，specialty={}", specialty);
+                return null;
+            }
+            log.info("通用专业方向兜底成功，匹配到 {} 位设计师", candidates.size());
         }
-        // 3. 取负载最低的第一位
+        // 4. 取负载最低的第一位
         UserEntity designer = candidates.getFirst();
-        // 4. 更新订单 designerId / designerName
+        // 5. 更新订单 designerId / designerName
         OrderMainEntity order = orderMainService.getById(orderId);
         updateOrderDesigner(order, designer);
+        log.info("自动分配成功，orderId={}, designerId={}, specialty={}", orderId, designer.getId(), specialty);
         return designer.getId();
     }
 

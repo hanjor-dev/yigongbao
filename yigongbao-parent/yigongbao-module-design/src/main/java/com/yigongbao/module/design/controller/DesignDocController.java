@@ -160,8 +160,7 @@ public class DesignDocController {
      */
     @Operation(summary = "上传数据包文件截图")
     @PostMapping("/{orderId}/package/{packageId}/files/{packageFileId}/screenshot")
-    public Result<ScreenshotVO> saveScreenshot(@PathVariable Long orderId,
-                                               @PathVariable Long packageId,
+    public Result<ScreenshotVO> saveScreenshot(@PathVariable Long packageId,
                                                @PathVariable Long packageFileId,
                                                @RequestParam("file") MultipartFile file) {
         return Result.success(screenshotService.saveScreenshot(packageId, packageFileId, file));
@@ -172,8 +171,7 @@ public class DesignDocController {
      */
     @Operation(summary = "查询数据包文件截图")
     @GetMapping("/{orderId}/package/{packageId}/files/{packageFileId}/screenshot")
-    public Result<ScreenshotVO> getScreenshot(@PathVariable Long orderId,
-                                              @PathVariable Long packageId,
+    public Result<ScreenshotVO> getScreenshot(@PathVariable Long packageId,
                                               @PathVariable Long packageFileId) {
         return Result.success(screenshotService.getScreenshot(packageId, packageFileId));
     }

@@ -88,8 +88,8 @@ INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, so
 (81, 70, '7.3', '脊椎方向', '3', 2, 3, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
 (82, 81, '7.3.1', '脊柱外科', '3_1', 3, 1, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
 (83, 81, '7.3.2', '神经外科', '3_2', 3, 2, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
--- 其他
-(89, 70, '7.99', '其他', '99', 2, 99, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
+-- 通用（兜底专业方向）
+(89, 70, '7.99', '通用', '99', 2, 99, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
 
 -- 结算类型（dict_code=8）
 (90, 0, '8', '结算类型', NULL, 1, 7, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, 0),
