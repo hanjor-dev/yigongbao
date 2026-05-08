@@ -52,6 +52,10 @@ public class RateLimitAspect {
     public Object limit(ProceedingJoinPoint point, RateLimit rateLimit) throws Throwable {
         HttpServletRequest request = getRequest();
         String key = buildKey(rateLimit, request);
+        // 本地开发环境跳过限流
+        if (key.contains("127.0.0.1")) {
+            return point.proceed();
+        }
         Long result;
         try {
             result = redisTemplate.execute(RATE_LIMIT_SCRIPT,
