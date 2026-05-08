@@ -168,7 +168,7 @@ class DeptServiceImplTest {
         assertNotNull(result);
         assertEquals(1L, result.getId());
         assertEquals("研发部", result.getDeptName());
-        assertNotNull(result.getOrgNames());
+        assertNotNull(result.getOrgs());
     }
 
     @Test

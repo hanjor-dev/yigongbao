@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RateLimit;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.auth.dto.ChangePasswordDTO;
@@ -39,6 +40,7 @@ public class AuthController {
             businessType = OperationTypeEnum.LOGIN,
             operation = "用户登录"
     )
+    @RateLimit(limit = 10, window = 60, dimension = RateLimit.Dimension.IP)
     @PostMapping("/login")
     public Result<LoginVO> login(@Validated @RequestBody LoginDTO dto) {
         return Result.success(authService.login(dto));

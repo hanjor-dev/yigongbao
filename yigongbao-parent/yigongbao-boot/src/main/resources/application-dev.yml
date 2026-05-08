@@ -158,6 +158,12 @@ dromara:
         # 存储根路径（映射到 URL /files/public/**）
         storage-path: D:/yigongbao-files/
 
+# 应用安全配置
+app:
+  sign:
+    # 请求签名密钥，生产环境通过环境变量 APP_SIGN_SECRET 注入
+    secret: ${APP_SIGN_SECRET:dev-secret-change-in-prod}
+
 # 医工宝系统配置
 yigongbao:
   # 文件存储业务配置
@@ -169,7 +175,7 @@ yigongbao:
 sms:
   mock:
     # 开发阶段短信 Mock 重定向邮箱：将短信验证码以邮件形式转发到此邮箱（留空则仅打印日志）
-    redirect-email: ${SMS_MOCK_REDIRECT_EMAIL:}
+    redirect-email: ${SMS_MOCK_REDIRECT_EMAIL:hanjor666@qq.com}
 
 # 行为验证码配置， 详细请看 cloud.tianai.captcha.autoconfiguration.ImageCaptchaProperties 类
 captcha:

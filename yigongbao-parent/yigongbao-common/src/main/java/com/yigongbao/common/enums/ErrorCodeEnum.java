@@ -301,7 +301,16 @@ public enum ErrorCodeEnum {
     // ==================== 用户名生成相关 777-778 ====================
     ORG_USERNAME_PREFIX_MISSING(777, "机构未配置账号前缀，无法自动生成用户名"),
     USER_USERNAME_REQUIRED(778, "手动输入模式下用户名不能为空"),
-    ORG_USERNAME_PREFIX_EXISTS(779, "账号前缀已存在");
+    ORG_USERNAME_PREFIX_EXISTS(779, "账号前缀已存在"),
+
+    // ==================== 限流 780 ====================
+    RATE_LIMIT_EXCEEDED(429, "操作过于频繁，请稍后再试"),
+
+    // ==================== 签名验证 781-784 ====================
+    SIGN_PARAM_MISSING(781, "缺少签名参数：%s"),
+    SIGN_TIMESTAMP_EXPIRED(782, "请求已过期，请检查系统时间"),
+    SIGN_NONCE_USED(783, "重复请求"),
+    SIGN_INVALID(784, "签名验证失败");
 
     /**
      * 错误码
