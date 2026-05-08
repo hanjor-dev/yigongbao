@@ -81,7 +81,7 @@ public class GlobalExceptionHandler {
             .map(FieldError::getDefaultMessage)
             .collect(Collectors.joining(", "));
         log.warn("参数校验失败：{}", errorMessage);
-        return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), errorMessage);
+        return Result.error(ErrorCodeEnum.PARAM_ERROR, errorMessage);
     }
 
     /**
@@ -98,7 +98,7 @@ public class GlobalExceptionHandler {
             .map(ConstraintViolation::getMessage)
             .collect(Collectors.joining(", "));
         log.warn("参数校验失败：{}", errorMessage);
-        return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), errorMessage);
+        return Result.error(ErrorCodeEnum.PARAM_ERROR, errorMessage);
     }
 
     /**
@@ -115,7 +115,7 @@ public class GlobalExceptionHandler {
             .map(error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : error.toString())
             .collect(Collectors.joining(", "));
         log.warn("参数校验失败：{}", errorMessage);
-        return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), errorMessage);
+        return Result.error(ErrorCodeEnum.PARAM_ERROR, errorMessage);
     }
 
     /**
@@ -144,7 +144,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleMissingServletRequestParameterException(MissingServletRequestParameterException e) {
         log.warn("缺少请求参数：{}", e.getParameterName());
-        return Result.error(ErrorCodeEnum.MISSING_PARAMETER.getCode(),
+        return Result.error(ErrorCodeEnum.MISSING_PARAMETER,
             ErrorCodeEnum.MISSING_PARAMETER.getMessage(e.getParameterName()));
     }
 
@@ -159,7 +159,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleMissingPathVariableException(MissingPathVariableException e) {
         log.warn("路径变量缺失：参数名={}", e.getVariableName());
-        return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), "请求的路径参数不完整，请检查URL是否正确");
+        return Result.error(ErrorCodeEnum.PARAM_ERROR, "请求的路径参数不完整，请检查URL是否正确");
     }
 
     /**
@@ -175,7 +175,7 @@ public class GlobalExceptionHandler {
         String paramName = e.getName();
         String paramValue = e.getValue() != null ? e.getValue().toString() : "空";
         log.warn("参数类型不匹配：参数名={}, 传入值={}, 期望类型={}", paramName, paramValue, e.getRequiredType());
-        return Result.error(ErrorCodeEnum.INVALID_PARAMETER.getCode(),
+        return Result.error(ErrorCodeEnum.INVALID_PARAMETER,
             ErrorCodeEnum.INVALID_PARAMETER.getMessage(paramName));
     }
 
@@ -197,7 +197,7 @@ public class GlobalExceptionHandler {
             userMessage = "请求参数格式错误，请检查数据格式后重试";
         }
         log.warn("参数格式错误：{}", message);
-        return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), userMessage);
+        return Result.error(ErrorCodeEnum.PARAM_ERROR, userMessage);
     }
 
     /**

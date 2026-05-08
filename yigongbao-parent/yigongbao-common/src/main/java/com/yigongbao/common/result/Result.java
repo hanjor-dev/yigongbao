@@ -151,4 +151,17 @@ public class Result<T> {
         return result;
     }
 
+    /**
+     * 失败响应，使用错误码枚举的 code 和 priority，但自定义错误信息
+     *
+     * @param errorCode     错误码枚举
+     * @param customMessage 自定义错误信息
+     * @return Result 实例
+     */
+    public static <T> Result<T> error(ErrorCodeEnum errorCode, String customMessage) {
+        Result<T> result = new Result<>(errorCode.getCode(), customMessage);
+        result.setPriority(errorCode.getPriority());
+        return result;
+    }
+
 }
