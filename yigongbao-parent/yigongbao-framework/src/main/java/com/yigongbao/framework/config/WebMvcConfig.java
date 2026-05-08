@@ -1,7 +1,11 @@
 package com.yigongbao.framework.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yigongbao.framework.interceptor.GlobalRateLimitInterceptor;
 import com.yigongbao.framework.interceptor.ResultInterceptor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
@@ -19,9 +23,21 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final ResultInterceptor resultInterceptor;
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final ObjectMapper objectMapper;
 
-    public WebMvcConfig(ResultInterceptor resultInterceptor) {
+    @Value("${app.rate-limit.default-limit:60}")
+    private int defaultLimit;
+
+    @Value("${app.rate-limit.default-window:60}")
+    private int defaultWindow;
+
+    public WebMvcConfig(ResultInterceptor resultInterceptor,
+                        RedisTemplate<String, Object> redisTemplate,
+                        ObjectMapper objectMapper) {
         this.resultInterceptor = resultInterceptor;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -46,6 +62,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
      */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // 全局限流拦截器（兜底，所有接口生效）
+        registry.addInterceptor(new GlobalRateLimitInterceptor(redisTemplate, objectMapper, defaultLimit, defaultWindow))
+            .addPathPatterns("/**")
+            .excludePathPatterns(
+                "/static/**", "/favicon.ico", "/error",
+                "/doc.html", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/webjars/**"
+            );
+
         // 注册统一响应拦截器
         registry.addInterceptor(resultInterceptor)
             .addPathPatterns("/**")

@@ -163,6 +163,11 @@ app:
   sign:
     # 请求签名密钥，生产环境通过环境变量 APP_SIGN_SECRET 注入
     secret: ${APP_SIGN_SECRET:dev-secret-change-in-prod}
+  rate-limit:
+    # 全局默认限流：60次/分钟（所有接口兜底值）
+    default-limit: 60
+    # 时间窗口（秒）
+    default-window: 60
 
 # 医工宝系统配置
 yigongbao:
