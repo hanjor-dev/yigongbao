@@ -15,11 +15,10 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
-import java.util.List;
 
 /**
  * 全局限流拦截器
- * 对所有接口应用默认限流兜底，@RateLimit 注解可覆盖单个接口的限流值
+ * 对所有接口应用默认限流兜底，限流值通过 app.rate-limit.* 配置
  *
  * @author hanjor
  * @date 2026-05-08
@@ -35,20 +34,19 @@ public class GlobalRateLimitInterceptor implements HandlerInterceptor {
     /** 默认时间窗口（秒） */
     private final int defaultWindow;
 
-    private static final DefaultRedisScript<Long> RATE_LIMIT_SCRIPT = new DefaultRedisScript<>(
-            "local c=redis.call('INCR',KEYS[1]) " +
-            "if c==1 then redis.call('EXPIRE',KEYS[1],tonumber(ARGV[1])) end " +
-            "if c>tonumber(ARGV[2]) then return 0 end return 1",
-            Long.class);
-
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String key = buildKey(request);
         Long result;
         try {
-            result = redisTemplate.execute(RATE_LIMIT_SCRIPT,
-                    Collections.singletonList(key),
-                    List.of(String.valueOf(defaultWindow), String.valueOf(defaultLimit)));
+            // 将参数直接嵌入脚本，避免 RedisTemplate varargs 序列化问题导致 ARGV 为 nil
+            String script = String.format(
+                    "local c=redis.call('INCR',KEYS[1]) " +
+                    "if c==1 then redis.call('EXPIRE',KEYS[1],%d) end " +
+                    "if c>%d then return 0 end return 1",
+                    defaultWindow, defaultLimit);
+            result = redisTemplate.execute(new DefaultRedisScript<>(script, Long.class),
+                    Collections.singletonList(key));
         } catch (Exception e) {
             log.warn("全局限流 Redis 异常，降级放行，key={}", key, e);
             return true;
