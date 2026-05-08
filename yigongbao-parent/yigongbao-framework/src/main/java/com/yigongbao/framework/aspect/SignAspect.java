@@ -60,7 +60,7 @@ public class SignAspect {
         try {
             ts = Long.parseLong(timestamp);
         } catch (NumberFormatException e) {
-            throw new BusinessException(ErrorCodeEnum.SIGN_PARAM_MISSING, "X-Timestamp");
+            throw new BusinessException(ErrorCodeEnum.SIGN_PARAM_MISSING);
         }
         if (Math.abs(System.currentTimeMillis() - ts * 1000L) > WINDOW_MS) {
             throw new BusinessException(ErrorCodeEnum.SIGN_TIMESTAMP_EXPIRED);
@@ -89,7 +89,7 @@ public class SignAspect {
     private String requireHeader(HttpServletRequest request, String name) {
         String v = request.getHeader(name);
         if (v == null || v.isBlank()) {
-            throw new BusinessException(ErrorCodeEnum.SIGN_PARAM_MISSING, name);
+            throw new BusinessException(ErrorCodeEnum.SIGN_PARAM_MISSING);
         }
         return v;
     }
