@@ -43,7 +43,7 @@ public class GlobalRateLimitInterceptor implements HandlerInterceptor {
             String script = String.format(
                     "local c=redis.call('INCR',KEYS[1]) " +
                     "if c==1 then redis.call('EXPIRE',KEYS[1],%d) end " +
-                    "if c>%d then return 0 end return 1",
+                    "if c>=%d then return 0 end return 1",
                     defaultWindow, defaultLimit);
             result = redisTemplate.execute(new DefaultRedisScript<>(script, Long.class),
                     Collections.singletonList(key));

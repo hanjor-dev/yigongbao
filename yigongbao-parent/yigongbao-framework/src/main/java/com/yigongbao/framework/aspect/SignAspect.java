@@ -48,6 +48,9 @@ public class SignAspect {
     @Around("@annotation(com.yigongbao.framework.annotation.RequireSign)")
     public Object verify(ProceedingJoinPoint point) throws Throwable {
         HttpServletRequest request = getRequest();
+        if (request == null) {
+            return point.proceed();
+        }
 
         // 1. 读取并校验 Header 存在性
         String appKey    = requireHeader(request, "X-App-Key");
@@ -66,9 +69,9 @@ public class SignAspect {
             throw new BusinessException(ErrorCodeEnum.SIGN_TIMESTAMP_EXPIRED);
         }
 
-        // 3. nonce 防重放（SET NX，TTL 5min）
+        // 3. nonce 防重放（SET NX，TTL 10min，大于时间窗口 5min，防边界重用）
         String nonceKey = "sign:nonce:" + nonce;
-        Boolean isNew = redisTemplate.opsForValue().setIfAbsent(nonceKey, "1", 5, TimeUnit.MINUTES);
+        Boolean isNew = redisTemplate.opsForValue().setIfAbsent(nonceKey, "1", 10, TimeUnit.MINUTES);
         if (Boolean.FALSE.equals(isNew)) {
             throw new BusinessException(ErrorCodeEnum.SIGN_NONCE_USED);
         }
