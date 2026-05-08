@@ -14,7 +14,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -26,7 +25,7 @@ import java.util.List;
  */
 @Tag(name = "用户医院关联管理", description = "用户与医院的多对多关联管理")
 @RestController
-@RequestMapping("/system/user/{userId}/hospitals")
+@RequestMapping("/system/user")
 @RequiredArgsConstructor
 public class UserHospitalController {
 
@@ -37,7 +36,7 @@ public class UserHospitalController {
      * 查询用户的医院列表
      */
     @Operation(summary = "查询用户的医院列表")
-    @GetMapping
+    @GetMapping("/{userId}/hospitals")
     public Result<List<OrgVO>> getHospitals(@PathVariable Long userId) {
         return Result.success(userHospitalService.getHospitalsByUserId(userId));
     }
@@ -51,7 +50,7 @@ public class UserHospitalController {
             businessType = OperationTypeEnum.ASSIGN,
             operation = "分配用户医院"
     )
-    @PutMapping
+    @PutMapping("/{userId}/hospitals")
     public Result<Void> assignHospitals(@PathVariable Long userId, @Valid @RequestBody AssignHospitalsDTO dto) {
         userHospitalService.assignHospitals(userId, dto.getHospitalIds());
         return Result.success();
@@ -61,23 +60,17 @@ public class UserHospitalController {
      * 获取可分配给用户的医院列表（管理员分配时使用）
      */
     @Operation(summary = "获取可分配给用户的医院列表（管理员分配时使用）")
-    @PostMapping("/options")
+    @PostMapping("/{userId}/hospitals/options")
     public Result<List<OrgVO>> getHospitalOptions(@PathVariable Long userId) {
         return Result.success(userHospitalService.getHospitalOptionsByUserId(userId));
     }
 
     /**
      * 预览模板包含的医院列表
-     * 管理员选择模板后，预览模板内预设的医院，可基于此列表微调后提交
-     *
-     * @param userId     用户ID（路径参数，保持路由一致性）
-     * @param templateId 模板ID
-     * @return 模板包含的医院列表
      */
     @Operation(summary = "预览模板包含的医院列表")
-    @GetMapping("/template/{templateId}")
+    @GetMapping("/{userId}/hospitals/template/{templateId}")
     public Result<HospitalGroupTemplateVO> previewTemplate(@PathVariable Long userId, @PathVariable Long templateId) {
-        // 用户分配场景：传入 userId，assigned 表示该用户是否已分配该医院
         return Result.success(hospitalGroupTemplateService.getTemplateById(templateId, userId));
     }
 }

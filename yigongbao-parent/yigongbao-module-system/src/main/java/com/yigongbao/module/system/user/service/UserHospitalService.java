@@ -88,4 +88,16 @@ public interface UserHospitalService {
      * @return 已被分配的医院ID集合
      */
     Set<Long> getAssignedHospitalIds(List<Long> hospitalIds);
+
+    /**
+     * 获取当前用户创建订单时可操作的医院列表
+     * <p>
+     * 基于用户所属经销商机构（sys_org_hospital）确定候选医院范围，
+     * 再按数据权限类型筛选：HOSPITALS 权限取与已分配列表的交集，ALL/ORG 直接返回全部。
+     * </p>
+     *
+     * @param userId 当前用户ID
+     * @return 可操作的医院VO列表
+     */
+    List<OrgVO> getOrderableHospitals(Long userId);
 }

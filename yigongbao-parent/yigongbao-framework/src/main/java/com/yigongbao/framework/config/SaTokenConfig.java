@@ -66,7 +66,9 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 "/v3/api-docs/**",
                 "/webjars/**",
                 // 文件访问接口（静态资源，无需登录）
-                "/files/public/**"
+                "/files/public/**",
+                // 登录验证码冷却时间配置
+                "/system/config/5"
         );
     }
 }

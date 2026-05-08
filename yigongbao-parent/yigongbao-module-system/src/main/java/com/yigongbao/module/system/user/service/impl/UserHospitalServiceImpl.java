@@ -3,6 +3,8 @@ package com.yigongbao.module.system.user.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
+import com.yigongbao.module.system.org.entity.OrgHospitalEntity;
+import com.yigongbao.module.system.org.mapper.OrgHospitalMapper;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -43,6 +45,7 @@ import java.util.stream.Collectors;
 public class UserHospitalServiceImpl implements UserHospitalService {
 
     private final UserHospitalMapper userHospitalMapper;
+    private final OrgHospitalMapper orgHospitalMapper;
     private final OrgService orgService;
     private final UserMapper userMapper;
     private final RoleService roleService;
@@ -249,6 +252,53 @@ public class UserHospitalServiceImpl implements UserHospitalService {
         List<UserHospitalEntity> list = userHospitalMapper.selectList(
                 new LambdaQueryWrapper<UserHospitalEntity>().in(UserHospitalEntity::getHospitalId, hospitalIds));
         return list.stream().map(UserHospitalEntity::getHospitalId).collect(Collectors.toSet());
+    }
+
+    /**
+     * 获取当前用户创建订单时可操作的医院列表
+     * <p>
+     * 先通过用户所属经销商机构（sys_org_hospital）确定候选医院范围，
+     * 再按数据权限类型筛选：HOSPITALS 权限取与已分配列表的交集，ALL/ORG 直接返回全部。
+     * </p>
+     *
+     * @param userId 当前用户ID
+     * @return 可操作的医院VO列表
+     */
+    @Override
+    public List<OrgVO> getOrderableHospitals(Long userId) {
+        log.info("查询用户可操作医院列表，userId={}", userId);
+        UserEntity user = userMapper.selectById(userId);
+        if (user == null) throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+
+        // 1. 查用户所属经销商机构下关联的所有医院
+        Long distributorOrgId = user.getOrgId();
+        List<Long> dealerHospitalIds = orgHospitalMapper.selectList(
+                        new LambdaQueryWrapper<OrgHospitalEntity>()
+                                .eq(OrgHospitalEntity::getDistributorOrgId, distributorOrgId))
+                .stream().map(OrgHospitalEntity::getHospitalOrgId).collect(Collectors.toList());
+
+        if (dealerHospitalIds.isEmpty()) {
+            log.info("经销商机构无关联医院，distributorOrgId={}", distributorOrgId);
+            return new ArrayList<>();
+        }
+
+        // 2. 按数据权限类型筛选
+        DataScopeTypeEnum scopeType = getDataScopeType(userId);
+        List<Long> resultIds;
+        if (scopeType == DataScopeTypeEnum.HOSPITALS) {
+            // HOSPITALS 权限：取经销商医院与用户已分配医院的交集
+            List<Long> assignedIds = getHospitalIdsByUserId(userId);
+            resultIds = dealerHospitalIds.stream().filter(assignedIds::contains).collect(Collectors.toList());
+        } else {
+            // ALL / ORG 权限：返回经销商下全部关联医院
+            resultIds = dealerHospitalIds;
+        }
+
+        if (resultIds.isEmpty()) return new ArrayList<>();
+        return orgService.listByIds(resultIds).stream()
+                .filter(Objects::nonNull)
+                .map(this::toOrgVO)
+                .collect(Collectors.toList());
     }
 
     /**

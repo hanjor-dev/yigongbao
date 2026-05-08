@@ -45,6 +45,8 @@ yigongbao-parent/
 ├── yigongbao-module-basic/  # Master data: hospitals, doctors, products, body parts, files, areas
 ├── yigongbao-module-flow/   # Generic workflow/state-machine engine (Facade pattern)
 ├── yigongbao-module-order/  # Order management — integrates with flow module for status transitions
+├── yigongbao-module-design/ # Design workorders, packages, review, print info, 3D models/drawings
+├── yigongbao-module-imaging/ # Medical imaging viewer — DICOM packages, STL models, part color config
 └── yigongbao-boot/          # Application entry point; aggregates all modules
 ```
 

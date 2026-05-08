@@ -185,6 +185,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                 log.warn("机构类型不存在，orgType={}", dto.getOrgType());
                 throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_FOUND);
             }
+            // 经销商机构类型时资质类型必填
+            if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType()) && dto.getQualificationType() == null) {
+                throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "资质类型");
+            }
             // 医疗器械资质时资质文件必填，且校验文件真实存在
             if (Integer.valueOf(1).equals(dto.getQualificationType()) && StrUtil.isBlank(dto.getQualificationFile())) {
                 throw new BusinessException(ErrorCodeEnum.ORG_CERT_FILE_REQUIRED);

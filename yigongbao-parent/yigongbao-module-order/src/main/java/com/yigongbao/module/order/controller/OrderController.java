@@ -3,6 +3,7 @@ package com.yigongbao.module.order.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.order.dto.draft.CreateOrderDraftDTO;
 import com.yigongbao.module.order.dto.draft.OrderDraftPageQueryDTO;
 import com.yigongbao.module.order.dto.order.AssignDesignerDTO;
@@ -89,6 +90,7 @@ public class OrderController {
         return Result.success(orderMainService.createOrder(dto));
     }
 
+    @RequireSign
     @Operation(summary = "分页查询订单列表")
     @PostMapping("/page")
     public Result<IPage<OrderListVO>> listOrders(@RequestBody OrderPageDTO dto) {

@@ -38,7 +38,7 @@ public class HospitalScopeController {
     @Operation(summary = "获取指定用户可操作的医院列表")
     @GetMapping("/my-hospitals/{userId}")
     public Result<List<OrgVO>> getMyHospitals(@PathVariable Long userId) {
-        return Result.success(userHospitalService.getMyHospitalOptions(userId));
+        return Result.success(userHospitalService.getOrderableHospitals(userId));
     }
 
     /**
@@ -49,7 +49,6 @@ public class HospitalScopeController {
     @Operation(summary = "获取当前登录用户可操作的医院列表")
     @GetMapping("/my-hospitals")
     public Result<List<OrgVO>> getMyHospitalsByLogin() {
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-        return Result.success(userHospitalService.getMyHospitalOptions(currentUserId));
+        return Result.success(userHospitalService.getOrderableHospitals(StpUtil.getLoginIdAsLong()));
     }
 }
