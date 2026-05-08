@@ -40,16 +40,9 @@ public class GlobalRateLimitInterceptor implements HandlerInterceptor {
             "if c>tonumber(ARGV[2]) then return 0 end return 1",
             Long.class);
 
-    /** 本地开发环境跳过限流的 IP */
-    private static final String LOCALHOST = "127.0.0.1";
-
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String key = buildKey(request);
-        // 本地开发环境跳过限流
-        if (key.contains(LOCALHOST)) {
-            return true;
-        }
         Long result;
         try {
             result = redisTemplate.execute(RATE_LIMIT_SCRIPT,
