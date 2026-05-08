@@ -1,6 +1,7 @@
 package com.yigongbao.common.result;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.yigongbao.common.enums.ErrorCodeEnum;
 import lombok.Data;
 
 /**
@@ -34,6 +35,11 @@ public class Result<T> {
      * 时间戳
      */
     private Long timestamp;
+
+    /**
+     * 错误优先级（1=最高优先级，5=最低优先级）
+     */
+    private Integer priority;
 
     /**
      * 私有构造函数，使用静态方法创建实例
@@ -128,7 +134,21 @@ public class Result<T> {
      * @return Result 实例
      */
     public static <T> Result<T> error(Integer code, String message) {
-        return new Result<>(code, message);
+        Result<T> result = new Result<>(code, message);
+        result.setPriority(null);
+        return result;
+    }
+
+    /**
+     * 失败响应，使用错误码枚举
+     *
+     * @param errorCode 错误码枚举
+     * @return Result 实例
+     */
+    public static <T> Result<T> error(ErrorCodeEnum errorCode) {
+        Result<T> result = new Result<>(errorCode.getCode(), errorCode.getMessage());
+        result.setPriority(errorCode.getPriority());
+        return result;
     }
 
 }

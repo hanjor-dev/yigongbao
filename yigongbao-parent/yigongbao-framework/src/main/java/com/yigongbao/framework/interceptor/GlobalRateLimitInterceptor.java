@@ -37,28 +37,36 @@ public class GlobalRateLimitInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String key = buildKey(request);
+        //log.debug("限流检查，key={}, limit={}, window={}s", key, defaultLimit, defaultWindow);
         Long result;
         try {
             // 将参数直接嵌入脚本，避免 RedisTemplate varargs 序列化问题导致 ARGV 为 nil
+            // 使用 GET+SET 模式：先检查key是否存在，不存在则SET+EXPIRE，存在则判断后INCR
             String script = String.format(
-                    "local c=redis.call('INCR',KEYS[1]) " +
-                    "if c==1 then redis.call('EXPIRE',KEYS[1],%d) end " +
-                    "if c>=%d then return 0 end return 1",
+                    "local c = redis.call('GET', KEYS[1]) " +
+                    "if not c then " +
+                    "  redis.call('SET', KEYS[1], 1, 'EX', %d) " +
+                    "  return 1 " +
+                    "end " +
+                    "c = tonumber(c) " +
+                    "if c >= %d then return 0 end " +
+                    "redis.call('INCR', KEYS[1]) " +
+                    "return 1",
                     defaultWindow, defaultLimit);
             result = redisTemplate.execute(new DefaultRedisScript<>(script, Long.class),
                     Collections.singletonList(key));
+            //log.debug("限流检查结果，key={}, result={}", key, result);
         } catch (Exception e) {
             log.warn("全局限流 Redis 异常，降级放行，key={}", key, e);
             return true;
         }
         if (result == null || result == 0L) {
-            log.warn("全局限流触发，key={}", key);
+            log.warn("全局限流触发，key={}, limit={}, window={}s", key, defaultLimit, defaultWindow);
             response.setStatus(HttpServletResponse.SC_OK);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding(StandardCharsets.UTF_8.name());
             response.getWriter().write(objectMapper.writeValueAsString(
-                    Result.error(ErrorCodeEnum.RATE_LIMIT_EXCEEDED.getCode(),
-                            ErrorCodeEnum.RATE_LIMIT_EXCEEDED.getMessage())));
+                    Result.error(ErrorCodeEnum.RATE_LIMIT_EXCEEDED)));
             return false;
         }
         return true;

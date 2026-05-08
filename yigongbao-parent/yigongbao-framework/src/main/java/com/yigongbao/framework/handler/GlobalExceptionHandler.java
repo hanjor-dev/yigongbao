@@ -1,6 +1,7 @@
 package com.yigongbao.framework.handler;
 
 import cn.dev33.satoken.exception.NotLoginException;
+import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.result.Result;
 import jakarta.validation.ConstraintViolation;
@@ -62,7 +63,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NotLoginException.class)
     public Result<Void> handleNotLoginException(NotLoginException e) {
         log.warn("未登录：{}", e.getMessage());
-        return Result.error(401, "未登录或登录已过期，请重新登录");
+        return Result.error(ErrorCodeEnum.UNAUTHORIZED);
     }
 
     /**
@@ -80,7 +81,7 @@ public class GlobalExceptionHandler {
             .map(FieldError::getDefaultMessage)
             .collect(Collectors.joining(", "));
         log.warn("参数校验失败：{}", errorMessage);
-        return Result.error(400, errorMessage);
+        return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), errorMessage);
     }
 
     /**
@@ -97,7 +98,7 @@ public class GlobalExceptionHandler {
             .map(ConstraintViolation::getMessage)
             .collect(Collectors.joining(", "));
         log.warn("参数校验失败：{}", errorMessage);
-        return Result.error(400, errorMessage);
+        return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), errorMessage);
     }
 
     /**
@@ -114,7 +115,7 @@ public class GlobalExceptionHandler {
             .map(error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : error.toString())
             .collect(Collectors.joining(", "));
         log.warn("参数校验失败：{}", errorMessage);
-        return Result.error(400, errorMessage);
+        return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), errorMessage);
     }
 
     /**
@@ -130,7 +131,7 @@ public class GlobalExceptionHandler {
             .map(FieldError::getDefaultMessage)
             .collect(Collectors.joining(", "));
         log.warn("参数绑定失败：{}", errorMessage);
-        return Result.error(400, errorMessage);
+        return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), errorMessage);
     }
 
     /**
@@ -143,7 +144,8 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleMissingServletRequestParameterException(MissingServletRequestParameterException e) {
         log.warn("缺少请求参数：{}", e.getParameterName());
-        return Result.error(400, "缺少必要的请求参数，请刷新页面后重试");
+        return Result.error(ErrorCodeEnum.MISSING_PARAMETER.getCode(),
+            ErrorCodeEnum.MISSING_PARAMETER.getMessage(e.getParameterName()));
     }
 
     /**
@@ -157,7 +159,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleMissingPathVariableException(MissingPathVariableException e) {
         log.warn("路径变量缺失：参数名={}", e.getVariableName());
-        return Result.error(400, "请求的路径参数不完整，请检查URL是否正确");
+        return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), "请求的路径参数不完整，请检查URL是否正确");
     }
 
     /**
@@ -173,7 +175,8 @@ public class GlobalExceptionHandler {
         String paramName = e.getName();
         String paramValue = e.getValue() != null ? e.getValue().toString() : "空";
         log.warn("参数类型不匹配：参数名={}, 传入值={}, 期望类型={}", paramName, paramValue, e.getRequiredType());
-        return Result.error(400, "请求的参数格式有误，请刷新页面后重试");
+        return Result.error(ErrorCodeEnum.INVALID_PARAMETER.getCode(),
+            ErrorCodeEnum.INVALID_PARAMETER.getMessage(paramName));
     }
 
     /**
@@ -194,7 +197,7 @@ public class GlobalExceptionHandler {
             userMessage = "请求参数格式错误，请检查数据格式后重试";
         }
         log.warn("参数格式错误：{}", message);
-        return Result.error(400, userMessage);
+        return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), userMessage);
     }
 
     /**
@@ -207,7 +210,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public Result<Void> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e) {
         log.warn("请求方法不支持：{}", e.getMethod());
-        return Result.error(405, "不支持的请求方法：" + e.getMethod());
+        return Result.error(ErrorCodeEnum.METHOD_NOT_ALLOWED);
     }
 
     /**
@@ -220,7 +223,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public Result<Void> handleNoHandlerFoundException(NoHandlerFoundException e) {
         log.warn("请求路径不存在：{}", e.getRequestURL());
-        return Result.error(404, "请求路径不存在：" + e.getRequestURL());
+        return Result.error(ErrorCodeEnum.REQUEST_NOT_FOUND);
     }
 
     /**
@@ -235,7 +238,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
         log.warn("文件大小超出系统限制：{}", e.getMessage());
-        return Result.error(664, "文件大小超出系统允许的最大限制，请压缩后重试");
+        return Result.error(ErrorCodeEnum.ATTACHMENT_SIZE_EXCEEDED);
     }
 
     /**
@@ -249,7 +252,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleMultipartException(MultipartException e) {
         log.warn("文件上传请求解析失败：{}", e.getMessage());
-        return Result.error(661, "文件上传失败，请检查文件格式后重试");
+        return Result.error(ErrorCodeEnum.ATTACHMENT_UPLOAD_FAILED);
     }
 
     /**
@@ -267,11 +270,11 @@ public class GlobalExceptionHandler {
             String message = sqlEx.getMessage();
             if (message != null && message.contains("Duplicate entry")) {
                 log.warn("唯一键冲突：{}", message);
-                return Result.error(409, "数据已存在，请勿重复提交");
+                return Result.error(ErrorCodeEnum.DATA_EXISTS);
             }
         }
         log.error("数据完整性异常：", e);
-        return Result.error(500, "数据操作失败，请稍后再试");
+        return Result.error(ErrorCodeEnum.SERVER_ERROR);
     }
 
     /**
@@ -285,7 +288,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Result<Void> handleException(Exception e) {
         log.error("系统异常：", e);
-        return Result.error(500, "系统繁忙，请稍后再试");
+        return Result.error(ErrorCodeEnum.SERVER_ERROR);
     }
 
 }
