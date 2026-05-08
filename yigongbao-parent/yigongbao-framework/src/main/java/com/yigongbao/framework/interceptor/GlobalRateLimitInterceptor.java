@@ -15,6 +15,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * 全局限流拦截器
@@ -47,8 +48,7 @@ public class GlobalRateLimitInterceptor implements HandlerInterceptor {
         try {
             result = redisTemplate.execute(RATE_LIMIT_SCRIPT,
                     Collections.singletonList(key),
-                    String.valueOf(defaultWindow),
-                    String.valueOf(defaultLimit));
+                    List.of(String.valueOf(defaultWindow), String.valueOf(defaultLimit)));
         } catch (Exception e) {
             log.warn("全局限流 Redis 异常，降级放行，key={}", key, e);
             return true;
