@@ -307,7 +307,7 @@ public enum ErrorCodeEnum {
     RATE_LIMIT_EXCEEDED(429, "操作过于频繁，请稍后再试"),
 
     // ==================== 签名验证 781-784 ====================
-    SIGN_PARAM_MISSING(781, "请求参数不合法"),
+    SIGN_PARAM_MISSING(781, "请求不合法"),
     SIGN_TIMESTAMP_EXPIRED(782, "请求已过期，请检查系统时间"),
     SIGN_NONCE_USED(783, "重复请求"),
     SIGN_INVALID(784, "签名验证失败");

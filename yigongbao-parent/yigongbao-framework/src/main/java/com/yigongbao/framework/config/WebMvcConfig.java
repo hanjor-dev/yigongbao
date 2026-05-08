@@ -98,13 +98,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addMapping("/**")
             // 允许的来源域名，生产环境应限制具体域名
             .allowedOriginPatterns("*")
-            // 允许的请求方法
             .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-            // 允许的请求头
             .allowedHeaders("*")
-            // 是否允许携带凭证（cookies、authorization header）
             .allowCredentials(true)
-            // 预检请求的缓存时间（秒）
             .maxAge(3600);
     }
 

@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -266,12 +267,17 @@ public class UserHospitalServiceImpl implements UserHospitalService {
      */
     @Override
     public List<OrgVO> getOrderableHospitals(Long userId) {
-        log.info("查询用户可操作医院列表，userId={}", userId);
+        log.info("查询用户可操作医院列表，userId=", userId);
         UserEntity user = userMapper.selectById(userId);
         if (user == null) throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
 
         // 1. 查用户所属经销商机构下关联的所有医院
         Long distributorOrgId = user.getOrgId();
+        if (distributorOrgId == null) {
+            log.warn("用户未分配机构，userId={}", userId);
+            return new ArrayList<>();
+        }
+
         List<Long> dealerHospitalIds = orgHospitalMapper.selectList(
                         new LambdaQueryWrapper<OrgHospitalEntity>()
                                 .eq(OrgHospitalEntity::getDistributorOrgId, distributorOrgId))
@@ -287,18 +293,20 @@ public class UserHospitalServiceImpl implements UserHospitalService {
         List<Long> resultIds;
         if (scopeType == DataScopeTypeEnum.HOSPITALS) {
             // HOSPITALS 权限：取经销商医院与用户已分配医院的交集
-            List<Long> assignedIds = getHospitalIdsByUserId(userId);
-            resultIds = dealerHospitalIds.stream().filter(assignedIds::contains).collect(Collectors.toList());
+            Set<Long> assignedIdSet = new HashSet<>(getHospitalIdsByUserId(userId));
+            resultIds = dealerHospitalIds.stream().filter(assignedIdSet::contains).collect(Collectors.toList());
         } else {
             // ALL / ORG 权限：返回经销商下全部关联医院
             resultIds = dealerHospitalIds;
         }
 
         if (resultIds.isEmpty()) return new ArrayList<>();
-        return orgService.listByIds(resultIds).stream()
+        List<OrgVO> result = orgService.listByIds(resultIds).stream()
                 .filter(Objects::nonNull)
                 .map(this::toOrgVO)
                 .collect(Collectors.toList());
+        log.info("查询用户可操作医院列表成功，userId={}, 数量={}", userId, result.size());
+        return result;
     }
 
     /**

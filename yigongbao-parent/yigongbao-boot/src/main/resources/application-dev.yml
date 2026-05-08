@@ -164,8 +164,8 @@ app:
     # 请求签名密钥，生产环境通过环境变量 APP_SIGN_SECRET 注入
     secret: ${APP_SIGN_SECRET:dev-secret-change-in-prod}
   rate-limit:
-    # 全局默认限流：每个接口独立计数，300次/分钟（约5次/秒）
-    default-limit: 300
+    # 全局默认限流：每个接口独立计数，60次/分钟（约5次/秒）
+    default-limit: 60
     # 时间窗口（秒）
     default-window: 60
 
