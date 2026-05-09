@@ -3,6 +3,7 @@ package com.yigongbao.module.order.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.common.entity.FlowStatusHistoryEntity;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.flow.enums.FlowActionEnum;
@@ -54,7 +55,7 @@ public class FlowDebugController {
             @RequestParam String actionCode) {
         FlowActionEnum action = FlowActionEnum.getByCode(actionCode);
         if (action == null) {
-            throw new BusinessException(400, "未知动作编码：" + actionCode);
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "未知动作编码：" + actionCode);
         }
         Long currentUserId = getCurrentUserId();
         log.info("【Debug】预览状态转换，orderId={}, action={}", id, actionCode);
@@ -80,7 +81,7 @@ public class FlowDebugController {
             @RequestParam(required = false) String remark) {
         FlowActionEnum action = FlowActionEnum.getByCode(actionCode);
         if (action == null) {
-            throw new BusinessException(400, "未知动作编码：" + actionCode);
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "未知动作编码：" + actionCode);
         }
         Long currentUserId = getCurrentUserId();
         log.info("【Debug】执行流转动作，orderId={}, action={}, currentUserId={}",
@@ -91,7 +92,7 @@ public class FlowDebugController {
         // 更新数据库
         OrderMainEntity entity = orderMainService.getById(id);
         if (entity == null) {
-            throw new BusinessException(675, "订单不存在");
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
         entity.setPhase(result.getTargetPhase());
         entity.setStatus(result.getFinalStatus());
@@ -122,7 +123,7 @@ public class FlowDebugController {
         log.info("【Debug】重置订单状态，orderId={}, phase={}, status={}", id, phase, status);
         OrderMainEntity entity = orderMainService.getById(id);
         if (entity == null) {
-            throw new BusinessException(675, "订单不存在");
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
         entity.setPhase(phase);
         entity.setStatus(status);

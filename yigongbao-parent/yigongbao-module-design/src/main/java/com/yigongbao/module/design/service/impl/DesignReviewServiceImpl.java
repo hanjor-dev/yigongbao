@@ -16,6 +16,7 @@ import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
 import com.yigongbao.module.design.dto.ReviewPassDTO;
 import com.yigongbao.module.design.dto.ReviewRejectDTO;
 import com.yigongbao.module.design.entity.DesignReviewEntity;
+import com.yigongbao.module.design.enums.ReviewResultEnum;
 import com.yigongbao.module.design.mapper.DesignReviewMapper;
 import com.yigongbao.module.design.service.DesignReviewService;
 import com.yigongbao.module.design.service.DesignWorkorderService;
@@ -251,9 +252,9 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
         // 明确判断三个分支：1=通过，0=驳回，null=未知（避免 null 时默认显示"驳回"的逻辑错误）
         Integer reviewResult = entity.getReviewResult();
         String resultName;
-        if (Integer.valueOf(1).equals(reviewResult)) {
+        if (ReviewResultEnum.PASS.getCode().equals(reviewResult)) {
             resultName = "通过";
-        } else if (Integer.valueOf(0).equals(reviewResult)) {
+        } else if (ReviewResultEnum.REJECT.getCode().equals(reviewResult)) {
             resultName = "驳回";
         } else {
             resultName = "未知";
