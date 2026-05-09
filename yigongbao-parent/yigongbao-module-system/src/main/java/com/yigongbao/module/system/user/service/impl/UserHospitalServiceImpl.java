@@ -7,6 +7,7 @@ import com.yigongbao.module.system.org.entity.OrgHospitalEntity;
 import com.yigongbao.module.system.org.mapper.OrgHospitalMapper;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
@@ -50,6 +51,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
     private final OrgService orgService;
     private final UserMapper userMapper;
     private final RoleService roleService;
+    private final com.yigongbao.module.system.config.service.ConfigService configService;
 
     /**
      * 查询指定用户关联的医院ID列表
@@ -177,9 +179,10 @@ public class UserHospitalServiceImpl implements UserHospitalService {
 
     /**
      * 获取指定用户可见的全部医院选项（不受数据权限限制，返回所有启用医院）
+     * 默认包含"其他医院"作为兜底选项
      *
      * @param userId 用户ID（当前实现未使用，保留供后续权限扩展）
-     * @return 所有状态正常的医疗机构VO列表，按名称升序排列
+     * @return 所有状态正常的医疗机构VO列表，按名称升序排列，末尾追加"其他医院"
      */
     @Override
     public List<OrgVO> getHospitalOptionsByUserId(Long userId) {
@@ -187,7 +190,11 @@ public class UserHospitalServiceImpl implements UserHospitalService {
                 .eq(OrgEntity::getOrgType, DictCodeConstants.ORG_TYPE_HOSPITAL)
                 .eq(OrgEntity::getStatus, StatusConstants.NORMAL)
                 .orderByAsc(OrgEntity::getOrgName));
-        return list.stream().map(this::toOrgVO).collect(Collectors.toList());
+        List<OrgVO> result = list.stream().map(this::toOrgVO).collect(Collectors.toList());
+
+        // 追加"其他医院"作为兜底选项
+        appendUnknownHospital(result);
+        return result;
     }
 
     /**
@@ -300,13 +307,41 @@ public class UserHospitalServiceImpl implements UserHospitalService {
             resultIds = dealerHospitalIds;
         }
 
-        if (resultIds.isEmpty()) return new ArrayList<>();
+        if (resultIds.isEmpty()) {
+            // 即使无可操作医院，也返回"其他医院"作为兜底
+            List<OrgVO> emptyResult = new ArrayList<>();
+            appendUnknownHospital(emptyResult);
+            return emptyResult;
+        }
         List<OrgVO> result = orgService.listByIds(resultIds).stream()
                 .filter(Objects::nonNull)
                 .map(this::toOrgVO)
                 .collect(Collectors.toList());
+
+        // 追加"其他医院"作为兜底选项
+        appendUnknownHospital(result);
         log.info("查询用户可操作医院列表成功，userId={}, 数量={}", userId, result.size());
         return result;
+    }
+
+    /**
+     * 追加"其他医院"作为兜底选项
+     * 从系统配置中获取未知医院ID，查询并追加到结果列表末尾
+     *
+     * @param result 医院VO列表
+     */
+    private void appendUnknownHospital(List<OrgVO> result) {
+        try {
+            String unknownHospitalIdStr = configService.getConfigValue(
+                    SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
+            Long unknownHospitalId = Long.parseLong(unknownHospitalIdStr);
+            OrgEntity unknownHospital = orgService.getById(unknownHospitalId);
+            if (unknownHospital != null && Integer.valueOf(StatusConstants.NORMAL).equals(unknownHospital.getStatus())) {
+                result.add(toOrgVO(unknownHospital));
+            }
+        } catch (Exception e) {
+            log.warn("追加其他医院失败", e);
+        }
     }
 
     /**
