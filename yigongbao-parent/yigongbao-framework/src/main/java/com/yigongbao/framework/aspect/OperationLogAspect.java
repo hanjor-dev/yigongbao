@@ -42,14 +42,14 @@ public class OperationLogAspect {
      * 敏感字段脱敏正则
      */
     private static final Pattern SENSITIVE_PATTERN = Pattern.compile(
-            "\"(password|passwd|secret|token|key|证书密码)\"?:\\s*\"[^\"]+\"",
+            "\"(password|passwd|secret|token|key|credential|证书密码)\"?:\\s*\"[^\"]+\"",
             Pattern.CASE_INSENSITIVE);
 
     /**
      * 敏感字段列表（用于参数名判断）
      */
     private static final String[] SENSITIVE_PARAMS = {
-            "password", "passwd", "oldPassword", "newPassword", "secret", "token", "key"
+            "password", "passwd", "oldPassword", "newPassword", "secret", "token", "key", "credential"
     };
 
     @Around("@annotation(com.yigongbao.framework.annotation.OperationLog)")

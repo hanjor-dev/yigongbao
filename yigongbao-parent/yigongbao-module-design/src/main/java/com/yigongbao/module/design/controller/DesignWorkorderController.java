@@ -2,6 +2,7 @@ package com.yigongbao.module.design.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
 import com.yigongbao.module.design.service.DesignWorkorderService;
 import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/design/workorder")
 @RequiredArgsConstructor
+@RequireSign
 public class DesignWorkorderController {
 
     private final DesignWorkorderService designWorkorderService;

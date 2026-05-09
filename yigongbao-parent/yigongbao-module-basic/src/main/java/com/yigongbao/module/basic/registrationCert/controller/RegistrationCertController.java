@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.registrationCert.dto.CreateRegistrationCertDTO;
 import com.yigongbao.module.basic.registrationCert.dto.RegistrationCertPageDTO;
 import com.yigongbao.module.basic.registrationCert.dto.UpdateRegistrationCertDTO;
@@ -27,6 +28,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/basic/registration-cert")
 @RequiredArgsConstructor
+@RequireSign
 public class RegistrationCertController {
 
     private final RegistrationCertService registrationCertService;

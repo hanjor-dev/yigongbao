@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.hospitalDept.dto.CreateHospitalDeptDTO;
 import com.yigongbao.module.basic.hospitalDept.dto.HospitalDeptListDTO;
 import com.yigongbao.module.basic.hospitalDept.dto.HospitalDeptPageDTO;
@@ -31,6 +32,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/basic/hospital-dept")
 @RequiredArgsConstructor
+@RequireSign
 @Validated
 public class HospitalDeptController {
 

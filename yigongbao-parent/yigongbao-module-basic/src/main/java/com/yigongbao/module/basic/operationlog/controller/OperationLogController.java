@@ -2,6 +2,7 @@ package com.yigongbao.module.basic.operationlog.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.operationlog.dto.OperationLogQueryDTO;
 import com.yigongbao.module.basic.operationlog.service.OperationLogService;
 import com.yigongbao.module.basic.operationlog.vo.OperationLogVO;
@@ -25,6 +26,7 @@ import jakarta.servlet.http.HttpServletResponse;
 @RestController
 @RequestMapping("/basic/operation-log")
 @RequiredArgsConstructor
+@RequireSign
 public class OperationLogController {
 
     private final OperationLogService operationLogService;

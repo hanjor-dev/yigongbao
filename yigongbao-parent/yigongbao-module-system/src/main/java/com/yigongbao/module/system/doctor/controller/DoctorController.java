@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.system.doctor.dto.CreateDoctorDTO;
 import com.yigongbao.module.system.doctor.dto.DoctorListDTO;
 import com.yigongbao.module.system.doctor.dto.DoctorPageDTO;
@@ -33,6 +34,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/system/doctor")
 @RequiredArgsConstructor
+@RequireSign
 @Validated
 public class DoctorController {
 

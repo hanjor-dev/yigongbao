@@ -193,7 +193,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
         List<OrgVO> result = list.stream().map(this::toOrgVO).collect(Collectors.toList());
 
         // 追加"其他医院"作为兜底选项
-        appendUnknownHospital(result);
+        //appendUnknownHospital(result);
         return result;
     }
 

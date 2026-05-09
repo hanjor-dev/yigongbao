@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.code.dto.CodeRulePageDTO;
 import com.yigongbao.module.basic.code.dto.CreateCodeRuleDTO;
 import com.yigongbao.module.basic.code.dto.UpdateCodeRuleDTO;
@@ -28,6 +29,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/basic/code")
 @RequiredArgsConstructor
+@RequireSign
 public class CodeRuleController {
 
     private final CodeGeneratorService codeGeneratorService;

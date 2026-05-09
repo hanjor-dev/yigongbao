@@ -2,6 +2,7 @@ package com.yigongbao.module.order.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.order.dto.modify.AuditModifyApplyDTO;
 import com.yigongbao.module.order.dto.modify.CreateModifyApplyDTO;
 import com.yigongbao.module.order.dto.modify.ExecuteModifyDTO;
@@ -36,6 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/order/modify")
 @RequiredArgsConstructor
+@RequireSign
 @Tag(name = "订单修改申请", description = "订单修改申请相关接口")
 public class OrderModifyApplyController {
 

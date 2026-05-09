@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.product.dto.CreateProductDTO;
 import com.yigongbao.module.basic.product.dto.CreateProductSpecDTO;
 import com.yigongbao.module.basic.product.dto.ProductCategoryDTO;
@@ -33,6 +34,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/basic/product")
 @RequiredArgsConstructor
+@RequireSign
 @Validated
 public class ProductController {
 

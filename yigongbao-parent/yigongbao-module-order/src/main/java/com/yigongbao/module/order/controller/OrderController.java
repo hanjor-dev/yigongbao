@@ -41,6 +41,7 @@ import java.util.List;
 @RequestMapping("/order")
 @RequiredArgsConstructor
 @Tag(name = "订单管理", description = "订单相关接口")
+@RequireSign
 public class OrderController {
 
     private final OrderDraftService orderDraftService;
@@ -90,7 +91,6 @@ public class OrderController {
         return Result.success(orderMainService.createOrder(dto));
     }
 
-    @RequireSign
     @Operation(summary = "分页查询订单列表")
     @PostMapping("/page")
     public Result<IPage<OrderListVO>> listOrders(@RequestBody OrderPageDTO dto) {

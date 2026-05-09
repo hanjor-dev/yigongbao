@@ -3,6 +3,7 @@ package com.yigongbao.module.basic.bodyPart.controller;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.bodyPart.dto.CreateBodyPartDTO;
 import com.yigongbao.module.basic.bodyPart.dto.UpdateBodyPartDTO;
 import com.yigongbao.module.basic.bodyPart.service.BodyPartService;
@@ -38,6 +39,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/basic/body-part")
 @RequiredArgsConstructor
+@RequireSign
 public class BodyPartController {
 
     private final BodyPartService bodyPartService;

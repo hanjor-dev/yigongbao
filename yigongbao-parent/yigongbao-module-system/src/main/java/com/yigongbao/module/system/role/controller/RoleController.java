@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequireSign;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.role.dto.CreateRoleDTO;
@@ -30,6 +31,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/system/role")
 @RequiredArgsConstructor
+@RequireSign
 public class RoleController {
 
     private final RoleService roleService;

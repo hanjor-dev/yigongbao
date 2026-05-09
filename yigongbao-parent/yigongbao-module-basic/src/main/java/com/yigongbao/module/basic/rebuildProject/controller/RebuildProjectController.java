@@ -3,6 +3,7 @@ package com.yigongbao.module.basic.rebuildProject.controller;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.rebuildProject.dto.CreateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectByBodyPartDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectFullTreeDTO;
@@ -43,6 +44,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/basic/rebuild-project")
 @RequiredArgsConstructor
+@RequireSign
 public class RebuildProjectController {
 
     private final RebuildProjectService rebuildProjectService;

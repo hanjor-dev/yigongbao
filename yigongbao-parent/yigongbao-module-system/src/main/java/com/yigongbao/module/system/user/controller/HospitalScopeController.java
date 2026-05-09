@@ -2,6 +2,7 @@ package com.yigongbao.module.system.user.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.system.org.vo.OrgVO;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,6 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/system/hospital-scope")
 @RequiredArgsConstructor
+@RequireSign
 public class HospitalScopeController {
 
     private final UserHospitalService userHospitalService;

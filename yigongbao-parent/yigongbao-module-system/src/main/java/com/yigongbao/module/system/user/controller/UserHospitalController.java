@@ -3,6 +3,7 @@ package com.yigongbao.module.system.user.controller;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequireSign;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.hospitalGroupTemplate.service.HospitalGroupTemplateService;
@@ -27,6 +28,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/system/user")
 @RequiredArgsConstructor
+@RequireSign
 public class UserHospitalController {
 
     private final UserHospitalService userHospitalService;

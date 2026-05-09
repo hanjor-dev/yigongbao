@@ -1,6 +1,7 @@
 package com.yigongbao.module.design.controller;
 
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.design.dto.SaveDesignColumnConfigDTO;
 import com.yigongbao.module.design.service.DesignWorkorderService;
 import com.yigongbao.module.design.vo.DesignColumnConfigVO;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/design/column-config")
 @RequiredArgsConstructor
+@RequireSign
 public class DesignColumnConfigController {
 
     private final DesignWorkorderService designWorkorderService;

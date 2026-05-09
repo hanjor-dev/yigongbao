@@ -9,7 +9,7 @@ import java.lang.annotation.*;
  * @author hanjor
  * @date 2026-05-08
  */
-@Target(ElementType.METHOD)
+@Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface RequireSign {

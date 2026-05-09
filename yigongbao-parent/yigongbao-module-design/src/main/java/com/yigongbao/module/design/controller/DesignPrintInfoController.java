@@ -1,6 +1,7 @@
 package com.yigongbao.module.design.controller;
 
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.design.dto.SavePrintInfoDTO;
 import com.yigongbao.module.design.service.DesignPrintInfoService;
 import com.yigongbao.module.design.vo.PrintInfoListVO;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/design/workorder")
 @RequiredArgsConstructor
+@RequireSign
 public class DesignPrintInfoController {
 
     private final DesignPrintInfoService printInfoService;

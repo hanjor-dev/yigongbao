@@ -2,6 +2,7 @@ package com.yigongbao.module.design.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
 import com.yigongbao.module.design.dto.ReviewPassDTO;
 import com.yigongbao.module.design.dto.ReviewRejectDTO;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/design/review")
 @RequiredArgsConstructor
+@RequireSign
 @Tag(name = "设计审核")
 public class DesignReviewController {
 

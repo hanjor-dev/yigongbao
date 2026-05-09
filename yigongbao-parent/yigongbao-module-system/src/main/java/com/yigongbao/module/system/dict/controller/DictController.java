@@ -3,6 +3,7 @@ package com.yigongbao.module.system.dict.controller;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequireSign;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.dict.dto.DictOptionsDTO;
@@ -29,6 +30,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/system/dict")
 @RequiredArgsConstructor
+@RequireSign
 public class DictController {
 
     private final DictService dictService;

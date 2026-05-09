@@ -3,6 +3,7 @@ package com.yigongbao.module.system.test.controller;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequireSign;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.test.dto.TestListDTO;
@@ -27,6 +28,7 @@ import java.util.List;
 @RequestMapping("/test")
 @RestController
 @RequiredArgsConstructor
+@RequireSign
 public class TestController {
 
     private final TestService testService;

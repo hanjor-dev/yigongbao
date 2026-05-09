@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequireSign;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.auth.dto.ChangePasswordDTO;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/system/auth")
 @RequiredArgsConstructor
+@RequireSign
 public class AuthController {
 
     private final AuthService authService;
