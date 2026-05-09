@@ -20,6 +20,7 @@ import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignProductFileEntity;
 import com.yigongbao.module.design.helper.DrawingExcelBuilder;
 import com.yigongbao.module.design.helper.InstructionExcelBuilder;
+import com.yigongbao.module.design.mapper.DesignPackageFileScreenshotMapper;
 import com.yigongbao.module.design.mapper.DesignProductMapper;
 import com.yigongbao.module.design.service.DesignDocService;
 import com.yigongbao.module.design.service.DesignDrawingService;
@@ -76,6 +77,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
     private final DesignScreenshotService screenshotService;
+    private final DesignPackageFileScreenshotMapper screenshotMapper;
 
     // ==================== 线下模式：下载接口 ====================
 
@@ -496,9 +498,11 @@ public class DesignDocServiceImpl implements DesignDocService {
         // 包级字段最后修改时间（productMark/packQuantity/remark 也影响指令单内容）
         DesignPackageEntity pkg = packageService.getById(packageId);
         LocalDateTime pkgUpdateTime = pkg != null ? pkg.getUpdateTime() : null;
+        // 截图最后修改时间（saveMark 后应触发重新生成）
+        LocalDateTime screenshotUpdateTime = screenshotMapper.getLatestUpdateTime(packageId);
 
-        // 取两者最大值
-        LocalDateTime dataLastModified = laterOf(productUpdateTime, pkgUpdateTime);
+        // 取三者最大值
+        LocalDateTime dataLastModified = laterOf(laterOf(productUpdateTime, pkgUpdateTime), screenshotUpdateTime);
         if (dataLastModified == null) {
             // 无打印信息记录（不应发生，已在调用方校验了 productCount > 0）
             return true;
