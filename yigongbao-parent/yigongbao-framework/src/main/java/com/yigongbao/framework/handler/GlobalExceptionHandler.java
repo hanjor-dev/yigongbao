@@ -74,7 +74,7 @@ public class GlobalExceptionHandler {
      * @return 统一返回结果
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
         // 获取第一个校验失败的错误信息，避免暴露内部字段名
         String errorMessage = e.getBindingResult().getFieldErrors().stream()
@@ -92,7 +92,7 @@ public class GlobalExceptionHandler {
      * @return 统一返回结果
      */
     @ExceptionHandler(ConstraintViolationException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleConstraintViolationException(ConstraintViolationException e) {
         String errorMessage = e.getConstraintViolations().stream()
             .map(ConstraintViolation::getMessage)
@@ -109,7 +109,7 @@ public class GlobalExceptionHandler {
      * @return 统一返回结果
      */
     @ExceptionHandler(HandlerMethodValidationException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleHandlerMethodValidationException(HandlerMethodValidationException e) {
         String errorMessage = e.getAllErrors().stream()
             .map(error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : error.toString())
@@ -125,7 +125,7 @@ public class GlobalExceptionHandler {
      * @return 统一返回结果
      */
     @ExceptionHandler(BindException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleBindException(BindException e) {
         String errorMessage = e.getBindingResult().getFieldErrors().stream()
             .map(FieldError::getDefaultMessage)
@@ -141,7 +141,7 @@ public class GlobalExceptionHandler {
      * @return 统一返回结果
      */
     @ExceptionHandler(MissingServletRequestParameterException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleMissingServletRequestParameterException(MissingServletRequestParameterException e) {
         log.warn("缺少请求参数：{}", e.getParameterName());
         return Result.error(ErrorCodeEnum.MISSING_PARAMETER,
@@ -156,7 +156,7 @@ public class GlobalExceptionHandler {
      * @return 统一返回结果
      */
     @ExceptionHandler(MissingPathVariableException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleMissingPathVariableException(MissingPathVariableException e) {
         log.warn("路径变量缺失：参数名={}", e.getVariableName());
         return Result.error(ErrorCodeEnum.PARAM_ERROR, "请求的路径参数不完整，请检查URL是否正确");
@@ -170,7 +170,7 @@ public class GlobalExceptionHandler {
      * @return 统一返回结果
      */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e) {
         String paramName = e.getName();
         String paramValue = e.getValue() != null ? e.getValue().toString() : "空";
@@ -187,7 +187,7 @@ public class GlobalExceptionHandler {
      * @return 统一返回结果
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
         String message = e.getMessage();
         String userMessage;

@@ -18,10 +18,10 @@ public enum ErrorCodeEnum {
     SUCCESS(200, "操作成功", 3),
 
     // ==================== 客户端请求错误 4xx ====================
-    PARAM_ERROR(400, "参数错误", 5),
-    MISSING_PARAMETER(400, "缺少参数：%s", 5),
-    INVALID_PARAMETER(400, "参数无效：%s", 5),
-    DATA_EXISTS(400, "数据已存在", 5),
+    PARAM_ERROR(410, "参数错误", 5),
+    MISSING_PARAMETER(410, "缺少参数：%s", 5),
+    INVALID_PARAMETER(410, "参数无效：%s", 5),
+    DATA_EXISTS(410, "数据已存在", 5),
     UNAUTHORIZED(401, "未登录或登录已过期，请重新登录", 1),
     FORBIDDEN(403, "没有权限访问该资源", 1),
     METHOD_NOT_ALLOWED(405, "不支持的请求方法", 5),
