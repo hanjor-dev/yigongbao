@@ -8,6 +8,8 @@ import org.apache.poi.util.Units;
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFShape;
+import org.apache.poi.xssf.usermodel.XSSFSimpleShape;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
@@ -149,6 +151,7 @@ public class DrawingExcelBuilder {
                         setCell(sheet, coord[2], coord[3], strOrEmpty(row.getProductName()));         // 产品名
                         // 槽2+ 的产品名单元格在模板中没有预设合并区域，需手动补充（与下一列合并，对齐槽1布局）
                         if (slot > 0) {
+                            ensureCellCentered((XSSFWorkbook) wb, sheet, coord[2], coord[3]);
                             mergeIfAbsent(sheet, coord[2], coord[3], coord[2], coord[3] + 1);
                         }
                         // 嵌入截图（如果有）
@@ -171,6 +174,9 @@ public class DrawingExcelBuilder {
                 setCell(sheet, DESIGN_NAME_ROW, DESIGN_NAME_COL, strOrEmpty(ctx.getDesignerName()));
                 setCell(sheet, DESIGN_DATE_ROW, DESIGN_DATE_COL, strOrEmpty(ctx.getGenerateDate()));
                 setCell(sheet, REVIEW_DATE_ROW, REVIEW_DATE_COL, strOrEmpty(ctx.getGenerateDate()));
+
+                // 更新文本框中的页码水印（如果存在）
+                updatePageWatermark((XSSFSheet) sheet, page + 1, totalPages);
             }
 
             // 写出
@@ -270,6 +276,27 @@ public class DrawingExcelBuilder {
         cell.setCellValue(value != null ? value : "");
     }
 
+    /** 确保单元格有居中样式（水平和垂直居中） */
+    private void ensureCellCentered(XSSFWorkbook wb, Sheet sheet, int rowIdx, int colIdx) {
+        Row row = sheet.getRow(rowIdx);
+        if (row == null) return;
+        Cell cell = row.getCell(colIdx);
+        if (cell == null) return;
+
+        CellStyle currentStyle = cell.getCellStyle();
+        if (currentStyle == null ||
+            currentStyle.getAlignment() != HorizontalAlignment.CENTER ||
+            currentStyle.getVerticalAlignment() != VerticalAlignment.CENTER) {
+            CellStyle newStyle = wb.createCellStyle();
+            if (currentStyle != null) {
+                newStyle.cloneStyleFrom(currentStyle);
+            }
+            newStyle.setAlignment(HorizontalAlignment.CENTER);
+            newStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            cell.setCellStyle(newStyle);
+        }
+    }
+
     /** 若指定区域尚未有合并区域则添加，避免重复合并报错（cloneSheet 会保留已有合并） */
     private void mergeIfAbsent(Sheet sheet, int firstRow, int firstCol, int lastRow, int lastCol) {
         for (int i = 0; i < sheet.getNumMergedRegions(); i++) {
@@ -280,6 +307,41 @@ public class DrawingExcelBuilder {
             }
         }
         sheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, firstCol, lastCol));
+    }
+
+    /**
+     * 更新文本框中的页码水印（如果存在）
+     * 查找包含"第X页"文本的文本框，并更新为当前页码
+     *
+     * @param sheet       目标 Sheet
+     * @param currentPage 当前页码（1-based）
+     * @param totalPages  总页数
+     */
+    private void updatePageWatermark(XSSFSheet sheet, int currentPage, int totalPages) {
+        try {
+            XSSFDrawing drawing = sheet.getDrawingPatriarch();
+            if (drawing == null) {
+                return;
+            }
+            // 遍历所有形状，查找包含页码文本的文本框
+            for (XSSFShape shape : drawing.getShapes()) {
+                if (shape instanceof org.apache.poi.xssf.usermodel.XSSFSimpleShape) {
+                    org.apache.poi.xssf.usermodel.XSSFSimpleShape textBox =
+                        (org.apache.poi.xssf.usermodel.XSSFSimpleShape) shape;
+                    String text = textBox.getText();
+                    // 检查是否包含"第"和"页"，表示这是页码水印
+                    if (text != null && text.contains("第") && text.contains("页")) {
+                        // 更新为当前页码
+                        String newText = "第 " + currentPage + " 页";
+                        textBox.setText(newText);
+                        log.debug("更新页码水印：{} -> {}", text, newText);
+                        break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("更新页码水印失败：{}", e.getMessage());
+        }
     }
 
     private String strOrEmpty(String s) {

@@ -95,6 +95,8 @@ public class InstructionExcelBuilder {
         private String orderCode;
         /** 患者姓名 */
         private String patientName;
+        /** 机构名称（客户名称） */
+        private String orgName;
         /** 医院名称 */
         private String hospitalName;
         /** 联系人（医生姓名） */
@@ -147,16 +149,16 @@ public class InstructionExcelBuilder {
 
             Sheet sheet = wb.getSheetAt(0);
 
-            // 1. 填充版本号（G2:I2 合并区左上角 → row1, col6）
-            setCell(sheet, 1, 6, "版本号：" + strOrEmpty(ctx.getVersion()));
+            // 1. 填充版本号（G2:I2 合并区左上角 → row1, col6，不设置边框）
+            setCellNoBorder(wb, sheet, 1, 6, "版本号：" + strOrEmpty(ctx.getVersion()));
 
             // 2. 填充基本信息区
-            setCell(sheet, 3, 1, strOrEmpty(ctx.getOrderCode()));            // B4：订单编号
-            setCell(sheet, 3, 4, strOrEmpty(ctx.getHospitalName()));         // E4：客户名称（医院名）
-            setCell(sheet, 3, 8, strOrEmpty(ctx.getContactName()));          // I4：联系人
-            setCell(sheet, 4, 1, strOrEmpty(ctx.getPackageCode()));          // B5：数据包编号
-            setCell(sheet, 4, 4, strOrEmpty(ctx.getHospitalName()));         // E5：医院名称
-            setCell(sheet, 4, 8, strOrEmpty(ctx.getExpectedDeliveryDate())); // I5：预交货时间
+            setCell(wb, sheet, 3, 1, strOrEmpty(ctx.getOrderCode()));            // B4：订单编号
+            setCell(wb, sheet, 3, 4, strOrEmpty(ctx.getOrgName()));              // E4：客户名称（机构名）
+            setCell(wb, sheet, 3, 8, strOrEmpty(ctx.getContactName()));          // I4：联系人
+            setCell(wb, sheet, 4, 1, strOrEmpty(ctx.getPackageCode()));          // B5：数据包编号
+            setCell(wb, sheet, 4, 4, strOrEmpty(ctx.getHospitalName()));         // E5：医院名称
+            setCell(wb, sheet, 4, 8, strOrEmpty(ctx.getExpectedDeliveryDate())); // I5：预交货时间
 
             // 3. 清除产品数据区合并（row7-24，共18行）
             removeMergedRegionsInRows(sheet, DATA_ROW_START, DATA_ROW_END);
@@ -184,33 +186,46 @@ public class InstructionExcelBuilder {
             for (int i = 0; i < n; i++) {
                 ProductRow row = rows.get(i);
                 int rowIdx = DATA_ROW_START + i;
-                setCell(sheet, rowIdx, 0, String.valueOf(i + 1));                    // A：序号
-                setCell(sheet, rowIdx, 1, strOrEmpty(row.getCertNo()));              // B：注册证号
-                setCell(sheet, rowIdx, 2, strOrEmpty(row.getProductName()));         // C：产品名称
-                setCell(sheet, rowIdx, 3, stripExtension(row.getPackageFileName())); // D：数据文件名称
-                setCell(sheet, rowIdx, 4, strOrEmpty(row.getSpecName()));            // E：型号/规格
-                setCell(sheet, rowIdx, 5, strOrEmpty(row.getMaterialName()));        // F：材质
-                setCell(sheet, rowIdx, 6, row.getQuantity() != null
+                setCell(wb, sheet, rowIdx, 0, String.valueOf(i + 1));                    // A：序号
+                setCell(wb, sheet, rowIdx, 1, strOrEmpty(row.getCertNo()));              // B：注册证号
+                setCell(wb, sheet, rowIdx, 2, strOrEmpty(row.getProductName()));         // C：产品名称
+                setCell(wb, sheet, rowIdx, 3, stripExtension(row.getPackageFileName())); // D：数据文件名称
+                setCell(wb, sheet, rowIdx, 4, strOrEmpty(row.getSpecName()));            // E：型号/规格
+                setCell(wb, sheet, rowIdx, 5, strOrEmpty(row.getMaterialName()));        // F：材质
+                setCell(wb, sheet, rowIdx, 6, row.getQuantity() != null
                         ? String.valueOf(row.getQuantity()) : "");                   // G：数量
                 // H：时效（0=普通，1=加急）
                 int urgentVal = row.getIsUrgent() != null ? row.getIsUrgent() : StatusConstants.NO;
-                setCell(sheet, rowIdx, 7, urgentVal == StatusConstants.YES ? "加急" : "普通");
+                setCell(wb, sheet, rowIdx, 7, urgentVal == StatusConstants.YES ? "加急" : "普通");
                 if (urgentVal == StatusConstants.YES) {
                     setBold(wb, sheet, rowIdx, 7);
                 }
-                setCell(sheet, rowIdx, 8, strOrEmpty(row.getColorName()));           // I：颜色
+                setCell(wb, sheet, rowIdx, 8, strOrEmpty(row.getColorName()));           // I：颜色
             }
 
-            // 6. 未使用的余量行清空内容，保持模板样式（不重新合并，合并会覆盖边框样式）
-            for (int i = Math.max(n, 1); i < DATA_ROW_ORIGINAL_COUNT; i++) {
-                int rowIdx = DATA_ROW_START + i;
-                Row r = sheet.getRow(rowIdx);
-                if (r == null) r = sheet.createRow(rowIdx);
-                for (int col = 0; col < 9; col++) {
-                    Cell cell = r.getCell(col);
-                    if (cell == null) cell = r.createCell(col);
-                    cell.setCellValue("");
+            // 6. 未使用的余量行：合并为一个大单元格并清空内容
+            int firstEmptyRow = DATA_ROW_START + n;
+            int lastEmptyRow = DATA_ROW_START + DATA_ROW_ORIGINAL_COUNT - 1;
+            if (firstEmptyRow <= lastEmptyRow) {
+                // 移除该区域内的所有合并区域
+                removeMergedRegionsInRows(sheet, firstEmptyRow, lastEmptyRow);
+                // 合并整个空白区域为一个大单元格（A列到I列）
+                sheet.addMergedRegion(new CellRangeAddress(firstEmptyRow, lastEmptyRow, 0, 8));
+                // 设置左上角单元格（合并单元格的样式由左上角单元格决定）
+                Row r = sheet.getRow(firstEmptyRow);
+                if (r == null) r = sheet.createRow(firstEmptyRow);
+                Cell cell = r.getCell(0);
+                if (cell == null) {
+                    cell = r.createCell(0);
+                    // 从模板行复制样式（边框）
+                    if (templateRow != null) {
+                        Cell templateCell = templateRow.getCell(0);
+                        if (templateCell != null && templateCell.getCellStyle() != null) {
+                            cell.setCellStyle(templateCell.getCellStyle());
+                        }
+                    }
                 }
+                cell.setCellValue("");
             }
 
             // 7. 填充底部区域（偏移量 = max(0, n - DATA_ROW_ORIGINAL_COUNT)）
@@ -218,30 +233,30 @@ public class InstructionExcelBuilder {
 
             // row26（原 row25）：产品标识/包装数量/开始时间
             int row26 = 25 + offset;
-            setCell(sheet, row26, 1, strOrEmpty(ctx.getProductMark()));              // B26：产品标识
-            setCell(sheet, row26, 4, ctx.getPackQuantity() != null
+            setCell(wb, sheet, row26, 1, strOrEmpty(ctx.getProductMark()));              // B26：产品标识
+            setCell(wb, sheet, row26, 4, ctx.getPackQuantity() != null
                     ? String.valueOf(ctx.getPackQuantity()) : "");                   // E26：包装数量
-            setCell(sheet, row26, 7, strOrEmpty(ctx.getDesignStartTime()));          // H26：开始时间
+            setCell(wb, sheet, row26, 7, strOrEmpty(ctx.getDesignStartTime()));          // H26：开始时间
 
             // row27（原 row26）：患者姓名/是否邮寄/结束时间
             int row27 = 26 + offset;
-            setCell(sheet, row27, 1, strOrEmpty(ctx.getPatientName()));              // B27：患者姓名
-            setCell(sheet, row27, 4, strOrEmpty(ctx.getIsPostal()));                 // E27：是否邮寄
-            setCell(sheet, row27, 7, strOrEmpty(ctx.getGenerateTime()));             // H27：结束时间
+            setCell(wb, sheet, row27, 1, strOrEmpty(ctx.getPatientName()));              // B27：患者姓名
+            setCell(wb, sheet, row27, 4, strOrEmpty(ctx.getIsPostal()));                 // E27：是否邮寄
+            setCell(wb, sheet, row27, 7, strOrEmpty(ctx.getGenerateTime()));             // H27：结束时间
 
             // row28（原 row27）：邮寄地址
             int row28 = 27 + offset;
-            setCell(sheet, row28, 1, strOrEmpty(ctx.getPostalAddress()));            // B28：邮寄地址
+            setCell(wb, sheet, row28, 1, strOrEmpty(ctx.getPostalAddress()));            // B28：邮寄地址
 
             // row29（原 row28）：备注
             int row29 = 28 + offset;
-            setCell(sheet, row29, 1, strOrEmpty(ctx.getRemark()));                   // B29：备注
+            setCell(wb, sheet, row29, 1, strOrEmpty(ctx.getRemark()));                   // B29：备注
 
-            // row30（原 row29）：指令人/日期 | 复核/日期
+            // row30（原 row29）：指令人/日期 | 复核/日期（无边框）
             int row30 = 29 + offset;
-            setCell(sheet, row30, 1, strOrEmpty(ctx.getDesignerName()));             // B30：指令人
-            setCell(sheet, row30, 2, strOrEmpty(ctx.getGenerateDate()));             // C30：指令日期
-            setCell(sheet, row30, 8, strOrEmpty(ctx.getGenerateDate()));             // I30：复核日期
+            setCellNoBorder(wb, sheet, row30, 1, strOrEmpty(ctx.getDesignerName()));     // B30：指令人
+            setCellNoBorder(wb, sheet, row30, 2, strOrEmpty(ctx.getGenerateDate()));     // C30：指令日期
+            setCellNoBorder(wb, sheet, row30, 8, strOrEmpty(ctx.getGenerateDate()));     // I30：复核日期
 
             // 8. 写出为 byte[]
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -277,8 +292,8 @@ public class InstructionExcelBuilder {
         }
     }
 
-    /** 向指定行列写入字符串值（复用已有 Cell，避免 createCell 覆盖模板样式） */
-    private void setCell(Sheet sheet, int rowIdx, int colIdx, String value) {
+    /** 向指定行列写入字符串值，并确保有边框和居中样式 */
+    private void setCell(Workbook wb, Sheet sheet, int rowIdx, int colIdx, String value) {
         Row row = sheet.getRow(rowIdx);
         if (row == null) {
             row = sheet.createRow(rowIdx);
@@ -286,16 +301,54 @@ public class InstructionExcelBuilder {
         Cell cell = row.getCell(colIdx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
         if (cell == null) {
             cell = row.createCell(colIdx);
-            // 新单元格从模板行复制样式（包括边框）
-            Row templateRow = sheet.getRow(DATA_ROW_START);
-            if (templateRow != null) {
-                Cell templateCell = templateRow.getCell(colIdx);
-                if (templateCell != null && templateCell.getCellStyle() != null) {
-                    cell.setCellStyle(templateCell.getCellStyle());
-                }
-            }
+        }
+        // 确保单元格有边框和居中样式
+        if (cell.getCellStyle() == null || cell.getCellStyle().getBorderTop() == BorderStyle.NONE) {
+            CellStyle style = wb.createCellStyle();
+            style.setBorderTop(BorderStyle.THIN);
+            style.setBorderBottom(BorderStyle.THIN);
+            style.setBorderLeft(BorderStyle.THIN);
+            style.setBorderRight(BorderStyle.THIN);
+            style.setAlignment(HorizontalAlignment.CENTER);
+            style.setVerticalAlignment(VerticalAlignment.CENTER);
+            cell.setCellStyle(style);
         }
         cell.setCellValue(value != null ? value : "");
+    }
+
+    /** 向指定行列写入字符串值，只设置居中对齐，不设置边框（用于版本号等特殊单元格） */
+    private void setCellNoBorder(Workbook wb, Sheet sheet, int rowIdx, int colIdx, String value) {
+        Row row = sheet.getRow(rowIdx);
+        if (row == null) {
+            row = sheet.createRow(rowIdx);
+        }
+        Cell cell = row.getCell(colIdx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (cell == null) {
+            cell = row.createCell(colIdx);
+            // 只设置居中对齐，不设置边框
+            CellStyle style = wb.createCellStyle();
+            style.setAlignment(HorizontalAlignment.CENTER);
+            style.setVerticalAlignment(VerticalAlignment.CENTER);
+            cell.setCellStyle(style);
+        }
+        cell.setCellValue(value != null ? value : "");
+    }
+
+    /** 确保单元格有边框和居中样式（用于底部字段） */
+    private void ensureCellStyle(Workbook wb, Cell cell) {
+        if (cell.getCellStyle() == null || cell.getCellStyle().getIndex() == 0) {
+            // 单元格没有样式或使用默认样式，创建新样式
+            CellStyle style = wb.createCellStyle();
+            // 设置边框
+            style.setBorderTop(BorderStyle.THIN);
+            style.setBorderBottom(BorderStyle.THIN);
+            style.setBorderLeft(BorderStyle.THIN);
+            style.setBorderRight(BorderStyle.THIN);
+            // 设置居中对齐
+            style.setAlignment(HorizontalAlignment.CENTER);
+            style.setVerticalAlignment(VerticalAlignment.CENTER);
+            cell.setCellStyle(style);
+        }
     }
 
     /** 将指定单元格设置为加粗（基于原有样式克隆，避免影响其他单元格） */

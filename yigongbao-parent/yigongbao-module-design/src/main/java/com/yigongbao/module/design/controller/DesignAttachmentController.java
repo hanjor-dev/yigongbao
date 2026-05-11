@@ -1,7 +1,6 @@
 package com.yigongbao.module.design.controller;
 
 import com.yigongbao.common.result.Result;
-import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.design.dto.LinkFilesDTO;
 import com.yigongbao.module.design.service.DesignFileService;
@@ -29,7 +28,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/design")
 @RequiredArgsConstructor
-@RequireSign
 public class DesignAttachmentController {
 
     private final DesignFileService designFileService;

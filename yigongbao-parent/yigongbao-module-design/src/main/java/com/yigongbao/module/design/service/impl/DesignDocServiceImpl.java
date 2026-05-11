@@ -803,6 +803,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         InstructionExcelBuilder.BuildContext ctx = new InstructionExcelBuilder.BuildContext();
         ctx.setOrderCode(order.getOrderCode());
         ctx.setPatientName(order.getPatientName());
+        ctx.setOrgName(order.getOrgName());
         ctx.setHospitalName(order.getHospitalName());
         ctx.setContactName(order.getDoctorName());
         ctx.setPackageCode(pkg.getPackageCode());

@@ -388,66 +388,66 @@ VALUES
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, redirect, sort, visible, status)
 VALUES
-(1, 0, '数据概览', 'DataBoard', 1, '&#xe62e;', '/home', NULL, '/home/index.vue', 1, 1, 1),
+(1, 0, '数据概览', 'DataBoard', 1, '&#xe62e;', '/home', NULL, '/home/index', 1, 1, 1),
 (2, 0, '业务运营', 'Business', 1, NULL, '/business', NULL, '/business/order', 2, 1, 1),
 (3, 0, '客户管理', 'Customer', 1, NULL, '/customer', NULL, '/customer/doctor', 3, 1, 1),
 (4, 0, '模块管理', 'Module', 1, NULL, '/module', NULL, '/module/org', 4, 1, 1),
 (5, 0, '用户和权限', 'Auth', 1, NULL, '/auth', NULL, '/auth/account', 5, 1, 1),
-(6, 0, '资料管理', 'Datum', 1, NULL, '/datum', NULL, '/datum/index.vue', 6, 1, 1),
+(6, 0, '资料管理', 'Datum', 1, NULL, '/datum', NULL, '/datum/index', 6, 1, 1),
 (7, 0, '系统配置', 'System', 1, NULL, '/system', NULL, '/system/dict', 7, 1, 1),
-(8, 0, '统计报表', 'Statistical', 1, '&#xe6d6;', '/statistical', NULL, '/statistical/index.vue', 8, 1, 1),
-(9, 0, '备份管理', 'Backup', 1, '&#xe7a0;', '/backup', NULL, '/backup/index.vue', 9, 1, 1),
-(10, 0, '个人中心', 'Personal', 1, '&#xe651;', '/personal', NULL, '/personal/index.vue', 10, 1, 1);
+(8, 0, '统计报表', 'Statistical', 1, '&#xe6d6;', '/statistical', NULL, '/statistical/index', 8, 1, 1),
+(9, 0, '备份管理', 'Backup', 1, '&#xe7a0;', '/backup', NULL, '/backup/index', 9, 1, 1),
+(10, 0, '个人中心', 'Personal', 1, '&#xe651;', '/personal', NULL, '/personal/index', 10, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：业务运营（parent_id=2）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
 VALUES
-(101, 2, '订单管理', 'Order', 2, '&#xeb49;', '/order', 'business/order/index.vue', 1, 1, 1),
-(102, 2, '我的工单', 'Design', 2, '&#xe608;', '/design', 'business/design/index.vue', 2, 1, 1),
-(103, 2, '生产管理', 'Manufacture', 2, '&#xe662;', '/manufacture', 'business/manufacture/index.vue', 3, 1, 1),
-(104, 2, '质检管理', 'Quality', 2, NULL, '/quality', 'business/quality/index.vue', 4, 1, 1),
-(105, 2, '仓储管理', 'Storage', 2, NULL, '/storage', 'business/storage/index.vue', 5, 1, 1);
+(101, 2, '订单管理', 'Order', 2, '&#xeb49;', '/order', 'business/order', 1, 1, 1),
+(102, 2, '我的工单', 'Design', 2, '&#xe608;', '/design', 'business/design', 2, 1, 1),
+(103, 2, '生产管理', 'Manufacture', 2, '&#xe662;', '/manufacture', 'business/manufacture', 3, 1, 1),
+(104, 2, '质检管理', 'Quality', 2, NULL, '/quality', 'business/quality', 4, 1, 1),
+(105, 2, '仓储管理', 'Storage', 2, NULL, '/storage', 'business/storage', 5, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：客户管理（parent_id=3）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
 VALUES
-(201, 3, '医生管理', 'Doctor', 2, '&#xe813;', '/doctor', 'customer/doctor/index.vue', 1, 1, 1),
-(202, 3, '科室管理', 'Department', 2, '&#xe69f;', '/department', 'customer/department/index.vue', 2, 1, 1);
+(201, 3, '医生管理', 'Doctor', 2, '&#xe813;', '/doctor', 'customer/doctor', 1, 1, 1),
+(202, 3, '科室管理', 'Department', 2, '&#xe69f;', '/department', 'customer/department', 2, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：模块管理（parent_id=4）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
 VALUES
-(301, 4, '机构管理', 'Org', 2, '&#xe61a;', '/org', 'module/org/index.vue', 1, 1, 1),
-(302, 4, '部门管理', 'Branch', 2, '&#xe62b;', '/branch', 'module/branch/index.vue', 2, 1, 1),
-(303, 4, '项目管理', 'Project', 2, '&#xe620;', '/project', 'module/project/index.vue', 3, 1, 1),
-(304, 4, '产品管理', 'Product', 2, '&#xe601;', '/product', 'module/product/index.vue', 4, 1, 1),
-(305, 4, '物料管理', 'Material', 2, '&#xe65c;', '/material', 'module/material/index.vue', 5, 1, 1),
-(306, 4, '医院范围模板管理', 'Template', 2, '&#xe605;', '/template', 'module/template/index.vue', 6, 1, 1);
+(301, 4, '机构管理', 'Org', 2, '&#xe61a;', '/org', 'module/org', 1, 1, 1),
+(302, 4, '部门管理', 'Branch', 2, '&#xe62b;', '/branch', 'module/branch', 2, 1, 1),
+(303, 4, '项目管理', 'Project', 2, '&#xe620;', '/project', 'module/project', 3, 1, 1),
+(304, 4, '产品管理', 'Product', 2, '&#xe601;', '/product', 'module/product', 4, 1, 1),
+(305, 4, '物料管理', 'Material', 2, '&#xe65c;', '/material', 'module/material', 5, 1, 1),
+(306, 4, '医院范围模板管理', 'Template', 2, '&#xe605;', '/template', 'module/template', 6, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：用户和权限（parent_id=5）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
 VALUES
-(401, 5, '账户管理', 'Account', 2, '&#xe602;', '/account', 'auth/account/index.vue', 1, 1, 1),
-(402, 5, '角色管理', 'Role', 2, '&#xe6a0;', '/role', 'auth/role/index.vue', 2, 1, 1),
-(403, 5, '资源管理', 'Resource', 2, '&#xe607;', '/resource', 'auth/resource/index.vue', 3, 1, 1),
-(404, 5, '注册审核', 'RegReview', 2, '&#xe76a;', '/regReview', 'auth/regReview/index.vue', 4, 1, 1);
+(401, 5, '账户管理', 'Account', 2, '&#xe602;', '/account', 'auth/account', 1, 1, 1),
+(402, 5, '角色管理', 'Role', 2, '&#xe6a0;', '/role', 'auth/role', 2, 1, 1),
+(403, 5, '资源管理', 'Resource', 2, '&#xe607;', '/resource', 'auth/resource', 3, 1, 1),
+(404, 5, '注册审核', 'RegReview', 2, '&#xe76a;', '/regReview', 'auth/regReview', 4, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：系统配置（parent_id=7）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
 VALUES
-(501, 7, '字典管理', 'Dict', 2, '&#xe636;', '/dict', 'system/dict/index.vue', 1, 1, 1),
-(502, 7, '参数配置', 'Param', 2, '&#xe60e;', '/param', 'system/param/index.vue', 2, 1, 1),
-(503, 7, '操作日志', 'Log', 2, '&#xe668;', '/log', 'system/log/index.vue', 3, 1, 1);
+(501, 7, '字典管理', 'Dict', 2, '&#xe636;', '/dict', 'system/dict', 1, 1, 1),
+(502, 7, '参数配置', 'Param', 2, '&#xe60e;', '/param', 'system/param', 2, 1, 1),
+(503, 7, '操作日志', 'Log', 2, '&#xe668;', '/log', 'system/log', 3, 1, 1);
 
 -- ------------------------------------------------------------
 -- 按钮级别资源（resource_type=3）
@@ -645,18 +645,6 @@ VALUES
 ('HDEPT-0009', '其他科室', 9, 1);
 
 
--- ============================================================
--- 编码序号同步（sys_code_rule.current_value）
--- 编码生成器首次调用时以此值为初始序号，确保新生成的编码不与已有种子数据冲突
--- 注意：必须在对应业务表数据插入之后执行
--- ============================================================
-UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_group_template) WHERE rule_code = 'TEMPLATE_NO';
-UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_dept)          WHERE rule_code = 'HDEPT_NO';
-UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM rebuild_body_part)      WHERE rule_code = 'BODYPART_NO';
-UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM rebuild_project)        WHERE rule_code = 'PROJECT_NO';
-UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM sys_org)                WHERE rule_code = 'ORG_NO';
-
-
 -- -- ============================================================
 -- -- 重建部位数据初始化（rebuild_body_part）
 -- -- 平级结构，直接列出所有具体部位
@@ -717,6 +705,19 @@ VALUES
 -- 颅骨修补假体（product_id=3）规格
 (6, 3, '小号', 3, '国械注准20243130003', 1, 1),
 (7, 3, '大号', 3, '国械注准20243130003', 2, 1);
+
+
+-- ============================================================
+-- 编码序号同步（sys_code_rule.current_value）
+-- 编码生成器首次调用时以此值为初始序号，确保新生成的编码不与已有种子数据冲突
+-- 注意：必须在对应业务表数据插入之后执行
+-- ============================================================
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_group_template) WHERE rule_code = 'TEMPLATE_NO';
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_dept)          WHERE rule_code = 'HDEPT_NO';
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM rebuild_body_part)      WHERE rule_code = 'BODYPART_NO';
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM rebuild_project)        WHERE rule_code = 'PROJECT_NO';
+UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM sys_org)                WHERE rule_code = 'ORG_NO';
+
 
 -- part_colors 初始数据（从 image-3d-ai 迁移，opacity 统一默认 1.00）
 INSERT INTO part_colors (id, part_detail, color_code, opacity) VALUES (1, '右肺上叶', '170,255,0', 1.00);

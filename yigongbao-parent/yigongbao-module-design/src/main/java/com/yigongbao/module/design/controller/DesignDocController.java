@@ -1,7 +1,6 @@
 package com.yigongbao.module.design.controller;
 
 import com.yigongbao.common.result.Result;
-import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.design.service.DesignDocService;
 import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.vo.DesignDocVersionVO;
@@ -31,7 +30,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/design/workorder")
 @RequiredArgsConstructor
-@RequireSign
 public class DesignDocController {
 
     private final DesignDocService docService;
