@@ -286,6 +286,14 @@ public class InstructionExcelBuilder {
         Cell cell = row.getCell(colIdx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
         if (cell == null) {
             cell = row.createCell(colIdx);
+            // 新单元格从模板行复制样式（包括边框）
+            Row templateRow = sheet.getRow(DATA_ROW_START);
+            if (templateRow != null) {
+                Cell templateCell = templateRow.getCell(colIdx);
+                if (templateCell != null && templateCell.getCellStyle() != null) {
+                    cell.setCellStyle(templateCell.getCellStyle());
+                }
+            }
         }
         cell.setCellValue(value != null ? value : "");
     }

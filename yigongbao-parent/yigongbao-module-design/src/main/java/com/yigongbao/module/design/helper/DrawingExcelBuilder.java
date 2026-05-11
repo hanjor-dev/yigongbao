@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.util.Units;
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -196,15 +197,25 @@ public class DrawingExcelBuilder {
             int pictureType = detectPictureType(screenshotBytes);
             int pictureIdx = wb.addPicture(screenshotBytes, pictureType);
 
-            // 图片区域：产品名行下方，占槽位主体（高度约10行，宽度4列）
-            int colStart = coord[3];          // productNameCol
-            int colEnd = coord[1] + 1;        // fileNameCol + 1（含右边列）
+            // 图片区域：产品名行下方，占槽位主体（高度10行，宽度4列：标签2列+值2列）
+            int colStart = coord[3] - 2;      // 标签列起始位置（产品名称值列向左2列）
+            int colEnd = coord[3] + 2;        // 值列结束位置（产品名称值列向右2列）
             int rowStart = coord[2] + 1;      // productNameRow + 1
-            int rowEnd = rowStart + 10;       // 向下10行（槽位主体）
+            int rowEnd = rowStart + 10;       // 向下10行
 
+            // 使用 CreationHelper 创建锚点，图片精确填充目标单元格区域，留出 padding 避免覆盖边框
+            int padding = 10;
+            CreationHelper helper = wb.getCreationHelper();
             XSSFDrawing drawing = sheet.createDrawingPatriarch();
-            XSSFClientAnchor anchor = new XSSFClientAnchor(0, 0, 0, 0,
-                    colStart, rowStart, colEnd, rowEnd);
+            ClientAnchor anchor = helper.createClientAnchor();
+            anchor.setCol1(colStart);
+            anchor.setRow1(rowStart);
+            anchor.setDx1(padding * Units.EMU_PER_PIXEL);
+            anchor.setDy1(padding * Units.EMU_PER_PIXEL);
+            anchor.setCol2(colEnd);
+            anchor.setRow2(rowEnd);
+            anchor.setDx2(-padding * Units.EMU_PER_PIXEL);
+            anchor.setDy2(-padding * Units.EMU_PER_PIXEL);
             anchor.setAnchorType(ClientAnchor.AnchorType.MOVE_AND_RESIZE);
             drawing.createPicture(anchor, pictureIdx);
         } catch (Exception e) {
@@ -224,11 +235,38 @@ public class DrawingExcelBuilder {
         return Workbook.PICTURE_TYPE_JPEG;
     }
 
+    /**
+     * 读取图片尺寸 [width, height]
+     */
+    private int[] getImageDimensions(byte[] imageBytes) {
+        try {
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(
+                    new java.io.ByteArrayInputStream(imageBytes));
+            if (img != null) {
+                return new int[]{img.getWidth(), img.getHeight()};
+            }
+        } catch (Exception e) {
+            log.warn("读取图片尺寸失败: {}", e.getMessage());
+        }
+        return new int[]{100, 100}; // 默认尺寸
+    }
+
     private void setCell(Sheet sheet, int rowIdx, int colIdx, String value) {
         Row row = sheet.getRow(rowIdx);
         if (row == null) row = sheet.createRow(rowIdx);
         Cell cell = row.getCell(colIdx);
-        if (cell == null) cell = row.createCell(colIdx);
+        if (cell == null) {
+            cell = row.createCell(colIdx);
+            // 新单元格从模板页（第0页）的对应位置复制样式（包括边框）
+            Sheet templateSheet = sheet.getWorkbook().getSheetAt(0);
+            Row templateRow = templateSheet.getRow(rowIdx);
+            if (templateRow != null) {
+                Cell templateCell = templateRow.getCell(colIdx);
+                if (templateCell != null && templateCell.getCellStyle() != null) {
+                    cell.setCellStyle(templateCell.getCellStyle());
+                }
+            }
+        }
         cell.setCellValue(value != null ? value : "");
     }
 
