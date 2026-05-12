@@ -36,6 +36,15 @@ public interface UserMapper extends BaseMapper<UserEntity> {
     Long countByRoleId(Long roleId);
 
     /**
+     * 查询角色下所有用户ID
+     *
+     * @param roleId 角色ID
+     * @return 用户ID列表
+     */
+    @Select("SELECT id FROM sys_user WHERE role_id = #{roleId} AND is_deleted = 0")
+    List<Long> selectIdsByRoleId(Long roleId);
+
+    /**
      * 根据用户名查询用户
      *
      * @param username 用户名

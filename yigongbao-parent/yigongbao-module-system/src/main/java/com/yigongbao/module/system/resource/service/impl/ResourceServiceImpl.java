@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 
 import java.util.ArrayList;
@@ -304,6 +305,9 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
             } else {
                 log.info("分配角色资源成功，roleId={}, 已清空资源", roleId);
             }
+
+            // 刷新该角色所有在线用户的权限缓存，确保权限变更实时生效
+            refreshPermissionCacheByRoleId(roleId);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
@@ -419,4 +423,38 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
                 .sorted(Comparator.comparing(ResourceVO::getSort))
                 .collect(Collectors.toList());
     }
+
+    /**
+     * 刷新指定角色所有在线用户的权限缓存
+     */
+    private void refreshPermissionCacheByRoleId(Long roleId) {
+        List<Long> userIds = userMapper.selectIdsByRoleId(roleId);
+        if (userIds == null || userIds.isEmpty()) {
+            return;
+        }
+        List<Long> resourceIds = roleResourceMapper.selectResourceIdsByRoleId(roleId);
+        List<String> newPermissions;
+        if (resourceIds == null || resourceIds.isEmpty()) {
+            newPermissions = new ArrayList<>();
+        } else {
+            LambdaQueryWrapper<ResourceEntity> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(ResourceEntity::getId, resourceIds)
+                    .eq(ResourceEntity::getResourceType, com.yigongbao.common.enums.ResourceTypeEnum.BUTTON.getCode())
+                    .eq(ResourceEntity::getStatus, StatusConstants.NORMAL);
+            newPermissions = baseMapper.selectList(wrapper).stream()
+                    .map(ResourceEntity::getResourceCode)
+                    .collect(Collectors.toList());
+        }
+        for (Long userId : userIds) {
+            try {
+                if (StpUtil.isLogin(userId)) {
+                    StpUtil.getSessionByLoginId(userId).set("permissions", newPermissions);
+                    log.info("刷新用户权限缓存，userId={}", userId);
+                }
+            } catch (Exception e) {
+                log.warn("刷新用户权限缓存失败，userId={}", userId, e);
+            }
+        }
+    }
+
 }

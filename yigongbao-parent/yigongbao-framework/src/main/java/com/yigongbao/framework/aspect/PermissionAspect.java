@@ -36,13 +36,24 @@ public class PermissionAspect {
         RequirePermission annotation = method.getAnnotation(RequirePermission.class);
         String permission = annotation.value();
 
-        // 获取当前用户ID
         Long userId = StpUtil.getLoginIdAsLong();
         log.debug("权限校验，userId={}, permission={}", userId, permission);
 
-        // TODO: 后续需要注入 ResourceService 进行实际校验
-        // 目前简化处理，后续实现完整的权限校验逻辑
+        // 从 Session 读取权限列表（登录时已缓存）
+        Object permissionsObj = StpUtil.getSession().get("permissions");
+        if (permissionsObj == null) {
+            log.warn("用户权限缓存为空，userId={}", userId);
+            throw new BusinessException(ErrorCodeEnum.FORBIDDEN);
+        }
 
+        @SuppressWarnings("unchecked")
+        java.util.List<String> permissions = (java.util.List<String>) permissionsObj;
+        if (!permissions.contains(permission)) {
+            log.warn("权限校验失败，userId={}, permission={}", userId, permission);
+            throw new BusinessException(ErrorCodeEnum.FORBIDDEN);
+        }
+
+        log.debug("权限校验通过，userId={}, permission={}", userId, permission);
         return point.proceed();
     }
 }
