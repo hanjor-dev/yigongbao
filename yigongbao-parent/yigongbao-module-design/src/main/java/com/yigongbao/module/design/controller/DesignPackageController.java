@@ -1,6 +1,7 @@
 package com.yigongbao.module.design.controller;
 
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.service.DesignFileService;
 import com.yigongbao.module.design.vo.DesignPackageFileVO;
 import com.yigongbao.module.design.vo.DesignPackageVO;
@@ -35,6 +36,7 @@ public class DesignPackageController {
      * 上传打印文件数据包（ZIP/RAR/7Z/TAR，后端自动解析有效文件）
      */
     @Operation(summary = "上传打印文件数据包")
+    @RequirePermission(value = "design:EditFile")
     @PostMapping("/package/upload")
     public Result<DesignPackageVO> uploadPackage(
             @Parameter(description = "订单ID") @RequestParam Long orderId,
@@ -46,6 +48,7 @@ public class DesignPackageController {
      * 删除数据包（若已有打印信息则拒绝）
      */
     @Operation(summary = "删除数据包")
+    @RequirePermission(value = "design:EditFile")
     @DeleteMapping("/package/{packageId}")
     public Result<Void> deletePackage(
             @Parameter(description = "订单ID") @RequestParam Long orderId,
@@ -58,6 +61,7 @@ public class DesignPackageController {
      * 获取订单下所有数据包列表（含包内文件）
      */
     @Operation(summary = "获取数据包列表")
+    @RequirePermission(value = "design:View")
     @GetMapping("/packages")
     public Result<List<DesignPackageVO>> listPackages(
             @Parameter(description = "订单ID") @RequestParam Long orderId) {
@@ -68,6 +72,7 @@ public class DesignPackageController {
      * 获取数据包包内文件列表
      */
     @Operation(summary = "获取数据包包内文件列表")
+    @RequirePermission(value = "design:View")
     @GetMapping("/package/{packageId}/files")
     public Result<List<DesignPackageFileVO>> listPackageFiles(
             @Parameter(description = "订单ID") @RequestParam Long orderId,

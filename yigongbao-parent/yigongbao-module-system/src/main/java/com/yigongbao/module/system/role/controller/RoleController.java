@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -64,6 +65,7 @@ public class RoleController {
      * @return 创建结果
      */
     @Operation(summary = "创建角色")
+    @RequirePermission("role:Add")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.CREATE,
@@ -83,6 +85,7 @@ public class RoleController {
      * @return 更新结果
      */
     @Operation(summary = "更新角色")
+    @RequirePermission("role:Edit")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -101,6 +104,7 @@ public class RoleController {
      * @return 删除结果
      */
     @Operation(summary = "删除角色")
+    @RequirePermission("role:Delete")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.DELETE,
@@ -120,6 +124,7 @@ public class RoleController {
      * @return 操作结果
      */
     @Operation(summary = "修改角色状态")
+    @RequirePermission("role:Status")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.UPDATE,

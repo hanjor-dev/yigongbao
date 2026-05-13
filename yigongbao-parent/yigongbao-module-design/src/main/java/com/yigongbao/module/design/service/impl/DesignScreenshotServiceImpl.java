@@ -10,6 +10,7 @@ import com.yigongbao.module.design.entity.DesignPackageFileEntity;
 import com.yigongbao.module.design.entity.DesignPackageFileScreenshotEntity;
 import com.yigongbao.module.design.mapper.DesignPackageFileScreenshotMapper;
 import com.yigongbao.module.design.service.DesignPackageFileService;
+import com.yigongbao.module.design.service.DesignPackageService;
 import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.vo.ScreenshotVO;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class DesignScreenshotServiceImpl
         implements DesignScreenshotService {
 
     private final DesignPackageFileService packageFileService;
+    private final DesignPackageService packageService;
     private final FileService fileService;
 
     /**
@@ -52,8 +54,8 @@ public class DesignScreenshotServiceImpl
     public ScreenshotVO saveScreenshot(Long packageId, Long packageFileId, MultipartFile file) {
         log.info("保存截图，packageId={}，packageFileId={}", packageId, packageFileId);
 
-        // 1. 校验 packageFileId 存在且归属 packageId
-        validatePackageFile(packageId, packageFileId);
+        // 1. 校验 packageFileId 存在且归属 packageId（orderId 校验由 Controller 层通过 validatePackage 保证）
+        validatePackageFile(null, packageId, packageFileId);
 
         // 2. 上传截图文件
         FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.IMAGE_SCREENSHOT.getDictCode());
@@ -98,7 +100,7 @@ public class DesignScreenshotServiceImpl
         log.info("查询截图，packageId={}，packageFileId={}", packageId, packageFileId);
 
         // 校验 packageFileId 存在且归属 packageId
-        validatePackageFile(packageId, packageFileId);
+        validatePackageFile(null, packageId, packageFileId);
 
         // 查询截图记录
         DesignPackageFileScreenshotEntity screenshot = lambdaQuery()
@@ -162,9 +164,15 @@ public class DesignScreenshotServiceImpl
     }
 
     /**
-     * 校验 packageFileId 存在且归属指定 packageId
+     * 校验 packageFileId 存在且归属指定 packageId，若 orderId 非 null 则同时校验 packageId 归属 orderId
      */
-    private void validatePackageFile(Long packageId, Long packageFileId) {
+    private void validatePackageFile(Long orderId, Long packageId, Long packageFileId) {
+        if (orderId != null) {
+            com.yigongbao.module.design.entity.DesignPackageEntity pkg = packageService.getById(packageId);
+            if (pkg == null || !pkg.getOrderId().equals(orderId)) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
+            }
+        }
         DesignPackageFileEntity packageFile = packageFileService.getById(packageFileId);
         if (packageFile == null) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_FILE_NOT_FOUND);

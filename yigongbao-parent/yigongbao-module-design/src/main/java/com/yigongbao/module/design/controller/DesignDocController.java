@@ -1,6 +1,7 @@
 package com.yigongbao.module.design.controller;
 
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.service.DesignDocService;
 import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.vo.DesignDocVersionVO;
@@ -40,6 +41,7 @@ public class DesignDocController {
      * 按需自动生成：若打印信息发生变化则重新生成，否则复用已有文件
      */
     @Operation(summary = "下载指令单（线下模式，按需自动生成）")
+    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/instruction/download")
     public void downloadInstruction(@PathVariable Long orderId,
                                     @PathVariable Long packageId,
@@ -52,6 +54,7 @@ public class DesignDocController {
      * 按需自动生成：若打印信息发生变化则重新生成，否则复用已有文件
      */
     @Operation(summary = "下载图纸（线下模式，按需自动生成）")
+    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/drawing/download")
     public void downloadDrawing(@PathVariable Long orderId,
                                 @PathVariable Long packageId,
@@ -64,6 +67,7 @@ public class DesignDocController {
      * 按需自动生成：若打印信息发生变化则重新生成，否则复用已有文件
      */
     @Operation(summary = "获取指令单预览 URL（在线模式，按需自动生成）")
+    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/instruction/preview-url")
     public Result<DocItemVO> getInstructionPreviewUrl(@PathVariable Long orderId,
                                                        @PathVariable Long packageId) {
@@ -75,6 +79,7 @@ public class DesignDocController {
      * 按需自动生成：若打印信息发生变化则重新生成，否则复用已有文件
      */
     @Operation(summary = "获取图纸预览 URL（在线模式，按需自动生成）")
+    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/drawing/preview-url")
     public Result<DocItemVO> getDrawingPreviewUrl(@PathVariable Long orderId,
                                                    @PathVariable Long packageId) {
@@ -85,6 +90,7 @@ public class DesignDocController {
      * 查询指令单历史版本列表
      */
     @Operation(summary = "查询指令单版本列表")
+    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/instruction/versions")
     public Result<List<DesignDocVersionVO>> listInstructionVersions(@PathVariable Long orderId,
                                                                      @PathVariable Long packageId) {
@@ -95,6 +101,7 @@ public class DesignDocController {
      * 查询图纸历史版本列表
      */
     @Operation(summary = "查询图纸版本列表")
+    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/drawing/versions")
     public Result<List<DesignDocVersionVO>> listDrawingVersions(@PathVariable Long orderId,
                                                                  @PathVariable Long packageId) {
@@ -105,6 +112,7 @@ public class DesignDocController {
      * 上传修订版指令单
      */
     @Operation(summary = "上传修订版指令单")
+    @RequirePermission(value = "design:EditDoc")
     @PostMapping("/{orderId}/package/{packageId}/instruction/upload-revised/{id}")
     public Result<Void> uploadRevisedInstruction(@PathVariable Long orderId,
                                                   @PathVariable Long packageId,
@@ -118,6 +126,7 @@ public class DesignDocController {
      * 上传修订版图纸
      */
     @Operation(summary = "上传修订版图纸")
+    @RequirePermission(value = "design:EditDoc")
     @PostMapping("/{orderId}/package/{packageId}/drawing/upload-revised/{id}")
     public Result<Void> uploadRevisedDrawing(@PathVariable Long orderId,
                                               @PathVariable Long packageId,
@@ -133,6 +142,7 @@ public class DesignDocController {
      * 若之后重新生成图纸，确认状态自动重置，需再次确认。
      */
     @Operation(summary = "确认图纸（在线模式）")
+    @RequirePermission(value = "design:EditDoc")
     @PostMapping("/{orderId}/package/{packageId}/drawing/confirm/{id}")
     public Result<Void> confirmDrawing(@PathVariable Long orderId,
                                        @PathVariable Long packageId,
@@ -147,6 +157,7 @@ public class DesignDocController {
      * 若之后重新生成指令单，确认状态自动重置，需再次确认。
      */
     @Operation(summary = "确认指令单（在线模式）")
+    @RequirePermission(value = "design:EditDoc")
     @PostMapping("/{orderId}/package/{packageId}/instruction/confirm/{id}")
     public Result<Void> confirmInstruction(@PathVariable Long orderId,
                                             @PathVariable Long packageId,
@@ -159,8 +170,10 @@ public class DesignDocController {
      * 上传数据包文件截图（upsert：有则覆盖，无则新增）
      */
     @Operation(summary = "上传数据包文件截图")
+    @RequirePermission(value = "design:EditDoc")
     @PostMapping("/{orderId}/package/{packageId}/files/{packageFileId}/screenshot")
-    public Result<ScreenshotVO> saveScreenshot(@PathVariable Long packageId,
+    public Result<ScreenshotVO> saveScreenshot(@PathVariable Long orderId,
+                                               @PathVariable Long packageId,
                                                @PathVariable Long packageFileId,
                                                @RequestParam("file") MultipartFile file) {
         return Result.success(screenshotService.saveScreenshot(packageId, packageFileId, file));
@@ -170,8 +183,10 @@ public class DesignDocController {
      * 查询数据包文件截图
      */
     @Operation(summary = "查询数据包文件截图")
+    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/files/{packageFileId}/screenshot")
-    public Result<ScreenshotVO> getScreenshot(@PathVariable Long packageId,
+    public Result<ScreenshotVO> getScreenshot(@PathVariable Long orderId,
+                                              @PathVariable Long packageId,
                                               @PathVariable Long packageFileId) {
         return Result.success(screenshotService.getScreenshot(packageId, packageFileId));
     }

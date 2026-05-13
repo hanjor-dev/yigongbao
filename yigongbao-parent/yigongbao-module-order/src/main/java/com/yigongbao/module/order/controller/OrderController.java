@@ -3,6 +3,7 @@ package com.yigongbao.module.order.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.order.dto.draft.CreateOrderDraftDTO;
 import com.yigongbao.module.order.dto.draft.OrderDraftPageQueryDTO;
@@ -52,12 +53,14 @@ public class OrderController {
     // ==================== 草稿接口 ====================
 
     @Operation(summary = "分页查询我的草稿列表")
+    @RequirePermission(value = "order:TabDraft")
     @PostMapping("/draft/list")
     public Result<IPage<OrderDraftVO>> listDrafts(@Valid @RequestBody OrderDraftPageQueryDTO dto) {
         return Result.success(orderDraftService.listDrafts(dto));
     }
 
     @Operation(summary = "查询草稿详情")
+    @RequirePermission(value = "draft:View")
     @GetMapping("/draft/{id}")
     public Result<OrderDraftDetailVO> getDraftDetail(@PathVariable Long id) {
         orderDraftService.validateDraftOwner(id, StpUtil.getLoginIdAsLong());
@@ -65,12 +68,14 @@ public class OrderController {
     }
 
     @Operation(summary = "创建或更新草稿")
+    @RequirePermission(value = "draft:Edit")
     @PostMapping("/draft")
     public Result<Long> saveDraft(@Valid @RequestBody CreateOrderDraftDTO dto) {
         return Result.success(orderDraftService.saveDraft(dto));
     }
 
     @Operation(summary = "删除草稿")
+    @RequirePermission(value = "draft:Delete")
     @DeleteMapping("/draft/{id}")
     public Result<Void> removeDraft(@PathVariable Long id) {
         orderDraftService.removeDraft(id);
@@ -78,6 +83,7 @@ public class OrderController {
     }
 
     @Operation(summary = "提交草稿，转为正式订单")
+    @RequirePermission(value = "draft:Submit")
     @PostMapping("/draft/{id}/submit")
     public Result<Long> submitDraft(@PathVariable Long id) {
         return Result.success(orderDraftService.submitDraft(id));
@@ -86,24 +92,28 @@ public class OrderController {
     // ==================== 订单接口 ====================
 
     @Operation(summary = "直接创建订单（直提，不经过草稿）")
+    @RequirePermission(value = "order:Add")
     @PostMapping
     public Result<Long> createOrder(@Valid @RequestBody CreateOrderDTO dto) {
         return Result.success(orderMainService.createOrder(dto));
     }
 
     @Operation(summary = "分页查询订单列表")
+    @RequirePermission(value = "order:TabOrderList")
     @PostMapping("/page")
-    public Result<IPage<OrderListVO>> listOrders(@RequestBody OrderPageDTO dto) {
+    public Result<IPage<OrderListVO>> listOrders(@Valid @RequestBody OrderPageDTO dto) {
         return Result.success(orderMainService.listOrders(dto));
     }
 
     @Operation(summary = "查询订单详情")
+    @RequirePermission(value = "order:View")
     @GetMapping("/{id}")
     public Result<OrderDetailVO> getOrderDetail(@PathVariable Long id) {
         return Result.success(orderMainService.getOrderDetail(id));
     }
 
     @Operation(summary = "提交订单")
+    @RequirePermission(value = "order:Submit")
     @PostMapping("/{id}/submit")
     public Result<Void> submitOrder(@PathVariable Long id) {
         orderMainService.submitOrder(id);
@@ -111,6 +121,7 @@ public class OrderController {
     }
 
     @Operation(summary = "撤回订单")
+    @RequirePermission(value = "order:Withdraw")
     @PostMapping("/{id}/withdraw")
     public Result<Void> withdrawOrder(@PathVariable Long id) {
         orderMainService.withdrawOrder(id);
@@ -118,6 +129,7 @@ public class OrderController {
     }
 
     @Operation(summary = "审核通过")
+    @RequirePermission(value = "order:Approve")
     @PostMapping("/{id}/audit-pass")
     public Result<Void> auditPass(@PathVariable Long id, @Valid @RequestBody AuditOrderDTO dto) {
         orderMainService.auditPass(id, dto);
@@ -125,6 +137,7 @@ public class OrderController {
     }
 
     @Operation(summary = "审核驳回")
+    @RequirePermission(value = "order:Reject")
     @PostMapping("/{id}/audit-reject")
     public Result<Void> auditReject(@PathVariable Long id, @Valid @RequestBody AuditOrderDTO dto) {
         orderMainService.auditReject(id, dto);
@@ -137,13 +150,6 @@ public class OrderController {
         return Result.success(orderMainService.listAvailableActions(id));
     }
 
-    @Operation(summary = "删除订单（过期不可用）")
-    @DeleteMapping("/{id}")
-    public Result<Void> removeOrder(@PathVariable Long id) {
-        orderMainService.removeOrder(id);
-        return Result.success();
-    }
-
     @Operation(summary = "查询可分配设计师列表")
     @PostMapping("/designers/available")
     public Result<List<DesignerVO>> listAvailableDesigners(@RequestBody DesignerQueryDTO dto) {
@@ -151,6 +157,7 @@ public class OrderController {
     }
 
     @Operation(summary = "手动分配设计师（管理员）")
+    @RequirePermission(value = "order:AssignDesigner")
     @PostMapping("/{id}/assign-designer")
     public Result<Void> assignDesigner(@PathVariable Long id, @Valid @RequestBody AssignDesignerDTO dto) {
         designerAssignmentService.manualAssignDesigner(id, dto.getDesignerId());
@@ -167,7 +174,7 @@ public class OrderController {
 
     @Operation(summary = "保存用户列配置")
     @PutMapping("/column-config")
-    public Result<Void> saveColumnConfig(@RequestBody OrderColumnConfigVO config) {
+    public Result<Void> saveColumnConfig(@Valid @RequestBody OrderColumnConfigVO config) {
         orderMainService.saveColumnConfig(config);
         return Result.success();
     }
@@ -182,6 +189,7 @@ public class OrderController {
     // ==================== 导出接口 ====================
 
     @Operation(summary = "导出订单列表（Excel）")
+    @RequirePermission(value = "order:BatchExport")
     @PostMapping("/export")
     public void exportOrders(@RequestBody OrderExportQueryDTO dto, HttpServletResponse response) {
         orderExportService.exportOrders(dto, response);

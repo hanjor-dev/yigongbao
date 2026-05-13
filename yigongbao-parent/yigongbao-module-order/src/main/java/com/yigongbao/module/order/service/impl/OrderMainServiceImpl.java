@@ -65,6 +65,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -129,6 +130,21 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      */
     private Long getCurrentUserId() {
         return orderQueryHelper.getCurrentUserId();
+    }
+
+    /**
+     * 数据权限校验：当前用户是否有权访问该订单，无权则抛 ORDER_NOT_FOUND（不暴露存在性）
+     */
+    private void validateDataScope(Long orderId) {
+        Long currentUserId = getCurrentUserId();
+        DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+        LambdaQueryWrapper<OrderMainEntity> scopeWrapper = new LambdaQueryWrapper<>();
+        scopeWrapper.eq(OrderMainEntity::getId, orderId);
+        orderQueryHelper.buildDataScopeCondition(scopeWrapper, currentUserId, scopeType);
+        if (count(scopeWrapper) == 0) {
+            log.warn("订单不在当前用户数据权限范围内，id={}, userId={}, scopeType={}", orderId, currentUserId, scopeType);
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
     }
 
     // ==================== 查询操作 ====================
@@ -361,6 +377,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
+            // 数据权限校验：防止横向越权
+            validateDataScope(id);
             // 校验 needsPhysicalDelivery 变更规则（不在订单阶段不允许修改，不允许从需要改为不需要）
             validateNeedsPhysicalDeliveryChange(entity, dto);
             // 排除不可变更字段后复制属性
@@ -430,6 +448,12 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
+            // 数据权限校验：只有创建人可删除（草稿状态订单）
+            Long currentUserId = getCurrentUserId();
+            if (!Objects.equals(entity.getCreateBy(), currentUserId)) {
+                log.warn("无权删除他人订单，id={}, createBy={}, currentUserId={}", id, entity.getCreateBy(), currentUserId);
+                throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+            }
             // 只允许删除草稿状态（status=1010）的订单，正式提交后的订单不可删除
             if (!FlowStatusEnum.DRAFT.getValue().equals(entity.getStatus())) {
                 log.warn("非草稿状态订单不允许删除，id={}, status={}", id, entity.getStatus());
@@ -480,6 +504,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
+            // 数据权限校验：只有创建人可提交
+            if (!Objects.equals(entity.getCreateBy(), currentUserId)) {
+                log.warn("无权提交他人订单，id={}, createBy={}, currentUserId={}", id, entity.getCreateBy(), currentUserId);
+                throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+            }
             // 校验无阻断性修改申请
             orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行提交动作，获取流转后的 phase 和 status
@@ -518,6 +547,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             OrderMainEntity entity = getById(id);
             if (entity == null) {
                 log.warn("订单不存在，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+            }
+            // 数据权限校验：只有创建人可撤回
+            if (!Objects.equals(entity.getCreateBy(), currentUserId)) {
+                log.warn("无权撤回他人订单，id={}, createBy={}, currentUserId={}", id, entity.getCreateBy(), currentUserId);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
             // 校验无阻断性修改申请
@@ -691,6 +725,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             } else {
                 log.warn("草稿无 operatorId，operatorDeptId/Name 将为 null，draftId={}", draft.getId());
             }
+
+            // 校验订单类型与机构资质是否匹配（与直提流程保持一致）
+            orderDataValidator.validateOrderType(draft.getOperatorId(), draft.getOrderType());
 
             save(order);
             Long orderId = order.getId();
@@ -970,12 +1007,16 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (orderFiles.isEmpty()) {
             return;
         }
+        // 批量查询文件详情（避免 N+1）
+        List<String> fileIds = orderFiles.stream().map(OrderFileEntity::getFileId).collect(Collectors.toList());
+        Map<String, FileVO> fileMap = fileService.listByIds(fileIds).stream()
+                .collect(Collectors.toMap(FileVO::getId, f -> f));
         // 按文件类别分组
         List<OrderDetailVO.OrderFileVO> imageDataFiles = new java.util.ArrayList<>();
         List<OrderDetailVO.OrderFileVO> imageReportFiles = new java.util.ArrayList<>();
         List<OrderDetailVO.OrderFileVO> approvalFiles = new java.util.ArrayList<>();
         for (OrderFileEntity orderFile : orderFiles) {
-            FileVO fileVO = fileService.getById(orderFile.getFileId());
+            FileVO fileVO = fileMap.get(orderFile.getFileId());
             if (fileVO == null) {
                 continue;
             }

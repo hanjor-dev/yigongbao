@@ -9,11 +9,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
+import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
+import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.design.vo.DesignColumnConfigVO;
+import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.system.config.service.ConfigService;
+import com.yigongbao.module.system.user.service.UserHospitalService;
+import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserService;
@@ -64,6 +69,9 @@ public class DesignQueryHelper {
     private final ConfigService configService;
     private final DictService dictService;
     private final ObjectMapper objectMapper;
+    private final OrderMainMapper orderMainMapper;
+    private final UserHospitalService userHospitalService;
+    private final OrderMainService orderMainService;
 
     // ==================== 当前用户 ====================
 
@@ -94,6 +102,25 @@ public class DesignQueryHelper {
     }
 
     // ==================== 数据权限 ====================
+
+    /**
+     * 校验当前用户是否有权查看指定订单（数据权限校验）
+     * 用于查询类接口入口，防止越权查询他人工单数据
+     *
+     * @param orderId 订单ID
+     * @throws BusinessException 无权限时抛出 ORDER_NOT_FOUND
+     */
+    public void checkOrderReadable(Long orderId) {
+        Long currentUserId = getCurrentUserId();
+        UserEntity currentUser = getCurrentUser();
+        DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+        LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(OrderMainEntity::getId, orderId);
+        buildDataScopeCondition(wrapper, currentUser, scopeType);
+        if (orderMainMapper.selectCount(wrapper) == 0) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+    }
 
     /**
      * 根据数据范围类型向查询条件注入数据权限过滤
@@ -317,5 +344,39 @@ public class DesignQueryHelper {
     public String getStatusName(Integer status) {
         FlowStatusEnum statusEnum = FlowStatusEnum.getByValue(status);
         return statusEnum != null ? statusEnum.getName() : null;
+    }
+
+    // ==================== 设计阶段公共校验 ====================
+
+    /**
+     * 校验订单存在且处于可操作的设计阶段（DESIGN_IN_PROGRESS 或 DESIGN_REVIEW_REJECTED）
+     */
+    public OrderMainEntity checkDesignPhase(Long orderId) {
+        OrderMainEntity order = orderMainService.getById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        FlowStatusEnum status = FlowStatusEnum.getByValue(order.getStatus());
+        if (status == null || !status.belongsTo(FlowPhaseEnum.DESIGN)) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+        }
+        if (status != FlowStatusEnum.DESIGN_IN_PROGRESS
+                && status != FlowStatusEnum.DESIGN_REVIEW_REJECTED) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+        }
+        return order;
+    }
+
+    /**
+     * 校验当前用户是该订单的指定设计师（仅对 designer 角色生效）
+     * 设计师管理员、系统管理员、超管等角色跳过本人校验。
+     */
+    public void checkIsAssignedDesigner(OrderMainEntity order) {
+        if (!StpUtil.hasPermission("design:EditFile")) {
+            Long currentUserId = StpUtil.getLoginIdAsLong();
+            if (!currentUserId.equals(order.getDesignerId())) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_OPERATOR_NOT_ALLOWED);
+            }
+        }
     }
 }

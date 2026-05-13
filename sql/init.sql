@@ -230,9 +230,7 @@ VALUES (76, 0, '13', '重建项目分类', NULL, 1, 13, 1);
 INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
 VALUES
 (77, 76, '13.1', '模型', 'model', 2, 1, 1),
-(78, 76, '13.2', '导板', 'guide', 2, 2, 1),
-(79, 76, '13.3', '假体', 'implant', 2, 3, 1),
-(80, 76, '13.4', '其他', 'other', 2, 4, 1);
+(78, 76, '13.2', '导板', 'guide', 2, 2, 1);
 
 -- ------------------------------------------------------------
 -- 订单修改申请类型（父节点 id=81，dict_code=14）
@@ -268,9 +266,7 @@ VALUES (90, 0, '16', '打印颜色', NULL, 1, 16, 1);
 INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
 VALUES
 (91, 90, '16.1', '白色', '17.1', 2, 1, 1),
-(92, 90, '16.2', '透明', '17.2', 2, 2, 1),
-(93, 90, '16.3', '肤色', '17.1', 2, 3, 1),
-(94, 90, '16.4', '蓝色', NULL,   2, 4, 1);
+(92, 90, '16.2', '透明', '17.2', 2, 2, 1);
 
 -- ------------------------------------------------------------
 -- 产品大类（父节点 id=95，dict_code=17）
@@ -282,8 +278,7 @@ VALUES (95, 0, '17', '产品大类', NULL, 1, 17, 1);
 INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
 VALUES
 (96, 95, '17.1', '模型类', 'MODEL', 2, 1, 1),
-(97, 95, '17.2', '导板类', 'GUIDE', 2, 2, 1),
-(98, 95, '17.3', '假体类', 'IMPLANT', 2, 3, 1);
+(97, 95, '17.2', '导板类', 'GUIDE', 2, 2, 1);
 
 
 -- ============================================================
@@ -370,7 +365,7 @@ VALUES
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
 VALUES
 ('manufacturer.org.id', '生产企业机构ID', '1', 'number', 'system', '系统预设唯一生产企业机构ID，不可动态创建', 1, 0, 10, 1),
-('unknown.hospital.org.id', '未知医院机构ID', '8', 'number', 'system', '提单时用于隐藏具体客户信息的占位医院ID，权限校验豁免', 1, 0, 11, 1),
+('unknown.hospital.org.id', '其他医院机构ID', '8', 'number', 'system', '提单时用于隐藏具体客户信息的占位医院ID，权限校验豁免', 1, 0, 11, 1),
 ('user.username.auto.generate', '用户名自动生成开关', 'true', 'boolean', 'system', 'true=后端按机构前缀+序号自动生成，false=前端手动输入', 1, 0, 21, 1);
 
 
@@ -555,35 +550,7 @@ VALUES
 -- ============================================================
 INSERT INTO sys_org (id, org_name, org_code, org_type, username_prefix, contact, phone, status)
 VALUES
-(1, '嘉一高科（内部）', 'ORG-0001', '1.1', 'jykg', '管理员', '13800000000', 1);
-
-
--- ============================================================
--- 机构种子数据（sys_org）
--- area_id 通过子查询按省级 area_code 获取，避免硬编码自增 id
--- 省级行政区划代码（area_code）：北京=110000，上海=310000，浙江=330000，广东=440000
--- ============================================================
-
--- 经销商（orgType=1.2）
-INSERT INTO sys_org (id, org_name, org_code, org_type, username_prefix, area_id, area_name, contact, phone, status)
-VALUES
-(2, '北京医疗器械经销有限公司', 'ORG-D-0001', '1.2', 'bjyq', 1, '北京市', '张经理', '13800000002', 1),
-(3, '广东医疗科技经销有限公司', 'ORG-D-0002', '1.2', 'gdyq', 2233, '广东省', '李经理', '13800000003', 1);
-
--- 医疗机构（orgType=1.3）
-INSERT INTO sys_org (id, org_name, org_code, org_type, area_id, area_name, contact, phone, status)
-VALUES
-(4, '北京协和医院', 'ORG-H-0001', '1.3', 1, '北京市', '张主任', '13800000004', 1),
-(5, '上海市第一人民医院', 'ORG-H-0002', '1.3', 894, '上海市', '李医生', '13800000005', 1),
-(6, '浙江大学医学院附属第一医院', 'ORG-H-0003', '1.3', 1045, '浙江省', '王医生', '13800000006', 1),
-(7, '广东省人民医院', 'ORG-H-0004', '1.3', 2233, '广东省', '陈医生', '13800000007', 1),
-(8, '其他医院', 'ORG-H-0000', '1.3', NULL, NULL, NULL, NULL, 1);
-
--- 经销商-医疗机构关联（sys_org_hospital）
-INSERT INTO sys_org_hospital (distributor_org_id, hospital_org_id)
-VALUES
-(2, 4), (2, 5),
-(3, 6), (3, 7);
+(1, '嘉一高科（内部）', 'ORG-0001', '1.1', 'jygk', '管理员', '13800000000', 1);
 
 
 -- ============================================================
@@ -744,27 +711,6 @@ INSERT INTO sys_role_resource (role_id, resource_id) VALUES
 
 
 -- ============================================================
--- 医院组合模板数据初始化（hospital_group_template）
--- ============================================================
-INSERT INTO hospital_group_template (id, template_name, template_code, template_desc, status, remark)
-VALUES
-(1, '北京市医院联盟', 'TPL-0001', '覆盖北京市主要三甲医院', 1, '用于北京地区业务拓展'),
-(2, '华东地区医院群', 'TPL-0002', '覆盖华东地区重点医院',   1, '用于华东区域业务'),
-(3, '广东省医院联盟', 'TPL-0003', '覆盖广东省主要医院',     1, '用于广东地区业务');
-
-
--- ============================================================
--- 医院组合模板明细数据初始化（hospital_group_template_detail）
--- ============================================================
-INSERT INTO hospital_group_template_detail (id, template_id, hospital_id)
-VALUES
-(1, 1, 4),
-(2, 2, 5),
-(3, 2, 6),
-(4, 3, 7);
-
-
--- ============================================================
 -- 编码规则数据初始化（sys_code_rule）
 -- 仅保留代码中实际调用的规则（通过 CodeRuleConstants 或硬编码字符串调用）
 -- ============================================================
@@ -801,77 +747,12 @@ VALUES
 ('HDEPT-0009', '其他科室', 9, 1);
 
 
--- -- ============================================================
--- -- 重建部位数据初始化（rebuild_body_part）
--- -- 平级结构，直接列出所有具体部位
--- -- ============================================================
-INSERT INTO rebuild_body_part (id, name, code, sort, status, remark, scope, create_time, update_time, create_by, update_by, is_deleted)
-VALUES
-(1, '头颈', 'BP-0001', 0, 1, NULL, '{"x":0.3807583867458058,"y":0.03811484718472379,"w":0.28001296039804896,"h":0.16117593298799132}', NOW(), NOW(), 1, 1, 0),
-(2, '腹部', 'BP-0002', 1, 1, NULL, '{"x":0.2840872456560032,"y":0.3577329175973382,"w":0.49668965594415837,"h":0.165454940058469}', NOW(), NOW(), 1, 1, 0);
-
-
--- -- ============================================================
--- -- 重建项目数据初始化（rebuild_project）
--- -- 层级结构：部位（body_part_id） → 重建项目（level=1） → 子重建项目（level=2）
--- -- ============================================================
-INSERT INTO rebuild_project (id, body_part_id, parent_id, name, code, level, standard_price, urgent_price, category_code, category_name, estimated_hours, description, forming_requirements, sort, status, specialty, remark, create_time, update_time, create_by, update_by, is_deleted)
-VALUES
--- 头颈重建（body_part_id=1）
-(1, 1, 0, '头部测试项目1', 'RP-0001', 1, NULL, NULL, '13.1', '模型', NULL, '头部测试项目1项目说明1111111', '头部测试项目1成型需求2222222', 0, 1, '7.1', NULL, NOW(), NOW(), 1, 1, 0),
-(2, 1, 0, '颈部测试项目1', 'RP-0002', 1, NULL, NULL, '13.2', '导板', NULL, '颈部测试项目1项目说明1111111', '颈部测试项目1成型续期2222', 1, 1, '7.2', NULL, NOW(), NOW(), 1, 1, 0),
--- 腹部重建（body_part_id=2）
-(3, 2, 0, '腹部项目A', 'RP-0003', 1, NULL, NULL, '13.1', '模型', NULL, NULL, NULL, 0, 1, '7.4', NULL, NOW(), NOW(), 1, 1, 0);
-
-
--- ============================================================
--- 注册证数据初始化（registration_cert）
--- ============================================================
-INSERT INTO registration_cert (id, cert_code, cert_name, valid_from, valid_to, status)
-VALUES
-(1, '国械注准20243130001', '颅骨修补模型注册证', '2024-01-01', '2029-12-31', 1),
-(2, '国械注准20243130002', '颌面导板注册证',     '2024-01-01', '2029-12-31', 1),
-(3, '国械注准20243130003', '颅骨修补假体注册证', '2024-01-01', '2029-12-31', 1);
-
-
--- ============================================================
--- 产品数据初始化（product）
--- 覆盖三大类：17.1 模型类 / 17.2 导板类 / 17.3 假体类
--- ============================================================
-INSERT INTO product (id, product_name, category, category_name, status)
-VALUES
-(1, '颅骨修补模型', '17.1', '模型类', 1),
-(2, '颌面导板', '17.2', '导板类', 1),
-(3, '颅骨修补假体', '17.3', '假体类', 1);
-
-
--- ============================================================
--- 产品规格数据初始化（product_spec）
--- cert_id 引用 registration_cert.id；cert_no 为冗余字段
--- ============================================================
-INSERT INTO product_spec (id, product_id, spec_name, cert_id, cert_no, sort, status)
-VALUES
--- 颅骨修补模型（product_id=1）规格
-(1, 1, 'S号', 1, '国械注准20243130001', 1, 1),
-(2, 1, 'M号', 1, '国械注准20243130001', 2, 1),
-(3, 1, 'L号', 1, '国械注准20243130001', 3, 1),
--- 颌面导板（product_id=2）规格
-(4, 2, '标准型', 2, '国械注准20243130002', 1, 1),
-(5, 2, '定制型', 2, '国械注准20243130002', 2, 1),
--- 颅骨修补假体（product_id=3）规格
-(6, 3, '小号', 3, '国械注准20243130003', 1, 1),
-(7, 3, '大号', 3, '国械注准20243130003', 2, 1);
-
-
 -- ============================================================
 -- 编码序号同步（sys_code_rule.current_value）
 -- 编码生成器首次调用时以此值为初始序号，确保新生成的编码不与已有种子数据冲突
 -- 注意：必须在对应业务表数据插入之后执行
 -- ============================================================
-UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_group_template) WHERE rule_code = 'TEMPLATE_NO';
 UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM hospital_dept)          WHERE rule_code = 'HDEPT_NO';
-UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM rebuild_body_part)      WHERE rule_code = 'BODYPART_NO';
-UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM rebuild_project)        WHERE rule_code = 'PROJECT_NO';
 UPDATE sys_code_rule SET current_value = (SELECT COUNT(*) FROM sys_org)                WHERE rule_code = 'ORG_NO';
 
 

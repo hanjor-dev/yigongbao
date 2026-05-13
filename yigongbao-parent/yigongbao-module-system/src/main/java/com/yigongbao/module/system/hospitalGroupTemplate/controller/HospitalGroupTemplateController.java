@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.system.hospitalGroupTemplate.dto.CreateHospitalGroupTemplateDTO;
 import com.yigongbao.module.system.hospitalGroupTemplate.dto.HospitalGroupTemplatePageDTO;
@@ -53,6 +54,7 @@ public class HospitalGroupTemplateController {
     }
 
     @Operation(summary = "创建医院组合模板")
+    @RequirePermission("hospital-Temp:Add")
     @OperationLog(module = "系统管理", businessType = OperationTypeEnum.CREATE, operation = "创建医院组合模板")
     @PostMapping
     public Result<Void> create(@Valid @RequestBody CreateHospitalGroupTemplateDTO dto) {
@@ -61,6 +63,7 @@ public class HospitalGroupTemplateController {
     }
 
     @Operation(summary = "更新医院组合模板")
+    @RequirePermission("hospital-Temp:Edit")
     @OperationLog(module = "系统管理", businessType = OperationTypeEnum.UPDATE, operation = "更新医院组合模板")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @Valid @RequestBody UpdateHospitalGroupTemplateDTO dto) {
@@ -69,6 +72,7 @@ public class HospitalGroupTemplateController {
     }
 
     @Operation(summary = "删除医院组合模板")
+    @RequirePermission("hospital-Temp:Delete")
     @OperationLog(module = "系统管理", businessType = OperationTypeEnum.DELETE, operation = "删除医院组合模板")
     @DeleteMapping("/{id}")
     public Result<Void> remove(@PathVariable Long id) {
@@ -77,6 +81,7 @@ public class HospitalGroupTemplateController {
     }
 
     @Operation(summary = "修改医院组合模板状态")
+    @RequirePermission("hospital-Temp:Status")
     @OperationLog(module = "系统管理", businessType = OperationTypeEnum.UPDATE, operation = "修改医院组合模板状态")
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(

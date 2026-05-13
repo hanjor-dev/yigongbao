@@ -1,6 +1,5 @@
 package com.yigongbao.module.design.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -10,8 +9,6 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.flow.enums.FlowPhaseEnum;
-import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
@@ -69,6 +66,7 @@ public class DesignFileServiceImpl implements DesignFileService {
     private final FileService fileService;
     private final CodeGeneratorService codeGeneratorService;
     private final ConfigService configService;
+    private final com.yigongbao.module.design.helper.DesignQueryHelper designQueryHelper;
 
     // ==================== 数据包 ====================
 
@@ -77,8 +75,14 @@ public class DesignFileServiceImpl implements DesignFileService {
     public DesignPackageVO uploadPackage(Long orderId, MultipartFile file) {
         log.info("上传数据包, orderId={}, fileName={}", orderId, file.getOriginalFilename());
 
+        // 0. 校验文件非空
+        if (file.isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "上传文件不能为空");
+        }
+
         // 1. 校验工单状态和操作权限
-        OrderMainEntity order = checkOrderAndPermission(orderId);
+        OrderMainEntity order = checkDesignPhase(orderId);
+        checkIsAssignedDesigner(order);
 
         // 2. 校验压缩包容器格式（由配置决定允许的格式）
         String fileName = file.getOriginalFilename();
@@ -185,7 +189,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         log.info("删除数据包, orderId={}, packageId={}", orderId, packageId);
 
         // 1. 校验工单状态和操作权限
-        checkOrderAndPermission(orderId);
+        checkIsAssignedDesigner(checkDesignPhase(orderId));
 
         // 2. 查询数据包
         DesignPackageEntity packageEntity = packageService.getById(packageId);
@@ -199,16 +203,31 @@ public class DesignFileServiceImpl implements DesignFileService {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_HAS_PRODUCTS);
         }
 
-        // 4. 检查是否已生成指令单或图纸（有则拒绝删除，防止产生孤儿记录）
-        long instructionCount = instructionService.count(
+        // 4. 检查是否已生成指令单或图纸，有则先清理 OSS 文件再删除记录
+        List<com.yigongbao.module.design.entity.DesignInstructionEntity> instructions = instructionService.list(
                 new LambdaQueryWrapper<com.yigongbao.module.design.entity.DesignInstructionEntity>()
                         .eq(com.yigongbao.module.design.entity.DesignInstructionEntity::getPackageId, packageId));
-        long drawingCount = drawingService.count(
+        for (com.yigongbao.module.design.entity.DesignInstructionEntity inst : instructions) {
+            if (inst.getTemplateFileId() != null) fileService.deleteById(inst.getTemplateFileId());
+            if (inst.getRevisedFileId() != null) fileService.deleteById(inst.getRevisedFileId());
+        }
+        if (!instructions.isEmpty()) {
+            instructionService.remove(new LambdaQueryWrapper<com.yigongbao.module.design.entity.DesignInstructionEntity>()
+                    .eq(com.yigongbao.module.design.entity.DesignInstructionEntity::getPackageId, packageId));
+        }
+
+        List<com.yigongbao.module.design.entity.DesignDrawingEntity> drawings = drawingService.list(
                 new LambdaQueryWrapper<com.yigongbao.module.design.entity.DesignDrawingEntity>()
                         .eq(com.yigongbao.module.design.entity.DesignDrawingEntity::getPackageId, packageId));
-        if (instructionCount > 0 || drawingCount > 0) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_HAS_DOCS);
+        for (com.yigongbao.module.design.entity.DesignDrawingEntity drawing : drawings) {
+            if (drawing.getTemplateFileId() != null) fileService.deleteById(drawing.getTemplateFileId());
+            if (drawing.getRevisedFileId() != null) fileService.deleteById(drawing.getRevisedFileId());
         }
+        if (!drawings.isEmpty()) {
+            drawingService.remove(new LambdaQueryWrapper<com.yigongbao.module.design.entity.DesignDrawingEntity>()
+                    .eq(com.yigongbao.module.design.entity.DesignDrawingEntity::getPackageId, packageId));
+        }
+        log.info("指令单/图纸 OSS 文件及记录清理完成, packageId={}", packageId);
 
         // 4. 删除包内文件的独立 OSS 存储（先查出文件ID，再批量删除）
         List<DesignPackageFileEntity> innerFiles = packageFileService.list(
@@ -251,6 +270,7 @@ public class DesignFileServiceImpl implements DesignFileService {
 
     @Override
     public List<DesignPackageVO> listPackages(Long orderId) {
+        designQueryHelper.checkOrderReadable(orderId);
         // 1. 查询数据包列表
         List<DesignPackageEntity> packages = packageService.list(
                 new LambdaQueryWrapper<DesignPackageEntity>()
@@ -293,7 +313,7 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Override
     public List<DesignPackageFileVO> listPackageFiles(Long orderId, Long packageId) {
         log.info("查询包内文件列表，orderId={}，packageId={}", orderId, packageId);
-
+        designQueryHelper.checkOrderReadable(orderId);
         // 1. 校验数据包归属
         DesignPackageEntity pkg = packageService.getById(packageId);
         if (pkg == null || !pkg.getOrderId().equals(orderId)) {
@@ -331,7 +351,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         log.info("批量关联可视化模型, orderId={}, fileIds={}", orderId, fileIds);
 
         // 1. 校验工单状态和操作权限
-        checkOrderAndPermission(orderId);
+        checkIsAssignedDesigner(checkDesignPhase(orderId));
 
         // 2. 批量校验文件是否存在（类型和大小已在上传时由 FileService/Provider 校验）
         List<FileVO> fileVOs = fileService.listByIds(fileIds);
@@ -371,7 +391,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         log.info("删除可视化模型, orderId={}, modelId={}", orderId, modelId);
 
         // 1. 校验工单状态和操作权限
-        checkOrderAndPermission(orderId);
+        checkIsAssignedDesigner(checkDesignPhase(orderId));
 
         // 2. 查询模型
         DesignModelEntity modelEntity = modelService.getById(modelId);
@@ -422,7 +442,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         log.info("关联设计报告, orderId={}, fileId={}", orderId, fileId);
 
         // 1. 校验工单状态和操作权限
-        checkOrderAndPermission(orderId);
+        checkIsAssignedDesigner(checkDesignPhase(orderId));
 
         // 2. 校验文件是否存在（类型和大小已在上传时由 FileService/Provider 校验）
         FileVO fileVO = fileService.getById(fileId);
@@ -447,7 +467,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         log.info("删除设计报告, orderId={}, fileId={}", orderId, fileId);
 
         // 1. 校验工单状态和操作权限
-        checkOrderAndPermission(orderId);
+        checkIsAssignedDesigner(checkDesignPhase(orderId));
 
         // 2. 校验文件归属
         FileVO fileVO = fileService.getById(fileId);
@@ -470,38 +490,12 @@ public class DesignFileServiceImpl implements DesignFileService {
 
     // ==================== 私有方法 ====================
 
-    /**
-     * 校验工单状态和操作权限
-     *
-     * @param orderId 订单ID
-     * @return 订单实体
-     */
-    private OrderMainEntity checkOrderAndPermission(Long orderId) {
-        // 1. 查询订单
-        OrderMainEntity order = orderMainService.getById(orderId);
-        if (order == null) {
-            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
-        }
+    private OrderMainEntity checkDesignPhase(Long orderId) {
+        return designQueryHelper.checkDesignPhase(orderId);
+    }
 
-        // 2. 校验阶段（必须在设计阶段）
-        FlowStatusEnum status = FlowStatusEnum.getByValue(order.getStatus());
-        if (status == null || !status.belongsTo(FlowPhaseEnum.DESIGN)) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
-        }
-
-        // 3. 校验状态（设计中或设计审核不通过才能操作）
-        if (status != FlowStatusEnum.DESIGN_IN_PROGRESS
-                && status != FlowStatusEnum.DESIGN_REVIEW_REJECTED) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
-        }
-
-        // 4. 校验操作人（必须是当前设计师）
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-        if (!currentUserId.equals(order.getDesignerId())) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_OPERATOR_NOT_ALLOWED);
-        }
-
-        return order;
+    private void checkIsAssignedDesigner(OrderMainEntity order) {
+        designQueryHelper.checkIsAssignedDesigner(order);
     }
 
     /**

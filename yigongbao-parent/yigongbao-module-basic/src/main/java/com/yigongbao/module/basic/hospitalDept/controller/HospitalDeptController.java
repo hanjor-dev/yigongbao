@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.hospitalDept.dto.CreateHospitalDeptDTO;
 import com.yigongbao.module.basic.hospitalDept.dto.HospitalDeptListDTO;
@@ -69,6 +70,7 @@ public class HospitalDeptController {
      * 创建科室
      */
     @Operation(summary = "创建科室")
+    @RequirePermission("hospital-dept:Add")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.CREATE,
@@ -84,6 +86,7 @@ public class HospitalDeptController {
      * 更新科室
      */
     @Operation(summary = "更新科室")
+    @RequirePermission("hospital-dept:Edit")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -99,6 +102,7 @@ public class HospitalDeptController {
      * 删除科室
      */
     @Operation(summary = "删除科室")
+    @RequirePermission("hospital-dept:Delete")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.DELETE,
@@ -114,6 +118,7 @@ public class HospitalDeptController {
      * 修改状态
      */
     @Operation(summary = "修改科室状态")
+    @RequirePermission("hospital-dept:Status")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.UPDATE,

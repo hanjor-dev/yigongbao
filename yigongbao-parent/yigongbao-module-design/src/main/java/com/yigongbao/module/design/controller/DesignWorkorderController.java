@@ -2,6 +2,7 @@ package com.yigongbao.module.design.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
 import com.yigongbao.module.design.service.DesignWorkorderService;
 import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
@@ -30,6 +31,7 @@ public class DesignWorkorderController {
      * 分页查询设计工单列表
      */
     @Operation(summary = "分页查询设计工单列表")
+    @RequirePermission(value = "design:View")
     @PostMapping("/list")
     public Result<IPage<DesignWorkorderListVO>> listWorkorders(@Validated @RequestBody DesignWorkorderQueryDTO queryDTO) {
         return Result.success(designWorkorderService.listWorkorders(queryDTO));
@@ -39,6 +41,7 @@ public class DesignWorkorderController {
      * 获取设计工单详情
      */
     @Operation(summary = "获取设计工单详情")
+    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}")
     public Result<DesignWorkorderDetailVO> getWorkorderDetail(@PathVariable Long orderId) {
         return Result.success(designWorkorderService.getWorkorderDetail(orderId));
@@ -49,6 +52,7 @@ public class DesignWorkorderController {
      * 仅分配给本人的订单，状态必须为待设计（PENDING_DESIGN）
      */
     @Operation(summary = "设计师开始设计")
+    @RequirePermission(value = "design:StartDesign")
     @PostMapping("/{orderId}/start-design")
     public Result<Void> startDesign(@PathVariable Long orderId) {
         designWorkorderService.startDesign(orderId);
@@ -60,6 +64,7 @@ public class DesignWorkorderController {
      * POST /design/workorder/{orderId}/continue-design
      */
     @Operation(summary = "驳回后继续修改")
+    @RequirePermission(value = "design:ContinueDesign")
     @PostMapping("/{orderId}/continue-design")
     public Result<Void> continueDesign(@PathVariable Long orderId) {
         designWorkorderService.continueDesign(orderId);
@@ -71,6 +76,7 @@ public class DesignWorkorderController {
      * POST /design/workorder/{orderId}/submit-design
      */
     @Operation(summary = "提交设计审核")
+    @RequirePermission(value = "design:submitCheck")
     @PostMapping("/{orderId}/submit-design")
     public Result<Void> submitDesign(@PathVariable Long orderId) {
         designWorkorderService.submitDesign(orderId);

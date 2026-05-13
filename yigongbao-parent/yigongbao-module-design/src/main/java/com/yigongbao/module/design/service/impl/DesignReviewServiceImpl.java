@@ -143,7 +143,7 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
             reviewRecord.setOrderId(orderId);
             reviewRecord.setReviewerId(reviewerId);
             reviewRecord.setReviewerName(reviewerName);
-            reviewRecord.setReviewResult(1);
+            reviewRecord.setReviewResult(ReviewResultEnum.PASS.getCode());
             reviewRecord.setComment(dto != null ? dto.getComment() : null);
             reviewRecord.setReviewTime(LocalDateTime.now());
             save(reviewRecord);
@@ -213,7 +213,7 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
             reviewRecord.setOrderId(orderId);
             reviewRecord.setReviewerId(reviewerId);
             reviewRecord.setReviewerName(reviewerName);
-            reviewRecord.setReviewResult(0);
+            reviewRecord.setReviewResult(ReviewResultEnum.REJECT.getCode());
             reviewRecord.setRejectReason(dto.getRejectReason());
             reviewRecord.setReviewTime(LocalDateTime.now());
             save(reviewRecord);

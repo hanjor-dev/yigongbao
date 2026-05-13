@@ -1,6 +1,7 @@
 package com.yigongbao.module.design.controller;
 
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.dto.SaveDesignColumnConfigDTO;
 import com.yigongbao.module.design.service.DesignWorkorderService;
 import com.yigongbao.module.design.vo.DesignColumnConfigVO;
@@ -28,6 +29,7 @@ public class DesignColumnConfigController {
      * 获取当前用户的列配置
      */
     @Operation(summary = "获取列配置")
+    @RequirePermission(value = "design:View")
     @GetMapping
     public Result<DesignColumnConfigVO> getColumnConfig() {
         return Result.success(designWorkorderService.getColumnConfig());
@@ -37,6 +39,7 @@ public class DesignColumnConfigController {
      * 保存当前用户的列配置
      */
     @Operation(summary = "保存列配置")
+    @RequirePermission(value = "design:View")
     @PostMapping
     public Result<Void> saveColumnConfig(@Validated @RequestBody SaveDesignColumnConfigDTO dto) {
         designWorkorderService.saveColumnConfig(dto);

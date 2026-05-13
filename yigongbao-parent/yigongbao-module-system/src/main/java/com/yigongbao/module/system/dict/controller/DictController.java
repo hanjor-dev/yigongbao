@@ -3,6 +3,7 @@ package com.yigongbao.module.system.dict.controller;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -112,6 +113,7 @@ public class DictController {
      * @return 创建结果
      */
     @Operation(summary = "创建字典")
+    @RequirePermission("dict:Add")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.CREATE,
@@ -131,6 +133,7 @@ public class DictController {
      * @return 更新结果
      */
     @Operation(summary = "更新字典")
+    @RequirePermission("dict:Edit")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -149,6 +152,7 @@ public class DictController {
      * @return 删除结果
      */
     @Operation(summary = "删除字典")
+    @RequirePermission("dict:Delete")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.DELETE,
@@ -168,6 +172,7 @@ public class DictController {
      * @return 操作结果
      */
     @Operation(summary = "修改字典状态（级联）")
+    @RequirePermission("dict:Status")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.UPDATE,

@@ -758,6 +758,9 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
                 .map(DesignPackageEntity::getId)
                 .collect(Collectors.toSet());
 
+        List<DesignInstructionEntity> instructions = Collections.emptyList();
+        List<DesignDrawingEntity> drawings = Collections.emptyList();
+
         if (!packages.isEmpty()) {
             // 2. 打印信息：每个数据包都有至少一条 design_product 记录
             List<DesignProductEntity> products = designProductMapper.selectList(
@@ -770,7 +773,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             check.setHasPrintInfo(pkgsWithProduct.containsAll(packageIds));
 
             // 3. 指令单：每个数据包都有 design_instruction 记录
-            List<DesignInstructionEntity> instructions = designInstructionMapper.selectList(
+            instructions = designInstructionMapper.selectList(
                     new LambdaQueryWrapper<DesignInstructionEntity>()
                             .in(DesignInstructionEntity::getPackageId, packageIds)
                             .eq(DesignInstructionEntity::getIsDeleted, StatusConstants.NOT_DELETED));
@@ -780,7 +783,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             check.setHasInstruction(pkgsWithInstruction.containsAll(packageIds));
 
             // 4. 图纸：每个数据包都有 design_drawing 记录
-            List<DesignDrawingEntity> drawings = designDrawingMapper.selectList(
+            drawings = designDrawingMapper.selectList(
                     new LambdaQueryWrapper<DesignDrawingEntity>()
                             .in(DesignDrawingEntity::getPackageId, packageIds)
                             .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED));
@@ -808,17 +811,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
 
         // 7. 修订版文件校验已废弃——提交校验直接检查 isConfirmed（见下方步骤8/9）
 
-        // 8. 图纸确认状态：所有数据包的最新版图纸都必须已确认（is_confirmed=1）
+        // 8. 图纸确认状态：复用步骤4已查询的 drawings，按 versionSeq 倒序取各包最新版
         if (!packages.isEmpty()) {
-            List<DesignDrawingEntity> allDrawingsForConfirm = designDrawingMapper.selectList(
-                    new LambdaQueryWrapper<DesignDrawingEntity>()
-                            .in(DesignDrawingEntity::getPackageId, packageIds)
-                            .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED)
-                            .orderByDesc(DesignDrawingEntity::getVersionSeq));
             Map<Long, DesignDrawingEntity> latestDrawingByPkg = new java.util.LinkedHashMap<>();
-            for (DesignDrawingEntity drawing : allDrawingsForConfirm) {
-                latestDrawingByPkg.putIfAbsent(drawing.getPackageId(), drawing);
-            }
+            drawings.stream()
+                    .sorted((a, b) -> Integer.compare(b.getVersionSeq(), a.getVersionSeq()))
+                    .forEach(d -> latestDrawingByPkg.putIfAbsent(d.getPackageId(), d));
             boolean allDrawingConfirmed = packageIds.stream().allMatch(pkgId -> {
                 DesignDrawingEntity drawing = latestDrawingByPkg.get(pkgId);
                 return drawing != null && Objects.equals(StatusConstants.CONFIRMED, drawing.getIsConfirmed());
@@ -828,17 +826,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             check.setHasDrawingConfirmed(true);
         }
 
-        // 9. 指令单确认状态：所有数据包的最新版指令单都必须已确认（is_confirmed=1）
+        // 9. 指令单确认状态：复用步骤3已查询的 instructions，按 versionSeq 倒序取各包最新版
         if (!packages.isEmpty()) {
-            List<DesignInstructionEntity> allInstructionsForConfirm = designInstructionMapper.selectList(
-                    new LambdaQueryWrapper<DesignInstructionEntity>()
-                            .in(DesignInstructionEntity::getPackageId, packageIds)
-                            .eq(DesignInstructionEntity::getIsDeleted, StatusConstants.NOT_DELETED)
-                            .orderByDesc(DesignInstructionEntity::getVersionSeq));
             Map<Long, DesignInstructionEntity> latestInstructionByPkg = new java.util.LinkedHashMap<>();
-            for (DesignInstructionEntity inst : allInstructionsForConfirm) {
-                latestInstructionByPkg.putIfAbsent(inst.getPackageId(), inst);
-            }
+            instructions.stream()
+                    .sorted((a, b) -> Integer.compare(b.getVersionSeq(), a.getVersionSeq()))
+                    .forEach(i -> latestInstructionByPkg.putIfAbsent(i.getPackageId(), i));
             boolean allInstructionConfirmed = packageIds.stream().allMatch(pkgId -> {
                 DesignInstructionEntity inst = latestInstructionByPkg.get(pkgId);
                 return inst != null && Objects.equals(StatusConstants.CONFIRMED, inst.getIsConfirmed());

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.registrationCert.dto.CreateRegistrationCertDTO;
 import com.yigongbao.module.basic.registrationCert.dto.RegistrationCertPageDTO;
@@ -61,6 +62,7 @@ public class RegistrationCertController {
      * @return 操作结果
      */
     @Operation(summary = "创建注册证")
+    @RequirePermission("registration-cert:Add")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.CREATE,
@@ -80,6 +82,7 @@ public class RegistrationCertController {
      * @return 操作结果
      */
     @Operation(summary = "更新注册证信息")
+    @RequirePermission("registration-cert:Edit")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -98,6 +101,7 @@ public class RegistrationCertController {
      * @return 操作结果
      */
     @Operation(summary = "删除注册证")
+    @RequirePermission("registration-cert:Delete")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.DELETE,

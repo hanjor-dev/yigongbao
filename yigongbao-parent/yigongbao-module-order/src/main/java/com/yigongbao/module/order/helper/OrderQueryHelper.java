@@ -487,7 +487,7 @@ public class OrderQueryHelper {
      * @param phase 阶段值（1=订单，2=设计，3=打印，4=后处理，5=质检，6=仓储，7=确认，8=完成）
      * @return 阶段名称
      */
-    private String getPhaseName(Integer phase) {
+    public String getPhaseName(Integer phase) {
         FlowPhaseEnum phaseEnum = FlowPhaseEnum.getByValue(phase);
         return phaseEnum != null ? phaseEnum.getName() : null;
     }

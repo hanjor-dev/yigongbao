@@ -194,7 +194,11 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         apply.setStatus(ModifyApplyStatusEnum.PENDING.getCode());
         apply.setApplicantId(StpUtil.getLoginIdAsLong());
         apply.setApplicantName(getCurrentUserName());
-        orderModifyApplyMapper.insert(apply);
+        try {
+            orderModifyApplyMapper.insert(apply);
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_EXISTS);
+        }
 
         log.info("发起修改申请成功，applyId={}", apply.getId());
         return toApplyVO(apply);
@@ -205,11 +209,11 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
      */
     private void validateApplyTypes(String applyTypes) {
         if (StrUtil.isBlank(applyTypes)) {
-            throw new BusinessException(400, "申请类型不能为空");
+            throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "申请类型");
         }
         for (String type : applyTypes.split(",")) {
             if (ModifyApplyTypeEnum.getByDictCode(type.trim()) == null) {
-                throw new BusinessException(400, "存在无效的申请类型：" + type.trim());
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "申请类型：" + type.trim());
             }
         }
     }
@@ -667,6 +671,11 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             newItems = List.of();
         }
 
+        // 提前校验：不允许将所有明细删除
+        if (newItems.isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_ITEM_REQUIRED);
+        }
+
         // 读取 14.3 配置的 item 子字段列表（用于留痕对比）
         ModifyApplyFieldConfigDTO.TypeConfig itemTypeConfig =
                 fieldConfig.getTypeConfig(ModifyApplyTypeEnum.ITEM.getDictCode());
@@ -687,7 +696,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         for (Map<String, Object> item : newItems) {
             Long orderItemId = Convert.convert(Long.class, item.get("orderItemId"));
             if (orderItemId != null && !validItemIds.contains(orderItemId)) {
-                throw new BusinessException(400, "重建项目ID不属于当前订单：" + orderItemId);
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "重建项目ID不属于当前订单");
             }
         }
 
@@ -749,15 +758,6 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             recordModificationLog(order.getId(), order.getOrderCode(), applyId,
                     "item_" + deletedItem.getId(), "删除重建项目",
                     deletedItem.getProjectName(), null, modifierId, modifierName);
-        }
-
-        // 校验执行后订单明细数量不能为0
-        long remainingCount = orderItemMapper.selectCount(
-                new LambdaQueryWrapper<OrderItemEntity>()
-                        .eq(OrderItemEntity::getOrderId, order.getId())
-                        .eq(OrderItemEntity::getIsDeleted, 0));
-        if (remainingCount == 0) {
-            throw new BusinessException(ErrorCodeEnum.ORDER_ITEM_REQUIRED);
         }
     }
 

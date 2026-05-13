@@ -486,7 +486,8 @@ public class OrderDataValidator {
         }
         // 未知医院（占位医院）豁免权限校验，任何用户均可选择
         String unknownHospitalIdStr = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
-        if (unknownHospitalIdStr != null && hospitalId.equals(Long.parseLong(unknownHospitalIdStr))) {
+        Long unknownHospitalId = cn.hutool.core.convert.Convert.toLong(unknownHospitalIdStr, null);
+        if (unknownHospitalId != null && hospitalId.equals(unknownHospitalId)) {
             return;
         }
         if (!userHospitalService.hasPermissionOnHospital(userId, hospitalId)) {

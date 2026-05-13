@@ -2,6 +2,7 @@ package com.yigongbao.module.order.task;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.yigongbao.module.order.entity.OrderDraftEntity;
+import com.yigongbao.module.order.enums.OrderDraftStatusEnum;
 import com.yigongbao.module.order.mapper.OrderDraftMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,10 +36,10 @@ public class OrderDraftCleanupTask {
             // 批量更新：将所有已过期且状态为"有效"的草稿直接更新为"已过期"
             int updated = orderDraftMapper.update(null,
                     new LambdaUpdateWrapper<OrderDraftEntity>()
-                            .set(OrderDraftEntity::getStatus, 3)
+                            .set(OrderDraftEntity::getStatus, OrderDraftStatusEnum.EXPIRED.getCode())
                             .lt(OrderDraftEntity::getExpiresAt, now)
                             .eq(OrderDraftEntity::getIsDeleted, 0)
-                            .eq(OrderDraftEntity::getStatus, 1)
+                            .eq(OrderDraftEntity::getStatus, OrderDraftStatusEnum.VALID.getCode())
             );
             log.info("过期草稿清理完成，清理数量：{}", updated);
         } catch (Exception e) {

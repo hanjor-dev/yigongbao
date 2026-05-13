@@ -20,6 +20,7 @@ import com.yigongbao.module.order.entity.OrderDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
 import com.yigongbao.module.order.mapper.OrderDraftMapper;
 import com.yigongbao.module.order.mapper.OrderItemDraftMapper;
+import com.yigongbao.module.order.enums.OrderDraftStatusEnum;
 import com.yigongbao.module.order.service.OrderDraftService;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.validator.OrderDataValidator;
@@ -96,7 +97,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             LambdaQueryWrapper<OrderDraftEntity> wrapper = new LambdaQueryWrapper<>();
             // 仅查询当前用户的草稿，排除已提交的草稿，按创建时间倒序
             wrapper.eq(OrderDraftEntity::getOperatorId, currentUserId)
-                    .ne(OrderDraftEntity::getStatus, 2)
+                    .ne(OrderDraftEntity::getStatus, OrderDraftStatusEnum.SUBMITTED.getCode())
                     .orderByDesc(OrderDraftEntity::getCreateTime);
             IPage<OrderDraftEntity> pageResult = page(page, wrapper);
 
@@ -202,9 +203,14 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
                     throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_MINE);
                 }
                 // 草稿已提交后不能再修改
-                if (entity.getStatus() != null && entity.getStatus() == 2) {
+                if (entity.getStatus() != null && entity.getStatus() == OrderDraftStatusEnum.SUBMITTED.getCode()) {
                     log.warn("草稿已提交，不能修改，id={}", dto.getId());
                     throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_ALREADY_SUBMITTED);
+                }
+                // 草稿已过期后不能再修改
+                if (entity.getExpiresAt() != null && entity.getExpiresAt().isBefore(LocalDateTime.now())) {
+                    log.warn("草稿已过期，不能修改，id={}", dto.getId());
+                    throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_EXPIRED);
                 }
             } else {
                 // 新增
@@ -221,7 +227,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
                 String expireDaysStr = configService.getConfigValue(SystemConfigKeyEnum.ORDER_DRAFT_EXPIRE_DAYS.getKey());
                 int expireDays = StrUtil.isNotBlank(expireDaysStr) ? Integer.parseInt(expireDaysStr) : 30;
                 entity.setExpiresAt(LocalDateTime.now().plusDays(expireDays));
-                entity.setStatus(1);
+                entity.setStatus(OrderDraftStatusEnum.VALID.getCode());
             }
             // 显式赋值允许前端设置的纯业务字段（白名单）
             // 以下字段不在此处赋值，原因：
@@ -336,7 +342,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
                 throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_MINE);
             }
             // 草稿已提交后不能删除
-            if (entity.getStatus() != null && entity.getStatus() == 2) {
+            if (entity.getStatus() != null && entity.getStatus() == OrderDraftStatusEnum.SUBMITTED.getCode()) {
                 log.warn("草稿已提交，不能删除，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_ALREADY_SUBMITTED);
             }
@@ -385,7 +391,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
                 throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_MINE);
             }
             // 草稿已提交后不能再提交
-            if (entity.getStatus() != null && entity.getStatus() == 2) {
+            if (entity.getStatus() != null && entity.getStatus() == OrderDraftStatusEnum.SUBMITTED.getCode()) {
                 log.warn("草稿已提交，不能重复提交，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_ALREADY_SUBMITTED);
             }
@@ -396,6 +402,12 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             }
             // 校验业务类型
             validateBusinessType(entity.getBusinessType());
+            // 以 SUBMIT 模式全量校验主表必填字段（草稿保存时是 DRAFT 模式，允许不完整）
+            orderDataValidator.validateAndFillMaster(
+                    entity,
+                    entity.getOrgId(), entity.getHospitalId(),
+                    entity.getDoctorId(), entity.getDoctorName(), entity.getDoctorPhone(),
+                    currentUserId, OrderDataValidator.ValidateMode.SUBMIT);
             // 校验重建项目至少1条
             long itemCount = orderItemDraftMapper.selectCount(
                     new LambdaQueryWrapper<OrderItemDraftEntity>()
@@ -410,7 +422,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             // 转为正式订单
             Long orderId = orderMainService.createFromDraft(entity);
             // 更新草稿状态为已提交
-            entity.setStatus(2);
+            entity.setStatus(OrderDraftStatusEnum.SUBMITTED.getCode());
             updateById(entity);
             log.info("提交草稿成功，draftId={}, orderId={}", id, orderId);
             return orderId;
@@ -664,9 +676,9 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
     private String getDraftStatusName(Integer status) {
         if (status == null) return null;
         return switch (status) {
-            case 1 -> "有效";
-            case 2 -> "已提交";
-            case 3 -> "已过期";
+            case 1 -> OrderDraftStatusEnum.VALID.getName();
+            case 2 -> OrderDraftStatusEnum.SUBMITTED.getName();
+            case 3 -> OrderDraftStatusEnum.EXPIRED.getName();
             default -> null;
         };
     }

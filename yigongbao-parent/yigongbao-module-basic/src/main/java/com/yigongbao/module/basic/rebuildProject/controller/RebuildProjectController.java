@@ -3,6 +3,7 @@ package com.yigongbao.module.basic.rebuildProject.controller;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.rebuildProject.dto.CreateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectByBodyPartDTO;
@@ -90,6 +91,7 @@ public class RebuildProjectController {
      * 创建项目
      */
     @Operation(summary = "创建项目")
+    @RequirePermission("project:Add")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.CREATE,
@@ -105,6 +107,7 @@ public class RebuildProjectController {
      * 更新项目
      */
     @Operation(summary = "更新项目")
+    @RequirePermission("project:Edit")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -120,6 +123,7 @@ public class RebuildProjectController {
      * 删除项目
      */
     @Operation(summary = "删除项目")
+    @RequirePermission("project:Delete")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.DELETE,
@@ -135,6 +139,7 @@ public class RebuildProjectController {
      * 修改项目状态
      */
     @Operation(summary = "修改项目状态")
+    @RequirePermission("project:Status")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.UPDATE,

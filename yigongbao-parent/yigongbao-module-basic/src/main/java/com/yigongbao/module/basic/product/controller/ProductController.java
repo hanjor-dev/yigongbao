@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.product.dto.CreateProductDTO;
 import com.yigongbao.module.basic.product.dto.CreateProductSpecDTO;
@@ -77,6 +78,7 @@ public class ProductController {
      * 创建产品
      */
     @Operation(summary = "创建产品")
+    @RequirePermission("product:Add")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.CREATE,
@@ -92,6 +94,7 @@ public class ProductController {
      * 更新产品
      */
     @Operation(summary = "更新产品")
+    @RequirePermission("product:Edit")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -107,6 +110,7 @@ public class ProductController {
      * 删除产品（有规格时拒绝）
      */
     @Operation(summary = "删除产品")
+    @RequirePermission("product:Delete")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.DELETE,
@@ -133,6 +137,7 @@ public class ProductController {
      * 创建规格
      */
     @Operation(summary = "创建产品规格")
+    @RequirePermission("product:Add")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.CREATE,
@@ -158,6 +163,7 @@ public class ProductController {
      * 更新规格
      */
     @Operation(summary = "更新产品规格")
+    @RequirePermission("product:Edit")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -174,6 +180,7 @@ public class ProductController {
      * 删除规格（被引用时拒绝）
      */
     @Operation(summary = "删除产品规格")
+    @RequirePermission("product:Delete")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.DELETE,

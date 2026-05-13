@@ -1,6 +1,7 @@
 package com.yigongbao.module.design.controller;
 
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.dto.SavePrintInfoDTO;
 import com.yigongbao.module.design.service.DesignPrintInfoService;
 import com.yigongbao.module.design.vo.PrintInfoListVO;
@@ -29,6 +30,7 @@ public class DesignPrintInfoController {
      * 获取打印信息选项数据（产品树、材质、颜色）以及包级已保存回显字段
      */
     @Operation(summary = "获取打印信息选项")
+    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/print-info/options")
     public Result<PrintInfoOptionsVO> getOptions(@PathVariable Long orderId,
                                                   @PathVariable Long packageId) {
@@ -39,6 +41,7 @@ public class DesignPrintInfoController {
      * 查询数据包打印信息列表
      */
     @Operation(summary = "查询打印信息列表")
+    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/print-info")
     public Result<PrintInfoListVO> listPrintInfo(@PathVariable Long orderId,
                                                 @PathVariable Long packageId) {
@@ -49,6 +52,7 @@ public class DesignPrintInfoController {
      * 保存打印信息（整包替换，空列表=清空）
      */
     @Operation(summary = "保存打印信息（整包替换）")
+    @RequirePermission(value = "design:EditPrintInfo")
     @PostMapping("/{orderId}/package/{packageId}/print-info")
     public Result<Void> savePrintInfo(@PathVariable Long orderId,
                                       @PathVariable Long packageId,
@@ -61,6 +65,7 @@ public class DesignPrintInfoController {
      * 删除单条打印信息
      */
     @Operation(summary = "删除单条打印信息")
+    @RequirePermission(value = "design:EditPrintInfo")
     @DeleteMapping("/{orderId}/package/{packageId}/print-info/{printInfoId}")
     public Result<Void> deletePrintInfo(@PathVariable Long orderId,
                                          @PathVariable Long packageId,

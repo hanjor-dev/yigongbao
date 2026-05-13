@@ -1,6 +1,5 @@
 package com.yigongbao.module.design.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -9,8 +8,6 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.flow.enums.FlowPhaseEnum;
-import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.product.entity.ProductSpecEntity;
 import com.yigongbao.module.basic.product.service.ProductService;
 import com.yigongbao.module.basic.product.service.ProductSpecService;
@@ -74,6 +71,7 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
     private final DictService dictService;
     private final DesignInstructionMapper instructionMapper;
     private final DesignDrawingMapper drawingMapper;
+    private final com.yigongbao.module.design.helper.DesignQueryHelper designQueryHelper;
 
     /**
      * 获取打印信息选项数据以及包级已保存回显字段
@@ -86,7 +84,7 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
     public PrintInfoOptionsVO getOptions(Long orderId, Long packageId) {
         log.info("获取打印信息选项，orderId={}, packageId={}", orderId, packageId);
 
-        // 1. 查订单
+        // 1. 查订单（含数据权限校验）
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
@@ -175,7 +173,8 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
     public PrintInfoListVO listPrintInfo(Long orderId, Long packageId) {
         log.info("查询打印信息列表，orderId={}, packageId={}", orderId, packageId);
 
-        // 1. 校验 packageId 属于 orderId，并回填包级字段
+        // 1. 校验 packageId 属于 orderId，并回填包级字段（checkDesignPhase 含数据权限校验）
+        checkDesignPhase(orderId);
         DesignPackageEntity pkg = packageService.getById(packageId);
         if (pkg == null || !pkg.getOrderId().equals(orderId)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
@@ -253,7 +252,8 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                 orderId, packageId, dto.getItems().size());
 
         // 1. 校验订单状态和操作人
-        checkOrderAndPermission(orderId);
+        OrderMainEntity order = checkDesignPhase(orderId);
+        checkIsAssignedDesigner(order);
 
         // 2. 校验 packageId 属于 orderId
         DesignPackageEntity pkg = packageService.getById(packageId);
@@ -279,16 +279,18 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                         .eq(DesignProductEntity::getPackageId, packageId));
 
         if (CollUtil.isNotEmpty(items)) {
-            // 5. 校验所有 packageFileIds 均属于该 packageId
+            // 5. 校验所有 packageFileIds 均属于该 packageId（allFileIds 为空时跳过）
             Set<Long> allFileIds = items.stream()
                     .flatMap(item -> item.getPackageFileIds().stream())
                     .collect(Collectors.toSet());
-            long validFileCount = packageFileService.count(
-                    new LambdaQueryWrapper<DesignPackageFileEntity>()
-                            .eq(DesignPackageFileEntity::getPackageId, packageId)
-                            .in(DesignPackageFileEntity::getId, allFileIds));
-            if (validFileCount != allFileIds.size()) {
-                throw new BusinessException(ErrorCodeEnum.ORDER_FILE_NOT_FOUND, "部分文件不属于该数据包");
+            if (!allFileIds.isEmpty()) {
+                long validFileCount = packageFileService.count(
+                        new LambdaQueryWrapper<DesignPackageFileEntity>()
+                                .eq(DesignPackageFileEntity::getPackageId, packageId)
+                                .in(DesignPackageFileEntity::getId, allFileIds));
+                if (validFileCount != allFileIds.size()) {
+                    throw new BusinessException(ErrorCodeEnum.ORDER_FILE_NOT_FOUND, "部分文件不属于该数据包");
+                }
             }
 
             // 6. 校验 productId / specId，批量加载产品和 spec 对象（用于覆盖 productName/certNo）
@@ -387,7 +389,8 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
         log.info("删除打印信息，orderId={}, packageId={}, printInfoId={}", orderId, packageId, printInfoId);
 
         // 1. 校验订单状态和操作人
-        checkOrderAndPermission(orderId);
+        OrderMainEntity order = checkDesignPhase(orderId);
+        checkIsAssignedDesigner(order);
 
         // 2. 查询并验证 orderId 和 packageId 匹配
         DesignProductEntity entity = designProductService.getById(printInfoId);
@@ -430,29 +433,17 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
     }
 
     /**
-     * 校验订单状态和操作权限（当前登录用户必须是该订单的设计师）
-     *
-     * @param orderId 订单ID
-     * @return 订单实体
+     * 校验订单存在且处于可操作的设计阶段（委托 DesignQueryHelper）
      */
-    private OrderMainEntity checkOrderAndPermission(Long orderId) {
-        OrderMainEntity order = orderMainService.getById(orderId);
-        if (order == null) {
-            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
-        }
-        FlowStatusEnum status = FlowStatusEnum.getByValue(order.getStatus());
-        if (status == null || !status.belongsTo(FlowPhaseEnum.DESIGN)) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
-        }
-        if (status != FlowStatusEnum.DESIGN_IN_PROGRESS
-                && status != FlowStatusEnum.DESIGN_REVIEW_REJECTED) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
-        }
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-        if (!currentUserId.equals(order.getDesignerId())) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_OPERATOR_NOT_ALLOWED);
-        }
-        return order;
+    private OrderMainEntity checkDesignPhase(Long orderId) {
+        return designQueryHelper.checkDesignPhase(orderId);
+    }
+
+    /**
+     * 校验当前用户是该订单的指定设计师（委托 DesignQueryHelper）
+     */
+    private void checkIsAssignedDesigner(OrderMainEntity order) {
+        designQueryHelper.checkIsAssignedDesigner(order);
     }
 
     /**

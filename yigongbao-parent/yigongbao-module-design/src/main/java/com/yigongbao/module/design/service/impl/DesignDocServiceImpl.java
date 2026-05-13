@@ -1,6 +1,5 @@
 package com.yigongbao.module.design.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.StatusConstants;
@@ -8,8 +7,6 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.flow.enums.FlowPhaseEnum;
-import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
@@ -78,6 +75,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     private final FileService fileService;
     private final DesignScreenshotService screenshotService;
     private final DesignPackageFileScreenshotMapper screenshotMapper;
+    private final com.yigongbao.module.design.helper.DesignQueryHelper designQueryHelper;
 
     // ==================== 线下模式：下载接口 ====================
 
@@ -91,7 +89,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public void downloadInstruction(Long orderId, Long packageId, HttpServletResponse response) {
         log.info("下载指令单模板，orderId={}, packageId={}", orderId, packageId);
-        checkOrderAndPermission(orderId);
+        checkDesignPhase(orderId);
         // 按需生成或复用已有版本
         DesignInstructionEntity entity = ensureInstruction(orderId, packageId);
         // 流式下载模板文件
@@ -114,7 +112,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public void downloadDrawing(Long orderId, Long packageId, HttpServletResponse response) {
         log.info("下载图纸模板，orderId={}, packageId={}", orderId, packageId);
-        checkOrderAndPermission(orderId);
+        checkDesignPhase(orderId);
         // 按需生成或复用已有版本
         DesignDrawingEntity entity = ensureDrawing(orderId, packageId);
         // 流式下载模板文件
@@ -139,7 +137,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public DocItemVO getInstructionPreviewUrl(Long orderId, Long packageId) {
         log.info("获取指令单预览URL，orderId={}, packageId={}", orderId, packageId);
-        checkOrderAndPermission(orderId);
+        checkDesignPhase(orderId);
         // 按需生成或复用已有版本
         DesignInstructionEntity entity = ensureInstruction(orderId, packageId);
         // 构造返回 VO
@@ -158,7 +156,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId) {
         log.info("获取图纸预览URL，orderId={}, packageId={}", orderId, packageId);
-        checkOrderAndPermission(orderId);
+        checkDesignPhase(orderId);
         // 按需生成或复用已有版本
         DesignDrawingEntity entity = ensureDrawing(orderId, packageId);
         // 构造返回 VO
@@ -175,6 +173,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Override
     public List<DesignDocVersionVO> listInstructionVersions(Long orderId, Long packageId) {
         log.info("查询指令单版本列表，orderId={}, packageId={}", orderId, packageId);
+        checkDesignPhase(orderId);
         validatePackage(orderId, packageId);
         return instructionService.listVersions(packageId).stream()
                 .map(this::toInstructionVersionVO)
@@ -187,6 +186,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Override
     public List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId) {
         log.info("查询图纸版本列表，orderId={}, packageId={}", orderId, packageId);
+        checkDesignPhase(orderId);
         validatePackage(orderId, packageId);
         return drawingService.listVersions(packageId).stream()
                 .map(this::toDrawingVersionVO)
@@ -205,7 +205,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public void uploadRevisedInstruction(Long orderId, Long packageId, Long id, MultipartFile file) {
         log.info("上传修订版指令单，orderId={}, packageId={}, id={}", orderId, packageId, id);
-        checkOrderAndPermission(orderId);
+        checkDesignPhase(orderId);
         validatePackage(orderId, packageId);
         DesignInstructionEntity entity = instructionService.getById(id);
         if (entity == null || !entity.getPackageId().equals(packageId)) {
@@ -218,7 +218,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         entity.setRevisedFileUrl(fileVO.getFileUrl());
         entity.setRevisedUploadTime(uploadTime);
         // 上传修订版本身即代表设计师已审阅，无论在线/离线模式均自动确认
-        entity.setIsConfirmed(1);
+        entity.setIsConfirmed(StatusConstants.CONFIRMED);
         entity.setConfirmTime(uploadTime);
         instructionService.updateById(entity);
         // 删除旧修订版文件，避免 OSS 泄漏
@@ -238,7 +238,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public void uploadRevisedDrawing(Long orderId, Long packageId, Long id, MultipartFile file) {
         log.info("上传修订版图纸，orderId={}, packageId={}, id={}", orderId, packageId, id);
-        checkOrderAndPermission(orderId);
+        checkDesignPhase(orderId);
         validatePackage(orderId, packageId);
         DesignDrawingEntity entity = drawingService.getById(id);
         if (entity == null || !entity.getPackageId().equals(packageId)) {
@@ -251,7 +251,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         entity.setRevisedFileUrl(fileVO.getFileUrl());
         entity.setRevisedUploadTime(uploadTime);
         // 上传修订版本身即代表设计师已审阅，无论在线/离线模式均自动确认
-        entity.setIsConfirmed(1);
+        entity.setIsConfirmed(StatusConstants.CONFIRMED);
         entity.setConfirmTime(uploadTime);
         drawingService.updateById(entity);
         // 删除旧修订版文件，避免 OSS 泄漏
@@ -274,7 +274,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public void confirmDrawing(Long orderId, Long packageId, Long id) {
         log.info("确认图纸，orderId={}, packageId={}, id={}", orderId, packageId, id);
-        checkOrderAndPermission(orderId);
+        checkDesignPhase(orderId);
         validatePackage(orderId, packageId);
         DesignDrawingEntity entity = drawingService.getById(id);
         if (entity == null || !entity.getPackageId().equals(packageId)) {
@@ -297,7 +297,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public void confirmInstruction(Long orderId, Long packageId, Long id) {
         log.info("确认指令单，orderId={}, packageId={}, id={}", orderId, packageId, id);
-        checkOrderAndPermission(orderId);
+        checkDesignPhase(orderId);
         validatePackage(orderId, packageId);
         DesignInstructionEntity entity = instructionService.getById(id);
         if (entity == null || !entity.getPackageId().equals(packageId)) {
@@ -528,7 +528,6 @@ public class DesignDocServiceImpl implements DesignDocService {
      * @param versionSeq 目标版本序号
      * @return 已持久化的 DesignInstructionEntity
      */
-    @Transactional(rollbackFor = Exception.class)
     protected DesignInstructionEntity doGenerateInstruction(
             OrderMainEntity order, DesignPackageEntity pkg,
             DesignInstructionEntity toOverride, int versionSeq) {
@@ -608,7 +607,6 @@ public class DesignDocServiceImpl implements DesignDocService {
      * @param versionSeq 目标版本序号
      * @return 已持久化的 DesignDrawingEntity
      */
-    @Transactional(rollbackFor = Exception.class)
     protected DesignDrawingEntity doGenerateDrawing(
             OrderMainEntity order, DesignPackageEntity pkg,
             DesignDrawingEntity toOverride, int versionSeq) {
@@ -761,26 +759,17 @@ public class DesignDocServiceImpl implements DesignDocService {
     }
 
     /**
-     * 校验订单状态和操作权限（设计中或设计审核不通过，且当前用户是订单设计师）
+     * 校验订单存在且处于可操作的设计阶段（委托 DesignQueryHelper）
      */
-    private OrderMainEntity checkOrderAndPermission(Long orderId) {
-        OrderMainEntity order = orderMainService.getById(orderId);
-        if (order == null) {
-            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
-        }
-        FlowStatusEnum status = FlowStatusEnum.getByValue(order.getStatus());
-        if (status == null || !status.belongsTo(FlowPhaseEnum.DESIGN)) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
-        }
-        if (status != FlowStatusEnum.DESIGN_IN_PROGRESS
-                && status != FlowStatusEnum.DESIGN_REVIEW_REJECTED) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
-        }
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-        if (!currentUserId.equals(order.getDesignerId())) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_OPERATOR_NOT_ALLOWED);
-        }
-        return order;
+    private OrderMainEntity checkDesignPhase(Long orderId) {
+        return designQueryHelper.checkDesignPhase(orderId);
+    }
+
+    /**
+     * 校验当前用户是该订单的指定设计师（委托 DesignQueryHelper）
+     */
+    private void checkIsAssignedDesigner(OrderMainEntity order) {
+        designQueryHelper.checkIsAssignedDesigner(order);
     }
 
     /**

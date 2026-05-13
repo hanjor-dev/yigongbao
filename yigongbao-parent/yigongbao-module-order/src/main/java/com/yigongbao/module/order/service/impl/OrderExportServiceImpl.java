@@ -45,8 +45,6 @@ public class OrderExportServiceImpl implements OrderExportService {
     private static final int MAX_EXPORT_COUNT = 10000;
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
-    /** setCellValue 中未匹配到处理逻辑的列数量，由 buildExcel 读取并决定是否记录警告 */
-    private int unsupportedColumnCount = 0;
 
     private final OrderMainMapper orderMainMapper;
     private final UserHospitalService userHospitalService;
@@ -81,6 +79,10 @@ public class OrderExportServiceImpl implements OrderExportService {
 
             // Step 3：构建 Excel（SXSSF 流式写入）
             buildExcel(visibleColumns, orderList, response);
+
+            // 在响应头中标注实际导出数量及是否被截断，前端可据此提示用户
+            response.setHeader("X-Export-Total", String.valueOf(orderList.size()));
+            response.setHeader("X-Export-Truncated", String.valueOf(orderList.size() >= MAX_EXPORT_COUNT));
 
             log.info("导出订单列表成功，共{}条", orderList.size());
         } catch (BusinessException e) {
@@ -157,7 +159,7 @@ public class OrderExportServiceImpl implements OrderExportService {
 
             // 构建表头行
             Row headerRow = sheet.createRow(0);
-            this.unsupportedColumnCount = 0;
+            int unsupportedColumnCount = 0;
             for (int i = 0; i < columns.size(); i++) {
                 OrderColumnConfigVO.ColumnItemVO col = columns.get(i);
                 Cell cell = headerRow.createCell(i);
@@ -172,14 +174,16 @@ public class OrderExportServiceImpl implements OrderExportService {
                 for (int i = 0; i < columns.size(); i++) {
                     OrderColumnConfigVO.ColumnItemVO col = columns.get(i);
                     Cell cell = row.createCell(i);
-                    setCellValue(cell, order, col.getField());
+                    if (!setCellValue(cell, order, col.getField())) {
+                        unsupportedColumnCount++;
+                    }
                 }
             }
 
             // 检测并记录未匹配到的列（辅助定位 Excel 导出字段遗漏问题）
-            if (this.unsupportedColumnCount > 0) {
+            if (unsupportedColumnCount > 0) {
                 log.warn("Excel 导出发现 {} 个字段未匹配到对应处理逻辑，请检查 setCellValue 方法",
-                        this.unsupportedColumnCount);
+                        unsupportedColumnCount);
             }
 
             // 设置响应头
@@ -214,9 +218,10 @@ public class OrderExportServiceImpl implements OrderExportService {
     /**
      * 根据字段名设置单元格值
      */
-    private void setCellValue(Cell cell, OrderListVO order, String field) {
+    /** @return true 表示字段已匹配处理，false 表示未匹配 */
+    private boolean setCellValue(Cell cell, OrderListVO order, String field) {
         if (field == null) {
-            return;
+            return true;
         }
         switch (field) {
             case "orderCode":
@@ -267,7 +272,7 @@ public class OrderExportServiceImpl implements OrderExportService {
                 cell.setCellValue(StrUtil.nullToEmpty(order.getDesignerName()));
                 break;
             case "phase":
-                cell.setCellValue(getPhaseName(order.getPhase()));
+                cell.setCellValue(StrUtil.nullToEmpty(orderQueryHelper.getPhaseName(order.getPhase())));
                 break;
             case "status":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getStatusName()));
@@ -290,29 +295,10 @@ public class OrderExportServiceImpl implements OrderExportService {
                 cell.setCellValue(projects);
                 break;
             default:
-                this.unsupportedColumnCount++;
                 cell.setCellValue("");
+                return false;
         }
-    }
-
-    /**
-     * 获取阶段名称
-     */
-    private String getPhaseName(Integer phase) {
-        if (phase == null) {
-            return "";
-        }
-        return switch (phase) {
-            case 1 -> "订单";
-            case 2 -> "设计";
-            case 3 -> "打印";
-            case 4 -> "后处理";
-            case 5 -> "质检";
-            case 6 -> "仓储";
-            case 7 -> "确认";
-            case 8 -> "完成";
-            default -> phase.toString();
-        };
+        return true;
     }
 
     /**

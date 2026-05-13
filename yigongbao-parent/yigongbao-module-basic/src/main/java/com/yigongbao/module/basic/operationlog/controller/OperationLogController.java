@@ -2,6 +2,7 @@ package com.yigongbao.module.basic.operationlog.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.operationlog.dto.OperationLogQueryDTO;
 import com.yigongbao.module.basic.operationlog.service.OperationLogService;
@@ -44,6 +45,7 @@ public class OperationLogController {
      * 导出操作日志
      */
     @Operation(summary = "导出操作日志")
+    @RequirePermission(value = "log:Export")
     @PostMapping("/export")
     public void export(@RequestBody OperationLogQueryDTO dto, HttpServletResponse response) {
         operationLogService.exportLogs(dto, response);

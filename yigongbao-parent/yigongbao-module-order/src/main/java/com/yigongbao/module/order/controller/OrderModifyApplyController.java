@@ -2,6 +2,7 @@ package com.yigongbao.module.order.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.order.dto.modify.AuditModifyApplyDTO;
 import com.yigongbao.module.order.dto.modify.CreateModifyApplyDTO;
@@ -48,12 +49,14 @@ public class OrderModifyApplyController {
     @Operation(summary = "获取订单可申请的修改类型",
             description = "返回当前订单可申请的修改类型列表。allowedTypes 为空时表示不可申请；"
                     + "pendingApplyId 不为 null 时表示已有待审核申请（reason=PENDING_EXISTS）")
+    @RequirePermission(value = "order:View")
     @GetMapping("/{orderId}/applicable-types")
     public Result<ApplicableModifyTypesVO> getApplicableTypes(@PathVariable Long orderId) {
         return Result.success(orderModifyApplyService.getApplicableTypes(orderId));
     }
 
     @Operation(summary = "发起修改申请")
+    @RequirePermission(value = "order:applyModify")
     @PostMapping("/{orderId}/apply")
     public Result<ModifyApplyVO> createApply(@PathVariable Long orderId,
             @Valid @RequestBody CreateModifyApplyDTO dto) {
@@ -72,14 +75,16 @@ public class OrderModifyApplyController {
                     + "③ imageDataFileIds / imageReportFileIds（14.2 影像文件）：全量替换文件ID列表，"
                     + "两者共用 14.2 申请类型控制，传 null 表示不修改该类别，传空列表表示清空。\n"
                     + "各子结构仅在申请类型白名单内时生效，白名单外的字段即使传入也会被忽略。")
+    @RequirePermission(value = "order:modify")
     @PutMapping("/execute/{applyId}")
     public Result<Void> executeModification(@PathVariable Long applyId,
-            @RequestBody ExecuteModifyDTO dto) {
+            @Valid @RequestBody ExecuteModifyDTO dto) {
         orderModifyApplyService.executeModification(applyId, dto);
         return Result.success();
     }
 
     @Operation(summary = "查询订单的修改申请记录列表（分页）")
+    @RequirePermission(value = "order:View")
     @PostMapping("/{orderId}/applies")
     public Result<IPage<ModifyApplyListVO>> listAppliesByOrder(@PathVariable Long orderId,
             @RequestBody ModifyApplyPageQueryDTO dto) {
@@ -87,6 +92,7 @@ public class OrderModifyApplyController {
     }
 
     @Operation(summary = "查询订单的修改留痕记录（分页）")
+    @RequirePermission(value = "order:View")
     @PostMapping("/{orderId}/logs")
     public Result<IPage<ModificationLogVO>> listModificationLogs(@PathVariable Long orderId,
             @RequestBody ModificationLogPageQueryDTO dto) {
@@ -96,6 +102,7 @@ public class OrderModifyApplyController {
     // ==================== 申请维度接口 ====================
 
     @Operation(summary = "撤回修改申请（仅申请人可撤回待审核申请）")
+    @RequirePermission(value = "order:MyApplyWithdraw")
     @DeleteMapping("/apply/{applyId}")
     public Result<Void> withdrawApply(@PathVariable Long applyId) {
         orderModifyApplyService.withdrawApply(applyId);
@@ -103,6 +110,7 @@ public class OrderModifyApplyController {
     }
 
     @Operation(summary = "审核修改申请（同意/拒绝）")
+    @RequirePermission(value = "order:AuditModifyApply")
     @PutMapping("/apply/{applyId}/audit")
     public Result<Void> auditApply(@PathVariable Long applyId,
             @Valid @RequestBody AuditModifyApplyDTO dto) {
@@ -119,12 +127,14 @@ public class OrderModifyApplyController {
     // ==================== 查询类接口 ====================
 
     @Operation(summary = "查询我发起的申请列表（分页）")
+    @RequirePermission(value = "order:MyApplyView")
     @PostMapping("/apply/my")
     public Result<IPage<ModifyApplyListVO>> listMyApplies(@RequestBody ModifyApplyPageQueryDTO dto) {
         return Result.success(orderModifyApplyService.listMyApplies(dto));
     }
 
     @Operation(summary = "查询待审核申请列表（管理员）")
+    @RequirePermission(value = "order:AuditView")
     @PostMapping("/apply/pending")
     public Result<IPage<ModifyApplyListVO>> listPendingApplies(
             @RequestBody ModifyApplyPageQueryDTO dto) {
