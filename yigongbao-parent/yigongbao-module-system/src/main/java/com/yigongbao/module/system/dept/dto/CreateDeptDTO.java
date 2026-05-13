@@ -35,9 +35,10 @@ public class CreateDeptDTO {
     private List<Long> orgIds;
 
     /**
-     * 部门负责人用户ID
+     * 部门负责人姓名（自由输入）
      */
-    private Long leaderUserId;
+    @Size(max = 64, message = "负责人姓名长度不能超过64个字符")
+    private String leaderUser;
 
     /**
      * 备注说明

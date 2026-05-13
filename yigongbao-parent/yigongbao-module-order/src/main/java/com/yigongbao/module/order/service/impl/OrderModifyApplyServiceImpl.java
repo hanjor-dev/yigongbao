@@ -12,8 +12,11 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
+import com.yigongbao.flow.facade.FlowFacade;
+import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.order.dto.modify.AuditModifyApplyDTO;
@@ -91,6 +94,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     private final FileService fileService;
     private final ConfigService configService;
     private final UserService userService;
+    private final FlowFacade flowFacade;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     // ==================== 阶段判断 ====================
@@ -434,6 +438,14 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         // 9. 将申请状态置为 COMPLETED（防止重复执行）
         apply.setStatus(ModifyApplyStatusEnum.COMPLETED.getCode());
         orderModifyApplyMapper.updateById(apply);
+
+        // 10. 执行状态流转：将订单重新流转到"数据待审核"状态
+        log.info("执行修改后触发状态流转，orderId={}, 操作人={}", orderId, modifierName);
+        flowFacade.executeFlow(
+                orderId,
+                FlowActionEnum.RESUBMIT,
+                new FlowOperator(modifierId, modifierName, "执行订单修改后重新提交审核")
+        );
     }
 
     // ==================== 辅助方法：执行前校验 ====================

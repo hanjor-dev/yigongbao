@@ -52,14 +52,9 @@ public class DeptVO {
     private List<OrgSimpleVO> orgs;
 
     /**
-     * 部门负责人用户ID
+     * 部门负责人姓名（自由输入）
      */
-    private Long leaderUserId;
-
-    /**
-     * 部门负责人姓名
-     */
-    private String leaderUserName;
+    private String leaderUser;
 
     /**
      * 状态（0=禁用，1=正常）

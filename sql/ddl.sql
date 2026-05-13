@@ -89,7 +89,7 @@ CREATE TABLE sys_dept (
     dept_name           VARCHAR(128)    NOT NULL COMMENT '部门名称',
     dept_code           VARCHAR(32)     NOT NULL COMMENT '部门编码',
     dept_type           TINYINT         NOT NULL COMMENT '部门类型（1=内部，2=外部）',
-    leader_user_id      BIGINT          COMMENT '部门负责人用户ID（关联sys_user表）',
+    leader_user         VARCHAR(64)     COMMENT '部门负责人姓名（自由输入）',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark              VARCHAR(512)    COMMENT '备注说明',
 

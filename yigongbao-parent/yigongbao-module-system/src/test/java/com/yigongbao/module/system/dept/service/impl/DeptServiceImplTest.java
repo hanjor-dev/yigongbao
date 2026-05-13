@@ -83,7 +83,7 @@ class DeptServiceImplTest {
         testEntity.setDeptName("研发部");
         testEntity.setDeptCode("DEPT-001");
         testEntity.setDeptType(1);
-        testEntity.setLeaderUserId(null);
+        testEntity.setLeaderUser(null);
         testEntity.setStatus(1);
         testEntity.setCreateTime(now);
         testEntity.setUpdateTime(now);
@@ -93,13 +93,13 @@ class DeptServiceImplTest {
         createDTO.setDeptName("市场部");
         createDTO.setDeptType(1);
         createDTO.setOrgIds(List.of(1L));
-        createDTO.setLeaderUserId(null);
+        createDTO.setLeaderUser(null);
         createDTO.setRemark("市场部门");
 
         // 初始化更新DTO
         updateDTO = new UpdateDeptDTO();
         updateDTO.setDeptName("研发部");
-        updateDTO.setLeaderUserId(100L);
+        updateDTO.setLeaderUser("张三");
         updateDTO.setRemark("研发部门");
     }
 

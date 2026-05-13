@@ -595,11 +595,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         }
         // 删除用户前先清理医院关联
         userHospitalService.assignHospitals(id, List.of());
-        // 清空以该用户为负责人的部门记录，避免悬空引用
-        deptService.lambdaUpdate()
-                .eq(DeptEntity::getLeaderUserId, id)
-                .set(DeptEntity::getLeaderUserId, null)
-                .update();
         removeById(id);
         log.info("删除用户成功，id={}", id);
     }

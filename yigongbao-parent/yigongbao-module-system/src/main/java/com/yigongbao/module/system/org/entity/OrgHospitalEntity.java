@@ -1,5 +1,7 @@
 package com.yigongbao.module.system.org.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -15,6 +17,7 @@ import java.time.LocalDateTime;
 public class OrgHospitalEntity {
 
     /** 主键ID */
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     /** 经销商机构ID */

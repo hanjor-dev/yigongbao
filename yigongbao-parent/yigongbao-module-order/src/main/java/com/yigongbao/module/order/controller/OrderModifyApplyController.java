@@ -56,7 +56,7 @@ public class OrderModifyApplyController {
     }
 
     @Operation(summary = "发起修改申请")
-    @RequirePermission(value = "order:applyModify")
+    @RequirePermission(value = "order:ApplyModify")
     @PostMapping("/{orderId}/apply")
     public Result<ModifyApplyVO> createApply(@PathVariable Long orderId,
             @Valid @RequestBody CreateModifyApplyDTO dto) {
@@ -75,7 +75,7 @@ public class OrderModifyApplyController {
                     + "③ imageDataFileIds / imageReportFileIds（14.2 影像文件）：全量替换文件ID列表，"
                     + "两者共用 14.2 申请类型控制，传 null 表示不修改该类别，传空列表表示清空。\n"
                     + "各子结构仅在申请类型白名单内时生效，白名单外的字段即使传入也会被忽略。")
-    @RequirePermission(value = "order:modify")
+    @RequirePermission(value = "order:Modify")
     @PutMapping("/execute/{applyId}")
     public Result<Void> executeModification(@PathVariable Long applyId,
             @Valid @RequestBody ExecuteModifyDTO dto) {
@@ -110,7 +110,7 @@ public class OrderModifyApplyController {
     }
 
     @Operation(summary = "审核修改申请（同意/拒绝）")
-    @RequirePermission(value = "order:AuditModifyApply")
+    @RequirePermission(value = "order:Approve")
     @PutMapping("/apply/{applyId}/audit")
     public Result<Void> auditApply(@PathVariable Long applyId,
             @Valid @RequestBody AuditModifyApplyDTO dto) {

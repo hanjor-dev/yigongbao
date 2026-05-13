@@ -399,50 +399,50 @@ VALUES
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
 VALUES
-(101, 2, '订单管理', 'Order', 2, '&#xeb49;', '/order', 'business/order', 1, 1, 1),
-(102, 2, '我的工单', 'Design', 2, '&#xe608;', '/design', 'business/design', 2, 1, 1),
-(103, 2, '生产管理', 'Manufacture', 2, '&#xe662;', '/manufacture', 'business/manufacture', 3, 1, 1),
-(104, 2, '质检管理', 'Quality', 2, NULL, '/quality', 'business/quality', 4, 1, 1),
-(105, 2, '仓储管理', 'Storage', 2, NULL, '/storage', 'business/storage', 5, 1, 1);
+(101, 2, '订单管理', 'Order', 2, '&#xeb49;', '/order', 'business/order.vue', 1, 1, 1),
+(102, 2, '我的工单', 'Design', 2, '&#xe608;', '/design', 'business/design.vue', 2, 1, 1),
+(103, 2, '生产管理', 'Manufacture', 2, '&#xe662;', '/manufacture', 'business/manufacture.vue', 3, 1, 1),
+(104, 2, '质检管理', 'Quality', 2, NULL, '/quality', 'business/quality.vue', 4, 1, 1),
+(105, 2, '仓储管理', 'Storage', 2, NULL, '/storage', 'business/storage.vue', 5, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：客户管理（parent_id=3）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
 VALUES
-(201, 3, '医生管理', 'Doctor', 2, '&#xe813;', '/doctor', 'customer/doctor', 1, 1, 1),
-(202, 3, '科室管理', 'Department', 2, '&#xe69f;', '/department', 'customer/department', 2, 1, 1);
+(201, 3, '医生管理', 'Doctor', 2, '&#xe813;', '/doctor', 'customer/doctor.vue', 1, 1, 1),
+(202, 3, '科室管理', 'Department', 2, '&#xe69f;', '/department', 'customer/department.vue', 2, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：模块管理（parent_id=4）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
 VALUES
-(301, 4, '机构管理', 'Org', 2, '&#xe61a;', '/org', 'module/org', 1, 1, 1),
-(302, 4, '部门管理', 'Branch', 2, '&#xe62b;', '/branch', 'module/branch', 2, 1, 1),
-(303, 4, '项目管理', 'Project', 2, '&#xe620;', '/project', 'module/project', 3, 1, 1),
-(304, 4, '产品管理', 'Product', 2, '&#xe601;', '/product', 'module/product', 4, 1, 1),
-(305, 4, '物料管理', 'Material', 2, '&#xe65c;', '/material', 'module/material', 5, 1, 1),
-(306, 4, '医院范围模板管理', 'Template', 2, '&#xe605;', '/template', 'module/template', 6, 1, 1);
+(301, 4, '机构管理', 'Org', 2, '&#xe61a;', '/org', 'module/org.vue', 1, 1, 1),
+(302, 4, '部门管理', 'Branch', 2, '&#xe62b;', '/branch', 'module/branch.vue', 2, 1, 1),
+(303, 4, '项目管理', 'Project', 2, '&#xe620;', '/project', 'module/project.vue', 3, 1, 1),
+(304, 4, '产品管理', 'Product', 2, '&#xe601;', '/product', 'module/product.vue', 4, 1, 1),
+(305, 4, '物料管理', 'Material', 2, '&#xe65c;', '/material', 'module/material.vue', 5, 1, 1),
+(306, 4, '医院范围模板管理', 'Template', 2, '&#xe605;', '/template', 'module/template.vue', 6, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：用户和权限（parent_id=5）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
 VALUES
-(401, 5, '账户管理', 'Account', 2, '&#xe602;', '/account', 'auth/account', 1, 1, 1),
-(402, 5, '角色管理', 'Role', 2, '&#xe6a0;', '/role', 'auth/role', 2, 1, 1),
-(403, 5, '资源管理', 'Resource', 2, '&#xe607;', '/resource', 'auth/resource', 3, 1, 1),
-(404, 5, '注册审核', 'RegReview', 2, '&#xe76a;', '/regReview', 'auth/regReview', 4, 1, 1);
+(401, 5, '账户管理', 'Account', 2, '&#xe602;', '/account', 'auth/account.vue', 1, 1, 1),
+(402, 5, '角色管理', 'Role', 2, '&#xe6a0;', '/role', 'auth/role.vue', 2, 1, 1),
+(403, 5, '资源管理', 'Resource', 2, '&#xe607;', '/resource', 'auth/resource.vue', 3, 1, 1),
+(404, 5, '注册审核', 'RegReview', 2, '&#xe76a;', '/regReview', 'auth/regReview.vue', 4, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：系统配置（parent_id=7）
 -- ------------------------------------------------------------
 INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
 VALUES
-(501, 7, '字典管理', 'Dict', 2, '&#xe636;', '/dict', 'system/dict', 1, 1, 1),
-(502, 7, '参数配置', 'Param', 2, '&#xe60e;', '/param', 'system/param', 2, 1, 1),
-(503, 7, '操作日志', 'Log', 2, '&#xe668;', '/log', 'system/log', 3, 1, 1);
+(501, 7, '字典管理', 'Dict', 2, '&#xe636;', '/dict', 'system/dict.vue', 1, 1, 1),
+(502, 7, '参数配置', 'Param', 2, '&#xe60e;', '/param', 'system/param.vue', 2, 1, 1),
+(503, 7, '操作日志', 'Log', 2, '&#xe668;', '/log', 'system/log.vue', 3, 1, 1);
 
 -- ------------------------------------------------------------
 -- 按钮级别资源（resource_type=3）

@@ -40,7 +40,6 @@ public class FileController {
      *
      * @param bizType 业务类型（字典 dict_code，如 10.1、10.4），通过 GET /system/select/biz-type-list 获取可选值
      */
-    @RequireSign
     @Operation(summary = "上传文件（不关联业务）")
     @OperationLog(
             module = "基础管理",
@@ -60,7 +59,6 @@ public class FileController {
      * @param bizType 业务类型（字典 dict_code，如 10.1、10.4）
      * @param bizId 业务ID
      */
-    @RequireSign
     @Operation(summary = "上传并关联业务")
     @OperationLog(
             module = "基础管理",
@@ -80,7 +78,6 @@ public class FileController {
      *
      * @param bizType 业务类型（字典 dict_code，如 10.1、10.4）
      */
-    @RequireSign
     @Operation(summary = "批量上传（不关联业务）")
     @OperationLog(
             module = "基础管理",
@@ -100,7 +97,6 @@ public class FileController {
      * @param bizType 业务类型（字典 dict_code）
      * @param bizId 业务ID
      */
-    @RequireSign
     @Operation(summary = "批量上传并关联业务")
     @OperationLog(
             module = "基础管理",
@@ -120,7 +116,6 @@ public class FileController {
      *
      * @param dto 查询参数
      */
-    @RequireSign
     @Operation(summary = "查询文件列表")
     @PostMapping("/list")
     public Result<List<FileVO>> listByBiz(@RequestBody FileListDTO dto) {
@@ -130,7 +125,6 @@ public class FileController {
     /**
      * 查询文件详情
      */
-    @RequireSign
     @Operation(summary = "查询文件详情")
     @GetMapping("/{id}")
     public Result<FileVO> getById(@PathVariable String id) {
@@ -140,7 +134,6 @@ public class FileController {
     /**
      * 下载文件
      */
-    @RequireSign
     @Operation(summary = "下载文件")
     @GetMapping("/download/{id}")
     public void download(
@@ -152,7 +145,6 @@ public class FileController {
     /**
      * 删除文件
      */
-    @RequireSign
     @Operation(summary = "删除文件")
     @OperationLog(
             module = "基础管理",

@@ -366,11 +366,6 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
         if (vo.getStatus() != null) {
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
-        // 填充负责人姓名（每条记录额外查询一次用户表）
-        if (vo.getLeaderUserId() != null) {
-            UserEntity userEntity = userService.getById(vo.getLeaderUserId());
-            if (userEntity != null) vo.setLeaderUserName(userEntity.getRealName());
-        }
         return vo;
     }
 

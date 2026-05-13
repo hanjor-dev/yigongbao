@@ -261,6 +261,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                     throw new BusinessException(ErrorCodeEnum.ORG_EXISTS);
                 }
             }
+            // 账号前缀不允许修改，如果传入且与原值不同则拒绝
+            if (StrUtil.isNotBlank(dto.getUsernamePrefix()) && !dto.getUsernamePrefix().equals(entity.getUsernamePrefix())) {
+                throw new BusinessException(ErrorCodeEnum.ORG_USERNAME_PREFIX_NOT_ALLOWED);
+            }
             // 资质类型以入参为准，入参为空则沿用原值，防止局部更新时误清空
             Integer qualType = dto.getQualificationType() != null ? dto.getQualificationType() : entity.getQualificationType();
             String qualFile = StrUtil.isNotBlank(dto.getQualificationFile()) ? dto.getQualificationFile() : entity.getQualificationFile();
@@ -276,8 +280,8 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             }
             // 记录原机构名称，用于后续判断是否需要同步 sys_user.org_name
             String originalOrgName = entity.getOrgName();
-            // 排除不可变字段，将DTO属性覆盖到实体（orgCode、usernamePrefix 不可修改）
-            BeanUtils.copyProperties(dto, entity, "id", "orgCode", "usernamePrefix", "createTime", "updateTime", "createBy", "updateBy", "hospitalOrgIds");
+            // 排除不可变字段，将DTO属性覆盖到实体（orgCode、usernamePrefix、orgType 不可修改）
+            BeanUtils.copyProperties(dto, entity, "id", "orgCode", "usernamePrefix", "orgType", "createTime", "updateTime", "createBy", "updateBy", "hospitalOrgIds");
             // areaId变更时同步刷新冗余的地区名称字段
             if (dto.getAreaId() != null) {
                 AreaEntity areaEntity = areaService.getById(dto.getAreaId());
@@ -296,7 +300,9 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             }
             // 经销商类型且前端传入了 hospitalOrgIds 时，全量替换关联关系（先校验后删插）
             String orgType = entity.getOrgType();
+            log.info("更新机构-检查关联医院，orgType={}, hospitalOrgIds={}", orgType, dto.getHospitalOrgIds());
             if (DictCodeConstants.ORG_TYPE_DEALER.equals(orgType) && dto.getHospitalOrgIds() != null) {
+                log.info("进入经销商关联医院更新逻辑");
                 // 先校验新列表合法性，再执行写操作
                 if (!dto.getHospitalOrgIds().isEmpty()) {
                     List<OrgEntity> hospitals = listByIds(dto.getHospitalOrgIds());
@@ -489,6 +495,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      * @param hospitalOrgIds   关联的医疗机构ID列表
      */
     private void saveOrgHospitalRelations(Long distributorOrgId, List<Long> hospitalOrgIds) {
+        log.info("保存经销商关联医院，distributorOrgId={}, hospitalOrgIds={}", distributorOrgId, hospitalOrgIds);
         // 将每个医疗机构ID构建为关联实体，逐条插入
         List<OrgHospitalEntity> relations = hospitalOrgIds.stream().map(hospitalOrgId -> {
             OrgHospitalEntity rel = new OrgHospitalEntity();
@@ -496,7 +503,12 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             rel.setHospitalOrgId(hospitalOrgId);
             return rel;
         }).collect(Collectors.toList());
-        relations.forEach(orgHospitalMapper::insert);
+        relations.forEach(rel -> {
+            log.info("插入关联记录，distributorOrgId={}, hospitalOrgId={}", rel.getDistributorOrgId(), rel.getHospitalOrgId());
+            orgHospitalMapper.insert(rel);
+            log.info("插入成功，生成的ID={}", rel.getId());
+        });
+        log.info("保存经销商关联医院完成，共插入{}条记录", relations.size());
     }
 
     /**

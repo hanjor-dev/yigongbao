@@ -36,9 +36,9 @@ public class DeptEntity extends BaseEntity implements Serializable {
     private Integer deptType;
 
     /**
-     * 部门负责人用户ID
+     * 部门负责人姓名（自由输入）
      */
-    private Long leaderUserId;
+    private String leaderUser;
 
     /**
      * 状态（0=禁用，1=正常）
