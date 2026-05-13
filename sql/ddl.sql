@@ -118,7 +118,7 @@ CREATE TABLE sys_role (
     role_code           VARCHAR(32)     NOT NULL COMMENT '角色编码',
     role_desc           VARCHAR(256)    COMMENT '角色描述',
     account_type        TINYINT         NOT NULL COMMENT '账户分类（关联字典编码=6）',
-    data_scope_type     VARCHAR(16)     NOT NULL DEFAULT 'org' COMMENT '数据权限范围（self=仅自己，hospitals=医院范围，org=本机构，all=全部）',
+    data_scope_type     VARCHAR(16)     NOT NULL DEFAULT 'org' COMMENT '数据权限范围（self=仅自己，hospitals=医院范围，dept=本部门，org=本机构，all=全部）',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark              VARCHAR(512)    COMMENT '备注说明',
 
