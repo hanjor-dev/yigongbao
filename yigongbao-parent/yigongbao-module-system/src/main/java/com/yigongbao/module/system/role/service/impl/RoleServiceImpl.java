@@ -296,7 +296,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
      * @param accountType 账户分类
      * @return 账户分类名称
      */
-    private String getAccountTypeName(Integer accountType) {
+    private String getAccountTypeName(String accountType) {
         return StatusConstants.getAccountTypeName(accountType);
     }
 

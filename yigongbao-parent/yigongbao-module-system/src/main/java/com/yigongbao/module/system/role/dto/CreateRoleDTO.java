@@ -40,10 +40,10 @@ public class CreateRoleDTO implements Serializable {
     private String roleDesc;
 
     /**
-     * 账户分类（1=内部用户，2=外部用户）
+     * 账户分类（6.1=企业账户，6.2=业务账户）
      */
     @NotNull(message = "账户分类不能为空")
-    private Integer accountType;
+    private String accountType;
 
     /**
      * 数据权限范围（self/hospitals/org/all）

@@ -76,33 +76,33 @@ public final class StatusConstants {
     // ==================== 账户分类 ====================
 
     /**
-     * 账户分类-内部用户
+     * 账户分类-企业账户
      */
-    public static final int ACCOUNT_TYPE_INTERNAL = 1;
+    public static final String ACCOUNT_TYPE_ENTERPRISE = "6.1";
 
     /**
-     * 账户分类-外部用户
+     * 账户分类-业务账户
      */
-    public static final int ACCOUNT_TYPE_EXTERNAL = 2;
+    public static final String ACCOUNT_TYPE_BUSINESS = "6.2";
 
     /**
-     * 账户分类-内部用户名称
+     * 账户分类-企业账户名称
      */
-    public static final String ACCOUNT_TYPE_INTERNAL_NAME = "内部用户";
+    public static final String ACCOUNT_TYPE_ENTERPRISE_NAME = "企业账户";
 
     /**
-     * 账户分类-外部用户名称
+     * 账户分类-业务账户名称
      */
-    public static final String ACCOUNT_TYPE_EXTERNAL_NAME = "外部用户";
+    public static final String ACCOUNT_TYPE_BUSINESS_NAME = "业务账户";
 
     /**
      * 根据账户分类值获取名称
      */
-    public static String getAccountTypeName(Integer accountType) {
+    public static String getAccountTypeName(String accountType) {
         if (accountType == null) {
             return "";
         }
-        return accountType == ACCOUNT_TYPE_INTERNAL ? ACCOUNT_TYPE_INTERNAL_NAME : ACCOUNT_TYPE_EXTERNAL_NAME;
+        return ACCOUNT_TYPE_ENTERPRISE.equals(accountType) ? ACCOUNT_TYPE_ENTERPRISE_NAME : ACCOUNT_TYPE_BUSINESS_NAME;
     }
 
     // ==================== 操作结果 ====================

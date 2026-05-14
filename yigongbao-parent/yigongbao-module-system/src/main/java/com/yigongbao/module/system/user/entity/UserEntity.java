@@ -58,9 +58,9 @@ public class UserEntity extends BaseEntity implements Serializable {
     private String avatar;
 
     /**
-     * 账户分类（1=内部用户，2=外部用户）
+     * 账户分类（6.1=企业账户，6.2=业务账户）
      */
-    private Integer accountType;
+    private String accountType;
 
     /**
      * 所属机构ID

@@ -388,10 +388,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     throw new BusinessException(ErrorCodeEnum.USER_ROLE_NOT_FOUND);
                 }
             }
-            // accountType 为空时默认设置为内部用户（1）
+            // accountType 为空时默认设置为企业账户（6.1）
             if (dto.getAccountType() == null) {
-                dto.setAccountType(1);
-                log.info("账户分类未指定，默认设置为内部用户");
+                dto.setAccountType(StatusConstants.ACCOUNT_TYPE_ENTERPRISE);
+                log.info("账户分类未指定，默认设置为企业账户");
             }
             // 角色业务规则校验（hospitals范围 + 设计师specialty）
             validateHospitalScope(roleEntity, dto.getHospitalIds());

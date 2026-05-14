@@ -33,8 +33,8 @@ public class UserPageDTO implements Serializable {
     /** 所属部门ID */
     private Long deptId;
 
-    /** 账户分类（1=内部用户，2=外部用户） */
-    private Integer accountType;
+    /** 账户分类（6.1=企业账户，6.2=业务账户） */
+    private String accountType;
 
     /** 状态（0=禁用，1=正常） */
     private Integer status;

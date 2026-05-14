@@ -63,12 +63,11 @@ public class CreateUserDTO implements Serializable {
     private String avatar;
 
     /**
-     * 账户分类（1=内部用户，2=外部用户）
-     * 允许为空，为空时默认设置为内部用户（1）
+     * 账户分类（6.1=企业账户，6.2=业务账户）
+     * 允许为空，为空时默认设置为企业账户（6.1）
      */
-    @Min(value = 1, message = "账户分类值不合法，仅支持1（内部用户）或2（外部用户）")
-    @Max(value = 2, message = "账户分类值不合法，仅支持1（内部用户）或2（外部用户）")
-    private Integer accountType;
+    @Pattern(regexp = "^(6\\.1|6\\.2)$", message = "账户分类值不合法，仅支持6.1（企业账户）或6.2（业务账户）")
+    private String accountType;
 
     /**
      * 所属机构ID
