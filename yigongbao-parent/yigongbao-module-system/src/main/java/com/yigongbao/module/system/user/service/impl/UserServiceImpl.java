@@ -26,6 +26,7 @@ import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.service.DeptService;
 import com.yigongbao.module.system.dict.entity.DictEntity;
 import com.yigongbao.module.system.dict.service.DictService;
+import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.role.entity.RoleEntity;
@@ -176,7 +177,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 vo.setSexName(sexDict != null ? sexDict.getDictName() : "");
             }
             if (vo.getAccountType() != null) {
-                vo.setAccountTypeName(StatusConstants.getAccountTypeName(vo.getAccountType()));
+                DictVO accountTypeDict = dictService.getByDictCode(vo.getAccountType());
+                vo.setAccountTypeName(accountTypeDict != null ? accountTypeDict.getDictName() : "");
             }
             // 填充角色的 dataScopeType
             if (vo.getRoleId() != null) {
@@ -393,6 +395,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 dto.setAccountType(StatusConstants.ACCOUNT_TYPE_ENTERPRISE);
                 log.info("账户分类未指定，默认设置为企业账户");
             }
+            // 校验部门必填规则和部门类型匹配：dataScopeType为dept或self的角色必须选择部门，且角色accountType必须与部门deptType匹配
+            validateDeptRequired(roleEntity, deptEntity);
             // 角色业务规则校验（hospitals范围 + 设计师specialty）
             validateHospitalScope(roleEntity, dto.getHospitalIds());
             validateSpecialty(roleEntity, dto.getSpecialtyList());
@@ -533,8 +537,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             // 确定本次操作生效的角色：新角色优先，否则沿用当前角色（避免因未传 roleId 而跳过业务规则校验）
             RoleEntity effectiveRole = newRole != null ? newRole
                     : (entity.getRoleId() != null ? roleService.getById(entity.getRoleId()) : null);
+            // 确定本次操作生效的部门：新部门优先，否则沿用当前部门
+            Long effectiveDeptId = dto.getDeptId() != null ? dto.getDeptId() : entity.getDeptId();
+            DeptEntity effectiveDept = effectiveDeptId != null ? deptService.getById(effectiveDeptId) : null;
             if (effectiveRole != null) {
-                // 角色业务规则校验（hospitals范围 + 设计师specialty）
+                // 角色业务规则校验（部门必填+类型匹配 + hospitals范围 + 设计师specialty）
+                validateDeptRequired(effectiveRole, effectiveDept);
                 validateHospitalScope(effectiveRole, dto.getHospitalIds());
                 validateSpecialty(effectiveRole, dto.getSpecialtyList());
             }
@@ -713,6 +721,38 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     // ==================== 私有方法 ====================
 
     /**
+     * 校验角色部门必填规则和部门类型匹配
+     * <p>
+     * 规则1：当角色 dataScopeType=DEPT 或 SELF 时，deptId 必填。
+     * 规则2：角色的 accountType 必须与部门的 deptType 匹配（企业角色→企业部门，业务角色→业务部门）。
+     *
+     * @param role 生效角色（null 时跳过校验）
+     * @param dept 所选部门（null 时仅校验必填规则）
+     */
+    private void validateDeptRequired(RoleEntity role, DeptEntity dept) {
+        if (role == null) {
+            return;
+        }
+        String dataScopeType = role.getDataScopeType();
+        // 规则1：dataScopeType为dept或self的角色必须选择部门
+        if (DataScopeTypeEnum.DEPT.getCode().equals(dataScopeType)
+                || DataScopeTypeEnum.SELF.getCode().equals(dataScopeType)) {
+            if (dept == null) {
+                log.warn("角色数据权限为{}，但未选择部门，roleId={}", dataScopeType, role.getId());
+                throw new BusinessException(ErrorCodeEnum.USER_DEPT_REQUIRED);
+            }
+        }
+        // 规则2：如果选择了部门，校验角色accountType与部门deptType是否匹配
+        if (dept != null && role.getAccountType() != null && dept.getDeptType() != null) {
+            if (!role.getAccountType().equals(dept.getDeptType())) {
+                log.warn("角色账户类型与部门类型不匹配，roleAccountType={}, deptType={}",
+                        role.getAccountType(), dept.getDeptType());
+                throw new BusinessException(ErrorCodeEnum.USER_DEPT_TYPE_MISMATCH);
+            }
+        }
+    }
+
+    /**
      * 校验角色医院范围权限
      * <p>
      * 当角色 dataScopeType=HOSPITALS 时，hospitalIds 必填且每个 ID 必须是真实存在的医院机构
@@ -882,7 +922,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         }
         // 账户分类名称
         if (vo.getAccountType() != null) {
-            vo.setAccountTypeName(StatusConstants.getAccountTypeName(vo.getAccountType()));
+            DictVO accountTypeDict = dictService.getByDictCode(vo.getAccountType());
+            vo.setAccountTypeName(accountTypeDict != null ? accountTypeDict.getDictName() : "");
         }
         // 填充角色的 dataScopeType
         if (vo.getRoleId() != null) {

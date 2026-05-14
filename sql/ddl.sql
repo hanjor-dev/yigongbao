@@ -137,7 +137,7 @@ CREATE UNIQUE INDEX uk_role_code ON sys_role ((CASE WHEN is_deleted = 0 THEN rol
 
 -- 生产环境迁移参考（已有数据时使用，勿直接执行 DDL DROP/CREATE）：
 -- ALTER TABLE sys_role ADD COLUMN data_scope_type VARCHAR(16) NULL COMMENT '数据权限范围';
--- UPDATE sys_role SET data_scope_type = CASE WHEN hospital_scope_enabled = 1 THEN 'hospitals' WHEN account_type = 1 THEN 'all' ELSE 'self' END;
+-- UPDATE sys_role SET data_scope_type = CASE WHEN hospital_scope_enabled = 1 THEN 'hospitals' WHEN account_type = '6.1' THEN 'all' ELSE 'self' END;
 -- UPDATE sys_role SET data_scope_type = 'org'  WHERE role_code IN ('ROLE_DESIGNER', 'ROLE_PRODUCTION', 'ROLE_ORG_ADMIN');
 -- UPDATE sys_role SET data_scope_type = 'self' WHERE role_code IN ('ROLE_DOCTOR', 'ROLE_ORG_USER');
 -- ALTER TABLE sys_role MODIFY COLUMN data_scope_type VARCHAR(16) NOT NULL DEFAULT 'org';

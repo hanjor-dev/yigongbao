@@ -91,9 +91,11 @@ public enum ErrorCodeEnum {
     USER_ROLE_SPECIALTY_REQUIRED(633, "设计师角色必须选择专业方向", 3),
     USER_SPECIALTY_INVALID(634, "专业方向无效，请重新选择：%s", 3),
     USER_PASSWORD_WEAK(635, "密码必须包含字母和数字，长度6-20位", 3),
+    USER_DEPT_REQUIRED(636, "该角色需要选择所属部门", 3),
+    USER_DEPT_TYPE_MISMATCH(637, "所选部门类型与角色账户类型不匹配", 3),
 
-    // ==================== 邮箱相关 636 ====================
-    USER_EMAIL_EXISTS(636, "邮箱已存在", 3),
+    // ==================== 邮箱相关 638 ====================
+    USER_EMAIL_EXISTS(638, "邮箱已存在", 3),
 
     // ==================== 验证码相关 637-641 ====================
     CAPTCHA_TOO_FREQUENT(637, "发送过于频繁，请稍后再试", 5),

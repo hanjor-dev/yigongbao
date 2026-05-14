@@ -20,6 +20,8 @@ import com.yigongbao.module.system.dept.mapper.DeptOrgMapper;
 import com.yigongbao.module.system.dept.mapper.DeptMapper;
 import com.yigongbao.module.system.dept.service.DeptService;
 import com.yigongbao.module.system.dept.vo.DeptVO;
+import com.yigongbao.module.system.dict.service.DictService;
+import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -50,6 +52,7 @@ import java.util.stream.Collectors;
 public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> implements DeptService {
 
     private final OrgService orgService;
+    private final DictService dictService;
     private final CodeGeneratorService codeGeneratorService;
     private final DeptOrgMapper deptOrgMapper;
 
@@ -367,7 +370,8 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
         if (vo.getDeptType() != null) {
-            vo.setDeptTypeName(StatusConstants.getDeptTypeName(vo.getDeptType()));
+            DictVO dictVO = dictService.getByDictCode(vo.getDeptType());
+            vo.setDeptTypeName(dictVO != null ? dictVO.getDictName() : "");
         }
         return vo;
     }

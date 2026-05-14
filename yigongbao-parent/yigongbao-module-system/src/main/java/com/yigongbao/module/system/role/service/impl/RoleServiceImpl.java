@@ -16,6 +16,8 @@ import com.yigongbao.module.system.role.entity.RoleEntity;
 import com.yigongbao.module.system.role.mapper.RoleMapper;
 import com.yigongbao.module.system.role.service.RoleService;
 import com.yigongbao.module.system.role.vo.RoleVO;
+import com.yigongbao.module.system.dict.service.DictService;
+import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.system.resource.mapper.RoleResourceMapper;
 import com.yigongbao.module.system.resource.service.ResourceService;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -44,6 +46,7 @@ import java.util.stream.Collectors;
 public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> implements RoleService {
 
     private final UserMapper userMapper;
+    private final DictService dictService;
     private final ResourceService resourceService;
     private final RoleResourceMapper roleResourceMapper;
 
@@ -277,7 +280,8 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
         }
         // 填充账户分类名称
         if (vo.getAccountType() != null) {
-            vo.setAccountTypeName(getAccountTypeName(vo.getAccountType()));
+            DictVO dictVO = dictService.getByDictCode(vo.getAccountType());
+            vo.setAccountTypeName(dictVO != null ? dictVO.getDictName() : "");
         }
         // 填充数据权限范围名称
         if (vo.getDataScopeType() != null) {
@@ -288,16 +292,6 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
         return vo;
-    }
-
-    /**
-     * 获取账户分类名称
-     *
-     * @param accountType 账户分类
-     * @return 账户分类名称
-     */
-    private String getAccountTypeName(String accountType) {
-        return StatusConstants.getAccountTypeName(accountType);
     }
 
     /**

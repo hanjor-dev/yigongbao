@@ -85,26 +85,6 @@ public final class StatusConstants {
      */
     public static final String ACCOUNT_TYPE_BUSINESS = "6.2";
 
-    /**
-     * 账户分类-企业账户名称
-     */
-    public static final String ACCOUNT_TYPE_ENTERPRISE_NAME = "企业账户";
-
-    /**
-     * 账户分类-业务账户名称
-     */
-    public static final String ACCOUNT_TYPE_BUSINESS_NAME = "业务账户";
-
-    /**
-     * 根据账户分类值获取名称
-     */
-    public static String getAccountTypeName(String accountType) {
-        if (accountType == null) {
-            return "";
-        }
-        return ACCOUNT_TYPE_ENTERPRISE.equals(accountType) ? ACCOUNT_TYPE_ENTERPRISE_NAME : ACCOUNT_TYPE_BUSINESS_NAME;
-    }
-
     // ==================== 操作结果 ====================
 
     /**
@@ -185,24 +165,4 @@ public final class StatusConstants {
      * 部门类型-业务部门
      */
     public static final String DEPT_TYPE_BUSINESS = "6.2";
-
-    /**
-     * 部门类型-企业部门名称
-     */
-    public static final String DEPT_TYPE_ENTERPRISE_NAME = "企业部门";
-
-    /**
-     * 部门类型-业务部门名称
-     */
-    public static final String DEPT_TYPE_BUSINESS_NAME = "业务部门";
-
-    /**
-     * 根据部门类型值获取名称
-     */
-    public static String getDeptTypeName(String deptType) {
-        if (deptType == null) {
-            return "";
-        }
-        return DEPT_TYPE_ENTERPRISE.equals(deptType) ? DEPT_TYPE_ENTERPRISE_NAME : DEPT_TYPE_BUSINESS_NAME;
-    }
 }

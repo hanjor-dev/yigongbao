@@ -287,7 +287,7 @@ class UserControllerTest {
         requestBody.put("password", "123456");
         requestBody.put("realName", "测试用户");
         requestBody.put("phone", "13900000003");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("orgId", 999999);
 
         mockMvc.perform(post("/system/user")
