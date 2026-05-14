@@ -132,7 +132,7 @@ class UserServiceImplTest {
         testEntity.setPassword("$2a$10$xxx");
         testEntity.setRealName("测试用户");
         testEntity.setPhone("13800000001");
-        testEntity.setAccountType(1);
+        testEntity.setAccountType("6.1");
         testEntity.setOrgId(1L);
         testEntity.setDeptId(1L);
         testEntity.setRoleId(1L);
@@ -146,7 +146,7 @@ class UserServiceImplTest {
         createDTO.setPassword("test123");
         createDTO.setRealName("新用户");
         createDTO.setPhone("13900000000");
-        createDTO.setAccountType(1);
+        createDTO.setAccountType("6.1");
         createDTO.setOrgId(1L);
         createDTO.setDeptId(1L);
         createDTO.setRoleId(1L);
@@ -307,7 +307,7 @@ class UserServiceImplTest {
         dto.setUsername("newuser");
         dto.setPhone("13900000000");
         dto.setEmail("exists@example.com");
-        dto.setAccountType(1);
+        dto.setAccountType("6.1");
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -350,7 +350,7 @@ class UserServiceImplTest {
         dto.setUsername("newuser");
         dto.setPhone("13900000000");
         dto.setOrgId(999L);
-        dto.setAccountType(1);
+        dto.setAccountType("6.1");
 
         // 执行 & 断言
         BusinessException exception = assertThrows(
@@ -373,7 +373,7 @@ class UserServiceImplTest {
         dto.setPhone("13900000000");
         dto.setOrgId(1L);
         dto.setDeptId(999L);
-        dto.setAccountType(1);
+        dto.setAccountType("6.1");
 
         // 执行 & 断言
         BusinessException exception = assertThrows(
@@ -398,7 +398,7 @@ class UserServiceImplTest {
         dto.setOrgId(1L);
         dto.setDeptId(1L);
         dto.setRoleId(999L);
-        dto.setAccountType(1);
+        dto.setAccountType("6.1");
 
         // 执行 & 断言
         BusinessException exception = assertThrows(
@@ -416,7 +416,7 @@ class UserServiceImplTest {
         dtoNoPassword.setUsername("newuser");
         dtoNoPassword.setRealName("新用户");
         dtoNoPassword.setPhone("13900000000");
-        dtoNoPassword.setAccountType(1);
+        dtoNoPassword.setAccountType("6.1");
         dtoNoPassword.setOrgId(1L);
 
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
@@ -443,7 +443,7 @@ class UserServiceImplTest {
         dtoNoPassword.setUsername("newuser");
         dtoNoPassword.setRealName("新用户");
         dtoNoPassword.setPhone("13900000000");
-        dtoNoPassword.setAccountType(1);
+        dtoNoPassword.setAccountType("6.1");
         dtoNoPassword.setOrgId(1L);
 
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
@@ -733,7 +733,7 @@ class UserServiceImplTest {
         dtoWithHospitals.setUsername("hospitaluser");
         dtoWithHospitals.setRealName("医院用户");
         dtoWithHospitals.setPhone("13900000002");
-        dtoWithHospitals.setAccountType(1);
+        dtoWithHospitals.setAccountType("6.1");
         dtoWithHospitals.setOrgId(1L);
         dtoWithHospitals.setRoleId(2L);
         dtoWithHospitals.setHospitalIds(List.of(10L, 20L, 30L));
@@ -774,7 +774,7 @@ class UserServiceImplTest {
         dtoWithHospitals.setUsername("normaluser");
         dtoWithHospitals.setRealName("普通用户");
         dtoWithHospitals.setPhone("13900000003");
-        dtoWithHospitals.setAccountType(1);
+        dtoWithHospitals.setAccountType("6.1");
         dtoWithHospitals.setOrgId(1L);
         dtoWithHospitals.setRoleId(3L);
         dtoWithHospitals.setHospitalIds(List.of(10L, 20L));
@@ -815,7 +815,7 @@ class UserServiceImplTest {
         dtoWithoutHospitals.setUsername("nohospitaluser");
         dtoWithoutHospitals.setRealName("无医院用户");
         dtoWithoutHospitals.setPhone("13900000004");
-        dtoWithoutHospitals.setAccountType(1);
+        dtoWithoutHospitals.setAccountType("6.1");
         dtoWithoutHospitals.setOrgId(1L);
         dtoWithoutHospitals.setRoleId(2L);
         // 不设置 hospitalIds
@@ -1091,7 +1091,7 @@ class UserServiceImplTest {
         dto.setPassword("test123");
         dto.setRealName("新设计师");
         dto.setPhone("13911111111");
-        dto.setAccountType(1);
+        dto.setAccountType("6.1");
         dto.setOrgId(1L);
         dto.setRoleId(10L);
         dto.setSpecialtyList(List.of("7.1", "7.2"));
@@ -1132,7 +1132,7 @@ class UserServiceImplTest {
         dto.setPassword("test123");
         dto.setRealName("新设计师2");
         dto.setPhone("13922222222");
-        dto.setAccountType(1);
+        dto.setAccountType("6.1");
         dto.setOrgId(1L);
         dto.setRoleId(10L);
         dto.setSpecialtyList(List.of("invalid"));
@@ -1163,7 +1163,7 @@ class UserServiceImplTest {
         dto.setPassword("test123");
         dto.setRealName("新设计师3");
         dto.setPhone("13933333333");
-        dto.setAccountType(1);
+        dto.setAccountType("6.1");
         dto.setOrgId(1L);
         dto.setRoleId(10L);
         // specialtyList 为 null

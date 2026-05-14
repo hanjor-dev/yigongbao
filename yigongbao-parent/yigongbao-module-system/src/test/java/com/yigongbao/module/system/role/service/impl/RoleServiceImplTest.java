@@ -86,7 +86,7 @@ class RoleServiceImplTest {
         testEntity.setRoleName("管理员");
         testEntity.setRoleCode("ROLE_ADMIN");
         testEntity.setRoleDesc("系统管理员");
-        testEntity.setAccountType(1);
+        testEntity.setAccountType("6.1");
         testEntity.setDataScopeType("org");
         testEntity.setStatus(1);
         testEntity.setCreateTime(now);
@@ -97,7 +97,7 @@ class RoleServiceImplTest {
         createDTO.setRoleName("测试角色");
         createDTO.setRoleCode("ROLE_TEST");
         createDTO.setRoleDesc("测试角色描述");
-        createDTO.setAccountType(1);
+        createDTO.setAccountType("6.1");
         createDTO.setDataScopeType("org");
 
         // 初始化更新DTO
@@ -224,7 +224,7 @@ class RoleServiceImplTest {
         dtoWithHospitalScope.setRoleName("业务员");
         dtoWithHospitalScope.setRoleCode("ROLE_SALES");
         dtoWithHospitalScope.setRoleDesc("医院范围权限");
-        dtoWithHospitalScope.setAccountType(1);
+        dtoWithHospitalScope.setAccountType("6.1");
         dtoWithHospitalScope.setDataScopeType("hospitals");
 
         when(roleMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);

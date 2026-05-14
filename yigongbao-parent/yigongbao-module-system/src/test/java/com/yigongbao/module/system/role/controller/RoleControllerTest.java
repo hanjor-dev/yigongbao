@@ -74,7 +74,7 @@ class RoleControllerTest {
         mockMvc.perform(get("/system/role/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
-                        .param("accountType", "1"))
+                        .param("accountType", "6.1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.records").isArray());
@@ -122,7 +122,7 @@ class RoleControllerTest {
         requestBody.put("roleName", "测试角色");
         requestBody.put("roleCode", "ROLE_TEST");
         requestBody.put("roleDesc", "测试角色描述");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("dataScopeType", "org");
 
         mockMvc.perform(post("/system/role")
@@ -139,7 +139,7 @@ class RoleControllerTest {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("roleName", "测试角色");
         requestBody.put("roleCode", "ROLE_ADMIN");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("dataScopeType", "org");
 
         mockMvc.perform(post("/system/role")
@@ -155,7 +155,7 @@ class RoleControllerTest {
     void create_whenRoleNameEmpty_shouldReturnError() throws Exception {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("roleCode", "ROLE_TEST2");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
 
         mockMvc.perform(post("/system/role")
                         .contentType(MediaType.APPLICATION_JSON)

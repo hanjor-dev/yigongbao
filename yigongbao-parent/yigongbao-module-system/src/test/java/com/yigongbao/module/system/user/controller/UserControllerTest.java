@@ -130,7 +130,7 @@ class UserControllerTest {
         mockMvc.perform(get("/system/user/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
-                        .param("accountType", "1"))
+                        .param("accountType", "6.1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.records").isArray());
@@ -180,7 +180,7 @@ class UserControllerTest {
         requestBody.put("realName", "测试用户");
         requestBody.put("phone", "13900000000");
         requestBody.put("email", "test@test.com");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("orgId", 1);
 
         mockMvc.perform(post("/system/user")
@@ -199,7 +199,7 @@ class UserControllerTest {
         requestBody.put("password", "123456");
         requestBody.put("realName", "测试用户");
         requestBody.put("phone", "13900000000");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("orgId", 1);
 
         mockMvc.perform(post("/system/user")
@@ -218,7 +218,7 @@ class UserControllerTest {
         requestBody.put("password", "123456");
         requestBody.put("realName", "测试用户");
         requestBody.put("phone", "13800000001");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("orgId", 1);
 
         mockMvc.perform(post("/system/user")
@@ -236,7 +236,7 @@ class UserControllerTest {
         requestBody.put("password", "123456");
         requestBody.put("realName", "测试用户");
         requestBody.put("phone", "13900000001");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("orgId", 1);
 
         mockMvc.perform(post("/system/user")
@@ -253,7 +253,7 @@ class UserControllerTest {
         requestBody.put("password", "123");
         requestBody.put("realName", "测试用户");
         requestBody.put("phone", "13900000002");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("orgId", 1);
 
         mockMvc.perform(post("/system/user")
@@ -270,7 +270,7 @@ class UserControllerTest {
         requestBody.put("password", "123456");
         requestBody.put("realName", "测试用户");
         requestBody.put("phone", "12345");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("orgId", 1);
 
         mockMvc.perform(post("/system/user")
@@ -306,7 +306,7 @@ class UserControllerTest {
         requestBody.put("password", "123456");
         requestBody.put("realName", "测试用户");
         requestBody.put("phone", "13900000004");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("orgId", 1);
         requestBody.put("deptId", 999999);
 
@@ -326,7 +326,7 @@ class UserControllerTest {
         requestBody.put("password", "123456");
         requestBody.put("realName", "测试用户");
         requestBody.put("phone", "13900000005");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("orgId", 1);
         requestBody.put("roleId", 999999);  // 不存在的角色
 
@@ -346,7 +346,7 @@ class UserControllerTest {
         // 不传password字段
         requestBody.put("realName", "测试用户");
         requestBody.put("phone", "13900000006");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("orgId", 1);
 
         mockMvc.perform(post("/system/user")
@@ -564,7 +564,7 @@ class UserControllerTest {
         requestBody.put("password", "123456");
         requestBody.put("realName", "医院用户1");
         requestBody.put("phone", "13900000011");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("orgId", 1);
         requestBody.put("roleId", 4);  // 业务员角色，dataScopeType=hospitals
         requestBody.put("hospitalIds", List.of(1L, 2L));
@@ -592,7 +592,7 @@ class UserControllerTest {
         requestBody.put("password", "123456");
         requestBody.put("realName", "普通用户1");
         requestBody.put("phone", "13900000012");
-        requestBody.put("accountType", 1);
+        requestBody.put("accountType", "6.1");
         requestBody.put("orgId", 1);
         requestBody.put("roleId", 1);  // 公司管理员角色，dataScopeType=all
         // 不传 hospitalIds
