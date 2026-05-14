@@ -49,8 +49,10 @@ public class UpdateUserDTO implements Serializable {
     private String avatar;
 
     /**
-     * 账户分类（6.1=企业账户，6.2=业务账户）
+     * 账户分类（字典编码：6.1=企业账户，6.2=业务账户）
+     * 必填，必须与所选角色的账户分类一致
      */
+    @NotBlank(message = "账户分类不能为空")
     @Pattern(regexp = "^(6\\.1|6\\.2)$", message = "账户分类值不合法，仅支持6.1（企业账户）或6.2（业务账户）")
     private String accountType;
 
