@@ -101,7 +101,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
             Page<OrgEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
-            // 固定排除生产企业（内置，不对外展示）和未知医院（占位，不对外展示）
+            // 固定排除生产企业（内置，不对外展示）和其他医院（占位，不对外展示）
             String unknownHospitalIdStr = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
             wrapper.ne(OrgEntity::getOrgType, DictCodeConstants.ORG_TYPE_PRODUCER);
             if (unknownHospitalIdStr != null) {
@@ -165,6 +165,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                         new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
                                 .eq(OrgHospitalEntity::getDistributorOrgId, id))
                         .stream().map(OrgHospitalEntity::getHospitalOrgId).collect(Collectors.toList());
+                assert vo != null;
                 vo.setHospitalOrgIds(hospitalOrgIds);
                 if (!hospitalOrgIds.isEmpty()) {
                     List<OrgEntity> hospitals = listByIds(hospitalOrgIds);
