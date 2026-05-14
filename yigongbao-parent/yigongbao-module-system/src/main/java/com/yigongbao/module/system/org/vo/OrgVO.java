@@ -144,4 +144,9 @@ public class OrgVO {
      * 账号前缀（英文字母和数字，2-16位）
      */
     private String usernamePrefix;
+
+    /**
+     * 资质文件详细信息
+     */
+    private com.yigongbao.module.basic.file.vo.FileVO qualificationFileInfo;
 }

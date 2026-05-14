@@ -172,6 +172,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                     vo.setHospitalOrgNames(hospitals.stream().map(OrgEntity::getOrgName).collect(Collectors.toList()));
                 }
             }
+            // 填充资质文件详细信息
+            if (StrUtil.isNotBlank(entity.getQualificationFile())) {
+                vo.setQualificationFileInfo(fileService.getById(entity.getQualificationFile()));
+            }
             return vo;
         } catch (BusinessException e) {
             throw e;
