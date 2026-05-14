@@ -50,9 +50,13 @@ import org.springframework.transaction.annotation.Transactional;
 import cn.hutool.core.util.StrUtil;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 机构 Service 实现类
@@ -110,8 +114,28 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                     .orderByDesc(OrgEntity::getCreateTime);
             // 执行分页查询
             IPage<OrgEntity> pageResult = page(page, wrapper);
+
+            // 批量查询字典，避免循环中逐条查询（N+1 问题）
+            Map<String, String> dictNameMap = Collections.emptyMap();
+            List<OrgEntity> records = pageResult.getRecords();
+            if (!records.isEmpty()) {
+                // 收集所有需要的字典编码（去重）
+                Set<String> dictCodes = records.stream()
+                        .flatMap(org -> Stream.of(org.getOrgType(), org.getHospitalLevel(), org.getHospitalType()))
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+                // 批量查询字典并构建 Map（dictCode -> dictName）
+                if (!dictCodes.isEmpty()) {
+                    dictNameMap = dictCodes.stream()
+                            .map(dictService::getByDictCode)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toMap(DictVO::getDictCode, DictVO::getDictName));
+                }
+            }
+
             // 转换为VO并填充字典名称
-            IPage<OrgVO> voPage = pageResult.convert(this::toVOWithDictNames);
+            Map<String, String> finalDictMap = dictNameMap;
+            IPage<OrgVO> voPage = pageResult.convert(entity -> toVOWithDictNames(entity, finalDictMap));
             log.info("分页查询机构列表成功，总数={}", pageResult.getTotal());
             return voPage;
         } catch (Exception e) {
@@ -462,6 +486,37 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
 
     /**
      * 转换为VO并填充字典名称
+     *
+     * @param entity 机构实体
+     * @return 机构VO
+     */
+    /**
+     * 转换为VO并填充字典名称（使用字典Map，避免重复查询）
+     *
+     * @param entity 机构实体
+     * @param dictNameMap 字典Map（dictCode -> dictName）
+     * @return 机构VO
+     */
+    private OrgVO toVOWithDictNames(OrgEntity entity, Map<String, String> dictNameMap) {
+        OrgVO vo = OrgConvert.toVO(entity);
+        if (vo == null) return null;
+        if (vo.getOrgType() != null) {
+            vo.setOrgTypeName(dictNameMap.get(vo.getOrgType()));
+        }
+        if (vo.getStatus() != null) {
+            vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
+        }
+        if (vo.getHospitalLevel() != null) {
+            vo.setHospitalLevelName(dictNameMap.get(vo.getHospitalLevel()));
+        }
+        if (vo.getHospitalType() != null) {
+            vo.setHospitalTypeName(dictNameMap.get(vo.getHospitalType()));
+        }
+        return vo;
+    }
+
+    /**
+     * 转换为VO并填充字典名称（单条查询场景）
      *
      * @param entity 机构实体
      * @return 机构VO
