@@ -167,18 +167,55 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         Map<Long, String> hospitalNameMap = allHospitalIds.isEmpty() ? Collections.emptyMap()
                 : orgService.listByIds(allHospitalIds).stream()
                         .collect(Collectors.toMap(OrgEntity::getId, OrgEntity::getOrgName));
+
+        // 批量查询字典，避免循环中逐条查询（N+1 问题）
+        Map<String, String> dictNameMap = Collections.emptyMap();
+        Map<Integer, String> settlementTypeNameMap = Collections.emptyMap();
+        if (!voPage.getRecords().isEmpty()) {
+            // 收集所有需要的字典编码（去重）
+            Set<String> dictCodes = new java.util.HashSet<>();
+            Set<Integer> settlementTypes = new java.util.HashSet<>();
+            for (UserVO vo : voPage.getRecords()) {
+                if (StrUtil.isNotBlank(vo.getSex())) dictCodes.add(vo.getSex());
+                if (vo.getAccountType() != null) dictCodes.add(vo.getAccountType());
+                if (StrUtil.isNotBlank(vo.getSpecialty())) {
+                    dictCodes.addAll(StrUtil.split(vo.getSpecialty(), ','));
+                }
+                if (vo.getSettlementType() != null) settlementTypes.add(vo.getSettlementType());
+            }
+            // 批量查询字典并构建 Map（dictCode -> dictName）
+            if (!dictCodes.isEmpty()) {
+                dictNameMap = dictCodes.stream()
+                        .map(dictService::getByDictCode)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toMap(DictVO::getDictCode, DictVO::getDictName));
+            }
+            // 批量查询结算类型字典（parentId=36，通过 dictValue 查询）
+            if (!settlementTypes.isEmpty()) {
+                settlementTypeNameMap = dictService.lambdaQuery()
+                        .eq(DictEntity::getParentId, 36L)
+                        .in(DictEntity::getDictValue, settlementTypes.stream()
+                                .map(Object::toString).collect(Collectors.toList()))
+                        .list()
+                        .stream()
+                        .collect(Collectors.toMap(
+                                d -> Integer.parseInt(d.getDictValue()),
+                                DictEntity::getDictName));
+            }
+        }
+
         // 转换后再填充 VO 中需要名称的字段和医院ID列表
+        Map<String, String> finalDictMap = dictNameMap;
+        Map<Integer, String> finalSettlementTypeMap = settlementTypeNameMap;
         for (UserVO vo : voPage.getRecords()) {
             if (vo.getStatus() != null) {
                 vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
             }
             if (StrUtil.isNotBlank(vo.getSex())) {
-                var sexDict = dictService.getByDictCode(vo.getSex());
-                vo.setSexName(sexDict != null ? sexDict.getDictName() : "");
+                vo.setSexName(finalDictMap.getOrDefault(vo.getSex(), ""));
             }
             if (vo.getAccountType() != null) {
-                DictVO accountTypeDict = dictService.getByDictCode(vo.getAccountType());
-                vo.setAccountTypeName(accountTypeDict != null ? accountTypeDict.getDictName() : "");
+                vo.setAccountTypeName(finalDictMap.getOrDefault(vo.getAccountType(), ""));
             }
             // 填充角色的 dataScopeType
             if (vo.getRoleId() != null) {
@@ -201,23 +238,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 List<String> specList = StrUtil.split(vo.getSpecialty(), ',');
                 vo.setSpecialtyList(specList);
                 List<String> nameList = specList.stream()
-                        .map(code -> {
-                            var dict = dictService.getByDictCode(code);
-                            return dict != null ? dict.getDictName() : code;
-                        })
+                        .map(code -> finalDictMap.getOrDefault(code, code))
                         .collect(Collectors.toList());
                 vo.setSpecialtyNameList(nameList);
                 vo.setSpecialtyName(String.join(",", nameList));
             }
             // 填充结算类型名称
             if (vo.getSettlementType() != null) {
-                // settlementType 存储的是整数值 1/2/3，对应字典 8.1/8.2/8.3
-                // 结算类型父节点 dict_code=DictCodeConstants.SETTLEMENT_TYPE("8")，其数据库 id=36
-                DictEntity dictEntity = dictService.lambdaQuery()
-                        .eq(DictEntity::getParentId, 36L)
-                        .eq(DictEntity::getDictValue, vo.getSettlementType().toString())
-                        .one();
-                vo.setSettlementTypeName(dictEntity != null ? dictEntity.getDictName() : null);
+                vo.setSettlementTypeName(finalSettlementTypeMap.get(vo.getSettlementType()));
             }
         }
         log.info("分页查询用户列表成功，总数={}", pageResult.getTotal());
