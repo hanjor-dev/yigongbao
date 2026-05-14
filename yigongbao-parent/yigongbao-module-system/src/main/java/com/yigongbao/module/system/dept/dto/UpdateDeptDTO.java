@@ -21,9 +21,9 @@ public class UpdateDeptDTO {
     private String deptName;
 
     /**
-     * 部门类型（1=内部，2=外部）
+     * 部门类型（字典编码：6.1=企业部门，6.2=业务部门）
      */
-    private Integer deptType;
+    private String deptType;
 
     /**
      * 关联机构ID列表

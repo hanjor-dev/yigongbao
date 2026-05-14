@@ -173,4 +173,36 @@ public final class StatusConstants {
      * 设计文档确认状态-已确认
      */
     public static final int CONFIRMED = 1;
+
+    // ==================== 部门类型 ====================
+
+    /**
+     * 部门类型-企业部门
+     */
+    public static final String DEPT_TYPE_ENTERPRISE = "6.1";
+
+    /**
+     * 部门类型-业务部门
+     */
+    public static final String DEPT_TYPE_BUSINESS = "6.2";
+
+    /**
+     * 部门类型-企业部门名称
+     */
+    public static final String DEPT_TYPE_ENTERPRISE_NAME = "企业部门";
+
+    /**
+     * 部门类型-业务部门名称
+     */
+    public static final String DEPT_TYPE_BUSINESS_NAME = "业务部门";
+
+    /**
+     * 根据部门类型值获取名称
+     */
+    public static String getDeptTypeName(String deptType) {
+        if (deptType == null) {
+            return "";
+        }
+        return DEPT_TYPE_ENTERPRISE.equals(deptType) ? DEPT_TYPE_ENTERPRISE_NAME : DEPT_TYPE_BUSINESS_NAME;
+    }
 }

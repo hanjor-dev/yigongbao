@@ -31,9 +31,9 @@ public class DeptEntity extends BaseEntity implements Serializable {
     private String deptCode;
 
     /**
-     * 部门类型（1=内部，2=外部）
+     * 部门类型（字典编码：6.1=企业部门，6.2=业务部门）
      */
-    private Integer deptType;
+    private String deptType;
 
     /**
      * 部门负责人姓名（自由输入）

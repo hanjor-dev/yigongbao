@@ -339,11 +339,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     throw new BusinessException(ErrorCodeEnum.USER_DEPT_NOT_FOUND);
                 }
             }
-            // 根据部门类型走不同的机构归属校验分支（内部部门强制绑定生产企业，外部部门校验 orgId 属于该部门）
+            // 根据部门类型走不同的机构归属校验分支（企业部门强制绑定生产企业，业务部门校验 orgId 属于该部门）
             if (deptEntity != null) {
-                Integer deptType = deptEntity.getDeptType();
-                if (Integer.valueOf(1).equals(deptType)) {
-                    // 内部部门（deptType=1）：强制覆盖 orgId 为生产企业，防止前端伪造归属；同时要求工号非空
+                String deptType = deptEntity.getDeptType();
+                if (StatusConstants.DEPT_TYPE_ENTERPRISE.equals(deptType)) {
+                    // 企业部门（deptType=6.1）：强制覆盖 orgId 为生产企业，防止前端伪造归属；同时要求工号非空
                     String manufacturerOrgIdStr = configService.getConfigValue(SystemConfigKeyEnum.MANUFACTURER_ORG_ID.getKey());
                     if (StrUtil.isBlank(manufacturerOrgIdStr)) {
                         log.error("系统配置缺失：{}，无法创建内部用户", SystemConfigKeyEnum.MANUFACTURER_ORG_ID.getKey());
@@ -356,8 +356,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     if (StrUtil.isBlank(dto.getEmployeeNo())) {
                         throw new BusinessException(ErrorCodeEnum.EMPLOYEE_NO_REQUIRED);
                     }
-                } else if (Integer.valueOf(2).equals(deptType)) {
-                    // 外部部门（deptType=2）：orgId 必填，且该机构必须已关联到此部门
+                } else if (StatusConstants.DEPT_TYPE_BUSINESS.equals(deptType)) {
+                    // 业务部门（deptType=6.2）：orgId 必填，且该机构必须已关联到此部门
                     if (dto.getOrgId() == null) {
                         throw new BusinessException(ErrorCodeEnum.ORG_NOT_BELONG_TO_DEPT);
                     }

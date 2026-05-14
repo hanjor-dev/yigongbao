@@ -42,9 +42,14 @@ public class DeptVO {
     private String deptCode;
 
     /**
-     * 部门类型（1=内部，2=外部）
+     * 部门类型（字典编码：6.1=企业部门，6.2=业务部门）
      */
-    private Integer deptType;
+    private String deptType;
+
+    /**
+     * 部门类型名称
+     */
+    private String deptTypeName;
 
     /**
      * 关联机构列表

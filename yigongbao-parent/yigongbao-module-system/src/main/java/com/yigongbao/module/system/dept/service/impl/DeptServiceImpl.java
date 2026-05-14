@@ -177,7 +177,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                 }
             }
             // 若未传入新 deptType，则沿用原值，用于后续机构类型匹配校验
-            Integer deptType = dto.getDeptType() != null ? dto.getDeptType() : entity.getDeptType();
+            String deptType = dto.getDeptType() != null ? dto.getDeptType() : entity.getDeptType();
             if (dto.getOrgIds() != null && !dto.getOrgIds().isEmpty()) {
                 validateOrgTypeMatchDeptType(dto.getOrgIds(), deptType, id);
             } else if (dto.getDeptType() != null && !dto.getDeptType().equals(entity.getDeptType()) && dto.getOrgIds() == null) {
@@ -366,6 +366,9 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
         if (vo.getStatus() != null) {
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
+        if (vo.getDeptType() != null) {
+            vo.setDeptTypeName(StatusConstants.getDeptTypeName(vo.getDeptType()));
+        }
         return vo;
     }
 
@@ -404,16 +407,16 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
 
     /**
      * 校验机构类型与部门类型的匹配关系，并附加以下约束：
-     * - 内部部门（deptType=1）：orgIds 只能传一个，且必须是生产企业
-     * - 外部部门（deptType=2）：每个经销商只能属于一个外部部门（排除 excludeDeptId 自身）
+     * - 企业部门（deptType=6.1）：orgIds 只能传一个，且必须是生产企业
+     * - 业务部门（deptType=6.2）：每个经销商只能属于一个业务部门（排除 excludeDeptId 自身）
      *
      * @param orgIds        待关联的机构ID列表
-     * @param deptType      部门类型（1=内部，2=外部）
+     * @param deptType      部门类型（字典编码：6.1=企业部门，6.2=业务部门）
      * @param excludeDeptId 更新时排除自身，创建时传 null
      */
-    private void validateOrgTypeMatchDeptType(List<Long> orgIds, Integer deptType, Long excludeDeptId) {
-        if (deptType == 1) {
-            // 内部部门只能关联一个生产企业
+    private void validateOrgTypeMatchDeptType(List<Long> orgIds, String deptType, Long excludeDeptId) {
+        if (StatusConstants.DEPT_TYPE_ENTERPRISE.equals(deptType)) {
+            // 企业部门只能关联一个生产企业
             if (orgIds.size() > 1) {
                 throw new BusinessException(ErrorCodeEnum.DEPT_INTERNAL_ORG_LIMIT);
             }
@@ -423,7 +426,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                 throw new BusinessException(ErrorCodeEnum.ORG_DEPT_TYPE_MISMATCH);
             }
         } else {
-            // 外部部门：校验机构类型均为经销商
+            // 业务部门：校验机构类型均为经销商
             List<OrgEntity> orgs = orgService.listByIds(orgIds);
             boolean mismatch = orgs.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_DEALER.equals(o.getOrgType()));
             if (mismatch) {

@@ -82,7 +82,7 @@ class DeptServiceImplTest {
         testEntity.setId(1L);
         testEntity.setDeptName("研发部");
         testEntity.setDeptCode("DEPT-001");
-        testEntity.setDeptType(1);
+        testEntity.setDeptType("6.1");
         testEntity.setLeaderUser(null);
         testEntity.setStatus(1);
         testEntity.setCreateTime(now);
@@ -91,7 +91,7 @@ class DeptServiceImplTest {
         // 初始化创建DTO
         createDTO = new CreateDeptDTO();
         createDTO.setDeptName("市场部");
-        createDTO.setDeptType(1);
+        createDTO.setDeptType("6.1");
         createDTO.setOrgIds(List.of(1L));
         createDTO.setLeaderUser(null);
         createDTO.setRemark("市场部门");
@@ -120,7 +120,7 @@ class DeptServiceImplTest {
         DeptPageDTO pageDTO = new DeptPageDTO();
         pageDTO.setPageNum(1);
         pageDTO.setPageSize(10);
-        pageDTO.setDeptType(1);
+        pageDTO.setDeptType("6.1");
         IPage<DeptVO> result = deptService.listDept(pageDTO);
 
         // 断言
@@ -212,7 +212,7 @@ class DeptServiceImplTest {
         // 设置一个不存在的机构ID
         CreateDeptDTO dto = new CreateDeptDTO();
         dto.setDeptName("测试部门");
-        dto.setDeptType(2);
+        dto.setDeptType("6.2");
         dto.setOrgIds(List.of(999L));
 
         // 执行 & 断言

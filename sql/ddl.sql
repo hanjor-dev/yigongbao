@@ -88,7 +88,7 @@ CREATE TABLE sys_dept (
     id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     dept_name           VARCHAR(128)    NOT NULL COMMENT '部门名称',
     dept_code           VARCHAR(32)     NOT NULL COMMENT '部门编码',
-    dept_type           TINYINT         NOT NULL COMMENT '部门类型（1=内部，2=外部）',
+    dept_type           VARCHAR(10)     NOT NULL COMMENT '部门类型（字典编码：6.1=企业部门，6.2=业务部门）',
     leader_user         VARCHAR(64)     COMMENT '部门负责人姓名（自由输入）',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark              VARCHAR(512)    COMMENT '备注说明',

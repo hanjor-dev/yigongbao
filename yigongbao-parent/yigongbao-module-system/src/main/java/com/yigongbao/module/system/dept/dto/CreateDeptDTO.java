@@ -4,6 +4,7 @@ import lombok.Data;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 
@@ -24,10 +25,12 @@ public class CreateDeptDTO {
     private String deptName;
 
     /**
-     * 部门类型（1=内部，2=外部）
+     * 部门类型（字典编码：6.1=企业部门，6.2=业务部门）
+     * 必填
      */
-    @NotNull(message = "部门类型不能为空")
-    private Integer deptType;
+    @NotBlank(message = "部门类型不能为空")
+    @Pattern(regexp = "^(6\\.1|6\\.2)$", message = "部门类型值不合法，仅支持6.1（企业部门）或6.2（业务部门）")
+    private String deptType;
 
     /**
      * 关联机构ID列表

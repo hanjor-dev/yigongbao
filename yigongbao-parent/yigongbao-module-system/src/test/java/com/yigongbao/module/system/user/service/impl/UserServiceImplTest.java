@@ -114,7 +114,7 @@ class UserServiceImplTest {
         testDept.setId(1L);
         testDept.setDeptName("研发部");
         testDept.setDeptCode("DEPT-001");
-        testDept.setDeptType(2);
+        testDept.setDeptType("6.2");
         testDept.setStatus(1);
 
         // 初始化测试角色实体
