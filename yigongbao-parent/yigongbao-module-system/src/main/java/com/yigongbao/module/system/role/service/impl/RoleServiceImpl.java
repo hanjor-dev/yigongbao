@@ -29,8 +29,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.hutool.core.util.StrUtil;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -70,7 +74,28 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
                     .eq(Objects.nonNull(dto.getStatus()), RoleEntity::getStatus, dto.getStatus())
                     .orderByDesc(RoleEntity::getCreateTime);
             IPage<RoleEntity> pageResult = page(page, wrapper);
-            IPage<RoleVO> voPage = pageResult.convert(this::toVOWithNames);
+
+            // 批量查询字典，避免 N+1 问题
+            Map<String, String> accountTypeNameMap = Collections.emptyMap();
+            List<RoleEntity> records = pageResult.getRecords();
+            if (!records.isEmpty()) {
+                // 收集所有不同的 accountType 值
+                Set<String> accountTypes = records.stream()
+                        .map(RoleEntity::getAccountType)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+                // 批量查询字典并构建 Map（dictCode -> dictName）
+                if (!accountTypes.isEmpty()) {
+                    accountTypeNameMap = accountTypes.stream()
+                            .map(dictService::getByDictCode)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toMap(DictVO::getDictCode, DictVO::getDictName));
+                }
+            }
+
+            // 使用 Map 填充 VO
+            Map<String, String> finalMap = accountTypeNameMap;
+            IPage<RoleVO> voPage = pageResult.convert(entity -> toVOWithNames(entity, finalMap));
             log.info("分页查询角色列表成功，总数={}", pageResult.getTotal());
             return voPage;
         } catch (Exception e) {
@@ -268,7 +293,34 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
     // ==================== 私有方法 ====================
 
     /**
-     * 转换为VO并填充关联名称
+     * 转换为VO并填充关联名称（使用字典Map，避免重复查询）
+     *
+     * @param entity 角色实体
+     * @param accountTypeNameMap 账户分类字典Map（dictCode -> dictName）
+     * @return 角色VO
+     */
+    private RoleVO toVOWithNames(RoleEntity entity, Map<String, String> accountTypeNameMap) {
+        RoleVO vo = RoleConvert.toVO(entity);
+        if (vo == null) {
+            return null;
+        }
+        // 从 Map 中获取账户分类名称
+        if (vo.getAccountType() != null) {
+            vo.setAccountTypeName(accountTypeNameMap.getOrDefault(vo.getAccountType(), ""));
+        }
+        // 填充数据权限范围名称
+        if (vo.getDataScopeType() != null) {
+            vo.setDataScopeTypeName(DataScopeTypeEnum.getDescByCode(vo.getDataScopeType()));
+        }
+        // 填充状态名称
+        if (vo.getStatus() != null) {
+            vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
+        }
+        return vo;
+    }
+
+    /**
+     * 转换为VO并填充关联名称（单条查询场景）
      *
      * @param entity 角色实体
      * @return 角色VO
