@@ -35,8 +35,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.hutool.core.util.StrUtil;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -80,7 +85,51 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                     .eq(Objects.nonNull(dto.getStatus()), DeptEntity::getStatus, dto.getStatus())
                     .orderByDesc(DeptEntity::getCreateTime);
             IPage<DeptEntity> pageResult = page(page, wrapper);
-            IPage<DeptVO> voPage = pageResult.convert(this::toVOWithNames);
+
+            // 批量查询字典和关联机构，避免循环中逐条查询（N+1 问题）
+            Map<String, String> dictNameMap = Collections.emptyMap();
+            Map<Long, List<OrgEntity>> deptOrgMap = Collections.emptyMap();
+            List<DeptEntity> records = pageResult.getRecords();
+            if (!records.isEmpty()) {
+                // 收集所有需要的字典编码（去重）
+                Set<String> dictCodes = records.stream()
+                        .map(DeptEntity::getDeptType)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+                // 批量查询字典并构建 Map（dictCode -> dictName）
+                if (!dictCodes.isEmpty()) {
+                    dictNameMap = dictCodes.stream()
+                            .map(dictService::getByDictCode)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toMap(DictVO::getDictCode, DictVO::getDictName));
+                }
+                // 批量查询所有部门的关联机构（一次查询替代N次查询）
+                List<Long> deptIds = records.stream().map(DeptEntity::getId).collect(Collectors.toList());
+                List<DeptOrgEntity> deptOrgList = deptOrgMapper.selectList(
+                        new LambdaQueryWrapper<DeptOrgEntity>().in(DeptOrgEntity::getDeptId, deptIds));
+                if (!deptOrgList.isEmpty()) {
+                    // 收集所有机构ID并批量查询机构信息
+                    Set<Long> orgIds = deptOrgList.stream()
+                            .map(DeptOrgEntity::getOrgId)
+                            .collect(Collectors.toSet());
+                    Map<Long, OrgEntity> orgMap = orgService.listByIds(new ArrayList<>(orgIds)).stream()
+                            .collect(Collectors.toMap(OrgEntity::getId, Function.identity()));
+                    // 构建 Map<deptId, List<OrgEntity>>
+                    deptOrgMap = deptOrgList.stream()
+                            .collect(Collectors.groupingBy(
+                                    DeptOrgEntity::getDeptId,
+                                    Collectors.mapping(
+                                            rel -> orgMap.get(rel.getOrgId()),
+                                            Collectors.filtering(Objects::nonNull, Collectors.toList())
+                                    )
+                            ));
+                }
+            }
+
+            // 转换为VO并填充字典名称和关联机构
+            Map<String, String> finalDictMap = dictNameMap;
+            Map<Long, List<OrgEntity>> finalDeptOrgMap = deptOrgMap;
+            IPage<DeptVO> voPage = pageResult.convert(entity -> toVOWithNames(entity, finalDictMap, finalDeptOrgMap));
             log.info("分页查询部门列表成功，总数={}", pageResult.getTotal());
             return voPage;
         } catch (Exception e) {
@@ -347,6 +396,44 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
      *
      * @param entity 部门实体
      * @return 填充了关联名称的部门 VO，entity 为 null 时返回 null
+     */
+    /**
+     * 转换为VO并填充关联名称（使用Map，避免重复查询）
+     *
+     * @param entity 部门实体
+     * @param dictNameMap 字典Map（dictCode -> dictName）
+     * @param deptOrgMap 部门关联机构Map（deptId -> List<OrgEntity>）
+     * @return 部门VO
+     */
+    private DeptVO toVOWithNames(DeptEntity entity, Map<String, String> dictNameMap, Map<Long, List<OrgEntity>> deptOrgMap) {
+        DeptVO vo = DeptConvert.toVO(entity);
+        if (vo == null) return null;
+        // 从 Map 中获取关联机构
+        List<OrgEntity> orgs = deptOrgMap.getOrDefault(entity.getId(), Collections.emptyList());
+        if (!orgs.isEmpty()) {
+            vo.setOrgs(orgs.stream().map(o -> {
+                DeptVO.OrgSimpleVO s = new DeptVO.OrgSimpleVO();
+                s.setId(o.getId());
+                s.setOrgName(o.getOrgName());
+                s.setOrgCode(o.getOrgCode());
+                s.setOrgType(o.getOrgType());
+                return s;
+            }).collect(Collectors.toList()));
+        }
+        if (vo.getStatus() != null) {
+            vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
+        }
+        if (vo.getDeptType() != null) {
+            vo.setDeptTypeName(dictNameMap.getOrDefault(vo.getDeptType(), ""));
+        }
+        return vo;
+    }
+
+    /**
+     * 转换为VO并填充关联名称（单条查询场景）
+     *
+     * @param entity 部门实体
+     * @return 部门VO
      */
     private DeptVO toVOWithNames(DeptEntity entity) {
         DeptVO vo = DeptConvert.toVO(entity);
