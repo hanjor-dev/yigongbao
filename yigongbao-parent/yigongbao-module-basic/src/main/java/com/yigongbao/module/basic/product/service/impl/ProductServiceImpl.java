@@ -157,7 +157,8 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, ProductEntity
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void create(CreateProductDTO dto) {
-        log.info("创建产品，productName={}", dto.getProductName());
+        log.info("创建产品，productName={}, category={}, categoryName={}",
+                dto.getProductName(), dto.getCategory(), dto.getCategoryName());
         try {
             // 校验产品名称唯一性
             long nameCount = super.count(new LambdaQueryWrapper<ProductEntity>()
@@ -165,6 +166,12 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, ProductEntity
             if (nameCount > 0) {
                 log.warn("产品名称已存在，productName={}", dto.getProductName());
                 throw new BusinessException(ErrorCodeEnum.PRODUCT_EXISTS);
+            }
+
+            // 校验 categoryName 必须提供（架构约束：basic 模块无法依赖 system 模块的 DictService）
+            if (StrUtil.isNotBlank(dto.getCategory()) && StrUtil.isBlank(dto.getCategoryName())) {
+                log.warn("产品类型名称未提供，category={}", dto.getCategory());
+                throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "产品类型名称");
             }
 
             ProductEntity entity = ProductConvert.toEntity(dto);
@@ -191,12 +198,18 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, ProductEntity
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void update(Long id, UpdateProductDTO dto) {
-        log.info("更新产品，id={}", id);
+        log.info("更新产品，id={}, category={}, categoryName={}", id, dto.getCategory(), dto.getCategoryName());
         try {
             ProductEntity entity = super.getById(id);
             if (entity == null) {
                 log.warn("产品不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
+            }
+
+            // 校验：若更新 category，则 categoryName 也必须提供（架构约束：basic 模块无法依赖 system 模块的 DictService）
+            if (StrUtil.isNotBlank(dto.getCategory()) && StrUtil.isBlank(dto.getCategoryName())) {
+                log.warn("产品类型变更时未提供类型名称，category={}", dto.getCategory());
+                throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "产品类型名称");
             }
 
             BeanUtils.copyProperties(dto, entity, "id", "createTime", "updateTime", "createBy", "updateBy", "categoryName");

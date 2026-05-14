@@ -26,7 +26,9 @@ public class UpdateProductDTO implements Serializable {
     private String category;
 
     /**
-     * 大类名称（冗余）
+     * 大类名称（冗余字段）
+     * 注意：若更新 category，必须同时提供 categoryName
+     * 原因：模块架构约束，basic 模块无法依赖 system 模块的字典服务
      */
     private String categoryName;
 

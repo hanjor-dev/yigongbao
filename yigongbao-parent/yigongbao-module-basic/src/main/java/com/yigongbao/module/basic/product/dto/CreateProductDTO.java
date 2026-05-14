@@ -29,7 +29,9 @@ public class CreateProductDTO implements Serializable {
     private String category;
 
     /**
-     * 大类名称（冗余）
+     * 大类名称（冗余字段，必填）
+     * 注意：由于模块架构约束，basic 模块无法依赖 system 模块的字典服务，
+     * 因此前端必须同时提供 category（字典编码）和 categoryName（字典名称）
      */
     private String categoryName;
 
