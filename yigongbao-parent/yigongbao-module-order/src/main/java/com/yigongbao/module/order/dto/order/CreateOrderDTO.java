@@ -62,7 +62,6 @@ public class CreateOrderDTO implements Serializable {
     /**
      * 操作员电话
      */
-    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "操作员电话格式不正确")
     private String operatorPhone;
 
     // ==================== 医院与科室 ====================
@@ -76,6 +75,11 @@ public class CreateOrderDTO implements Serializable {
      * 医院名称
      */
     private String hospitalName;
+
+    /**
+     * 医院科室ID
+     */
+    private Long hospitalDeptId;
 
     // ==================== 医生/患者信息 ====================
     /**
@@ -91,7 +95,6 @@ public class CreateOrderDTO implements Serializable {
     /**
      * 医生电话
      */
-    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "医生电话格式不正确")
     private String doctorPhone;
 
     /**

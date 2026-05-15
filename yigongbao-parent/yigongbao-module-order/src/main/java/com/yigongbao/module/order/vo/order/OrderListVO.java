@@ -123,6 +123,16 @@ public class OrderListVO implements Serializable {
      */
     private String fullAreaName;
 
+    /**
+     * 医院科室ID
+     */
+    private Long hospitalDeptId;
+
+    /**
+     * 医院科室名称
+     */
+    private String hospitalDeptName;
+
     // ==================== 科室与医生 ====================
 
     /**

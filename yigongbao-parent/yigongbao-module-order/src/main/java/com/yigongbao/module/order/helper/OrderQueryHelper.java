@@ -267,7 +267,10 @@ public class OrderQueryHelper {
         vo.setAreaId(entity.getAreaId());
         vo.setAreaName(entity.getAreaName());
         vo.setFullAreaName(entity.getFullAreaName());
-        // 科室与医生
+        // 医院科室
+        vo.setHospitalDeptId(entity.getHospitalDeptId());
+        vo.setHospitalDeptName(entity.getHospitalDeptName());
+        // 提单人部门与医生
         vo.setOperatorDeptId(entity.getOperatorDeptId());
         vo.setOperatorDeptName(entity.getOperatorDeptName());
         vo.setDoctorId(entity.getDoctorId());
