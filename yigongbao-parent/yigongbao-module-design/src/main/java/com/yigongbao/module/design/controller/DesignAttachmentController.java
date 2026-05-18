@@ -39,7 +39,7 @@ public class DesignAttachmentController {
      * 批量关联可视化模型（fileIds 通过通用文件上传接口获得）
      */
     @Operation(summary = "批量关联可视化模型")
-    @RequirePermission(value = "design:EditFile")
+    @RequirePermission(value = "design:Upload")
     @PostMapping("/models/link")
     public Result<List<DesignModelVO>> linkModels(@Valid @RequestBody LinkFilesDTO dto) {
         return Result.success(designFileService.linkModels(dto.getOrderId(), dto.getFileIds()));
@@ -49,7 +49,7 @@ public class DesignAttachmentController {
      * 删除可视化模型
      */
     @Operation(summary = "删除可视化模型")
-    @RequirePermission(value = "design:EditFile")
+    @RequirePermission(value = "design:Upload")
     @DeleteMapping("/model/{modelId}")
     public Result<Void> deleteModel(
             @Parameter(description = "订单ID") @RequestParam Long orderId,
@@ -75,7 +75,7 @@ public class DesignAttachmentController {
      * 关联设计报告（每订单仅保留一份，重复关联自动覆盖）
      */
     @Operation(summary = "关联设计报告")
-    @RequirePermission(value = "design:EditFile")
+    @RequirePermission(value = "design:Upload")
     @PostMapping("/report/link")
     public Result<FileVO> linkReport(@Valid @RequestBody LinkFilesDTO dto) {
         return Result.success(designFileService.linkReport(dto.getOrderId(), dto.getFileIds().get(0)));
@@ -85,7 +85,7 @@ public class DesignAttachmentController {
      * 删除设计报告
      */
     @Operation(summary = "删除设计报告")
-    @RequirePermission(value = "design:EditFile")
+    @RequirePermission(value = "design:Upload")
     @DeleteMapping("/report/{fileId}")
     public Result<Void> deleteReport(
             @Parameter(description = "订单ID") @RequestParam Long orderId,

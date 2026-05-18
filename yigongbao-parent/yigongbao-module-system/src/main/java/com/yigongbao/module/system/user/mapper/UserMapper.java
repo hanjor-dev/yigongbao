@@ -124,4 +124,34 @@ public interface UserMapper extends BaseMapper<UserEntity> {
         """)
     List<UserEntity> selectDesignersBySpecialties(
             @Param("specialtyCondition") String specialtyCondition);
+
+    /**
+     * 查询所有拥有设计权限的用户（通过权限点判断，不硬编码角色）
+     * 支持按姓名模糊搜索
+     *
+     * @param nameKeyword 姓名关键字（可选，为空时不过滤）
+     * @return 设计师列表，已按 current_load ASC 排序
+     */
+    @Select("""
+        <script>
+        SELECT DISTINCT u.*,
+               (SELECT COUNT(*) FROM order_main om
+                WHERE om.designer_id = u.id
+                  AND om.status BETWEEN 2010 AND 2090
+                  AND om.is_deleted = 0) AS current_load
+        FROM sys_user u
+        INNER JOIN sys_role r ON u.role_id = r.id AND r.is_deleted = 0
+        INNER JOIN sys_role_resource rr ON r.id = rr.role_id
+        INNER JOIN sys_resource res ON rr.resource_id = res.id
+            AND res.resource_code = 'design:View'
+            AND res.is_deleted = 0
+        WHERE u.status = 1
+          AND u.is_deleted = 0
+        <if test="nameKeyword != null and nameKeyword != ''">
+          AND u.real_name LIKE CONCAT('%', #{nameKeyword}, '%')
+        </if>
+        ORDER BY current_load ASC
+        </script>
+        """)
+    List<UserEntity> selectAllDesignersByPermission(@Param("nameKeyword") String nameKeyword);
 }

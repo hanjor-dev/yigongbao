@@ -64,7 +64,7 @@ public class DesignWorkorderController {
      * POST /design/workorder/{orderId}/continue-design
      */
     @Operation(summary = "驳回后继续修改")
-    @RequirePermission(value = "design:ContinueDesign")
+    @RequirePermission(value = "design:StartDesign")
     @PostMapping("/{orderId}/continue-design")
     public Result<Void> continueDesign(@PathVariable Long orderId) {
         designWorkorderService.continueDesign(orderId);
@@ -76,7 +76,7 @@ public class DesignWorkorderController {
      * POST /design/workorder/{orderId}/submit-design
      */
     @Operation(summary = "提交设计审核")
-    @RequirePermission(value = "design:submitCheck")
+    @RequirePermission(value = "design:SubmitCheck")
     @PostMapping("/{orderId}/submit-design")
     public Result<Void> submitDesign(@PathVariable Long orderId) {
         designWorkorderService.submitDesign(orderId);

@@ -18,6 +18,8 @@ import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.entity.OrderDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
+import com.yigongbao.module.basic.hospitalDept.service.HospitalDeptService;
+import com.yigongbao.module.basic.hospitalDept.vo.HospitalDeptVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.user.service.UserHospitalService;
@@ -55,6 +57,7 @@ public class OrderDataValidator {
     private final RebuildProjectService rebuildProjectService;
     private final UserHospitalService userHospitalService;
     private final ConfigService configService;
+    private final HospitalDeptService hospitalDeptService;
 
     /**
      * 校验模式
@@ -95,7 +98,7 @@ public class OrderDataValidator {
      * @param mode       校验模式
      */
     public void validateAndFillMaster(OrderDraftEntity entity,
-            Long orgId, Long hospitalId,
+            Long orgId, Long hospitalId, Long hospitalDeptId,
             Long doctorId, String doctorName, String doctorPhone, Long creatorId,
             ValidateMode mode) {
         boolean required = (mode != ValidateMode.DRAFT);
@@ -111,6 +114,12 @@ public class OrderDataValidator {
         }
         if (required && hospitalId != null) {
             validateHospitalScope(creatorId, hospitalId);
+        }
+        // 校验科室并覆盖科室名称（不信任前端传入值）
+        HospitalDeptVO dept = lookupDept(hospitalDeptId, false);
+        if (dept != null) {
+            entity.setHospitalDeptId(hospitalDeptId);
+            entity.setHospitalDeptName(dept.getHospitalDeptName());
         }
         // 校验并填充医生（支持 quickAdd）
         applyDoctorInfo(entity::setDoctorId, entity::setDoctorName, entity::setDoctorPhone,
@@ -137,7 +146,7 @@ public class OrderDataValidator {
      * @param mode       校验模式
      */
     public void validateAndFillMasterForOrder(OrderMainEntity entity,
-            Long orgId, Long hospitalId,
+            Long orgId, Long hospitalId, Long hospitalDeptId,
             Long doctorId, String doctorName, String doctorPhone, Long creatorId,
             ValidateMode mode) {
         boolean required = (mode != ValidateMode.DRAFT);
@@ -155,6 +164,12 @@ public class OrderDataValidator {
         }
         if (required && hospitalId != null) {
             validateHospitalScope(creatorId, hospitalId);
+        }
+        // 校验科室并覆盖科室名称（不信任前端传入值）
+        HospitalDeptVO dept = lookupDept(hospitalDeptId, false);
+        if (dept != null) {
+            entity.setHospitalDeptId(hospitalDeptId);
+            entity.setHospitalDeptName(dept.getHospitalDeptName());
         }
         // 校验并填充医生（支持 quickAdd）
         applyDoctorInfo(entity::setDoctorId, entity::setDoctorName, entity::setDoctorPhone,
@@ -419,6 +434,28 @@ public class OrderDataValidator {
                     userId, org.getId(), org.getQualificationType(), orderType);
             throw new BusinessException(ErrorCodeEnum.ORG_QUALIFICATION_LIMIT);
         }
+    }
+
+    /**
+     * 查找并校验科室
+     */
+    private HospitalDeptVO lookupDept(Long deptId, boolean required) {
+        if (deptId == null) {
+            if (required) {
+                throw new BusinessException(ErrorCodeEnum.HOSPITAL_DEPT_NOT_FOUND);
+            }
+            return null;
+        }
+        HospitalDeptVO dept = hospitalDeptService.getById(deptId);
+        if (dept == null) {
+            log.warn("科室不存在，deptId={}", deptId);
+            throw new BusinessException(ErrorCodeEnum.HOSPITAL_DEPT_NOT_FOUND);
+        }
+        if (dept.getStatus() != null && dept.getStatus().equals(StatusConstants.DISABLED)) {
+            log.warn("科室已禁用，deptId={}", deptId);
+            throw new BusinessException(ErrorCodeEnum.HOSPITAL_DEPT_NOT_FOUND);
+        }
+        return dept;
     }
 
     /**

@@ -331,7 +331,7 @@ VALUES
 
 -- 订单列表默认列配置（独立 INSERT，避免 JSON 跨行问题）
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
-VALUES ('order.column.config', '订单列表默认列配置', '{"module":"order","columns":[{"field":"orderCode","label":"订单编号","visible":true,"sort":1,"width":160,"fixed":null},{"field":"phaseName","label":"当前阶段","visible":true,"sort":2,"width":100,"fixed":null},{"field":"statusName","label":"当前状态","visible":true,"sort":3,"width":120,"fixed":null},{"field":"isUrgent","label":"加急","visible":true,"sort":4,"width":70,"fixed":null},{"field":"businessTypeName","label":"业务类型","visible":true,"sort":5,"width":100,"fixed":null},{"field":"orderTypeName","label":"订单类型","visible":true,"sort":6,"width":110,"fixed":null},{"field":"needsPhysicalDeliveryName","label":"实体交付","visible":true,"sort":7,"width":90,"fixed":null},{"field":"orgName","label":"提单机构","visible":true,"sort":8,"width":150,"fixed":null},{"field":"operatorName","label":"操作员","visible":true,"sort":9,"width":100,"fixed":null},{"field":"operatorPhone","label":"操作员电话","visible":true,"sort":10,"width":120,"fixed":null},{"field":"operatorDeptName","label":"所属部门","visible":true,"sort":11,"width":120,"fixed":null},{"field":"hospitalName","label":"医院","visible":true,"sort":12,"width":180,"fixed":null},{"field":"areaName","label":"地区","visible":true,"sort":13,"width":100,"fixed":null},{"field":"fullAreaName","label":"完整地区","visible":true,"sort":14,"width":160,"fixed":null},{"field":"hospitalDeptName","label":"科室","visible":true,"sort":15,"width":100,"fixed":null},{"field":"doctorName","label":"医生姓名","visible":true,"sort":16,"width":100,"fixed":null},{"field":"doctorPhone","label":"医生电话","visible":true,"sort":17,"width":120,"fixed":null},{"field":"patientName","label":"患者姓名","visible":true,"sort":18,"width":100,"fixed":null},{"field":"patientAge","label":"患者年龄","visible":true,"sort":19,"width":80,"fixed":null},{"field":"patientGenderName","label":"患者性别","visible":true,"sort":20,"width":80,"fixed":null},{"field":"isPostal","label":"是否邮寄","visible":true,"sort":21,"width":80,"fixed":null},{"field":"postalAddress","label":"邮寄地址","visible":true,"sort":22,"width":160,"fixed":null},{"field":"designerName","label":"设计师","visible":true,"sort":23,"width":100,"fixed":null},{"field":"expectedDeliveryDate","label":"期望交付时间","visible":true,"sort":24,"width":160,"fixed":null},{"field":"estimatedCost","label":"预估费用","visible":true,"sort":25,"width":100,"fixed":null},{"field":"dataEvaluationOpinion","label":"影像评估意见","visible":true,"sort":26,"width":160,"fixed":null},{"field":"rebuildProjectList","label":"重建项目","visible":true,"sort":27,"width":200,"fixed":null},{"field":"createTime","label":"创建时间","visible":true,"sort":28,"width":160,"fixed":null},{"field":"action","label":"操作","visible":true,"sort":29,"width":150,"fixed":null}]}', 'json', 'system', '订单列表默认显示的列（JSON格式）', 1, 0, 10, 1);
+VALUES ('order.column.config', '订单列表默认列配置', '{"module":"order","columns":[{"field":"orderCode","label":"订单编号","visible":true,"sort":1,"width":160,"fixed":null},{"field":"statusName","label":"当前状态","visible":true,"sort":3,"width":120,"fixed":null},{"field":"isUrgent","label":"加急","visible":true,"sort":4,"width":70,"fixed":null},{"field":"businessTypeName","label":"业务类型","visible":true,"sort":5,"width":100,"fixed":null},{"field":"orderTypeName","label":"订单类型","visible":true,"sort":6,"width":110,"fixed":null},{"field":"needsPhysicalDeliveryName","label":"实体交付","visible":true,"sort":7,"width":90,"fixed":null},{"field":"orgName","label":"提单机构","visible":true,"sort":8,"width":150,"fixed":null},{"field":"operatorName","label":"业务员","visible":true,"sort":9,"width":100,"fixed":null},{"field":"operatorPhone","label":"业务员电话","visible":true,"sort":10,"width":120,"fixed":null},{"field":"operatorDeptName","label":"部门","visible":true,"sort":11,"width":120,"fixed":null},{"field":"hospitalName","label":"医院","visible":true,"sort":12,"width":180,"fixed":null},{"field":"areaName","label":"地区","visible":true,"sort":13,"width":100,"fixed":null},{"field":"hospitalDeptName","label":"科室","visible":true,"sort":15,"width":100,"fixed":null},{"field":"doctorName","label":"医生","visible":true,"sort":16,"width":100,"fixed":null},{"field":"doctorPhone","label":"医生电话","visible":true,"sort":17,"width":120,"fixed":null},{"field":"patientName","label":"患者姓名","visible":true,"sort":18,"width":100,"fixed":null},{"field":"patientAge","label":"患者年龄","visible":true,"sort":19,"width":80,"fixed":null},{"field":"patientGenderName","label":"患者性别","visible":true,"sort":20,"width":80,"fixed":null},{"field":"isPostal","label":"是否邮寄","visible":true,"sort":21,"width":80,"fixed":null},{"field":"postalAddress","label":"邮寄地址","visible":true,"sort":22,"width":160,"fixed":null},{"field":"designerName","label":"设计师","visible":true,"sort":23,"width":100,"fixed":null},{"field":"expectedDeliveryDate","label":"期望交付时间","visible":true,"sort":24,"width":160,"fixed":null},{"field":"estimatedCost","label":"预估费用","visible":true,"sort":25,"width":100,"fixed":null},{"field":"dataEvaluationOpinion","label":"影像评估意见","visible":true,"sort":26,"width":160,"fixed":null},{"field":"rebuildProjectList","label":"重建项目","visible":true,"sort":27,"width":200,"fixed":null},{"field":"createTime","label":"创建时间","visible":true,"sort":28,"width":160,"fixed":null},{"field":"action","label":"操作","visible":true,"sort":29,"width":150,"fixed":null}]}', 'json', 'system', '订单列表默认显示的列（JSON格式）', 1, 0, 10, 1);
 
 -- 订单修改申请字段配置（独立 INSERT）
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
@@ -364,7 +364,7 @@ VALUES
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
 VALUES
 ('manufacturer.org.id', '生产企业机构ID', '1', 'number', 'system', '系统预设唯一生产企业机构ID，不可动态创建', 1, 0, 10, 1),
-('unknown.hospital.org.id', '其他医院机构ID', '8', 'number', 'system', '提单时用于隐藏具体客户信息的占位医院ID，权限校验豁免', 1, 0, 11, 1),
+('unknown.hospital.org.id', '其他医院机构ID', '2', 'number', 'system', '提单时用于隐藏具体客户信息的占位医院ID，权限校验豁免', 1, 0, 11, 1),
 ('user.username.auto.generate', '用户名自动生成开关', 'true', 'boolean', 'system', 'true=后端按机构前缀+序号自动生成，false=前端手动输入', 1, 0, 21, 1);
 
 
@@ -380,7 +380,6 @@ INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_
 VALUES
 (1, 0, '数据概览', 'DataBoard', 1, '&#xe62e;', '/home', NULL, '/home/index', 1, 1, 1),
 (2, 0, '业务运营', 'Business', 1, NULL, '/business', NULL, '/business/order', 2, 1, 1),
-(3, 0, '客户管理', 'Customer', 1, NULL, '/customer', NULL, '/customer/doctor', 3, 1, 1),
 (4, 0, '模块管理', 'Module', 1, NULL, '/module', NULL, '/module/org', 4, 1, 1),
 (5, 0, '用户和权限', 'Auth', 1, NULL, '/auth', NULL, '/auth/account', 5, 1, 1),
 (6, 0, '资料管理', 'Datum', 1, NULL, '/datum', NULL, '/datum/index', 6, 1, 1),
@@ -403,10 +402,9 @@ VALUES
 -- ------------------------------------------------------------
 -- 二级菜单：客户管理（parent_id=3）
 -- ------------------------------------------------------------
-INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
-VALUES
-(201, 3, '医生管理', 'Doctor', 2, '&#xe813;', '/doctor', 'customer/doctor.vue', 1, 1, 1),
-(202, 3, '科室管理', 'Department', 2, '&#xe69f;', '/department', 'customer/department.vue', 2, 1, 1);
+-- INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, sort, visible, status)
+-- VALUES
+-- (202, 4, '科室管理', 'Department', 2, '&#xe69f;', '/department', 'model/department.vue', 2, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：模块管理（parent_id=4）
@@ -415,11 +413,13 @@ INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_
 VALUES
 (301, 4, '机构管理', 'Org', 2, '&#xe61a;', '/org', 'module/org.vue', 1, 1, 1),
 (302, 4, '部门管理', 'Branch', 2, '&#xe62b;', '/branch', 'module/branch.vue', 2, 1, 1),
-(303, 4, '项目管理', 'Project', 2, '&#xe620;', '/project', 'module/project.vue', 3, 1, 1),
-(304, 4, '产品管理', 'Product', 2, '&#xe601;', '/product', 'module/product.vue', 4, 1, 1),
-(305, 4, '物料管理', 'Material', 2, '&#xe65c;', '/material', 'module/material.vue', 5, 1, 1),
-(306, 4, '医院范围模板管理', 'Template', 2, '&#xe605;', '/template', 'module/template.vue', 6, 1, 1),
-(307, 4, '注册证管理', 'RegCertificate', 2, '&#xe76a;', '/regCertificate', 'module/template', 7, 1, 1);
+(303, 4, '科室管理', 'Department', 2, '&#xe69f;', '/department', 'module/department.vue', 3, 1, 1),
+
+
+(304, 4, '项目管理', 'Project', 2, '&#xe620;', '/project', 'module/project.vue', 4, 1, 1),
+(305, 4, '产品管理', 'Product', 2, '&#xe601;', '/product', 'module/product.vue', 5, 1, 1),
+(306, 4, '医院范围模板管理', 'Template', 2, '&#xe605;', '/template', 'module/template.vue', 7, 1, 1),
+(307, 4, '注册证管理', 'RegCertificate', 2, '&#xe76a;', '/regCertificate', 'module/regCertificate.vue', 6, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：用户和权限（parent_id=5）
@@ -456,16 +456,12 @@ VALUES
 (1007, 402, '状态', 'role:Status', 3, 3, 1),
 (1008, 402, '删除', 'role:Delete', 3, 4, 1),
 (1009, 402, '配置权限', 'role:config', 3, 5, 1),
--- 科室管理（parent_id=202）
-(1014, 202, '添加', 'hospital-dept:Add', 3, 1, 1),
-(1015, 202, '编辑', 'hospital-dept:Edit', 3, 2, 1),
-(1016, 202, '状态', 'hospital-dept:Status', 3, 3, 1),
-(1017, 202, '删除', 'hospital-dept:Delete', 3, 4, 1),
--- 医生管理（parent_id=201）
-(1018, 201, '添加', 'doctor:Add', 3, 1, 1),
-(1019, 201, '编辑', 'doctor:Edit', 3, 2, 1),
-(1020, 201, '状态', 'doctor:Status', 3, 3, 1),
-(1021, 201, '删除', 'doctor:Delete', 3, 4, 1),
+-- 科室管理（parent_id=303）
+(1014, 303, '添加', 'hospital-dept:Add', 3, 1, 1),
+(1015, 303, '编辑', 'hospital-dept:Edit', 3, 2, 1),
+(1016, 303, '状态', 'hospital-dept:Status', 3, 3, 1),
+(1017, 303, '删除', 'hospital-dept:Delete', 3, 4, 1),
+
 -- 医院范围模板管理（parent_id=306）
 (1022, 306, '添加', 'hospital-Temp:Add', 3, 1, 1),
 (1023, 306, '编辑', 'hospital-Temp:Edit', 3, 2, 1),
@@ -481,21 +477,21 @@ VALUES
 (1031, 302, '编辑', 'department:Edit', 3, 2, 1),
 (1032, 302, '状态', 'department:Status', 3, 3, 1),
 (1033, 302, '删除', 'department:Delete', 3, 4, 1),
--- 重建项目管理（parent_id=303）
-(1034, 303, '添加', 'project:Add', 3, 1, 1),
-(1035, 303, '编辑', 'project:Edit', 3, 2, 1),
-(1036, 303, '状态', 'project:Status', 3, 3, 1),
-(1037, 303, '删除', 'project:Delete', 3, 4, 1),
--- 产品管理（parent_id=304）
-(1038, 304, '添加', 'product:Add', 3, 1, 1),
-(1039, 304, '编辑', 'product:Edit', 3, 2, 1),
-(1040, 304, '状态', 'product:Status', 3, 3, 1),
-(1041, 304, '删除', 'product:Delete', 3, 4, 1),
--- 注册证管理（parent_id=305）
-(1042, 305, '添加', 'registration-cert:Add', 3, 1, 1),
-(1043, 305, '编辑', 'registration-cert:Edit', 3, 2, 1),
-(1044, 305, '状态', 'registration-cert:Status', 3, 3, 1),
-(1045, 305, '删除', 'registration-cert:Delete', 3, 4, 1),
+-- 重建项目管理（parent_id=304）
+(1034, 304, '添加', 'project:Add', 3, 1, 1),
+(1035, 304, '编辑', 'project:Edit', 3, 2, 1),
+(1036, 304, '状态', 'project:Status', 3, 3, 1),
+(1037, 304, '删除', 'project:Delete', 3, 4, 1),
+-- 产品管理（parent_id=305）
+(1038, 305, '添加', 'product:Add', 3, 1, 1),
+(1039, 305, '编辑', 'product:Edit', 3, 2, 1),
+(1040, 305, '状态', 'product:Status', 3, 3, 1),
+(1041, 305, '删除', 'product:Delete', 3, 4, 1),
+-- 注册证管理（parent_id=307）
+(1042, 307, '添加', 'registration-cert:Add', 3, 1, 1),
+(1043, 307, '编辑', 'registration-cert:Edit', 3, 2, 1),
+(1044, 307, '状态', 'registration-cert:Status', 3, 3, 1),
+(1045, 307, '删除', 'registration-cert:Delete', 3, 4, 1),
 -- 字典管理（parent_id=501）
 (1046, 501, '添加', 'dict:Add', 3, 1, 1),
 (1047, 501, '编辑', 'dict:Edit', 3, 2, 1),
@@ -527,6 +523,7 @@ VALUES
 (1117, 101, '审核查看',        'order:AuditView',         3, 17, 1),
 (1118, 101, '我的申请查看',    'order:MyApplyView',       3, 18, 1),
 (1119, 101, '撤回申请',        'order:MyApplyWithdraw',   3, 19, 1),
+(1120, 101, '分配设计师',      'order:AssignDesigner',    3, 20, 1),
 -- 我的工单页按钮（parent_id=102）
 (1201, 102, '导出记录',        'design:Export',           3, 1,  1),
 (1202, 102, '查看详情',        'design:View',             3, 2,  1),
@@ -600,8 +597,7 @@ SELECT 1, id FROM sys_resource;
 --   1=数据概览, 2=业务运营(父), 3=客户管理(父), 4=模块管理(父), 5=用户和权限(父)
 --   6=资料管理, 7=系统配置(父), 8=统计报表, 9=备份管理, 10=个人中心
 --   101=订单管理, 102=我的工单, 103=生产管理, 104=质检管理, 105=仓储管理
---   201=医生管理, 202=科室管理
---   301=机构管理, 302=部门管理, 303=项目管理, 304=产品管理, 305=物料管理, 306=医院范围模板
+--   301=机构管理, 302=部门管理, 303=科室管理, 304=项目管理, 305=产品管理, 307=注册证管理, 306=医院范围模板
 --   401=账户管理, 402=角色管理, 403=资源管理, 404=注册审核
 --   501=字典管理, 502=参数配置, 503=操作日志
 -- ============================================================
@@ -641,7 +637,7 @@ INSERT INTO sys_role_resource (role_id, resource_id) VALUES
 (5, 1), (5, 2), (5, 4), (5, 6), (5, 8), (5, 10),
 (5, 101), (5, 102), (5, 303), (5, 304),
 -- 订单管理页按钮
-(5, 1102), (5, 1106), (5, 1107), (5, 1108), (5, 1110),
+(5, 1102), (5, 1106), (5, 1107), (5, 1108), (5, 1110), (5, 1120),
 -- 工单页全部按钮
 (5, 1201), (5, 1202), (5, 1203), (5, 1204), (5, 1205), (5, 1206), (5, 1207), (5, 1208), (5, 1209), (5, 1210), (5, 1211),
 -- 项目/产品全量按钮
@@ -694,7 +690,6 @@ INSERT INTO sys_role_resource (role_id, resource_id) VALUES
 -- 父级菜单节点（前端路由渲染需要）
 (11, 2), (11, 3), (11, 4), (11, 5),
 (11, 101), (11, 102), (11, 103), (11, 104), (11, 105),
-(11, 201), (11, 202),
 (11, 301), (11, 302), (11, 303), (11, 304), (11, 305), (11, 306), (11, 307),
 (11, 401), (11, 404),
 -- 订单管理页全部按钮

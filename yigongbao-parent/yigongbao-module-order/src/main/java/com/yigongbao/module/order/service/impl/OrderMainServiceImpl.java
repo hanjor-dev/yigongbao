@@ -836,7 +836,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             // 校验关联数据并覆盖所有冗余名称字段（orgName/hospitalName/area/doctorId+Name+Phone）
             orderDataValidator.validateAndFillMasterForOrder(
                     order,
-                    dto.getOrgId(), dto.getHospitalId(),
+                    dto.getOrgId(), dto.getHospitalId(), dto.getHospitalDeptId(),
                     dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone(),
                     currentUserId, OrderDataValidator.ValidateMode.DIRECT);
             // 校验订单类型与机构资质是否匹配

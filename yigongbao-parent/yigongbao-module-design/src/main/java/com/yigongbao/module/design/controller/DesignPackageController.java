@@ -36,7 +36,7 @@ public class DesignPackageController {
      * 上传打印文件数据包（ZIP/RAR/7Z/TAR，后端自动解析有效文件）
      */
     @Operation(summary = "上传打印文件数据包")
-    @RequirePermission(value = "design:EditFile")
+    @RequirePermission(value = "design:Upload")
     @PostMapping("/package/upload")
     public Result<DesignPackageVO> uploadPackage(
             @Parameter(description = "订单ID") @RequestParam Long orderId,
@@ -48,7 +48,7 @@ public class DesignPackageController {
      * 删除数据包（若已有打印信息则拒绝）
      */
     @Operation(summary = "删除数据包")
-    @RequirePermission(value = "design:EditFile")
+    @RequirePermission(value = "design:Upload")
     @DeleteMapping("/package/{packageId}")
     public Result<Void> deletePackage(
             @Parameter(description = "订单ID") @RequestParam Long orderId,

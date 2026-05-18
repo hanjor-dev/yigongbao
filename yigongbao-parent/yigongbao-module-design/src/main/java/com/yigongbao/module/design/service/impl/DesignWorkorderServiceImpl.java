@@ -130,7 +130,14 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         // 动态筛选条件
         wrapper.like(StrUtil.isNotBlank(queryDTO.getOrderCode()), OrderMainEntity::getOrderCode, queryDTO.getOrderCode());
         wrapper.like(StrUtil.isNotBlank(queryDTO.getPatientName()), OrderMainEntity::getPatientName, queryDTO.getPatientName());
-        wrapper.eq(queryDTO.getStatus() != null, OrderMainEntity::getStatus, queryDTO.getStatus());
+        // 状态筛选：设计审核通过时查询该状态及后续所有阶段
+        if (queryDTO.getStatus() != null) {
+            if (queryDTO.getStatus().equals(FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue())) {
+                wrapper.ge(OrderMainEntity::getStatus, FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue());
+            } else {
+                wrapper.eq(OrderMainEntity::getStatus, queryDTO.getStatus());
+            }
+        }
         wrapper.eq(queryDTO.getIsUrgent() != null, OrderMainEntity::getIsUrgent, queryDTO.getIsUrgent());
         wrapper.eq(queryDTO.getHospitalId() != null, OrderMainEntity::getHospitalId, queryDTO.getHospitalId());
         wrapper.eq(StrUtil.isNotBlank(queryDTO.getBusinessType()), OrderMainEntity::getBusinessType, queryDTO.getBusinessType());

@@ -239,6 +239,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             entity.setBusinessType(dto.getBusinessType());
             entity.setOrgId(dto.getOrgId());
             entity.setHospitalId(dto.getHospitalId());
+            entity.setHospitalDeptId(dto.getHospitalDeptId());
             entity.setDoctorId(dto.getDoctorId());
             entity.setPatientName(dto.getPatientName());
             entity.setPatientAge(dto.getPatientAge());
@@ -251,7 +252,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             // 校验关联数据并覆盖所有冗余名称字段（DRAFT 模式：仅校验已填写的字段）
             orderDataValidator.validateAndFillMaster(
                     entity,
-                    dto.getOrgId(), dto.getHospitalId(),
+                    dto.getOrgId(), dto.getHospitalId(), dto.getHospitalDeptId(),
                     dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone(),
                     currentUserId, OrderDataValidator.ValidateMode.DRAFT);
 
@@ -405,7 +406,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             // 以 SUBMIT 模式全量校验主表必填字段（草稿保存时是 DRAFT 模式，允许不完整）
             orderDataValidator.validateAndFillMaster(
                     entity,
-                    entity.getOrgId(), entity.getHospitalId(),
+                    entity.getOrgId(), entity.getHospitalId(), entity.getHospitalDeptId(),
                     entity.getDoctorId(), entity.getDoctorName(), entity.getDoctorPhone(),
                     currentUserId, OrderDataValidator.ValidateMode.SUBMIT);
             // 校验重建项目至少1条

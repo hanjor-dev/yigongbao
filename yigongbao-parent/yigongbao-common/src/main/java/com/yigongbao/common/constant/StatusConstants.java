@@ -165,4 +165,16 @@ public final class StatusConstants {
      * 部门类型-业务部门
      */
     public static final String DEPT_TYPE_BUSINESS = "6.2";
+
+    // ==================== 版本来源 ====================
+
+    /**
+     * 版本来源-自动生成
+     */
+    public static final String SOURCE_TYPE_AUTO = "AUTO";
+
+    /**
+     * 版本来源-手动上传
+     */
+    public static final String SOURCE_TYPE_MANUAL = "MANUAL";
 }

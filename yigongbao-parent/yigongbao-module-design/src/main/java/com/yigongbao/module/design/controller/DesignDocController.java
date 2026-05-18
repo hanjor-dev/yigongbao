@@ -112,7 +112,7 @@ public class DesignDocController {
      * 上传修订版指令单
      */
     @Operation(summary = "上传修订版指令单")
-    @RequirePermission(value = "design:EditDoc")
+    @RequirePermission(value = "design:Upload")
     @PostMapping("/{orderId}/package/{packageId}/instruction/upload-revised/{id}")
     public Result<Void> uploadRevisedInstruction(@PathVariable Long orderId,
                                                   @PathVariable Long packageId,
@@ -126,7 +126,7 @@ public class DesignDocController {
      * 上传修订版图纸
      */
     @Operation(summary = "上传修订版图纸")
-    @RequirePermission(value = "design:EditDoc")
+    @RequirePermission(value = "design:Upload")
     @PostMapping("/{orderId}/package/{packageId}/drawing/upload-revised/{id}")
     public Result<Void> uploadRevisedDrawing(@PathVariable Long orderId,
                                               @PathVariable Long packageId,
@@ -142,7 +142,7 @@ public class DesignDocController {
      * 若之后重新生成图纸，确认状态自动重置，需再次确认。
      */
     @Operation(summary = "确认图纸（在线模式）")
-    @RequirePermission(value = "design:EditDoc")
+    @RequirePermission(value = "design:Upload")
     @PostMapping("/{orderId}/package/{packageId}/drawing/confirm/{id}")
     public Result<Void> confirmDrawing(@PathVariable Long orderId,
                                        @PathVariable Long packageId,
@@ -157,7 +157,7 @@ public class DesignDocController {
      * 若之后重新生成指令单，确认状态自动重置，需再次确认。
      */
     @Operation(summary = "确认指令单（在线模式）")
-    @RequirePermission(value = "design:EditDoc")
+    @RequirePermission(value = "design:Upload")
     @PostMapping("/{orderId}/package/{packageId}/instruction/confirm/{id}")
     public Result<Void> confirmInstruction(@PathVariable Long orderId,
                                             @PathVariable Long packageId,
@@ -170,7 +170,7 @@ public class DesignDocController {
      * 上传数据包文件截图（upsert：有则覆盖，无则新增）
      */
     @Operation(summary = "上传数据包文件截图")
-    @RequirePermission(value = "design:EditDoc")
+    @RequirePermission(value = "design:Upload")
     @PostMapping("/{orderId}/package/{packageId}/files/{packageFileId}/screenshot")
     public Result<ScreenshotVO> saveScreenshot(@PathVariable Long orderId,
                                                @PathVariable Long packageId,

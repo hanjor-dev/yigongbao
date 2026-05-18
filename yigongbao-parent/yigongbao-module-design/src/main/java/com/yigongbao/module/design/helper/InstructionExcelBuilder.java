@@ -64,7 +64,7 @@ public class InstructionExcelBuilder {
     // ==================== 填充上下文 ====================
 
     /**
-     * 展开后的产品×文件行（一个文件=一行）
+     * 产品行（一个文件=一行，同产品多文件时需合并单元格）
      */
     @Data
     public static class ProductRow {
@@ -125,7 +125,7 @@ public class InstructionExcelBuilder {
         private String designStartTime;
         /** 生成时间（填入"结束时间"列） */
         private String generateTime;
-        /** 展开后的产品×文件行列表 */
+        /** 展开后的产品×文件行列表（一个文件=一行，同产品多文件时合并单元格） */
         private List<ProductRow> rows;
     }
 
@@ -194,14 +194,17 @@ public class InstructionExcelBuilder {
                 setCell(wb, sheet, rowIdx, 5, strOrEmpty(row.getMaterialName()));        // F：材质
                 setCell(wb, sheet, rowIdx, 6, row.getQuantity() != null
                         ? String.valueOf(row.getQuantity()) : "");                   // G：数量
-                // H：时效（0=普通，1=加急）
+                // H：时效（0=按时，1=加急）
                 int urgentVal = row.getIsUrgent() != null ? row.getIsUrgent() : StatusConstants.NO;
-                setCell(wb, sheet, rowIdx, 7, urgentVal == StatusConstants.YES ? "加急" : "普通");
+                setCell(wb, sheet, rowIdx, 7, urgentVal == StatusConstants.YES ? "加急" : "按时");
                 if (urgentVal == StatusConstants.YES) {
                     setBold(wb, sheet, rowIdx, 7);
                 }
                 setCell(wb, sheet, rowIdx, 8, strOrEmpty(row.getColorName()));           // I：颜色
             }
+
+            // 6. 合并同产品的多文件行（除文件名列外）
+            mergeSameProductRows(sheet, rows, DATA_ROW_START);
 
             // 6. 未使用的余量行：合并为一个大单元格并清空内容
             int firstEmptyRow = DATA_ROW_START + n;
@@ -264,6 +267,64 @@ public class InstructionExcelBuilder {
             log.info("生产指令单生成完成，size={}", baos.size());
             return baos.toByteArray();
         }
+    }
+
+    // ==================== 私有工具方法 ====================
+
+    /**
+     * 合并同产品的多文件行（除文件名列外的所有列）
+     *
+     * @param sheet 工作表
+     * @param rows 产品行列表
+     * @param startRow 数据起始行索引
+     */
+    private void mergeSameProductRows(Sheet sheet, List<ProductRow> rows, int startRow) {
+        if (rows.isEmpty()) return;
+
+        int i = 0;
+        while (i < rows.size()) {
+            ProductRow current = rows.get(i);
+            int mergeStart = i;
+            int mergeEnd = i;
+
+            // 查找连续的相同产品行
+            while (mergeEnd + 1 < rows.size() && isSameProduct(current, rows.get(mergeEnd + 1))) {
+                mergeEnd++;
+            }
+
+            // 如果有多行属于同一产品，则合并单元格（除文件名列）
+            if (mergeEnd > mergeStart) {
+                int firstRow = startRow + mergeStart;
+                int lastRow = startRow + mergeEnd;
+
+                // 合并列：A(0), B(1), C(2), E(4), F(5), G(6), H(7), I(8)
+                // 不合并 D(3) 文件名列
+                sheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, 0, 0));  // A：序号
+                sheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, 1, 1));  // B：注册证号
+                sheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, 2, 2));  // C：产品名称
+                // D列（文件名）不合并
+                sheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, 4, 4));  // E：型号/规格
+                sheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, 5, 5));  // F：材质
+                sheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, 6, 6));  // G：数量
+                sheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, 7, 7));  // H：时效
+                sheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, 8, 8));  // I：颜色
+            }
+
+            i = mergeEnd + 1;
+        }
+    }
+
+    /**
+     * 判断两个产品行是否为同一产品（通过比较产品信息字段）
+     */
+    private boolean isSameProduct(ProductRow r1, ProductRow r2) {
+        return java.util.Objects.equals(r1.getCertNo(), r2.getCertNo())
+                && java.util.Objects.equals(r1.getProductName(), r2.getProductName())
+                && java.util.Objects.equals(r1.getSpecName(), r2.getSpecName())
+                && java.util.Objects.equals(r1.getMaterialName(), r2.getMaterialName())
+                && java.util.Objects.equals(r1.getQuantity(), r2.getQuantity())
+                && java.util.Objects.equals(r1.getIsUrgent(), r2.getIsUrgent())
+                && java.util.Objects.equals(r1.getColorName(), r2.getColorName());
     }
 
     // ==================== 私有工具方法 ====================

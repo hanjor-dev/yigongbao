@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +71,7 @@ public class DesignScreenshotServiceImpl
             // 有则更新 fileId，先记录旧文件ID以便删除
             String oldFileId = existing.getFileId();
             existing.setFileId(fileVO.getId());
+            existing.setUpdateTime(LocalDateTime.now());
             updateById(existing);
             // 删除旧截图文件，避免 OSS 泄漏
             if (oldFileId != null) {

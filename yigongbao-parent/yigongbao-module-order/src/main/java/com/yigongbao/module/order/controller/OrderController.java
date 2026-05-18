@@ -113,7 +113,7 @@ public class OrderController {
     }
 
     @Operation(summary = "提交订单")
-    @RequirePermission(value = "order:Submit")
+    @RequirePermission(value = "order:Add")
     @PostMapping("/{id}/submit")
     public Result<Void> submitOrder(@PathVariable Long id) {
         orderMainService.submitOrder(id);
@@ -121,7 +121,7 @@ public class OrderController {
     }
 
     @Operation(summary = "撤回订单")
-    @RequirePermission(value = "order:Withdraw")
+    @RequirePermission(value = "order:TabDraft")
     @PostMapping("/{id}/withdraw")
     public Result<Void> withdrawOrder(@PathVariable Long id) {
         orderMainService.withdrawOrder(id);
@@ -157,7 +157,7 @@ public class OrderController {
     }
 
     @Operation(summary = "手动分配设计师（管理员）")
-    @RequirePermission(value = "order:AssignDesigner")
+    @RequirePermission(value = "order:Approve")
     @PostMapping("/{id}/assign-designer")
     public Result<Void> assignDesigner(@PathVariable Long id, @Valid @RequestBody AssignDesignerDTO dto) {
         designerAssignmentService.manualAssignDesigner(id, dto.getDesignerId());

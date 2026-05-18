@@ -29,7 +29,7 @@ public class CreateDeptDTO {
      * 必填
      */
     @NotBlank(message = "部门类型不能为空")
-    @Pattern(regexp = "^(6\\.1|6\\.2)$", message = "部门类型值不合法，仅支持6.1（企业部门）或6.2（业务部门）")
+    @Pattern(regexp = "^(6\\.1|6\\.2)$", message = "部门类型值不合法")
     private String deptType;
 
     /**

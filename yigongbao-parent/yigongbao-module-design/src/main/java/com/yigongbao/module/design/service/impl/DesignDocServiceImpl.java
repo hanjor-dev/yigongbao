@@ -198,7 +198,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     /**
      * 上传修订版指令单
      * <p>
-     * 上传后自动将 is_confirmed 置为 1（上传即视为已审阅确认）。
+     * 创建新版本记录，sourceType = 'MANUAL'，上传后自动将 is_confirmed 置为 1。
      * </p>
      */
     @Override
@@ -207,31 +207,43 @@ public class DesignDocServiceImpl implements DesignDocService {
         log.info("上传修订版指令单，orderId={}, packageId={}, id={}", orderId, packageId, id);
         checkDesignPhase(orderId);
         validatePackage(orderId, packageId);
-        DesignInstructionEntity entity = instructionService.getById(id);
-        if (entity == null || !entity.getPackageId().equals(packageId)) {
+
+        // 查询当前最新版本
+        DesignInstructionEntity latest = instructionService.getLatestVersion(packageId);
+        if (latest == null) {
             throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
         }
-        String oldRevisedFileId = entity.getRevisedFileId();
+
+        // 上传文件
         FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
         LocalDateTime uploadTime = LocalDateTime.now();
-        entity.setRevisedFileId(fileVO.getId());
-        entity.setRevisedFileUrl(fileVO.getFileUrl());
-        entity.setRevisedUploadTime(uploadTime);
-        // 上传修订版本身即代表设计师已审阅，无论在线/离线模式均自动确认
-        entity.setIsConfirmed(StatusConstants.CONFIRMED);
-        entity.setConfirmTime(uploadTime);
-        instructionService.updateById(entity);
-        // 删除旧修订版文件，避免 OSS 泄漏
-        if (oldRevisedFileId != null) {
-            fileService.deleteById(oldRevisedFileId);
-        }
-        log.info("上传修订版指令单成功，已自动确认，id={}", id);
+
+        // 创建新版本记录
+        int newVersionSeq = latest.getVersionSeq() + 1;
+        String newVersion = "A/" + newVersionSeq;
+        String newInstructionCode = codeGeneratorService.generate(CodeRuleConstants.INSTRUCTION_NO);
+
+        DesignInstructionEntity newEntity = new DesignInstructionEntity();
+        newEntity.setOrderId(orderId);
+        newEntity.setPackageId(packageId);
+        newEntity.setInstructionCode(newInstructionCode);
+        newEntity.setVersion(newVersion);
+        newEntity.setVersionSeq(newVersionSeq);
+        newEntity.setSourceType(StatusConstants.SOURCE_TYPE_MANUAL);
+        newEntity.setTemplateFileId(fileVO.getId());
+        newEntity.setTemplateFileUrl(fileVO.getFileUrl());
+        newEntity.setGenerateTime(uploadTime);
+        newEntity.setIsConfirmed(StatusConstants.CONFIRMED);
+        newEntity.setConfirmTime(uploadTime);
+
+        instructionService.save(newEntity);
+        log.info("上传修订版指令单成功，创建新版本，packageId={}, version={}, instructionCode={}", packageId, newVersion, newInstructionCode);
     }
 
     /**
      * 上传修订版图纸
      * <p>
-     * 上传后自动将 is_confirmed 置为 1（上传即视为已审阅确认）。
+     * 创建新版本记录，sourceType = 'MANUAL'，上传后自动将 is_confirmed 置为 1。
      * </p>
      */
     @Override
@@ -240,25 +252,35 @@ public class DesignDocServiceImpl implements DesignDocService {
         log.info("上传修订版图纸，orderId={}, packageId={}, id={}", orderId, packageId, id);
         checkDesignPhase(orderId);
         validatePackage(orderId, packageId);
-        DesignDrawingEntity entity = drawingService.getById(id);
-        if (entity == null || !entity.getPackageId().equals(packageId)) {
+
+        // 查询当前最新版本
+        DesignDrawingEntity latest = drawingService.getLatestVersion(packageId);
+        if (latest == null) {
             throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
         }
-        String oldRevisedFileId = entity.getRevisedFileId();
+
+        // 上传文件
         FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.DRAWING_FILE.getDictCode());
         LocalDateTime uploadTime = LocalDateTime.now();
-        entity.setRevisedFileId(fileVO.getId());
-        entity.setRevisedFileUrl(fileVO.getFileUrl());
-        entity.setRevisedUploadTime(uploadTime);
-        // 上传修订版本身即代表设计师已审阅，无论在线/离线模式均自动确认
-        entity.setIsConfirmed(StatusConstants.CONFIRMED);
-        entity.setConfirmTime(uploadTime);
-        drawingService.updateById(entity);
-        // 删除旧修订版文件，避免 OSS 泄漏
-        if (oldRevisedFileId != null) {
-            fileService.deleteById(oldRevisedFileId);
-        }
-        log.info("上传修订版图纸成功，已自动确认，id={}", id);
+
+        // 创建新版本记录
+        int newVersionSeq = latest.getVersionSeq() + 1;
+        String newVersion = "A/" + newVersionSeq;
+
+        DesignDrawingEntity newEntity = new DesignDrawingEntity();
+        newEntity.setOrderId(orderId);
+        newEntity.setPackageId(packageId);
+        newEntity.setVersion(newVersion);
+        newEntity.setVersionSeq(newVersionSeq);
+        newEntity.setSourceType(StatusConstants.SOURCE_TYPE_MANUAL);
+        newEntity.setTemplateFileId(fileVO.getId());
+        newEntity.setTemplateFileUrl(fileVO.getFileUrl());
+        newEntity.setGenerateTime(uploadTime);
+        newEntity.setIsConfirmed(StatusConstants.CONFIRMED);
+        newEntity.setConfirmTime(uploadTime);
+
+        drawingService.save(newEntity);
+        log.info("上传修订版图纸成功，创建新版本，packageId={}, version={}", packageId, newVersion);
     }
 
     // ==================== 确认接口 ====================
@@ -411,12 +433,12 @@ public class DesignDocServiceImpl implements DesignDocService {
         }
 
         // 打印信息已变化
-        if (latest.getRevisedFileId() == null) {
-            // 场景2：未封版，覆盖当前版本
+        if (!StatusConstants.SOURCE_TYPE_MANUAL.equals(latest.getSourceType())) {
+            // 场景2：未封版（自动生成的版本），覆盖当前版本
             log.info("打印信息已变化，覆盖当前指令单版本，packageId={}, version={}", packageId, latest.getVersion());
             return doGenerateInstruction(order, pkg, latest, latest.getVersionSeq());
         } else {
-            // 场景3：已封版，新建下一版本
+            // 场景3：已封版（手动上传的版本），新建下一版本
             log.info("打印信息已变化，新建下一指令单版本，packageId={}, prevVersion={}", packageId, latest.getVersion());
             return doGenerateInstruction(order, pkg, null, latest.getVersionSeq() + 1);
         }
@@ -467,12 +489,12 @@ public class DesignDocServiceImpl implements DesignDocService {
         }
 
         // 打印信息已变化
-        if (latest.getRevisedFileId() == null) {
-            // 场景2：未封版，覆盖当前版本
+        if (!StatusConstants.SOURCE_TYPE_MANUAL.equals(latest.getSourceType())) {
+            // 场景2：未封版（自动生成的版本），覆盖当前版本
             log.info("打印信息已变化，覆盖当前图纸版本，packageId={}, version={}", packageId, latest.getVersion());
             return doGenerateDrawing(order, pkg, latest, latest.getVersionSeq());
         } else {
-            // 场景3：已封版，新建下一版本
+            // 场景3：已封版（手动上传的版本），新建下一版本
             log.info("打印信息已变化，新建下一图纸版本，packageId={}, prevVersion={}", packageId, latest.getVersion());
             return doGenerateDrawing(order, pkg, null, latest.getVersionSeq() + 1);
         }
@@ -569,6 +591,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             toOverride.setTemplateFileId(fileVO.getId());
             toOverride.setTemplateFileUrl(fileVO.getFileUrl());
             toOverride.setGenerateTime(now);
+            toOverride.setSourceType(StatusConstants.SOURCE_TYPE_AUTO);
             // 数据已变，重置确认状态，强制重新确认
             toOverride.setIsConfirmed(StatusConstants.NOT_CONFIRMED);
             toOverride.setConfirmTime(null);
@@ -587,6 +610,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             entity.setInstructionCode(instructionCode);
             entity.setVersion(version);
             entity.setVersionSeq(versionSeq);
+            entity.setSourceType("AUTO");
             entity.setGenerateTime(now);
             entity.setTemplateFileId(fileVO.getId());
             entity.setTemplateFileUrl(fileVO.getFileUrl());
@@ -652,6 +676,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             toOverride.setTemplateFileId(fileVO.getId());
             toOverride.setTemplateFileUrl(fileVO.getFileUrl());
             toOverride.setGenerateTime(now);
+            toOverride.setSourceType(StatusConstants.SOURCE_TYPE_AUTO);
             // 数据已变，重置确认状态，强制重新确认
             toOverride.setIsConfirmed(StatusConstants.NOT_CONFIRMED);
             toOverride.setConfirmTime(null);
@@ -669,6 +694,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             entity.setPackageId(packageId);
             entity.setVersion(version);
             entity.setVersionSeq(versionSeq);
+            entity.setSourceType("AUTO");
             entity.setGenerateTime(now);
             entity.setTemplateFileId(fileVO.getId());
             entity.setTemplateFileUrl(fileVO.getFileUrl());
@@ -862,6 +888,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         vo.setId(entity.getId());
         vo.setVersion(entity.getVersion());
         vo.setVersionSeq(entity.getVersionSeq());
+        vo.setSourceType(entity.getSourceType());
         vo.setTemplateFileId(entity.getTemplateFileId());
         vo.setTemplateFileUrl(entity.getTemplateFileUrl());
         vo.setRevisedFileId(entity.getRevisedFileId());
@@ -878,6 +905,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         vo.setId(entity.getId());
         vo.setVersion(entity.getVersion());
         vo.setVersionSeq(entity.getVersionSeq());
+        vo.setSourceType(entity.getSourceType());
         vo.setTemplateFileId(entity.getTemplateFileId());
         vo.setTemplateFileUrl(entity.getTemplateFileUrl());
         vo.setRevisedFileId(entity.getRevisedFileId());

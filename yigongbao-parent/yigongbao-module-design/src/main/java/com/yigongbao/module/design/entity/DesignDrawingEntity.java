@@ -47,6 +47,11 @@ public class DesignDrawingEntity extends BaseEntity {
     private Integer versionSeq;
 
     /**
+     * 版本来源：AUTO=自动生成，MANUAL=手动上传
+     */
+    private String sourceType;
+
+    /**
      * 模板文件ID（系统生成）
      */
     private String templateFileId;

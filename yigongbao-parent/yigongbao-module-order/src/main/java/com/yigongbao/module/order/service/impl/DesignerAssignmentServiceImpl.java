@@ -50,6 +50,7 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
     private final ConfigService configService;
     private final DictService dictService;
     private final RebuildProjectService rebuildProjectService;
+    private final com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper;
 
     /**
      * 手写构造函数，对 OrderMainService 使用 @Lazy 打破循环依赖
@@ -62,13 +63,15 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
             UserMapper userMapper,
             ConfigService configService,
             DictService dictService,
-            RebuildProjectService rebuildProjectService) {
+            RebuildProjectService rebuildProjectService,
+            com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper) {
         this.orderMainService = orderMainService;
         this.orderItemMapper = orderItemMapper;
         this.userMapper = userMapper;
         this.configService = configService;
         this.dictService = dictService;
         this.rebuildProjectService = rebuildProjectService;
+        this.assignmentLogMapper = assignmentLogMapper;
     }
 
     /**
@@ -131,15 +134,18 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         }
         // 4. 取负载最低的第一位
         UserEntity designer = candidates.getFirst();
-        // 5. 更新订单 designerId / designerName
+        // 5. 获取订单实体
         OrderMainEntity order = orderMainService.getById(orderId);
+        // 6. 记录分配历史（自动分配）
+        saveAutoAssignmentLog(order, designer);
+        // 7. 更新订单 designerId / designerName
         updateOrderDesigner(order, designer);
         log.info("自动分配成功，orderId={}, designerId={}, specialty={}", orderId, designer.getId(), specialty);
         return designer.getId();
     }
 
     /**
-     * 手动分配设计师（仅管理员；订单必须处于 PENDING_DESIGN 状态）
+     * 手动分配设计师（仅管理员；允许在开始设计前分配，支持重新分配）
      *
      * @param orderId    订单ID
      * @param designerId 设计师用户ID
@@ -147,28 +153,34 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void manualAssignDesigner(Long orderId, Long designerId) {
-        log.info("手动分配设计师，orderId={}, designerId={}", orderId, designerId);
-        // 1. 校验订单存在且状态为 PENDING_DESIGN
+        log.info("手动分配设计师，orderId={}, designerId=", orderId, designerId);
+        // 1. 校验订单存在且状态允许分配（DATA_AUDIT_PASSED 或 PENDING_DESIGN）
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
-        if (!FlowStatusEnum.PENDING_DESIGN.getValue().equals(order.getStatus())) {
-            log.warn("订单状态不允许分配，orderId={}, status={}", orderId, order.getStatus());
-            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR);
+        Integer status = order.getStatus();
+        if (!FlowStatusEnum.DATA_AUDIT_PASSED.getValue().equals(status)
+                && !FlowStatusEnum.PENDING_DESIGN.getValue().equals(status)) {
+            log.warn("订单状态不允许分配，orderId={}, status={}", orderId, status);
+            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR, "仅允许在数据审核通过或待设计状态分配设计师");
         }
-        // 2. 校验设计师存在、角色合法、状态正常
+        // 2. 校验设计师存在、拥有设计权限、状态正常
         UserEntity designer = userMapper.selectById(designerId);
         if (designer == null || designer.getIsDeleted() == StatusConstants.DELETED) {
             throw new BusinessException(ErrorCodeEnum.DESIGNER_NOT_FOUND);
         }
-        if (!DESIGNER_ROLES.contains(designer.getRoleCode())) {
-            log.warn("用户角色不合法，designerId={}, roleCode={}", designerId, designer.getRoleCode());
-            throw new BusinessException(ErrorCodeEnum.DESIGNER_ROLE_INVALID);
-        }
         if (designer.getStatus() != StatusConstants.NORMAL) {
             log.warn("设计师已禁用，designerId={}", designerId);
             throw new BusinessException(ErrorCodeEnum.DESIGNER_DISABLED);
+        }
+        // 通过权限点校验设计师身份（不硬编码角色）
+        List<UserEntity> designerCheck = userMapper.selectAllDesignersByPermission(null);
+        boolean hasDesignPermission = designerCheck.stream()
+                .anyMatch(u -> u.getId().equals(designerId));
+        if (!hasDesignPermission) {
+            log.warn("用户无设计权限，designerId={}", designerId);
+            throw new BusinessException(ErrorCodeEnum.DESIGNER_ROLE_INVALID, "该用户无设计权限");
         }
         // 3. 校验设计师 specialty 包含订单项目方向
         String orderSpecialty = getOrderSpecialty(orderId);
@@ -177,36 +189,24 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
                     designerId, designer.getSpecialty(), orderSpecialty);
             throw new BusinessException(ErrorCodeEnum.DESIGNER_SPECIALTY_MISMATCH);
         }
-        // 4. 更新订单
+        // 4. 记录分配历史（支持重新分配）
+        saveAssignmentLog(order, designer);
+        // 5. 更新订单
         updateOrderDesigner(order, designer);
         log.info("手动分配成功，orderId={}, designerId={}", orderId, designerId);
     }
 
     /**
-     * 查询可分配设计师列表（按专业方向过滤 + 负载排序）
+     * 查询可分配设计师列表（列出所有设计师 + 支持名字搜索 + 负载排序）
      *
      * @param dto 查询条件
      * @return 匹配的设计师列表
      */
     @Override
     public List<DesignerVO> listAvailableDesigners(DesignerQueryDTO dto) {
-        log.info("查询可分配设计师，specialties={}", dto.getSpecialties());
-        List<String> specialties = dto.getSpecialties();
-        if (CollUtil.isEmpty(specialties)) {
-            return List.of();
-        }
-        // 严格白名单校验：只允许 \d+\.\d+ 格式，长度 ≤ 16，防止 SQL 注入
-        String condition = specialties.stream()
-                .filter(s -> StrUtil.isNotBlank(s)
-                        && s.length() <= 16
-                        && SPECIALTY_PATTERN.matcher(s).matches())
-                .map(s -> String.format("FIND_IN_SET('%s', specialty) > 0", s))
-                .collect(Collectors.joining(" OR "));
-        if (StrUtil.isBlank(condition)) {
-            log.warn("所有专业方向编码均未通过白名单校验，返回空列表");
-            return List.of();
-        }
-        List<UserEntity> users = userMapper.selectDesignersBySpecialties(condition);
+        log.info("查询可分配设计师，nameKeyword={}", dto.getNameKeyword());
+        // 通过权限点查询所有拥有 design:View 权限的用户，支持按姓名模糊搜索
+        List<UserEntity> users = userMapper.selectAllDesignersByPermission(dto.getNameKeyword());
         return users.stream().map(this::toDesignerVO).collect(Collectors.toList());
     }
 
@@ -249,6 +249,66 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         order.setDesignerId(designer.getId());
         order.setDesignerName(designer.getRealName());
         orderMainService.updateById(order);
+    }
+
+    /**
+     * 记录设计师分配历史（支持首次分配和重新分配）
+     */
+    private void saveAssignmentLog(OrderMainEntity order, UserEntity newDesigner) {
+        com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity log =
+                new com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity();
+        log.setOrderId(order.getId());
+        log.setOrderCode(order.getOrderCode());
+        log.setOldDesignerId(order.getDesignerId());
+        log.setOldDesignerName(order.getDesignerName());
+        log.setNewDesignerId(newDesigner.getId());
+        log.setNewDesignerName(newDesigner.getRealName());
+        log.setAssignType("MANUAL");
+        log.setAssignTime(java.time.LocalDateTime.now());
+        // 获取当前操作人信息
+        try {
+            Long operatorId = cn.dev33.satoken.stp.StpUtil.getLoginIdAsLong();
+            log.setOperatorId(operatorId);
+            UserEntity operator = userMapper.selectById(operatorId);
+            if (operator != null) {
+                log.setOperatorName(operator.getRealName());
+            }
+        } catch (Exception e) {
+            log.warn("获取操作人信息失败", e);
+        }
+        // 记录日志信息
+        if (log.getOldDesignerId() != null) {
+            log.setRemark(String.format("重新分配：%s(%d) → %s(%d)",
+                    log.getOldDesignerName(), log.getOldDesignerId(),
+                    log.getNewDesignerName(), log.getNewDesignerId()));
+            log.info("设计师重新分配，orderId={}, 原设计师={}({}), 新设计师={}({})",
+                    order.getId(), log.getOldDesignerName(), log.getOldDesignerId(),
+                    log.getNewDesignerName(), log.getNewDesignerId());
+        } else {
+            log.setRemark(String.format("首次分配：%s(%d)",
+                    log.getNewDesignerName(), log.getNewDesignerId()));
+        }
+        assignmentLogMapper.insert(log);
+    }
+
+    /**
+     * 记录自动分配历史
+     */
+    private void saveAutoAssignmentLog(OrderMainEntity order, UserEntity newDesigner) {
+        com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity log =
+                new com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity();
+        log.setOrderId(order.getId());
+        log.setOrderCode(order.getOrderCode());
+        log.setOldDesignerId(order.getDesignerId());
+        log.setOldDesignerName(order.getDesignerName());
+        log.setNewDesignerId(newDesigner.getId());
+        log.setNewDesignerName(newDesigner.getRealName());
+        log.setAssignType("AUTO");
+        log.setAssignTime(java.time.LocalDateTime.now());
+        log.setOperatorId(null);
+        log.setOperatorName(null);
+        log.setRemark(String.format("系统自动分配：%s(%d)", newDesigner.getRealName(), newDesigner.getId()));
+        assignmentLogMapper.insert(log);
     }
 
     /**

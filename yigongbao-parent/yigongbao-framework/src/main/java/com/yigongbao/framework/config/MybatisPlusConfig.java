@@ -72,10 +72,10 @@ public class MybatisPlusConfig {
              */
             @Override
             public void updateFill(MetaObject metaObject) {
-                // 填充更新时间
-                this.strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
-                // 填充更新人，未登录则为空
-                this.strictUpdateFill(metaObject, "updateBy", Long.class, getUserId());
+                // 填充更新时间（使用 fillStrategy 强制更新，即使字段已有值）
+                this.fillStrategy(metaObject, "updateTime", LocalDateTime.now());
+                // 填充更新人（使用 fillStrategy 强制更新）
+                this.fillStrategy(metaObject, "updateBy", getUserId());
             }
 
             /**

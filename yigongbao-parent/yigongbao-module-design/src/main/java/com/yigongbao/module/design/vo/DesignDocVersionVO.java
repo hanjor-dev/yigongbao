@@ -22,6 +22,9 @@ public class DesignDocVersionVO {
     /** 版本序号，用于排序 */
     private Integer versionSeq;
 
+    /** 版本来源：AUTO=自动生成，MANUAL=手动上传 */
+    private String sourceType;
+
     /** 模板文件ID，前端通过 GET /basic/file/download/{fileId} 下载 */
     private String templateFileId;
 

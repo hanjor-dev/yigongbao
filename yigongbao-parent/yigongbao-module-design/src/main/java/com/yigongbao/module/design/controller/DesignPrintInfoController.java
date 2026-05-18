@@ -41,7 +41,7 @@ public class DesignPrintInfoController {
      * 查询数据包打印信息列表
      */
     @Operation(summary = "查询打印信息列表")
-    @RequirePermission(value = "design:View")
+    @RequirePermission(value = "design:PrintInfo")
     @GetMapping("/{orderId}/package/{packageId}/print-info")
     public Result<PrintInfoListVO> listPrintInfo(@PathVariable Long orderId,
                                                 @PathVariable Long packageId) {
@@ -52,7 +52,7 @@ public class DesignPrintInfoController {
      * 保存打印信息（整包替换，空列表=清空）
      */
     @Operation(summary = "保存打印信息（整包替换）")
-    @RequirePermission(value = "design:EditPrintInfo")
+    @RequirePermission(value = "design:PrintInfo")
     @PostMapping("/{orderId}/package/{packageId}/print-info")
     public Result<Void> savePrintInfo(@PathVariable Long orderId,
                                       @PathVariable Long packageId,
@@ -65,7 +65,7 @@ public class DesignPrintInfoController {
      * 删除单条打印信息
      */
     @Operation(summary = "删除单条打印信息")
-    @RequirePermission(value = "design:EditPrintInfo")
+    @RequirePermission(value = "design:PrintInfo")
     @DeleteMapping("/{orderId}/package/{packageId}/print-info/{printInfoId}")
     public Result<Void> deletePrintInfo(@PathVariable Long orderId,
                                          @PathVariable Long packageId,
