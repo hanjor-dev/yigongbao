@@ -597,11 +597,14 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
+            // 获取当前用户姓名
+            UserEntity currentUser = userService.getById(currentUserId);
+            String operatorName = currentUser != null ? currentUser.getRealName() : null;
             // 校验无阻断性修改申请
             orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行审核通过动作
             TransitionResult result = flowFacade.executeFlow(
-                    id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, null, dto.getRemark()));
+                    id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, operatorName, dto.getRemark()));
             // 更新订单的阶段、状态和当前处理人，同步写入审核时填写的预估费用和影像评估意见
             entity.setPhase(result.getTargetPhase());
             entity.setStatus(result.getFinalStatus());
@@ -655,11 +658,14 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("审核驳回时必须填写驳回原因");
                 throw new BusinessException(ErrorCodeEnum.ORDER_AUDIT_REMARK_REQUIRED);
             }
+            // 获取当前用户姓名
+            UserEntity currentUser = userService.getById(currentUserId);
+            String operatorName = currentUser != null ? currentUser.getRealName() : null;
             // 校验无阻断性修改申请
             orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行审核驳回动作
             TransitionResult result = flowFacade.executeFlow(
-                    id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, null, dto.getRemark()));
+                    id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()));
             // 更新订单的阶段、状态、驳回原因和当前处理人
             entity.setPhase(result.getTargetPhase());
             entity.setStatus(result.getFinalStatus());
@@ -691,9 +697,12 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             log.warn("订单已取消，不能重复取消，id={}", id);
             throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_CANCELLED);
         }
+        // 获取当前用户姓名
+        UserEntity currentUser = userService.getById(currentUserId);
+        String operatorName = currentUser != null ? currentUser.getRealName() : null;
         // 通过 FlowFacade 执行取消动作
         TransitionResult result = flowFacade.executeFlow(
-                id, FlowActionEnum.CANCEL, new FlowOperator(currentUserId, null, null));
+                id, FlowActionEnum.CANCEL, new FlowOperator(currentUserId, operatorName, null));
         // 更新订单的阶段和状态
         entity.setPhase(result.getTargetPhase());
         entity.setStatus(result.getFinalStatus());

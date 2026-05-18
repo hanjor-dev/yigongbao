@@ -12,6 +12,8 @@ import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.flow.service.FlowStatusHistoryService;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,7 @@ public class FlowDebugController {
     private final FlowFacade flowFacade;
     private final FlowStatusHistoryService flowStatusHistoryService;
     private final OrderMainService orderMainService;
+    private final UserService userService;
 
     /**
      * 预览状态转换结果（真实执行，落库历史记录）
@@ -86,8 +89,11 @@ public class FlowDebugController {
         Long currentUserId = getCurrentUserId();
         log.info("【Debug】执行流转动作，orderId={}, action={}, currentUserId={}",
                 id, actionCode, currentUserId);
+        // 获取当前用户姓名
+        UserEntity currentUser = userService.getById(currentUserId);
+        String operatorName = currentUser != null ? currentUser.getRealName() : null;
         TransitionResult result = flowFacade.executeFlow(
-                id, action, new FlowOperator(currentUserId, null, remark));
+                id, action, new FlowOperator(currentUserId, operatorName, remark));
 
         // 更新数据库
         OrderMainEntity entity = orderMainService.getById(id);
