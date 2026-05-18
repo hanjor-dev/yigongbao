@@ -75,4 +75,12 @@ public interface DesignWorkorderService {
      * @param orderId 订单ID
      */
     void submitDesign(Long orderId);
+
+    /**
+     * 查询订单设计师分配历史
+     *
+     * @param orderId 订单ID
+     * @return 分配历史列表
+     */
+    java.util.List<com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO> listAssignmentHistory(Long orderId);
 }

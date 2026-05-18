@@ -82,4 +82,15 @@ public class DesignWorkorderController {
         designWorkorderService.submitDesign(orderId);
         return Result.success();
     }
+
+    /**
+     * 查询订单设计师分配历史
+     * GET /design/workorder/{orderId}/assignment-history
+     */
+    @Operation(summary = "查询订单设计师分配历史")
+    @RequirePermission(value = "design:View")
+    @GetMapping("/{orderId}/assignment-history")
+    public Result<java.util.List<com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO>> getAssignmentHistory(@PathVariable Long orderId) {
+        return Result.success(designWorkorderService.listAssignmentHistory(orderId));
+    }
 }

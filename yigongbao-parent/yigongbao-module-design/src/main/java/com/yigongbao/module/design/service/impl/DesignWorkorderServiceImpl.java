@@ -100,6 +100,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     private final DesignFileService designFileService;
     private final DesignDocService designDocService;
     private final OrderFileMapper orderFileMapper;
+    private final com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper;
 
     /**
      * 分页查询设计工单列表
@@ -893,5 +894,27 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             log.warn("读取设计模式配置失败，默认使用线下模式", e);
             return null;
         }
+    }
+
+    /**
+     * 查询订单设计师分配历史
+     *
+     * @param orderId 订单ID
+     * @return 分配历史列表
+     */
+    @Override
+    public List<com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO> listAssignmentHistory(Long orderId) {
+        log.info("查询订单设计师分配历史，orderId={}", orderId);
+        // 查询分配历史记录，按分配时间倒序
+        List<com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity> logs = assignmentLogMapper.selectList(
+                new LambdaQueryWrapper<com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity>()
+                        .eq(com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity::getOrderId, orderId)
+                        .orderByDesc(com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity::getAssignTime));
+        // 转换为 VO
+        return logs.stream().map(log -> {
+            com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO vo = new com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO();
+            cn.hutool.core.bean.BeanUtil.copyProperties(log, vo);
+            return vo;
+        }).collect(Collectors.toList());
     }
 }
