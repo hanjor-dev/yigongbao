@@ -88,7 +88,7 @@ public class DesignWorkorderController {
      * GET /design/workorder/{orderId}/assignment-history
      */
     @Operation(summary = "查询订单设计师分配历史")
-    @RequirePermission(value = "design:View")
+    @RequirePermission(value = "design:AssignDesignerLog")
     @GetMapping("/{orderId}/assignment-history")
     public Result<java.util.List<com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO>> getAssignmentHistory(@PathVariable Long orderId) {
         return Result.success(designWorkorderService.listAssignmentHistory(orderId));
