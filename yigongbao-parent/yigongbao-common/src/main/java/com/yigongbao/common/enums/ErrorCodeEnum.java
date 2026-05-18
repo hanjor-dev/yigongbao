@@ -195,6 +195,7 @@ public enum ErrorCodeEnum {
     ORDER_ALREADY_SUBMITTED(685, "订单已提交，不能重复提交", 3),
     ORDER_ALREADY_AUDITED(686, "订单已审核，不能重复操作", 3),
     ORDER_NOT_WITHIN_WINDOW(687, "订单已超过10分钟修改窗口期", 3),
+    ORDER_ALREADY_CANCELLED(688, "订单已取消", 3),
 
     // 草稿相关
     ORDER_DRAFT_EXPIRED(688, "草稿已过期，请重新创建", 3),

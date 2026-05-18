@@ -144,6 +144,14 @@ public class OrderController {
         return Result.success();
     }
 
+    @Operation(summary = "取消订单")
+    @RequirePermission(value = "order:Cancel")
+    @PostMapping("/{id}/cancel")
+    public Result<Void> cancelOrder(@PathVariable Long id) {
+        orderMainService.cancelOrder(id);
+        return Result.success();
+    }
+
     @Operation(summary = "查询可执行的动作")
     @GetMapping("/{id}/actions")
     public Result<List<String>> listAvailableActions(@PathVariable Long id) {
@@ -157,7 +165,7 @@ public class OrderController {
     }
 
     @Operation(summary = "手动分配设计师（管理员）")
-    @RequirePermission(value = "order:Approve")
+    @RequirePermission(value = "design:AssignDesigner")
     @PostMapping("/{id}/assign-designer")
     public Result<Void> assignDesigner(@PathVariable Long id, @Valid @RequestBody AssignDesignerDTO dto) {
         designerAssignmentService.manualAssignDesigner(id, dto.getDesignerId());

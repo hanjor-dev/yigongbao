@@ -84,6 +84,13 @@ public interface OrderMainService extends IService<OrderMainEntity> {
     void auditReject(Long id, AuditOrderDTO dto);
 
     /**
+     * 取消订单（全阶段可用）
+     *
+     * @param id 订单ID
+     */
+    void cancelOrder(Long id);
+
+    /**
      * 查询可执行的动作
      *
      * @param id 订单ID

@@ -675,6 +675,32 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelOrder(Long id) {
+        Long currentUserId = getCurrentUserId();
+        log.info("取消订单，id={}, currentUserId={}", id, currentUserId);
+        // 校验订单存在
+        OrderMainEntity entity = getById(id);
+        if (entity == null) {
+            log.warn("订单不存在，id={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        // 校验订单未取消
+        if (entity.getStatus().equals(FlowStatusEnum.CANCELLED.getValue())) {
+            log.warn("订单已取消，不能重复取消，id={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_CANCELLED);
+        }
+        // 通过 FlowFacade 执行取消动作
+        TransitionResult result = flowFacade.executeFlow(
+                id, FlowActionEnum.CANCEL, new FlowOperator(currentUserId, null, null));
+        // 更新订单的阶段和状态
+        entity.setPhase(result.getTargetPhase());
+        entity.setStatus(result.getFinalStatus());
+        updateById(entity);
+        log.info("取消订单成功，id={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
+    }
+
     // ==================== 创建操作 ====================
 
     /**

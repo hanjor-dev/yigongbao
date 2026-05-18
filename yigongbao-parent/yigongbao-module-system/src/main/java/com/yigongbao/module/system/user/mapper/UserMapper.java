@@ -127,6 +127,7 @@ public interface UserMapper extends BaseMapper<UserEntity> {
 
     /**
      * 查询所有拥有设计权限的用户（通过权限点判断，不硬编码角色）
+     * 使用 design:StartDesign 权限（开始设计操作权限，只有设计师才有）
      * 支持按姓名模糊搜索
      *
      * @param nameKeyword 姓名关键字（可选，为空时不过滤）
@@ -143,10 +144,12 @@ public interface UserMapper extends BaseMapper<UserEntity> {
         INNER JOIN sys_role r ON u.role_id = r.id AND r.is_deleted = 0
         INNER JOIN sys_role_resource rr ON r.id = rr.role_id
         INNER JOIN sys_resource res ON rr.resource_id = res.id
-            AND res.resource_code = 'design:View'
+            AND res.resource_code = 'design:StartDesign'
             AND res.is_deleted = 0
         WHERE u.status = 1
           AND u.is_deleted = 0
+          AND u.specialty IS NOT NULL
+          AND u.specialty != ''
         <if test="nameKeyword != null and nameKeyword != ''">
           AND u.real_name LIKE CONCAT('%', #{nameKeyword}, '%')
         </if>

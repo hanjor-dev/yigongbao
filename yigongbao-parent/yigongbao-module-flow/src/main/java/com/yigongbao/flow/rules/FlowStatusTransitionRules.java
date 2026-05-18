@@ -239,7 +239,7 @@ public class FlowStatusTransitionRules {
 
         // 通用动作在任何状态下都有效
         return switch (action) {
-            case CANCEL -> FlowStatusEnum.DATA_AUDIT_REJECTED.getValue();
+            case CANCEL -> FlowStatusEnum.CANCELLED.getValue(); // 废弃订单，全阶段可用
             case COMPLETE -> FlowStatusEnum.COMPLETED.getValue();
             case CREATE -> currentStatus; // 保持当前状态
 
