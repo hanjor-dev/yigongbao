@@ -24,7 +24,7 @@
 - 文件：`controller/OrderController.java`
 - 问题：`POST /{id}/assign-designer` 注释写"管理员"，但无 `@RequirePermission`，任意登录用户均可调用。
 - 影响：普通业务员可绕过管理员直接分配设计师。
-- 修复：已补充 `@RequirePermission("order:AssignDesigner")`。
+- 修复：已补充 `@RequirePermission("design:AssignDesigner")`。
 
 ---
 

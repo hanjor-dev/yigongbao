@@ -523,7 +523,7 @@ VALUES
 (1117, 101, '审核查看',        'order:AuditView',         3, 17, 1),
 (1118, 101, '我的申请查看',    'order:MyApplyView',       3, 18, 1),
 (1119, 101, '撤回申请',        'order:MyApplyWithdraw',   3, 19, 1),
-(1120, 101, '分配设计师',      'order:AssignDesigner',    3, 20, 1),
+(1120, 101, '分配设计师',      'design:AssignDesigner',   3, 20, 1),
 -- 我的工单页按钮（parent_id=102）
 (1201, 102, '导出记录',        'design:Export',           3, 1,  1),
 (1202, 102, '查看详情',        'design:View',             3, 2,  1),
