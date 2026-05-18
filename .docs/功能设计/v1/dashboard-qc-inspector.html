@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>质管工作台 - 医工宝</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            background: #fafafa;
+            color: #1a1a1a;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+        .header {
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        .header .subtitle {
+            font-size: 14px;
+            color: #666;
+        }
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 32px;
+            padding: 16px;
+            background: white;
+            border: 1px solid #e5e5e5;
+        }
+        .toolbar select, .toolbar button {
+            padding: 8px 16px;
+            border: 1px solid #e5e5e5;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .toolbar select:hover, .toolbar button:hover {
+            border-color: #1a1a1a;
+        }
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+            transition: box-shadow 0.2s;
+        }
+        .card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card-title {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .card-value {
+            font-size: 36px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+        .card-change {
+            font-size: 13px;
+            color: #666;
+        }
+        .card-change.positive { color: #16a34a; }
+        .card-change.negative { color: #dc2626; }
+        .charts-section {
+            margin-bottom: 40px;
+        }
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        .chart-container {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+        }
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .chart {
+            width: 100%;
+            height: 320px;
+        }
+        .actions-section {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .todo-list {
+            list-style: none;
+        }
+        .todo-item {
+            padding: 16px 0;
+            border-bottom: 1px solid #f5f5f5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .todo-item:last-child {
+            border-bottom: none;
+        }
+        .todo-text {
+            font-size: 14px;
+        }
+        .todo-badge {
+            padding: 4px 12px;
+            background: #f5f5f5;
+            font-size: 12px;
+            color: #666;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: 1px solid #1a1a1a;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: #1a1a1a;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="header">
+                <h1>质管工作台</h1>
+                <p class="subtitle">{{ currentDate }} · 最后更新: {{ lastUpdate }}</p>
+            </div>
+
+            <div class="toolbar">
+                <select v-model="timeRange">
+                    <option value="today">今日</option>
+                    <option value="week">本周</option>
+                    <option value="month">本月</option>
+                    <option value="quarter">本季度</option>
+                    <option value="year">本年</option>
+                </select>
+                <button @click="refresh">刷新数据</button>
+            </div>
+
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-title">待质检任务</div>
+                    <div class="card-value">{{ stats.pendingQC }}</div>
+                    <div class="card-change" :class="stats.pendingChange >= 0 ? 'positive' : 'negative'">
+                        {{ stats.pendingChange >= 0 ? '+' : '' }}{{ stats.pendingChange }}% 环比
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">今日已质检</div>
+                    <div class="card-value">{{ stats.todayCompleted }}</div>
+                    <div class="card-change">通过 {{ stats.todayPassed }} / 返工 {{ stats.todayRework }}</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">质检通过率</div>
+                    <div class="card-value">{{ stats.passRate }}%</div>
+                    <div class="card-change" :class="stats.passRateChange >= 0 ? 'positive' : 'negative'">
+                        {{ stats.passRateChange >= 0 ? '+' : '' }}{{ stats.passRateChange }}% 环比
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">返工任务数</div>
+                    <div class="card-value">{{ stats.reworkTasks }}</div>
+                    <div class="card-change">查看返工原因</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">平均质检时长</div>
+                    <div class="card-value">{{ stats.avgQCTime }}</div>
+                    <div class="card-change" :class="stats.timeChange <= 0 ? 'positive' : 'negative'">
+                        {{ stats.timeChange >= 0 ? '+' : '' }}{{ stats.timeChange }} 分钟环比
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-section">
+                <div class="charts-row">
+                    <div class="chart-container">
+                        <div class="chart-title">质检结果趋势</div>
+                        <div id="resultChart" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">质量问题分类统计</div>
+                        <div id="issueChart" class="chart"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions-section">
+                <div class="section-title">待质检任务列表</div>
+                <ul class="todo-list">
+                    <li class="todo-item" v-for="todo in todos" :key="todo.id">
+                        <span class="todo-text">{{ todo.text }}</span>
+                        <span class="todo-badge">{{ todo.count }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    timeRange: 'month',
+                    currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),
+                    lastUpdate: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                    stats: {
+                        pendingQC: 45,
+                        pendingChange: -3.2,
+                        todayCompleted: 28,
+                        todayPassed: 26,
+                        todayRework: 2,
+                        passRate: 94,
+                        passRateChange: 1.5,
+                        reworkTasks: 8,
+                        avgQCTime: 35,
+                        timeChange: -2
+                    },
+                    todos: [
+                        { id: 1, text: '任务 #QC2024051801 待质检', count: '1' },
+                        { id: 2, text: '任务 #QC2024051802 待质检', count: '1' },
+                        { id: 3, text: '任务 #QC2024051803 待质检', count: '1' }
+                    ]
+                };
+            },
+            mounted() {
+                this.initCharts();
+            },
+            methods: {
+                refresh() {
+                    this.lastUpdate = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                },
+                initCharts() {
+                    const resultChart = echarts.init(document.getElementById('resultChart'));
+                    resultChart.setOption({
+                        grid: { left: 60, right: 40, top: 40, bottom: 40 },
+                        xAxis: {
+                            type: 'category',
+                            data: ['5/12', '5/13', '5/14', '5/15', '5/16', '5/17', '5/18'],
+                            axisLine: { lineStyle: { color: '#e5e5e5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        yAxis: {
+                            type: 'value',
+                            axisLine: { show: false },
+                            splitLine: { lineStyle: { color: '#f5f5f5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        series: [
+                            {
+                                name: '质检通过',
+                                type: 'line',
+                                data: [24, 26, 25, 28, 27, 29, 26],
+                                smooth: true,
+                                lineStyle: { color: '#10b981', width: 2 },
+                                itemStyle: { color: '#10b981' }
+                            },
+                            {
+                                name: '质检不通过',
+                                type: 'line',
+                                data: [2, 1, 2, 1, 2, 1, 2],
+                                smooth: true,
+                                lineStyle: { color: '#f59e0b', width: 2 },
+                                itemStyle: { color: '#f59e0b' }
+                            }
+                        ],
+                        legend: {
+                            bottom: 0,
+                            textStyle: { color: '#666' }
+                        }
+                    });
+
+                    const issueChart = echarts.init(document.getElementById('issueChart'));
+                    issueChart.setOption({
+                        grid: { left: 100, right: 40, top: 40, bottom: 40 },
+                        xAxis: {
+                            type: 'value',
+                            axisLine: { show: false },
+                            splitLine: { lineStyle: { color: '#f5f5f5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        yAxis: {
+                            type: 'category',
+                            data: ['其他', '材料问题', '表面瑕疵', '尺寸偏差'],
+                            axisLine: { lineStyle: { color: '#e5e5e5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        series: [{
+                            type: 'bar',
+                            data: [2, 3, 5, 8],
+                            itemStyle: { color: '#3b82f6' }
+                        }]
+                    });
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

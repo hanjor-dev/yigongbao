@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超级管理员工作台 - 医工宝</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            background: #fafafa;
+            color: #1a1a1a;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+        .header {
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        .header .subtitle {
+            font-size: 14px;
+            color: #666;
+        }
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 32px;
+            padding: 16px;
+            background: white;
+            border: 1px solid #e5e5e5;
+        }
+        .toolbar select, .toolbar button {
+            padding: 8px 16px;
+            border: 1px solid #e5e5e5;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .toolbar select:hover, .toolbar button:hover {
+            border-color: #1a1a1a;
+        }
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+            transition: box-shadow 0.2s;
+        }
+        .card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card-title {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .card-value {
+            font-size: 36px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+        .card-change {
+            font-size: 13px;
+            color: #666;
+        }
+        .card-change.positive { color: #16a34a; }
+        .card-change.negative { color: #dc2626; }
+        .card-metric {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        .card-metric .arrow {
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .card-metric.up { color: #16a34a; }
+        .card-metric.down { color: #dc2626; }
+        .card-metric.neutral { color: #666; }
+        .charts-section {
+            margin-bottom: 40px;
+        }
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        .chart-container {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+        }
+        .chart-container.full-width {
+            grid-column: 1 / -1;
+        }
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .chart {
+            width: 100%;
+            height: 320px;
+        }
+        .actions-section {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .metric-item {
+            padding: 12px;
+            background: #fafafa;
+            border: 1px solid #f5f5f5;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .metric-value {
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .system-section {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+        }
+        .system-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .system-item {
+            padding: 12px;
+            background: #fafafa;
+            border: 1px solid #f5f5f5;
+        }
+        .system-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .system-value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .system-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .system-status.healthy { background: #16a34a; }
+        .system-status.warning { background: #f59e0b; }
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: 1px solid #1a1a1a;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: #1a1a1a;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="header">
+                <h1>超级管理员工作台</h1>
+                <p class="subtitle">{{ currentDate }} · 最后更新: {{ lastUpdate }}</p>
+            </div>
+
+            <div class="toolbar">
+                <select v-model="timeRange">
+                    <option value="today">今日</option>
+                    <option value="week">本周</option>
+                    <option value="month">本月</option>
+                    <option value="quarter">本季度</option>
+                    <option value="year">本年</option>
+                </select>
+                <button @click="refresh">刷新数据</button>
+            </div>
+
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-title">订单总量</div>
+                    <div class="card-value">{{ stats.totalOrders }}</div>
+                    <div class="card-change" :class="stats.totalChange >= 0 ? 'positive' : 'negative'">
+                        {{ stats.totalChange >= 0 ? '+' : '' }}{{ stats.totalChange }}% 环比
+                    </div>
+                    <div class="card-metric up">
+                        <span class="arrow">↑</span>
+                        <span>今日新增 {{ metrics.todayNew }}</span>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">订单完成率</div>
+                    <div class="card-value">{{ stats.completionRate }}%</div>
+                    <div class="card-change" :class="stats.rateChange >= 0 ? 'positive' : 'negative'">
+                        {{ stats.rateChange >= 0 ? '+' : '' }}{{ stats.rateChange }}% 环比
+                    </div>
+                    <div class="card-metric up">
+                        <span class="arrow">↑</span>
+                        <span>今日完成 {{ metrics.todayCompleted }}</span>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">平均订单周期</div>
+                    <div class="card-value">{{ stats.avgCycle }}</div>
+                    <div class="card-change" :class="stats.cycleChange <= 0 ? 'positive' : 'negative'">
+                        {{ stats.cycleChange >= 0 ? '+' : '' }}{{ stats.cycleChange }} 天环比
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">各阶段订单</div>
+                    <div class="card-value">{{ stats.activeOrders }}</div>
+                    <div class="card-change">进行中订单数</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">异常订单数</div>
+                    <div class="card-value">{{ stats.abnormalOrders }}</div>
+                    <div class="card-change" :class="'negative'">异常率 {{ stats.abnormalRate }}%</div>
+                    <div class="card-metric down">
+                        <span class="arrow">↓</span>
+                        <span>当前异常 {{ metrics.currentAbnormal }}</span>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">团队人效</div>
+                    <div class="card-value">{{ stats.efficiency }}</div>
+                    <div class="card-change">人均订单完成数</div>
+                    <div class="card-metric neutral">
+                        <span class="arrow">→</span>
+                        <span>待审核 {{ metrics.pendingReview }}</span>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">系统活跃用户</div>
+                    <div class="card-value">{{ stats.activeUsers }}</div>
+                    <div class="card-change" :class="stats.userChange >= 0 ? 'positive' : 'negative'">
+                        {{ stats.userChange >= 0 ? '+' : '' }}{{ stats.userChange }}% 环比
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">数据增长</div>
+                    <div class="card-value">{{ stats.dataGrowth }}%</div>
+                    <div class="card-change">本月新增数据</div>
+                </div>
+            </div>
+
+            <div class="charts-section">
+                <div class="charts-row">
+                    <div class="chart-container">
+                        <div class="chart-title">订单全流程漏斗</div>
+                        <div id="funnelChart" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">各阶段平均耗时</div>
+                        <div id="durationChart" class="chart"></div>
+                    </div>
+                </div>
+                <div class="charts-row">
+                    <div class="chart-container">
+                        <div class="chart-title">订单趋势分析</div>
+                        <div id="trendChart" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">部门业绩对比</div>
+                        <div id="deptChart" class="chart"></div>
+                    </div>
+                </div>
+                <div class="chart-container full-width">
+                    <div class="chart-title">用户活跃度分析</div>
+                    <div id="activityChart" class="chart"></div>
+                </div>
+            </div>
+
+            <div class="system-section">
+                <div class="section-title">系统监控面板</div>
+                <div class="system-grid">
+                    <div class="system-item">
+                        <div class="system-label">系统健康状态</div>
+                        <div class="system-value">
+                            <span class="system-status healthy"></span>正常
+                        </div>
+                    </div>
+                    <div class="system-item">
+                        <div class="system-label">平均响应时间</div>
+                        <div class="system-value">{{ system.avgResponseTime }}</div>
+                    </div>
+                    <div class="system-item">
+                        <div class="system-label">活跃用户数</div>
+                        <div class="system-value">{{ system.onlineUsers }}</div>
+                    </div>
+                    <div class="system-item">
+                        <div class="system-label">平均订单周期</div>
+                        <div class="system-value">{{ system.avgOrderCycle }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    timeRange: 'month',
+                    currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),
+                    lastUpdate: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                    stats: {
+                        totalOrders: 1285,
+                        totalChange: 9.2,
+                        completionRate: 68,
+                        rateChange: 2.3,
+                        avgCycle: 18,
+                        cycleChange: -1.5,
+                        activeOrders: 412,
+                        abnormalOrders: 38,
+                        abnormalRate: 3.0,
+                        efficiency: 24,
+                        activeUsers: 156,
+                        userChange: 5.8,
+                        dataGrowth: 12.5
+                    },
+                    metrics: {
+                        todayNew: 52,
+                        todayCompleted: 48,
+                        currentAbnormal: 38,
+                        pendingReview: 65
+                    },
+                    system: {
+                        avgResponseTime: '120ms',
+                        onlineUsers: 156,
+                        avgOrderCycle: '432h'
+                    }
+                };
+            },
+            mounted() {
+                this.initCharts();
+            },
+            methods: {
+                refresh() {
+                    this.lastUpdate = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                },
+                initCharts() {
+                    const funnelChart = echarts.init(document.getElementById('funnelChart'));
+                    funnelChart.setOption({
+                        series: [{
+                            type: 'funnel',
+                            left: '20%',
+                            width: '60%',
+                            label: {
+                                formatter: '{b}: {c}'
+                            },
+                            data: [
+                                { value: 1285, name: '创建订单' },
+                                { value: 1220, name: '审核通过' },
+                                { value: 1180, name: '设计完成' },
+                                { value: 1145, name: '生产完成' },
+                                { value: 1098, name: '质检通过' },
+                                { value: 1065, name: '入库完成' },
+                                { value: 873, name: '已完成' }
+                            ],
+                            itemStyle: {
+                                color: function(params) {
+                                    const colors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4', '#fbbf24'];
+                                    return colors[params.dataIndex];
+                                }
+                            }
+                        }]
+                    });
+
+                    const durationChart = echarts.init(document.getElementById('durationChart'));
+                    durationChart.setOption({
+                        grid: { left: 80, right: 40, top: 40, bottom: 40 },
+                        xAxis: {
+                            type: 'value',
+                            axisLine: { show: false },
+                            splitLine: { lineStyle: { color: '#f5f5f5' } },
+                            axisLabel: { color: '#666', formatter: '{value}h' }
+                        },
+                        yAxis: {
+                            type: 'category',
+                            data: ['出库', '质检', '生产', '设计', '审核'],
+                            axisLine: { lineStyle: { color: '#e5e5e5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        series: [{
+                            type: 'bar',
+                            data: [48, 72, 192, 96, 24],
+                            itemStyle: { color: '#3b82f6' }
+                        }]
+                    });
+
+                    const trendChart = echarts.init(document.getElementById('trendChart'));
+                    trendChart.setOption({
+                        grid: { left: 60, right: 40, top: 40, bottom: 40 },
+                        xAxis: {
+                            type: 'category',
+                            data: ['第1周', '第2周', '第3周', '第4周'],
+                            axisLine: { lineStyle: { color: '#e5e5e5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        yAxis: {
+                            type: 'value',
+                            axisLine: { show: false },
+                            splitLine: { lineStyle: { color: '#f5f5f5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        series: [
+                            {
+                                name: '新建订单',
+                                type: 'line',
+                                data: [285, 310, 325, 365],
+                                smooth: true,
+                                lineStyle: { color: '#3b82f6', width: 2 },
+                                itemStyle: { color: '#3b82f6' }
+                            },
+                            {
+                                name: '完成订单',
+                                type: 'line',
+                                data: [195, 210, 225, 243],
+                                smooth: true,
+                                lineStyle: { color: '#10b981', width: 2 },
+                                itemStyle: { color: '#10b981' }
+                            },
+                            {
+                                name: '取消订单',
+                                type: 'line',
+                                data: [8, 10, 9, 11],
+                                smooth: true,
+                                lineStyle: { color: '#f59e0b', width: 2 },
+                                itemStyle: { color: '#f59e0b' }
+                            }
+                        ],
+                        legend: {
+                            bottom: 0,
+                            textStyle: { color: '#666' }
+                        }
+                    });
+
+                    const deptChart = echarts.init(document.getElementById('deptChart'));
+                    deptChart.setOption({
+                        grid: { left: 80, right: 40, top: 40, bottom: 40 },
+                        xAxis: {
+                            type: 'value',
+                            axisLine: { show: false },
+                            splitLine: { lineStyle: { color: '#f5f5f5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        yAxis: {
+                            type: 'category',
+                            data: ['华南区', '华东区', '华北区', '西南区', '华中区'],
+                            axisLine: { lineStyle: { color: '#e5e5e5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        series: [{
+                            type: 'bar',
+                            data: [428, 385, 342, 298, 256],
+                            itemStyle: { color: '#3b82f6' }
+                        }]
+                    });
+
+                    const activityChart = echarts.init(document.getElementById('activityChart'));
+                    activityChart.setOption({
+                        tooltip: {
+                            position: 'top'
+                        },
+                        grid: {
+                            left: 60,
+                            right: 40,
+                            top: 40,
+                            bottom: 40
+                        },
+                        xAxis: {
+                            type: 'category',
+                            data: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+                            axisLine: { lineStyle: { color: '#e5e5e5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        yAxis: {
+                            type: 'category',
+                            data: ['周日', '周六', '周五', '周四', '周三', '周二', '周一'],
+                            axisLine: { lineStyle: { color: '#e5e5e5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        visualMap: {
+                            min: 0,
+                            max: 100,
+                            calculable: true,
+                            orient: 'horizontal',
+                            left: 'center',
+                            bottom: 0,
+                            inRange: {
+                                color: ['#dbeafe', '#3b82f6']
+                            }
+                        },
+                        series: [{
+                            type: 'heatmap',
+                            data: [
+                                [0, 0, 15], [1, 0, 22], [2, 0, 45], [3, 0, 68], [4, 0, 52], [5, 0, 28],
+                                [0, 1, 12], [1, 1, 18], [2, 1, 38], [3, 1, 55], [4, 1, 45], [5, 1, 22],
+                                [0, 2, 18], [1, 2, 28], [2, 2, 52], [3, 2, 78], [4, 2, 62], [5, 2, 35],
+                                [0, 3, 22], [1, 3, 32], [2, 3, 58], [3, 3, 85], [4, 3, 68], [5, 3, 38],
+                                [0, 4, 20], [1, 4, 30], [2, 4, 55], [3, 4, 82], [4, 4, 65], [5, 5, 36],
+                                [0, 5, 16], [1, 5, 25], [2, 5, 48], [3, 5, 72], [4, 5, 58], [5, 5, 32],
+                                [0, 6, 10], [1, 6, 15], [2, 6, 32], [3, 6, 48], [4, 6, 38], [5, 6, 20]
+                            ],
+                            label: {
+                                show: false
+                            }
+                        }]
+                    });
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

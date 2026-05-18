@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设计管理员工作台 - 医工宝</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            background: #fafafa;
+            color: #1a1a1a;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+        .header {
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        .header .subtitle {
+            font-size: 14px;
+            color: #666;
+        }
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 32px;
+            padding: 16px;
+            background: white;
+            border: 1px solid #e5e5e5;
+        }
+        .toolbar select, .toolbar button {
+            padding: 8px 16px;
+            border: 1px solid #e5e5e5;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .toolbar select:hover, .toolbar button:hover {
+            border-color: #1a1a1a;
+        }
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+            transition: box-shadow 0.2s;
+        }
+        .card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card-title {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .card-value {
+            font-size: 36px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+        .card-change {
+            font-size: 13px;
+            color: #666;
+        }
+        .card-change.positive { color: #16a34a; }
+        .card-change.negative { color: #dc2626; }
+        .charts-section {
+            margin-bottom: 40px;
+        }
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        .chart-container {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+        }
+        .chart-container.full-width {
+            grid-column: 1 / -1;
+        }
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .chart {
+            width: 100%;
+            height: 320px;
+        }
+        .actions-section {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .todo-list {
+            list-style: none;
+        }
+        .todo-item {
+            padding: 16px 0;
+            border-bottom: 1px solid #f5f5f5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .todo-item:last-child {
+            border-bottom: none;
+        }
+        .todo-text {
+            font-size: 14px;
+        }
+        .todo-badge {
+            padding: 4px 12px;
+            background: #f5f5f5;
+            font-size: 12px;
+            color: #666;
+        }
+        .todo-badge.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: 1px solid #1a1a1a;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: #1a1a1a;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="header">
+                <h1>设计管理员工作台</h1>
+                <p class="subtitle">{{ currentDate }} · 最后更新: {{ lastUpdate }}</p>
+            </div>
+
+            <div class="toolbar">
+                <select v-model="timeRange">
+                    <option value="today">今日</option>
+                    <option value="week">本周</option>
+                    <option value="month">本月</option>
+                    <option value="quarter">本季度</option>
+                    <option value="year">本年</option>
+                </select>
+                <button @click="refresh">刷新数据</button>
+            </div>
+
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-title">团队工单总数</div>
+                    <div class="card-value">{{ stats.totalWorkorders }}</div>
+                    <div class="card-change" :class="stats.totalChange >= 0 ? 'positive' : 'negative'">
+                        {{ stats.totalChange >= 0 ? '+' : '' }}{{ stats.totalChange }}% 环比
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">待分配工单</div>
+                    <div class="card-value">{{ stats.pendingAssign }}</div>
+                    <div class="card-change">需要分配设计师</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">设计中工单</div>
+                    <div class="card-value">{{ stats.inDesign }}</div>
+                    <div class="card-change">{{ stats.designerCount }} 名设计师</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">待审核工单</div>
+                    <div class="card-value">{{ stats.pendingReview }}</div>
+                    <div class="card-change">平均等待 {{ stats.avgWaitTime }}h</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">审核通过率</div>
+                    <div class="card-value">{{ stats.passRate }}%</div>
+                    <div class="card-change" :class="stats.passRateChange >= 0 ? 'positive' : 'negative'">
+                        {{ stats.passRateChange >= 0 ? '+' : '' }}{{ stats.passRateChange }}% 环比
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">平均完成时长</div>
+                    <div class="card-value">{{ stats.avgCompletionTime }}h</div>
+                    <div class="card-change" :class="stats.timeChange <= 0 ? 'positive' : 'negative'">
+                        {{ stats.timeChange >= 0 ? '+' : '' }}{{ stats.timeChange }}h 环比
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-section">
+                <div class="charts-row">
+                    <div class="chart-container">
+                        <div class="chart-title">审核通过率趋势</div>
+                        <div id="passRateChart" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">工单阶段分布</div>
+                        <div id="phaseChart" class="chart"></div>
+                    </div>
+                </div>
+                <div class="chart-container full-width">
+                    <div class="chart-title">设计师工作负载对比</div>
+                    <div id="workloadChart" class="chart"></div>
+                </div>
+            </div>
+
+            <div class="actions-section">
+                <div class="section-title">待办事项</div>
+                <ul class="todo-list">
+                    <li class="todo-item" v-for="todo in todos" :key="todo.id">
+                        <span class="todo-text">{{ todo.text }}</span>
+                        <span class="todo-badge" :class="todo.priority">{{ todo.count }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    timeRange: 'month',
+                    currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),
+                    lastUpdate: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                    stats: {
+                        totalWorkorders: 342,
+                        totalChange: 7.8,
+                        pendingAssign: 18,
+                        inDesign: 95,
+                        designerCount: 8,
+                        pendingReview: 32,
+                        avgWaitTime: 4.2,
+                        passRate: 91,
+                        passRateChange: 2.5,
+                        avgCompletionTime: 22.5,
+                        timeChange: -1.8
+                    },
+                    todos: [
+                        { id: 1, text: '待分配工单 18 个，需优先处理', count: '18', priority: '' },
+                        { id: 2, text: '待审核工单 32 个', count: '32', priority: '' },
+                        { id: 3, text: '超时未完成工单 3 个', count: '3', priority: 'warning' }
+                    ]
+                };
+            },
+            mounted() {
+                this.initCharts();
+            },
+            methods: {
+                refresh() {
+                    this.lastUpdate = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                },
+                initCharts() {
+                    const workloadChart = echarts.init(document.getElementById('workloadChart'));
+                    workloadChart.setOption({
+                        grid: { left: 80, right: 40, top: 40, bottom: 40 },
+                        xAxis: {
+                            type: 'value',
+                            axisLine: { show: false },
+                            splitLine: { lineStyle: { color: '#f5f5f5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        yAxis: {
+                            type: 'category',
+                            data: ['张三', '李四', '王五', '赵六', '钱七', '孙八', '周九', '吴十'],
+                            axisLine: { lineStyle: { color: '#e5e5e5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        series: [
+                            {
+                                name: '待开始',
+                                type: 'bar',
+                                stack: 'total',
+                                data: [3, 2, 4, 2, 3, 2, 1, 1],
+                                itemStyle: { color: '#fbbf24' }
+                            },
+                            {
+                                name: '设计中',
+                                type: 'bar',
+                                stack: 'total',
+                                data: [8, 10, 12, 14, 11, 13, 15, 12],
+                                itemStyle: { color: '#3b82f6' }
+                            },
+                            {
+                                name: '已完成',
+                                type: 'bar',
+                                stack: 'total',
+                                data: [42, 38, 45, 40, 43, 41, 39, 44],
+                                itemStyle: { color: '#10b981' }
+                            }
+                        ],
+                        legend: {
+                            bottom: 0,
+                            textStyle: { color: '#666' }
+                        }
+                    });
+
+                    const passRateChart = echarts.init(document.getElementById('passRateChart'));
+                    passRateChart.setOption({
+                        grid: { left: 60, right: 40, top: 40, bottom: 40 },
+                        xAxis: {
+                            type: 'category',
+                            data: ['第1周', '第2周', '第3周', '第4周'],
+                            axisLine: { lineStyle: { color: '#e5e5e5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        yAxis: {
+                            type: 'value',
+                            min: 80,
+                            max: 100,
+                            axisLine: { show: false },
+                            splitLine: { lineStyle: { color: '#f5f5f5' } },
+                            axisLabel: { color: '#666', formatter: '{value}%' }
+                        },
+                        series: [{
+                            name: '通过率',
+                            type: 'line',
+                            data: [88, 90, 89, 91],
+                            smooth: true,
+                            lineStyle: { color: '#10b981', width: 2 },
+                            itemStyle: { color: '#10b981' },
+                            areaStyle: {
+                                color: {
+                                    type: 'linear',
+                                    x: 0, y: 0, x2: 0, y2: 1,
+                                    colorStops: [
+                                        { offset: 0, color: 'rgba(16, 185, 129, 0.2)' },
+                                        { offset: 1, color: 'rgba(16, 185, 129, 0)' }
+                                    ]
+                                }
+                            }
+                        }]
+                    });
+
+                    const phaseChart = echarts.init(document.getElementById('phaseChart'));
+                    phaseChart.setOption({
+                        series: [{
+                            type: 'pie',
+                            radius: ['50%', '70%'],
+                            avoidLabelOverlap: false,
+                            itemStyle: {
+                                borderColor: '#fff',
+                                borderWidth: 2
+                            },
+                            label: {
+                                show: true,
+                                formatter: '{b}\n{c}',
+                                color: '#666'
+                            },
+                            data: [
+                                { value: 18, name: '待分配', itemStyle: { color: '#fbbf24' } },
+                                { value: 95, name: '设计中', itemStyle: { color: '#3b82f6' } },
+                                { value: 32, name: '待审核', itemStyle: { color: '#8b5cf6' } },
+                                { value: 197, name: '已完成', itemStyle: { color: '#10b981' } }
+                            ]
+                        }]
+                    });
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
