@@ -217,20 +217,79 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
     }
 
     /**
+     * 修改资源状态
+     *
+     * @param id     资源ID
+     * @param status 状态（0=禁用，1=启用）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStatus(Long id, Integer status) {
+        log.info("修改资源状态，id={}, status={}", id, status);
+        try {
+            if (status == null || (status != StatusConstants.DISABLED && status != StatusConstants.NORMAL)) {
+                log.warn("状态值不合法，status={}", status);
+                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR);
+            }
+            ResourceEntity entity = baseMapper.selectById(id);
+            if (entity == null) {
+                log.warn("资源不存在，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.RESOURCE_NOT_FOUND);
+            }
+            if (StatusConstants.NORMAL == status) {
+                if (entity.getParentId() != null && entity.getParentId() > 0) {
+                    ResourceEntity parent = baseMapper.selectById(entity.getParentId());
+                    if (parent != null && StatusConstants.DISABLED == parent.getStatus()) {
+                        log.warn("父资源已禁用，无法启用子资源，parentId={}", entity.getParentId());
+                        throw new BusinessException(ErrorCodeEnum.PARAM_ERROR);
+                    }
+                }
+            } else if (StatusConstants.DISABLED == status) {
+                cascadeDisableChildren(id);
+            }
+            entity.setStatus(status);
+            baseMapper.updateById(entity);
+            log.info("修改资源状态成功，id={}, status={}", id, status);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("修改资源状态异常，id={}", id, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 递归禁用所有子资源
+     *
+     * @param parentId 父资源ID
+     */
+    private void cascadeDisableChildren(Long parentId) {
+        LambdaQueryWrapper<ResourceEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ResourceEntity::getParentId, parentId)
+                .eq(ResourceEntity::getStatus, StatusConstants.NORMAL);
+        List<ResourceEntity> children = baseMapper.selectList(wrapper);
+        for (ResourceEntity child : children) {
+            child.setStatus(StatusConstants.DISABLED);
+            baseMapper.updateById(child);
+            cascadeDisableChildren(child.getId());
+        }
+    }
+
+    /**
      * 获取资源树（所有资源，用于管理后台）
+     * 不过滤状态，管理员需要看到禁用的资源以便重新启用
      */
     @Override
     public List<ResourceVO> getResourceTree() {
         log.info("获取资源树");
         LambdaQueryWrapper<ResourceEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ResourceEntity::getStatus, StatusConstants.NORMAL)
-                .orderByAsc(ResourceEntity::getSort);
+        wrapper.orderByAsc(ResourceEntity::getSort);
         List<ResourceEntity> allResources = baseMapper.selectList(wrapper);
         return buildResourceTree(allResources, 0L);
     }
 
     /**
-     * 递归构建资源树
+     * 递归构建资源树（管理后台用，不过滤状态和可见性）
      */
     private List<ResourceVO> buildResourceTree(List<ResourceEntity> allResources, Long parentId) {
         if (allResources == null || allResources.isEmpty()) {
@@ -238,7 +297,6 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
         }
         return allResources.stream()
                 .filter(r -> r.getParentId().equals(parentId))
-                .filter(r -> r.getVisible().equals(StatusConstants.NORMAL))
                 .map(ResourceConvert::toVO)
                 .peek(vo -> vo.setChildren(buildResourceTree(allResources, vo.getId())))
                 .sorted(Comparator.comparing(ResourceVO::getSort))

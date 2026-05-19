@@ -248,17 +248,16 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     }
 
     /**
-     * 获取医院组合模板下拉选项列表
+     * 获取医院组合模板下拉选项列表（仅返回启用状态的模板）
      *
-     * @param status 状态过滤（null 表示不过滤）
      * @return 简化VO列表，包含id、名称、编号和医院数量，按名称升序排列
      */
     @Override
-    public List<HospitalGroupTemplateSimpleVO> listOptions(Integer status) {
-        log.info("获取医院组合模板下拉选项，status={}", status);
+    public List<HospitalGroupTemplateSimpleVO> listOptions() {
+        log.info("获取医院组合模板下拉选项");
         try {
             LambdaQueryWrapper<HospitalGroupTemplateEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(Objects.nonNull(status), HospitalGroupTemplateEntity::getStatus, status)
+            wrapper.eq(HospitalGroupTemplateEntity::getStatus, StatusConstants.NORMAL)
                     .orderByAsc(HospitalGroupTemplateEntity::getTemplateName);
             List<HospitalGroupTemplateEntity> list = list(wrapper);
             List<HospitalGroupTemplateSimpleVO> voList = list.stream().map(this::toSimpleVO).collect(Collectors.toList());

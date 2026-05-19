@@ -110,6 +110,26 @@ public class ResourceController {
     }
 
     /**
+     * 修改资源状态
+     *
+     * @param id 资源ID
+     * @param status 状态（0=禁用，1=启用）
+     * @return 操作结果
+     */
+    @Operation(summary = "修改资源状态")
+    @RequirePermission("resource:Edit")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "修改资源状态"
+    )
+    @PutMapping("/{id}/status")
+    public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
+        resourceService.updateStatus(id, status);
+        return Result.success();
+    }
+
+    /**
      * 获取角色已分配的资源ID列表
      */
     @Operation(summary = "获取角色已分配的资源ID列表")

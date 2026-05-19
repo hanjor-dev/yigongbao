@@ -103,6 +103,11 @@ public class UserEntity extends BaseEntity implements Serializable {
     private String employeeNo;
 
     /**
+     * 资产编码（企业账户选填）
+     */
+    private String assetNumber;
+
+    /**
      * 专业方向
      */
     private String specialty;

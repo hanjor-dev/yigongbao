@@ -147,6 +147,11 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
                 log.warn("角色编码已存在，roleCode={}", dto.getRoleCode());
                 throw new BusinessException(ErrorCodeEnum.ROLE_EXISTS);
             }
+            // 校验角色名称是否已存在
+            if (isRoleNameExists(dto.getRoleName())) {
+                log.warn("角色名称已存在，roleName={}", dto.getRoleName());
+                throw new BusinessException(ErrorCodeEnum.ROLE_NAME_EXISTS);
+            }
             // DTO转换为实体对象
             RoleEntity entity = RoleConvert.toEntity(dto);
             entity.setStatus(StatusConstants.NORMAL);
@@ -176,13 +181,20 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             RoleEntity entity = getById(id);
             if (entity == null) {
                 log.warn("角色不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.ROLE_NOT_FOUND);
             }
             // 校验角色编码是否与其他角色重复
             if (StrUtil.isNotBlank(dto.getRoleCode()) && !dto.getRoleCode().equals(entity.getRoleCode())) {
                 if (isRoleCodeExistsExcludingId(dto.getRoleCode(), id)) {
                     log.warn("角色编码已存在，roleCode={}", dto.getRoleCode());
                     throw new BusinessException(ErrorCodeEnum.ROLE_EXISTS);
+                }
+            }
+            // 校验角色名称是否与其他角色重复
+            if (StrUtil.isNotBlank(dto.getRoleName()) && !dto.getRoleName().equals(entity.getRoleName())) {
+                if (isRoleNameExistsExcludingId(dto.getRoleName(), id)) {
+                    log.warn("角色名称已存在，roleName={}", dto.getRoleName());
+                    throw new BusinessException(ErrorCodeEnum.ROLE_NAME_EXISTS);
                 }
             }
             // 更新角色信息（先记录旧名称，用于后续同步冗余字段）
@@ -253,7 +265,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             RoleEntity entity = getById(id);
             if (entity == null) {
                 log.warn("角色不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+                throw new BusinessException(ErrorCodeEnum.ROLE_NOT_FOUND);
             }
             // 更新状态
             entity.setStatus(status);
@@ -378,5 +390,29 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
      */
     private boolean hasUsers(Long roleId) {
         return userMapper.countByRoleId(roleId) > 0;
+    }
+
+    /**
+     * 校验角色名称是否已存在
+     *
+     * @param roleName 角色名称
+     * @return true-存在，false-不存在
+     */
+    private boolean isRoleNameExists(String roleName) {
+        return count(new LambdaQueryWrapper<RoleEntity>()
+                .eq(RoleEntity::getRoleName, roleName)) > 0;
+    }
+
+    /**
+     * 校验角色名称是否存在（排除指定ID）
+     *
+     * @param roleName  角色名称
+     * @param excludeId 排除的角色ID
+     * @return true-存在，false-不存在
+     */
+    private boolean isRoleNameExistsExcludingId(String roleName, Long excludeId) {
+        return count(new LambdaQueryWrapper<RoleEntity>()
+                .eq(RoleEntity::getRoleName, roleName)
+                .ne(RoleEntity::getId, excludeId)) > 0;
     }
 }

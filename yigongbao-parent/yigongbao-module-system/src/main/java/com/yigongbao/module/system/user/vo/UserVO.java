@@ -113,6 +113,11 @@ public class UserVO implements Serializable {
     private String employeeNo;
 
     /**
+     * 资产编码（企业账户选填）
+     */
+    private String assetNumber;
+
+    /**
      * 专业方向
      */
     private String specialty;

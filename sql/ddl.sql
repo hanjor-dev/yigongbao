@@ -168,6 +168,7 @@ CREATE TABLE sys_user (
 
     -- 扩展字段
     employee_no         VARCHAR(32)     COMMENT '工号',
+    asset_number        VARCHAR(64)     COMMENT '资产编码（企业账户选填）',
     specialty           VARCHAR(255)    COMMENT '专业方向（多选逗号拼接，如 7.1,7.2）',
     qualification       VARCHAR(512)    COMMENT '资质证书信息',
     settlement_type     TINYINT         COMMENT '结算类型（关联字典编码=8）',

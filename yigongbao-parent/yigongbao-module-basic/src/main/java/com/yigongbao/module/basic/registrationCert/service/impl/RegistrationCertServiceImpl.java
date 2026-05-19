@@ -59,9 +59,25 @@ import java.util.Objects;
             int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
             Page<RegistrationCertEntity> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<RegistrationCertEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StringUtils.hasText(dto.getCertCode()), RegistrationCertEntity::getCertCode, dto.getCertCode())
-                    .like(StringUtils.hasText(dto.getCertName()), RegistrationCertEntity::getCertName, dto.getCertName())
-                    .eq(Objects.nonNull(dto.getStatus()), RegistrationCertEntity::getStatus, dto.getStatus())
+
+            // 注册证号或名称查询（OR 关系）
+            if (StringUtils.hasText(dto.getCertCode()) || StringUtils.hasText(dto.getCertName())) {
+                wrapper.and(w -> {
+                    boolean hasCode = StringUtils.hasText(dto.getCertCode());
+                    boolean hasName = StringUtils.hasText(dto.getCertName());
+                    if (hasCode) {
+                        w.like(RegistrationCertEntity::getCertCode, dto.getCertCode());
+                    }
+                    if (hasName) {
+                        if (hasCode) {
+                            w.or();
+                        }
+                        w.like(RegistrationCertEntity::getCertName, dto.getCertName());
+                    }
+                });
+            }
+
+            wrapper.eq(Objects.nonNull(dto.getStatus()), RegistrationCertEntity::getStatus, dto.getStatus())
                     .orderByDesc(RegistrationCertEntity::getCreateTime);
             IPage<RegistrationCertVO> result = page(page, wrapper).convert(entity -> {
                 RegistrationCertVO vo = RegistrationCertConvert.toVO(entity);
@@ -140,9 +156,19 @@ import java.util.Objects;
     public void create(CreateRegistrationCertDTO dto) {
         log.info("创建注册证，certCode={}", dto.getCertCode());
         try {
+            // 校验有效期时间
+            if (dto.getValidFrom() != null && dto.getValidTo() != null
+                    && dto.getValidFrom().isAfter(dto.getValidTo())) {
+                log.warn("有效期开始时间不能大于截止时间，validFrom={}, validTo={}", dto.getValidFrom(), dto.getValidTo());
+                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "有效期开始时间不能大于截止时间");
+            }
             if (isCertCodeExists(dto.getCertCode(), null)) {
                 log.warn("注册证号已存在，certCode={}", dto.getCertCode());
                 throw new BusinessException(ErrorCodeEnum.CERT_EXISTS);
+            }
+            if (isCertNameExists(dto.getCertName(), null)) {
+                log.warn("注册证名称已存在，certName={}", dto.getCertName());
+                throw new BusinessException(ErrorCodeEnum.CERT_NAME_EXISTS);
             }
             RegistrationCertEntity entity = RegistrationCertConvert.toEntity(dto);
             if (entity.getStatus() == null) {
@@ -176,10 +202,22 @@ import java.util.Objects;
                 log.warn("注册证不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.CERT_NOT_FOUND);
             }
+            // 校验有效期时间
+            LocalDate validFrom = dto.getValidFrom() != null ? dto.getValidFrom() : entity.getValidFrom();
+            LocalDate validTo = dto.getValidTo() != null ? dto.getValidTo() : entity.getValidTo();
+            if (validFrom != null && validTo != null && validFrom.isAfter(validTo)) {
+                log.warn("有效期开始时间不能大于截止时间，validFrom={}, validTo={}", validFrom, validTo);
+                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "有效期开始时间不能大于截止时间");
+            }
             if (StringUtils.hasText(dto.getCertCode()) && !dto.getCertCode().equals(entity.getCertCode())
                     && isCertCodeExists(dto.getCertCode(), id)) {
                 log.warn("注册证号已存在，certCode={}", dto.getCertCode());
                 throw new BusinessException(ErrorCodeEnum.CERT_EXISTS);
+            }
+            if (StringUtils.hasText(dto.getCertName()) && !dto.getCertName().equals(entity.getCertName())
+                    && isCertNameExists(dto.getCertName(), id)) {
+                log.warn("注册证名称已存在，certName={}", dto.getCertName());
+                throw new BusinessException(ErrorCodeEnum.CERT_NAME_EXISTS);
             }
             String oldCertCode = entity.getCertCode();
             BeanUtils.copyProperties(dto, entity, "id", "createTime", "updateTime", "createBy", "updateBy");
@@ -282,13 +320,22 @@ import java.util.Objects;
      */
     private void fillExtraFields(RegistrationCertVO vo, RegistrationCertEntity entity) {
         if (entity.getStatus() != null) {
-            vo.setStatusName(entity.getStatus().equals(StatusConstants.NORMAL) ? "有效" : "过期");
+            vo.setStatusName(entity.getStatus().equals(StatusConstants.NORMAL) ? "可用" : "不可用");
         }
     }
 
     private boolean isCertCodeExists(String certCode, Long excludeId) {
         LambdaQueryWrapper<RegistrationCertEntity> wrapper = new LambdaQueryWrapper<RegistrationCertEntity>()
                 .eq(RegistrationCertEntity::getCertCode, certCode);
+        if (excludeId != null) {
+            wrapper.ne(RegistrationCertEntity::getId, excludeId);
+        }
+        return count(wrapper) > 0;
+    }
+
+    private boolean isCertNameExists(String certName, Long excludeId) {
+        LambdaQueryWrapper<RegistrationCertEntity> wrapper = new LambdaQueryWrapper<RegistrationCertEntity>()
+                .eq(RegistrationCertEntity::getCertName, certName);
         if (excludeId != null) {
             wrapper.ne(RegistrationCertEntity::getId, excludeId);
         }

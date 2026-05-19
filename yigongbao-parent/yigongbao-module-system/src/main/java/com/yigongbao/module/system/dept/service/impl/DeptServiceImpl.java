@@ -349,9 +349,13 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                         new LambdaQueryWrapper<DeptOrgEntity>().eq(DeptOrgEntity::getOrgId, orgId))
                         .stream().map(DeptOrgEntity::getDeptId).collect(Collectors.toList());
                 if (deptIds.isEmpty()) return List.of();
-                entityList = listByIds(deptIds);
+                entityList = list(new LambdaQueryWrapper<DeptEntity>()
+                        .in(DeptEntity::getId, deptIds)
+                        .eq(DeptEntity::getStatus, StatusConstants.NORMAL));
             } else {
-                entityList = list(new LambdaQueryWrapper<DeptEntity>().orderByAsc(DeptEntity::getDeptName));
+                entityList = list(new LambdaQueryWrapper<DeptEntity>()
+                        .eq(DeptEntity::getStatus, StatusConstants.NORMAL)
+                        .orderByAsc(DeptEntity::getDeptName));
             }
             return entityList.stream().map(this::toVOWithNames).collect(Collectors.toList());
         } catch (Exception e) {
@@ -523,7 +527,8 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             if (mismatch) {
                 throw new BusinessException(ErrorCodeEnum.ORG_DEPT_TYPE_MISMATCH);
             }
-            // 校验每个经销商未被其他外部部门关联（一个经销商只属于一个外部部门）
+            // 校验每个经销商未被其他外部部门关联（一个经销商只属于一个部门）
+            List<Long> boundOrgIds = new ArrayList<>();
             for (Long orgId : orgIds) {
                 LambdaQueryWrapper<DeptOrgEntity> wrapper = new LambdaQueryWrapper<DeptOrgEntity>()
                         .eq(DeptOrgEntity::getOrgId, orgId);
@@ -531,8 +536,14 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                     wrapper.ne(DeptOrgEntity::getDeptId, excludeDeptId);
                 }
                 if (deptOrgMapper.selectCount(wrapper) > 0) {
-                    throw new BusinessException(ErrorCodeEnum.DEPT_ORG_ALREADY_BOUND);
+                    boundOrgIds.add(orgId);
                 }
+            }
+            if (!boundOrgIds.isEmpty()) {
+                String orgNames = orgService.listByIds(boundOrgIds).stream()
+                        .map(OrgEntity::getOrgName)
+                        .collect(Collectors.joining("、"));
+                throw new BusinessException(ErrorCodeEnum.DEPT_ORG_ALREADY_BOUND, orgNames);
             }
         }
     }

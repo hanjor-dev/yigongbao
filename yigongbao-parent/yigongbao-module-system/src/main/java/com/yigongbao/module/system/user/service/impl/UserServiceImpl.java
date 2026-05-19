@@ -111,7 +111,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 .like(StrUtil.isNotBlank(dto.getRealName()), UserEntity::getRealName, dto.getRealName())
                 .eq(Objects.nonNull(dto.getOrgId()), UserEntity::getOrgId, dto.getOrgId())
                 .eq(Objects.nonNull(dto.getDeptId()), UserEntity::getDeptId, dto.getDeptId())
-                .eq(Objects.nonNull(dto.getAccountType()), UserEntity::getAccountType, dto.getAccountType())
+                .eq(StrUtil.isNotBlank(dto.getAccountType()), UserEntity::getAccountType, dto.getAccountType())
                 .eq(Objects.nonNull(dto.getStatus()), UserEntity::getStatus, dto.getStatus())
                 .orderByDesc(UserEntity::getCreateTime);
         IPage<UserEntity> pageResult = page(page, wrapper);

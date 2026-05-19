@@ -93,8 +93,7 @@ public class HospitalGroupTemplateController {
 
     @Operation(summary = "获取医院组合模板下拉选项")
     @GetMapping("/options")
-    public Result<List<HospitalGroupTemplateSimpleVO>> options(
-            @RequestParam(required = false) @Min(0) @Max(1) Integer status) {
-        return Result.success(templateService.listOptions(status));
+    public Result<List<HospitalGroupTemplateSimpleVO>> options() {
+        return Result.success(templateService.listOptions());
     }
 }

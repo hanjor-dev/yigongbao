@@ -38,5 +38,5 @@ public interface HospitalGroupTemplateService extends IService<HospitalGroupTemp
 
     void updateStatus(Long id, Integer status);
 
-    List<HospitalGroupTemplateSimpleVO> listOptions(Integer status);
+    List<HospitalGroupTemplateSimpleVO> listOptions();
 }

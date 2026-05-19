@@ -255,40 +255,40 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
      * 记录设计师分配历史（支持首次分配和重新分配）
      */
     private void saveAssignmentLog(OrderMainEntity order, UserEntity newDesigner) {
-        com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity log =
+        com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity aggignLog =
                 new com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity();
-        log.setOrderId(order.getId());
-        log.setOrderCode(order.getOrderCode());
-        log.setOldDesignerId(order.getDesignerId());
-        log.setOldDesignerName(order.getDesignerName());
-        log.setNewDesignerId(newDesigner.getId());
-        log.setNewDesignerName(newDesigner.getRealName());
-        log.setAssignType("MANUAL");
-        log.setAssignTime(java.time.LocalDateTime.now());
+        aggignLog.setOrderId(order.getId());
+        aggignLog.setOrderCode(order.getOrderCode());
+        aggignLog.setOldDesignerId(order.getDesignerId());
+        aggignLog.setOldDesignerName(order.getDesignerName());
+        aggignLog.setNewDesignerId(newDesigner.getId());
+        aggignLog.setNewDesignerName(newDesigner.getRealName());
+        aggignLog.setAssignType("MANUAL");
+        aggignLog.setAssignTime(java.time.LocalDateTime.now());
         // 获取当前操作人信息
         try {
             Long operatorId = cn.dev33.satoken.stp.StpUtil.getLoginIdAsLong();
-            log.setOperatorId(operatorId);
+            aggignLog.setOperatorId(operatorId);
             UserEntity operator = userMapper.selectById(operatorId);
             if (operator != null) {
-                log.setOperatorName(operator.getRealName());
+                aggignLog.setOperatorName(operator.getRealName());
             }
         } catch (Exception e) {
             log.warn("获取操作人信息失败", e);
         }
         // 记录日志信息
-        if (log.getOldDesignerId() != null) {
-            log.setRemark(String.format("重新分配：%s(%d) → %s(%d)",
-                    log.getOldDesignerName(), log.getOldDesignerId(),
-                    log.getNewDesignerName(), log.getNewDesignerId()));
+        if (aggignLog.getOldDesignerId() != null) {
+            aggignLog.setRemark(String.format("重新分配：%s(%d) → %s(%d)",
+                    aggignLog.getOldDesignerName(), aggignLog.getOldDesignerId(),
+                    aggignLog.getNewDesignerName(), aggignLog.getNewDesignerId()));
             log.info("设计师重新分配，orderId={}, 原设计师={}({}), 新设计师={}({})",
-                    order.getId(), log.getOldDesignerName(), log.getOldDesignerId(),
-                    log.getNewDesignerName(), log.getNewDesignerId());
+                    order.getId(), aggignLog.getOldDesignerName(), aggignLog.getOldDesignerId(),
+                    aggignLog.getNewDesignerName(), aggignLog.getNewDesignerId());
         } else {
-            log.setRemark(String.format("首次分配：%s(%d)",
-                    log.getNewDesignerName(), log.getNewDesignerId()));
+            aggignLog.setRemark(String.format("首次分配：%s(%d)",
+                    aggignLog.getNewDesignerName(), aggignLog.getNewDesignerId()));
         }
-        assignmentLogMapper.insert(log);
+        assignmentLogMapper.insert(aggignLog);
     }
 
     /**

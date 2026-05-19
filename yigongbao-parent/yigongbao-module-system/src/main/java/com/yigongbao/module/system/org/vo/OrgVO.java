@@ -126,6 +126,11 @@ public class OrgVO {
     private String statusName;
 
     /**
+     * 是否已被经销商关联（仅医疗机构类型有效）
+     */
+    private Boolean isBound;
+
+    /**
      * 备注说明
      */
     private String remark;

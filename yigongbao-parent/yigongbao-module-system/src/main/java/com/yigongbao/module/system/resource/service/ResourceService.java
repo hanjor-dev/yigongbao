@@ -102,4 +102,12 @@ public interface ResourceService extends IService<ResourceEntity> {
      * @return 资源树，每节点含 checked=true/false
      */
     List<ResourceVO> getResourceTreeWithChecked(Long roleId);
+
+    /**
+     * 修改资源状态
+     *
+     * @param id     资源ID
+     * @param status 状态（0=禁用，1=启用）
+     */
+    void updateStatus(Long id, Integer status);
 }

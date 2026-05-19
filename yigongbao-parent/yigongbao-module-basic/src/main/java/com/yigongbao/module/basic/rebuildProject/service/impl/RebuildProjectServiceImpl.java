@@ -101,7 +101,9 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
                 throw new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND);
             }
             Map<Long, String> bodyPartNameMap = getBodyPartNameMap();
+            // 只查询启用状态的项目
             LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(bodyPartId, categoryCode, keyword);
+            wrapper.eq(RebuildProjectEntity::getStatus, StatusConstants.NORMAL);
             List<RebuildProjectEntity> allList = list(wrapper
                     .orderByAsc(RebuildProjectEntity::getSort));
             List<RebuildProjectVO> voList = allList.stream()

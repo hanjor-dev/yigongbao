@@ -137,6 +137,12 @@ public class BodyPartServiceImpl extends ServiceImpl<BodyPartMapper, BodyPartEnt
                 log.warn("部位名称已存在，name={}", dto.getName());
                 throw new BusinessException(ErrorCodeEnum.BODY_PART_NAME_EXISTS);
             }
+            // 状态变更为禁用时，校验该部位下是否有启用状态的重建项目
+            Integer newStatus = Objects.requireNonNullElse(dto.getStatus(), entity.getStatus());
+            if (newStatus == StatusConstants.DISABLED && entity.getStatus() == StatusConstants.NORMAL && hasEnabledProjects(id)) {
+                log.warn("该部位下存在启用状态的重建项目，无法禁用，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.DATA_HAS_CHILDREN);
+            }
             entity.setName(dto.getName());
             entity.setSort(Objects.requireNonNullElse(dto.getSort(), 0));
             entity.setStatus(Objects.requireNonNullElse(dto.getStatus(), entity.getStatus()));
@@ -167,12 +173,9 @@ public class BodyPartServiceImpl extends ServiceImpl<BodyPartMapper, BodyPartEnt
                 log.warn("部位不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND);
             }
-            // 校验该部位下是否有关联的重建项目，有则拒绝删除
-            boolean hasProjects = rebuildProjectMapper.selectCount(
-                    new LambdaQueryWrapper<RebuildProjectEntity>()
-                            .eq(RebuildProjectEntity::getBodyPartId, id)) > 0;
-            if (hasProjects) {
-                log.warn("该部位下存在重建项目，无法删除，id={}", id);
+            // 校验该部位下是否有启用状态的重建项目，有则拒绝删除
+            if (hasEnabledProjects(id)) {
+                log.warn("该部位下存在启用状态的重建项目，无法删除，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_HAS_CHILDREN);
             }
             removeById(id);
@@ -204,6 +207,11 @@ public class BodyPartServiceImpl extends ServiceImpl<BodyPartMapper, BodyPartEnt
             if (entity == null) {
                 log.warn("部位不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND);
+            }
+            // 禁用时，校验该部位下是否有启用状态的重建项目
+            if (status == StatusConstants.DISABLED && hasEnabledProjects(id)) {
+                log.warn("该部位下存在启用状态的重建项目，无法禁用，id={}", id);
+                throw new BusinessException(ErrorCodeEnum.DATA_HAS_CHILDREN);
             }
             entity.setStatus(status);
             updateById(entity);
@@ -256,5 +264,18 @@ public class BodyPartServiceImpl extends ServiceImpl<BodyPartMapper, BodyPartEnt
         return count(new LambdaQueryWrapper<BodyPartEntity>()
                 .eq(BodyPartEntity::getName, name)
                 .ne(BodyPartEntity::getId, excludeId)) > 0;
+    }
+
+    /**
+     * 检查部位下是否有启用状态的重建项目
+     *
+     * @param bodyPartId 部位ID
+     * @return true=存在启用状态的重建项目
+     */
+    private boolean hasEnabledProjects(Long bodyPartId) {
+        return rebuildProjectMapper.selectCount(
+                new LambdaQueryWrapper<RebuildProjectEntity>()
+                        .eq(RebuildProjectEntity::getBodyPartId, bodyPartId)
+                        .eq(RebuildProjectEntity::getStatus, StatusConstants.NORMAL)) > 0;
     }
 }

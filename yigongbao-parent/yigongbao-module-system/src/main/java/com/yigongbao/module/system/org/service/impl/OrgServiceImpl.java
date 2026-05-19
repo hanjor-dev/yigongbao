@@ -473,6 +473,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
         log.info("全量查询机构列表，用于下拉选择");
         try {
             LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(OrgEntity::getStatus, StatusConstants.NORMAL);
             wrapper.ne(OrgEntity::getOrgType, DictCodeConstants.ORG_TYPE_PRODUCER);
             String unknownHospitalIdStr = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
             if (unknownHospitalIdStr != null) {
@@ -480,8 +481,22 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             }
             wrapper.orderByAsc(OrgEntity::getOrgName);
             List<OrgEntity> entityList = list(wrapper);
+
+            // 查询所有已被经销商关联的医疗机构ID集合
+            Set<Long> boundHospitalIds = orgHospitalMapper.selectList(new LambdaQueryWrapper<>())
+                    .stream()
+                    .map(OrgHospitalEntity::getHospitalOrgId)
+                    .collect(Collectors.toSet());
+
             List<OrgVO> voList = entityList.stream()
-                    .map(this::toVOWithDictNames)
+                    .map(entity -> {
+                        OrgVO vo = toVOWithDictNames(entity);
+                        // 如果是医疗机构类型，设置是否已被关联标识
+                        if (DictCodeConstants.ORG_TYPE_HOSPITAL.equals(vo.getOrgType())) {
+                            vo.setIsBound(boundHospitalIds.contains(vo.getId()));
+                        }
+                        return vo;
+                    })
                     .collect(Collectors.toList());
             log.info("全量查询机构列表成功，总数={}", voList.size());
             return voList;

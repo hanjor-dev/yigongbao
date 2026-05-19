@@ -53,7 +53,7 @@ public class UpdateUserDTO implements Serializable {
      * 必填，必须与所选角色的账户分类一致
      */
     @NotBlank(message = "账户分类不能为空")
-    @Pattern(regexp = "^(6\\.1|6\\.2)$", message = "账户分类值不合法，仅支持6.1（企业账户）或6.2（业务账户）")
+    @Pattern(regexp = "^(6\\.1|6\\.2)$", message = "账户分类参数不合法")
     private String accountType;
 
     /**
@@ -82,6 +82,12 @@ public class UpdateUserDTO implements Serializable {
      */
     @Size(max = 32, message = "工号长度不能超过32个字符")
     private String employeeNo;
+
+    /**
+     * 资产编码（企业账户选填）
+     */
+    @Size(max = 64, message = "资产编码长度不能超过64个字符")
+    private String assetNumber;
 
     /**
      * 专业方向字典编码列表（设计师/设计师管理员必填，如 ["7.1", "7.2"]）

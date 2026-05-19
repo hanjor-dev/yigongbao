@@ -199,11 +199,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
                 log.warn("配置不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.CONFIG_NOT_FOUND);
             }
-            // 检查是否为系统内置配置，系统内置配置不可修改
-            if (entity.getIsSystem() != null && entity.getIsSystem() == 1) {
-                log.warn("系统内置配置不可修改，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.CONFIG_SYSTEM_NOT_ALLOW_UPDATE);
-            }
+
             // 更新配置实体
             ConfigConvert.updateEntity(dto, entity);
             // 更新数据库

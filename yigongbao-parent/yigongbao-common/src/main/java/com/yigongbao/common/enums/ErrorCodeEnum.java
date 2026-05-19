@@ -69,21 +69,22 @@ public enum ErrorCodeEnum {
     DEPT_EXISTS(631, "部门名称已存在", 5),
     DEPT_HAS_USERS(632, "该部门下存在用户，无法删除", 5),
     DEPT_DISABLED(633, "部门已停用", 5),
-    DEPT_ORG_ALREADY_BOUND(634, "该经销商已被其他外部部门关联", 5),
+    DEPT_ORG_ALREADY_BOUND(634, "以下经销商已被其他部门关联: %s", 5),
     DEPT_INTERNAL_ORG_LIMIT(635, "内部部门只能关联一个生产企业机构", 5),
 
-    // ==================== 角色相关 622-627 ====================
+    // ==================== 角色相关 622-628 ====================
     USER_ROLE_NOT_FOUND(622, "角色不存在", 5),
     ROLE_EXISTS(623, "角色编码已存在", 5),
     ROLE_HAS_USERS(624, "该角色下存在用户，无法删除", 5),
     ROLE_HAS_RESOURCES(625, "该角色已分配资源，请先取消分配", 5),
     ROLE_NOT_FOUND(626, "角色不存在", 5),
     USER_ROLE_EXISTS(627, "用户已拥有该角色", 5),
+    ROLE_NAME_EXISTS(628, "角色名称已存在", 5),
 
-    // ==================== 用户关联 628-630 ====================
-    USER_ORG_NOT_FOUND(628, "所属机构不存在", 4),
-    USER_DEPT_NOT_FOUND(629, "所属部门不存在", 5),
-    USER_HOSPITAL_NOT_FOUND(630, "用户医院关联不存在", 4),
+    // ==================== 用户关联 629-631 ====================
+    USER_ORG_NOT_FOUND(629, "所属机构不存在", 4),
+    USER_DEPT_NOT_FOUND(630, "所属部门不存在", 5),
+    USER_HOSPITAL_NOT_FOUND(631, "用户医院关联不存在", 4),
 
     // ==================== 用户创建相关 631-634 ====================
     USER_ROLE_HOSPITAL_SCOPE_REQUIRED(631, "角色数据权限为医院范围，请选择可操作的医院", 3),
@@ -146,15 +147,16 @@ public enum ErrorCodeEnum {
     REBUILD_PROJECT_NOT_FOUND(652, "项目不存在", 4),
     REBUILD_PROJECT_NAME_EXISTS(653, "项目名称已存在", 4),
 
-    // ==================== 注册证 654-655 ====================
+    // ==================== 注册证 654-656 ====================
     CERT_NOT_FOUND(654, "注册证不存在", 4),
     CERT_EXISTS(655, "注册证号已存在", 4),
+    CERT_NAME_EXISTS(656, "注册证名称已存在", 4),
 
-    // ==================== 模板相关 656-659 ====================
-    TEMPLATE_NOT_FOUND(656, "医院组合模板不存在", 4),
-    TEMPLATE_DISABLED(657, "医院组合模板已停用", 4),
-    TEMPLATE_EXISTS(658, "医院组合模板名称已存在", 4),
-    TEMPLATE_HAS_USERS(659, "该模板已被用户使用，无法删除", 4),
+    // ==================== 模板相关 657-660 ====================
+    TEMPLATE_NOT_FOUND(657, "医院组合模板不存在", 4),
+    TEMPLATE_DISABLED(658, "医院组合模板已停用", 4),
+    TEMPLATE_EXISTS(659, "医院组合模板名称已存在", 4),
+    TEMPLATE_HAS_USERS(660, "该模板已被用户使用，无法删除", 4),
 
     // ==================== 附件相关 660-665 ====================
     ATTACHMENT_NOT_FOUND(660, "附件不存在", 4),
