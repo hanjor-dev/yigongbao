@@ -963,16 +963,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             assertFilesExist(fileService.listByIds(dto.getImageDataFileIds()), dto.getImageDataFileIds(), "影像数据包");
         }
 
-        // ---- 影像报告 ----
-        boolean hasImageReport = dto.getImageReportFileIds() != null && !dto.getImageReportFileIds().isEmpty();
-        if (required && !hasImageReport) {
-            log.warn("直提创建订单缺少影像报告，配置要求必须上传");
-            throw new BusinessException(ErrorCodeEnum.ORDER_FILE_REQUIRED, "影像报告");
-        }
-        if (hasImageReport) {
-            assertFilesExist(fileService.listByIds(dto.getImageReportFileIds()), dto.getImageReportFileIds(), "影像报告");
-        }
-
         // ---- 免费业务审批文件（测试/试用业务类型必填）----
         boolean isTrialOrTest = DictCodeConstants.ORDER_BUSINESS_TYPE_TEST.equals(dto.getBusinessType())
                 || DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(dto.getBusinessType());
@@ -985,9 +975,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             assertFilesExist(fileService.listByIds(dto.getApprovalFileIds()), dto.getApprovalFileIds(), "免费业务审批文件");
         }
 
-        log.info("直提创建订单影像文件校验通过，imageDataCount={}, imageReportCount={}",
-                hasImageData ? dto.getImageDataFileIds().size() : 0,
-                hasImageReport ? dto.getImageReportFileIds().size() : 0);
+        log.info("直提创建订单影像文件校验通过，imageDataCount={}",
+                hasImageData ? dto.getImageDataFileIds().size() : 0);
     }
 
     /**

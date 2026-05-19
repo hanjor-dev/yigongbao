@@ -97,6 +97,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
         if (ids.isEmpty()) return new ArrayList<>();
         return orgService.listByIds(ids).stream()
                 .filter(Objects::nonNull)
+                .filter(org -> org.getStatus() != null && org.getStatus().equals(StatusConstants.NORMAL))
                 .map(this::toOrgVO)
                 .collect(Collectors.toList());
     }
@@ -315,6 +316,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
         }
         List<OrgVO> result = orgService.listByIds(resultIds).stream()
                 .filter(Objects::nonNull)
+                .filter(org -> org.getStatus() != null && org.getStatus().equals(StatusConstants.NORMAL))
                 .map(this::toOrgVO)
                 .collect(Collectors.toList());
 

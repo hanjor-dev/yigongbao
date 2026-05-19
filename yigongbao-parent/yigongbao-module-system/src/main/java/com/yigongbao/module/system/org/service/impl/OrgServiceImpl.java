@@ -78,6 +78,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     private final AreaService areaService;
     private final OrgHospitalMapper orgHospitalMapper;
     private final HospitalGroupTemplateDetailMapper templateDetailMapper;
+    private final com.yigongbao.module.system.hospitalGroupTemplate.mapper.HospitalGroupTemplateMapper templateMapper;
     private final DeptOrgMapper deptOrgMapper;
     private final FileService fileService;
     private final com.yigongbao.module.system.dept.mapper.DeptMapper deptMapper;
@@ -488,12 +489,22 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                     .map(OrgHospitalEntity::getHospitalOrgId)
                     .collect(Collectors.toSet());
 
+            // 查询所有已被部门关联的经销商ID集合
+            Set<Long> boundDealerIds = deptOrgMapper.selectList(new LambdaQueryWrapper<>())
+                    .stream()
+                    .map(DeptOrgEntity::getOrgId)
+                    .collect(Collectors.toSet());
+
             List<OrgVO> voList = entityList.stream()
                     .map(entity -> {
                         OrgVO vo = toVOWithDictNames(entity);
                         // 如果是医疗机构类型，设置是否已被关联标识
                         if (DictCodeConstants.ORG_TYPE_HOSPITAL.equals(vo.getOrgType())) {
                             vo.setIsBound(boundHospitalIds.contains(vo.getId()));
+                        }
+                        // 如果是经销商类型，设置是否已被关联标识
+                        if (DictCodeConstants.ORG_TYPE_DEALER.equals(vo.getOrgType())) {
+                            vo.setIsBound(boundDealerIds.contains(vo.getId()));
                         }
                         return vo;
                     })
@@ -701,21 +712,44 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                     return vo;
                 }).collect(Collectors.toList());
 
+        // 查询包含该医院的组合模板（仅医疗机构类型需要检查）
+        List<OrgOperationCheckVO.AffectedTemplateVO> affectedTemplates = java.util.Collections.emptyList();
+        if (DictCodeConstants.ORG_TYPE_HOSPITAL.equals(entity.getOrgType())) {
+            List<Long> templateIds = templateDetailMapper.selectList(
+                    new LambdaQueryWrapper<HospitalGroupTemplateDetailEntity>()
+                            .eq(HospitalGroupTemplateDetailEntity::getHospitalId, id))
+                    .stream().map(HospitalGroupTemplateDetailEntity::getTemplateId)
+                    .distinct().collect(Collectors.toList());
+            if (!templateIds.isEmpty()) {
+                affectedTemplates = templateMapper.selectBatchIds(templateIds).stream()
+                        .filter(t -> t != null)
+                        .map(t -> {
+                            OrgOperationCheckVO.AffectedTemplateVO vo = new OrgOperationCheckVO.AffectedTemplateVO();
+                            vo.setId(t.getId());
+                            vo.setTemplateName(t.getTemplateName());
+                            return vo;
+                        }).collect(Collectors.toList());
+            }
+        }
+
         OrgOperationCheckVO result = new OrgOperationCheckVO();
         result.setAffectedUsers(affectedUsers);
         result.setAffectedDoctors(affectedDoctors);
         result.setAffectedDepts(affectedDepts);
-        result.setAffected(!affectedUsers.isEmpty() || !affectedDoctors.isEmpty() || !affectedDepts.isEmpty());
+        result.setAffectedTemplates(affectedTemplates);
+        result.setAffected(!affectedUsers.isEmpty() || !affectedDoctors.isEmpty()
+                || !affectedDepts.isEmpty() || !affectedTemplates.isEmpty());
         if (result.isAffected()) {
             StringBuilder msg = new StringBuilder("删除该机构将产生以下影响：");
             if (!affectedUsers.isEmpty()) msg.append("【").append(affectedUsers.size()).append(" 个用户账号将失去机构归属】");
             if (!affectedDoctors.isEmpty()) msg.append("【").append(affectedDoctors.size()).append(" 位医生历史记录将失效】");
             if (!affectedDepts.isEmpty()) msg.append("【").append(affectedDepts.size()).append(" 个部门将解除与该机构的关联】");
+            if (!affectedTemplates.isEmpty()) msg.append("【").append(affectedTemplates.size()).append(" 个医院组合模板将移除该医院】");
             msg.append("，请确认是否继续？");
             result.setMessage(msg.toString());
         }
-        log.info("预检查删除机构完成，id={}, affectedUsers={}, affectedDoctors={}, affectedDepts={}",
-                id, affectedUsers.size(), affectedDoctors.size(), affectedDepts.size());
+        log.info("预检查删除机构完成，id={}, affectedUsers={}, affectedDoctors={}, affectedDepts={}, affectedTemplates={}",
+                id, affectedUsers.size(), affectedDoctors.size(), affectedDepts.size(), affectedTemplates.size());
         return result;
     }
 
@@ -740,14 +774,40 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             return vo;
         }).collect(Collectors.toList());
 
+        // 查询包含该医院的组合模板（仅医疗机构类型需要检查）
+        List<OrgOperationCheckVO.AffectedTemplateVO> affectedTemplates = java.util.Collections.emptyList();
+        if (DictCodeConstants.ORG_TYPE_HOSPITAL.equals(entity.getOrgType())) {
+            List<Long> templateIds = templateDetailMapper.selectList(
+                    new LambdaQueryWrapper<HospitalGroupTemplateDetailEntity>()
+                            .eq(HospitalGroupTemplateDetailEntity::getHospitalId, id))
+                    .stream().map(HospitalGroupTemplateDetailEntity::getTemplateId)
+                    .distinct().collect(Collectors.toList());
+            if (!templateIds.isEmpty()) {
+                affectedTemplates = templateMapper.selectBatchIds(templateIds).stream()
+                        .filter(t -> t != null)
+                        .map(t -> {
+                            OrgOperationCheckVO.AffectedTemplateVO vo = new OrgOperationCheckVO.AffectedTemplateVO();
+                            vo.setId(t.getId());
+                            vo.setTemplateName(t.getTemplateName());
+                            return vo;
+                        }).collect(Collectors.toList());
+            }
+        }
+
         OrgOperationCheckVO result = new OrgOperationCheckVO();
         result.setAffectedUsers(affectedUsers);
         result.setAffectedDoctors(java.util.Collections.emptyList());
-        result.setAffected(!affectedUsers.isEmpty());
+        result.setAffectedTemplates(affectedTemplates);
+        result.setAffected(!affectedUsers.isEmpty() || !affectedTemplates.isEmpty());
         if (result.isAffected()) {
-            result.setMessage("禁用该机构后，" + affectedUsers.size() + " 个用户将被立即踢出登录会话且无法再登录，请确认是否继续？");
+            StringBuilder msg = new StringBuilder("禁用该机构将产生以下影响：");
+            if (!affectedUsers.isEmpty()) msg.append("【").append(affectedUsers.size()).append(" 个用户将被踢出会话且无法登录】");
+            if (!affectedTemplates.isEmpty()) msg.append("【").append(affectedTemplates.size()).append(" 个医院组合模板中该医院将暂时不可用】");
+            msg.append("，请确认是否继续？");
+            result.setMessage(msg.toString());
         }
-        log.info("预检查禁用机构完成，id={}, affectedUsers={}", id, affectedUsers.size());
+        log.info("预检查禁用机构完成，id={}, affectedUsers={}, affectedTemplates={}",
+                id, affectedUsers.size(), affectedTemplates.size());
         return result;
     }
 

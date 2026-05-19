@@ -351,6 +351,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 log.warn("邮箱已存在，email={}", dto.getEmail());
                 throw new BusinessException(ErrorCodeEnum.USER_EMAIL_EXISTS);
             }
+            // 校验真实姓名在同角色下的唯一性
+            if (isRealNameExistsForRole(dto.getRealName(), dto.getRoleId())) {
+                log.warn("该角色下已存在同名用户，realName={}, roleId={}", dto.getRealName(), dto.getRoleId());
+                throw new BusinessException(ErrorCodeEnum.USER_REALNAME_EXISTS_IN_ROLE);
+            }
             // 校验所属机构是否存在，并获取名称设置到冗余字段
             OrgEntity orgEntity = null;
             if (dto.getOrgId() != null) {
@@ -531,6 +536,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 if (isEmailExistsExcludingId(dto.getEmail(), id)) {
                     log.warn("邮箱已存在，email={}", dto.getEmail());
                     throw new BusinessException(ErrorCodeEnum.USER_EMAIL_EXISTS);
+                }
+            }
+            // 校验真实姓名在同角色下的唯一性（当姓名或角色发生变化时）
+            String effectiveRealName = StrUtil.isNotBlank(dto.getRealName()) ? dto.getRealName() : entity.getRealName();
+            Long effectiveRoleId = dto.getRoleId() != null ? dto.getRoleId() : entity.getRoleId();
+            if ((StrUtil.isNotBlank(dto.getRealName()) && !dto.getRealName().equals(entity.getRealName()))
+                    || (dto.getRoleId() != null && !dto.getRoleId().equals(entity.getRoleId()))) {
+                if (isRealNameExistsForRoleExcludingId(effectiveRealName, effectiveRoleId, id)) {
+                    log.warn("该角色下已存在同名用户，realName={}, roleId={}", effectiveRealName, effectiveRoleId);
+                    throw new BusinessException(ErrorCodeEnum.USER_REALNAME_EXISTS_IN_ROLE);
                 }
             }
             // 校验所属机构是否存在
@@ -1037,6 +1052,25 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     private boolean isEmailExistsExcludingId(String email, Long excludeId) {
         return count(new LambdaQueryWrapper<UserEntity>()
                 .eq(UserEntity::getEmail, email)
+                .ne(UserEntity::getId, excludeId)) > 0;
+    }
+
+    /**
+     * 校验真实姓名在同角色下是否存在
+     */
+    private boolean isRealNameExistsForRole(String realName, Long roleId) {
+        return count(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getRealName, realName)
+                .eq(UserEntity::getRoleId, roleId)) > 0;
+    }
+
+    /**
+     * 校验真实姓名在同角色下是否存在（排除指定ID）
+     */
+    private boolean isRealNameExistsForRoleExcludingId(String realName, Long roleId, Long excludeId) {
+        return count(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getRealName, realName)
+                .eq(UserEntity::getRoleId, roleId)
                 .ne(UserEntity::getId, excludeId)) > 0;
     }
 

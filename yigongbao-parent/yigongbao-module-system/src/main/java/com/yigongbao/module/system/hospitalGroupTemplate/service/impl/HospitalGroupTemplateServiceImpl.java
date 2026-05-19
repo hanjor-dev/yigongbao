@@ -283,9 +283,9 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
         if (vo.getStatus() != null) {
             vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
         }
-        // 查询该模板关联的医院数量
-        Long count = detailMapper.countByTemplateId(entity.getId());
-        vo.setHospitalCount(count != null ? count.intValue() : 0);
+        // 查询该模板关联的启用状态医院数量（过滤已禁用）
+        int count = countEnabledHospitals(entity.getId());
+        vo.setHospitalCount(count);
         return vo;
     }
 
@@ -300,10 +300,31 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
         vo.setId(entity.getId());
         vo.setTemplateName(entity.getTemplateName());
         vo.setTemplateCode(entity.getTemplateCode());
-        // 查询该模板关联的医院数量
-        Long count = detailMapper.countByTemplateId(entity.getId());
-        vo.setHospitalCount(count != null ? count.intValue() : 0);
+        // 查询该模板关联的启用状态医院数量（过滤已禁用）
+        int count = countEnabledHospitals(entity.getId());
+        vo.setHospitalCount(count);
         return vo;
+    }
+
+    /**
+     * 统计模板中启用状态的医院数量
+     *
+     * @param templateId 模板ID
+     * @return 启用状态的医院数量
+     */
+    private int countEnabledHospitals(Long templateId) {
+        List<HospitalGroupTemplateDetailEntity> details = detailMapper.selectList(
+                new LambdaQueryWrapper<HospitalGroupTemplateDetailEntity>()
+                        .eq(HospitalGroupTemplateDetailEntity::getTemplateId, templateId));
+        if (details == null || details.isEmpty()) {
+            return 0;
+        }
+        List<Long> hospitalIds = details.stream()
+                .map(HospitalGroupTemplateDetailEntity::getHospitalId)
+                .collect(Collectors.toList());
+        return (int) orgService.listByIds(hospitalIds).stream()
+                .filter(org -> org.getStatus() != null && org.getStatus().equals(StatusConstants.NORMAL))
+                .count();
     }
 
     /**
@@ -362,7 +383,13 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                 detailVO.setPhone(org.getPhone());
             }
             return detailVO;
-        }).collect(Collectors.toList());
+        })
+        .filter(vo -> {
+            // 过滤掉已禁用的医院（保留关联数据，但查询时不返回）
+            OrgEntity org = orgMap.get(vo.getHospitalId());
+            return org != null && org.getStatus() != null && org.getStatus().equals(StatusConstants.NORMAL);
+        })
+        .collect(Collectors.toList());
     }
 
     /**

@@ -38,6 +38,11 @@ public class OrgOperationCheckVO {
      */
     private List<AffectedDeptVO> affectedDepts;
 
+    /**
+     * 包含该医院的组合模板列表（禁用/删除时会从模板中移除）
+     */
+    private List<AffectedTemplateVO> affectedTemplates;
+
     @Data
     public static class AffectedUserVO {
         private Long id;
@@ -54,5 +59,11 @@ public class OrgOperationCheckVO {
     public static class AffectedDeptVO {
         private Long id;
         private String deptName;
+    }
+
+    @Data
+    public static class AffectedTemplateVO {
+        private Long id;
+        private String templateName;
     }
 }

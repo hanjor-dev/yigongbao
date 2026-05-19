@@ -142,7 +142,7 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                     DictOptionVO colorOpt = new DictOptionVO();
                     colorOpt.setCode(level2.getDictCode());
                     colorOpt.setName(level2.getDictName());
-                    colorOpt.setIsDefault(false);
+                    colorOpt.setIsDefault(true);
                     group.setColors(List.of(colorOpt));
                     colorGroups.add(group);
                 }
