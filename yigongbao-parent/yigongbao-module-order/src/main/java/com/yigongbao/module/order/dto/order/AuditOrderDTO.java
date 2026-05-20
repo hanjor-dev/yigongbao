@@ -31,4 +31,10 @@ public class AuditOrderDTO implements Serializable {
      * 影像数据评估意见（审核时填写）
      */
     private String dataEvaluationOpinion;
+
+    /**
+     * 订单版本号（乐观锁）
+     * 前端加载订单详情时记录，提交审核时传入，防止基于过期数据的错误审核
+     */
+    private Integer version;
 }

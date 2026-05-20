@@ -30,13 +30,24 @@ public interface FlowFacade {
 
     /**
      * 执行流程动作
-     * 封装状态转换 + 历史记录的完整流程
      *
-     * @param orderId 业务实体ID（订单ID）
-     * @param action 动作枚举
+     * @param orderId  业务实体ID（订单ID）
+     * @param action   动作枚举
      * @param operator 操作人信息
      * @return 转换结果（包含 phase 和 status）
      */
     TransitionResult executeFlow(Long orderId, FlowActionEnum action, FlowOperator operator);
+
+    /**
+     * 执行流程动作（带乐观锁版本校验）
+     * 用于审核类动作，防止基于过期数据的错误审核
+     *
+     * @param orderId         订单ID
+     * @param action          动作枚举
+     * @param operator        操作人信息
+     * @param expectedVersion 调用方加载订单时的版本号，与当前 DB 版本不一致时抛出 ORDER_VERSION_CONFLICT
+     * @return 转换结果
+     */
+    TransitionResult executeFlow(Long orderId, FlowActionEnum action, FlowOperator operator, Integer expectedVersion);
 
 }

@@ -1,15 +1,20 @@
 package com.yigongbao.flow.facade.impl;
 
+import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
+import com.yigongbao.flow.service.FlowOrderService;
 import com.yigongbao.flow.service.FlowStateMachineService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * 流程 Facade 实现
@@ -24,34 +29,22 @@ import java.util.List;
 public class FlowFacadeImpl implements FlowFacade {
 
     private final FlowStateMachineService flowStateMachineService;
+    private final FlowOrderService flowOrderService;
 
-    /**
-     * 查询当前可执行的动作列表
-     * 直接委托 FlowStateMachineService 执行
-     *
-     * @param orderId 订单ID
-     * @return 可执行的动作编码列表
-     */
+    private static final Set<FlowActionEnum> AUDIT_ACTIONS = Set.of(
+            FlowActionEnum.DATA_AUDIT_PASS,
+            FlowActionEnum.DATA_AUDIT_REJECT,
+            FlowActionEnum.DESIGN_REVIEW_PASS,
+            FlowActionEnum.DESIGN_REVIEW_REJECT
+    );
+
     @Override
     public List<String> getAvailableActions(Long orderId) {
         return flowStateMachineService.getAvailableActions(orderId);
     }
 
-    /**
-     * 执行流程动作
-     * 封装状态转换 + 历史记录的完整流程
-     *
-     * 【防御性处理】
-     * - operator 为 null 时使用空对象，避免 NPE
-     *
-     * @param orderId 订单ID
-     * @param action 动作枚举
-     * @param operator 操作人信息（允许为 null）
-     * @return 转换结果（包含 phase 和 status）
-     */
     @Override
     public TransitionResult executeFlow(Long orderId, FlowActionEnum action, FlowOperator operator) {
-        // 防御：operator 为 null 时使用空对象
         if (operator == null) {
             operator = new FlowOperator();
         }
@@ -62,4 +55,25 @@ public class FlowFacadeImpl implements FlowFacade {
         return result;
     }
 
+    @Override
+    public TransitionResult executeFlow(Long orderId, FlowActionEnum action,
+            FlowOperator operator, Integer expectedVersion) {
+        if (operator == null) {
+            operator = new FlowOperator();
+        }
+        if (expectedVersion != null && AUDIT_ACTIONS.contains(action)) {
+            OrderMainEntity order = flowOrderService.getById(orderId);
+            if (order == null) {
+                throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+            }
+            if (!expectedVersion.equals(order.getVersion())) {
+                log.warn("订单版本冲突，orderId={}, expectedVersion={}, actualVersion={}",
+                        orderId, expectedVersion, order.getVersion());
+                throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+            }
+        }
+        log.info("FlowFacade 执行流程动作（带版本校验），orderId={}, action={}, expectedVersion={}",
+                orderId, action.getCode(), expectedVersion);
+        return flowStateMachineService.executeTransition(orderId, action, operator);
+    }
 }

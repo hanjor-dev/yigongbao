@@ -136,7 +136,7 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
         // flow 模块内部根据 order.needsPhysicalDelivery 自动完成分支跳转
         try {
             TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.DESIGN_REVIEW_PASS,
-                    FlowOperator.of(reviewerId, reviewerName));
+                    FlowOperator.of(reviewerId, reviewerName), dto != null ? dto.getVersion() : null);
 
             // 4. 写入审核记录（result=1 通过）
             DesignReviewEntity reviewRecord = new DesignReviewEntity();
@@ -206,7 +206,8 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
         FlowOperator operator = FlowOperator.of(reviewerId, reviewerName);
         operator.setRemark(dto.getRejectReason());
         try {
-            TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.DESIGN_REVIEW_REJECT, operator);
+            TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.DESIGN_REVIEW_REJECT,
+                    operator, dto.getVersion());
 
             // 5. 写入审核记录（result=0 驳回）
             DesignReviewEntity reviewRecord = new DesignReviewEntity();

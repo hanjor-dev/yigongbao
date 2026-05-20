@@ -96,6 +96,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     private final UserService userService;
     private final FlowFacade flowFacade;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final com.yigongbao.flow.service.FlowOrderService flowOrderService;
 
     // ==================== 阶段判断 ====================
 
@@ -467,6 +468,9 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         apply.setStatus(ModifyApplyStatusEnum.COMPLETED.getCode());
         orderModifyApplyMapper.updateById(apply);
 
+        // 递增版本号，使持有旧版本的审核操作失效
+        flowOrderService.incrementVersion(orderId);
+
         // 10. 执行修改后流转
         triggerPostModifyFlow(orderId, order.getPhase(), order.getStatus(), modifierId, modifierName);
     }
@@ -527,6 +531,9 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         if (infoModified) {
             orderMainMapper.updateById(order);
         }
+
+        // 递增版本号，使持有旧版本的审核操作失效
+        flowOrderService.incrementVersion(orderId);
 
         // 11. 执行修改后流转
         triggerPostModifyFlow(orderId, order.getPhase(), order.getStatus(), modifierId, modifierName);

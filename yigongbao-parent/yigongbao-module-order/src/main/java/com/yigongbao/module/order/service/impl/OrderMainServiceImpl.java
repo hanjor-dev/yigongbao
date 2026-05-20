@@ -604,7 +604,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行审核通过动作
             TransitionResult result = flowFacade.executeFlow(
-                    id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, operatorName, dto.getRemark()));
+                    id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
+                    dto.getVersion());
             // 更新订单的阶段、状态和当前处理人，同步写入审核时填写的预估费用和影像评估意见
             entity.setPhase(result.getTargetPhase());
             entity.setStatus(result.getFinalStatus());
@@ -665,7 +666,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行审核驳回动作
             TransitionResult result = flowFacade.executeFlow(
-                    id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()));
+                    id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
+                    dto.getVersion());
             // 更新订单的阶段、状态、驳回原因和当前处理人
             entity.setPhase(result.getTargetPhase());
             entity.setStatus(result.getFinalStatus());

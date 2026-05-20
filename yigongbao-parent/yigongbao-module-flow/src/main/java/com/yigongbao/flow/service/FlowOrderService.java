@@ -48,4 +48,12 @@ public interface FlowOrderService {
      * @param currentHandlerId 当前处理人ID
      */
     void updatePhaseAndStatusWithHandler(Long id, Integer phase, Integer status, Long currentHandlerId);
+
+    /**
+     * 递增订单版本号（乐观锁）
+     * 订单数据被修改时调用，使持有旧版本号的审核操作失效
+     *
+     * @param id 订单ID
+     */
+    void incrementVersion(Long id);
 }

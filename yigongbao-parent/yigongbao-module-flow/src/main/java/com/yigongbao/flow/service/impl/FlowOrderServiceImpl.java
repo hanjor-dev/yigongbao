@@ -93,4 +93,13 @@ public class FlowOrderServiceImpl implements FlowOrderService {
             throw e;
         }
     }
+
+    @Override
+    public void incrementVersion(Long id) {
+        log.info("递增订单版本号，orderId={}", id);
+        LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(OrderMainEntity::getId, id)
+               .setSql("version = version + 1");
+        flowOrderMapper.update(null, wrapper);
+    }
 }
