@@ -2,11 +2,14 @@ package com.yigongbao.module.order.service.impl;
 
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
+import com.yigongbao.module.order.dto.modify.ExecuteModifyDTO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,5 +43,20 @@ class OrderModifyDirectServiceTest {
         assertThrows(BusinessException.class, () -> {
             service.determineAllowedTypesByPhase(30);
         });
+    }
+
+    @Test
+    void testBuildModificationsMap_WithInfoFields_ReturnsCorrectMap() {
+        ExecuteModifyDTO dto = new ExecuteModifyDTO();
+        ExecuteModifyDTO.ModifyField field = new ExecuteModifyDTO.ModifyField();
+        field.setField("patientName");
+        field.setValue("张三");
+        dto.setInfoFields(List.of(field));
+
+        Map<String, Object> result = service.buildModificationsMap(dto);
+
+        assertNotNull(result);
+        assertTrue(result.containsKey("patientName"));
+        assertEquals("张三", result.get("patientName"));
     }
 }

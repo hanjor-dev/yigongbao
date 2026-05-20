@@ -172,6 +172,46 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         }
     }
 
+    /**
+     * 将 ExecuteModifyDTO 转换为 Map 结构（供内部处理方法使用）
+     */
+    Map<String, Object> buildModificationsMap(ExecuteModifyDTO dto) {
+        Map<String, Object> modifications = new HashMap<>();
+        if (dto != null) {
+            if (dto.getInfoFields() != null) {
+                dto.getInfoFields().forEach(f -> {
+                    if (StrUtil.isNotBlank(f.getField())) {
+                        modifications.put(f.getField(), f.getValue());
+                    }
+                });
+            }
+            if (dto.getItems() != null) {
+                List<Map<String, Object>> itemMaps = dto.getItems().stream().map(item -> {
+                    Map<String, Object> m = new HashMap<>();
+                    if (item.getOrderItemId() != null) {
+                        m.put("orderItemId", item.getOrderItemId());
+                    }
+                    if (item.getFields() != null) {
+                        item.getFields().forEach(f -> {
+                            if (StrUtil.isNotBlank(f.getField())) {
+                                m.put(f.getField(), f.getValue());
+                            }
+                        });
+                    }
+                    return m;
+                }).collect(Collectors.toList());
+                modifications.put("items", itemMaps);
+            }
+            if (dto.getImageDataFileIds() != null) {
+                modifications.put("imageDataFileIds", dto.getImageDataFileIds());
+            }
+            if (dto.getImageReportFileIds() != null) {
+                modifications.put("imageReportFileIds", dto.getImageReportFileIds());
+            }
+        }
+        return modifications;
+    }
+
     // ==================== 申请发起 ====================
 
     /**
@@ -358,43 +398,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     @Transactional(rollbackFor = Exception.class)
     public void executeModification(Long applyId, ExecuteModifyDTO dto) {
         log.info("执行订单修改，applyId={}", applyId);
-        // 将 DTO 中的 infoFields / items 转换为内部处理用的 Map
-        Map<String, Object> modifications = new HashMap<>();
-        if (dto != null) {
-            // 基础信息字段：List<ModifyField> → Map（key=字段名，value=新值）
-            if (dto.getInfoFields() != null) {
-                dto.getInfoFields().forEach(f -> {
-                    if (StrUtil.isNotBlank(f.getField())) {
-                        modifications.put(f.getField(), f.getValue());
-                    }
-                });
-            }
-            // 重建项目：List<ModifyItem> → List<Map<String, Object>>
-            if (dto.getItems() != null) {
-                List<Map<String, Object>> itemMaps = dto.getItems().stream().map(item -> {
-                    Map<String, Object> m = new HashMap<>();
-                    if (item.getOrderItemId() != null) {
-                        m.put("orderItemId", item.getOrderItemId());
-                    }
-                    if (item.getFields() != null) {
-                        item.getFields().forEach(f -> {
-                            if (StrUtil.isNotBlank(f.getField())) {
-                                m.put(f.getField(), f.getValue());
-                            }
-                        });
-                    }
-                    return m;
-                }).collect(Collectors.toList());
-                modifications.put("items", itemMaps);
-            }
-            // 影像文件 ID 列表直接放入 Map（null 表示不修改该类别）
-            if (dto.getImageDataFileIds() != null) {
-                modifications.put("imageDataFileIds", dto.getImageDataFileIds());
-            }
-            if (dto.getImageReportFileIds() != null) {
-                modifications.put("imageReportFileIds", dto.getImageReportFileIds());
-            }
-        }
+        Map<String, Object> modifications = buildModificationsMap(dto);
 
         // 1. 校验申请存在且状态为 APPROVED
         OrderModifyApplyEntity apply = orderModifyApplyMapper.selectById(applyId);
