@@ -467,13 +467,22 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         apply.setStatus(ModifyApplyStatusEnum.COMPLETED.getCode());
         orderModifyApplyMapper.updateById(apply);
 
-        // 10. 执行状态流转：将订单重新流转到"数据待审核"状态
-        log.info("执行修改后触发状态流转，orderId={}, 操作人={}", orderId, modifierName);
-        flowFacade.executeFlow(
-                orderId,
-                FlowActionEnum.RESUBMIT,
-                new FlowOperator(modifierId, modifierName, "执行订单修改后重新提交审核")
-        );
+        // 10. 执行状态流转：根据当前状态决定是否需要流转
+        // RESUBMIT 动作仅在 DATA_AUDIT_REJECTED (1040) 状态下有效
+        // 如果已经是 PENDING_DATA_AUDIT (1020)，无需流转
+        if (FlowStatusEnum.DATA_AUDIT_REJECTED.getValue().equals(order.getStatus())) {
+            log.info("执行修改后触发状态流转（RESUBMIT），orderId={}, 当前状态={}, 操作人={}",
+                    orderId, order.getStatus(), modifierName);
+            flowFacade.executeFlow(
+                    orderId,
+                    FlowActionEnum.RESUBMIT,
+                    new FlowOperator(modifierId, modifierName, "执行订单修改后重新提交审核")
+            );
+        } else if (FlowStatusEnum.PENDING_DATA_AUDIT.getValue().equals(order.getStatus())) {
+            log.info("订单已处于待审核状态，无需流转，orderId={}, status={}", orderId, order.getStatus());
+        } else {
+            log.warn("订单当前状态不支持自动流转到待审核，orderId={}, status={}", orderId, order.getStatus());
+        }
     }
 
     @Override
@@ -533,13 +542,22 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             orderMainMapper.updateById(order);
         }
 
-        // 11. 执行状态流转：将订单重新流转到"数据待审核"状态
-        log.info("直接修改订单后触发状态流转，orderId={}, 操作人={}", orderId, modifierName);
-        flowFacade.executeFlow(
-                orderId,
-                FlowActionEnum.RESUBMIT,
-                new FlowOperator(modifierId, modifierName, "直接修改订单后重新提交审核")
-        );
+        // 11. 执行状态流转：根据当前状态决定是否需要流转
+        // RESUBMIT 动作仅在 DATA_AUDIT_REJECTED (1040) 状态下有效
+        // 如果已经是 PENDING_DATA_AUDIT (1020)，无需流转
+        if (FlowStatusEnum.DATA_AUDIT_REJECTED.getValue().equals(order.getStatus())) {
+            log.info("直接修改订单后触发状态流转（RESUBMIT），orderId={}, 当前状态={}, 操作人={}",
+                    orderId, order.getStatus(), modifierName);
+            flowFacade.executeFlow(
+                    orderId,
+                    FlowActionEnum.RESUBMIT,
+                    new FlowOperator(modifierId, modifierName, "直接修改订单后重新提交审核")
+            );
+        } else if (FlowStatusEnum.PENDING_DATA_AUDIT.getValue().equals(order.getStatus())) {
+            log.info("订单已处于待审核状态，无需流转，orderId={}, status={}", orderId, order.getStatus());
+        } else {
+            log.warn("订单当前状态不支持自动流转到待审核，orderId={}, status={}", orderId, order.getStatus());
+        }
 
         log.info("直接修改订单成功，orderId={}", orderId);
     }
