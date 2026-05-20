@@ -83,6 +83,19 @@ public class OrderModifyApplyController {
         return Result.success();
     }
 
+    @Operation(summary = "直接修改订单（无需申请审核）",
+            description = "根据订单当前阶段判断允许的修改类型：\n"
+                    + "订单阶段（phase=10）：允许全部三种类型（14.1基础信息/14.2影像文件/14.3重建项目）\n"
+                    + "设计阶段（phase=20）：仅允许重建项目（14.3）\n"
+                    + "参数说明同 executeModification 接口")
+    @RequirePermission(value = "order:Modify")
+    @PutMapping("/{orderId}/direct")
+    public Result<Void> directModify(@PathVariable Long orderId,
+            @Valid @RequestBody ExecuteModifyDTO dto) {
+        orderModifyApplyService.directModify(orderId, dto);
+        return Result.success();
+    }
+
     @Operation(summary = "查询订单的修改申请记录列表（分页）")
     @RequirePermission(value = "order:View")
     @PostMapping("/{orderId}/applies")
