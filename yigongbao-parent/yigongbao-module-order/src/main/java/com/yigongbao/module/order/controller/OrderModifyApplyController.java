@@ -55,7 +55,8 @@ public class OrderModifyApplyController {
         return Result.success(orderModifyApplyService.getApplicableTypes(orderId));
     }
 
-    @Operation(summary = "发起修改申请")
+    @Deprecated(since = "2026-05-20", forRemoval = true)
+    @Operation(summary = "发起修改申请（已废弃，请使用直接修改接口）")
     @RequirePermission(value = "order:ApplyModify")
     @PostMapping("/{orderId}/apply")
     public Result<ModifyApplyVO> createApply(@PathVariable Long orderId,
@@ -63,7 +64,8 @@ public class OrderModifyApplyController {
         return Result.success(orderModifyApplyService.createApply(orderId, dto));
     }
 
-    @Operation(summary = "执行订单修改（审核通过后调用）",
+    @Deprecated(since = "2026-05-20", forRemoval = true)
+    @Operation(summary = "执行订单修改（已废弃，请使用直接修改接口）",
             description = "必须提供已审核通过（APPROVED 状态）的 applyId，否则报错。"
                     + "参数说明：\n"
                     + "① infoFields（14.1 基础信息）：差量列表，只传需要修改的字段。"
@@ -114,7 +116,8 @@ public class OrderModifyApplyController {
 
     // ==================== 申请维度接口 ====================
 
-    @Operation(summary = "撤回修改申请（仅申请人可撤回待审核申请）")
+    @Deprecated(since = "2026-05-20", forRemoval = true)
+    @Operation(summary = "撤回修改申请（已废弃）")
     @RequirePermission(value = "order:MyApplyWithdraw")
     @DeleteMapping("/apply/{applyId}")
     public Result<Void> withdrawApply(@PathVariable Long applyId) {
@@ -122,7 +125,8 @@ public class OrderModifyApplyController {
         return Result.success();
     }
 
-    @Operation(summary = "审核修改申请（同意/拒绝）")
+    @Deprecated(since = "2026-05-20", forRemoval = true)
+    @Operation(summary = "审核修改申请（已废弃）")
     @RequirePermission(value = "order:Approve")
     @PutMapping("/apply/{applyId}/audit")
     public Result<Void> auditApply(@PathVariable Long applyId,
