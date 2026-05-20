@@ -30,7 +30,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 订单修改申请 Controller
- * 统一入口，所有修改申请相关接口均在此处，路径前缀 /order/modify
+ *
+ * 【推荐使用】直接修改接口：/{orderId}/direct
+ * 【已废弃】申请审核流程接口：/{orderId}/apply, /apply/{applyId}/audit 等
  *
  * @author hanjor
  * @date 2026-04-09
