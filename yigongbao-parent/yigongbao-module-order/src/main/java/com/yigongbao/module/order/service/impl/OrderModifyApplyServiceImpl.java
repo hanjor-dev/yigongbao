@@ -476,6 +476,74 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         );
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void directModify(Long orderId, ExecuteModifyDTO dto) {
+        log.info("直接修改订单，orderId={}", orderId);
+
+        // 1. 查询订单
+        OrderMainEntity order = orderMainMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+
+        // 2. 根据阶段判断允许的修改类型
+        Set<String> allowedTypes = determineAllowedTypesByPhase(order.getPhase());
+
+        // 3. 加载字段配置
+        ModifyApplyFieldConfigDTO fieldConfig = loadFieldConfig();
+
+        // 4. 校验字段白名单
+        if (dto != null && dto.getInfoFields() != null && !dto.getInfoFields().isEmpty()) {
+            ModifyApplyFieldConfigDTO.TypeConfig infoTypeConfig =
+                    fieldConfig.getTypeConfig(ModifyApplyTypeEnum.INFO.getDictCode());
+            validateInfoFieldsInWhitelist(dto.getInfoFields(), infoTypeConfig);
+        }
+
+        // 5. 构建修改内容 Map
+        Map<String, Object> modifications = buildModificationsMap(dto);
+
+        // 6. 获取当前操作人
+        Long modifierId = StpUtil.getLoginIdAsLong();
+        String modifierName = getCurrentUserName();
+
+        // 7. 处理基础信息修改（14.1）
+        boolean infoModified = false;
+        if (allowedTypes.contains(ModifyApplyTypeEnum.INFO.getDictCode())
+                && !modifications.isEmpty()) {
+            infoModified = processInfoModification(order, modifications, null,
+                    modifierId, modifierName, fieldConfig);
+        }
+
+        // 8. 处理重建项目修改（14.3）
+        if (allowedTypes.contains(ModifyApplyTypeEnum.ITEM.getDictCode())
+                && modifications.containsKey("items")) {
+            processItemModification(order, modifications, null,
+                    modifierId, modifierName, fieldConfig);
+        }
+
+        // 9. 处理影像文件修改（14.2）
+        if (allowedTypes.contains(ModifyApplyTypeEnum.IMAGE.getDictCode())) {
+            processImageModification(order, modifications, null,
+                    modifierId, modifierName);
+        }
+
+        // 10. 仅 INFO 类型修改了 order 实体字段时才回写 DB
+        if (infoModified) {
+            orderMainMapper.updateById(order);
+        }
+
+        // 11. 执行状态流转：将订单重新流转到"数据待审核"状态
+        log.info("直接修改订单后触发状态流转，orderId={}, 操作人={}", orderId, modifierName);
+        flowFacade.executeFlow(
+                orderId,
+                FlowActionEnum.RESUBMIT,
+                new FlowOperator(modifierId, modifierName, "直接修改订单后重新提交审核")
+        );
+
+        log.info("直接修改订单成功，orderId={}", orderId);
+    }
+
     // ==================== 辅助方法：执行前校验 ====================
 
     /**
