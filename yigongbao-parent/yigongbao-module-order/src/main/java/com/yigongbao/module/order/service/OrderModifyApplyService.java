@@ -136,4 +136,15 @@ public interface OrderModifyApplyService {
      * @param orderId 订单ID
      */
     void validateNoBlockingModifyApply(Long orderId);
+
+    /**
+     * 直接修改订单（无需申请审核流程）
+     * 根据订单当前阶段判断允许的修改类型：
+     * - 订单阶段（phase=10）：允许全部三种类型（14.1/14.2/14.3）
+     * - 设计阶段（phase=20）：仅允许重建项目（14.3）
+     *
+     * @param orderId 订单ID
+     * @param dto     修改内容
+     */
+    void directModify(Long orderId, ExecuteModifyDTO dto);
 }
