@@ -467,22 +467,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         apply.setStatus(ModifyApplyStatusEnum.COMPLETED.getCode());
         orderModifyApplyMapper.updateById(apply);
 
-        // 10. 执行状态流转：根据当前状态决定是否需要流转
-        // RESUBMIT 动作仅在 DATA_AUDIT_REJECTED (1040) 状态下有效
-        // 如果已经是 PENDING_DATA_AUDIT (1020)，无需流转
-        if (FlowStatusEnum.DATA_AUDIT_REJECTED.getValue().equals(order.getStatus())) {
-            log.info("执行修改后触发状态流转（RESUBMIT），orderId={}, 当前状态={}, 操作人={}",
-                    orderId, order.getStatus(), modifierName);
-            flowFacade.executeFlow(
-                    orderId,
-                    FlowActionEnum.RESUBMIT,
-                    new FlowOperator(modifierId, modifierName, "执行订单修改后重新提交审核")
-            );
-        } else if (FlowStatusEnum.PENDING_DATA_AUDIT.getValue().equals(order.getStatus())) {
-            log.info("订单已处于待审核状态，无需流转，orderId={}, status={}", orderId, order.getStatus());
-        } else {
-            log.warn("订单当前状态不支持自动流转到待审核，orderId={}, status={}", orderId, order.getStatus());
-        }
+        // 10. 执行修改后流转
+        triggerPostModifyFlow(orderId, order.getPhase(), order.getStatus(), modifierId, modifierName);
     }
 
     @Override
@@ -542,22 +528,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             orderMainMapper.updateById(order);
         }
 
-        // 11. 执行状态流转：根据当前状态决定是否需要流转
-        // RESUBMIT 动作仅在 DATA_AUDIT_REJECTED (1040) 状态下有效
-        // 如果已经是 PENDING_DATA_AUDIT (1020)，无需流转
-        if (FlowStatusEnum.DATA_AUDIT_REJECTED.getValue().equals(order.getStatus())) {
-            log.info("直接修改订单后触发状态流转（RESUBMIT），orderId={}, 当前状态={}, 操作人={}",
-                    orderId, order.getStatus(), modifierName);
-            flowFacade.executeFlow(
-                    orderId,
-                    FlowActionEnum.RESUBMIT,
-                    new FlowOperator(modifierId, modifierName, "直接修改订单后重新提交审核")
-            );
-        } else if (FlowStatusEnum.PENDING_DATA_AUDIT.getValue().equals(order.getStatus())) {
-            log.info("订单已处于待审核状态，无需流转，orderId={}, status={}", orderId, order.getStatus());
-        } else {
-            log.warn("订单当前状态不支持自动流转到待审核，orderId={}, status={}", orderId, order.getStatus());
-        }
+        // 11. 执行修改后流转
+        triggerPostModifyFlow(orderId, order.getPhase(), order.getStatus(), modifierId, modifierName);
 
         log.info("直接修改订单成功，orderId={}", orderId);
     }
@@ -961,6 +933,38 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 JSONUtil.toJsonStr(oldFileIds),
                 JSONUtil.toJsonStr(newFileIds),
                 modifierId, modifierName);
+    }
+
+    // ==================== 辅助方法：修改后流转 ====================
+
+    /**
+     * 订单修改完成后，根据当前阶段和状态决定是否触发流转
+     * ORDER 阶段：DATA_AUDIT_REJECTED → RESUBMIT
+     * DESIGN 阶段：DESIGN_REVIEW_REJECTED → CONTINUE_DESIGN + SUBMIT_DESIGN
+     */
+    private void triggerPostModifyFlow(Long orderId, Integer phase, Integer status,
+            Long modifierId, String modifierName) {
+        if (FlowPhaseEnum.ORDER.getValue().equals(phase)) {
+            if (FlowStatusEnum.DATA_AUDIT_REJECTED.getValue().equals(status)) {
+                log.info("订单修改后触发 RESUBMIT，orderId={}", orderId);
+                flowFacade.executeFlow(orderId, FlowActionEnum.RESUBMIT,
+                        new FlowOperator(modifierId, modifierName, "修改后重新提交审核"));
+            } else if (FlowStatusEnum.PENDING_DATA_AUDIT.getValue().equals(status)) {
+                log.info("订单已处于待审核状态，无需流转，orderId={}", orderId);
+            } else {
+                log.warn("ORDER 阶段当前状态不触发自动流转，orderId={}, status={}", orderId, status);
+            }
+        } else if (FlowPhaseEnum.DESIGN.getValue().equals(phase)) {
+            if (FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue().equals(status)) {
+                log.info("设计审核不通过后修改，触发 CONTINUE_DESIGN + SUBMIT_DESIGN，orderId={}", orderId);
+                flowFacade.executeFlow(orderId, FlowActionEnum.CONTINUE_DESIGN,
+                        new FlowOperator(modifierId, modifierName, "修改后继续设计"));
+                flowFacade.executeFlow(orderId, FlowActionEnum.SUBMIT_DESIGN,
+                        new FlowOperator(modifierId, modifierName, "修改后重新提交设计审核"));
+            } else {
+                log.info("DESIGN 阶段当前状态无需自动流转，orderId={}, status={}", orderId, status);
+            }
+        }
     }
 
     // ==================== 查询方法 ====================
