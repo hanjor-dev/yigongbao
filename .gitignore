@@ -65,3 +65,13 @@ uploads/
 .env
 .env.local
 .env.*.local
+.env.test
+.env.prod
+
+### Docker ###
+.dockerignore
+docker-compose.override.yml
+*.log
+
+### Deployment Docs（部署文档，可选忽略）###
+DEPLOYMENT_CHECKLIST.md

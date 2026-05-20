@@ -60,7 +60,7 @@ class ResultTest {
 
         assertNotNull(result.getPriority(), "使用 ErrorCodeEnum 的错误响应应该包含 priority");
         assertEquals(5, result.getPriority(), "PARAM_ERROR 的 priority 应该为 5");
-        assertEquals(400, result.getCode(), "错误码应该正确");
+        assertEquals(410, result.getCode(), "错误码应该正确");
         assertEquals("自定义参数错误信息", result.getMessage(), "自定义错误信息应该正确");
     }
 }

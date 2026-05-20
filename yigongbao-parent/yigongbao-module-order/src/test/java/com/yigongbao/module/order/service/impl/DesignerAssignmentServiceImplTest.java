@@ -45,6 +45,7 @@ class DesignerAssignmentServiceImplTest {
     @Mock private ConfigService configService;
     @Mock private DictService dictService;
     @Mock private RebuildProjectService rebuildProjectService;
+    @Mock private com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper;
 
     @InjectMocks private DesignerAssignmentServiceImpl service;
 
@@ -240,6 +241,8 @@ class DesignerAssignmentServiceImplTest {
         when(orderMainService.getById(1L)).thenReturn(buildPendingDesignOrder(1L));
         UserEntity designer = buildDesigner(100L, "7.2"); // 设计师是 7.2
         when(userMapper.selectById(100L)).thenReturn(designer);
+        // 权限校验通过（设计师在权限列表中）
+        when(userMapper.selectAllDesignersByPermission(null)).thenReturn(List.of(designer));
         OrderItemEntity item = new OrderItemEntity();
         item.setProjectId(10L);
         when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
@@ -264,33 +267,33 @@ class DesignerAssignmentServiceImplTest {
     // ==================== listAvailableDesigners ====================
 
     @Test
-    @DisplayName("listAvailableDesigners — 非法 specialty 编码被过滤，返回空列表")
-    void listDesigners_invalidSpecialty_shouldReturnEmpty() {
-        DesignerQueryDTO dto = new DesignerQueryDTO();
-        dto.setSpecialties(List.of("invalid", "7.", "../hack"));
-        List<DesignerVO> result = service.listAvailableDesigners(dto);
-        assertTrue(result.isEmpty());
-        verifyNoInteractions(userMapper);
-    }
-
-    @Test
-    @DisplayName("listAvailableDesigners — specialties 为空，返回空列表")
+    @DisplayName("listAvailableDesigners — specialties 为空，仍返回所有设计师")
     void listDesigners_emptySpecialties_shouldReturnEmpty() {
         DesignerQueryDTO dto = new DesignerQueryDTO();
         dto.setSpecialties(List.of());
+        when(userMapper.selectAllDesignersByPermission(null)).thenReturn(List.of());
         List<DesignerVO> result = service.listAvailableDesigners(dto);
         assertTrue(result.isEmpty());
-        verifyNoInteractions(userMapper);
     }
 
     @Test
-    @DisplayName("listAvailableDesigners — 合法 specialty，返回设计师列表")
+    @DisplayName("listAvailableDesigners — 非法 specialty 编码，仍返回所有设计师（不按 specialty 过滤）")
+    void listDesigners_invalidSpecialty_shouldReturnEmpty() {
+        DesignerQueryDTO dto = new DesignerQueryDTO();
+        dto.setSpecialties(List.of("invalid", "7.", "../hack"));
+        when(userMapper.selectAllDesignersByPermission(null)).thenReturn(List.of());
+        List<DesignerVO> result = service.listAvailableDesigners(dto);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("listAvailableDesigners — 返回设计师列表")
     void listDesigners_validSpecialty_shouldReturnList() {
         DesignerQueryDTO dto = new DesignerQueryDTO();
         dto.setSpecialties(List.of("7.1"));
         UserEntity designer = buildDesigner(100L, "7.1");
         designer.setCurrentLoad(3);
-        when(userMapper.selectDesignersBySpecialties(anyString())).thenReturn(List.of(designer));
+        when(userMapper.selectAllDesignersByPermission(null)).thenReturn(List.of(designer));
         List<DesignerVO> result = service.listAvailableDesigners(dto);
         assertEquals(1, result.size());
         assertEquals(100L, result.get(0).getUserId());
@@ -298,14 +301,13 @@ class DesignerAssignmentServiceImplTest {
     }
 
     @Test
-    @DisplayName("listAvailableDesigners — 合法多个 specialty，SQL 条件包含 OR")
+    @DisplayName("listAvailableDesigners — 多个 specialty，调用 selectAllDesignersByPermission")
     void listDesigners_multipleSpecialties_shouldBuildOrCondition() {
         DesignerQueryDTO dto = new DesignerQueryDTO();
         dto.setSpecialties(List.of("7.1", "7.2"));
-        when(userMapper.selectDesignersBySpecialties(anyString())).thenReturn(List.of());
+        when(userMapper.selectAllDesignersByPermission(null)).thenReturn(List.of());
         service.listAvailableDesigners(dto);
-        verify(userMapper).selectDesignersBySpecialties(
-                argThat(cond -> cond.contains("7.1") && cond.contains("7.2") && cond.contains(" OR ")));
+        verify(userMapper).selectAllDesignersByPermission(null);
     }
 
     // ==================== 辅助方法 ====================

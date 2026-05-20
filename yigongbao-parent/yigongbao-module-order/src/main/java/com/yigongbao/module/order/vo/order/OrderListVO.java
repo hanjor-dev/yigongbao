@@ -245,18 +245,12 @@ public class OrderListVO implements Serializable {
      */
     private LocalDateTime createTime;
 
-    // ==================== 修改申请角标 ====================
+    // ==================== 版本控制 ====================
 
     /**
-     * 当前有效修改申请的状态（null=无申请，"PENDING"=待审核，"APPROVED"=已同意待执行）
-     * 用于列表行角标展示
+     * 版本号（乐观锁）
      */
-    private String pendingModifyApplyStatus;
-
-    /**
-     * 当前有效修改申请的ID（配合角标状态使用，前端可据此跳转到申请详情页）
-     */
-    private Long pendingModifyApplyId;
+    private Integer version;
 
     // ==================== 重建项目列表 ====================
 

@@ -281,6 +281,11 @@ public class OrderDetailVO implements Serializable {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 版本号（乐观锁）
+     */
+    private Integer version;
+
     // ==================== 订单明细 ====================
     /**
      * 订单明细列表

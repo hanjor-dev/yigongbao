@@ -101,10 +101,10 @@ class FlowStatusTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("phase=DESIGN, status=DESIGN_REVIEW_REJECTED(2060) → 返回 [START_DESIGN]")
+        @DisplayName("phase=DESIGN, status=DESIGN_REVIEW_REJECTED(2060) → 返回 [CONTINUE_DESIGN]")
         void design_phase_reviewRejected_shouldReturn_startDesign() {
             List<FlowActionEnum> actions = rules.getAvailableActions(2060, 20, 1);
-            assertEquals(List.of(FlowActionEnum.START_DESIGN), actions);
+            assertEquals(List.of(FlowActionEnum.CONTINUE_DESIGN), actions);
         }
 
         // ==================== PRINT 阶段测试 ====================
@@ -360,9 +360,9 @@ class FlowStatusTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("CANCEL → DATA_AUDIT_REJECTED(1040)")
+        @DisplayName("CANCEL → CANCELLED(9010)")
         void cancel_shouldReturn_auditRejected() {
-            assertEquals(1040, rules.getTargetStatus(1010, FlowActionEnum.CANCEL));
+            assertEquals(9010, rules.getTargetStatus(1010, FlowActionEnum.CANCEL));
         }
 
         @Test
@@ -616,10 +616,10 @@ class FlowStatusTransitionRulesTest {
         @Test
         @DisplayName("任意合法动作都有对应目标状态，返回格式化的转换描述")
         void anyValidAction_shouldReturnFormattedDescription() {
-            // CANCEL → DATA_AUDIT_REJECTED(1040)，有对应状态，返回 "草稿 → 数据审核不通过"
+            // CANCEL → CANCELLED(9010)，有对应状态，返回 "草稿 → 已取消"
             String desc = rules.getTransitionDescription(1010, FlowActionEnum.CANCEL);
             assertTrue(desc.contains("草稿"));
-            assertTrue(desc.contains("数据审核不通过"));
+            assertTrue(desc.contains("已取消"));
         }
     }
 }

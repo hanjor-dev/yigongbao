@@ -459,13 +459,11 @@ class OrderMainServiceImplListOrdersTest {
             when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
             when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
             mockSelectPage(List.of(), 0L);
-            ArgumentCaptor<LambdaQueryWrapper> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
 
             orderMainService.listOrders(baseDto());
 
-            verify(orderMainMapper).selectPage(any(), captor.capture());
-            // phase=1 是必加条件，wrapper 非空
-            assertThat(captor.getValue().getExpression().getNormal()).isNotEmpty();
+            // phase 不传时不加过滤条件，wrapper 可为空（ALL 数据权限无额外条件）
+            verify(orderMainMapper).selectPage(any(), any());
         }
     }
 

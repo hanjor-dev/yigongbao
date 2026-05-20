@@ -106,6 +106,9 @@ public class DesignWorkorderDetailVO {
     /** 设计提交时间 */
     private LocalDateTime designSubmitTime;
 
+    /** 版本号（乐观锁） */
+    private Integer version;
+
     // ==================== 重建项目列表 ====================
     private List<RebuildProjectItemVO> rebuildProjectList;
 

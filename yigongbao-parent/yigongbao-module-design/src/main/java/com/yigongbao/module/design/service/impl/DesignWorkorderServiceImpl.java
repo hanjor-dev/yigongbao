@@ -1,6 +1,7 @@
 package com.yigongbao.module.design.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -165,6 +166,9 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
 
         // 批量填充数据包数量
         fillPackageCount(voList);
+
+        // 批量填充打印信息状态
+        fillPrintInfoStatus(voList);
 
         // 批量填充驳回原因
         fillRejectReason(voList);
@@ -678,6 +682,36 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         for (DesignWorkorderListVO vo : voList) {
             Long count = countByOrderId.get(vo.getId());
             vo.setPackageCount(count != null ? count.intValue() : 0);
+        }
+    }
+
+    /**
+     * 批量填充工单列表的打印信息状态（避免 N+1 查询）
+     * design_product 记录仅在用户主动保存打印信息时创建，因此只需判断记录是否存在
+     *
+     * @param voList 工单列表 VO
+     */
+    private void fillPrintInfoStatus(List<DesignWorkorderListVO> voList) {
+        if (CollUtil.isEmpty(voList)) {
+            return;
+        }
+        log.debug("批量填充打印信息状态，工单数量={}", voList.size());
+
+        List<Long> orderIds = voList.stream().map(DesignWorkorderListVO::getId).collect(Collectors.toList());
+        List<DesignProductEntity> allProducts = designProductMapper.selectList(
+                new LambdaQueryWrapper<DesignProductEntity>()
+                        .select(DesignProductEntity::getOrderId)
+                        .in(DesignProductEntity::getOrderId, orderIds)
+                        .eq(DesignProductEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+
+        log.debug("查询到打印产品记录数={}", allProducts.size());
+
+        Set<Long> orderIdsWithPrintInfo = allProducts.stream()
+                .map(DesignProductEntity::getOrderId)
+                .collect(Collectors.toSet());
+
+        for (DesignWorkorderListVO vo : voList) {
+            vo.setHasPrintInfo(orderIdsWithPrintInfo.contains(vo.getId()) ? StatusConstants.YES : StatusConstants.NO);
         }
     }
 

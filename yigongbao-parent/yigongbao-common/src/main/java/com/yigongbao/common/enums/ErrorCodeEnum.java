@@ -227,11 +227,6 @@ public enum ErrorCodeEnum {
     // 审核相关
     ORDER_AUDIT_REMARK_REQUIRED(702, "审核驳回时必须填写驳回原因", 3),
 
-    // 修改申请相关
-    ORDER_MODIFY_APPLY_NOT_FOUND(703, "修改申请不存在", 3),
-    ORDER_MODIFY_APPLY_STATUS_ERROR(704, "修改申请状态不合法", 3),
-    ORDER_MODIFY_APPLY_ALREADY_PROCESSED(705, "该修改申请已处理", 3),
-
     // 状态机循环限制
     ORDER_EXCESSIVE_AUDIT_REJECT(706, "审核驳回次数超过上限（%s次），请联系管理员处理", 3),
     ORDER_EXCESSIVE_REWORK(707, "返工次数超过上限（%s次），请联系管理员处理", 3),
@@ -249,15 +244,10 @@ public enum ErrorCodeEnum {
     // 导出
     ORDER_EXPORT_FAILED(714, "订单导出失败", 3),
 
-    // 修改申请新增错误码（715 起）
-    ORDER_MODIFY_APPLY_EXISTS(715, "已有待审核的修改申请，请等待处理后再发起新申请", 3),
+    // 修改字段校验错误码（716 起）
     ORDER_MODIFY_FIELD_NOT_ALLOWED(716, "该字段不在申请范围内，请检查申请类型", 3),
     ORDER_NOT_APPLICABLE_STATUS(717, "当前订单状态不适用修改申请功能", 3),
-    ORDER_MODIFY_APPLY_NOT_MINE(718, "只能撤回自己的申请", 3),
-    ORDER_MODIFY_REJECT_REASON_REQUIRED(719, "审核拒绝时必须填写驳回原因", 3),
-    ORDER_MODIFY_AUDIT_PERMISSION_DENIED(720, "只有管理员可以审核申请", 3),
     ORDER_MODIFY_FIELD_CONFIG_NOT_FOUND(721, "字段配置不存在，请联系管理员", 5),
-    ORDER_MODIFY_TYPE_NOT_ALLOWED_IN_PHASE(722, "当前阶段不允许申请该类型的修改", 3),
 
     // ==================== 设计师分配（723-729）====================
     DESIGNER_NOT_FOUND(723, "设计师不存在", 3),
@@ -265,10 +255,6 @@ public enum ErrorCodeEnum {
     DESIGNER_DISABLED(725, "设计师已被禁用", 3),
     DESIGNER_SPECIALTY_MISMATCH(726, "设计师专业方向与订单项目不一致", 3),
     ORDER_DESIGNER_MISMATCH(727, "非分配设计师，无权操作此订单", 3),
-
-    // ==================== 修改申请阻断（730-731）====================
-    ORDER_HAS_PENDING_MODIFY_APPLY(730, "订单存在待审核的修改申请，请先处理后再操作", 3),
-    ORDER_HAS_APPROVED_MODIFY_APPLY(731, "订单存在已批准但未执行的修改申请，请先执行或撤销后再操作", 3),
 
     // ==================== 修改执行校验（732-733）====================
     ORDER_MODIFY_INCOMPLETE(732, "申请类型 {0} 未提供修改内容，请补充后重新提交", 3),

@@ -2,6 +2,7 @@ package com.yigongbao.module.order.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -36,7 +37,6 @@ import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.entity.OrderModificationLogEntity;
-import com.yigongbao.module.order.entity.OrderModifyApplyEntity;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.service.DesignerAssignmentService;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
@@ -46,7 +46,6 @@ import com.yigongbao.module.order.mapper.OrderItemDraftMapper;
 import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
-import com.yigongbao.module.order.mapper.OrderModifyApplyMapper;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
@@ -102,7 +101,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderDraftMapper orderDraftMapper;
     private final OrderItemDraftMapper orderItemDraftMapper;
     private final OrderFileMapper orderFileMapper;
-    private final OrderModifyApplyMapper orderModifyApplyMapper;
     private final OrderModificationLogMapper orderModificationLogMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
@@ -253,8 +251,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
             // 批量填充重建项目列表（避免 N+1）
             orderQueryHelper.fillRebuildProjectList(voList);
-            // 批量填充修改申请角标（避免 N+1）
-            orderModifyApplyService.fillModifyApplyStatus(voList);
 
             // 构建返回页（复用分页元信息，替换 records）
             IPage<OrderListVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
@@ -287,17 +283,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("订单不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            // 数据权限校验：复用 buildDataScopeCondition 在同一 COUNT 查询中校验当前用户是否有权访问该订单
-            // 防止横向越权（A 用户访问 B 用户权限范围外的订单）
-            Long currentUserId = getCurrentUserId();
-            DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
-            LambdaQueryWrapper<OrderMainEntity> scopeWrapper = new LambdaQueryWrapper<>();
-            scopeWrapper.eq(OrderMainEntity::getId, id);
-            orderQueryHelper.buildDataScopeCondition(scopeWrapper, currentUserId, scopeType);
-            if (count(scopeWrapper) == 0) {
-                log.warn("订单不在当前用户数据权限范围内，id={}, userId={}, scopeType={}", id, currentUserId, scopeType);
-                throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
-            }
+            // 数据权限校验：防止横向越权
+            validateDataScope(id);
             // 转换为详情 VO，补充性别名称等显示字段
             OrderDetailVO vo = toOrderDetailVO(entity);
             // 查询订单明细列表，按排序字段升序
@@ -371,14 +358,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     public void updateOrder(Long id, UpdateOrderDTO dto) {
         log.info("更新订单，id={}", id);
         try {
-            // 校验订单存在
-            OrderMainEntity entity = getById(id);
-            if (entity == null) {
-                log.warn("订单不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
-            }
-            // 数据权限校验：防止横向越权
+            // 数据权限校验（含存在性校验）：无权访问时抛 ORDER_NOT_FOUND
             validateDataScope(id);
+            OrderMainEntity entity = getById(id);
             // 校验 needsPhysicalDelivery 变更规则（不在订单阶段不允许修改，不允许从需要改为不需要）
             validateNeedsPhysicalDeliveryChange(entity, dto);
             // 排除不可变更字段后复制属性
@@ -465,8 +447,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             orderItemMapper.delete(new LambdaQueryWrapper<OrderItemEntity>().eq(OrderItemEntity::getOrderId, id));
             // 清理关联文件记录（软删除）
             orderFileMapper.delete(new LambdaQueryWrapper<OrderFileEntity>().eq(OrderFileEntity::getOrderId, id));
-            // 清理修改申请记录（软删除）
-            orderModifyApplyMapper.delete(new LambdaQueryWrapper<OrderModifyApplyEntity>().eq(OrderModifyApplyEntity::getOrderId, id));
             // 清理修改留痕日志（硬删除，不继承 BaseEntity）
             orderModificationLogMapper.delete(new LambdaQueryWrapper<OrderModificationLogEntity>().eq(OrderModificationLogEntity::getOrderId, id));
             // TODO: 流程历史记录清理需 FlowFacade 提供接口支持
@@ -509,8 +489,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("无权提交他人订单，id={}, createBy={}, currentUserId={}", id, entity.getCreateBy(), currentUserId);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            // 校验无阻断性修改申请
-            orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行提交动作，获取流转后的 phase 和 status
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.SUBMIT_ORDER, FlowOperator.of(currentUserId, null));
@@ -554,8 +532,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("无权撤回他人订单，id={}, createBy={}, currentUserId={}", id, entity.getCreateBy(), currentUserId);
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            // 校验无阻断性修改申请
-            orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行撤回动作
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.WITHDRAW, FlowOperator.of(currentUserId, null));
@@ -600,23 +576,21 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             // 获取当前用户姓名
             UserEntity currentUser = userService.getById(currentUserId);
             String operatorName = currentUser != null ? currentUser.getRealName() : null;
-            // 校验无阻断性修改申请
-            orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行审核通过动作
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
                     dto.getVersion());
-            // 更新订单的阶段、状态和当前处理人，同步写入审核时填写的预估费用和影像评估意见
-            entity.setPhase(result.getTargetPhase());
-            entity.setStatus(result.getFinalStatus());
-            entity.setCurrentHandlerId(currentUserId);
+            // 仅更新业务字段，不覆盖 flow engine 已写入的 phase/status/version
+            LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<OrderMainEntity>()
+                    .eq(OrderMainEntity::getId, id)
+                    .set(OrderMainEntity::getCurrentHandlerId, currentUserId);
             if (dto.getEstimatedCost() != null) {
-                entity.setEstimatedCost(dto.getEstimatedCost());
+                uw.set(OrderMainEntity::getEstimatedCost, dto.getEstimatedCost());
             }
             if (StrUtil.isNotBlank(dto.getDataEvaluationOpinion())) {
-                entity.setDataEvaluationOpinion(dto.getDataEvaluationOpinion());
+                uw.set(OrderMainEntity::getDataEvaluationOpinion, dto.getDataEvaluationOpinion());
             }
-            updateById(entity);
+            update(uw);
             // 触发设计师分配（分配失败不影响审核结果）
             designerAssignmentService.triggerAssignmentAfterAudit(id);
             log.info("审核通过成功，id={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
@@ -662,18 +636,15 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             // 获取当前用户姓名
             UserEntity currentUser = userService.getById(currentUserId);
             String operatorName = currentUser != null ? currentUser.getRealName() : null;
-            // 校验无阻断性修改申请
-            orderModifyApplyService.validateNoBlockingModifyApply(id);
             // 通过 FlowFacade 执行审核驳回动作
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
                     dto.getVersion());
-            // 更新订单的阶段、状态、驳回原因和当前处理人
-            entity.setPhase(result.getTargetPhase());
-            entity.setStatus(result.getFinalStatus());
-            entity.setAuditRemark(dto.getRemark());
-            entity.setCurrentHandlerId(currentUserId);
-            updateById(entity);
+            // 仅更新业务字段，不覆盖 flow engine 已写入的 phase/status/version
+            update(new LambdaUpdateWrapper<OrderMainEntity>()
+                    .eq(OrderMainEntity::getId, id)
+                    .set(OrderMainEntity::getAuditRemark, dto.getRemark())
+                    .set(OrderMainEntity::getCurrentHandlerId, currentUserId));
             log.info("审核驳回成功，id={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
         } catch (BusinessException e) {
             throw e;

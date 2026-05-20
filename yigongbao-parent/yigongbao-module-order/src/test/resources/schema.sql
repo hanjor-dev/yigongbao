@@ -169,30 +169,6 @@ CREATE TABLE order_flow_status_history (
     is_deleted INT DEFAULT 0
 );
 
--- 订单修改申请表（P1）
-CREATE TABLE order_modify_apply (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    order_id BIGINT NOT NULL COMMENT '订单ID',
-    order_code VARCHAR(50) NOT NULL COMMENT '订单编号',
-    hospital_name VARCHAR(100) COMMENT '医院名称（冗余）',
-    patient_name VARCHAR(100) COMMENT '患者姓名（冗余）',
-    apply_type_codes VARCHAR(50) NOT NULL COMMENT '申请类型字典编码（逗号分隔）',
-    apply_type_names VARCHAR(200) COMMENT '申请类型中文名冗余',
-    apply_reason VARCHAR(5000) COMMENT '申请原因',
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '状态：PENDING/APPROVED/REJECTED',
-    reject_reason VARCHAR(5000) COMMENT '驳回原因',
-    auditor_id BIGINT COMMENT '审核人ID',
-    auditor_name VARCHAR(100) COMMENT '审核人姓名',
-    audit_time TIMESTAMP COMMENT '审核时间',
-    applicant_id BIGINT NOT NULL COMMENT '申请人ID',
-    applicant_name VARCHAR(100) COMMENT '申请人姓名',
-    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    create_by BIGINT,
-    update_by BIGINT,
-    is_deleted INT DEFAULT 0
-);
-
 -- 订单修改留痕表（P1）
 CREATE TABLE order_modification_log (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,

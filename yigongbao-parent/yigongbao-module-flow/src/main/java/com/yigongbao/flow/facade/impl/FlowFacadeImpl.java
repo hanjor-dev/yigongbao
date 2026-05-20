@@ -61,14 +61,17 @@ public class FlowFacadeImpl implements FlowFacade {
         if (operator == null) {
             operator = new FlowOperator();
         }
-        if (expectedVersion != null && AUDIT_ACTIONS.contains(action)) {
+        if (AUDIT_ACTIONS.contains(action)) {
+            // 将 null 视为 0（新订单的初始版本）
+            Integer expected = expectedVersion != null ? expectedVersion : 0;
             OrderMainEntity order = flowOrderService.getById(orderId);
             if (order == null) {
                 throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
             }
-            if (!expectedVersion.equals(order.getVersion())) {
+            Integer actual = order.getVersion() != null ? order.getVersion() : 0;
+            if (!expected.equals(actual)) {
                 log.warn("订单版本冲突，orderId={}, expectedVersion={}, actualVersion={}",
-                        orderId, expectedVersion, order.getVersion());
+                        orderId, expected, actual);
                 throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
             }
         }

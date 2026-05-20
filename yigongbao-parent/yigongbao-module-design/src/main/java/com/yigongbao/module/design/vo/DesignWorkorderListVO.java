@@ -84,6 +84,12 @@ public class DesignWorkorderListVO {
     /** 创建时间 */
     private LocalDateTime createTime;
 
+    /** 版本号（乐观锁） */
+    private Integer version;
+
+    /** 是否已填写打印信息（0=否，1=是） */
+    private Integer hasPrintInfo;
+
     /** 驳回原因（最近一次，默认隐藏） */
     private String rejectReason;
 }

@@ -9,8 +9,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * 订单修改申请类型枚举
- * 对应 order_modify_apply.apply_type_codes 字段，存储字典编码
+ * 订单修改类型枚举
  * 字典编码对应 sys_dict group=14：14.1（基础信息）/ 14.2（影像文件）/ 14.3（重建项目）
  *
  * @author hanjor
