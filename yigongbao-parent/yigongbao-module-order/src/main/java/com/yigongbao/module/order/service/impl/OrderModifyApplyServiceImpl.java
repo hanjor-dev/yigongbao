@@ -148,6 +148,30 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         return ApplicableModifyTypesVO.forAllowed(allowedTypes);
     }
 
+    /**
+     * 根据订单阶段判断允许的修改类型
+     * <p>
+     * 订单阶段（phase=10）：允许全部三种类型（14.1/14.2/14.3）<br>
+     * 设计阶段（phase=20）：仅允许重建项目（14.3）<br>
+     * 其他阶段：抛出异常
+     *
+     * @param phase 订单阶段值
+     * @return 允许的类型编码集合
+     */
+    Set<String> determineAllowedTypesByPhase(Integer phase) {
+        if (FlowPhaseEnum.ORDER.getValue().equals(phase)) {
+            return Set.of(
+                ModifyApplyTypeEnum.INFO.getDictCode(),
+                ModifyApplyTypeEnum.IMAGE.getDictCode(),
+                ModifyApplyTypeEnum.ITEM.getDictCode()
+            );
+        } else if (FlowPhaseEnum.DESIGN.getValue().equals(phase)) {
+            return Set.of(ModifyApplyTypeEnum.ITEM.getDictCode());
+        } else {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_APPLICABLE_STATUS);
+        }
+    }
+
     // ==================== 申请发起 ====================
 
     /**
