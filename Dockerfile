@@ -1,5 +1,6 @@
 # 多阶段构建：第一阶段 - Maven 构建
-FROM maven:3.9-amazoncorretto-21 AS builder
+# 使用阿里云镜像加速
+FROM registry.cn-hangzhou.aliyuncs.com/library/maven:3.9-amazoncorretto-21 AS builder
 
 WORKDIR /build
 
@@ -25,7 +26,8 @@ COPY yigongbao-parent/ ./
 RUN mvn clean package -DskipTests -B
 
 # 多阶段构建：第二阶段 - 运行时镜像
-FROM amazoncorretto:21-alpine
+# 使用阿里云镜像加速
+FROM registry.cn-hangzhou.aliyuncs.com/library/amazoncorretto:21-alpine
 
 WORKDIR /app
 
@@ -45,7 +47,7 @@ RUN mkdir -p /app/files && chown -R appuser:appgroup /app
 USER appuser
 
 # 暴露端口
-EXPOSE 8081
+EXPOSE 8080
 
 # JVM 参数优化
 ENV JAVA_OPTS="-Xms512m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
