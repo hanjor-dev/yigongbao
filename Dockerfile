@@ -1,6 +1,5 @@
 # 多阶段构建：第一阶段 - Maven 构建
-# 使用阿里云镜像加速
-FROM registry.cn-hangzhou.aliyuncs.com/library/maven:3.9-amazoncorretto-21 AS builder
+FROM maven:3.9-amazoncorretto-21 AS builder
 
 WORKDIR /build
 
@@ -26,8 +25,7 @@ COPY yigongbao-parent/ ./
 RUN mvn clean package -DskipTests -B
 
 # 多阶段构建：第二阶段 - 运行时镜像
-# 使用阿里云镜像加速
-FROM registry.cn-hangzhou.aliyuncs.com/library/amazoncorretto:21-alpine
+FROM amazoncorretto:21-alpine
 
 WORKDIR /app
 
