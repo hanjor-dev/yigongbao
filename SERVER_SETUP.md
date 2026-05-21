@@ -75,8 +75,9 @@ cd /home/app/yigongbao-java-8081
 /home/app/yigongbao-java-8081/
 ├── docker-compose.test.yml    # 测试环境编排文件
 ├── docker-compose.prod.yml    # 生产环境编排文件
-├── .env.test                  # 测试环境变量
-├── .env.prod                  # 生产环境变量
+├── env.test.text              # 测试环境变量（已废弃）
+├── env.prod.text              # 生产环境变量（已废弃）
+├── .env                       # 环境变量文件（docker-compose 默认读取）
 ├── sql/                       # 数据库初始化脚本
 │   ├── ddl.sql
 │   ├── init.sql
@@ -97,10 +98,10 @@ cd /home/app/yigongbao-java-8081
 
 ### 2. 环境变量文件
 
-创建 `.env.test`（测试环境）：
+创建 `.env` 文件（测试/生产环境共用，根据实际环境修改）：
 
 ```bash
-cat > .env.test <<'EOF'
+cat > .env <<'EOF'
 # 数据库配置
 DB_NAME=yigongbao
 DB_USERNAME=root
@@ -129,37 +130,10 @@ SMS_MOCK_REDIRECT_EMAIL=test@example.com
 EOF
 ```
 
-创建 `.env.prod`（生产环境）：
-
-```bash
-cat > .env.prod <<'EOF'
-# 数据库配置
-DB_NAME=yigongbao
-DB_USERNAME=root
-DB_PASSWORD=生产环境强密码
-
-# Redis 配置
-REDIS_PASSWORD=生产环境Redis密码
-
-# 阿里云 OSS
-OSS_ACCESS_KEY=你的AccessKey
-OSS_SECRET_KEY=你的SecretKey
-OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
-OSS_BUCKET=yigongbao-prod
-OSS_DOMAIN=https://你的OSS域名/
-
-# 邮件配置
-MAIL_HOST=smtp.qq.com
-MAIL_PORT=587
-MAIL_USERNAME=your-email@qq.com
-MAIL_PASSWORD=your-password
-
-# 系统配置
-DEFAULT_PASSWORD=生产环境默认密码
-APP_SIGN_SECRET=生产环境签名密钥-至少32位
-SMS_MOCK_REDIRECT_EMAIL=
-EOF
-```
+**说明：**
+- 测试环境和生产环境使用相同的文件名 `.env`
+- 在不同服务器上根据实际环境修改文件内容
+- docker-compose 会自动读取 `.env` 文件
 
 ### 3. 数据库初始化脚本
 
@@ -194,8 +168,8 @@ docker login --username=你的阿里云账号 crpi-ie9dcy6o6rjohsiv.cn-hangzhou.
 ```bash
 cd /home/app/yigongbao-java-8081
 
-# 启动所有服务
-docker-compose -f docker-compose.test.yml --env-file .env.test up -d
+# 启动所有服务（docker-compose 自动读取 .env 文件）
+docker-compose -f docker-compose.test.yml up -d
 
 # 查看服务状态
 docker-compose -f docker-compose.test.yml ps
@@ -209,8 +183,8 @@ docker-compose -f docker-compose.test.yml logs -f app
 ```bash
 cd /home/app/yigongbao-java-8081
 
-# 启动所有服务
-docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+# 启动所有服务（docker-compose 自动读取 .env 文件）
+docker-compose -f docker-compose.prod.yml up -d
 
 # 查看服务状态
 docker-compose -f docker-compose.prod.yml ps

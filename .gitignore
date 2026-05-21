@@ -67,6 +67,8 @@ uploads/
 .env.*.local
 .env.test
 .env.prod
+env.test.text
+env.prod.text
 
 ### Docker ###
 .dockerignore

@@ -5,6 +5,8 @@ services:
   mysql:
     image: mysql:8.0
     container_name: yigongbao-mysql
+    env_file:
+      - .env
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
@@ -31,6 +33,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: yigongbao-redis
+    env_file:
+      - .env
     command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
     ports:
       - "6379:6379"
@@ -49,6 +53,8 @@ services:
   app:
     image: crpi-ie9dcy6o6rjohsiv.cn-hangzhou.personal.cr.aliyuncs.com/yigongbao/yigongbao-app:latest
     container_name: yigongbao-app
+    env_file:
+      - .env
     environment:
       SPRING_PROFILES_ACTIVE: test
       DB_HOST: mysql
