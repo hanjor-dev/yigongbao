@@ -145,18 +145,19 @@ public class OrderQueryHelper {
                                         DataScopeTypeEnum scopeType) {
         switch (scopeType) {
             case SELF:
-                // 仅看自己创建的订单，按创建人过滤
-                wrapper.eq(currentUserId != null, OrderMainEntity::getCreateBy, currentUserId);
+                // 仅看自己作为操作员创建的订单
+                wrapper.eq(currentUserId != null, OrderMainEntity::getOperatorId, currentUserId);
                 break;
             case HOSPITALS:
-                // 看自己关联的全部医院订单
+                // 看自己关联的医院范围内 + 自己创建的订单
                 List<Long> hospitalIds = userHospitalService.getHospitalIdsByUserId(currentUserId);
                 if (hospitalIds.isEmpty()) {
                     // 用户未关联任何医院（理论上不应发生），返回空列表
                     log.info("用户无权访问任何医院，返回空列表，userId={}", currentUserId);
                     wrapper.apply("1 = 0");
                 } else {
-                    wrapper.in(OrderMainEntity::getHospitalId, hospitalIds);
+                    wrapper.in(OrderMainEntity::getHospitalId, hospitalIds)
+                           .eq(OrderMainEntity::getOperatorId, currentUserId);
                 }
                 break;
             case ORG:
