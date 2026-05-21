@@ -37,6 +37,7 @@ import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.entity.OrderModificationLogEntity;
+import com.yigongbao.module.order.enums.OrderDraftStatusEnum;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.service.DesignerAssignmentService;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
@@ -63,6 +64,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -194,10 +196,16 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             }
 
             // 追加其他过滤条件
-            wrapper.like(StrUtil.isNotBlank(dto.getOrderCode()), OrderMainEntity::getOrderCode, dto.getOrderCode())
-                    .eq(Objects.nonNull(dto.getAreaId()), OrderMainEntity::getAreaId, dto.getAreaId())
+            // orderCode 参数：多字段模糊搜索（订单编号/机构名称/业务员姓名/医院名称/患者名字）
+            if (StrUtil.isNotBlank(dto.getOrderCode())) {
+                wrapper.and(w -> w.like(OrderMainEntity::getOrderCode, dto.getOrderCode())
+                        .or().like(OrderMainEntity::getOrgName, dto.getOrderCode())
+                        .or().like(OrderMainEntity::getOperatorName, dto.getOrderCode())
+                        .or().like(OrderMainEntity::getHospitalName, dto.getOrderCode())
+                        .or().like(OrderMainEntity::getPatientName, dto.getOrderCode()));
+            }
+            wrapper.eq(Objects.nonNull(dto.getAreaId()), OrderMainEntity::getAreaId, dto.getAreaId())
                     .like(StrUtil.isNotBlank(dto.getDoctorName()), OrderMainEntity::getDoctorName, dto.getDoctorName())
-                    .like(StrUtil.isNotBlank(dto.getPatientName()), OrderMainEntity::getPatientName, dto.getPatientName())
                     .eq(StrUtil.isNotBlank(dto.getBusinessType()), OrderMainEntity::getBusinessType, dto.getBusinessType())
                     .eq(Objects.nonNull(dto.getOperatorId()), OrderMainEntity::getOperatorId, dto.getOperatorId())
                     .ge(Objects.nonNull(dto.getCreateTimeStart()), OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
@@ -590,7 +598,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 uw.set(OrderMainEntity::getEstimatedCost, dto.getEstimatedCost());
             }
             if (StrUtil.isNotBlank(dto.getDataEvaluationOpinion())) {
-                uw.set(OrderMainEntity::getDataEvaluationOpinion, dto.getDataEvaluationOpinion);
+                uw.set(OrderMainEntity::getDataEvaluationOpinion, dto.getDataEvaluationOpinion());
             }
             update(uw);
             // 触发设计师分配（分配失败不影响审核结果）
@@ -811,8 +819,14 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     @Transactional(rollbackFor = Exception.class)
     public Long createOrder(CreateOrderDTO dto) {
         Long currentUserId = getCurrentUserId();
-        log.info("直接创建正式订单，currentUserId={}", currentUserId);
         try {
+            // Step 0：如果传入了草稿ID，原子性更新草稿状态（防止并发重复提交）
+            if (dto.getId() != null) {
+                lockDraftForSubmission(dto.getId(), currentUserId);
+            } else {
+                log.info("直接创建正式订单，currentUserId={}", currentUserId);
+            }
+
             // Step 1：生成订单编号
             String orderCode = codeGeneratorService.generate(CodeRuleConstants.ORDER_NO);
             log.info("生成订单编号，orderCode={}", orderCode);
@@ -860,6 +874,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
             // Step 4：保存重建项目列表，校验并覆盖 bodyPartName/projectName/estimatedHours/projectDesc
             if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+                // 校验重建项目去重：同一订单中不允许出现相同的（部位+项目）组合
+                validateDuplicateItems(dto.getItems());
                 List<OrderItemEntity> items = new ArrayList<>();
                 for (int i = 0; i < dto.getItems().size(); i++) {
                     var itemDTO = dto.getItems().get(i);
@@ -889,6 +905,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             // Step 6：记录状态历史（CREATE 动作仅记录历史，不改变 phase/status）
             flowFacade.executeFlow(orderId, FlowActionEnum.CREATE,
                     new FlowOperator(currentUserId, currentUser.getRealName(), "直提创建"));
+
             log.info("直接创建正式订单成功，orderId={}, orderCode={}", orderId, orderCode);
             return orderId;
         } catch (BusinessException e) {
@@ -1153,5 +1170,43 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         user.setOrderColumnSettings(null);
         userService.updateById(user);
         log.info("重置用户列配置成功，userId={}", currentUserId);
+    }
+
+    /**
+     * 原子性锁定草稿用于提交（防止并发重复提交）
+     *
+     * @param draftId 草稿ID
+     * @param currentUserId 当前用户ID
+     * @throws BusinessException 草稿不存在/不属于当前用户/已提交
+     */
+    private void lockDraftForSubmission(Long draftId, Long currentUserId) {
+        log.info("从草稿提交创建订单，currentUserId={}, draftId={}", currentUserId, draftId);
+        LambdaUpdateWrapper<OrderDraftEntity> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(OrderDraftEntity::getId, draftId)
+                .eq(OrderDraftEntity::getOperatorId, currentUserId)
+                .ne(OrderDraftEntity::getStatus, OrderDraftStatusEnum.SUBMITTED.getCode())
+                .set(OrderDraftEntity::getStatus, OrderDraftStatusEnum.SUBMITTED.getCode());
+        int updated = orderDraftMapper.update(null, updateWrapper);
+        if (updated == 0) {
+            log.warn("草稿锁定失败，draftId={}, userId={}", draftId, currentUserId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_FOUND);
+        }
+    }
+
+    /**
+     * 校验重建项目去重：同一订单中不允许出现相同的（部位+项目）组合
+     *
+     * @param items 重建项目列表
+     * @throws BusinessException 存在重复项目时抛出
+     */
+    private void validateDuplicateItems(List<com.yigongbao.module.order.dto.draft.OrderItemDraftItemDTO> items) {
+        Set<Integer> seen = new HashSet<>();
+        for (var item : items) {
+            int key = Objects.hash(item.getBodyPartId(), item.getProjectId());
+            if (!seen.add(key)) {
+                log.warn("订单中存在重复的重建项目，bodyPartId={}, projectId={}", item.getBodyPartId(), item.getProjectId());
+                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "同一订单中不允许重复添加相同的部位和项目组合");
+            }
+        }
     }
 }

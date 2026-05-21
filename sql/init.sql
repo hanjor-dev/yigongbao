@@ -335,7 +335,7 @@ VALUES ('order.column.config', '订单列表默认列配置', '{"module":"order"
 
 -- 订单修改申请字段配置（独立 INSERT）
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
-VALUES ('order.modify.field.config', '订单修改申请字段配置', '{"14.1":{"name":"基础信息","fields":[{"field":"hospitalId","label":"医院","type":"autocomplete","required":false,"group":"hospital_doctor"},{"field":"hospitalDeptId","label":"科室","type":"autocomplete","required":false,"group":"hospital_doctor"},{"field":"doctorId","label":"关联医生","type":"autocomplete","required":false,"group":"hospital_doctor"},{"field":"doctorName","label":"医生姓名","type":"text","required":false,"group":"hospital_doctor"},{"field":"doctorPhone","label":"医生电话","type":"text","required":false,"group":"hospital_doctor"},{"field":"patientName","label":"患者姓名","type":"text","required":false},{"field":"patientAge","label":"患者年龄","type":"number","required":false},{"field":"patientGender","label":"患者性别","type":"select","required":false,"options":[{"value":"12.1","label":"男"},{"value":"12.2","label":"女"}]},{"field":"isUrgent","label":"是否加急","type":"switch","required":false},{"field":"isPostal","label":"是否邮寄","type":"switch","required":false},{"field":"postalAddress","label":"邮寄地址","type":"textarea","required":false},{"field":"expectedDeliveryDate","label":"期望交付时间","type":"datetime","required":false}]},"14.2":{"name":"影像文件","fields":[{"field":"imageDataFileIds","label":"影像数据文件","type":"file","required":false},{"field":"imageReportFileIds","label":"影像报告文件","type":"file","required":false}]},"14.3":{"name":"重建项目","fields":[{"field":"items","label":"重建项目明细","type":"array","required":false,"subFields":[{"field":"bodyPartId","label":"部位","type":"select"},{"field":"projectId","label":"重建项目","type":"select"},{"field":"projectDesc","label":"项目说明","type":"textarea"},{"field":"formingRequirement","label":"成形需求","type":"textarea"},{"field":"otherRequirement","label":"其他要求","type":"textarea"}]}]}}', 'json', 'system', '订单修改申请各类型允许修改的字段配置', 1, 0, 11, 1);
+VALUES ('order.modify.field.config', '订单修改字段配置', '{"14.1":{"name":"基础信息","fields":[{"field":"hospitalId","label":"医院","type":"autocomplete","required":false,"group":"hospital_doctor"},{"field":"hospitalDeptId","label":"科室","type":"autocomplete","required":false,"group":"hospital_doctor"},{"field":"doctorId","label":"关联医生","type":"autocomplete","required":false,"group":"hospital_doctor"},{"field":"doctorName","label":"医生姓名","type":"text","required":false,"group":"hospital_doctor"},{"field":"doctorPhone","label":"医生电话","type":"text","required":false,"group":"hospital_doctor"},{"field":"patientName","label":"患者姓名","type":"text","required":false},{"field":"patientAge","label":"患者年龄","type":"number","required":false},{"field":"patientGender","label":"患者性别","type":"select","required":false,"options":[{"value":"12.1","label":"男"},{"value":"12.2","label":"女"}]},{"field":"isUrgent","label":"是否加急","type":"switch","required":false},{"field":"isPostal","label":"是否邮寄","type":"switch","required":false},{"field":"postalAddress","label":"邮寄地址","type":"textarea","required":false},{"field":"expectedDeliveryDate","label":"期望交付时间","type":"datetime","required":false}]},"14.2":{"name":"影像文件","fields":[{"field":"imageDataFileIds","label":"影像数据文件","type":"file","required":false},{"field":"imageReportFileIds","label":"影像报告文件","type":"file","required":false}]},"14.3":{"name":"重建项目","fields":[{"field":"items","label":"重建项目明细","type":"array","required":false,"subFields":[{"field":"bodyPartId","label":"部位","type":"select"},{"field":"projectId","label":"重建项目","type":"select"},{"field":"projectDesc","label":"项目说明","type":"textarea"},{"field":"formingRequirement","label":"成形需求","type":"textarea"},{"field":"otherRequirement","label":"其他要求","type":"textarea"}]}]}}', 'json', 'system', '订单修改申请各类型允许修改的字段配置', 1, 0, 11, 1);
 
 -- 设计工单列表默认列配置（独立 INSERT）
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
@@ -523,9 +523,9 @@ VALUES
 (1117, 101, '审核查看',        'order:AuditView',         3, 17, 1),
 (1118, 101, '我的申请查看',    'order:MyApplyView',       3, 18, 1),
 (1119, 101, '撤回申请',        'order:MyApplyWithdraw',   3, 19, 1),
-(1120, 101, '分配设计师',      'design:AssignDesigner',   3, 20, 1),
 (1121, 101, '取消订单',        'order:Cancel',            3, 21, 1),
 -- 我的工单页按钮（parent_id=102）
+(1120, 101, '分配设计师',      'design:AssignDesigner',   3, 20, 1),
 (1201, 102, '导出记录',        'design:Export',           3, 1,  1),
 (1202, 102, '查看详情',        'design:View',             3, 2,  1),
 (1203, 102, '上传设计文件',    'design:Upload',           3, 3,  1),
@@ -536,8 +536,7 @@ VALUES
 (1208, 102, '开始设计',        'design:StartDesign',      3, 8,  1),
 (1209, 102, '提交设计审核',    'design:SubmitCheck',      3, 9,  1),
 (1210, 102, '审核通过',        'design:Approve',          3, 10, 1),
-(1211, 102, '审核驳回',        'design:Reject',           3, 11, 1),
-(1212, 102, '查看分配历史',    'design:AssignDesignerLog', 3, 12, 1);
+(1211, 102, '审核驳回',        'design:Reject',           3, 11, 1);
 
 
 -- ============================================================
@@ -633,15 +632,15 @@ INSERT INTO sys_role_resource (role_id, resource_id) VALUES
 (4, 1202), (4, 1203), (4, 1204), (4, 1205), (4, 1206), (4, 1207), (4, 1208), (4, 1209), (4, 1121);
 
 -- 设计管理员（role_id=5）
--- 菜单：数据概览、订单管理、我的工单、项目管理、产品管理、资料管理、统计报表、个人中心
+-- 菜单：数据概览、我的工单、项目管理、产品管理、资料管理、统计报表、个人中心
 -- 按钮：工单页全部按钮、项目管理/产品管理全量按钮、订单管理页（订单列表Tab/批量导出/查看详情/影像调阅/修改历史）
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
 (5, 1), (5, 2), (5, 4), (5, 6), (5, 8), (5, 10),
-(5, 101), (5, 102), (5, 303), (5, 304),
+(5, 102), (5, 303), (5, 304),
 -- 订单管理页按钮
 (5, 1102), (5, 1106), (5, 1107), (5, 1108), (5, 1110), (5, 1120), (5, 1121),
 -- 工单页全部按钮
-(5, 1201), (5, 1202), (5, 1203), (5, 1204), (5, 1205), (5, 1206), (5, 1207), (5, 1208), (5, 1209), (5, 1210), (5, 1211), (5, 1212),
+(5, 1201), (5, 1202), (5, 1203), (5, 1204), (5, 1205), (5, 1206), (5, 1207), (5, 1208), (5, 1209), (5, 1210), (5, 1211),
 -- 项目/产品全量按钮
 (5, 1034), (5, 1035), (5, 1036), (5, 1037),
 (5, 1038), (5, 1039), (5, 1040), (5, 1041);
@@ -661,19 +660,19 @@ INSERT INTO sys_role_resource (role_id, resource_id) VALUES
 (7, 1042), (7, 1043), (7, 1044), (7, 1045);
 
 -- 质管（role_id=8）
--- 菜单：数据概览、订单管理、质检管理、资料管理、个人中心
+-- 菜单：数据概览、质检管理、资料管理、个人中心
 -- 按钮：订单管理页（订单列表Tab/查看详情/影像调阅/修改历史）
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
 (8, 1), (8, 2), (8, 6), (8, 10),
-(8, 101), (8, 104),
+(8, 104),
 (8, 1102), (8, 1107), (8, 1108), (8, 1110);
 
 -- 库管（role_id=9）
--- 菜单：数据概览、订单管理、仓储管理、资料管理、统计报表、个人中心
+-- 菜单：数据概览、仓储管理、资料管理、统计报表、个人中心
 -- 按钮：订单管理页（订单列表Tab/查看详情）、仓储管理页全部按钮（待模块完善后补充）
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
 (9, 1), (9, 2), (9, 6), (9, 8), (9, 10),
-(9, 101), (9, 105),
+(9, 105),
 (9, 1102), (9, 1107);
 
 -- 财务（role_id=10）

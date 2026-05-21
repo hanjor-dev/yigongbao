@@ -183,12 +183,12 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
             throw new BusinessException(ErrorCodeEnum.DESIGNER_ROLE_INVALID, "该用户无设计权限");
         }
         // 3. 校验设计师 specialty 包含订单项目方向
-        String orderSpecialty = getOrderSpecialty(orderId);
+        /*String orderSpecialty = getOrderSpecialty(orderId);
         if (StrUtil.isNotBlank(orderSpecialty) && !isSpecialtyMatch(designer.getSpecialty(), orderSpecialty)) {
             log.warn("设计师专业方向不匹配，designerId={}, designerSpecialty={}, orderSpecialty={}",
                     designerId, designer.getSpecialty(), orderSpecialty);
             throw new BusinessException(ErrorCodeEnum.DESIGNER_SPECIALTY_MISMATCH);
-        }
+        }*/
         // 4. 记录分配历史（支持重新分配）
         saveAssignmentLog(order, designer);
         // 5. 更新订单

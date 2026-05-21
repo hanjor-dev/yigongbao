@@ -128,10 +128,10 @@ dromara:
     default-platform: aliyun-oss-1
     #缩略图后缀
     thumbnail-suffix: ".min.jpg"
-    # 阿里云 OSS 配置（测试环境可选）
+    # 阿里云 OSS 配置（测试环境）
     aliyun-oss:
       - platform: aliyun-oss-1
-        enable-storage: false
+        enable-storage: true
         # AccessKey ID（从环境变量注入，禁止硬编码）
         access-key: ${OSS_ACCESS_KEY:your-access-key-id}
         # AccessKey Secret（从环境变量注入，禁止硬编码）

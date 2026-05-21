@@ -21,6 +21,13 @@ public class CreateOrderDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    // ==================== 草稿ID（可选） ====================
+    /**
+     * 草稿ID（可选）
+     * 前端从草稿提交时传入，用于更新草稿状态；直接创建订单时为 null
+     */
+    private Long id;
+
     // ==================== 订单类型 ====================
     /**
      * 订单类型：1-医疗器械，2-非医疗器械

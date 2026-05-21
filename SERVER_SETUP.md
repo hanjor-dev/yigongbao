@@ -153,7 +153,7 @@ rsync -avz sql/ user@server:/home/app/yigongbao-java-8081/sql/
 
 ```bash
 # 使用你的阿里云账号和密码登录
-docker login --username=你的阿里云账号 crpi-ie9dcy6o6rjohsiv.cn-hangzhou.personal.cr.aliyuncs.com
+docker login --username=18251917668@163.com crpi-ie9dcy6o6rjohsiv.cn-hangzhou.personal.cr.aliyuncs.com
 
 # 输入密码后，登录成功会显示：
 # Login Succeeded
@@ -262,14 +262,22 @@ docker exec -it yigongbao-app tail -f /app/logs/yigongbao-info.log
 
 ## 七、更新部署
 
-### 自动构建流程
+### 方式一：自动构建流程（推荐）
 
+**流程说明：**
 1. 本地推送代码到 GitHub
 2. 阿里云自动构建镜像（10-20 分钟）
 3. 服务器拉取最新镜像并重启
 
-### 更新命令
+**本地操作：**
+```bash
+# 提交并推送代码
+git add .
+git commit -m "feat: 功能描述"
+git push origin dev
+```
 
+**服务器操作（等待阿里云构建完成后）：**
 ```bash
 cd /home/app/yigongbao-java-8081
 
@@ -282,6 +290,51 @@ docker-compose -f docker-compose.test.yml up -d app
 # 查看日志确认启动成功
 docker-compose -f docker-compose.test.yml logs -f app
 ```
+
+---
+
+### 方式二：本地构建发布（适用于紧急修复或测试）
+
+**适用场景：**
+- 阿里云自动构建失败或速度慢
+- 需要快速验证修改
+- 紧急热修复
+
+**本地操作：**
+
+```bash
+# 1. 登录阿里云镜像仓库
+docker login --username=18251917668@163.com crpi-ie9dcy6o6rjohsiv.cn-hangzhou.personal.cr.aliyuncs.com
+
+# 2. 构建镜像（在项目根目录执行）
+docker build -t yigongbao-app:local .
+
+# 3. 打标签
+docker tag yigongbao-app:local crpi-ie9dcy6o6rjohsiv.cn-hangzhou.personal.cr.aliyuncs.com/yigongbao/yigongbao-app:latest
+
+# 4. 推送到阿里云
+docker push crpi-ie9dcy6o6rjohsiv.cn-hangzhou.personal.cr.aliyuncs.com/yigongbao/yigongbao-app:latest
+```
+
+**服务器操作：**
+```bash
+cd /home/app/yigongbao-java-8081
+
+# 拉取最新镜像
+docker-compose -f docker-compose.test.yml pull app
+
+# 重启应用
+docker-compose -f docker-compose.test.yml up -d app
+
+# 查看日志确认启动成功
+docker-compose -f docker-compose.test.yml logs -f app
+```
+
+**注意事项：**
+- 本地构建需要确保 Docker 环境可用
+- 构建时间约 5-10 分钟（取决于网络和机器性能）
+- 推送镜像大小约 400-500MB，需要稳定网络
+- 本地构建会覆盖 `latest` 标签，影响所有使用该标签的环境
 
 ---
 

@@ -130,8 +130,14 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         designQueryHelper.buildDataScopeCondition(wrapper, currentUser, scopeType);
 
         // 动态筛选条件
-        wrapper.like(StrUtil.isNotBlank(queryDTO.getOrderCode()), OrderMainEntity::getOrderCode, queryDTO.getOrderCode());
-        wrapper.like(StrUtil.isNotBlank(queryDTO.getPatientName()), OrderMainEntity::getPatientName, queryDTO.getPatientName());
+        // orderCode 参数：多字段模糊搜索（订单编号/机构名称/业务员姓名/医院名称/患者名字）
+        if (StrUtil.isNotBlank(queryDTO.getOrderCode())) {
+            wrapper.and(w -> w.like(OrderMainEntity::getOrderCode, queryDTO.getOrderCode())
+                    .or().like(OrderMainEntity::getOrgName, queryDTO.getOrderCode())
+                    .or().like(OrderMainEntity::getOperatorName, queryDTO.getOrderCode())
+                    .or().like(OrderMainEntity::getHospitalName, queryDTO.getOrderCode())
+                    .or().like(OrderMainEntity::getPatientName, queryDTO.getOrderCode()));
+        }
         // 状态筛选：设计审核通过时查询该状态及后续所有阶段
         if (queryDTO.getStatus() != null) {
             if (queryDTO.getStatus().equals(FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue())) {
@@ -245,6 +251,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         vo.setDesignerName(order.getDesignerName());
         vo.setDesignStartTime(order.getDesignStartTime());
         vo.setDesignSubmitTime(order.getDesignSubmitTime());
+        vo.setVersion(order.getVersion());
 
         // 最近一次驳回原因
         vo.setRejectReason(getLatestRejectReason(orderId));

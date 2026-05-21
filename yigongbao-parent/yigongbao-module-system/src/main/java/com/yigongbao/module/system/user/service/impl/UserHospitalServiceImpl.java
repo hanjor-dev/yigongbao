@@ -1,6 +1,7 @@
 package com.yigongbao.module.system.user.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.yigongbao.common.constant.CacheConstants;
 import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.module.system.org.entity.OrgHospitalEntity;
@@ -22,6 +23,8 @@ import com.yigongbao.module.system.user.service.UserHospitalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,6 +63,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
      * @return 该用户已分配的医院ID列表；无记录时返回空列表
      */
     @Override
+    @Cacheable(value = CacheConstants.USER_HOSPITALS, key = "#userId")
     public List<Long> getHospitalIdsByUserId(Long userId) {
         List<Long> ids = userHospitalMapper.selectHospitalIdsByUserId(userId);
         return ids != null ? ids : new ArrayList<>();
@@ -117,6 +121,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = CacheConstants.USER_HOSPITALS, key = "#userId")
     public void assignHospitals(Long userId, List<Long> hospitalIds) {
         log.info("分配用户医疗机构范围，userId={}, 数量={}", userId, hospitalIds != null ? hospitalIds.size() : 0);
         UserEntity user = userMapper.selectById(userId);
