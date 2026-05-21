@@ -143,6 +143,8 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
                 if (vo.getStatus() != null) {
                     vo.setStatusName(StatusConstants.getOperationResultName(vo.getStatus()));
                 }
+                vo.setRequestUrl("*****");
+                vo.setRequestMethod("*****");
                 return vo;
             });
 
