@@ -45,7 +45,7 @@ RUN mkdir -p /app/files && chown -R appuser:appgroup /app
 USER appuser
 
 # 暴露端口
-EXPOSE 8080
+EXPOSE 8081
 
 # JVM 参数优化
 ENV JAVA_OPTS="-Xms512m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"

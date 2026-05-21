@@ -1,6 +1,6 @@
 server:
   # 服务器端口
-  port: 8080
+  port: 8081
   servlet:
     # 项目 context-path
     context-path: /api
