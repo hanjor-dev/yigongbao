@@ -24,11 +24,11 @@ public interface HospitalGroupTemplateService extends IService<HospitalGroupTemp
     /**
      * 根据ID查询模板详情
      *
-     * @param id     模板ID
-     * @param userId 用户ID（可选，传入时 assigned 字段表示该用户是否已分配；不传时表示全系统任意用户是否已分配）
+     * @param id    模板ID
+     * @param orgId 经销商机构ID（可选，传入时标记医院对该经销商是否可用；不传时不标记可用性）
      * @return 模板详情VO
      */
-    HospitalGroupTemplateVO getTemplateById(Long id, Long userId);
+    HospitalGroupTemplateVO getTemplateById(Long id, Long orgId);
 
     void createTemplate(CreateHospitalGroupTemplateDTO dto);
 

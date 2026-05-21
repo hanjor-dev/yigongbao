@@ -49,6 +49,12 @@ public class HospitalGroupTemplateDetailVO implements Serializable {
      */
     private Boolean assigned;
 
+    /**
+     * 该医院对当前经销商是否可用。
+     * true=在经销商关联医院列表中，false=不在列表中，前端可展示但不可选中
+     */
+    private Boolean isAvailable;
+
     /** 记录创建时间 */
     private LocalDateTime createTime;
 }

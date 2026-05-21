@@ -48,9 +48,11 @@ public class HospitalGroupTemplateController {
 
     @Operation(summary = "根据ID查询医院组合模板")
     @GetMapping("/{id}")
-    public Result<HospitalGroupTemplateVO> getById(@PathVariable Long id) {
-        // 模板管理场景：userId=null，assigned 表示全系统任意用户是否已分配
-        return Result.success(templateService.getTemplateById(id, null));
+    public Result<HospitalGroupTemplateVO> getById(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long orgId) {
+        // orgId: 经销商机构ID，用于标记医院对该经销商是否可用（管理员分配场景）
+        return Result.success(templateService.getTemplateById(id, orgId));
     }
 
     @Operation(summary = "创建医院组合模板")

@@ -29,6 +29,8 @@ import com.yigongbao.module.system.hospitalGroupTemplate.vo.HospitalGroupTemplat
 import com.yigongbao.module.system.hospitalGroupTemplate.vo.HospitalGroupTemplateSimpleVO;
 import com.yigongbao.module.system.hospitalGroupTemplate.vo.HospitalGroupTemplateVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
+import com.yigongbao.module.system.org.entity.OrgHospitalEntity;
+import com.yigongbao.module.system.org.mapper.OrgHospitalMapper;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +57,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     private final OrgService orgService;
     private final UserHospitalService userHospitalService;
     private final CodeGeneratorService codeGeneratorService;
+    private final OrgHospitalMapper orgHospitalMapper;
 
     /**
      * 分页查询医院组合模板列表
@@ -93,8 +96,8 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
      * @throws BusinessException 模板不存在时抛出 TEMPLATE_NOT_FOUND
      */
     @Override
-    public HospitalGroupTemplateVO getTemplateById(Long id, Long userId) {
-        log.info("根据ID查询医院组合模板详情，id={}, userId={}", id, userId);
+    public HospitalGroupTemplateVO getTemplateById(Long id, Long orgId) {
+        log.info("根据ID查询医院组合模板详情，id={}, orgId={}", id, orgId);
         try {
             HospitalGroupTemplateEntity entity = getById(id);
             if (entity == null) {
@@ -102,8 +105,8 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                 throw new BusinessException(ErrorCodeEnum.TEMPLATE_NOT_FOUND);
             }
             HospitalGroupTemplateVO vo = toVOWithCount(entity);
-            // 填充明细列表（含机构信息和已分配状态）
-            List<HospitalGroupTemplateDetailVO> details = getDetails(id, userId);
+            // 填充明细列表（含机构信息和可用性标识）
+            List<HospitalGroupTemplateDetailVO> details = getDetails(id, orgId);
             vo.setDetails(details);
             log.info("查询医院组合模板详情成功，id={}", id);
             return vo;
@@ -328,18 +331,17 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
     }
 
     /**
-     * 查询模板医院明细列表，并填充机构详细信息和已分配状态
+     * 查询模板医院明细列表，并填充机构详细信息、已分配状态和可用性标识
      * <p>
-     * assigned 字段语义：
-     * - userId 为 null：表示该医院已被全系统任意用户分配（模板管理场景）
-     * - userId 不为 null：表示该医院已被指定用户分配（用户分配预览场景）
+     * assigned 字段：表示该医院已被全系统任意用户分配<br>
+     * isAvailable 字段：表示该医院对指定经销商机构是否可用（在经销商关联医院列表中）
      * </p>
      *
      * @param templateId 模板ID
-     * @param userId     用户ID（可选）
-     * @return 明细VO列表，每条记录包含机构信息和 assigned 标志
+     * @param orgId      经销商机构ID（可选，传入时标记医院可用性；不传时 isAvailable 默认为 true）
+     * @return 明细VO列表，每条记录包含机构信息、assigned 和 isAvailable 标志
      */
-    private List<HospitalGroupTemplateDetailVO> getDetails(Long templateId, Long userId) {
+    private List<HospitalGroupTemplateDetailVO> getDetails(Long templateId, Long orgId) {
         List<HospitalGroupTemplateDetailEntity> details = detailMapper.selectList(
                 new LambdaQueryWrapper<HospitalGroupTemplateDetailEntity>()
                         .eq(HospitalGroupTemplateDetailEntity::getTemplateId, templateId));
@@ -354,16 +356,18 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
         Map<Long, OrgEntity> orgMap = orgService.listByIds(hospitalIds).stream()
                 .collect(Collectors.toMap(OrgEntity::getId, o -> o));
 
-        // 根据 userId 参数选择查询策略
-        Set<Long> assignedHospitalIds;
-        if (userId != null) {
-            // 用户分配场景：查询该用户已分配的医院ID集合
-            List<Long> userHospitalIds = userHospitalService.getHospitalIdsByUserId(userId);
-            assignedHospitalIds = userHospitalIds.stream().collect(Collectors.toSet());
-        } else {
-            // 模板管理场景：查询全系统任意用户已分配的医院ID集合
-            assignedHospitalIds = userHospitalService.getAssignedHospitalIds(hospitalIds);
+        // 查询全系统任意用户已分配的医院ID集合（管理员视角）
+        Set<Long> assignedHospitalIds = userHospitalService.getAssignedHospitalIds(hospitalIds);
+
+        // 查询指定经销商关联的医院ID集合（用于标记可用性）
+        Set<Long> availableHospitalIds = new java.util.HashSet<>();
+        if (orgId != null) {
+            availableHospitalIds = orgHospitalMapper.selectList(
+                    new LambdaQueryWrapper<OrgHospitalEntity>()
+                            .eq(OrgHospitalEntity::getDistributorOrgId, orgId))
+                    .stream().map(OrgHospitalEntity::getHospitalOrgId).collect(Collectors.toSet());
         }
+        Set<Long> finalAvailableHospitalIds = availableHospitalIds;
 
         return details.stream().map(d -> {
             HospitalGroupTemplateDetailVO detailVO = new HospitalGroupTemplateDetailVO();
@@ -371,8 +375,10 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
             detailVO.setTemplateId(d.getTemplateId());
             detailVO.setHospitalId(d.getHospitalId());
             detailVO.setCreateTime(d.getCreateTime());
-            // 若该医院ID存在于已分配集合中，则标记为已分配
+            // 标记该医院是否已被系统中任意用户分配
             detailVO.setAssigned(assignedHospitalIds.contains(d.getHospitalId()));
+            // 标记该医院对指定经销商是否可用
+            detailVO.setIsAvailable(orgId == null || finalAvailableHospitalIds.contains(d.getHospitalId()));
             OrgEntity org = orgMap.get(d.getHospitalId());
             if (org != null) {
                 detailVO.setHospitalName(org.getOrgName());

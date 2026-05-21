@@ -151,6 +151,18 @@ public class OrderQueryHelper {
             case HOSPITALS:
                 // 看自己关联的医院范围内 + 自己创建的订单
                 List<Long> hospitalIds = userHospitalService.getHospitalIdsByUserId(currentUserId);
+                // 自动加入"其他医院"ID（所有业务员默认有权限）
+                String unknownHospitalIdStr = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
+                if (StrUtil.isNotBlank(unknownHospitalIdStr)) {
+                    try {
+                        Long unknownHospitalId = Long.parseLong(unknownHospitalIdStr);
+                        if (!hospitalIds.contains(unknownHospitalId)) {
+                            hospitalIds.add(unknownHospitalId);
+                        }
+                    } catch (NumberFormatException e) {
+                        log.warn("其他医院ID配置格式错误，跳过自动添加，value={}", unknownHospitalIdStr);
+                    }
+                }
                 if (hospitalIds.isEmpty()) {
                     // 用户未关联任何医院（理论上不应发生），返回空列表
                     log.info("用户无权访问任何医院，返回空列表，userId={}", currentUserId);
@@ -180,7 +192,7 @@ public class OrderQueryHelper {
                     // 用户未配置部门，降级为仅看自己，避免泄露全量数据
                     log.warn("DEPT 类型用户未配置部门，降级为 SELF，userId={}", currentUserId);
                     if (currentUserId != null) {
-                        wrapper.eq(OrderMainEntity::getCreateBy, currentUserId);
+                        wrapper.eq(OrderMainEntity::getOperatorId, currentUserId);
                     } else {
                         // currentUserId 也为 null（会话失效等异常情况），硬兜底返回空列表
                         log.warn("DEPT 降级 SELF 但 currentUserId 也为 null，返回空列表");

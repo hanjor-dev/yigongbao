@@ -580,15 +580,17 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
                     dto.getVersion());
-            // 仅更新业务字段，不覆盖 flow engine 已写入的 phase/status/version
+            // 更新订单状态和业务字段
             LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<OrderMainEntity>()
                     .eq(OrderMainEntity::getId, id)
+                    .set(OrderMainEntity::getPhase, result.getTargetPhase())
+                    .set(OrderMainEntity::getStatus, result.getFinalStatus())
                     .set(OrderMainEntity::getCurrentHandlerId, currentUserId);
             if (dto.getEstimatedCost() != null) {
                 uw.set(OrderMainEntity::getEstimatedCost, dto.getEstimatedCost());
             }
             if (StrUtil.isNotBlank(dto.getDataEvaluationOpinion())) {
-                uw.set(OrderMainEntity::getDataEvaluationOpinion, dto.getDataEvaluationOpinion());
+                uw.set(OrderMainEntity::getDataEvaluationOpinion, dto.getDataEvaluationOpinion);
             }
             update(uw);
             // 触发设计师分配（分配失败不影响审核结果）
@@ -640,9 +642,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
                     dto.getVersion());
-            // 仅更新业务字段，不覆盖 flow engine 已写入的 phase/status/version
+            // 更新订单状态和业务字段
             update(new LambdaUpdateWrapper<OrderMainEntity>()
                     .eq(OrderMainEntity::getId, id)
+                    .set(OrderMainEntity::getPhase, result.getTargetPhase())
+                    .set(OrderMainEntity::getStatus, result.getFinalStatus())
                     .set(OrderMainEntity::getAuditRemark, dto.getRemark())
                     .set(OrderMainEntity::getCurrentHandlerId, currentUserId));
             log.info("审核驳回成功，id={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
