@@ -124,82 +124,57 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public FileVO linkFile(String fileId, String bizType, Long bizId) {
-        log.info("关联文件到业务，fileId={}, bizType={}, bizId={}", fileId, bizType, bizId);
-        try {
-            // 1. 校验文件是否存在
-            FileDetail detail = fileRecorderService.getDetailById(fileId);
-            if (detail == null) {
-                log.warn("文件不存在，fileId={}", fileId);
-                throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
-            }
-
-            // 2. 校验 bizType 是否为合法的字典编码
-            FileBizTypeEnum fileBizTypeEnum = FileBizTypeEnum.getByDictCode(bizType);
-            if (fileBizTypeEnum == null) {
-                log.warn("业务类型不合法，bizType={}", bizType);
-                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "bizType");
-            }
-
-            // 3. 更新文件的业务关联信息
-            detail.setObjectType(bizType);
-            detail.setObjectId(bizId != null ? bizId.toString() : null);
-            fileRecorderService.updateById(detail);
-
-            log.info("文件关联成功，fileId={}, bizType={}, bizId={}", fileId, bizType, bizId);
-            return fileRecorderService.toFileVO(detail);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("关联文件异常，fileId={}", fileId, e);
-            throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
+        // 1. 校验文件是否存在
+        FileDetail detail = fileRecorderService.getDetailById(fileId);
+        if (detail == null) {
+            log.warn("文件不存在: fileId={}", fileId);
+            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
         }
+
+        // 2. 校验 bizType 是否为合法的字典编码
+        FileBizTypeEnum fileBizTypeEnum = FileBizTypeEnum.getByDictCode(bizType);
+        if (fileBizTypeEnum == null) {
+            log.warn("业务类型不合法: bizType={}", bizType);
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "bizType");
+        }
+
+        // 3. 更新文件的业务关联信息
+        detail.setObjectType(bizType);
+        detail.setObjectId(bizId != null ? bizId.toString() : null);
+        fileRecorderService.updateById(detail);
+
+        log.info("关联文件: fileId={}, bizType={}, bizId={}", fileId, bizType, bizId);
+        return fileRecorderService.toFileVO(detail);
     }
 
     @Override
     public void unlinkByBiz(String bizType, Long bizId) {
-        log.info("解除文件业务关联，bizType={}, bizId={}", bizType, bizId);
-        try {
-            LambdaQueryWrapper<FileDetail> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(FileDetail::getObjectType, bizType)
-                    .eq(FileDetail::getObjectId, bizId.toString());
-            List<FileDetail> details = fileRecorderService.list(wrapper);
-            for (FileDetail detail : details) {
-                detail.setObjectType(null);
-                detail.setObjectId(null);
-                fileRecorderService.updateById(detail);
-            }
-            log.info("解除文件业务关联成功，bizType={}, bizId={}, count={}", bizType, bizId, details.size());
-        } catch (Exception e) {
-            log.error("解除文件业务关联异常，bizType={}, bizId={}", bizType, bizId, e);
-            throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
+        LambdaQueryWrapper<FileDetail> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(FileDetail::getObjectType, bizType)
+                .eq(FileDetail::getObjectId, bizId.toString());
+        List<FileDetail> details = fileRecorderService.list(wrapper);
+        for (FileDetail detail : details) {
+            detail.setObjectType(null);
+            detail.setObjectId(null);
+            fileRecorderService.updateById(detail);
         }
+        log.info("解除文件业务关联: bizType={}, bizId={}, count={}", bizType, bizId, details.size());
     }
 
     // ==================== 查询 ====================
 
     @Override
     public FileVO getById(String id) {
-        log.info("根据ID查询文件信息，id={}", id);
-        try {
-            FileDetail detail = fileRecorderService.getDetailById(id);
-            if (detail == null) {
-                log.warn("文件不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
-            }
-            FileVO vo = fileRecorderService.toFileVO(detail);
-            log.info("查询文件信息成功，id={}", id);
-            return vo;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("查询文件信息异常，id={}", id, e);
-            throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
+        FileDetail detail = fileRecorderService.getDetailById(id);
+        if (detail == null) {
+            log.warn("文件不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
         }
+        return fileRecorderService.toFileVO(detail);
     }
 
     @Override
     public List<FileVO> listByIds(List<String> ids) {
-        log.info("批量查询文件信息，ids={}", ids);
         if (CollUtil.isEmpty(ids)) {
             return List.of();
         }
@@ -209,76 +184,52 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public List<FileVO> listByBiz(String bizType, Long bizId) {
-        log.info("查询文件列表，bizType={}, bizId={}", bizType, bizId);
-        try {
-            LambdaQueryWrapper<FileDetail> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(FileDetail::getObjectType, bizType)
-                    .eq(bizId != null, FileDetail::getObjectId,
-                            bizId != null ? bizId.toString() : null)
-                    .orderByDesc(FileDetail::getCreateTime);
-            List<FileDetail> details = fileRecorderService.list(wrapper);
-            List<FileVO> vos = details.stream()
-                    .map(fileRecorderService::toFileVO)
-                    .toList();
-            log.info("查询文件列表成功，共{}条", vos.size());
-            return vos;
-        } catch (Exception e) {
-            log.error("查询文件列表异常，bizType={}", bizType, e);
-            throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
-        }
+        LambdaQueryWrapper<FileDetail> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(FileDetail::getObjectType, bizType)
+                .eq(bizId != null, FileDetail::getObjectId,
+                        bizId != null ? bizId.toString() : null)
+                .orderByDesc(FileDetail::getCreateTime);
+        List<FileDetail> details = fileRecorderService.list(wrapper);
+        return details.stream()
+                .map(fileRecorderService::toFileVO)
+                .toList();
     }
 
     // ==================== 下载 ====================
 
     @Override
     public void download(String id, jakarta.servlet.http.HttpServletResponse response) throws IOException {
-        log.info("下载文件，id={}", id);
-        try {
-            FileDetail detail = fileRecorderService.getDetailById(id);
-            if (detail == null) {
-                log.warn("文件不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
-            }
-            FileInfo fileInfo = fileRecorderService.getById(id);
-            // 设置响应头，触发浏览器文件下载
-            response.setContentType("application/octet-stream");
-            response.setHeader("Content-Disposition",
-                    "attachment;filename=" + URLEncoder.encode(
-                            detail.getOriginalFilename(), StandardCharsets.UTF_8));
-            // 使用框架的 outputStream 方法直接将文件写入响应流，避免内存中转
-            Downloader downloader = fileStorageService.download(fileInfo);
-            downloader.setProgressMonitor((progressSize, allSize) ->
-                    log.debug("文件下载进度，id={}, progress={}/{}",
-                            id, progressSize, allSize));
-            downloader.outputStream(response.getOutputStream());
-            log.info("下载文件成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("下载文件异常，id={}", id, e);
-            // 区分文件在存储平台不存在的情况
-            String msg = e.getMessage();
-            if (msg != null && (msg.contains("not exist") || msg.contains("不存在")
-                    || msg.contains("No such") || msg.contains("404"))) {
-                throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
-            }
-            throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
+        FileDetail detail = fileRecorderService.getDetailById(id);
+        if (detail == null) {
+            log.warn("文件不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
         }
+        FileInfo fileInfo = fileRecorderService.getById(id);
+        // 设置响应头，触发浏览器文件下载
+        response.setContentType("application/octet-stream");
+        response.setHeader("Content-Disposition",
+                "attachment;filename=" + URLEncoder.encode(
+                        detail.getOriginalFilename(), StandardCharsets.UTF_8));
+        // 使用框架的 outputStream 方法直接将文件写入响应流，避免内存中转
+        Downloader downloader = fileStorageService.download(fileInfo);
+        downloader.setProgressMonitor((progressSize, allSize) ->
+                log.debug("文件下载进度，id={}, progress={}/{}",
+                        id, progressSize, allSize));
+        downloader.outputStream(response.getOutputStream());
+        log.info("下载文件: id={}", id);
     }
 
     // ==================== 删除 ====================
 
     @Override
     public byte[] downloadToBytes(String id) throws IOException {
-        log.info("下载文件到字节数组，id={}", id);
         FileInfo fileInfo = fileRecorderService.getById(id);
         if (fileInfo == null) {
-            log.warn("文件不存在，id={}", id);
+            log.warn("文件不存在: id={}", id);
             throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
         }
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         fileStorageService.download(fileInfo).outputStream(baos);
-        log.info("下载文件到字节数组成功，id={}，size={}", id, baos.size());
         return baos.toByteArray();
     }
 
@@ -286,24 +237,16 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public void deleteById(String id) {
-        log.info("删除文件，id={}", id);
-        try {
-            FileDetail detail = fileRecorderService.getDetailById(id);
-            if (detail == null) {
-                log.warn("文件不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
-            }
-            // 先删数据库记录（事务可回滚），再删存储平台文件（不可回滚）
-            // 若存储平台删除失败，数据库记录已删，文件成为孤儿文件，需运维清理
-            fileRecorderService.removeById(id);
-            fileStorageService.delete(detail.getUrl());
-            log.info("删除文件成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("删除文件异常，id={}", id, e);
-            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_DELETE_FAILED);
+        FileDetail detail = fileRecorderService.getDetailById(id);
+        if (detail == null) {
+            log.warn("文件不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
         }
+        // 先删数据库记录（事务可回滚），再删存储平台文件（不可回滚）
+        // 若存储平台删除失败，数据库记录已删，文件成为孤儿文件，需运维清理
+        fileRecorderService.removeById(id);
+        fileStorageService.delete(detail.getUrl());
+        log.info("删除文件: id={}", id);
     }
 
     // ==================== 校验工具方法 ====================
@@ -463,7 +406,7 @@ public class FileServiceImpl implements FileService {
                     String ext = (originalFilename != null && originalFilename.contains("."))
                             ? originalFilename.substring(originalFilename.lastIndexOf('.')).toLowerCase() : "";
                     if (ext.isEmpty() || !allowedExts.contains(ext)) {
-                        log.warn("{} 文件类型不允许上传，ext={}, allowed={}", fileBizTypeEnum.getName(), ext, allowedExts);
+                        log.warn("{} 文件类型不允许: ext={}, allowed={}", fileBizTypeEnum.getName(), ext, allowedExts);
                         throw new BusinessException(ErrorCodeEnum.ATTACHMENT_TYPE_NOT_ALLOWED);
                     }
                 }
@@ -489,7 +432,7 @@ public class FileServiceImpl implements FileService {
                     .setObjectType(objectType)
                     .setObjectId(bizId != null ? bizId.toString() : null)
                     .upload();
-            log.info("上传文件成功，id={}, bizType={}, url={}", fileInfo.getId(), bizType, fileInfo.getUrl());
+            log.info("上传文件: id={}, bizType={}, url={}", fileInfo.getId(), bizType, fileInfo.getUrl());
 
             // 5. 从数据库查询完整记录（含 createTime、createBy 等自动填充字段）
             FileDetail detail = fileRecorderService.getDetailById(fileInfo.getId());

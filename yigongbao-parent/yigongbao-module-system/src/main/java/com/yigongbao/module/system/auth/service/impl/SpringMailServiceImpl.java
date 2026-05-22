@@ -42,6 +42,6 @@ public class SpringMailServiceImpl implements MailService {
         message.setSubject(subject);
         message.setText(content);
         javaMailSender.send(message);
-        log.info("邮件发送成功，to={}", to);
+        log.info("邮件发送: to={}", to);
     }
 }

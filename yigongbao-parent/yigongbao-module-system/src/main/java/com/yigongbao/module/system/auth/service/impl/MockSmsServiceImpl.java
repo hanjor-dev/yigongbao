@@ -46,7 +46,7 @@ public class MockSmsServiceImpl implements SmsService {
                 mailService.send(redirectEmail, subject, content);
                 log.info("【短信模拟】已将短信内容转发至邮箱，phone={}, email={}", phone, redirectEmail);
             } catch (Exception e) {
-                log.warn("【短信模拟】邮件转发失败，降级为日志输出，phone={}, error={}", phone, e.getMessage());
+                log.warn("【短信模拟】邮件转发失败，降级为日志输出: phone={}, error={}", phone, e.getMessage());
             }
         }
     }

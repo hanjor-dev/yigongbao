@@ -67,7 +67,6 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
      */
     @Override
     public IPage<HospitalGroupTemplateVO> listTemplate(HospitalGroupTemplatePageDTO dto) {
-        log.info("分页查询医院组合模板列表，dto={}", dto);
         try {
             int pageNum = dto.getPageNum() == null || dto.getPageNum() < 1 ? 1 : dto.getPageNum();
             int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
@@ -78,7 +77,6 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                     .orderByDesc(HospitalGroupTemplateEntity::getCreateTime);
             IPage<HospitalGroupTemplateEntity> pageResult = page(page, wrapper);
             IPage<HospitalGroupTemplateVO> voPage = pageResult.convert(this::toVOWithCount);
-            log.info("分页查询医院组合模板列表成功，总数={}", pageResult.getTotal());
             return voPage;
         } catch (Exception e) {
             log.error("分页查询医院组合模板列表异常", e);
@@ -97,21 +95,17 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
      */
     @Override
     public HospitalGroupTemplateVO getTemplateById(Long id, Long orgId) {
-        log.info("根据ID查询医院组合模板详情，id={}, orgId={}", id, orgId);
         try {
             HospitalGroupTemplateEntity entity = getById(id);
             if (entity == null) {
-                log.warn("医院组合模板不存在，id={}", id);
+                log.warn("医院组合模板不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.TEMPLATE_NOT_FOUND);
             }
             HospitalGroupTemplateVO vo = toVOWithCount(entity);
             // 填充明细列表（含机构信息和可用性标识）
             List<HospitalGroupTemplateDetailVO> details = getDetails(id, orgId);
             vo.setDetails(details);
-            log.info("查询医院组合模板详情成功，id={}", id);
             return vo;
-        } catch (BusinessException e) {
-            throw e;
         } catch (Exception e) {
             log.error("查询医院组合模板详情异常，id={}", id, e);
             throw e;
@@ -130,7 +124,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
         log.info("创建医院组合模板，templateName={}", dto.getTemplateName());
         try {
             if (isTemplateNameExists(dto.getTemplateName())) {
-                log.warn("模板名称已存在，templateName={}", dto.getTemplateName());
+                log.warn("模板名称已存在: templateName={}", dto.getTemplateName());
                 throw new BusinessException(ErrorCodeEnum.TEMPLATE_EXISTS);
             }
             HospitalGroupTemplateEntity entity = HospitalGroupTemplateConvert.toEntity(dto);
@@ -140,11 +134,9 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
             save(entity);
             // 批量保存模板关联的医院明细
             saveDetails(entity.getId(), dto.getHospitalIds());
-            log.info("创建医院组合模板成功，id={}, templateCode={}, 包含医院数量={}",
+            log.info("创建医院组合模板: id={}, templateCode={}, 包含医院数量={}",
                     entity.getId(), entity.getTemplateCode(),
                     dto.getHospitalIds() != null ? dto.getHospitalIds().size() : 0);
-        } catch (BusinessException e) {
-            throw e;
         } catch (Exception e) {
             log.error("创建医院组合模板异常，templateName={}", dto.getTemplateName(), e);
             throw e;
@@ -165,12 +157,12 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
         try {
             HospitalGroupTemplateEntity entity = getById(id);
             if (entity == null) {
-                log.warn("医院组合模板不存在，id={}", id);
+                log.warn("医院组合模板不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.TEMPLATE_NOT_FOUND);
             }
             if (StrUtil.isNotBlank(dto.getTemplateName()) && !dto.getTemplateName().equals(entity.getTemplateName())) {
                 if (isTemplateNameExistsExcludingId(dto.getTemplateName(), id)) {
-                    log.warn("模板名称已存在，templateName={}", dto.getTemplateName());
+                    log.warn("模板名称已存在: templateName={}", dto.getTemplateName());
                     throw new BusinessException(ErrorCodeEnum.TEMPLATE_EXISTS);
                 }
             }
@@ -181,9 +173,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                 detailMapper.deleteByTemplateId(id);
                 saveDetails(id, dto.getHospitalIds());
             }
-            log.info("更新医院组合模板成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("更新医院组合模板: id={}", id);
         } catch (Exception e) {
             log.error("更新医院组合模板异常，id={}", id, e);
             throw e;
@@ -203,15 +193,13 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
         try {
             HospitalGroupTemplateEntity entity = getById(id);
             if (entity == null) {
-                log.warn("医院组合模板不存在，id={}", id);
+                log.warn("医院组合模板不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.TEMPLATE_NOT_FOUND);
             }
             // 先删除明细，再删除主记录，保证数据一致性
             detailMapper.deleteByTemplateId(id);
             removeById(id);
-            log.info("删除医院组合模板成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("删除医院组合模板: id={}", id);
         } catch (Exception e) {
             log.error("删除医院组合模板异常，id={}", id, e);
             throw e;
@@ -231,19 +219,17 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
         log.info("修改医院组合模板状态，id={}, status={}", id, status);
         try {
             if (status == null || (status != StatusConstants.DISABLED && status != StatusConstants.NORMAL)) {
-                log.warn("状态值不合法，status={}", status);
+                log.warn("状态值不合法: status={}", status);
                 throw new BusinessException(ErrorCodeEnum.PARAM_ERROR);
             }
             HospitalGroupTemplateEntity entity = getById(id);
             if (entity == null) {
-                log.warn("医院组合模板不存在，id={}", id);
+                log.warn("医院组合模板不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.TEMPLATE_NOT_FOUND);
             }
             entity.setStatus(status);
             updateById(entity);
-            log.info("修改医院组合模板状态成功，id={}, status={}", id, status);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("修改医院组合模板状态: id={}, status={}", id, status);
         } catch (Exception e) {
             log.error("修改医院组合模板状态异常，id={}", id, e);
             throw e;
@@ -264,7 +250,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
                     .orderByAsc(HospitalGroupTemplateEntity::getTemplateName);
             List<HospitalGroupTemplateEntity> list = list(wrapper);
             List<HospitalGroupTemplateSimpleVO> voList = list.stream().map(this::toSimpleVO).collect(Collectors.toList());
-            log.info("获取医院组合模板下拉选项成功，数量={}", voList.size());
+            log.info("获取医院组合模板下拉选项: 数量={}", voList.size());
             return voList;
         } catch (Exception e) {
             log.error("获取医院组合模板下拉选项异常", e);

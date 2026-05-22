@@ -86,48 +86,40 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
     @Override
     public IPage<OrderDraftVO> listDrafts(OrderDraftPageQueryDTO dto) {
         Long currentUserId = getCurrentUserId();
-        log.info("分页查询我的草稿列表，pageNum={}, pageSize={}, currentUserId={}",
-                dto.getPageNum(), dto.getPageSize(), currentUserId);
-        try {
-            // 未登录时直接返回空页，不查询数据库
-            if (currentUserId == null) {
-                return new Page<>(dto.getPageNum(), dto.getPageSize(), 0);
-            }
-            Page<OrderDraftEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
-            LambdaQueryWrapper<OrderDraftEntity> wrapper = new LambdaQueryWrapper<>();
-            // 仅查询当前用户的草稿，排除已提交的草稿，按创建时间倒序
-            wrapper.eq(OrderDraftEntity::getOperatorId, currentUserId)
-                    .ne(OrderDraftEntity::getStatus, OrderDraftStatusEnum.SUBMITTED.getCode())
-                    .orderByDesc(OrderDraftEntity::getCreateTime);
-            IPage<OrderDraftEntity> pageResult = page(page, wrapper);
-
-            // 查询每个草稿的明细数量
-            List<OrderDraftEntity> records = pageResult.getRecords();
-            Map<Long, Long> itemCountMap = new java.util.HashMap<>();
-            if (!records.isEmpty()) {
-                List<Long> draftIds = records.stream().map(OrderDraftEntity::getId).collect(Collectors.toList());
-                itemCountMap = orderItemDraftMapper.selectList(
-                                new LambdaQueryWrapper<OrderItemDraftEntity>()
-                                        .in(OrderItemDraftEntity::getDraftId, draftIds)
-                                        .eq(OrderItemDraftEntity::getIsDeleted, 0))
-                        .stream()
-                        .collect(Collectors.groupingBy(OrderItemDraftEntity::getDraftId, Collectors.counting()));
-            }
-
-            // 在 convert lambda 中填充计算字段，确保数据正确传入 VO
-            final Map<Long, Long> finalItemCountMap = itemCountMap;
-            IPage<OrderDraftVO> voPage = pageResult.convert(entity -> {
-                OrderDraftVO vo = toOrderDraftVO(entity);
-                vo.setItemCount(finalItemCountMap.getOrDefault(entity.getId(), 0L).intValue());
-                vo.setStatusName(getDraftStatusName(entity.getStatus()));
-                return vo;
-            });
-            log.info("分页查询我的草稿列表成功，总数={}", pageResult.getTotal());
-            return voPage;
-        } catch (Exception e) {
-            log.error("分页查询我的草稿列表异常", e);
-            throw e;
+        // 未登录时直接返回空页，不查询数据库
+        if (currentUserId == null) {
+            return new Page<>(dto.getPageNum(), dto.getPageSize(), 0);
         }
+        Page<OrderDraftEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
+        LambdaQueryWrapper<OrderDraftEntity> wrapper = new LambdaQueryWrapper<>();
+        // 仅查询当前用户的草稿，排除已提交的草稿，按创建时间倒序
+        wrapper.eq(OrderDraftEntity::getOperatorId, currentUserId)
+                .ne(OrderDraftEntity::getStatus, OrderDraftStatusEnum.SUBMITTED.getCode())
+                .orderByDesc(OrderDraftEntity::getCreateTime);
+        IPage<OrderDraftEntity> pageResult = page(page, wrapper);
+
+        // 查询每个草稿的明细数量
+        List<OrderDraftEntity> records = pageResult.getRecords();
+        Map<Long, Long> itemCountMap = new java.util.HashMap<>();
+        if (!records.isEmpty()) {
+            List<Long> draftIds = records.stream().map(OrderDraftEntity::getId).collect(Collectors.toList());
+            itemCountMap = orderItemDraftMapper.selectList(
+                            new LambdaQueryWrapper<OrderItemDraftEntity>()
+                                    .in(OrderItemDraftEntity::getDraftId, draftIds)
+                                    .eq(OrderItemDraftEntity::getIsDeleted, 0))
+                    .stream()
+                    .collect(Collectors.groupingBy(OrderItemDraftEntity::getDraftId, Collectors.counting()));
+        }
+
+        // 在 convert lambda 中填充计算字段，确保数据正确传入 VO
+        final Map<Long, Long> finalItemCountMap = itemCountMap;
+        IPage<OrderDraftVO> voPage = pageResult.convert(entity -> {
+            OrderDraftVO vo = toOrderDraftVO(entity);
+            vo.setItemCount(finalItemCountMap.getOrDefault(entity.getId(), 0L).intValue());
+            vo.setStatusName(getDraftStatusName(entity.getStatus()));
+            return vo;
+        });
+        return voPage;
     }
 
     /**
@@ -139,35 +131,26 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
      */
     @Override
     public OrderDraftDetailVO getDraftDetail(Long id) {
-        log.info("查询草稿详情，id={}", id);
-        try {
-            OrderDraftEntity entity = getById(id);
-            if (entity == null) {
-                log.warn("草稿不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_FOUND);
-            }
-            OrderDraftDetailVO vo = toOrderDraftDetailVO(entity);
-            // 查询重建项目列表
-            List<OrderItemDraftEntity> items = orderItemDraftMapper.selectList(
-                    new LambdaQueryWrapper<OrderItemDraftEntity>()
-                            .eq(OrderItemDraftEntity::getDraftId, id)
-                            .eq(OrderItemDraftEntity::getIsDeleted, 0)
-                            .orderByAsc(OrderItemDraftEntity::getSortOrder));
-            List<OrderDraftDetailVO.OrderItemDraftVO> itemVOs = items.stream()
-                    .map(this::toOrderItemDraftVO)
-                    .collect(Collectors.toList());
-            vo.setItems(itemVOs);
-            vo.setItemCount(itemVOs.size());
-            // 查询草稿关联的影像文件列表
-            fillDraftFiles(vo, id);
-            log.info("查询草稿详情成功，id={}", id);
-            return vo;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("查询草稿详情异常，id={}", id, e);
-            throw e;
+        OrderDraftEntity entity = getById(id);
+        if (entity == null) {
+            log.warn("草稿不存在: draftId={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_FOUND);
         }
+        OrderDraftDetailVO vo = toOrderDraftDetailVO(entity);
+        // 查询重建项目列表
+        List<OrderItemDraftEntity> items = orderItemDraftMapper.selectList(
+                new LambdaQueryWrapper<OrderItemDraftEntity>()
+                        .eq(OrderItemDraftEntity::getDraftId, id)
+                        .eq(OrderItemDraftEntity::getIsDeleted, 0)
+                        .orderByAsc(OrderItemDraftEntity::getSortOrder));
+        List<OrderDraftDetailVO.OrderItemDraftVO> itemVOs = items.stream()
+                .map(this::toOrderItemDraftVO)
+                .collect(Collectors.toList());
+        vo.setItems(itemVOs);
+        vo.setItemCount(itemVOs.size());
+        // 查询草稿关联的影像文件列表
+        fillDraftFiles(vo, id);
+        return vo;
     }
 
     /**
@@ -184,19 +167,17 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
     @Transactional(rollbackFor = Exception.class)
     public Long saveDraft(CreateOrderDraftDTO dto) {
         Long currentUserId = getCurrentUserId();
-        log.info("保存草稿，currentUserId={}, draftId={}", currentUserId, dto.getId());
-        try {
-            // 校验业务类型
-            validateBusinessType(dto.getBusinessType());
-            // 判断是新增还是更新
-            OrderDraftEntity entity;
-            if (dto.getId() != null) {
-                // 更新：校验草稿存在且属于当前用户
-                entity = getById(dto.getId());
-                if (entity == null) {
-                    log.warn("草稿不存在，id={}", dto.getId());
-                    throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_FOUND);
-                }
+        // 校验业务类型
+        validateBusinessType(dto.getBusinessType());
+        // 判断是新增还是更新
+        OrderDraftEntity entity;
+        if (dto.getId() != null) {
+            // 更新：校验草稿存在且属于当前用户
+            entity = getById(dto.getId());
+            if (entity == null) {
+                log.warn("草稿不存在: draftId={}", dto.getId());
+                throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_FOUND);
+            }
                 if (!Objects.equals(currentUserId, entity.getOperatorId())) {
                     log.warn("只能修改自己的草稿，id={}, operatorId={}, currentUserId={}",
                             dto.getId(), entity.getOperatorId(), currentUserId);
@@ -304,14 +285,8 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
                     }
                 }
             }
-            log.info("保存草稿成功，id={}", draftId);
+            log.info("保存草稿: draftId={}, userId={}", draftId, currentUserId);
             return draftId;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("保存草稿异常，draftId={}", dto.getId(), e);
-            throw e;
-        }
     }
 
     /**
@@ -378,61 +353,53 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
     @Transactional(rollbackFor = Exception.class)
     public Long submitDraft(Long id) {
         Long currentUserId = getCurrentUserId();
-        log.info("提交草稿，id={}, currentUserId={}", id, currentUserId);
-        try {
-            OrderDraftEntity entity = getById(id);
-            if (entity == null) {
-                log.warn("草稿不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_FOUND);
-            }
-            // 校验权限：只有创建人能提交
-            if (!Objects.equals(currentUserId, entity.getOperatorId())) {
-                log.warn("只能提交自己的草稿，id={}, operatorId={}, currentUserId={}",
-                        id, entity.getOperatorId(), currentUserId);
-                throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_MINE);
-            }
-            // 草稿已提交后不能再提交
-            if (entity.getStatus() != null && entity.getStatus() == OrderDraftStatusEnum.SUBMITTED.getCode()) {
-                log.warn("草稿已提交，不能重复提交，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_ALREADY_SUBMITTED);
-            }
-            // 校验是否过期
-            if (entity.getExpiresAt() != null && entity.getExpiresAt().isBefore(LocalDateTime.now())) {
-                log.warn("草稿已过期，id={}, expiresAt={}", id, entity.getExpiresAt());
-                throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_EXPIRED);
-            }
-            // 校验业务类型
-            validateBusinessType(entity.getBusinessType());
-            // 以 SUBMIT 模式全量校验主表必填字段（草稿保存时是 DRAFT 模式，允许不完整）
-            orderDataValidator.validateAndFillMaster(
-                    entity,
-                    entity.getOrgId(), entity.getHospitalId(), entity.getHospitalDeptId(),
-                    entity.getDoctorId(), entity.getDoctorName(), entity.getDoctorPhone(),
-                    currentUserId, OrderDataValidator.ValidateMode.SUBMIT);
-            // 校验重建项目至少1条
-            long itemCount = orderItemDraftMapper.selectCount(
-                    new LambdaQueryWrapper<OrderItemDraftEntity>()
-                            .eq(OrderItemDraftEntity::getDraftId, id)
-                            .eq(OrderItemDraftEntity::getIsDeleted, 0));
-            if (itemCount == 0) {
-                log.warn("重建项目明细为空，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.ORDER_ITEM_EMPTY);
-            }
-            // 校验文件
-            validateDraftFiles(id);
-            // 转为正式订单
-            Long orderId = orderMainService.createFromDraft(entity);
-            // 更新草稿状态为已提交
-            entity.setStatus(OrderDraftStatusEnum.SUBMITTED.getCode());
-            updateById(entity);
-            log.info("提交草稿成功，draftId={}, orderId={}", id, orderId);
-            return orderId;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("提交草稿异常，id={}", id, e);
-            throw e;
+        OrderDraftEntity entity = getById(id);
+        if (entity == null) {
+            log.warn("草稿不存在: draftId={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_FOUND);
         }
+        // 校验权限：只有创建人能提交
+        if (!Objects.equals(currentUserId, entity.getOperatorId())) {
+            log.warn("只能提交自己的草稿: draftId={}, operatorId={}, currentUserId={}",
+                    id, entity.getOperatorId(), currentUserId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_MINE);
+        }
+        // 草稿已提交后不能再提交
+        if (entity.getStatus() != null && entity.getStatus() == OrderDraftStatusEnum.SUBMITTED.getCode()) {
+            log.warn("草稿已提交，不能重复提交: draftId={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_ALREADY_SUBMITTED);
+        }
+        // 校验是否过期
+        if (entity.getExpiresAt() != null && entity.getExpiresAt().isBefore(LocalDateTime.now())) {
+            log.warn("草稿已过期: draftId={}, expiresAt={}", id, entity.getExpiresAt());
+            throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_EXPIRED);
+        }
+        // 校验业务类型
+        validateBusinessType(entity.getBusinessType());
+        // 以 SUBMIT 模式全量校验主表必填字段（草稿保存时是 DRAFT 模式，允许不完整）
+        orderDataValidator.validateAndFillMaster(
+                entity,
+                entity.getOrgId(), entity.getHospitalId(), entity.getHospitalDeptId(),
+                entity.getDoctorId(), entity.getDoctorName(), entity.getDoctorPhone(),
+                currentUserId, OrderDataValidator.ValidateMode.SUBMIT);
+        // 校验重建项目至少1条
+        long itemCount = orderItemDraftMapper.selectCount(
+                new LambdaQueryWrapper<OrderItemDraftEntity>()
+                        .eq(OrderItemDraftEntity::getDraftId, id)
+                        .eq(OrderItemDraftEntity::getIsDeleted, 0));
+        if (itemCount == 0) {
+            log.warn("重建项目明细为空: draftId={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORDER_ITEM_EMPTY);
+        }
+        // 校验文件
+        validateDraftFiles(id);
+        // 转为正式订单
+        Long orderId = orderMainService.createFromDraft(entity);
+        // 更新草稿状态为已提交
+        entity.setStatus(OrderDraftStatusEnum.SUBMITTED.getCode());
+        updateById(entity);
+        log.info("提交草稿: draftId={}, orderId={}", id, orderId);
+        return orderId;
     }
 
     /**

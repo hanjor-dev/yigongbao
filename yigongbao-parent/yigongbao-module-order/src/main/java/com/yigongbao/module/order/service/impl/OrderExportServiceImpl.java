@@ -52,43 +52,37 @@ public class OrderExportServiceImpl implements OrderExportService {
 
     @Override
     public void exportOrders(OrderExportQueryDTO dto, HttpServletResponse response) {
-        log.info("导出订单列表，orderCode={}, hospitalId={}, status={}",
-                dto.getOrderCode(), dto.getHospitalId(), dto.getStatus());
+        // Step 1：获取当前用户的列配置（用户个人配置 > 系统默认配置）
+        OrderColumnConfigVO columnConfig = orderQueryHelper.getColumnConfig();
+        if (columnConfig == null || columnConfig.getColumns() == null || columnConfig.getColumns().isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "列配置");
+        }
+
+        // 过滤出 visible=true 的列，按 sort 排序
+        List<OrderColumnConfigVO.ColumnItemVO> visibleColumns = columnConfig.getColumns().stream()
+                .filter(col -> Boolean.TRUE.equals(col.getVisible()))
+                .sorted((a, b) -> {
+                    int sortA = a.getSort() != null ? a.getSort() : 0;
+                    int sortB = b.getSort() != null ? b.getSort() : 0;
+                    return Integer.compare(sortA, sortB);
+                })
+                .collect(Collectors.toList());
+        if (visibleColumns.isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "列配置无可见列");
+        }
+
+        // Step 2：按数据权限查询订单（最多10000条）
+        List<OrderListVO> orderList = queryOrdersForExport(dto);
+
+        // Step 3：构建 Excel（SXSSF 流式写入）
         try {
-            // Step 1：获取当前用户的列配置（用户个人配置 > 系统默认配置）
-            OrderColumnConfigVO columnConfig = orderQueryHelper.getColumnConfig();
-            if (columnConfig == null || columnConfig.getColumns() == null || columnConfig.getColumns().isEmpty()) {
-                throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "列配置");
-            }
-
-            // 过滤出 visible=true 的列，按 sort 排序
-            List<OrderColumnConfigVO.ColumnItemVO> visibleColumns = columnConfig.getColumns().stream()
-                    .filter(col -> Boolean.TRUE.equals(col.getVisible()))
-                    .sorted((a, b) -> {
-                        int sortA = a.getSort() != null ? a.getSort() : 0;
-                        int sortB = b.getSort() != null ? b.getSort() : 0;
-                        return Integer.compare(sortA, sortB);
-                    })
-                    .collect(Collectors.toList());
-            if (visibleColumns.isEmpty()) {
-                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "列配置无可见列");
-            }
-
-            // Step 2：按数据权限查询订单（最多10000条）
-            List<OrderListVO> orderList = queryOrdersForExport(dto);
-
-            // Step 3：构建 Excel（SXSSF 流式写入）
             buildExcel(visibleColumns, orderList, response);
-
             // 在响应头中标注实际导出数量及是否被截断，前端可据此提示用户
             response.setHeader("X-Export-Total", String.valueOf(orderList.size()));
             response.setHeader("X-Export-Truncated", String.valueOf(orderList.size() >= MAX_EXPORT_COUNT));
-
-            log.info("导出订单列表成功，共{}条", orderList.size());
-        } catch (BusinessException e) {
-            throw e;
+            log.info("导出订单: 总数={}, 截断={}", orderList.size(), orderList.size() >= MAX_EXPORT_COUNT);
         } catch (Exception e) {
-            log.error("导出订单列表异常", e);
+            log.error("导出订单异常", e);
             throw new BusinessException(ErrorCodeEnum.ORDER_EXPORT_FAILED);
         }
     }

@@ -63,7 +63,6 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
      */
     @Override
     public IPage<DesignWorkorderListVO> listReviewWorkorders(DesignWorkorderQueryDTO queryDTO) {
-        log.info("查询待审核工单列表，queryDTO={}", queryDTO);
         // 强制覆盖 status 为 2040，前端传入值无效
         queryDTO.setStatus(FlowStatusEnum.DESIGN_REVIEWING.getValue());
         return designWorkorderService.listWorkorders(queryDTO);
@@ -78,12 +77,10 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
      */
     @Override
     public DesignReviewDetailVO getReviewDetail(Long orderId) {
-        log.info("查询审核详情，orderId={}", orderId);
-
         // 1. 获取工单详情（复用现有逻辑）
         DesignWorkorderDetailVO workorderDetail = designWorkorderService.getWorkorderDetail(orderId);
         if (workorderDetail == null) {
-            log.warn("订单不存在，orderId={}", orderId);
+            log.warn("订单不存在: orderId={}", orderId);
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
@@ -114,8 +111,6 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void reviewPass(Long orderId, ReviewPassDTO dto) {
-        log.info("审核通过，orderId={}", orderId);
-
         // 1. 校验订单存在且状态为 2040
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
@@ -157,12 +152,13 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
             update.setCurrentHandlerName(null);
             orderMainService.updateById(update);
 
-            log.info("审核通过成功，orderId={}, finalPhase={}, finalStatus={}",
-                    orderId, result.getTargetPhase(), result.getFinalStatus());
+            log.info("设计审核通过: orderId={}, {} -> {}, reviewerId={}",
+                orderId, FlowStatusEnum.DESIGN_REVIEWING.getName(),
+                result.getTargetPhase() == 30 ? "待打印" : "待客户确认", reviewerId);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("审核通过异常，orderId={}", orderId, e);
+            log.error("审核通过异常: orderId={}", orderId, e);
             throw e;
         }
     }
@@ -178,8 +174,6 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void reviewReject(Long orderId, ReviewRejectDTO dto) {
-        log.info("审核驳回，orderId={}", orderId);
-
         // 1. 校验订单存在且状态为 2040
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
@@ -229,12 +223,13 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
             update.setCurrentHandlerName(order.getDesignerName());
             orderMainService.updateById(update);
 
-            log.info("审核驳回成功，orderId={}, phase={}, status={}",
-                    orderId, result.getTargetPhase(), result.getFinalStatus());
+            log.info("设计审核驳回: orderId={}, {} -> {}, reviewerId={}, reason={}",
+                orderId, FlowStatusEnum.DESIGN_REVIEWING.getName(), FlowStatusEnum.DESIGN_REVIEW_REJECTED.getName(),
+                reviewerId, dto.getRejectReason());
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("审核驳回异常，orderId={}", orderId, e);
+            log.error("审核驳回异常: orderId={}", orderId, e);
             throw e;
         }
     }

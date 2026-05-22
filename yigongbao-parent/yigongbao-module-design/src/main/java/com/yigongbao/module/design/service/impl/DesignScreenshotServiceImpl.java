@@ -53,14 +53,11 @@ public class DesignScreenshotServiceImpl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ScreenshotVO saveScreenshot(Long packageId, Long packageFileId, MultipartFile file) {
-        log.info("保存截图，packageId={}，packageFileId={}", packageId, packageFileId);
-
         // 1. 校验 packageFileId 存在且归属 packageId（orderId 校验由 Controller 层通过 validatePackage 保证）
         validatePackageFile(null, packageId, packageFileId);
 
         // 2. 上传截图文件
         FileVO fileVO = fileService.uploadFile(file, FileBizTypeEnum.IMAGE_SCREENSHOT.getDictCode());
-        log.info("截图文件上传成功，fileId={}，packageFileId={}", fileVO.getId(), packageFileId);
 
         // 3. upsert：查询是否已有截图记录（含逻辑删除过滤）
         DesignPackageFileScreenshotEntity existing = lambdaQuery()
@@ -77,14 +74,12 @@ public class DesignScreenshotServiceImpl
             if (oldFileId != null) {
                 fileService.deleteById(oldFileId);
             }
-            log.info("截图记录已更新，id={}，新 fileId={}", existing.getId(), fileVO.getId());
         } else {
             // 无则插入
             DesignPackageFileScreenshotEntity entity = new DesignPackageFileScreenshotEntity();
             entity.setPackageFileId(packageFileId);
             entity.setFileId(fileVO.getId());
             save(entity);
-            log.info("截图记录已新增，packageFileId={}，fileId={}", packageFileId, fileVO.getId());
         }
 
         return toScreenshotVO(fileVO);
@@ -99,8 +94,6 @@ public class DesignScreenshotServiceImpl
      */
     @Override
     public ScreenshotVO getScreenshot(Long packageId, Long packageFileId) {
-        log.info("查询截图，packageId={}，packageFileId={}", packageId, packageFileId);
-
         // 校验 packageFileId 存在且归属 packageId
         validatePackageFile(null, packageId, packageFileId);
 
@@ -110,14 +103,12 @@ public class DesignScreenshotServiceImpl
                 .one();
 
         if (screenshot == null) {
-            log.info("截图不存在，packageFileId={}", packageFileId);
             return null;
         }
 
         // 查询文件详情
         FileVO fileVO = fileService.getById(screenshot.getFileId());
         if (fileVO == null) {
-            log.warn("截图关联文件不存在，fileId={}", screenshot.getFileId());
             return null;
         }
 

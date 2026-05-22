@@ -154,7 +154,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
                 userHospitalMapper.insert(entity);
             }
         }
-        log.info("分配用户医疗机构范围成功，userId={}", userId);
+        log.info("分配用户医疗机构范围: userId={}", userId);
     }
 
     /**
@@ -280,14 +280,13 @@ public class UserHospitalServiceImpl implements UserHospitalService {
      */
     @Override
     public List<OrgVO> getOrderableHospitals(Long userId) {
-        log.info("查询用户可操作医院列表，userId=", userId);
         UserEntity user = userMapper.selectById(userId);
         if (user == null) throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
 
         // 1. 查用户所属经销商机构下关联的所有医院
         Long distributorOrgId = user.getOrgId();
         if (distributorOrgId == null) {
-            log.warn("用户未分配机构，userId={}", userId);
+            log.warn("用户未分配机构: userId={}", userId);
             return new ArrayList<>();
         }
 
@@ -327,7 +326,6 @@ public class UserHospitalServiceImpl implements UserHospitalService {
 
         // 追加"其他医院"作为兜底选项
         appendUnknownHospital(result);
-        log.info("查询用户可操作医院列表成功，userId={}, 数量={}", userId, result.size());
         return result;
     }
 

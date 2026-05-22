@@ -68,8 +68,6 @@ public class FlowStateMachineServiceImpl implements FlowStateMachineService {
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
-        log.debug("查询订单可执行动作，orderId={}, status={}, phase={}",
-                order.getId(), order.getStatus(), order.getPhase());
         List<FlowActionEnum> availableActions = statusTransitionRules.getAvailableActions(
                 order.getStatus(), order.getPhase(), order.getNeedsPhysicalDelivery());
         return availableActions.stream()
@@ -104,10 +102,6 @@ public class FlowStateMachineServiceImpl implements FlowStateMachineService {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
-        log.info("执行订单状态转换，orderId={}, currentPhase={}, currentStatus={}, action={}, operatorId={}",
-                order.getId(), order.getPhase(), order.getStatus(), action.getCode(),
-                operator != null ? operator.getOperatorId() : null);
-
         Integer fromStatus = order.getStatus();
         FlowPhaseEnum currentPhase = FlowPhaseEnum.getByValue(order.getPhase());
         // 防御：phase 为 null 时视为非法数据，拒绝流转
@@ -124,7 +118,6 @@ public class FlowStateMachineServiceImpl implements FlowStateMachineService {
                         fromStatus, fromStatus,
                         action.getCode(), action.getName(),
                         operator);
-                log.info("CREATE 动作仅记录历史，orderId={}, status={}", order.getId(), fromStatus);
                 return TransitionResult.of(currentPhase.getValue(), fromStatus);
             }
 
@@ -161,17 +154,14 @@ public class FlowStateMachineServiceImpl implements FlowStateMachineService {
             // ========== Step 7: 不可见状态处理 ==========
             // 不可见状态：历史记录不可见状态，落库初始可见状态
             if (FlowPhaseTransitionRules.isInvisibleStatus(targetStatus)) {
-                log.info("检测到不可见状态{}，自动推进阶段，nextPhase={}, initialStatus={}",
-                        targetStatus, nextPhase, initialStatus);
-
                 flowStatusHistoryService.recordTransition(
                         order.getId(), order.getOrderCode(), currentPhase.getValue(),
                         fromStatus, targetStatusValue,
                         action.getCode(), action.getName(),
                         operator);
 
-                log.info("不可见状态推进完成，orderId={}, nextPhase={}, initialStatus={}",
-                        order.getId(), nextPhase, initialStatus);
+                log.info("阶段推进: orderId={}, {} -> {}, initialStatus={}",
+                        order.getId(), currentPhase.getValue(), nextPhase, initialStatus);
                 return TransitionResult.ofWithPhaseChange(nextPhase, targetStatusValue, initialStatus);
             }
 
@@ -188,13 +178,13 @@ public class FlowStateMachineServiceImpl implements FlowStateMachineService {
             if (nextPhase != null) {
                 // 阶段推进：落库 initialStatus
                 Integer finalStatus = initialStatus != null ? initialStatus : targetStatusValue;
-                log.info("阶段推进，orderId={}, fromPhase={}, toPhase={}, finalStatus={}",
+                log.info("阶段推进: orderId={}, {} -> {}, finalStatus={}",
                         order.getId(), currentPhase.getValue(), nextPhase, finalStatus);
                 return TransitionResult.ofWithPhaseChange(nextPhase, targetStatusValue, finalStatus);
             } else {
-                // 状态不变
-                log.info("执行订单状态转换成功，orderId={}, fromStatus={}, toStatus={}",
-                        order.getId(), fromStatus, targetStatusValue);
+                // 状态流转
+                log.info("状态流转: orderId={}, {} -> {}, action={}",
+                        order.getId(), fromStatus, targetStatusValue, action.getCode());
                 return TransitionResult.of(currentPhase.getValue(), targetStatusValue);
             }
 

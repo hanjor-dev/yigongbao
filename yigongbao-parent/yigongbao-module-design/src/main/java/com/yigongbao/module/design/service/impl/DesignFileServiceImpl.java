@@ -73,8 +73,6 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public DesignPackageVO uploadPackage(Long orderId, MultipartFile file) {
-        log.info("上传数据包, orderId={}, fileName={}", orderId, file.getOriginalFilename());
-
         // 0. 校验文件非空
         if (file.isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "上传文件不能为空");
@@ -125,11 +123,9 @@ public class DesignFileServiceImpl implements DesignFileService {
         if (CollUtil.isEmpty(archiveFiles)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_EMPTY);
         }
-        log.info("压缩包解析成功, 有效文件数={}", archiveFiles.size());
 
         // 7. 上传压缩包文件（使用缓存的 byte[]）
         FileVO fileVO = fileService.uploadBytes(fileBytes, fileName, FileBizTypeEnum.PRINT_PACKAGE.getDictCode());
-        log.info("压缩包上传成功, fileId={}", fileVO.getId());
 
         // 8. 生成数据包编号
         String packageCode = codeGeneratorService.generateWithSeqSuffix(
@@ -151,7 +147,6 @@ public class DesignFileServiceImpl implements DesignFileService {
         packageEntity.setFileCount(archiveFiles.size());
         packageEntity.setUploadTime(LocalDateTime.now());
         packageService.save(packageEntity);
-        log.info("数据包记录保存成功, packageId={}, packageCode={}", packageEntity.getId(), packageCode);
 
         // 11. 逐文件上传内部文件到 OSS，并保存包内文件记录
         List<DesignPackageFileEntity> fileEntities = new ArrayList<>();
@@ -162,7 +157,6 @@ public class DesignFileServiceImpl implements DesignFileService {
                     archiveFile.getFileContent(),
                     archiveFile.getFileName(),
                     FileBizTypeEnum.PACKAGE_FILE.getDictCode());
-            log.info("包内文件上传成功, fileName={}, fileId={}", archiveFile.getFileName(), innerFileVO.getId());
 
             DesignPackageFileEntity fileEntity = new DesignPackageFileEntity();
             fileEntity.setPackageId(packageEntity.getId());
@@ -177,17 +171,15 @@ public class DesignFileServiceImpl implements DesignFileService {
         }
         // 批量插入
         packageFileService.saveBatch(fileEntities);
-        log.info("包内文件记录保存成功, count={}", fileEntities.size());
 
         // 12. 构建返回结果
+        log.info("上传数据包: orderId={}, packageCode={}, fileCount={}", orderId, packageCode, archiveFiles.size());
         return buildPackageVO(packageEntity, fileEntities);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deletePackage(Long orderId, Long packageId) {
-        log.info("删除数据包, orderId={}, packageId={}", orderId, packageId);
-
         // 1. 校验工单状态和操作权限
         checkIsAssignedDesigner(checkDesignPhase(orderId));
 
@@ -227,7 +219,6 @@ public class DesignFileServiceImpl implements DesignFileService {
             drawingService.remove(new LambdaQueryWrapper<com.yigongbao.module.design.entity.DesignDrawingEntity>()
                     .eq(com.yigongbao.module.design.entity.DesignDrawingEntity::getPackageId, packageId));
         }
-        log.info("指令单/图纸 OSS 文件及记录清理完成, packageId={}", packageId);
 
         // 4. 删除包内文件的独立 OSS 存储（先查出文件ID，再批量删除）
         List<DesignPackageFileEntity> innerFiles = packageFileService.list(
@@ -245,14 +236,12 @@ public class DesignFileServiceImpl implements DesignFileService {
             if (!screenshotFileIds.isEmpty()) {
                 screenshotService.deleteByPackageFileIds(packageFileIds);
             }
-            log.info("包内文件截图删除完成, count={}", screenshotFileIds.size());
         }
 
         // 4.2 删除包内文件本身的 OSS 存储
         for (DesignPackageFileEntity innerFile : innerFiles) {
             fileService.deleteById(innerFile.getFileId());
         }
-        log.info("包内文件 OSS 存储删除完成, count={}", innerFiles.size());
 
         // 5. 删除包内文件记录
         packageFileService.remove(
@@ -265,7 +254,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         // 7. 删除存储的压缩包文件
         fileService.deleteById(packageEntity.getFileId());
 
-        log.info("数据包删除成功, packageId={}", packageId);
+        log.info("删除数据包: packageId={}, orderId={}", packageId, orderId);
     }
 
     @Override
@@ -312,7 +301,6 @@ public class DesignFileServiceImpl implements DesignFileService {
      */
     @Override
     public List<DesignPackageFileVO> listPackageFiles(Long orderId, Long packageId) {
-        log.info("查询包内文件列表，orderId={}，packageId={}", orderId, packageId);
         designQueryHelper.checkOrderReadable(orderId);
         // 1. 校验数据包归属
         DesignPackageEntity pkg = packageService.getById(packageId);
@@ -381,15 +369,13 @@ public class DesignFileServiceImpl implements DesignFileService {
             results.add(buildModelVO(modelEntity, fileMap.get(fileId)));
         }
 
-        log.info("批量关联可视化模型成功, orderId={}, count={}", orderId, results.size());
+        log.info("批量关联可视化模型: orderId={}, count={}", orderId, results.size());
         return results;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteModel(Long orderId, Long modelId) {
-        log.info("删除可视化模型, orderId={}, modelId={}", orderId, modelId);
-
         // 1. 校验工单状态和操作权限
         checkIsAssignedDesigner(checkDesignPhase(orderId));
 
@@ -405,7 +391,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         // 4. 删除存储的文件
         fileService.deleteById(modelEntity.getFileId());
 
-        log.info("可视化模型删除成功, modelId={}", modelId);
+        log.info("删除可视化模型: modelId=, orderId=", modelId, orderId);
     }
 
     @Override
@@ -439,8 +425,6 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public FileVO linkReport(Long orderId, String fileId) {
-        log.info("关联设计报告, orderId={}, fileId={}", orderId, fileId);
-
         // 1. 校验工单状态和操作权限
         checkIsAssignedDesigner(checkDesignPhase(orderId));
 
@@ -454,7 +438,6 @@ public class DesignFileServiceImpl implements DesignFileService {
         List<FileVO> existingReports = fileService.listByBiz(FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId);
         for (FileVO existing : existingReports) {
             fileService.deleteById(existing.getId());
-            log.info("删除旧设计报告, fileId={}", existing.getId());
         }
 
         // 5. 关联新文件到业务
@@ -464,8 +447,6 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteReport(Long orderId, String fileId) {
-        log.info("删除设计报告, orderId={}, fileId={}", orderId, fileId);
-
         // 1. 校验工单状态和操作权限
         checkIsAssignedDesigner(checkDesignPhase(orderId));
 
@@ -479,7 +460,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         // 3. 删除文件
         fileService.deleteById(fileId);
 
-        log.info("设计报告删除成功, fileId={}", fileId);
+        log.info("删除设计报告: fileId={}, orderId={}", fileId, orderId);
     }
 
     @Override

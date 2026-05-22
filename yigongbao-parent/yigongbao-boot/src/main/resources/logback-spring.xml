@@ -52,14 +52,47 @@
         </rollingPolicy>
     </appender>
 
-    <!-- 系统模块日志级别控制 -->
-    <logger name="com.yigongbao" level="DEBUG" />
-    <!-- Spring 日志级别控制 -->
-    <logger name="org.springframework" level="WARN" />
+    <!-- WARN 级别日志输出 -->
+    <appender name="file_warn" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${log.path}/yigongbao-warn.log</file>
+        <encoder>
+            <pattern>${log.pattern}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>WARN</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${log.path}/yigongbao-warn.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 开发环境：DEBUG 级别，便于调试 -->
+    <springProfile name="dev">
+        <logger name="com.yigongbao" level="DEBUG" />
+        <logger name="org.springframework" level="INFO" />
+    </springProfile>
+
+    <!-- 测试环境：INFO 级别，减少日志量 -->
+    <springProfile name="test">
+        <logger name="com.yigongbao" level="INFO" />
+        <logger name="org.springframework" level="WARN" />
+    </springProfile>
+
+    <!-- 生产环境：INFO 级别，只记录关键信息 -->
+    <springProfile name="prod">
+        <logger name="com.yigongbao" level="INFO" />
+        <logger name="org.springframework" level="WARN" />
+    </springProfile>
 
     <root level="INFO">
         <appender-ref ref="console" />
         <appender-ref ref="file_info" />
+        <appender-ref ref="file_warn" />
         <appender-ref ref="file_error" />
     </root>
 </configuration>

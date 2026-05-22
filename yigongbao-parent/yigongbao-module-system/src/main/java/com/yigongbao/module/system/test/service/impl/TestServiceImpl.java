@@ -55,21 +55,17 @@ public class TestServiceImpl extends ServiceImpl<TestMapper, TestEntity> impleme
     @Override
     public TestVO getVoById(Long id) {
         // 记录查询入参
-        log.info("根据ID查询测试数据，id={}", id);
         try {
             // 根据ID查询实体
             TestEntity entity = getById(id);
             // 校验数据是否存在
             if (entity == null) {
-                log.warn("测试数据不存在，id={}", id);
+                log.warn("测试数据不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             // 转换为VO返回
             TestVO vo = TestConvert.toVO(entity);
-            log.info("查询测试数据成功，id={}", id);
             return vo;
-        } catch (BusinessException e) {
-            throw e;
         } catch (Exception e) {
             log.error("查询测试数据异常，id={}", id, e);
             throw e;
@@ -92,7 +88,7 @@ public class TestServiceImpl extends ServiceImpl<TestMapper, TestEntity> impleme
             // 插入数据库
             save(entity);
             // 记录创建成功
-            log.info("创建测试数据成功，id={}, key={}", entity.getId(), dto.getKey());
+            log.info("创建测试数据: id={}, key={}", entity.getId(), dto.getKey());
         } catch (Exception e) {
             log.error("创建测试数据异常，key={}", dto.getKey(), e);
             throw e;
@@ -116,7 +112,7 @@ public class TestServiceImpl extends ServiceImpl<TestMapper, TestEntity> impleme
             TestEntity entity = getById(id);
             // 校验数据是否存在
             if (entity == null) {
-                log.warn("测试数据不存在，id={}", id);
+                log.warn("测试数据不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             // 更新数据
@@ -125,9 +121,7 @@ public class TestServiceImpl extends ServiceImpl<TestMapper, TestEntity> impleme
             // 更新数据库
             updateById(entity);
             // 记录更新成功
-            log.info("更新测试数据成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("更新测试数据: id={}", id);
         } catch (Exception e) {
             log.error("更新测试数据异常，id={}", id, e);
             throw e;
@@ -148,13 +142,11 @@ public class TestServiceImpl extends ServiceImpl<TestMapper, TestEntity> impleme
         try {
             // 校验数据是否存在并删除
             if (!removeById(id)) {
-                log.warn("测试数据不存在，id={}", id);
+                log.warn("测试数据不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             // 记录删除成功
-            log.info("删除测试数据成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("删除测试数据: id={}", id);
         } catch (Exception e) {
             log.error("删除测试数据异常，id={}", id, e);
             throw e;

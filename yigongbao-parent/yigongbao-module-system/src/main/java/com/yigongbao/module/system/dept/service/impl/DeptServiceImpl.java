@@ -73,7 +73,6 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
      */
     @Override
     public IPage<DeptVO> listDept(DeptPageDTO dto) {
-        log.info("分页查询部门列表，dto={}", dto);
         try {
             // 如果未传入分页参数，使用默认值
             int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
@@ -130,7 +129,6 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             Map<String, String> finalDictMap = dictNameMap;
             Map<Long, List<OrgEntity>> finalDeptOrgMap = deptOrgMap;
             IPage<DeptVO> voPage = pageResult.convert(entity -> toVOWithNames(entity, finalDictMap, finalDeptOrgMap));
-            log.info("分页查询部门列表成功，总数={}", pageResult.getTotal());
             return voPage;
         } catch (Exception e) {
             log.error("分页查询部门列表异常", e);
@@ -146,18 +144,14 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
      */
     @Override
     public DeptVO getDeptById(Long id) {
-        log.info("根据ID查询部门详情，id={}", id);
         try {
             DeptEntity entity = getById(id);
             if (entity == null) {
-                log.warn("部门不存在，id={}", id);
+                log.warn("部门不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DEPT_NOT_FOUND);
             }
             DeptVO vo = toVOWithNames(entity);
-            log.info("查询部门详情成功，id={}", id);
             return vo;
-        } catch (BusinessException e) {
-            throw e;
         } catch (Exception e) {
             log.error("查询部门详情异常，id={}", id, e);
             throw e;
@@ -196,9 +190,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             if (dto.getOrgIds() != null && !dto.getOrgIds().isEmpty()) {
                 saveDeptOrgRelations(entity.getId(), dto.getOrgIds());
             }
-            log.info("创建部门成功，id={}, deptCode={}", entity.getId(), deptCode);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("创建部门: id={}, deptCode={}", entity.getId(), deptCode);
         } catch (Exception e) {
             log.error("创建部门异常，deptName={}", dto.getDeptName(), e);
             throw e;
@@ -258,9 +250,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                     saveDeptOrgRelations(id, dto.getOrgIds());
                 }
             }
-            log.info("更新部门成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("更新部门: id={}", id);
         } catch (Exception e) {
             log.error("更新部门异常，id={}", id, e);
             throw e;
@@ -282,21 +272,19 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
         try {
             DeptEntity entity = getById(id);
             if (entity == null) {
-                log.warn("部门不存在，id={}", id);
+                log.warn("部门不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DEPT_NOT_FOUND);
             }
             // 部门下存在用户时禁止删除，避免用户失去归属
             if (hasUsers(id)) {
-                log.warn("该部门下存在用户，无法删除，id={}", id);
+                log.warn("该部门下存在用户，无法删除: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DEPT_HAS_USERS);
             }
             // 级联物理删除 sys_dept_org 关联记录，防止产生孤儿数据
             deptOrgMapper.delete(new LambdaQueryWrapper<DeptOrgEntity>().eq(DeptOrgEntity::getDeptId, id));
             // 对部门本身执行逻辑删除（is_deleted=1）
             removeById(id);
-            log.info("删除部门成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("删除部门: id={}", id);
         } catch (Exception e) {
             log.error("删除部门异常，id={}", id, e);
             throw e;
@@ -317,15 +305,13 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
             // 校验部门是否存在
             DeptEntity entity = getById(id);
             if (entity == null) {
-                log.warn("部门不存在，id={}", id);
+                log.warn("部门不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DEPT_NOT_FOUND);
             }
             // 更新状态
             entity.setStatus(status);
             updateById(entity);
-            log.info("修改部门状态成功，id={}, status={}", id, status);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("修改部门状态: id={}, status={}", id, status);
         } catch (Exception e) {
             log.error("修改部门状态异常，id={}, status={}", id, status, e);
             throw e;
@@ -340,7 +326,6 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
      */
     @Override
     public List<DeptVO> listAllDept(Long orgId) {
-        log.info("全量查询部门列表，orgId={}", orgId);
         try {
             List<DeptEntity> entityList;
             if (orgId != null) {
@@ -372,7 +357,6 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
      */
     @Override
     public List<DeptVO.OrgSimpleVO> listOrgsByDeptId(Long id) {
-        log.info("查询部门关联机构列表，deptId={}", id);
         if (getById(id) == null) {
             throw new BusinessException(ErrorCodeEnum.DEPT_NOT_FOUND);
         }

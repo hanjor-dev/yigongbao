@@ -62,32 +62,24 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, ProductEntity
     @Override
     public IPage<ProductVO> listProducts(int pageNum, int pageSize, String productName,
                                          String category, Long certId, Integer status) {
-        log.info("分页查询产品列表，pageNum={}, pageSize={}, productName={}, category={}, status={}",
-                pageNum, pageSize, productName, category, status);
-        try {
-            Page<ProductEntity> page = new Page<>(pageNum, pageSize);
-            LambdaQueryWrapper<ProductEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StringUtils.hasText(productName), ProductEntity::getProductName, productName)
-                    .eq(StringUtils.hasText(category), ProductEntity::getCategory, category)
-                    .eq(Objects.nonNull(status), ProductEntity::getStatus, status)
-                    .orderByDesc(ProductEntity::getCreateTime);
+        Page<ProductEntity> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<ProductEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.like(StringUtils.hasText(productName), ProductEntity::getProductName, productName)
+                .eq(StringUtils.hasText(category), ProductEntity::getCategory, category)
+                .eq(Objects.nonNull(status), ProductEntity::getStatus, status)
+                .orderByDesc(ProductEntity::getCreateTime);
 
-            IPage<ProductEntity> pageResult = baseMapper.selectPage(page, wrapper);
+        IPage<ProductEntity> pageResult = baseMapper.selectPage(page, wrapper);
 
-            List<ProductVO> voList = pageResult.getRecords().stream()
-                    .map(ProductConvert::toVO)
-                    .toList();
-            fillStatusName(voList);
+        List<ProductVO> voList = pageResult.getRecords().stream()
+                .map(ProductConvert::toVO)
+                .toList();
+        fillStatusName(voList);
 
-            IPage<ProductVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
-            voPage.setRecords(voList);
+        IPage<ProductVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
+        voPage.setRecords(voList);
 
-            log.info("分页查询产品列表成功，总数={}", pageResult.getTotal());
-            return voPage;
-        } catch (Exception e) {
-            log.error("分页查询产品列表异常", e);
-            throw e;
-        }
+        return voPage;
     }
 
     /**
@@ -100,24 +92,17 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, ProductEntity
      */
     @Override
     public List<ProductVO> listAll(String productName, String category, Integer status) {
-        log.info("查询所有产品列表，productName={}, category={}, status={}", productName, category, status);
-        try {
-            LambdaQueryWrapper<ProductEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(StringUtils.hasText(productName), ProductEntity::getProductName, productName)
-                    .eq(StringUtils.hasText(category), ProductEntity::getCategory, category)
-                    .eq(Objects.nonNull(status), ProductEntity::getStatus, status)
-                    .orderByDesc(ProductEntity::getCreateTime);
+        LambdaQueryWrapper<ProductEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.like(StringUtils.hasText(productName), ProductEntity::getProductName, productName)
+                .eq(StringUtils.hasText(category), ProductEntity::getCategory, category)
+                .eq(Objects.nonNull(status), ProductEntity::getStatus, status)
+                .orderByDesc(ProductEntity::getCreateTime);
 
-            List<ProductEntity> list = list(wrapper);
-            List<ProductVO> voList = list.stream().map(ProductConvert::toVO).toList();
-            fillStatusName(voList);
+        List<ProductEntity> list = list(wrapper);
+        List<ProductVO> voList = list.stream().map(ProductConvert::toVO).toList();
+        fillStatusName(voList);
 
-            log.info("查询所有产品列表成功，数量={}", voList.size());
-            return voList;
-        } catch (Exception e) {
-            log.error("查询所有产品列表异常", e);
-            throw e;
-        }
+        return voList;
     }
 
     /**
@@ -128,25 +113,16 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, ProductEntity
      */
     @Override
     public ProductVO getById(Long id) {
-        log.info("根据ID查询产品，id={}", id);
-        try {
-            ProductEntity entity = super.getById(id);
-            if (entity == null) {
-                log.warn("产品不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
-            }
-            ProductVO vo = ProductConvert.toVO(entity);
-            vo.setStatusName(StatusConstants.getStatusName(entity.getStatus()));
-            // 填充规格列表
-            vo.setSpecs(productSpecService.listByProductId(id));
-            log.info("查询产品成功，id={}", id);
-            return vo;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("查询产品异常，id={}", id, e);
-            throw e;
+        ProductEntity entity = super.getById(id);
+        if (entity == null) {
+            log.warn("产品不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
         }
+        ProductVO vo = ProductConvert.toVO(entity);
+        vo.setStatusName(StatusConstants.getStatusName(entity.getStatus()));
+        // 填充规格列表
+        vo.setSpecs(productSpecService.listByProductId(id));
+        return vo;
     }
 
     /**
@@ -157,36 +133,27 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, ProductEntity
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void create(CreateProductDTO dto) {
-        log.info("创建产品，productName={}, category={}, categoryName={}",
-                dto.getProductName(), dto.getCategory(), dto.getCategoryName());
-        try {
-            // 校验产品名称唯一性
-            long nameCount = super.count(new LambdaQueryWrapper<ProductEntity>()
-                    .eq(ProductEntity::getProductName, dto.getProductName()));
-            if (nameCount > 0) {
-                log.warn("产品名称已存在，productName={}", dto.getProductName());
-                throw new BusinessException(ErrorCodeEnum.PRODUCT_EXISTS);
-            }
-
-            // 校验 categoryName 必须提供（架构约束：basic 模块无法依赖 system 模块的 DictService）
-            if (StrUtil.isNotBlank(dto.getCategory()) && StrUtil.isBlank(dto.getCategoryName())) {
-                log.warn("产品类型名称未提供，category={}", dto.getCategory());
-                throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "产品类型名称");
-            }
-
-            ProductEntity entity = ProductConvert.toEntity(dto);
-            if (entity.getStatus() == null) {
-                entity.setStatus(StatusConstants.NORMAL);
-            }
-
-            save(entity);
-            log.info("创建产品成功，id={}, productName={}", entity.getId(), dto.getProductName());
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("创建产品异常，productName={}", dto.getProductName(), e);
-            throw e;
+        // 校验产品名称唯一性
+        long nameCount = super.count(new LambdaQueryWrapper<ProductEntity>()
+                .eq(ProductEntity::getProductName, dto.getProductName()));
+        if (nameCount > 0) {
+            log.warn("产品名称已存在: productName={}", dto.getProductName());
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_EXISTS);
         }
+
+        // 校验 categoryName 必须提供（架构约束：basic 模块无法依赖 system 模块的 DictService）
+        if (StrUtil.isNotBlank(dto.getCategory()) && StrUtil.isBlank(dto.getCategoryName())) {
+            log.warn("产品类型名称未提供: category={}", dto.getCategory());
+            throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "产品类型名称");
+        }
+
+        ProductEntity entity = ProductConvert.toEntity(dto);
+        if (entity.getStatus() == null) {
+            entity.setStatus(StatusConstants.NORMAL);
+        }
+
+        save(entity);
+        log.info("创建产品: id={}, productName={}", entity.getId(), dto.getProductName());
     }
 
     /**
@@ -198,33 +165,25 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, ProductEntity
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void update(Long id, UpdateProductDTO dto) {
-        log.info("更新产品，id={}, category={}, categoryName={}", id, dto.getCategory(), dto.getCategoryName());
-        try {
-            ProductEntity entity = super.getById(id);
-            if (entity == null) {
-                log.warn("产品不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
-            }
-
-            // 校验：若更新 category，则 categoryName 也必须提供（架构约束：basic 模块无法依赖 system 模块的 DictService）
-            if (StrUtil.isNotBlank(dto.getCategory()) && StrUtil.isBlank(dto.getCategoryName())) {
-                log.warn("产品类型变更时未提供类型名称，category={}", dto.getCategory());
-                throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "产品类型名称");
-            }
-
-            BeanUtils.copyProperties(dto, entity, "id", "createTime", "updateTime", "createBy", "updateBy", "categoryName");
-            // categoryName 是冗余字段，不允许被 null 覆盖；若 DTO 中有值则更新
-            if (StrUtil.isNotBlank(dto.getCategoryName())) {
-                entity.setCategoryName(dto.getCategoryName());
-            }
-            updateById(entity);
-            log.info("更新产品成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("更新产品异常，id={}", id, e);
-            throw e;
+        ProductEntity entity = super.getById(id);
+        if (entity == null) {
+            log.warn("产品不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
         }
+
+        // 校验：若更新 category，则 categoryName 也必须提供（架构约束：basic 模块无法依赖 system 模块的 DictService）
+        if (StrUtil.isNotBlank(dto.getCategory()) && StrUtil.isBlank(dto.getCategoryName())) {
+            log.warn("产品类型变更时未提供类型名称: category={}", dto.getCategory());
+            throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "产品类型名称");
+        }
+
+        BeanUtils.copyProperties(dto, entity, "id", "createTime", "updateTime", "createBy", "updateBy", "categoryName");
+        // categoryName 是冗余字段，不允许被 null 覆盖；若 DTO 中有值则更新
+        if (StrUtil.isNotBlank(dto.getCategoryName())) {
+            entity.setCategoryName(dto.getCategoryName());
+        }
+        updateById(entity);
+        log.info("更新产品: id={}", id);
     }
 
     /**
@@ -236,26 +195,18 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, ProductEntity
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void remove(Long id) {
-        log.info("删除产品，id={}", id);
-        try {
-            ProductEntity entity = super.getById(id);
-            if (entity == null) {
-                log.warn("产品不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
-            }
-            // 校验产品下是否存在规格
-            if (productSpecService.existsByProductId(id)) {
-                log.warn("产品下存在规格，无法删除，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.PRODUCT_HAS_SPECS);
-            }
-            removeById(id);
-            log.info("删除产品成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("删除产品异常，id={}", id, e);
-            throw e;
+        ProductEntity entity = super.getById(id);
+        if (entity == null) {
+            log.warn("产品不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
         }
+        // 校验产品下是否存在规格
+        if (productSpecService.existsByProductId(id)) {
+            log.warn("产品下存在规格，无法删除: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_HAS_SPECS);
+        }
+        removeById(id);
+        log.info("删除产品: id={}", id);
     }
 
     /**

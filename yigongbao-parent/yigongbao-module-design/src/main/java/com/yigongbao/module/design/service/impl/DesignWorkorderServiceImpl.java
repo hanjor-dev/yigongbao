@@ -112,13 +112,10 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
      */
     @Override
     public IPage<DesignWorkorderListVO> listWorkorders(DesignWorkorderQueryDTO queryDTO) {
-        log.info("查询设计工单列表，queryDTO={}", queryDTO);
-
         // 获取当前用户信息和数据权限类型
         Long currentUserId = designQueryHelper.getCurrentUserId();
         UserEntity currentUser = designQueryHelper.getCurrentUser();
         DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
-        log.info("当前用户数据权限类型，userId={}，scopeType={}", currentUserId, scopeType);
 
         // 构建查询条件
         LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
@@ -159,7 +156,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         int pageSize = queryDTO.getPageSize() == null ? 10 : Math.min(queryDTO.getPageSize(), 100);
         int pageNum = queryDTO.getPageNum() == null ? 1 : queryDTO.getPageNum();
         IPage<OrderMainEntity> entityPage = orderMainService.page(new Page<>(pageNum, pageSize), wrapper);
-        log.info("查询到工单数量，total={}", entityPage.getTotal());
 
         // 转换为列表 VO
         List<OrderMainEntity> entities = entityPage.getRecords();
@@ -193,8 +189,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
      */
     @Override
     public DesignWorkorderDetailVO getWorkorderDetail(Long orderId) {
-        log.info("查询设计工单详情，orderId={}", orderId);
-
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
@@ -280,7 +274,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
      */
     @Override
     public DesignColumnConfigVO getColumnConfig() {
-        log.info("获取用户设计列配置");
         return designQueryHelper.getColumnConfig();
     }
 
@@ -293,8 +286,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     @Transactional(rollbackFor = Exception.class)
     public void saveColumnConfig(SaveDesignColumnConfigDTO dto) {
         Long currentUserId = designQueryHelper.getCurrentUserId();
-        log.info("保存用户设计列配置，userId={}", currentUserId);
-
         UserEntity user = userService.getById(currentUserId);
         if (user == null) {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
@@ -324,9 +315,9 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             update.setId(currentUserId);
             update.setDesignColumnSettings(configJson);
             userService.updateById(update);
-            log.info("用户设计列配置保存成功，userId={}", currentUserId);
+            log.info("保存用户设计列配置: userId={}", currentUserId);
         } catch (JsonProcessingException e) {
-            log.error("序列化列配置失败，userId={}", currentUserId, e);
+            log.error("序列化列配置失败: userId={}", currentUserId, e);
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR, "列配置保存失败");
         }
     }
@@ -343,8 +334,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void startDesign(Long orderId) {
-        log.info("设计师开始设计，orderId={}", orderId);
-
         // 1. 校验订单存在
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
@@ -384,11 +373,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             update.setCurrentHandlerName(currentUserName);
             orderMainService.updateById(update);
 
-            log.info("开始设计成功，orderId={}, phase={}, status={}", orderId, result.getTargetPhase(), result.getFinalStatus());
+            log.info("设计师开始设计: orderId={}, {} -> {}, designerId={}",
+                orderId, FlowStatusEnum.PENDING_DESIGN.getName(), FlowStatusEnum.DESIGN_IN_PROGRESS.getName(), currentUserId);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("开始设计异常，orderId={}", orderId, e);
+            log.error("开始设计异常: orderId={}", orderId, e);
             throw e;
         }
     }
@@ -402,8 +392,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void continueDesign(Long orderId) {
-        log.info("设计师继续修改，orderId={}", orderId);
-
         // 1. 校验订单存在
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
@@ -442,12 +430,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             update.setCurrentHandlerName(currentUserName);
             orderMainService.updateById(update);
 
-            log.info("继续修改成功，orderId={}, phase={}, status={}",
-                    orderId, result.getTargetPhase(), result.getFinalStatus());
+            log.info("设计师继续修改: orderId={}, {} -> {}, designerId={}",
+                orderId, FlowStatusEnum.DESIGN_REVIEW_REJECTED.getName(), FlowStatusEnum.DESIGN_IN_PROGRESS.getName(), currentUserId);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("继续修改异常，orderId={}", orderId, e);
+            log.error("继续修改异常: orderId={}", orderId, e);
             throw e;
         }
     }
@@ -462,8 +450,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void submitDesign(Long orderId) {
-        log.info("设计师提交设计审核，orderId={}", orderId);
-
         // 1. 校验订单存在
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
@@ -511,12 +497,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             update.setCurrentHandlerName(currentUserName);
             orderMainService.updateById(update);
 
-            log.info("提交设计审核成功，orderId={}, phase={}, status={}",
-                    orderId, result.getTargetPhase(), result.getFinalStatus());
+            log.info("提交设计审核: orderId={}, {} -> {}, designerId={}",
+                orderId, FlowStatusEnum.DESIGN_IN_PROGRESS.getName(), FlowStatusEnum.DESIGN_REVIEWING.getName(), currentUserId);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("提交设计审核异常，orderId={}", orderId, e);
+            log.error("提交设计审核异常: orderId={}", orderId, e);
             throw e;
         }
     }
@@ -702,16 +688,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         if (CollUtil.isEmpty(voList)) {
             return;
         }
-        log.debug("批量填充打印信息状态，工单数量={}", voList.size());
-
         List<Long> orderIds = voList.stream().map(DesignWorkorderListVO::getId).collect(Collectors.toList());
         List<DesignProductEntity> allProducts = designProductMapper.selectList(
                 new LambdaQueryWrapper<DesignProductEntity>()
                         .select(DesignProductEntity::getOrderId)
                         .in(DesignProductEntity::getOrderId, orderIds)
                         .eq(DesignProductEntity::getIsDeleted, StatusConstants.NOT_DELETED));
-
-        log.debug("查询到打印产品记录数={}", allProducts.size());
 
         Set<Long> orderIdsWithPrintInfo = allProducts.stream()
                 .map(DesignProductEntity::getOrderId)
@@ -945,7 +927,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
      */
     @Override
     public List<com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO> listAssignmentHistory(Long orderId) {
-        log.info("查询订单设计师分配历史，orderId={}", orderId);
         // 查询分配历史记录，按分配时间倒序
         List<com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity> logs = assignmentLogMapper.selectList(
                 new LambdaQueryWrapper<com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity>()

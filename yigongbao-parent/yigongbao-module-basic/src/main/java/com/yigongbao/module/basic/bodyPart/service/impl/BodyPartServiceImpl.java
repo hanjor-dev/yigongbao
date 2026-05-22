@@ -48,18 +48,10 @@ public class BodyPartServiceImpl extends ServiceImpl<BodyPartMapper, BodyPartEnt
      */
     @Override
     public List<BodyPartVO> listAll() {
-        log.info("获取部位列表");
-        try {
-            List<BodyPartEntity> allList = list(new LambdaQueryWrapper<BodyPartEntity>()
-                    .orderByAsc(BodyPartEntity::getSort)
-                    .orderByDesc(BodyPartEntity::getCreateTime));
-            List<BodyPartVO> voList = allList.stream().map(this::toVO).collect(Collectors.toList());
-            log.info("获取部位列表成功，数量={}", voList.size());
-            return voList;
-        } catch (Exception e) {
-            log.error("获取部位列表异常", e);
-            throw e;
-        }
+        List<BodyPartEntity> allList = list(new LambdaQueryWrapper<BodyPartEntity>()
+                .orderByAsc(BodyPartEntity::getSort)
+                .orderByDesc(BodyPartEntity::getCreateTime));
+        return allList.stream().map(this::toVO).collect(Collectors.toList());
     }
 
     /**
@@ -70,21 +62,12 @@ public class BodyPartServiceImpl extends ServiceImpl<BodyPartMapper, BodyPartEnt
      */
     @Override
     public BodyPartDetailVO getDetailById(Long id) {
-        log.info("查询部位详情，id={}", id);
-        try {
-            BodyPartEntity entity = getById(id);
-            if (entity == null) {
-                log.warn("部位不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND);
-            }
-            log.info("查询部位详情成功，id={}", id);
-            return toDetailVO(entity);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("查询部位详情异常，id={}", id, e);
-            throw e;
+        BodyPartEntity entity = getById(id);
+        if (entity == null) {
+            log.warn("部位不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND);
         }
+        return toDetailVO(entity);
     }
 
     /**

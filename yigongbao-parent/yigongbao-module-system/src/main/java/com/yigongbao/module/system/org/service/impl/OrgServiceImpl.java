@@ -95,54 +95,46 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      */
     @Override
     public IPage<OrgVO> listOrg(OrgPageDTO dto) {
-        log.info("分页查询机构列表，dto={}", dto);
-        try {
-            // 如果未传入分页参数，使用默认值
-            int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
-            int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
-            Page<OrgEntity> page = new Page<>(pageNum, pageSize);
-            LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
-            // 固定排除生产企业（内置，不对外展示）和其他医院（占位，不对外展示）
-            String unknownHospitalIdStr = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
-            wrapper.ne(OrgEntity::getOrgType, DictCodeConstants.ORG_TYPE_PRODUCER);
-            if (unknownHospitalIdStr != null) {
-                wrapper.ne(OrgEntity::getId, Long.parseLong(unknownHospitalIdStr));
-            }
-            wrapper.like(StrUtil.isNotBlank(dto.getOrgName()), OrgEntity::getOrgName, dto.getOrgName())
-                    .eq(StrUtil.isNotBlank(dto.getOrgType()), OrgEntity::getOrgType, dto.getOrgType())
-                    .eq(Objects.nonNull(dto.getAreaId()), OrgEntity::getAreaId, dto.getAreaId())
-                    .eq(Objects.nonNull(dto.getStatus()), OrgEntity::getStatus, dto.getStatus())
-                    .orderByDesc(OrgEntity::getCreateTime);
-            // 执行分页查询
-            IPage<OrgEntity> pageResult = page(page, wrapper);
-
-            // 批量查询字典，避免循环中逐条查询（N+1 问题）
-            Map<String, String> dictNameMap = Collections.emptyMap();
-            List<OrgEntity> records = pageResult.getRecords();
-            if (!records.isEmpty()) {
-                // 收集所有需要的字典编码（去重）
-                Set<String> dictCodes = records.stream()
-                        .flatMap(org -> Stream.of(org.getOrgType(), org.getHospitalLevel(), org.getHospitalType()))
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toSet());
-                // 批量查询字典并构建 Map（dictCode -> dictName）
-                if (!dictCodes.isEmpty()) {
-                    dictNameMap = dictCodes.stream()
-                            .map(dictService::getByDictCode)
-                            .filter(Objects::nonNull)
-                            .collect(Collectors.toMap(DictVO::getDictCode, DictVO::getDictName));
-                }
-            }
-
-            // 转换为VO并填充字典名称
-            Map<String, String> finalDictMap = dictNameMap;
-            IPage<OrgVO> voPage = pageResult.convert(entity -> toVOWithDictNames(entity, finalDictMap));
-            log.info("分页查询机构列表成功，总数={}", pageResult.getTotal());
-            return voPage;
-        } catch (Exception e) {
-            log.error("分页查询机构列表异常", e);
-            throw e;
+        // 如果未传入分页参数，使用默认值
+        int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
+        int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
+        Page<OrgEntity> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
+        // 固定排除生产企业（内置，不对外展示）和其他医院（占位，不对外展示）
+        String unknownHospitalIdStr = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
+        wrapper.ne(OrgEntity::getOrgType, DictCodeConstants.ORG_TYPE_PRODUCER);
+        if (unknownHospitalIdStr != null) {
+            wrapper.ne(OrgEntity::getId, Long.parseLong(unknownHospitalIdStr));
         }
+        wrapper.like(StrUtil.isNotBlank(dto.getOrgName()), OrgEntity::getOrgName, dto.getOrgName())
+                .eq(StrUtil.isNotBlank(dto.getOrgType()), OrgEntity::getOrgType, dto.getOrgType())
+                .eq(Objects.nonNull(dto.getAreaId()), OrgEntity::getAreaId, dto.getAreaId())
+                .eq(Objects.nonNull(dto.getStatus()), OrgEntity::getStatus, dto.getStatus())
+                .orderByDesc(OrgEntity::getCreateTime);
+        // 执行分页查询
+        IPage<OrgEntity> pageResult = page(page, wrapper);
+
+        // 批量查询字典，避免循环中逐条查询（N+1 问题）
+        Map<String, String> dictNameMap = Collections.emptyMap();
+        List<OrgEntity> records = pageResult.getRecords();
+        if (!records.isEmpty()) {
+            // 收集所有需要的字典编码（去重）
+            Set<String> dictCodes = records.stream()
+                    .flatMap(org -> Stream.of(org.getOrgType(), org.getHospitalLevel(), org.getHospitalType()))
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            // 批量查询字典并构建 Map（dictCode -> dictName）
+            if (!dictCodes.isEmpty()) {
+                dictNameMap = dictCodes.stream()
+                        .map(dictService::getByDictCode)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toMap(DictVO::getDictCode, DictVO::getDictName));
+            }
+        }
+
+        // 转换为VO并填充字典名称
+        Map<String, String> finalDictMap = dictNameMap;
+        return pageResult.convert(entity -> toVOWithDictNames(entity, finalDictMap));
     }
 
     /**
@@ -153,37 +145,29 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      */
     @Override
     public OrgVO getOrgById(Long id) {
-        log.info("根据ID查询机构详情，id={}", id);
-        try {
-            OrgEntity entity = getById(id);
-            if (entity == null) {
-                throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
-            }
-            OrgVO vo = toVOWithDictNames(entity);
-            // 填充经销商关联的医疗机构
-            if (DictCodeConstants.ORG_TYPE_DEALER.equals(entity.getOrgType())) {
-                List<Long> hospitalOrgIds = orgHospitalMapper.selectList(
-                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
-                                .eq(OrgHospitalEntity::getDistributorOrgId, id))
-                        .stream().map(OrgHospitalEntity::getHospitalOrgId).collect(Collectors.toList());
-                assert vo != null;
-                vo.setHospitalOrgIds(hospitalOrgIds);
-                if (!hospitalOrgIds.isEmpty()) {
-                    List<OrgEntity> hospitals = listByIds(hospitalOrgIds);
-                    vo.setHospitalOrgNames(hospitals.stream().map(OrgEntity::getOrgName).collect(Collectors.toList()));
-                }
-            }
-            // 填充资质文件详细信息
-            if (StrUtil.isNotBlank(entity.getQualificationFile())) {
-                vo.setQualificationFileInfo(fileService.getById(entity.getQualificationFile()));
-            }
-            return vo;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("查询机构详情异常，id={}", id, e);
-            throw e;
+        OrgEntity entity = getById(id);
+        if (entity == null) {
+            throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
         }
+        OrgVO vo = toVOWithDictNames(entity);
+        // 填充经销商关联的医疗机构
+        if (DictCodeConstants.ORG_TYPE_DEALER.equals(entity.getOrgType())) {
+            List<Long> hospitalOrgIds = orgHospitalMapper.selectList(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
+                            .eq(OrgHospitalEntity::getDistributorOrgId, id))
+                    .stream().map(OrgHospitalEntity::getHospitalOrgId).collect(Collectors.toList());
+            assert vo != null;
+            vo.setHospitalOrgIds(hospitalOrgIds);
+            if (!hospitalOrgIds.isEmpty()) {
+                List<OrgEntity> hospitals = listByIds(hospitalOrgIds);
+                vo.setHospitalOrgNames(hospitals.stream().map(OrgEntity::getOrgName).collect(Collectors.toList()));
+            }
+        }
+        // 填充资质文件详细信息
+        if (StrUtil.isNotBlank(entity.getQualificationFile())) {
+            vo.setQualificationFileInfo(fileService.getById(entity.getQualificationFile()));
+        }
+        return vo;
     }
 
     /**
@@ -194,82 +178,75 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createOrg(CreateOrgDTO dto) {
-        log.info("创建机构，orgName={}", dto.getOrgName());
-        try {
-            // 禁止创建生产企业类型
-            if (DictCodeConstants.ORG_TYPE_PRODUCER.equals(dto.getOrgType())) {
-                throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_ALLOWED);
-            }
-            // 校验机构名称是否已存在
-            if (isOrgNameExists(dto.getOrgName())) {
-                log.warn("机构名称已存在，orgName={}", dto.getOrgName());
-                throw new BusinessException(ErrorCodeEnum.ORG_EXISTS);
-            }
-            // 校验账号前缀唯一性（生产企业/经销商专用）
-            if (StrUtil.isNotBlank(dto.getUsernamePrefix()) && isUsernamePrefixExists(dto.getUsernamePrefix())) {
-                log.warn("账号前缀已存在，usernamePrefix={}", dto.getUsernamePrefix());
-                throw new BusinessException(ErrorCodeEnum.ORG_USERNAME_PREFIX_EXISTS);
-            }
-            // 校验机构类型是否存在
-            if (!isOrgTypeValid(dto.getOrgType())) {
-                log.warn("机构类型不存在，orgType={}", dto.getOrgType());
-                throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_FOUND);
-            }
-            // 经销商机构类型时账号前缀必填
-            if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType()) && StrUtil.isBlank(dto.getUsernamePrefix())) {
-                throw new BusinessException(ErrorCodeEnum.ORG_USERNAME_PREFIX_REQUIRED);
-            }
-            // 经销商机构类型时资质类型必填
-            if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType()) && dto.getQualificationType() == null) {
-                throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "资质类型");
-            }
-            // 经销商类型 + 医疗器械资质时资质文件必填
-            if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType())
-                    && Integer.valueOf(1).equals(dto.getQualificationType())
-                    && StrUtil.isBlank(dto.getQualificationFile())) {
-                throw new BusinessException(ErrorCodeEnum.ORG_CERT_FILE_REQUIRED);
-            }
-            if (StrUtil.isNotBlank(dto.getQualificationFile())) {
-                FileVO fileVO = fileService.getById(dto.getQualificationFile());
-                if (fileVO == null) {
-                    throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
-                }
-            }
-            // 生成机构编码
-            String prefix = getOrgPrefixByType(dto.getOrgType());
-            String orgCode = codeGeneratorService.generateWithCustomPrefix(CodeRuleConstants.ORG_NO, prefix);
-            // DTO转换为实体对象
-            OrgEntity entity = OrgConvert.toEntity(dto);
-            entity.setOrgCode(orgCode);
-            entity.setStatus(StatusConstants.NORMAL);
-            // 根据 areaId 查询地区名称并写入冗余字段
-            if (dto.getAreaId() != null) {
-                AreaEntity areaEntity = areaService.getById(dto.getAreaId());
-                entity.setAreaName(areaEntity != null ? areaEntity.getName() : null);
-            }
-            // 插入数据库
-            save(entity);
-            // 资质文件关联到机构
-            if (StrUtil.isNotBlank(dto.getQualificationFile())) {
-                fileService.linkFile(dto.getQualificationFile(), FileBizTypeEnum.ORG_CERT.getDictCode(), entity.getId());
-            }
-            // 经销商类型：保存关联医疗机构
-            if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType()) && dto.getHospitalOrgIds() != null && !dto.getHospitalOrgIds().isEmpty()) {
-                // 校验 hospitalOrgIds 中的机构必须是医疗机构类型
-                List<OrgEntity> hospitals = listByIds(dto.getHospitalOrgIds());
-                boolean hasInvalid = hospitals.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_HOSPITAL.equals(o.getOrgType()));
-                if (hasInvalid || hospitals.size() != dto.getHospitalOrgIds().size()) {
-                    throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
-                }
-                saveOrgHospitalRelations(entity.getId(), dto.getHospitalOrgIds());
-            }
-            log.info("创建机构成功，id={}, orgCode={}", entity.getId(), orgCode);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("创建机构异常，orgName={}", dto.getOrgName(), e);
-            throw e;
+        // 禁止创建生产企业类型
+        if (DictCodeConstants.ORG_TYPE_PRODUCER.equals(dto.getOrgType())) {
+            throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_ALLOWED);
         }
+        // 校验机构名称是否已存在
+        if (isOrgNameExists(dto.getOrgName())) {
+            log.warn("机构名称已存在: orgName={}", dto.getOrgName());
+            throw new BusinessException(ErrorCodeEnum.ORG_EXISTS);
+        }
+        // 校验账号前缀唯一性（生产企业/经销商专用）
+        if (StrUtil.isNotBlank(dto.getUsernamePrefix()) && isUsernamePrefixExists(dto.getUsernamePrefix())) {
+            log.warn("账号前缀已存在: usernamePrefix={}", dto.getUsernamePrefix());
+            throw new BusinessException(ErrorCodeEnum.ORG_USERNAME_PREFIX_EXISTS);
+        }
+        // 校验机构类型是否存在
+        if (!isOrgTypeValid(dto.getOrgType())) {
+            log.warn("机构类型不存在: orgType={}", dto.getOrgType());
+            throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_FOUND);
+        }
+        // 经销商机构类型时账号前缀必填
+        if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType()) && StrUtil.isBlank(dto.getUsernamePrefix())) {
+            throw new BusinessException(ErrorCodeEnum.ORG_USERNAME_PREFIX_REQUIRED);
+        }
+        // 经销商机构类型时资质类型必填
+        if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType()) && dto.getQualificationType() == null) {
+            throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "资质类型");
+        }
+        // 经销商类型 + 医疗器械资质时资质文件必填
+        if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType())
+                && Integer.valueOf(1).equals(dto.getQualificationType())
+                && StrUtil.isBlank(dto.getQualificationFile())) {
+            throw new BusinessException(ErrorCodeEnum.ORG_CERT_FILE_REQUIRED);
+        }
+        if (StrUtil.isNotBlank(dto.getQualificationFile())) {
+            FileVO fileVO = fileService.getById(dto.getQualificationFile());
+            if (fileVO == null) {
+                throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
+            }
+        }
+        // 生成机构编码
+        String prefix = getOrgPrefixByType(dto.getOrgType());
+        String orgCode = codeGeneratorService.generateWithCustomPrefix(CodeRuleConstants.ORG_NO, prefix);
+        // DTO转换为实体对象
+        OrgEntity entity = OrgConvert.toEntity(dto);
+        entity.setOrgCode(orgCode);
+        entity.setStatus(StatusConstants.NORMAL);
+        // 根据 areaId 查询地区名称并写入冗余字段
+        if (dto.getAreaId() != null) {
+            AreaEntity areaEntity = areaService.getById(dto.getAreaId());
+            entity.setAreaName(areaEntity != null ? areaEntity.getName() : null);
+        }
+        // 插入数据库
+        save(entity);
+        // 资质文件关联到机构
+        if (StrUtil.isNotBlank(dto.getQualificationFile())) {
+            fileService.linkFile(dto.getQualificationFile(), FileBizTypeEnum.ORG_CERT.getDictCode(), entity.getId());
+        }
+        // 经销商类型：保存关联医疗机构
+        if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType()) && dto.getHospitalOrgIds() != null && !dto.getHospitalOrgIds().isEmpty()) {
+            // 校验 hospitalOrgIds 中的机构必须是医疗机构类型
+            List<OrgEntity> hospitals = listByIds(dto.getHospitalOrgIds());
+            boolean hasInvalid = hospitals.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_HOSPITAL.equals(o.getOrgType()));
+            if (hasInvalid || hospitals.size() != dto.getHospitalOrgIds().size()) {
+                throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
+            }
+            saveOrgHospitalRelations(entity.getId(), dto.getHospitalOrgIds());
+        }
+        log.info("创建机构: id={}, orgCode={}, orgName={}, orgType={}",
+            entity.getId(), orgCode, dto.getOrgName(), dto.getOrgType());
     }
 
     /**
@@ -281,102 +258,92 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateOrg(Long id, UpdateOrgDTO dto) {
-        log.info("更新机构，id={}", id);
-        try {
-            OrgEntity entity = getById(id);
-            if (entity == null) {
-                throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
-            }
-            // 禁止修改机构类型
-            if (dto.getOrgType() != null && !dto.getOrgType().equals(entity.getOrgType())) {
-                throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_ALLOWED);
-            }
-            // 机构名称有变更时才校验唯一性，避免与自身冲突
-            if (StrUtil.isNotBlank(dto.getOrgName()) && !dto.getOrgName().equals(entity.getOrgName())) {
-                if (isOrgNameExistsExcludingId(dto.getOrgName(), id)) {
-                    throw new BusinessException(ErrorCodeEnum.ORG_EXISTS);
-                }
-            }
-            // 账号前缀不允许修改，如果传入且与原值不同则拒绝
-            if (StrUtil.isNotBlank(dto.getUsernamePrefix()) && !dto.getUsernamePrefix().equals(entity.getUsernamePrefix())) {
-                throw new BusinessException(ErrorCodeEnum.ORG_USERNAME_PREFIX_NOT_ALLOWED);
-            }
-            // 资质类型以入参为准，入参为空则沿用原值，防止局部更新时误清空
-            Integer qualType = dto.getQualificationType() != null ? dto.getQualificationType() : entity.getQualificationType();
-            String qualFile = StrUtil.isNotBlank(dto.getQualificationFile()) ? dto.getQualificationFile() : entity.getQualificationFile();
-            // 经销商类型 + 医疗器械资质时资质文件必填
-            if (DictCodeConstants.ORG_TYPE_DEALER.equals(entity.getOrgType())
-                    && Integer.valueOf(1).equals(qualType)
-                    && StrUtil.isBlank(qualFile)) {
-                throw new BusinessException(ErrorCodeEnum.ORG_CERT_FILE_REQUIRED);
-            }
-            if (StrUtil.isNotBlank(dto.getQualificationFile())) {
-                FileVO fileVO = fileService.getById(dto.getQualificationFile());
-                if (fileVO == null) {
-                    throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
-                }
-            }
-            // 记录原机构名称，用于后续判断是否需要同步 sys_user.org_name
-            String originalOrgName = entity.getOrgName();
-            // 排除不可变字段，将DTO属性覆盖到实体（orgCode、usernamePrefix、orgType 不可修改）
-            BeanUtils.copyProperties(dto, entity, "id", "orgCode", "usernamePrefix", "orgType", "createTime", "updateTime", "createBy", "updateBy", "hospitalOrgIds");
-            // areaId变更时同步刷新冗余的地区名称字段
-            if (dto.getAreaId() != null) {
-                AreaEntity areaEntity = areaService.getById(dto.getAreaId());
-                entity.setAreaName(areaEntity != null ? areaEntity.getName() : null);
-            }
-            updateById(entity);
-            // 资质文件有变更时重新关联
-            if (StrUtil.isNotBlank(dto.getQualificationFile())) {
-                fileService.linkFile(dto.getQualificationFile(), FileBizTypeEnum.ORG_CERT.getDictCode(), id);
-            }
-            // 机构名称变更时，同步更新 sys_user 中的冗余字段 org_name
-            if (StrUtil.isNotBlank(dto.getOrgName()) && !dto.getOrgName().equals(originalOrgName)) {
-                userMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UserEntity>()
-                        .eq(UserEntity::getOrgId, id)
-                        .set(UserEntity::getOrgName, dto.getOrgName()));
-            }
-            // 经销商类型且前端传入了 hospitalOrgIds 时，全量替换关联关系（先校验后删插）
-            String orgType = entity.getOrgType();
-            log.info("更新机构-检查关联医院，orgType={}, hospitalOrgIds={}", orgType, dto.getHospitalOrgIds());
-            if (DictCodeConstants.ORG_TYPE_DEALER.equals(orgType) && dto.getHospitalOrgIds() != null) {
-                log.info("进入经销商关联医院更新逻辑");
-                // 先校验新列表合法性，再执行写操作
-                if (!dto.getHospitalOrgIds().isEmpty()) {
-                    List<OrgEntity> hospitals = listByIds(dto.getHospitalOrgIds());
-                    boolean hasInvalid = hospitals.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_HOSPITAL.equals(o.getOrgType()));
-                    if (hasInvalid || hospitals.size() != dto.getHospitalOrgIds().size()) {
-                        throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
-                    }
-                }
-                // 校验通过后再删除旧关联
-                orgHospitalMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
-                        .eq(OrgHospitalEntity::getDistributorOrgId, id));
-                if (!dto.getHospitalOrgIds().isEmpty()) {
-                    saveOrgHospitalRelations(id, dto.getHospitalOrgIds());
-                }
-                // 同步清理该经销商下业务员中已失效的医院权限
-                java.util.Set<Long> newSet = new java.util.HashSet<>(dto.getHospitalOrgIds());
-                List<UserEntity> users = userMapper.selectList(
-                        new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id));
-                for (UserEntity user : users) {
-                    List<Long> toRemove = userHospitalMapper.selectHospitalIdsByUserId(user.getId())
-                            .stream().filter(hid -> !newSet.contains(hid)).collect(Collectors.toList());
-                    if (!toRemove.isEmpty()) {
-                        userHospitalMapper.delete(new LambdaQueryWrapper<UserHospitalEntity>()
-                                .eq(UserHospitalEntity::getUserId, user.getId())
-                                .in(UserHospitalEntity::getHospitalId, toRemove));
-                        log.info("清理用户失效医院权限，userId={}, removedHospitalIds={}", user.getId(), toRemove);
-                    }
-                }
-            }
-            log.info("更新机构成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("更新机构异常，id={}", id, e);
-            throw e;
+        OrgEntity entity = getById(id);
+        if (entity == null) {
+            throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
         }
+        // 禁止修改机构类型
+        if (dto.getOrgType() != null && !dto.getOrgType().equals(entity.getOrgType())) {
+            throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_ALLOWED);
+        }
+        // 机构名称有变更时才校验唯一性，避免与自身冲突
+        if (StrUtil.isNotBlank(dto.getOrgName()) && !dto.getOrgName().equals(entity.getOrgName())) {
+            if (isOrgNameExistsExcludingId(dto.getOrgName(), id)) {
+                throw new BusinessException(ErrorCodeEnum.ORG_EXISTS);
+            }
+        }
+        // 账号前缀不允许修改，如果传入且与原值不同则拒绝
+        if (StrUtil.isNotBlank(dto.getUsernamePrefix()) && !dto.getUsernamePrefix().equals(entity.getUsernamePrefix())) {
+            throw new BusinessException(ErrorCodeEnum.ORG_USERNAME_PREFIX_NOT_ALLOWED);
+        }
+        // 资质类型以入参为准，入参为空则沿用原值，防止局部更新时误清空
+        Integer qualType = dto.getQualificationType() != null ? dto.getQualificationType() : entity.getQualificationType();
+        String qualFile = StrUtil.isNotBlank(dto.getQualificationFile()) ? dto.getQualificationFile() : entity.getQualificationFile();
+        // 经销商类型 + 医疗器械资质时资质文件必填
+        if (DictCodeConstants.ORG_TYPE_DEALER.equals(entity.getOrgType())
+                && Integer.valueOf(1).equals(qualType)
+                && StrUtil.isBlank(qualFile)) {
+            throw new BusinessException(ErrorCodeEnum.ORG_CERT_FILE_REQUIRED);
+        }
+        if (StrUtil.isNotBlank(dto.getQualificationFile())) {
+            FileVO fileVO = fileService.getById(dto.getQualificationFile());
+            if (fileVO == null) {
+                throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
+            }
+        }
+        // 记录原机构名称，用于后续判断是否需要同步 sys_user.org_name
+        String originalOrgName = entity.getOrgName();
+        // 排除不可变字段，将DTO属性覆盖到实体（orgCode、usernamePrefix、orgType 不可修改）
+        BeanUtils.copyProperties(dto, entity, "id", "orgCode", "usernamePrefix", "orgType", "createTime", "updateTime", "createBy", "updateBy", "hospitalOrgIds");
+        // areaId变更时同步刷新冗余的地区名称字段
+        if (dto.getAreaId() != null) {
+            AreaEntity areaEntity = areaService.getById(dto.getAreaId());
+            entity.setAreaName(areaEntity != null ? areaEntity.getName() : null);
+        }
+        updateById(entity);
+        // 资质文件有变更时重新关联
+        if (StrUtil.isNotBlank(dto.getQualificationFile())) {
+            fileService.linkFile(dto.getQualificationFile(), FileBizTypeEnum.ORG_CERT.getDictCode(), id);
+        }
+        // 机构名称变更时，同步更新 sys_user 中的冗余字段 org_name
+        if (StrUtil.isNotBlank(dto.getOrgName()) && !dto.getOrgName().equals(originalOrgName)) {
+            userMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UserEntity>()
+                    .eq(UserEntity::getOrgId, id)
+                    .set(UserEntity::getOrgName, dto.getOrgName()));
+        }
+        // 经销商类型且前端传入了 hospitalOrgIds 时，全量替换关联关系（先校验后删插）
+        String orgType = entity.getOrgType();
+        if (DictCodeConstants.ORG_TYPE_DEALER.equals(orgType) && dto.getHospitalOrgIds() != null) {
+            // 先校验新列表合法性，再执行写操作
+            if (!dto.getHospitalOrgIds().isEmpty()) {
+                List<OrgEntity> hospitals = listByIds(dto.getHospitalOrgIds());
+                boolean hasInvalid = hospitals.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_HOSPITAL.equals(o.getOrgType()));
+                if (hasInvalid || hospitals.size() != dto.getHospitalOrgIds().size()) {
+                    throw new BusinessException(ErrorCodeEnum.HOSPITAL_NOT_FOUND);
+                }
+            }
+            // 校验通过后再删除旧关联
+            orgHospitalMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
+                    .eq(OrgHospitalEntity::getDistributorOrgId, id));
+            if (!dto.getHospitalOrgIds().isEmpty()) {
+                saveOrgHospitalRelations(id, dto.getHospitalOrgIds());
+            }
+            // 同步清理该经销商下业务员中已失效的医院权限
+            java.util.Set<Long> newSet = new java.util.HashSet<>(dto.getHospitalOrgIds());
+            List<UserEntity> users = userMapper.selectList(
+                    new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id));
+            for (UserEntity user : users) {
+                List<Long> toRemove = userHospitalMapper.selectHospitalIdsByUserId(user.getId())
+                        .stream().filter(hid -> !newSet.contains(hid)).collect(Collectors.toList());
+                if (!toRemove.isEmpty()) {
+                    userHospitalMapper.delete(new LambdaQueryWrapper<UserHospitalEntity>()
+                            .eq(UserHospitalEntity::getUserId, user.getId())
+                            .in(UserHospitalEntity::getHospitalId, toRemove));
+                    log.info("清理用户失效医院权限: userId={}, removedCount={}", user.getId(), toRemove.size());
+                }
+            }
+        }
+        log.info("更新机构: id={}, orgName={}", id, entity.getOrgName());
     }
 
     /**
@@ -387,42 +354,34 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void removeOrg(Long id) {
-        log.info("删除机构，id={}", id);
-        try {
-            // 校验机构是否存在
-            OrgEntity entity = getById(id);
-            if (entity == null) {
-                log.warn("机构不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
-            }
-            // 校验该机构下是否有用户
-            if (hasUsers(id)) {
-                log.warn("该机构下存在用户，无法删除，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.ORG_HAS_USERS);
-            }
-            // 清理经销商-医疗机构关联记录（作为经销商或医疗机构均需清理）
-            orgHospitalMapper.delete(new LambdaQueryWrapper<OrgHospitalEntity>()
-                    .eq(OrgHospitalEntity::getDistributorOrgId, id)
-                    .or()
-                    .eq(OrgHospitalEntity::getHospitalOrgId, id));
-            // 清理用户-医院关联记录（该机构作为医疗机构被分配给用户的记录）
-            userHospitalMapper.delete(new LambdaQueryWrapper<UserHospitalEntity>()
-                    .eq(UserHospitalEntity::getHospitalId, id));
-            // 清理医院组合模板明细记录（该机构作为医院被加入模板的记录）
-            templateDetailMapper.delete(new LambdaQueryWrapper<HospitalGroupTemplateDetailEntity>()
-                    .eq(HospitalGroupTemplateDetailEntity::getHospitalId, id));
-            // 清理部门-机构关联记录（该机构被部门关联的记录）
-            deptOrgMapper.delete(new LambdaQueryWrapper<DeptOrgEntity>()
-                    .eq(DeptOrgEntity::getOrgId, id));
-            // 逻辑删除
-            removeById(id);
-            log.info("删除机构成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("删除机构异常，id={}", id, e);
-            throw e;
+        // 校验机构是否存在
+        OrgEntity entity = getById(id);
+        if (entity == null) {
+            log.warn("机构不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
         }
+        // 校验该机构下是否有用户
+        if (hasUsers(id)) {
+            log.warn("机构下存在用户: 无法删除: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORG_HAS_USERS);
+        }
+        // 清理经销商-医疗机构关联记录（作为经销商或医疗机构均需清理）
+        orgHospitalMapper.delete(new LambdaQueryWrapper<OrgHospitalEntity>()
+                .eq(OrgHospitalEntity::getDistributorOrgId, id)
+                .or()
+                .eq(OrgHospitalEntity::getHospitalOrgId, id));
+        // 清理用户-医院关联记录（该机构作为医疗机构被分配给用户的记录）
+        userHospitalMapper.delete(new LambdaQueryWrapper<UserHospitalEntity>()
+                .eq(UserHospitalEntity::getHospitalId, id));
+        // 清理医院组合模板明细记录（该机构作为医院被加入模板的记录）
+        templateDetailMapper.delete(new LambdaQueryWrapper<HospitalGroupTemplateDetailEntity>()
+                .eq(HospitalGroupTemplateDetailEntity::getHospitalId, id));
+        // 清理部门-机构关联记录（该机构被部门关联的记录）
+        deptOrgMapper.delete(new LambdaQueryWrapper<DeptOrgEntity>()
+                .eq(DeptOrgEntity::getOrgId, id));
+        // 逻辑删除
+        removeById(id);
+        log.info("删除机构: id={}, orgName={}", id, entity.getOrgName());
     }
 
     /**
@@ -434,37 +393,32 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, Integer status) {
-        log.info("修改机构状态，id={}, status={}", id, status);
-        try {
-            // 校验机构是否存在
-            OrgEntity entity = getById(id);
-            if (entity == null) {
-                log.warn("机构不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
+        // 校验机构是否存在
+        OrgEntity entity = getById(id);
+        if (entity == null) {
+            log.warn("机构不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
+        }
+        Integer oldStatus = entity.getStatus();
+        // 更新状态
+        entity.setStatus(status);
+        updateById(entity);
+        // 禁用机构时踢出其下所有用户的登录会话
+        if (StatusConstants.DISABLED == status) {
+            List<UserEntity> users = userMapper.selectList(
+                    new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id));
+            int kickedCount = 0;
+            for (UserEntity u : users) {
+                try {
+                    cn.dev33.satoken.stp.StpUtil.kickout(u.getId());
+                    kickedCount++;
+                } catch (Exception ex) {
+                    log.warn("踢出用户会话失败（用户可能未登录）: userId={}", u.getId());
+                }
             }
-            // 更新状态
-            entity.setStatus(status);
-            updateById(entity);
-            // 禁用机构时踢出其下所有用户的登录会话
-            if (StatusConstants.DISABLED == status) {
-                List<UserEntity> users = userMapper.selectList(
-                        new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id));
-                users.forEach(u -> {
-                    try {
-                        cn.dev33.satoken.stp.StpUtil.kickout(u.getId());
-                        log.info("已踢出用户会话，userId={}", u.getId());
-                    } catch (Exception ex) {
-                        log.warn("踢出用户会话失败（用户可能未登录），userId={}", u.getId());
-                    }
-                });
-                log.info("禁用机构完成，共踢出 {} 个用户会话，orgId={}", users.size(), id);
-            }
-            log.info("修改机构状态成功，id={}, status={}", id, status);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("修改机构状态异常，id={}, status={}", id, status, e);
-            throw e;
+            log.info("修改机构状态: id={}, {} -> {}, 踢出会话={}个", id, oldStatus, status, kickedCount);
+        } else {
+            log.info("修改机构状态: id={}, {} -> {}", id, oldStatus, status);
         }
     }
 
@@ -475,50 +429,42 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      */
     @Override
     public List<OrgVO> listAllOrg() {
-        log.info("全量查询机构列表，用于下拉选择");
-        try {
-            LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(OrgEntity::getStatus, StatusConstants.NORMAL);
-            wrapper.ne(OrgEntity::getOrgType, DictCodeConstants.ORG_TYPE_PRODUCER);
-            String unknownHospitalIdStr = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
-            if (unknownHospitalIdStr != null) {
-                wrapper.ne(OrgEntity::getId, Long.parseLong(unknownHospitalIdStr));
-            }
-            wrapper.orderByAsc(OrgEntity::getOrgName);
-            List<OrgEntity> entityList = list(wrapper);
-
-            // 查询所有已被经销商关联的医疗机构ID集合
-            Set<Long> boundHospitalIds = orgHospitalMapper.selectList(new LambdaQueryWrapper<>())
-                    .stream()
-                    .map(OrgHospitalEntity::getHospitalOrgId)
-                    .collect(Collectors.toSet());
-
-            // 查询所有已被部门关联的经销商ID集合
-            Set<Long> boundDealerIds = deptOrgMapper.selectList(new LambdaQueryWrapper<>())
-                    .stream()
-                    .map(DeptOrgEntity::getOrgId)
-                    .collect(Collectors.toSet());
-
-            List<OrgVO> voList = entityList.stream()
-                    .map(entity -> {
-                        OrgVO vo = toVOWithDictNames(entity);
-                        // 如果是医疗机构类型，设置是否已被关联标识
-                        if (DictCodeConstants.ORG_TYPE_HOSPITAL.equals(vo.getOrgType())) {
-                            vo.setIsBound(boundHospitalIds.contains(vo.getId()));
-                        }
-                        // 如果是经销商类型，设置是否已被关联标识
-                        if (DictCodeConstants.ORG_TYPE_DEALER.equals(vo.getOrgType())) {
-                            vo.setIsBound(boundDealerIds.contains(vo.getId()));
-                        }
-                        return vo;
-                    })
-                    .collect(Collectors.toList());
-            log.info("全量查询机构列表成功，总数={}", voList.size());
-            return voList;
-        } catch (Exception e) {
-            log.error("全量查询机构列表异常", e);
-            throw e;
+        LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(OrgEntity::getStatus, StatusConstants.NORMAL);
+        wrapper.ne(OrgEntity::getOrgType, DictCodeConstants.ORG_TYPE_PRODUCER);
+        String unknownHospitalIdStr = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
+        if (unknownHospitalIdStr != null) {
+            wrapper.ne(OrgEntity::getId, Long.parseLong(unknownHospitalIdStr));
         }
+        wrapper.orderByAsc(OrgEntity::getOrgName);
+        List<OrgEntity> entityList = list(wrapper);
+
+        // 查询所有已被经销商关联的医疗机构ID集合
+        Set<Long> boundHospitalIds = orgHospitalMapper.selectList(new LambdaQueryWrapper<>())
+                .stream()
+                .map(OrgHospitalEntity::getHospitalOrgId)
+                .collect(Collectors.toSet());
+
+        // 查询所有已被部门关联的经销商ID集合
+        Set<Long> boundDealerIds = deptOrgMapper.selectList(new LambdaQueryWrapper<>())
+                .stream()
+                .map(DeptOrgEntity::getOrgId)
+                .collect(Collectors.toSet());
+
+        return entityList.stream()
+                .map(entity -> {
+                    OrgVO vo = toVOWithDictNames(entity);
+                    // 如果是医疗机构类型，设置是否已被关联标识
+                    if (DictCodeConstants.ORG_TYPE_HOSPITAL.equals(vo.getOrgType())) {
+                        vo.setIsBound(boundHospitalIds.contains(vo.getId()));
+                    }
+                    // 如果是经销商类型，设置是否已被关联标识
+                    if (DictCodeConstants.ORG_TYPE_DEALER.equals(vo.getOrgType())) {
+                        vo.setIsBound(boundDealerIds.contains(vo.getId()));
+                    }
+                    return vo;
+                })
+                .collect(Collectors.toList());
     }
 
     // ==================== 私有方法 ====================
@@ -589,20 +535,14 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      * @param hospitalOrgIds   关联的医疗机构ID列表
      */
     private void saveOrgHospitalRelations(Long distributorOrgId, List<Long> hospitalOrgIds) {
-        log.info("保存经销商关联医院，distributorOrgId={}, hospitalOrgIds={}", distributorOrgId, hospitalOrgIds);
-        // 将每个医疗机构ID构建为关联实体，逐条插入
         List<OrgHospitalEntity> relations = hospitalOrgIds.stream().map(hospitalOrgId -> {
             OrgHospitalEntity rel = new OrgHospitalEntity();
             rel.setDistributorOrgId(distributorOrgId);
             rel.setHospitalOrgId(hospitalOrgId);
             return rel;
         }).collect(Collectors.toList());
-        relations.forEach(rel -> {
-            log.info("插入关联记录，distributorOrgId={}, hospitalOrgId={}", rel.getDistributorOrgId(), rel.getHospitalOrgId());
-            orgHospitalMapper.insert(rel);
-            log.info("插入成功，生成的ID={}", rel.getId());
-        });
-        log.info("保存经销商关联医院完成，共插入{}条记录", relations.size());
+        relations.forEach(orgHospitalMapper::insert);
+        log.info("保存经销商关联医院: distributorOrgId={}, 关联数={}", distributorOrgId, relations.size());
     }
 
     /**
@@ -681,7 +621,6 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      */
     @Override
     public OrgOperationCheckVO checkRemove(Long id) {
-        log.info("预检查删除机构影响，id={}", id);
         OrgEntity entity = getById(id);
         if (entity == null) throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
 
@@ -752,8 +691,6 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             msg.append("，请确认是否继续？");
             result.setMessage(msg.toString());
         }
-        log.info("预检查删除机构完成，id={}, affectedUsers={}, affectedDoctors={}, affectedDepts={}, affectedTemplates={}",
-                id, affectedUsers.size(), affectedDoctors.size(), affectedDepts.size(), affectedTemplates.size());
         return result;
     }
 
@@ -766,7 +703,6 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      */
     @Override
     public OrgOperationCheckVO checkDisable(Long id) {
-        log.info("预检查禁用机构影响，id={}", id);
         OrgEntity entity = getById(id);
         if (entity == null) throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
 
@@ -810,8 +746,6 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             msg.append("，请确认是否继续？");
             result.setMessage(msg.toString());
         }
-        log.info("预检查禁用机构完成，id={}, affectedUsers={}, affectedTemplates={}",
-                id, affectedUsers.size(), affectedTemplates.size());
         return result;
     }
 
@@ -820,7 +754,6 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
      */
     @Override
     public OrgHospitalChangeCheckVO checkHospitalChange(Long id, List<Long> newHospitalIds) {
-        log.info("预检查经销商关联医院变更，id={}, newHospitalIds={}", id, newHospitalIds);
         OrgHospitalChangeCheckVO result = new OrgHospitalChangeCheckVO();
 
         // 查询当前关联的医院ID列表
@@ -868,7 +801,6 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
         if (result.isAffected()) {
             result.setMessage("本次变更将移除 " + removedHospitals.size() + " 家医院，导致 " + affectedUsers.size() + " 个业务员失去对应医院的访问权限，请确认是否继续？");
         }
-        log.info("预检查完成，removedCount={}, affectedUserCount={}", removedIds.size(), affectedUsers.size());
         return result;
     }
 }

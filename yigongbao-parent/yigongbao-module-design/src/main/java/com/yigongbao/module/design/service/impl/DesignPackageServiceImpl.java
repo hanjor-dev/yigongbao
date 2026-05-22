@@ -28,8 +28,6 @@ public class DesignPackageServiceImpl
      */
     @Override
     public Integer getNextPackageSeq(Long orderId) {
-        log.info("获取数据包下一个序号，orderId={}", orderId);
-
         // 只查询 package_seq 非空的记录，避免 Integer.compareTo 对 null 比较时抛出 NPE
         Integer maxSeq = list(new LambdaQueryWrapper<DesignPackageEntity>()
                         .eq(DesignPackageEntity::getOrderId, orderId)
@@ -40,7 +38,6 @@ public class DesignPackageServiceImpl
                 .max(Integer::compareTo)
                 .orElse(0);
 
-        log.info("获取数据包下一个序号完成，orderId={}, maxSeq={}, nextSeq={}", orderId, maxSeq, maxSeq + 1);
         return maxSeq + 1;
     }
 }

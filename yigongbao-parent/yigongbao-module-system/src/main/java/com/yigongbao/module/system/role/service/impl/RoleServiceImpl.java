@@ -62,7 +62,6 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
      */
     @Override
     public IPage<RoleVO> listRole(RolePageDTO dto) {
-        log.info("分页查询角色列表，dto={}", dto);
         try {
             // 如果未传入分页参数，使用默认值
             int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
@@ -96,7 +95,6 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             // 使用 Map 填充 VO
             Map<String, String> finalMap = accountTypeNameMap;
             IPage<RoleVO> voPage = pageResult.convert(entity -> toVOWithNames(entity, finalMap));
-            log.info("分页查询角色列表成功，总数={}", pageResult.getTotal());
             return voPage;
         } catch (Exception e) {
             log.error("分页查询角色列表异常", e);
@@ -112,20 +110,16 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
      */
     @Override
     public RoleVO getRoleById(Long id) {
-        log.info("根据ID查询角色详情，id={}", id);
         try {
             RoleEntity entity = getById(id);
             if (entity == null) {
-                log.warn("角色不存在，id={}", id);
+                log.warn("角色不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             RoleVO vo = toVOWithNames(entity);
             // 填充已分配的资源ID列表
             vo.setResourceIds(resourceService.getResourceIdsByRoleId(id));
-            log.info("查询角色详情成功，id={}", id);
             return vo;
-        } catch (BusinessException e) {
-            throw e;
         } catch (Exception e) {
             log.error("查询角色详情异常，id={}", id, e);
             throw e;
@@ -144,12 +138,12 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
         try {
             // 校验角色编码是否已存在
             if (isRoleCodeExists(dto.getRoleCode())) {
-                log.warn("角色编码已存在，roleCode={}", dto.getRoleCode());
+                log.warn("角色编码已存在: roleCode={}", dto.getRoleCode());
                 throw new BusinessException(ErrorCodeEnum.ROLE_EXISTS);
             }
             // 校验角色名称是否已存在
             if (isRoleNameExists(dto.getRoleName())) {
-                log.warn("角色名称已存在，roleName={}", dto.getRoleName());
+                log.warn("角色名称已存在: roleName={}", dto.getRoleName());
                 throw new BusinessException(ErrorCodeEnum.ROLE_NAME_EXISTS);
             }
             // DTO转换为实体对象
@@ -157,9 +151,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             entity.setStatus(StatusConstants.NORMAL);
             // 插入数据库
             save(entity);
-            log.info("创建角色成功，id={}, roleCode={}", entity.getId(), dto.getRoleCode());
-        } catch (BusinessException e) {
-            throw e;
+            log.info("创建角色: id={}, roleCode={}", entity.getId(), dto.getRoleCode());
         } catch (Exception e) {
             log.error("创建角色异常，roleName={}", dto.getRoleName(), e);
             throw e;
@@ -180,20 +172,20 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             // 校验角色是否存在
             RoleEntity entity = getById(id);
             if (entity == null) {
-                log.warn("角色不存在，id={}", id);
+                log.warn("角色不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ROLE_NOT_FOUND);
             }
             // 校验角色编码是否与其他角色重复
             if (StrUtil.isNotBlank(dto.getRoleCode()) && !dto.getRoleCode().equals(entity.getRoleCode())) {
                 if (isRoleCodeExistsExcludingId(dto.getRoleCode(), id)) {
-                    log.warn("角色编码已存在，roleCode={}", dto.getRoleCode());
+                    log.warn("角色编码已存在: roleCode={}", dto.getRoleCode());
                     throw new BusinessException(ErrorCodeEnum.ROLE_EXISTS);
                 }
             }
             // 校验角色名称是否与其他角色重复
             if (StrUtil.isNotBlank(dto.getRoleName()) && !dto.getRoleName().equals(entity.getRoleName())) {
                 if (isRoleNameExistsExcludingId(dto.getRoleName(), id)) {
-                    log.warn("角色名称已存在，roleName={}", dto.getRoleName());
+                    log.warn("角色名称已存在: roleName={}", dto.getRoleName());
                     throw new BusinessException(ErrorCodeEnum.ROLE_NAME_EXISTS);
                 }
             }
@@ -208,9 +200,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
                         .eq(UserEntity::getRoleId, id)
                         .set(UserEntity::getRoleName, dto.getRoleName()));
             }
-            log.info("更新角色成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("更新角色: id={}", id);
         } catch (Exception e) {
             log.error("更新角色异常，id={}", id, e);
             throw e;
@@ -230,20 +220,18 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             // 校验角色是否存在
             RoleEntity entity = getById(id);
             if (entity == null) {
-                log.warn("角色不存在，id={}", id);
+                log.warn("角色不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             // 校验该角色下是否有用户
             if (hasUsers(id)) {
-                log.warn("该角色下存在用户，无法删除，id={}", id);
+                log.warn("该角色下存在用户，无法删除: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ROLE_HAS_USERS);
             }
             // 先清理角色资源关联表，再逻辑删除角色
             roleResourceMapper.deleteByRoleId(id);
             removeById(id);
-            log.info("删除角色成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("删除角色: id={}", id);
         } catch (Exception e) {
             log.error("删除角色异常，id={}", id, e);
             throw e;
@@ -264,15 +252,13 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             // 校验角色是否存在
             RoleEntity entity = getById(id);
             if (entity == null) {
-                log.warn("角色不存在，id={}", id);
+                log.warn("角色不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.ROLE_NOT_FOUND);
             }
             // 更新状态
             entity.setStatus(status);
             updateById(entity);
-            log.info("修改角色状态成功，id={}, status={}", id, status);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("修改角色状态: id={}, status={}", id, status);
         } catch (Exception e) {
             log.error("修改角色状态异常，id={}, status={}", id, status, e);
             throw e;
@@ -286,7 +272,6 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
      */
     @Override
     public List<RoleVO> listAllRole() {
-        log.info("全量查询角色列表，用于下拉选择");
         try {
             LambdaQueryWrapper<RoleEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.orderByAsc(RoleEntity::getRoleName);
@@ -294,7 +279,6 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleEntity> impleme
             List<RoleVO> voList = entityList.stream()
                     .map(this::toVOWithNames)
                     .collect(Collectors.toList());
-            log.info("全量查询角色列表成功，总数={}", voList.size());
             return voList;
         } catch (Exception e) {
             log.error("全量查询角色列表异常", e);

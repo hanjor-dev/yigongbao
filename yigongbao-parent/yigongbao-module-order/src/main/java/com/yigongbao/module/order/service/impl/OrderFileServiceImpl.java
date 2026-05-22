@@ -29,7 +29,6 @@ public class OrderFileServiceImpl extends ServiceImpl<OrderFileMapper, OrderFile
      */
     @Override
     public List<OrderFileEntity> listByOrderIdAndCategory(Long orderId, String fileCategory) {
-        log.info("查询订单文件列表，orderId={}, fileCategory={}", orderId, fileCategory);
         return list(new LambdaQueryWrapper<OrderFileEntity>()
                 .eq(OrderFileEntity::getOrderId, orderId)
                 .eq(OrderFileEntity::getFileCategory, fileCategory)

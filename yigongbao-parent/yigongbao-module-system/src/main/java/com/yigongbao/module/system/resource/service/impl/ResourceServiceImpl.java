@@ -59,7 +59,6 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
      */
     @Override
     public IPage<ResourceVO> pageResources(ResourcePageDTO dto) {
-        log.info("分页查询资源列表，dto={}", dto);
         try {
             // 如果未传入分页参数，使用默认值
             int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
@@ -111,10 +110,9 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
      */
     @Override
     public ResourceVO getResourceById(Long id) {
-        log.info("根据ID查询资源详情，id={}", id);
         ResourceEntity entity = baseMapper.selectById(id);
         if (entity == null) {
-            log.warn("资源不存在，id={}", id);
+            log.warn("资源不存在: id={}", id);
             throw new BusinessException(ErrorCodeEnum.RESOURCE_NOT_FOUND);
         }
         return ResourceConvert.toVO(entity);
@@ -130,7 +128,7 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
 
         // 校验资源编码唯一性
         if (baseMapper.selectIdByCode(dto.getResourceCode()) != null) {
-            log.warn("资源编码已存在，resourceCode={}", dto.getResourceCode());
+            log.warn("资源编码已存在: resourceCode={}", dto.getResourceCode());
             throw new BusinessException(ErrorCodeEnum.RESOURCE_EXISTS);
         }
 
@@ -140,7 +138,7 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
             if (!dto.getParentId().equals(0L)) {
                 ResourceEntity parent = baseMapper.selectById(dto.getParentId());
                 if (parent == null) {
-                    log.warn("父级资源不存在，parentId={}", dto.getParentId());
+                    log.warn("父级资源不存在: parentId={}", dto.getParentId());
                     throw new BusinessException(ErrorCodeEnum.RESOURCE_NOT_FOUND);
                 }
             }
@@ -148,7 +146,7 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
 
         ResourceEntity entity = ResourceConvert.toEntity(dto);
         baseMapper.insert(entity);
-        log.info("创建资源成功，id={}", entity.getId());
+        log.info("创建资源: id={}", entity.getId());
     }
 
     /**
@@ -161,14 +159,14 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
 
         ResourceEntity entity = baseMapper.selectById(id);
         if (entity == null) {
-            log.warn("资源不存在，id={}", id);
+            log.warn("资源不存在: id={}", id);
             throw new BusinessException(ErrorCodeEnum.RESOURCE_NOT_FOUND);
         }
 
         // 校验资源编码唯一性（排除自身）
         Long existingId = baseMapper.selectIdByCode(dto.getResourceCode());
         if (existingId != null && !existingId.equals(id)) {
-            log.warn("资源编码已存在，resourceCode={}", dto.getResourceCode());
+            log.warn("资源编码已存在: resourceCode={}", dto.getResourceCode());
             throw new BusinessException(ErrorCodeEnum.RESOURCE_EXISTS);
         }
 
@@ -181,7 +179,7 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
         // 更新资源信息
         BeanUtils.copyProperties(dto, entity);
         baseMapper.updateById(entity);
-        log.info("更新资源成功，id={}", id);
+        log.info("更新资源: id={}", id);
     }
 
     /**
@@ -194,26 +192,26 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
 
         ResourceEntity entity = baseMapper.selectById(id);
         if (entity == null) {
-            log.warn("资源不存在，id={}", id);
+            log.warn("资源不存在: id={}", id);
             throw new BusinessException(ErrorCodeEnum.RESOURCE_NOT_FOUND);
         }
 
         // 校验是否有子资源
         Long childCount = baseMapper.countByParentId(id);
         if (childCount > 0) {
-            log.warn("资源下存在子资源，无法删除，id={}", id);
+            log.warn("资源下存在子资源，无法删除: id={}", id);
             throw new BusinessException(ErrorCodeEnum.RESOURCE_HAS_CHILDREN);
         }
 
         // 校验是否有角色关联
         Long roleCount = roleResourceMapper.countByResourceId(id);
         if (roleCount > 0) {
-            log.warn("资源已分配给角色，无法删除，id={}", id);
+            log.warn("资源已分配给角色，无法删除: id={}", id);
             throw new BusinessException(ErrorCodeEnum.RESOURCE_HAS_ROLES);
         }
 
         removeById(id);
-        log.info("删除资源成功，id={}", id);
+        log.info("删除资源: id={}", id);
     }
 
     /**
@@ -228,19 +226,19 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
         log.info("修改资源状态，id={}, status={}", id, status);
         try {
             if (status == null || (status != StatusConstants.DISABLED && status != StatusConstants.NORMAL)) {
-                log.warn("状态值不合法，status={}", status);
+                log.warn("状态值不合法: status={}", status);
                 throw new BusinessException(ErrorCodeEnum.PARAM_ERROR);
             }
             ResourceEntity entity = baseMapper.selectById(id);
             if (entity == null) {
-                log.warn("资源不存在，id={}", id);
+                log.warn("资源不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.RESOURCE_NOT_FOUND);
             }
             if (StatusConstants.NORMAL == status) {
                 if (entity.getParentId() != null && entity.getParentId() > 0) {
                     ResourceEntity parent = baseMapper.selectById(entity.getParentId());
                     if (parent != null && StatusConstants.DISABLED == parent.getStatus()) {
-                        log.warn("父资源已禁用，无法启用子资源，parentId={}", entity.getParentId());
+                        log.warn("父资源已禁用，无法启用子资源: parentId={}", entity.getParentId());
                         throw new BusinessException(ErrorCodeEnum.PARAM_ERROR);
                     }
                 }
@@ -249,9 +247,7 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
             }
             entity.setStatus(status);
             baseMapper.updateById(entity);
-            log.info("修改资源状态成功，id={}, status={}", id, status);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("修改资源状态: id={}, status={}", id, status);
         } catch (Exception e) {
             log.error("修改资源状态异常，id={}", id, e);
             throw e;
@@ -325,7 +321,7 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
             // 校验角色是否存在
             RoleEntity role = roleMapper.selectById(roleId);
             if (role == null) {
-                log.warn("角色不存在，roleId={}", roleId);
+                log.warn("角色不存在: roleId={}", roleId);
                 throw new BusinessException(ErrorCodeEnum.USER_ROLE_NOT_FOUND);
             }
 
@@ -344,7 +340,7 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
                     List<Long> invalidIds = resourceIds.stream()
                             .filter(id -> !validIds.contains(id))
                             .collect(Collectors.toList());
-                    log.warn("部分资源不存在，invalidIds={}", invalidIds);
+                    log.warn("部分资源不存在: invalidIds={}", invalidIds);
                     throw new BusinessException(ErrorCodeEnum.RESOURCE_NOT_FOUND);
                 }
 
@@ -359,15 +355,13 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
 
                 // 批量插入
                 roleResourceMapper.insertBatch(relations);
-                log.info("分配角色资源成功，roleId={}, count={}", roleId, relations.size());
+                log.info("分配角色资源: roleId={}, count={}", roleId, relations.size());
             } else {
-                log.info("分配角色资源成功，roleId={}, 已清空资源", roleId);
+                log.info("分配角色资源: roleId={}, 已清空资源", roleId);
             }
 
             // 刷新该角色所有在线用户的权限缓存，确保权限变更实时生效
             refreshPermissionCacheByRoleId(roleId);
-        } catch (BusinessException e) {
-            throw e;
         } catch (Exception e) {
             log.error("分配角色资源异常，roleId={}", roleId, e);
             throw e;
@@ -510,7 +504,7 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
                     log.info("刷新用户权限缓存，userId={}", userId);
                 }
             } catch (Exception e) {
-                log.warn("刷新用户权限缓存失败，userId={}", userId, e);
+                log.warn("刷新用户权限缓存失败: userId={}", userId, e);
             }
         }
     }

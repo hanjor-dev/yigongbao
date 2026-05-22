@@ -81,25 +81,22 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
      */
     @Override
     public void triggerAssignmentAfterAudit(Long orderId) {
-        log.info("触发设计师分配，orderId={}", orderId);
         String mode = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_ASSIGN_MODE.getKey());
         if (!"auto".equals(mode)) {
             // 手动模式：跳过自动分配，订单保持 PENDING_DESIGN 状态等待管理员手动分配
-            log.info("当前为手动分配模式，跳过自动分配，orderId={}", orderId);
             return;
         }
         try {
             Long designerId = autoAssignDesigner(orderId);
             if (designerId == null) {
                 // 无可用设计师（专业方向无人覆盖或无在职设计师），订单保持 PENDING_DESIGN 状态
-                // 管理员可通过筛选 status=PENDING_DESIGN & designerId=null 找到此类待分配订单
-                log.warn("自动分配未找到合适设计师，订单进入待分配状态，orderId={}", orderId);
+                log.warn("自动分配未找到合适设计师: orderId={}", orderId);
             } else {
-                log.info("自动分配成功，orderId={}, designerId={}", orderId, designerId);
+                log.info("自动分配设计师: orderId={}, designerId={}", orderId, designerId);
             }
         } catch (Exception e) {
             // 技术异常（DB 故障等），分配失败不阻断审核结果，管理员后续手动分配
-            log.error("自动分配异常，订单保持 PENDING_DESIGN 状态，orderId={}", orderId, e);
+            log.error("自动分配异常: orderId={}", orderId, e);
         }
     }
 
@@ -113,24 +110,21 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long autoAssignDesigner(Long orderId) {
-        log.info("自动分配设计师，orderId={}", orderId);
         // 1. 获取订单专业方向
         String specialty = getOrderSpecialty(orderId);
         if (StrUtil.isBlank(specialty)) {
-            log.warn("订单无可用专业方向，跳过自动分配，orderId={}", orderId);
+            log.warn("订单无可用专业方向，跳过自动分配: orderId={}", orderId);
             return null;
         }
         // 2. 第一次查询：精确匹配订单专业方向
         List<UserEntity> candidates = userMapper.selectAvailableDesigners(specialty);
         if (CollUtil.isEmpty(candidates)) {
-            log.info("精确匹配无结果，尝试通用专业方向兜底，specialty={}", specialty);
             // 3. 第二次查询：使用通用专业方向兜底
             candidates = userMapper.selectAvailableDesigners(DictCodeConstants.USER_SPECIALTY_GENERAL);
             if (CollUtil.isEmpty(candidates)) {
-                log.warn("通用专业方向兜底仍无结果，specialty={}", specialty);
+                log.warn("通用专业方向兜底仍无结果: specialty={}", specialty);
                 return null;
             }
-            log.info("通用专业方向兜底成功，匹配到 {} 位设计师", candidates.size());
         }
         // 4. 取负载最低的第一位
         UserEntity designer = candidates.getFirst();
@@ -140,7 +134,7 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         saveAutoAssignmentLog(order, designer);
         // 7. 更新订单 designerId / designerName
         updateOrderDesigner(order, designer);
-        log.info("自动分配成功，orderId={}, designerId={}, specialty={}", orderId, designer.getId(), specialty);
+        log.info("自动分配设计师: orderId={}, designerId={}, specialty={}", orderId, designer.getId(), specialty);
         return designer.getId();
     }
 
@@ -204,7 +198,6 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
      */
     @Override
     public List<DesignerVO> listAvailableDesigners(DesignerQueryDTO dto) {
-        log.info("查询可分配设计师，nameKeyword={}", dto.getNameKeyword());
         // 通过权限点查询所有拥有 design:View 权限的用户，支持按姓名模糊搜索
         List<UserEntity> users = userMapper.selectAllDesignersByPermission(dto.getNameKeyword());
         return users.stream().map(this::toDesignerVO).collect(Collectors.toList());
@@ -281,9 +274,6 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
             aggignLog.setRemark(String.format("重新分配：%s(%d) → %s(%d)",
                     aggignLog.getOldDesignerName(), aggignLog.getOldDesignerId(),
                     aggignLog.getNewDesignerName(), aggignLog.getNewDesignerId()));
-            log.info("设计师重新分配，orderId={}, 原设计师={}({}), 新设计师={}({})",
-                    order.getId(), aggignLog.getOldDesignerName(), aggignLog.getOldDesignerId(),
-                    aggignLog.getNewDesignerName(), aggignLog.getNewDesignerId());
         } else {
             aggignLog.setRemark(String.format("首次分配：%s(%d)",
                     aggignLog.getNewDesignerName(), aggignLog.getNewDesignerId()));

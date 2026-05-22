@@ -54,7 +54,6 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
      */
     @Override
     public IPage<DoctorVO> listDoctors(DoctorPageDTO dto) {
-        log.info("分页查询医生列表，dto={}", dto);
         try {
             int pageNum = dto.getPageNum() == null || dto.getPageNum() < 1 ? 1 : dto.getPageNum();
             int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
@@ -74,7 +73,6 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             Page<DoctorVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
             voPage.setRecords(voList);
 
-            log.info("分页查询医生列表成功，总数={}", pageResult.getTotal());
             return voPage;
         } catch (Exception e) {
             log.error("分页查询医生列表异常", e);
@@ -87,7 +85,6 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
      */
     @Override
     public List<DoctorVO> listAll(DoctorListDTO dto) {
-        log.info("查询所有医生列表，dto={}", dto);
         try {
             LambdaQueryWrapper<DoctorEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.like(StrUtil.isNotBlank(dto.getDoctorName()), DoctorEntity::getDoctorName, dto.getDoctorName())
@@ -100,7 +97,6 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             // 批量填充医院名称，避免 N+1 查询
             fillExtraFieldsBatch(voList, list);
 
-            log.info("查询所有医生列表成功，数量={}", voList.size());
             return voList;
         } catch (Exception e) {
             log.error("查询所有医生列表异常", e);
@@ -113,19 +109,15 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
      */
     @Override
     public DoctorVO getById(Long id) {
-        log.info("根据ID查询医生，id={}", id);
         try {
             DoctorEntity entity = super.getById(id);
             if (entity == null) {
-                log.warn("医生不存在，id={}", id);
+                log.warn("医生不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             DoctorVO vo = DoctorConvert.toVO(entity);
             fillExtraFields(vo, entity);
-            log.info("查询医生成功，id={}", id);
             return vo;
-        } catch (BusinessException e) {
-            throw e;
         } catch (Exception e) {
             log.error("查询医生异常，id={}", id, e);
             throw e;
@@ -160,9 +152,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             }
 
             save(entity);
-            log.info("创建医生成功，id={}, doctorName={}", entity.getId(), dto.getDoctorName());
-        } catch (BusinessException e) {
-            throw e;
+            log.info("创建医生: id={}, doctorName={}", entity.getId(), dto.getDoctorName());
         } catch (Exception e) {
             log.error("创建医生异常，doctorName={}", dto.getDoctorName(), e);
             throw e;
@@ -179,16 +169,14 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
         try {
             DoctorEntity entity = super.getById(id);
             if (entity == null) {
-                log.warn("医生不存在，id={}", id);
+                log.warn("医生不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
 
             BeanUtils.copyProperties(dto, entity, "id", "hospitalId", "creatorId", "orderCount",
                     "createTime", "updateTime", "createBy", "updateBy");
             updateById(entity);
-            log.info("更新医生成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("更新医生: id={}", id);
         } catch (Exception e) {
             log.error("更新医生异常，id={}", id, e);
             throw e;
@@ -205,13 +193,11 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
         try {
             DoctorEntity entity = super.getById(id);
             if (entity == null) {
-                log.warn("医生不存在，id={}", id);
+                log.warn("医生不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             removeById(id);
-            log.info("删除医生成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("删除医生: id={}", id);
         } catch (Exception e) {
             log.error("删除医生异常，id={}", id, e);
             throw e;
@@ -223,7 +209,6 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
      */
     @Override
     public List<DoctorVO> listByCreatorAndHospital(DoctorSuggestDTO dto) {
-        log.info("查询业务员在医院下的历史医生列表，dto={}", dto);
         try {
             LambdaQueryWrapper<DoctorEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(dto.getCreatorId() != null, DoctorEntity::getCreatorId, dto.getCreatorId());
@@ -234,7 +219,6 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             List<DoctorVO> voList = list.stream().map(DoctorConvert::toVO).collect(Collectors.toList());
             // 批量填充医院名称，避免 N+1 查询
             fillExtraFieldsBatch(voList, list);
-            log.info("查询历史医生列表成功，数量={}", voList.size());
             return voList;
         } catch (Exception e) {
             log.error("查询历史医生列表异常，dto={}", dto, e);
@@ -294,13 +278,11 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             entity.setOrderCount(0);
 
             save(entity);
-            log.info("快速添加医生成功，id={}", entity.getId());
+            log.info("快速添加医生: id={}", entity.getId());
 
             DoctorVO vo = DoctorConvert.toVO(entity);
             fillExtraFields(vo, entity);
             return vo;
-        } catch (BusinessException e) {
-            throw e;
         } catch (Exception e) {
             log.error("快速添加医生异常，doctorName={}", dto.getDoctorName(), e);
             throw e;
@@ -317,14 +299,12 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
         try {
             DoctorEntity entity = super.getById(id);
             if (entity == null) {
-                log.warn("医生不存在，id={}", id);
+                log.warn("医生不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
             }
             entity.setStatus(status);
             updateById(entity);
-            log.info("修改医生状态成功，id={}, status={}", id, status);
-        } catch (BusinessException e) {
-            throw e;
+            log.info("修改医生状态: id={}, status={}", id, status);
         } catch (Exception e) {
             log.error("修改医生状态异常，id={}, status={}", id, status, e);
             throw e;

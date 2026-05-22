@@ -57,7 +57,6 @@ public class ProductSpecServiceImpl extends ServiceImpl<ProductSpecMapper, Produ
      */
     @Override
     public List<ProductSpecVO> listByProductId(Long productId) {
-        log.info("查询产品规格列表，productId={}", productId);
         List<ProductSpecEntity> list = list(new LambdaQueryWrapper<ProductSpecEntity>()
                 .eq(ProductSpecEntity::getProductId, productId)
                 .orderByAsc(ProductSpecEntity::getSort)
@@ -77,48 +76,40 @@ public class ProductSpecServiceImpl extends ServiceImpl<ProductSpecMapper, Produ
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void create(Long productId, CreateProductSpecDTO dto) {
-        log.info("创建产品规格，productId={}, specName={}", productId, dto.getSpecName());
-        try {
-            // 1. 校验产品存在
-            ProductEntity product = productMapper.selectById(productId);
-            if (product == null) {
-                log.warn("产品不存在，productId={}", productId);
-                throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
-            }
-
-            // 2. 校验同产品下规格名称唯一
-            long count = count(new LambdaQueryWrapper<ProductSpecEntity>()
-                    .eq(ProductSpecEntity::getProductId, productId)
-                    .eq(ProductSpecEntity::getSpecName, dto.getSpecName()));
-            if (count > 0) {
-                log.warn("同产品下规格名称已存在，productId={}, specName={}", productId, dto.getSpecName());
-                throw new BusinessException(ErrorCodeEnum.PRODUCT_SPEC_EXISTS);
-            }
-
-            // 3. 构建并插入规格
-            ProductSpecEntity entity = new ProductSpecEntity();
-            BeanUtils.copyProperties(dto, entity);
-            entity.setProductId(productId);
-            // 根据 certId 查询注册证号并写入冗余字段
-            if (dto.getCertId() != null && registrationCertService != null) {
-                RegistrationCertVO cert = registrationCertService.getById(dto.getCertId());
-                entity.setCertNo(cert != null ? cert.getCertCode() : null);
-            }
-            if (entity.getStatus() == null) {
-                entity.setStatus(StatusConstants.NORMAL);
-            }
-            if (entity.getSort() == null) {
-                entity.setSort(0);
-            }
-
-            save(entity);
-            log.info("创建产品规格成功，specId={}, productId={}", entity.getId(), productId);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("创建产品规格异常，productId={}", productId, e);
-            throw e;
+        // 1. 校验产品存在
+        ProductEntity product = productMapper.selectById(productId);
+        if (product == null) {
+            log.warn("产品不存在: productId={}", productId);
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
         }
+
+        // 2. 校验同产品下规格名称唯一
+        long count = count(new LambdaQueryWrapper<ProductSpecEntity>()
+                .eq(ProductSpecEntity::getProductId, productId)
+                .eq(ProductSpecEntity::getSpecName, dto.getSpecName()));
+        if (count > 0) {
+            log.warn("同产品下规格名称已存在: productId={}, specName={}", productId, dto.getSpecName());
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_SPEC_EXISTS);
+        }
+
+        // 3. 构建并插入规格
+        ProductSpecEntity entity = new ProductSpecEntity();
+        BeanUtils.copyProperties(dto, entity);
+        entity.setProductId(productId);
+        // 根据 certId 查询注册证号并写入冗余字段
+        if (dto.getCertId() != null && registrationCertService != null) {
+            RegistrationCertVO cert = registrationCertService.getById(dto.getCertId());
+            entity.setCertNo(cert != null ? cert.getCertCode() : null);
+        }
+        if (entity.getStatus() == null) {
+            entity.setStatus(StatusConstants.NORMAL);
+        }
+        if (entity.getSort() == null) {
+            entity.setSort(0);
+        }
+
+        save(entity);
+        log.info("创建产品规格: specId={}, productId={}, specName={}", entity.getId(), productId, dto.getSpecName());
     }
 
     /**
@@ -133,48 +124,40 @@ public class ProductSpecServiceImpl extends ServiceImpl<ProductSpecMapper, Produ
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void update(Long specId, UpdateProductSpecDTO dto) {
-        log.info("更新产品规格，specId={}", specId);
-        try {
-            // 1. 校验规格存在
-            ProductSpecEntity entity = getById(specId);
-            if (entity == null) {
-                log.warn("产品规格不存在，specId={}", specId);
-                throw new BusinessException(ErrorCodeEnum.PRODUCT_SPEC_NOT_FOUND);
-            }
-
-            // 2. 若修改了规格名称，校验同产品下名称唯一
-            if (dto.getSpecName() != null && !dto.getSpecName().equals(entity.getSpecName())) {
-                long count = count(new LambdaQueryWrapper<ProductSpecEntity>()
-                        .eq(ProductSpecEntity::getProductId, entity.getProductId())
-                        .eq(ProductSpecEntity::getSpecName, dto.getSpecName()));
-                if (count > 0) {
-                    log.warn("同产品下规格名称已存在，productId={}, specName={}", entity.getProductId(), dto.getSpecName());
-                    throw new BusinessException(ErrorCodeEnum.PRODUCT_SPEC_EXISTS);
-                }
-            }
-
-            // 3. 更新
-            Long oldCertId = entity.getCertId();
-            BeanUtils.copyProperties(dto, entity, "id", "productId", "createTime", "updateTime", "createBy", "updateBy", "certNo");
-            // 若 certId 有变化或 certNo 为空，则重新查询 certNo；否则保留原值
-            if (dto.getCertId() != null) {
-                if (!dto.getCertId().equals(oldCertId) || entity.getCertNo() == null) {
-                    RegistrationCertVO cert = registrationCertService != null
-                            ? registrationCertService.getById(dto.getCertId()) : null;
-                    entity.setCertNo(cert != null ? cert.getCertCode() : null);
-                }
-            } else if (dto.getCertId() == null && oldCertId != null) {
-                // certId 被清空，同步清空 certNo
-                entity.setCertNo(null);
-            }
-            updateById(entity);
-            log.info("更新产品规格成功，specId={}", specId);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("更新产品规格异常，specId={}", specId, e);
-            throw e;
+        // 1. 校验规格存在
+        ProductSpecEntity entity = getById(specId);
+        if (entity == null) {
+            log.warn("产品规格不存在: specId={}", specId);
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_SPEC_NOT_FOUND);
         }
+
+        // 2. 若修改了规格名称，校验同产品下名称唯一
+        if (dto.getSpecName() != null && !dto.getSpecName().equals(entity.getSpecName())) {
+            long count = count(new LambdaQueryWrapper<ProductSpecEntity>()
+                    .eq(ProductSpecEntity::getProductId, entity.getProductId())
+                    .eq(ProductSpecEntity::getSpecName, dto.getSpecName()));
+            if (count > 0) {
+                log.warn("同产品下规格名称已存在: productId={}, specName={}", entity.getProductId(), dto.getSpecName());
+                throw new BusinessException(ErrorCodeEnum.PRODUCT_SPEC_EXISTS);
+            }
+        }
+
+        // 3. 更新
+        Long oldCertId = entity.getCertId();
+        BeanUtils.copyProperties(dto, entity, "id", "productId", "createTime", "updateTime", "createBy", "updateBy", "certNo");
+        // 若 certId 有变化或 certNo 为空，则重新查询 certNo；否则保留原值
+        if (dto.getCertId() != null) {
+            if (!dto.getCertId().equals(oldCertId) || entity.getCertNo() == null) {
+                RegistrationCertVO cert = registrationCertService != null
+                        ? registrationCertService.getById(dto.getCertId()) : null;
+                entity.setCertNo(cert != null ? cert.getCertCode() : null);
+            }
+        } else if (dto.getCertId() == null && oldCertId != null) {
+            // certId 被清空，同步清空 certNo
+            entity.setCertNo(null);
+        }
+        updateById(entity);
+        log.info("更新产品规格: specId={}", specId);
     }
 
     /**
@@ -188,30 +171,22 @@ public class ProductSpecServiceImpl extends ServiceImpl<ProductSpecMapper, Produ
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void remove(Long specId) {
-        log.info("删除产品规格，specId={}", specId);
-        try {
-            // 1. 校验规格存在
-            ProductSpecEntity entity = getById(specId);
-            if (entity == null) {
-                log.warn("产品规格不存在，specId={}", specId);
-                throw new BusinessException(ErrorCodeEnum.PRODUCT_SPEC_NOT_FOUND);
-            }
-
-            // 2. 校验规格未被 design_product 引用
-            if (specReferenceChecker != null && specReferenceChecker.isSpecInUse(specId)) {
-                log.warn("规格已被打印信息引用，无法删除，specId={}", specId);
-                throw new BusinessException(ErrorCodeEnum.PRODUCT_SPEC_IN_USE);
-            }
-
-            // 3. 逻辑删除
-            removeById(specId);
-            log.info("删除产品规格成功，specId={}", specId);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("删除产品规格异常，specId={}", specId, e);
-            throw e;
+        // 1. 校验规格存在
+        ProductSpecEntity entity = getById(specId);
+        if (entity == null) {
+            log.warn("产品规格不存在: specId={}", specId);
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_SPEC_NOT_FOUND);
         }
+
+        // 2. 校验规格未被 design_product 引用
+        if (specReferenceChecker != null && specReferenceChecker.isSpecInUse(specId)) {
+            log.warn("规格已被打印信息引用，无法删除: specId={}", specId);
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_SPEC_IN_USE);
+        }
+
+        // 3. 逻辑删除
+        removeById(specId);
+        log.info("删除产品规格: specId={}", specId);
     }
 
     /**

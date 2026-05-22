@@ -50,7 +50,6 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
      */
     @Override
     public IPage<ConfigVO> pageConfig(ConfigPageDTO dto) {
-        log.info("分页查询配置列表，dto={}", dto);
         try {
             // 如果未传入分页参数，使用默认值
             int pageNum = dto.getPageNum() != null && dto.getPageNum() > 0 ? dto.getPageNum() : 1;
@@ -65,7 +64,6 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
                     .orderByAsc(ConfigEntity::getSort)
                     .orderByDesc(ConfigEntity::getCreateTime);
             IPage<ConfigEntity> pageResult = this.page(page, wrapper);
-            log.info("分页查询配置列表成功，总数={}", pageResult.getTotal());
             return pageResult.convert(ConfigConvert::toVO);
         } catch (Exception e) {
             log.error("分页查询配置列表异常", e);
@@ -83,23 +81,18 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
     @Override
     public ConfigVO getConfigById(Long id) {
         // 记录查询入参
-        log.info("根据ID查询配置，id={}", id);
         try {
             // 执行数据库查询
             ConfigEntity entity = this.getById(id);
             // 校验配置是否存在
             if (entity == null) {
-                log.warn("配置不存在，id={}", id);
+                log.warn("配置不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.CONFIG_NOT_FOUND);
             }
             // 转换为VO对象
             ConfigVO vo = ConfigConvert.toVO(entity);
             // 记录查询成功
-            log.info("查询配置成功，id={}", id);
             return vo;
-        } catch (BusinessException e) {
-            // 业务异常直接抛出
-            throw e;
         } catch (Exception e) {
             // 记录系统异常
             log.error("查询配置异常，id={}", id, e);
@@ -117,7 +110,6 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
     @Override
     public ConfigVO getConfigByKey(String configKey) {
         // 记录查询入参
-        log.info("根据键名查询配置，configKey={}", configKey);
         try {
             // 构建查询条件
             LambdaQueryWrapper<ConfigEntity> wrapper = new LambdaQueryWrapper<>();
@@ -126,17 +118,13 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
             ConfigEntity entity = baseMapper.selectOne(wrapper);
             // 校验配置是否存在
             if (entity == null) {
-                log.warn("配置不存在，configKey={}", configKey);
+                log.warn("配置不存在: configKey={}", configKey);
                 throw new BusinessException(ErrorCodeEnum.CONFIG_NOT_FOUND);
             }
             // 转换为VO对象
             ConfigVO vo = ConfigConvert.toVO(entity);
             // 记录查询成功
-            log.info("查询配置成功，configKey={}", configKey);
             return vo;
-        } catch (BusinessException e) {
-            // 业务异常直接抛出
-            throw e;
         } catch (Exception e) {
             // 记录系统异常
             log.error("查询配置异常，configKey={}", configKey, e);
@@ -158,7 +146,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
         try {
             // 检查 configKey 是否已存在
             if (isConfigKeyExists(dto.getConfigKey(), null)) {
-                log.warn("配置键已存在，configKey={}", dto.getConfigKey());
+                log.warn("配置键已存在: configKey={}", dto.getConfigKey());
                 throw new BusinessException(ErrorCodeEnum.CONFIG_KEY_EXISTS);
             }
             // DTO转换为实体对象
@@ -168,10 +156,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
             // 插入数据库
             this.save(entity);
             // 记录创建成功
-            log.info("创建配置成功，id={}, configKey={}", entity.getId(), dto.getConfigKey());
-        } catch (BusinessException e) {
-            // 业务异常直接抛出
-            throw e;
+            log.info("创建配置: id={}, configKey={}", entity.getId(), dto.getConfigKey());
         } catch (Exception e) {
             // 记录系统异常
             log.error("创建配置异常，configKey={}", dto.getConfigKey(), e);
@@ -196,7 +181,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
             ConfigEntity entity = this.getById(id);
             // 校验配置是否存在
             if (entity == null) {
-                log.warn("配置不存在，id={}", id);
+                log.warn("配置不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.CONFIG_NOT_FOUND);
             }
 
@@ -205,10 +190,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
             // 更新数据库
             this.updateById(entity);
             // 记录更新成功
-            log.info("更新配置成功，id={}", id);
-        } catch (BusinessException e) {
-            // 业务异常直接抛出
-            throw e;
+            log.info("更新配置: id={}", id);
         } catch (Exception e) {
             // 记录系统异常
             log.error("更新配置异常，id={}", id, e);
@@ -232,21 +214,18 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
             ConfigEntity entity = this.getById(id);
             // 校验配置是否存在
             if (entity == null) {
-                log.warn("配置不存在，id={}", id);
+                log.warn("配置不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.CONFIG_NOT_FOUND);
             }
             // 检查是否为系统内置配置，系统内置配置不可删除
             if (entity.getIsSystem() != null && entity.getIsSystem() == 1) {
-                log.warn("系统内置配置不可删除，id={}", id);
+                log.warn("系统内置配置不可删除: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.CONFIG_SYSTEM_NOT_ALLOW_DELETE);
             }
             // 执行删除
             this.removeById(id);
             // 记录删除成功
-            log.info("删除配置成功，id={}", id);
-        } catch (BusinessException e) {
-            // 业务异常直接抛出
-            throw e;
+            log.info("删除配置: id={}", id);
         } catch (Exception e) {
             // 记录系统异常
             log.error("删除配置异常，id={}", id, e);
@@ -399,7 +378,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
         // 1. 校验 configKey 是否在枚举定义中
         SystemConfigKeyEnum configEnum = SystemConfigKeyEnum.getByKey(configKey);
         if (configEnum == null) {
-            log.warn("configKey 未在 SystemConfigKeyEnum 中定义，configKey={}", configKey);
+            log.warn("configKey 未在 SystemConfigKeyEnum 中定义: configKey={}", configKey);
             return null;
         }
         // 2. 动态构建字段名：configKey 转驼峰加 config 前缀

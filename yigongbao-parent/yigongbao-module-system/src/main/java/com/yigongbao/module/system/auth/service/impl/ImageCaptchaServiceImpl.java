@@ -59,7 +59,7 @@ public class ImageCaptchaServiceImpl implements ImageCaptchaService {
         // 1. 校验滑动轨迹
         ApiResponse<?> response = imageCaptchaApplication.matching(captchaId, trackData);
         if (!response.isSuccess()) {
-            log.warn("滑动轨迹校验失败，captchaId={}", captchaId);
+            log.warn("滑动轨迹校验失败: captchaId={}", captchaId);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_GRAPHIC_ERROR);
         }
 
@@ -68,7 +68,7 @@ public class ImageCaptchaServiceImpl implements ImageCaptchaService {
         String redisKey = ImageCaptchaService.CAPTCHA_SECONDARY_TOKEN_PREFIX + token;
         stringRedisTemplate.opsForValue().set(redisKey, captchaId, TOKEN_TTL_MINUTES, TimeUnit.MINUTES);
 
-        log.info("二次验证 Token 生成成功，token={}, ttl={}min", token, TOKEN_TTL_MINUTES);
+        log.info("二次验证 Token 生成: token={}, ttl={}min", token, TOKEN_TTL_MINUTES);
         return token;
     }
 }

@@ -57,7 +57,6 @@ public class ViewerServiceImpl implements ViewerService {
 
     @Override
     public ViewerConfigVO getViewerConfig(Long orderId, String token) {
-        log.info("获取查看器配置, orderId={}", orderId);
         // dcmPath：查看器用此接口获取 DCM 影像压缩包 URL 列表
         ViewerConfigVO.PathItem dcmItem = new ViewerConfigVO.PathItem();
         dcmItem.setPath(DCM_PATH);
@@ -87,13 +86,11 @@ public class ViewerServiceImpl implements ViewerService {
         if (StrUtil.isNotBlank(token)) {
             vo.setToken(Map.of("Authorization", token));
         }
-        log.info("获取查看器配置成功, orderId={}", orderId);
         return vo;
     }
 
     @Override
     public List<String> getDcmUrls(Long orderId) {
-        log.info("查询DCM URL列表, orderId={}", orderId);
         List<OrderFileEntity> orderFiles = orderFileService.listByOrderIdAndCategory(
                 orderId, DictCodeConstants.ORDER_FILE_CATEGORY_DCM);
         if (CollUtil.isEmpty(orderFiles)) {
@@ -113,7 +110,7 @@ public class ViewerServiceImpl implements ViewerService {
 
     @Override
     public ViewerStlVO getStlData(Long orderId) {
-        log.info("查询STL数据, orderId={}", orderId);        List<DesignPackageEntity> packages = designPackageService.list(
+        List<DesignPackageEntity> packages = designPackageService.list(
                 new LambdaQueryWrapper<DesignPackageEntity>()
                         .eq(DesignPackageEntity::getOrderId, orderId)
                         .orderByAsc(DesignPackageEntity::getPackageSeq));
@@ -162,7 +159,6 @@ public class ViewerServiceImpl implements ViewerService {
 
     @Override
     public void saveMark(String groupId, String modelFileId, MultipartFile file) {
-        log.info("保存标注截图, groupId={}, modelFileId={}", groupId, modelFileId);
         if (StrUtil.isBlank(groupId) || StrUtil.isBlank(modelFileId)) {
             log.warn("groupId 或 modelFileId 为空，无法关联截图");
             throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "groupId, modelFileId");
@@ -178,7 +174,8 @@ public class ViewerServiceImpl implements ViewerService {
         }
         // 复用现有的截图服务（关联到 packageId + packageFileId）
         screenshotService.saveScreenshot(pkg.getId(), Long.valueOf(modelFileId), file);
-        log.info("标注截图保存成功, packageId={}, packageFileId={}", pkg.getId(), modelFileId);
+        log.info("保存标注截图: packageId={}, packageFileId={}, fileName={}",
+            pkg.getId(), modelFileId, file.getOriginalFilename());
     }
 
     private Map<String, PartColorEntity> batchQueryColors(List<String> fileNames) {

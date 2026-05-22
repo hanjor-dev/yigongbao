@@ -82,8 +82,6 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
      */
     @Override
     public PrintInfoOptionsVO getOptions(Long orderId, Long packageId) {
-        log.info("获取打印信息选项，orderId={}, packageId={}", orderId, packageId);
-
         // 1. 查订单（含数据权限校验）
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
@@ -158,7 +156,6 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
             vo.setRemark(pkg.getRemark());
         }
 
-        log.info("获取打印信息选项成功，orderId={}, packageId={}", orderId, packageId);
         return vo;
     }
 
@@ -171,8 +168,6 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
      */
     @Override
     public PrintInfoListVO listPrintInfo(Long orderId, Long packageId) {
-        log.info("查询打印信息列表，orderId={}, packageId={}", orderId, packageId);
-
         // 1. 校验 packageId 属于 orderId，并回填包级字段（checkDesignPhase 含数据权限校验）
         checkDesignPhase(orderId);
         DesignPackageEntity pkg = packageService.getById(packageId);
@@ -233,7 +228,6 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
         }).toList();
 
         result.setItems(items);
-        log.info("查询打印信息列表成功，orderId={}, packageId={}, itemCount={}", orderId, packageId, items.size());
         return result;
     }
 
@@ -248,9 +242,6 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void savePrintInfo(Long orderId, Long packageId, SavePrintInfoDTO dto) {
-        log.info("保存打印信息，orderId={}, packageId={}, itemCount={}",
-                orderId, packageId, dto.getItems().size());
-
         // 1. 校验订单状态和操作人
         OrderMainEntity order = checkDesignPhase(orderId);
         checkIsAssignedDesigner(order);
@@ -373,7 +364,7 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
         // 10. 打印信息变化，重置该数据包的指令单和图纸确认状态（is_confirmed=0）
         resetConfirmedStatus(packageId);
 
-        log.info("保存打印信息成功，orderId={}, packageId={}", orderId, packageId);
+        log.info("保存打印信息: orderId={}, packageId={}, itemCount={}", orderId, packageId, dto.getItems().size());
     }
 
     /**
@@ -386,8 +377,6 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deletePrintInfo(Long orderId, Long packageId, Long printInfoId) {
-        log.info("删除打印信息，orderId={}, packageId={}, printInfoId={}", orderId, packageId, printInfoId);
-
         // 1. 校验订单状态和操作人
         OrderMainEntity order = checkDesignPhase(orderId);
         checkIsAssignedDesigner(order);
@@ -408,7 +397,7 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
         // 4. 打印信息变化，重置该数据包的指令单和图纸确认状态（is_confirmed=0）
         resetConfirmedStatus(packageId);
 
-        log.info("删除打印信息成功，printInfoId={}", printInfoId);
+        log.info("删除打印信息: printInfoId={}, packageId={}", printInfoId, packageId);
     }
 
     // ==================== 私有方法 ====================
@@ -429,7 +418,6 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                         .eq(DesignDrawingEntity::getPackageId, packageId)
                         .set(DesignDrawingEntity::getIsConfirmed, StatusConstants.NOT_CONFIRMED)
                         .set(DesignDrawingEntity::getConfirmTime, null));
-        log.info("重置数据包确认状态成功，packageId={}", packageId);
     }
 
     /**

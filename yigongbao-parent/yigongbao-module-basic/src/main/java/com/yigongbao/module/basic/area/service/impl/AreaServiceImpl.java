@@ -39,18 +39,10 @@ public class AreaServiceImpl extends ServiceImpl<AreaMapper, AreaEntity> impleme
      */
     @Override
     public List<AreaVO> listTree(Long parentCode) {
-        log.info("获取地区树形结构，parentCode={}", parentCode);
-        try {
-            List<AreaEntity> allList = list(new LambdaQueryWrapper<AreaEntity>()
-                    .orderByAsc(AreaEntity::getAreaCode));
-            Long rootCode = parentCode != null ? parentCode : ROOT_PARENT_CODE;
-            List<AreaVO> tree = buildTree(allList, rootCode);
-            log.info("获取地区树形结构成功，根节点数量={}", tree.size());
-            return tree;
-        } catch (Exception e) {
-            log.error("获取地区树形结构异常，parentCode={}", parentCode, e);
-            throw e;
-        }
+        List<AreaEntity> allList = list(new LambdaQueryWrapper<AreaEntity>()
+                .orderByAsc(AreaEntity::getAreaCode));
+        Long rootCode = parentCode != null ? parentCode : ROOT_PARENT_CODE;
+        return buildTree(allList, rootCode);
     }
 
     /**
@@ -61,18 +53,11 @@ public class AreaServiceImpl extends ServiceImpl<AreaMapper, AreaEntity> impleme
      */
     @Override
     public List<AreaVO> listByParentId(Long parentCode) {
-        log.info("根据父级行政代码查询子地区列表，parentCode={}", parentCode);
-        try {
-            Long pid = parentCode != null ? parentCode : ROOT_PARENT_CODE;
-            List<AreaEntity> list = list(new LambdaQueryWrapper<AreaEntity>()
-                    .eq(AreaEntity::getParentCode, pid)
-                    .orderByAsc(AreaEntity::getAreaCode));
-            log.info("查询子地区列表成功，数量={}", list.size());
-            return AreaConvert.toVOList(list);
-        } catch (Exception e) {
-            log.error("根据父级行政代码查询子地区列表异常，parentCode={}", parentCode, e);
-            throw e;
-        }
+        Long pid = parentCode != null ? parentCode : ROOT_PARENT_CODE;
+        List<AreaEntity> list = list(new LambdaQueryWrapper<AreaEntity>()
+                .eq(AreaEntity::getParentCode, pid)
+                .orderByAsc(AreaEntity::getAreaCode));
+        return AreaConvert.toVOList(list);
     }
 
     /**
@@ -82,17 +67,10 @@ public class AreaServiceImpl extends ServiceImpl<AreaMapper, AreaEntity> impleme
      */
     @Override
     public List<AreaVO> listProvinces() {
-        log.info("获取省份列表");
-        try {
-            List<AreaEntity> list = list(new LambdaQueryWrapper<AreaEntity>()
-                    .eq(AreaEntity::getParentCode, ROOT_PARENT_CODE)
-                    .orderByAsc(AreaEntity::getAreaCode));
-            log.info("获取省份列表成功，数量={}", list.size());
-            return AreaConvert.toVOList(list);
-        } catch (Exception e) {
-            log.error("获取省份列表异常", e);
-            throw e;
-        }
+        List<AreaEntity> list = list(new LambdaQueryWrapper<AreaEntity>()
+                .eq(AreaEntity::getParentCode, ROOT_PARENT_CODE)
+                .orderByAsc(AreaEntity::getAreaCode));
+        return AreaConvert.toVOList(list);
     }
 
     /**

@@ -159,8 +159,6 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void directModify(Long orderId, ExecuteModifyDTO dto) {
-        log.info("直接修改订单，orderId={}", orderId);
-
         // 1. 查询订单
         OrderMainEntity order = orderMainMapper.selectById(orderId);
         if (order == null) {
@@ -219,7 +217,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         // 11. 执行修改后流转
         triggerPostModifyFlow(orderId, order.getPhase(), order.getStatus(), modifierId, modifierName);
 
-        log.info("直接修改订单成功，orderId={}", orderId);
+        log.info("直接修改订单: orderId={}", orderId);
     }
 
     // ==================== 辅助方法：执行前校验 ====================
@@ -634,23 +632,15 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             Long modifierId, String modifierName) {
         if (FlowPhaseEnum.ORDER.getValue().equals(phase)) {
             if (FlowStatusEnum.DATA_AUDIT_REJECTED.getValue().equals(status)) {
-                log.info("订单修改后触发 RESUBMIT，orderId={}", orderId);
                 flowFacade.executeFlow(orderId, FlowActionEnum.RESUBMIT,
                         new FlowOperator(modifierId, modifierName, "修改后重新提交审核"));
-            } else if (FlowStatusEnum.PENDING_DATA_AUDIT.getValue().equals(status)) {
-                log.info("订单已处于待审核状态，无需流转，orderId={}", orderId);
-            } else {
-                log.warn("ORDER 阶段当前状态不触发自动流转，orderId={}, status={}", orderId, status);
             }
         } else if (FlowPhaseEnum.DESIGN.getValue().equals(phase)) {
             if (FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue().equals(status)) {
-                log.info("设计审核不通过后修改，触发 CONTINUE_DESIGN + SUBMIT_DESIGN，orderId={}", orderId);
                 flowFacade.executeFlow(orderId, FlowActionEnum.CONTINUE_DESIGN,
                         new FlowOperator(modifierId, modifierName, "修改后继续设计"));
                 flowFacade.executeFlow(orderId, FlowActionEnum.SUBMIT_DESIGN,
                         new FlowOperator(modifierId, modifierName, "修改后重新提交设计审核"));
-            } else {
-                log.info("DESIGN 阶段当前状态无需自动流转，orderId={}, status={}", orderId, status);
             }
         }
     }
@@ -666,7 +656,6 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
      */
     @Override
     public IPage<ModificationLogVO> listModificationLogs(Long orderId, ModificationLogPageQueryDTO dto) {
-        log.info("查询修改留痕记录，orderId={}", orderId);
         Page<OrderModificationLogEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
         LambdaQueryWrapper<OrderModificationLogEntity> wrapper =
                 new LambdaQueryWrapper<OrderModificationLogEntity>()

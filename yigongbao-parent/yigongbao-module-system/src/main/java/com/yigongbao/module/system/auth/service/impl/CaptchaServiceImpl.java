@@ -47,7 +47,7 @@ public class CaptchaServiceImpl implements CaptchaService {
         // 1. 冷却检测
         String cooldownKey = buildCooldownKey(scene, captchaType, target);
         if (redisTemplate.hasKey(cooldownKey)) {
-            log.warn("验证码发送过于频繁，type={}, target={}", captchaType, target);
+            log.warn("验证码发送过于频繁: type={}, target={}", captchaType, target);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_TOO_FREQUENT);
         }
 
@@ -56,7 +56,7 @@ public class CaptchaServiceImpl implements CaptchaService {
         Object dailyCountObj = redisTemplate.opsForValue().get(dailyKey);
         int dailyLimit = getDailyLimit();
         if (dailyCountObj != null && toInt(dailyCountObj) >= dailyLimit) {
-            log.warn("验证码每日发送次数已达上限，type={}, target={}", captchaType, target);
+            log.warn("验证码每日发送次数已达上限: type={}, target={}", captchaType, target);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_DAILY_LIMIT);
         }
 
@@ -79,7 +79,7 @@ public class CaptchaServiceImpl implements CaptchaService {
 
         // 5. 分发发送
         dispatch(captchaType, target, code);
-        log.info("验证码发送成功，type={}, target={}", captchaType, target);
+        log.info("验证码发送: type={}, target={}", captchaType, target);
     }
 
     @Override
@@ -92,7 +92,7 @@ public class CaptchaServiceImpl implements CaptchaService {
         // 1. 验证码是否存在
         String storedCode = (String) redisTemplate.opsForValue().get(captchaKey);
         if (storedCode == null) {
-            log.warn("验证码不存在或已过期，type={}, target={}", captchaType, target);
+            log.warn("验证码不存在或已过期: type={}, target={}", captchaType, target);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_EXPIRED);
         }
 
@@ -100,7 +100,7 @@ public class CaptchaServiceImpl implements CaptchaService {
         Object attemptsObj = redisTemplate.opsForValue().get(attemptsKey);
         int attempts = attemptsObj == null ? 0 : toInt(attemptsObj);
         if (attempts >= MAX_ATTEMPTS) {
-            log.warn("验证码错误次数已达上限，强制删除，type={}, target={}", captchaType, target);
+            log.warn("验证码错误次数已达上限，强制删除: type={}, target={}", captchaType, target);
             redisTemplate.delete(captchaKey);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_EXPIRED);
         }
@@ -115,14 +115,14 @@ public class CaptchaServiceImpl implements CaptchaService {
                     redisTemplate.expire(attemptsKey, ttl, TimeUnit.SECONDS);
                 }
             }
-            log.warn("验证码不匹配，type={}, target={}, attempts={}", captchaType, target, newAttempts);
+            log.warn("验证码不匹配: type={}, target={}, attempts={}", captchaType, target, newAttempts);
             throw new BusinessException(ErrorCodeEnum.CAPTCHA_ERROR);
         }
 
         // 4. 校验成功，删除验证码和错误次数
         redisTemplate.delete(captchaKey);
         redisTemplate.delete(attemptsKey);
-        log.info("验证码校验成功，type={}, target={}", captchaType, target);
+        log.info("验证码校验: type={}, target={}", captchaType, target);
     }
 
     // ==================== 私有方法 ====================
@@ -165,7 +165,7 @@ public class CaptchaServiceImpl implements CaptchaService {
             try {
                 return Integer.parseInt(val);
             } catch (NumberFormatException e) {
-                log.warn("captcha.expire.seconds 配置值无效，val={}", val);
+                log.warn("captcha.expire.seconds 配置值无效: val={}", val);
             }
         }
         return 300;
@@ -177,7 +177,7 @@ public class CaptchaServiceImpl implements CaptchaService {
             try {
                 return Integer.parseInt(val);
             } catch (NumberFormatException e) {
-                log.warn("captcha.cooldown.seconds 配置值无效，val={}", val);
+                log.warn("captcha.cooldown.seconds 配置值无效: val={}", val);
             }
         }
         return 60;
@@ -189,7 +189,7 @@ public class CaptchaServiceImpl implements CaptchaService {
             try {
                 return Integer.parseInt(val);
             } catch (NumberFormatException e) {
-                log.warn("captcha.daily.limit 配置值无效，val={}", val);
+                log.warn("captcha.daily.limit 配置值无效: val={}", val);
             }
         }
         return 10;

@@ -47,18 +47,11 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
      */
     @Override
     public List<DictVO> listType() {
-        log.info("查询字典类型列表");
-        try {
-            List<DictEntity> list = list(new LambdaQueryWrapper<DictEntity>()
-                    .eq(DictEntity::getParentId, ROOT_PARENT_ID)
-                    .orderByAsc(DictEntity::getSort)
-                    .orderByAsc(DictEntity::getId));
-            log.info("查询字典类型列表成功，数量={}", list.size());
-            return DictConvert.toVOList(list);
-        } catch (Exception e) {
-            log.error("查询字典类型列表异常", e);
-            throw e;
-        }
+        List<DictEntity> list = list(new LambdaQueryWrapper<DictEntity>()
+                .eq(DictEntity::getParentId, ROOT_PARENT_ID)
+                .orderByAsc(DictEntity::getSort)
+                .orderByAsc(DictEntity::getId));
+        return DictConvert.toVOList(list);
     }
 
     /**
@@ -69,36 +62,27 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
      */
     @Override
     public List<DictVO> listByTypeCode(String typeCode) {
-        log.info("根据类型编码查询字典数据，typeCode={}", typeCode);
-        try {
-            // 查询所有数据并筛选根节点
-            List<DictEntity> allList = list(new LambdaQueryWrapper<DictEntity>()
-                    .orderByAsc(DictEntity::getSort)
-                    .orderByAsc(DictEntity::getId));
-            // 查找根节点
-            DictEntity typeEntity = allList.stream()
-                    .filter(e -> Objects.equals(e.getDictCode(), typeCode) && Objects.equals(e.getParentId(), ROOT_PARENT_ID))
-                    .findFirst()
-                    .orElse(null);
-            if (typeEntity == null) {
-                log.warn("字典类型不存在，typeCode={}", typeCode);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
-            }
-            // 筛选子节点（仅返回启用状态的字典项）
-            List<DictEntity> list = allList.stream()
-                    .filter(e -> Objects.equals(e.getParentId(), typeEntity.getId())
-                            && StatusConstants.NORMAL == e.getStatus())
-                    .sorted(Comparator.comparing(DictEntity::getSort, Comparator.nullsLast(Comparator.naturalOrder())))
-                    .sorted(Comparator.comparing(DictEntity::getId, Comparator.nullsLast(Comparator.naturalOrder())))
-                    .collect(Collectors.toList());
-            log.info("查询字典数据成功，数量={}", list.size());
-            return DictConvert.toVOList(list);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("根据类型编码查询字典数据异常，typeCode={}", typeCode, e);
-            throw e;
+        // 查询所有数据并筛选根节点
+        List<DictEntity> allList = list(new LambdaQueryWrapper<DictEntity>()
+                .orderByAsc(DictEntity::getSort)
+                .orderByAsc(DictEntity::getId));
+        // 查找根节点
+        DictEntity typeEntity = allList.stream()
+                .filter(e -> Objects.equals(e.getDictCode(), typeCode) && Objects.equals(e.getParentId(), ROOT_PARENT_ID))
+                .findFirst()
+                .orElse(null);
+        if (typeEntity == null) {
+            log.warn("字典类型不存在: typeCode={}", typeCode);
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
+        // 筛选子节点（仅返回启用状态的字典项）
+        List<DictEntity> list = allList.stream()
+                .filter(e -> Objects.equals(e.getParentId(), typeEntity.getId())
+                        && StatusConstants.NORMAL == e.getStatus())
+                .sorted(Comparator.comparing(DictEntity::getSort, Comparator.nullsLast(Comparator.naturalOrder())))
+                .sorted(Comparator.comparing(DictEntity::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(Collectors.toList());
+        return DictConvert.toVOList(list);
     }
 
     /**
@@ -108,18 +92,10 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
      */
     @Override
     public List<DictVO> listTree() {
-        log.info("查询字典完整树形结构");
-        try {
-            List<DictEntity> allList = list(new LambdaQueryWrapper<DictEntity>()
-                    .orderByAsc(DictEntity::getSort)
-                    .orderByAsc(DictEntity::getId));
-            List<DictVO> tree = buildTree(allList, ROOT_PARENT_ID);
-            log.info("查询字典树形结构成功，根节点数量={}", tree.size());
-            return tree;
-        } catch (Exception e) {
-            log.error("查询字典树形结构异常", e);
-            throw e;
-        }
+        List<DictEntity> allList = list(new LambdaQueryWrapper<DictEntity>()
+                .orderByAsc(DictEntity::getSort)
+                .orderByAsc(DictEntity::getId));
+        return buildTree(allList, ROOT_PARENT_ID);
     }
 
     /**
@@ -130,35 +106,26 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
      */
     @Override
     public List<DictVO> listTreeByTypeCode(String typeCode) {
-        log.info("查询字典树形结构，typeCode={}", typeCode);
-        try {
-            // 查询所有数据并筛选根节点
-            List<DictEntity> allList = list(new LambdaQueryWrapper<DictEntity>()
-                    .orderByAsc(DictEntity::getSort)
-                    .orderByAsc(DictEntity::getId));
-            // 查找根节点
-            DictEntity typeEntity = allList.stream()
-                    .filter(e -> Objects.equals(e.getDictCode(), typeCode) && Objects.equals(e.getParentId(), ROOT_PARENT_ID))
-                    .findFirst()
-                    .orElse(null);
-            if (typeEntity == null) {
-                log.warn("字典类型不存在，typeCode={}", typeCode);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
-            }
-            // 构建树形结构，根节点作为树的根
-            DictVO rootVO = DictConvert.toVO(typeEntity);
-            rootVO.setChildren(buildTree(allList, typeEntity.getId()));
-            if (rootVO.getChildren() != null && rootVO.getChildren().isEmpty()) {
-                rootVO.setChildren(null);
-            }
-            log.info("查询字典树形结构成功");
-            return Arrays.asList(rootVO);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("查询字典树形结构异常，typeCode={}", typeCode, e);
-            throw e;
+        // 查询所有数据并筛选根节点
+        List<DictEntity> allList = list(new LambdaQueryWrapper<DictEntity>()
+                .orderByAsc(DictEntity::getSort)
+                .orderByAsc(DictEntity::getId));
+        // 查找根节点
+        DictEntity typeEntity = allList.stream()
+                .filter(e -> Objects.equals(e.getDictCode(), typeCode) && Objects.equals(e.getParentId(), ROOT_PARENT_ID))
+                .findFirst()
+                .orElse(null);
+        if (typeEntity == null) {
+            log.warn("字典类型不存在: typeCode={}", typeCode);
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
+        // 构建树形结构，根节点作为树的根
+        DictVO rootVO = DictConvert.toVO(typeEntity);
+        rootVO.setChildren(buildTree(allList, typeEntity.getId()));
+        if (rootVO.getChildren() != null && rootVO.getChildren().isEmpty()) {
+            rootVO.setChildren(null);
+        }
+        return Arrays.asList(rootVO);
     }
 
     /**
@@ -169,31 +136,22 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
      */
     @Override
     public List<DictVO> listOptions(String typeCode) {
-        log.info("查询字典下拉选项，typeCode={}", typeCode);
-        try {
-            // 查询所有数据并筛选根节点
-            List<DictEntity> allList = list(new LambdaQueryWrapper<DictEntity>()
-                    .orderByAsc(DictEntity::getSort)
-                    .orderByAsc(DictEntity::getId));
-            // 查找根节点
-            DictEntity typeEntity = allList.stream()
-                    .filter(e -> Objects.equals(e.getDictCode(), typeCode) && Objects.equals(e.getParentId(), ROOT_PARENT_ID))
-                    .findFirst()
-                    .orElse(null);
-            if (typeEntity == null) {
-                log.warn("字典类型不存在，typeCode={}", typeCode);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
-            }
-            List<DictVO> result = new ArrayList<>();
-            collectLeafNodes(allList, typeEntity.getId(), result);
-            log.info("查询字典下拉选项成功，数量={}", result.size());
-            return result;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("查询字典下拉选项异常，typeCode={}", typeCode, e);
-            throw e;
+        // 查询所有数据并筛选根节点
+        List<DictEntity> allList = list(new LambdaQueryWrapper<DictEntity>()
+                .orderByAsc(DictEntity::getSort)
+                .orderByAsc(DictEntity::getId));
+        // 查找根节点
+        DictEntity typeEntity = allList.stream()
+                .filter(e -> Objects.equals(e.getDictCode(), typeCode) && Objects.equals(e.getParentId(), ROOT_PARENT_ID))
+                .findFirst()
+                .orElse(null);
+        if (typeEntity == null) {
+            log.warn("字典类型不存在: typeCode={}", typeCode);
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
+        List<DictVO> result = new ArrayList<>();
+        collectLeafNodes(allList, typeEntity.getId(), result);
+        return result;
     }
 
     /**
@@ -204,21 +162,12 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
      */
     @Override
     public DictVO getById(Long id) {
-        log.info("根据ID查询字典，id={}", id);
-        try {
-            DictEntity entity = super.getById(id);
-            if (entity == null) {
-                log.warn("字典不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
-            }
-            log.info("查询字典成功，id={}", id);
-            return DictConvert.toVO(entity);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("根据ID查询字典异常，id={}", id, e);
-            throw e;
+        DictEntity entity = super.getById(id);
+        if (entity == null) {
+            log.warn("字典不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
+        return DictConvert.toVO(entity);
     }
 
     /**
@@ -229,20 +178,12 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
      */
     @Override
     public DictVO getByDictCode(String dictCode) {
-        log.info("根据字典编码查询字典，dictCode={}", dictCode);
-        try {
-            DictEntity entity = getOne(new LambdaQueryWrapper<DictEntity>()
-                    .eq(DictEntity::getDictCode, dictCode));
-            if (entity == null) {
-                log.warn("字典不存在，dictCode={}", dictCode);
-                return null;
-            }
-            log.info("查询字典成功，dictCode={}", dictCode);
-            return DictConvert.toVO(entity);
-        } catch (Exception e) {
-            log.error("根据字典编码查询字典异常，dictCode={}", dictCode, e);
-            throw e;
+        DictEntity entity = getOne(new LambdaQueryWrapper<DictEntity>()
+                .eq(DictEntity::getDictCode, dictCode));
+        if (entity == null) {
+            return null;
         }
+        return DictConvert.toVO(entity);
     }
 
     /**
@@ -253,40 +194,33 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void create(CreateDictDTO dto) {
-        log.info("创建字典，parentId={}, dictName={}", dto.getParentId(), dto.getDictName());
-        try {
-            // 校验字典编码唯一性
-            String newDictCode = generateDictCode(dto.getParentId());
-            if (isDictCodeExists(newDictCode, null)) {
-                log.warn("字典编码已存在，dictCode={}", newDictCode);
-                throw new BusinessException(ErrorCodeEnum.DICT_CODE_EXISTS);
-            }
-            // 校验字典名称在同一父节点下唯一性
-            if (isDictNameExists(dto.getDictName(), dto.getParentId(), null)) {
-                log.warn("字典名称在同一父节点下已存在，dictName={}, parentId={}", dto.getDictName(), dto.getParentId());
-                throw new BusinessException(ErrorCodeEnum.DICT_NAME_EXISTS);
-            }
-            // 计算层级
-            int level = calculateLevel(dto.getParentId());
-            // 构建实体
-            DictEntity entity = new DictEntity();
-            entity.setParentId(dto.getParentId());
-            entity.setDictCode(newDictCode);
-            entity.setDictName(dto.getDictName());
-            entity.setDictValue(dto.getDictValue());
-            entity.setLevel(level);
-            entity.setSort(dto.getSort() != null ? dto.getSort() : 0);
-            entity.setStatus(dto.getStatus() != null ? dto.getStatus() : 1);
-            entity.setRemark(dto.getRemark());
-            // 保存
-            save(entity);
-            log.info("创建字典成功，id={}, dictCode={}", entity.getId(), newDictCode);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("创建字典异常，parentId={}", dto.getParentId(), e);
-            throw e;
+        // 校验字典编码唯一性
+        String newDictCode = generateDictCode(dto.getParentId());
+        if (isDictCodeExists(newDictCode, null)) {
+            log.warn("字典编码已存在: dictCode={}", newDictCode);
+            throw new BusinessException(ErrorCodeEnum.DICT_CODE_EXISTS);
         }
+        // 校验字典名称在同一父节点下唯一性
+        if (isDictNameExists(dto.getDictName(), dto.getParentId(), null)) {
+            log.warn("字典名称已存在: dictName={}, parentId={}", dto.getDictName(), dto.getParentId());
+            throw new BusinessException(ErrorCodeEnum.DICT_NAME_EXISTS);
+        }
+        // 计算层级
+        int level = calculateLevel(dto.getParentId());
+        // 构建实体
+        DictEntity entity = new DictEntity();
+        entity.setParentId(dto.getParentId());
+        entity.setDictCode(newDictCode);
+        entity.setDictName(dto.getDictName());
+        entity.setDictValue(dto.getDictValue());
+        entity.setLevel(level);
+        entity.setSort(dto.getSort() != null ? dto.getSort() : 0);
+        entity.setStatus(dto.getStatus() != null ? dto.getStatus() : 1);
+        entity.setRemark(dto.getRemark());
+        // 保存
+        save(entity);
+        log.info("创建字典: id={}, dictCode={}, dictName={}, parentId={}",
+            entity.getId(), newDictCode, dto.getDictName(), dto.getParentId());
     }
 
     /**
@@ -298,37 +232,29 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void update(Long id, UpdateDictDTO dto) {
-        log.info("更新字典，id={}", id);
-        try {
-            DictEntity entity = super.getById(id);
-            if (entity == null) {
-                log.warn("字典不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
-            }
-            // 校验字典名称在同一父节点下唯一性（排除自身）
-            if (isDictNameExists(dto.getDictName(), entity.getParentId(), id)) {
-                log.warn("字典名称在同一父节点下已存在，dictName={}, parentId={}", dto.getDictName(), entity.getParentId());
-                throw new BusinessException(ErrorCodeEnum.DICT_NAME_EXISTS);
-            }
-            // 更新非核心字段
-            entity.setDictName(dto.getDictName());
-            entity.setDictValue(dto.getDictValue());
-            if (dto.getSort() != null) {
-                entity.setSort(dto.getSort());
-            }
-            if (dto.getStatus() != null) {
-                entity.setStatus(dto.getStatus());
-            }
-            entity.setRemark(dto.getRemark());
-            // 保存
-            updateById(entity);
-            log.info("更新字典成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("更新字典异常，id={}", id, e);
-            throw e;
+        DictEntity entity = super.getById(id);
+        if (entity == null) {
+            log.warn("字典不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
+        // 校验字典名称在同一父节点下唯一性（排除自身）
+        if (isDictNameExists(dto.getDictName(), entity.getParentId(), id)) {
+            log.warn("字典名称已存在: dictName={}, parentId={}", dto.getDictName(), entity.getParentId());
+            throw new BusinessException(ErrorCodeEnum.DICT_NAME_EXISTS);
+        }
+        // 更新非核心字段
+        entity.setDictName(dto.getDictName());
+        entity.setDictValue(dto.getDictValue());
+        if (dto.getSort() != null) {
+            entity.setSort(dto.getSort());
+        }
+        if (dto.getStatus() != null) {
+            entity.setStatus(dto.getStatus());
+        }
+        entity.setRemark(dto.getRemark());
+        // 保存
+        updateById(entity);
+        log.info("更新字典: id={}, dictName={}, dictCode={}", id, dto.getDictName(), entity.getDictCode());
     }
 
     /**
@@ -339,33 +265,25 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void remove(Long id) {
-        log.info("删除字典，id={}", id);
-        try {
-            DictEntity entity = super.getById(id);
-            if (entity == null) {
-                log.warn("字典不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
-            }
-            // 检查是否有子节点
-            if (hasChildren(id)) {
-                log.warn("字典存在子节点，无法删除，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_HAS_CHILDREN);
-            }
-            // 叶子节点可能被业务表（sys_org.org_type、sys_user.specialty 等）引用，
-            // 禁止物理/逻辑删除，只允许通过 updateStatus 禁用
-            if (!ROOT_PARENT_ID.equals(entity.getParentId())) {
-                log.warn("字典叶子节点可能被业务数据引用，禁止删除，请使用禁用操作，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "字典数据项不允许删除，请使用禁用操作");
-            }
-            // 根节点（字典类型）：无子节点时允许删除
-            super.removeById(id);
-            log.info("删除字典成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("删除字典异常，id={}", id, e);
-            throw e;
+        DictEntity entity = super.getById(id);
+        if (entity == null) {
+            log.warn("字典不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
+        // 检查是否有子节点
+        if (hasChildren(id)) {
+            log.warn("字典存在子节点无法删除: id={}, dictName={}", id, entity.getDictName());
+            throw new BusinessException(ErrorCodeEnum.DATA_HAS_CHILDREN);
+        }
+        // 叶子节点可能被业务表（sys_org.org_type、sys_user.specialty 等）引用，
+        // 禁止物理/逻辑删除，只允许通过 updateStatus 禁用
+        if (!ROOT_PARENT_ID.equals(entity.getParentId())) {
+            log.warn("字典叶子节点禁止删除: id={}, dictName={}", id, entity.getDictName());
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "字典数据项不允许删除，请使用禁用操作");
+        }
+        // 根节点（字典类型）：无子节点时允许删除
+        super.removeById(id);
+        log.info("删除字典: id={}, dictCode={}, dictName={}", id, entity.getDictCode(), entity.getDictName());
     }
 
     /**
@@ -377,35 +295,28 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, Integer status) {
-        log.info("修改字典状态，id={}, status={}", id, status);
-        try {
-            // 校验状态值合法性
-            if (status == null || (status != StatusConstants.DISABLED && status != StatusConstants.NORMAL)) {
-                log.warn("状态值不合法，status={}", status);
-                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR);
-            }
-            DictEntity entity = super.getById(id);
-            if (entity == null) {
-                log.warn("字典不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
-            }
-            // 递归获取所有子节点ID
-            List<Long> allIds = getAllChildrenIds(id);
-            allIds.add(id);
-            // 逐条更新，确保自动填充生效（updateTime、updateBy）
-            for (Long dictId : allIds) {
-                DictEntity updateEntity = new DictEntity();
-                updateEntity.setId(dictId);
-                updateEntity.setStatus(status);
-                super.updateById(updateEntity);
-            }
-            log.info("修改字典状态成功，id={}, status={}, 级联数量={}", id, status, allIds.size());
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("修改字典状态异常，id={}", id, e);
-            throw e;
+        // 校验状态值合法性
+        if (status == null || (status != StatusConstants.DISABLED && status != StatusConstants.NORMAL)) {
+            log.warn("状态值不合法: status={}", status);
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR);
         }
+        DictEntity entity = super.getById(id);
+        if (entity == null) {
+            log.warn("字典不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+        }
+        // 递归获取所有子节点ID
+        List<Long> allIds = getAllChildrenIds(id);
+        allIds.add(id);
+        // 逐条更新，确保自动填充生效（updateTime、updateBy）
+        for (Long dictId : allIds) {
+            DictEntity updateEntity = new DictEntity();
+            updateEntity.setId(dictId);
+            updateEntity.setStatus(status);
+            super.updateById(updateEntity);
+        }
+        log.info("修改字典状态: id={}, dictName={}, status={}, 级联数量={}",
+            id, entity.getDictName(), status, allIds.size());
     }
 
     /**
@@ -590,26 +501,19 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
      */
     @Override
     public List<DictVO> listFileBizTypeOptions() {
-        log.info("查询文件业务类型下拉列表");
-        try {
-            // 查找文件业务类型根节点（id=50）
-            DictEntity bizTypeRoot = super.getById(50L);
-            if (bizTypeRoot == null || bizTypeRoot.getIsDeleted() == StatusConstants.DELETED) {
-                log.warn("文件业务类型字典根节点不存在");
-                return List.of();
-            }
-            // 查询所有子节点（status=1），按 sort 排序
-            List<DictEntity> list = list(new LambdaQueryWrapper<DictEntity>()
-                    .eq(DictEntity::getParentId, bizTypeRoot.getId())
-                    .eq(DictEntity::getStatus, StatusConstants.NORMAL)
-                    .orderByAsc(DictEntity::getSort)
-                    .orderByAsc(DictEntity::getId));
-            log.info("查询文件业务类型下拉列表成功，数量={}", list.size());
-            return DictConvert.toVOList(list);
-        } catch (Exception e) {
-            log.error("查询文件业务类型下拉列表异常", e);
-            throw e;
+        // 查找文件业务类型根节点（id=50）
+        DictEntity bizTypeRoot = super.getById(50L);
+        if (bizTypeRoot == null || bizTypeRoot.getIsDeleted() == StatusConstants.DELETED) {
+            log.warn("文件业务类型字典根节点不存在");
+            return List.of();
         }
+        // 查询所有子节点（status=1），按 sort 排序
+        List<DictEntity> list = list(new LambdaQueryWrapper<DictEntity>()
+                .eq(DictEntity::getParentId, bizTypeRoot.getId())
+                .eq(DictEntity::getStatus, StatusConstants.NORMAL)
+                .orderByAsc(DictEntity::getSort)
+                .orderByAsc(DictEntity::getId));
+        return DictConvert.toVOList(list);
     }
 
     /**

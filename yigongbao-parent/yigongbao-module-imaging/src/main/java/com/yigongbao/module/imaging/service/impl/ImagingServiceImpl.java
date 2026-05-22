@@ -80,8 +80,6 @@ public class ImagingServiceImpl implements ImagingService {
      */
     @Override
     public List<DcmPackageVO> getDcmPackages(Long orderId) {
-        log.info("查询DCM影像包列表, orderId={}", orderId);
-
         // 1. 通过 OrderFileService 查询订单下的 DCM 影像文件记录
         List<OrderFileEntity> orderFiles = orderFileService.listByOrderIdAndCategory(
                 orderId, DictCodeConstants.ORDER_FILE_CATEGORY_DCM);
@@ -124,8 +122,6 @@ public class ImagingServiceImpl implements ImagingService {
      */
     @Override
     public List<PackageModelFileVO> getPackageModelFiles(Long packageId) {
-        log.info("查询数据包内模型文件, packageId={}", packageId);
-
         // 1. 通过 DesignPackageFileService 查询包内文件，按 sortOrder 排序
         List<DesignPackageFileEntity> files = designPackageFileService.list(
                 new LambdaQueryWrapper<DesignPackageFileEntity>()
@@ -159,8 +155,6 @@ public class ImagingServiceImpl implements ImagingService {
      */
     @Override
     public List<PackageModelGroupVO> getPackageModelFilesByOrder(Long orderId) {
-        log.info("查询订单所有数据包模型文件（按包分组）, orderId={}", orderId);
-
         // 1. 通过 DesignPackageService 查询该订单的所有数据包，按序号排序
         List<DesignPackageEntity> packages = designPackageService.list(
                 new LambdaQueryWrapper<DesignPackageEntity>()
@@ -213,8 +207,6 @@ public class ImagingServiceImpl implements ImagingService {
      */
     @Override
     public List<ModelVO> getModels(Long orderId) {
-        log.info("查询可视化模型列表, orderId={}", orderId);
-
         // 1. 通过 DesignModelService 查询设计模型记录
         List<DesignModelEntity> models = designModelService.list(
                 new LambdaQueryWrapper<DesignModelEntity>()

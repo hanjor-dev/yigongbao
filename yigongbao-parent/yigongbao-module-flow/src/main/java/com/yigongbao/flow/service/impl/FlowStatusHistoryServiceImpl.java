@@ -54,33 +54,27 @@ public class FlowStatusHistoryServiceImpl implements FlowStatusHistoryService {
                                 Integer fromStatus, Integer toStatus,
                                 String action, String actionName,
                                 FlowOperator operator) {
-        log.info("记录订单状态变更，orderId={}, orderCode={}, phase={}, fromStatus={}, toStatus={}, action={}, operatorId={}",
-                orderId, orderCode, phase, fromStatus, toStatus, action, operator.getOperatorId());
-        try {
-            FlowStatusHistoryEntity entity = new FlowStatusHistoryEntity();
-            entity.setOrderId(orderId);
-            entity.setOrderCode(orderCode);
-            entity.setPhase(phase);
-            // 快照阶段和状态名称，防止枚举后续改名导致历史展示错误
-            FlowPhaseEnum phaseEnum = FlowPhaseEnum.getByValue(phase);
-            entity.setPhaseName(phaseEnum != null ? phaseEnum.getName() : null);
-            entity.setFromStatus(fromStatus);
-            FlowStatusEnum fromStatusEnum = FlowStatusEnum.getByValue(fromStatus);
-            entity.setFromStatusName(fromStatusEnum != null ? fromStatusEnum.getName() : null);
-            entity.setToStatus(toStatus);
-            FlowStatusEnum toStatusEnum = FlowStatusEnum.getByValue(toStatus);
-            entity.setToStatusName(toStatusEnum != null ? toStatusEnum.getName() : null);
-            entity.setAction(action);
-            entity.setActionName(actionName);
-            entity.setOperatorId(operator.getOperatorId());
-            entity.setOperatorName(operator.getOperatorName());
-            entity.setRemark(operator.getRemark());
-            flowStatusHistoryMapper.insert(entity);
-            log.info("记录订单状态变更成功，id={}", entity.getId());
-        } catch (Exception e) {
-            log.error("记录订单状态变更异常，orderId={}, orderCode={}", orderId, orderCode, e);
-            throw e;
-        }
+        FlowStatusHistoryEntity entity = new FlowStatusHistoryEntity();
+        entity.setOrderId(orderId);
+        entity.setOrderCode(orderCode);
+        entity.setPhase(phase);
+        // 快照阶段和状态名称，防止枚举后续改名导致历史展示错误
+        FlowPhaseEnum phaseEnum = FlowPhaseEnum.getByValue(phase);
+        entity.setPhaseName(phaseEnum != null ? phaseEnum.getName() : null);
+        entity.setFromStatus(fromStatus);
+        FlowStatusEnum fromStatusEnum = FlowStatusEnum.getByValue(fromStatus);
+        entity.setFromStatusName(fromStatusEnum != null ? fromStatusEnum.getName() : null);
+        entity.setToStatus(toStatus);
+        FlowStatusEnum toStatusEnum = FlowStatusEnum.getByValue(toStatus);
+        entity.setToStatusName(toStatusEnum != null ? toStatusEnum.getName() : null);
+        entity.setAction(action);
+        entity.setActionName(actionName);
+        entity.setOperatorId(operator.getOperatorId());
+        entity.setOperatorName(operator.getOperatorName());
+        entity.setRemark(operator.getRemark());
+        flowStatusHistoryMapper.insert(entity);
+        log.info("记录状态变更: orderId={}, {} -> {}, action={}",
+                orderId, fromStatus, toStatus, action);
     }
 
     /**

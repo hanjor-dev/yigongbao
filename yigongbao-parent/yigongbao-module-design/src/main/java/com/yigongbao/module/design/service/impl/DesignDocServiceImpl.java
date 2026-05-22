@@ -88,7 +88,6 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void downloadInstruction(Long orderId, Long packageId, HttpServletResponse response) {
-        log.info("下载指令单模板，orderId={}, packageId={}", orderId, packageId);
         checkDesignPhase(orderId);
         // 按需生成或复用已有版本
         DesignInstructionEntity entity = ensureInstruction(orderId, packageId);
@@ -96,10 +95,9 @@ public class DesignDocServiceImpl implements DesignDocService {
         try {
             fileService.download(entity.getTemplateFileId(), response);
         } catch (IOException e) {
-            log.error("指令单模板下载失败，packageId={}, templateFileId={}", packageId, entity.getTemplateFileId(), e);
+            log.error("指令单模板下载失败: packageId={}, templateFileId={}", packageId, entity.getTemplateFileId(), e);
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
-        log.info("指令单模板下载完成，packageId={}, version={}", packageId, entity.getVersion());
     }
 
     /**

@@ -51,18 +51,12 @@ public class FlowOrderServiceImpl implements FlowOrderService {
      */
     @Override
     public void updatePhaseAndStatus(Long id, Integer phase, Integer status) {
-        log.info("更新订单阶段和状态，orderId={}, phase={}, status={}", id, phase, status);
-        try {
-            LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
-            wrapper.eq(OrderMainEntity::getId, id)
-                    .set(OrderMainEntity::getPhase, phase)
-                    .set(OrderMainEntity::getStatus, status);
-            flowOrderMapper.update(null, wrapper);
-            log.info("更新订单阶段和状态成功，orderId={}", id);
-        } catch (Exception e) {
-            log.error("更新订单阶段和状态异常，orderId={}, phase={}, status={}", id, phase, status, e);
-            throw e;
-        }
+        LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(OrderMainEntity::getId, id)
+                .set(OrderMainEntity::getPhase, phase)
+                .set(OrderMainEntity::getStatus, status);
+        flowOrderMapper.update(null, wrapper);
+        log.info("更新订单阶段和状态: orderId={}, phase={}, status={}", id, phase, status);
     }
 
     /**
@@ -78,25 +72,18 @@ public class FlowOrderServiceImpl implements FlowOrderService {
      */
     @Override
     public void updatePhaseAndStatusWithHandler(Long id, Integer phase, Integer status, Long currentHandlerId) {
-        log.info("更新订单阶段和状态（带处理人），orderId={}, phase={}, status={}, handlerId={}",
+        LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(OrderMainEntity::getId, id)
+                .set(OrderMainEntity::getPhase, phase)
+                .set(OrderMainEntity::getStatus, status)
+                .set(OrderMainEntity::getCurrentHandlerId, currentHandlerId);
+        flowOrderMapper.update(null, wrapper);
+        log.info("更新订单阶段和状态: orderId={}, phase={}, status={}, handlerId={}",
                 id, phase, status, currentHandlerId);
-        try {
-            LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
-            wrapper.eq(OrderMainEntity::getId, id)
-                    .set(OrderMainEntity::getPhase, phase)
-                    .set(OrderMainEntity::getStatus, status)
-                    .set(OrderMainEntity::getCurrentHandlerId, currentHandlerId);
-            flowOrderMapper.update(null, wrapper);
-            log.info("更新订单阶段和状态成功，orderId={}", id);
-        } catch (Exception e) {
-            log.error("更新订单阶段和状态异常，orderId={}, handlerId={}", id, currentHandlerId, e);
-            throw e;
-        }
     }
 
     @Override
     public void incrementVersion(Long id) {
-        log.info("递增订单版本号，orderId={}", id);
         LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(OrderMainEntity::getId, id)
                .setSql("version = version + 1");

@@ -40,33 +40,24 @@ public class CodeRuleServiceImpl extends ServiceImpl<CodeRuleMapper, CodeRuleEnt
      */
     @Override
     public IPage<CodeRuleVO> listRules(CodeRulePageDTO dto) {
-        log.info("分页查询编码规则，dto={}", dto);
-        try {
-            int pageNum = dto.getPageNum() == null || dto.getPageNum() < 1 ? 1 : dto.getPageNum();
-            int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
-            Page<CodeRuleEntity> page = new Page<>(pageNum, pageSize);
-            LambdaQueryWrapper<CodeRuleEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.like(Objects.nonNull(dto.getRuleCode()) && !dto.getRuleCode().isEmpty(),
-                    CodeRuleEntity::getRuleCode, dto.getRuleCode())
-                    .like(Objects.nonNull(dto.getRuleName()) && !dto.getRuleName().isEmpty(),
-                            CodeRuleEntity::getRuleName, dto.getRuleName())
-                    .eq(Objects.nonNull(dto.getStatus()), CodeRuleEntity::getStatus, dto.getStatus())
-                    .orderByDesc(CodeRuleEntity::getCreateTime);
+        int pageNum = dto.getPageNum() == null || dto.getPageNum() < 1 ? 1 : dto.getPageNum();
+        int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
+        Page<CodeRuleEntity> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<CodeRuleEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.like(Objects.nonNull(dto.getRuleCode()) && !dto.getRuleCode().isEmpty(),
+                CodeRuleEntity::getRuleCode, dto.getRuleCode())
+                .like(Objects.nonNull(dto.getRuleName()) && !dto.getRuleName().isEmpty(),
+                        CodeRuleEntity::getRuleName, dto.getRuleName())
+                .eq(Objects.nonNull(dto.getStatus()), CodeRuleEntity::getStatus, dto.getStatus())
+                .orderByDesc(CodeRuleEntity::getCreateTime);
 
-            IPage<CodeRuleEntity> pageResult = page(page, wrapper);
+        IPage<CodeRuleEntity> pageResult = page(page, wrapper);
 
-            IPage<CodeRuleVO> voPage = pageResult.convert(entity -> {
-                CodeRuleVO vo = CodeRuleConvert.toVO(entity);
-                fillExtraFields(vo, entity);
-                return vo;
-            });
-
-            log.info("分页查询编码规则成功，总数={}", pageResult.getTotal());
-            return voPage;
-        } catch (Exception e) {
-            log.error("分页查询编码规则异常", e);
-            throw e;
-        }
+        return pageResult.convert(entity -> {
+            CodeRuleVO vo = CodeRuleConvert.toVO(entity);
+            fillExtraFields(vo, entity);
+            return vo;
+        });
     }
 
     /**
@@ -74,24 +65,15 @@ public class CodeRuleServiceImpl extends ServiceImpl<CodeRuleMapper, CodeRuleEnt
      */
     @Override
     public CodeRuleVO getByRuleCode(String ruleCode) {
-        log.info("根据规则编码查询，ruleCode={}", ruleCode);
-        try {
-            CodeRuleEntity entity = getOne(new LambdaQueryWrapper<CodeRuleEntity>()
-                    .eq(CodeRuleEntity::getRuleCode, ruleCode));
-            if (entity == null) {
-                log.warn("编码规则不存在，ruleCode={}", ruleCode);
-                throw new BusinessException(ErrorCodeEnum.CODE_RULE_NOT_FOUND);
-            }
-            CodeRuleVO vo = CodeRuleConvert.toVO(entity);
-            fillExtraFields(vo, entity);
-            log.info("查询编码规则成功，id={}", entity.getId());
-            return vo;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("查询编码规则异常，ruleCode={}", ruleCode, e);
-            throw e;
+        CodeRuleEntity entity = getOne(new LambdaQueryWrapper<CodeRuleEntity>()
+                .eq(CodeRuleEntity::getRuleCode, ruleCode));
+        if (entity == null) {
+            log.warn("编码规则不存在: ruleCode={}", ruleCode);
+            throw new BusinessException(ErrorCodeEnum.CODE_RULE_NOT_FOUND);
         }
+        CodeRuleVO vo = CodeRuleConvert.toVO(entity);
+        fillExtraFields(vo, entity);
+        return vo;
     }
 
     /**
@@ -100,35 +82,27 @@ public class CodeRuleServiceImpl extends ServiceImpl<CodeRuleMapper, CodeRuleEnt
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createRule(CreateCodeRuleDTO dto) {
-        log.info("创建编码规则，ruleCode={}", dto.getRuleCode());
-        try {
-            if (isRuleCodeExists(dto.getRuleCode(), null)) {
-                log.warn("规则编码已存在，ruleCode={}", dto.getRuleCode());
-                throw new BusinessException(ErrorCodeEnum.CODE_RULE_EXISTS);
-            }
-
-            CodeRuleEntity entity = CodeRuleConvert.toEntity(dto);
-            if (entity.getSeqLength() == null) {
-                entity.setSeqLength(6);
-            }
-            if (entity.getResetType() == null) {
-                entity.setResetType(CodeResetTypeEnum.NEVER.getCode());
-            }
-            if (entity.getStep() == null) {
-                entity.setStep(1);
-            }
-            if (entity.getStatus() == null) {
-                entity.setStatus(StatusConstants.NORMAL);
-            }
-
-            save(entity);
-            log.info("创建编码规则成功，id={}, ruleCode={}", entity.getId(), dto.getRuleCode());
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("创建编码规则异常，ruleCode={}", dto.getRuleCode(), e);
-            throw e;
+        if (isRuleCodeExists(dto.getRuleCode(), null)) {
+            log.warn("规则编码已存在: ruleCode={}", dto.getRuleCode());
+            throw new BusinessException(ErrorCodeEnum.CODE_RULE_EXISTS);
         }
+
+        CodeRuleEntity entity = CodeRuleConvert.toEntity(dto);
+        if (entity.getSeqLength() == null) {
+            entity.setSeqLength(6);
+        }
+        if (entity.getResetType() == null) {
+            entity.setResetType(CodeResetTypeEnum.NEVER.getCode());
+        }
+        if (entity.getStep() == null) {
+            entity.setStep(1);
+        }
+        if (entity.getStatus() == null) {
+            entity.setStatus(StatusConstants.NORMAL);
+        }
+
+        save(entity);
+        log.info("创建编码规则: id={}, ruleCode={}", entity.getId(), dto.getRuleCode());
     }
 
     /**
@@ -137,23 +111,15 @@ public class CodeRuleServiceImpl extends ServiceImpl<CodeRuleMapper, CodeRuleEnt
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateRule(Long id, UpdateCodeRuleDTO dto) {
-        log.info("更新编码规则，id={}", id);
-        try {
-            CodeRuleEntity entity = getById(id);
-            if (entity == null) {
-                log.warn("编码规则不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.CODE_RULE_NOT_FOUND);
-            }
-
-            BeanUtils.copyProperties(dto, entity, "id", "ruleCode", "createTime", "updateTime", "createBy", "updateBy");
-            updateById(entity);
-            log.info("更新编码规则成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("更新编码规则异常，id={}", id, e);
-            throw e;
+        CodeRuleEntity entity = getById(id);
+        if (entity == null) {
+            log.warn("编码规则不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.CODE_RULE_NOT_FOUND);
         }
+
+        BeanUtils.copyProperties(dto, entity, "id", "ruleCode", "createTime", "updateTime", "createBy", "updateBy");
+        updateById(entity);
+        log.info("更新编码规则: id={}", id);
     }
 
     /**
@@ -162,21 +128,13 @@ public class CodeRuleServiceImpl extends ServiceImpl<CodeRuleMapper, CodeRuleEnt
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void removeRule(Long id) {
-        log.info("删除编码规则，id={}", id);
-        try {
-            CodeRuleEntity entity = getById(id);
-            if (entity == null) {
-                log.warn("编码规则不存在，id={}", id);
-                throw new BusinessException(ErrorCodeEnum.CODE_RULE_NOT_FOUND);
-            }
-            removeById(id);
-            log.info("删除编码规则成功，id={}", id);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("删除编码规则异常，id={}", id, e);
-            throw e;
+        CodeRuleEntity entity = getById(id);
+        if (entity == null) {
+            log.warn("编码规则不存在: id={}", id);
+            throw new BusinessException(ErrorCodeEnum.CODE_RULE_NOT_FOUND);
         }
+        removeById(id);
+        log.info("删除编码规则: id={}", id);
     }
 
     /**

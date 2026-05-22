@@ -30,7 +30,6 @@ public class OrderItemServiceImpl extends ServiceImpl<OrderItemMapper, OrderItem
      */
     @Override
     public List<OrderItemEntity> listByOrderId(Long orderId) {
-        log.info("查询订单明细，orderId={}", orderId);
         return list(new LambdaQueryWrapper<OrderItemEntity>()
                 .eq(OrderItemEntity::getOrderId, orderId)
                 .eq(OrderItemEntity::getIsDeleted, StatusConstants.NOT_DELETED));
@@ -47,7 +46,6 @@ public class OrderItemServiceImpl extends ServiceImpl<OrderItemMapper, OrderItem
         if (orderIds == null || orderIds.isEmpty()) {
             return Collections.emptyList();
         }
-        log.info("批量查询订单明细，orderIds.size={}", orderIds.size());
         return list(new LambdaQueryWrapper<OrderItemEntity>()
                 .in(OrderItemEntity::getOrderId, orderIds)
                 .eq(OrderItemEntity::getIsDeleted, StatusConstants.NOT_DELETED));
