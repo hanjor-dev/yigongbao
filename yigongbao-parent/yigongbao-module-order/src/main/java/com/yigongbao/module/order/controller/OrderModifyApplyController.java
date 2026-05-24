@@ -6,7 +6,9 @@ import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.order.dto.modify.ExecuteModifyDTO;
 import com.yigongbao.module.order.dto.modify.ModificationLogPageQueryDTO;
+import com.yigongbao.module.order.dto.modify.OrderModifyFullDTO;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
+import com.yigongbao.module.order.service.OrderModifyFullService;
 import com.yigongbao.module.order.vo.modify.ModificationLogVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderModifyApplyController {
 
     private final OrderModifyApplyService orderModifyApplyService;
+    private final OrderModifyFullService orderModifyFullService;
 
     @Operation(summary = "直接修改订单（无需申请审核）",
             description = "根据订单当前阶段判断允许的修改类型：\n"
@@ -48,6 +51,20 @@ public class OrderModifyApplyController {
     public Result<Void> directModify(@PathVariable Long orderId,
             @Valid @RequestBody ExecuteModifyDTO dto) {
         orderModifyApplyService.directModify(orderId, dto);
+        return Result.success();
+    }
+
+    @Operation(summary = "全量修改订单",
+            description = "前端传入完整订单数据，后端自动判断变更内容并应用。\n"
+                    + "支持修改：患者信息、医生信息、医院科室、交付信息、重建项目、影像文件\n"
+                    + "根据订单当前阶段判断允许的修改对象：\n"
+                    + "订单阶段（phase=10）：允许修改所有对象\n"
+                    + "设计阶段（phase=20）：仅允许修改重建项目")
+    @RequirePermission(value = "order:Modify")
+    @PutMapping("/{orderId}/full")
+    public Result<Void> modifyOrderFull(@PathVariable Long orderId,
+            @Valid @RequestBody OrderModifyFullDTO dto) {
+        orderModifyFullService.modifyOrderFull(orderId, dto);
         return Result.success();
     }
 

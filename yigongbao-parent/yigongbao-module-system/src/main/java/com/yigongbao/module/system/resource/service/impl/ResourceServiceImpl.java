@@ -242,7 +242,7 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
                         throw new BusinessException(ErrorCodeEnum.PARAM_ERROR);
                     }
                 }
-            } else if (StatusConstants.DISABLED == status) {
+            } else {
                 cascadeDisableChildren(id);
             }
             entity.setStatus(status);
@@ -277,7 +277,6 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
      */
     @Override
     public List<ResourceVO> getResourceTree() {
-        log.info("获取资源树");
         LambdaQueryWrapper<ResourceEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.orderByAsc(ResourceEntity::getSort);
         List<ResourceEntity> allResources = baseMapper.selectList(wrapper);
@@ -373,9 +372,7 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
      */
     @Override
     public List<ResourceVO> getUserMenuTree(Long userId) {
-        log.info("获取用户菜单树，userId={}", userId);
-
-        // 查询用户信息
+      // 查询用户信息
         UserEntity user = userMapper.selectById(userId);
         if (user == null || user.getRoleId() == null) {
             return new ArrayList<>();
@@ -406,8 +403,6 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
      */
     @Override
     public List<String> getUserPermissions(Long userId) {
-        log.info("获取用户按钮权限，userId={}", userId);
-
         // 查询用户信息
         UserEntity user = userMapper.selectById(userId);
         if (user == null || user.getRoleId() == null) {
@@ -437,8 +432,6 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
      */
     @Override
     public List<ResourceVO> getResourceTreeWithChecked(Long roleId) {
-        log.info("获取带分配状态的资源树，roleId={}", roleId);
-
         // 查询所有正常状态资源
         LambdaQueryWrapper<ResourceEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ResourceEntity::getStatus, StatusConstants.NORMAL)

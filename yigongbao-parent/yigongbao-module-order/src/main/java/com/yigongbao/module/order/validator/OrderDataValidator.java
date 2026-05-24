@@ -10,6 +10,7 @@ import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.basic.bodyPart.service.BodyPartService;
 import com.yigongbao.module.basic.bodyPart.vo.BodyPartDetailVO;
 import com.yigongbao.module.system.doctor.dto.QuickAddDoctorDTO;
+import com.yigongbao.module.system.doctor.dto.UpdateDoctorDTO;
 import com.yigongbao.module.system.doctor.service.DoctorService;
 import com.yigongbao.module.system.doctor.vo.DoctorVO;
 import com.yigongbao.module.system.user.service.UserService;
@@ -476,7 +477,7 @@ public class OrderDataValidator {
             Long doctorId, String doctorName, String doctorPhone,
             Long hospitalId, Long creatorId) {
         if (doctorId != null) {
-            // 场景 A：已选择医生（从历史联想列表选择），校验后覆盖名称和电话
+            // 场景 A：已选择医生（从历史联想列表选择），校验后检查是否需要更新历史记录
             DoctorVO doctor = doctorService.getById(doctorId);
             if (doctor == null) {
                 log.warn("医生不存在，doctorId={}", doctorId);
@@ -486,9 +487,27 @@ public class OrderDataValidator {
                 log.warn("医生已禁用，doctorId={}", doctorId);
                 throw new BusinessException(ErrorCodeEnum.DOCTOR_DISABLED);
             }
-            // 强制覆盖，不信任前端传入值
-            setDoctorName.accept(doctor.getDoctorName());
-            setDoctorPhone.accept(doctor.getDoctorPhone());
+
+            // 检查前端传入的名字/电话是否与数据库不一致，如果不一致则更新历史记录
+            boolean nameChanged = StrUtil.isNotBlank(doctorName) && !doctorName.equals(doctor.getDoctorName());
+            boolean phoneChanged = StrUtil.isNotBlank(doctorPhone) && !doctorPhone.equals(doctor.getDoctorPhone());
+
+            if (nameChanged || phoneChanged) {
+                log.info("医生信息变更，更新历史记录: doctorId={}, oldName={}, newName={}, oldPhone={}, newPhone={}",
+                    doctorId, doctor.getDoctorName(), doctorName, doctor.getDoctorPhone(), doctorPhone);
+                UpdateDoctorDTO updateDto = new UpdateDoctorDTO();
+                updateDto.setDoctorName(nameChanged ? doctorName : doctor.getDoctorName());
+                updateDto.setDoctorPhone(phoneChanged ? doctorPhone : doctor.getDoctorPhone());
+                doctorService.update(doctorId, updateDto);
+
+                // 使用更新后的值
+                setDoctorName.accept(updateDto.getDoctorName());
+                setDoctorPhone.accept(updateDto.getDoctorPhone());
+            } else {
+                // 使用数据库原值
+                setDoctorName.accept(doctor.getDoctorName());
+                setDoctorPhone.accept(doctor.getDoctorPhone());
+            }
         } else if (StrUtil.isNotBlank(doctorName)) {
             // 场景 B：手动输入了医生姓名，快速创建/获取医生并关联操作员
             // hospitalId 为必填（QuickAddDoctorDTO @NotNull），若未选医院则跳过
