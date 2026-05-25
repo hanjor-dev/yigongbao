@@ -342,7 +342,6 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
      */
     @Override
     public String getConfigValue(String configKey) {
-        log.debug("根据键名获取配置值，configKey={}", configKey);
         // 1. 查询数据库
         LambdaQueryWrapper<ConfigEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ConfigEntity::getConfigKey, configKey)
@@ -351,7 +350,6 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
 
         // 2. 数据库有值，直接返回
         if (entity != null && StrUtil.isNotBlank(entity.getConfigValue())) {
-            log.debug("使用数据库配置，configKey={}, value={}", configKey, entity.getConfigValue());
             return entity.getConfigValue();
         }
 

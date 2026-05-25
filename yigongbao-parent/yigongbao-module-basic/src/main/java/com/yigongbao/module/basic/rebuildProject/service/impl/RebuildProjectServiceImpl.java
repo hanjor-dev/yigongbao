@@ -64,7 +64,6 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
      */
     @Override
     public List<RebuildProjectVO> listTree(String categoryCode, String keyword) {
-        log.info("获取项目树形结构，categoryCode={}, keyword={}", categoryCode, keyword);
         try {
             Map<Long, String> bodyPartNameMap = getBodyPartNameMap();
             LambdaQueryWrapper<RebuildProjectEntity> wrapper = buildQueryWrapper(null, categoryCode, keyword);
@@ -75,7 +74,6 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
                     .map(e -> toVO(e, bodyPartNameMap))
                     .collect(Collectors.toList());
             List<RebuildProjectVO> tree = buildTree(voList);
-            log.info("获取项目树形结构成功");
             return tree;
         } catch (Exception e) {
             log.error("获取项目树形结构异常", e);
@@ -93,7 +91,6 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
      */
     @Override
     public List<RebuildProjectVO> listByBodyPartId(Long bodyPartId, String categoryCode, String keyword) {
-        log.info("根据部位ID获取项目列表，bodyPartId={}, categoryCode={}, keyword={}", bodyPartId, categoryCode, keyword);
         try {
             BodyPartEntity bodyPart = bodyPartService.getById(bodyPartId);
             if (bodyPart == null) {
@@ -110,7 +107,6 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
                     .map(e -> toVO(e, bodyPartNameMap))
                     .collect(Collectors.toList());
             List<RebuildProjectVO> tree = buildTree(voList);
-            log.info("根据部位ID获取项目列表成功，数量={}", tree.size());
             return tree;
         } catch (BusinessException e) {
             throw e;
@@ -130,7 +126,6 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
      */
     @Override
     public List<BodyPartProjectTreeVO> listFullTree(String categoryCode, Long bodyPartId, String keyword) {
-        log.info("获取完整部位-项目树形结构，bodyPartId={}, categoryCode={}, keyword={}", bodyPartId, categoryCode, keyword);
         try {
             // 1. 查询启用部位（可按 bodyPartId 过滤），按 sort 升序
             LambdaQueryWrapper<BodyPartEntity> partWrapper = new LambdaQueryWrapper<BodyPartEntity>()
@@ -173,7 +168,6 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
                     result.add(partVO);
                 }
             }
-            log.info("获取完整部位-项目树形结构成功，部位数={}", result.size());
             return result;
         } catch (Exception e) {
             log.error("获取完整部位-项目树形结构异常", e);
@@ -189,7 +183,6 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
      */
     @Override
     public RebuildProjectDetailVO getDetailById(Long id) {
-        log.info("查询项目详情，id={}", id);
         try {
             RebuildProjectEntity entity = getById(id);
             if (entity == null) {
@@ -205,7 +198,6 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
             if (entity.getParentId() != null && entity.getParentId() > 0) {
                 vo.setParentName(getProjectNameCache().get(entity.getParentId()));
             }
-            log.info("查询项目详情成功，id={}", id);
             return vo;
         } catch (BusinessException e) {
             throw e;

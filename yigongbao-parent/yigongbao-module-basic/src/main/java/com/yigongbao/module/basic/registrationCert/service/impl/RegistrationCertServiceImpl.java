@@ -53,7 +53,6 @@ import java.util.Objects;
      */
     @Override
     public IPage<RegistrationCertVO> listCerts(RegistrationCertPageDTO dto) {
-        log.info("分页查询注册证，dto={}", dto);
         try {
             int pageNum = dto.getPageNum() == null || dto.getPageNum() < 1 ? 1 : dto.getPageNum();
             int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1 ? 10 : dto.getPageSize();
@@ -84,7 +83,6 @@ import java.util.Objects;
                 fillExtraFields(vo, entity);
                 return vo;
             });
-            log.info("分页查询注册证成功，共{}条", result.getRecords().size());
             return result;
         } catch (Exception e) {
             log.error("分页查询注册证异常，dto={}", dto, e);
@@ -99,7 +97,6 @@ import java.util.Objects;
      */
     @Override
     public List<RegistrationCertVO> listValidCerts() {
-        log.info("查询有效注册证列表");
         try {
             LambdaQueryWrapper<RegistrationCertEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(RegistrationCertEntity::getStatus, StatusConstants.NORMAL)
@@ -109,7 +106,6 @@ import java.util.Objects;
                 fillExtraFields(vo, entity);
                 return vo;
             }).toList();
-            log.info("查询有效注册证列表成功，共{}条", result.size());
             return result;
         } catch (Exception e) {
             log.error("查询有效注册证列表异常", e);
@@ -126,7 +122,6 @@ import java.util.Objects;
      */
     @Override
     public RegistrationCertVO getById(Long id) {
-        log.info("根据ID查询注册证详情，id={}", id);
         try {
             RegistrationCertEntity entity = super.getById(id);
             if (entity == null) {
@@ -135,7 +130,6 @@ import java.util.Objects;
             }
             RegistrationCertVO vo = RegistrationCertConvert.toVO(entity);
             fillExtraFields(vo, entity);
-            log.info("查询注册证详情成功，id={}", id);
             return vo;
         } catch (BusinessException e) {
             throw e;

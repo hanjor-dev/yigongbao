@@ -31,11 +31,6 @@ public class ResultInterceptor implements HandlerInterceptor {
         long startTime = System.currentTimeMillis();
         request.setAttribute("startTime", startTime);
 
-        // 记录请求日志
-        String uri = request.getRequestURI();
-        String method = request.getMethod();
-        log.debug("请求开始：{} {}", method, uri);
-
         return true;
     }
 
@@ -68,8 +63,6 @@ public class ResultInterceptor implements HandlerInterceptor {
             // 慢请求日志警告
             if (executeTime > 1000) {
                 log.warn("慢请求：{} {} 耗时 {}ms", method, uri, executeTime);
-            } else {
-                log.debug("请求完成：{} {} 耗时 {}ms", method, uri, executeTime);
             }
         }
 
