@@ -1509,3 +1509,77 @@ CREATE TABLE part_colors
   DEFAULT CHARSET = utf8mb4 COMMENT = '部位颜色透明度配置表';
 
 CREATE INDEX idx_part_colors_part_detail ON part_colors (part_detail);
+
+
+-- ============================================================
+-- 加工中心表
+-- ============================================================
+DROP TABLE IF EXISTS processing_center;
+CREATE TABLE processing_center (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    center_code VARCHAR(50) NOT NULL COMMENT '中心编码',
+    center_name VARCHAR(100) NOT NULL COMMENT '中心名称',
+    contact_person VARCHAR(50) COMMENT '联系人',
+    contact_phone VARCHAR(20) COMMENT '联系电话',
+    address VARCHAR(200) COMMENT '地址',
+    device_id_ranges TEXT COMMENT '可用设备ID范围（JSON）',
+    status TINYINT DEFAULT 1 COMMENT '状态（0=禁用，1=启用）',
+    remark VARCHAR(500) COMMENT '备注',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by BIGINT COMMENT '创建人ID',
+    update_by BIGINT COMMENT '更新人ID',
+    is_deleted TINYINT DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+    KEY idx_status (status),
+    KEY idx_center_name (center_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='加工中心表';
+
+CREATE UNIQUE INDEX uk_center_code
+    ON processing_center ((CASE WHEN is_deleted = 0 THEN center_code ELSE NULL END));
+
+
+-- ============================================================
+-- 设备表
+-- ============================================================
+DROP TABLE IF EXISTS device;
+CREATE TABLE device (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    device_id VARCHAR(50) NOT NULL COMMENT '设备编号',
+    device_name VARCHAR(100) COMMENT '设备名称',
+    device_type VARCHAR(50) COMMENT '设备类型',
+    center_id BIGINT COMMENT '所属加工中心ID',
+    center_name VARCHAR(100) COMMENT '所属加工中心名称',
+    state TINYINT DEFAULT 0 COMMENT '设备状态（0=空闲，1=占用）',
+    connection_status TINYINT DEFAULT 0 COMMENT '连接状态（0=离线，1=在线）',
+    last_heartbeat DATETIME COMMENT '最后心跳时间',
+    remark VARCHAR(500) COMMENT '备注',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by BIGINT COMMENT '创建人ID',
+    update_by BIGINT COMMENT '更新人ID',
+    is_deleted TINYINT DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+    KEY idx_center_id (center_id),
+    KEY idx_device_type (device_type),
+    KEY idx_state (state),
+    KEY idx_connection_status (connection_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备表';
+
+CREATE UNIQUE INDEX uk_device_id
+    ON device ((CASE WHEN is_deleted = 0 THEN device_id ELSE NULL END));
+
+
+-- ============================================================
+-- 设备状态变更日志表
+-- ============================================================
+DROP TABLE IF EXISTS device_state_log;
+CREATE TABLE device_state_log (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    device_id VARCHAR(50) NOT NULL COMMENT '设备编号',
+    old_state TINYINT COMMENT '旧状态',
+    new_state TINYINT NOT NULL COMMENT '新状态',
+    change_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '变更时间',
+    change_type VARCHAR(20) COMMENT '变更类型（auto=自动，manual=手动）',
+    operator_id BIGINT COMMENT '操作人ID',
+    KEY idx_device_id (device_id),
+    KEY idx_change_time (change_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备状态变更日志';
