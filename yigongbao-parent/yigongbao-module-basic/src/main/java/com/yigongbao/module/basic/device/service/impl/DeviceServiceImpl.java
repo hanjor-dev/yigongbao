@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.common.exception.ErrorCodeEnum;
+import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.module.basic.device.convert.DeviceConvert;
 import com.yigongbao.module.basic.device.dto.CreateDeviceDTO;
 import com.yigongbao.module.basic.device.dto.DevicePageDTO;
@@ -66,7 +66,7 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         LambdaQueryWrapper<DeviceEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(DeviceEntity::getDeviceId, dto.getDeviceId());
         if (count(wrapper) > 0) {
-            throw new BusinessException(ErrorCodeEnum.DATA_ALREADY_EXISTS, "设备编号已存在");
+            throw new BusinessException(ErrorCodeEnum.DATA_EXISTS, "设备编号已存在");
         }
 
         DeviceEntity entity = DeviceConvert.toEntity(dto);
@@ -122,7 +122,7 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
     public void batchUpdateDeviceStatus(DeviceStatusPushDTO dto) {
         LambdaQueryWrapper<ProcessingCenterEntity> centerWrapper = new LambdaQueryWrapper<>();
         centerWrapper.eq(ProcessingCenterEntity::getCenterName, dto.getCenterName())
-                     .eq(ProcessingCenterEntity::getStatus, StatusConstants.STATUS_ENABLED);
+                     .eq(ProcessingCenterEntity::getStatus, StatusConstants.NORMAL);
         ProcessingCenterEntity center = processingCenterMapper.selectOne(centerWrapper);
 
         if (center == null) {
