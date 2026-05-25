@@ -23,6 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * 加工中心管理服务实现类
+ *
+ * @author hanjor
+ * @date 2026-05-25
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,9 +37,13 @@ public class ProcessingCenterServiceImpl extends ServiceImpl<ProcessingCenterMap
 
     /**
      * 分页查询加工中心列表
+     *
+     * @param dto 分页查询参数（支持按名称模糊查询、按状态筛选）
+     * @return 分页结果
      */
     @Override
     public IPage<ProcessingCenterVO> listProcessingCenters(ProcessingCenterPageDTO dto) {
+        // 构建查询条件
         LambdaQueryWrapper<ProcessingCenterEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StrUtil.isNotBlank(dto.getCenterName()), ProcessingCenterEntity::getCenterName, dto.getCenterName())
                .eq(dto.getStatus() != null, ProcessingCenterEntity::getStatus, dto.getStatus())
@@ -44,7 +54,11 @@ public class ProcessingCenterServiceImpl extends ServiceImpl<ProcessingCenterMap
     }
 
     /**
-     * 根据ID查询加工中心
+     * 根据ID查询加工中心详情
+     *
+     * @param id 加工中心ID
+     * @return 加工中心详情
+     * @throws BusinessException 数据不存在时抛出
      */
     @Override
     public ProcessingCenterVO getProcessingCenterById(Long id) {
@@ -57,11 +71,14 @@ public class ProcessingCenterServiceImpl extends ServiceImpl<ProcessingCenterMap
 
     /**
      * 创建加工中心
+     *
+     * @param dto 创建参数
+     * @return 新创建的加工中心ID
+     * @throws BusinessException 中心编码已存在时抛出
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createProcessingCenter(CreateProcessingCenterDTO dto) {
-        // 检查编码是否重复
         LambdaQueryWrapper<ProcessingCenterEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ProcessingCenterEntity::getCenterCode, dto.getCenterCode());
         if (count(wrapper) > 0) {
@@ -79,7 +96,10 @@ public class ProcessingCenterServiceImpl extends ServiceImpl<ProcessingCenterMap
     }
 
     /**
-     * 更新加工中心
+     * 更新加工中心信息
+     *
+     * @param dto 更新参数（仅更新非空字段）
+     * @throws BusinessException 数据不存在时抛出
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -89,7 +109,7 @@ public class ProcessingCenterServiceImpl extends ServiceImpl<ProcessingCenterMap
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
 
-        // 更新非空字段
+        // 仅更新非空字段，避免覆盖原有数据
         if (StrUtil.isNotBlank(dto.getCenterName())) {
             entity.setCenterName(dto.getCenterName());
         }
@@ -117,7 +137,10 @@ public class ProcessingCenterServiceImpl extends ServiceImpl<ProcessingCenterMap
     }
 
     /**
-     * 删除加工中心
+     * 删除加工中心（逻辑删除）
+     *
+     * @param id 加工中心ID
+     * @throws BusinessException 数据不存在时抛出
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -132,10 +155,13 @@ public class ProcessingCenterServiceImpl extends ServiceImpl<ProcessingCenterMap
     }
 
     /**
-     * 查询所有启用的加工中心
+     * 查询所有启用的加工中心（用于下拉选择）
+     *
+     * @return 启用的加工中心列表，按编码升序排列
      */
     @Override
     public List<ProcessingCenterVO> listAllEnabled() {
+        // 查询状态为启用的加工中心
         LambdaQueryWrapper<ProcessingCenterEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ProcessingCenterEntity::getStatus, StatusConstants.NORMAL)
                .orderByAsc(ProcessingCenterEntity::getCenterCode);

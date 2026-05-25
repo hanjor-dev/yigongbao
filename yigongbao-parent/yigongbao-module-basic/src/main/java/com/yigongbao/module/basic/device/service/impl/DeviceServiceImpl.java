@@ -26,9 +26,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * 设备管理服务实现类
+ *
+ * 负责设备的CRUD操作、状态管理、WebSocket批量更新、离线检测等功能
+ *
+ * @author hanjor
+ * @date 2026-05-25
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -37,8 +47,15 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
     private final ProcessingCenterMapper processingCenterMapper;
     private final IDeviceStateLogService deviceStateLogService;
 
+    /**
+     * 分页查询设备列表
+     *
+     * @param dto 分页查询参数（支持按中心、类型、状态、连接状态、设备编号筛选）
+     * @return 分页结果
+     */
     @Override
     public IPage<DeviceVO> listDevices(DevicePageDTO dto) {
+        // 构建查询条件
         LambdaQueryWrapper<DeviceEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(dto.getCenterId() != null, DeviceEntity::getCenterId, dto.getCenterId())
                .eq(StrUtil.isNotBlank(dto.getDeviceType()), DeviceEntity::getDeviceType, dto.getDeviceType())
@@ -51,6 +68,13 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         return page.convert(DeviceConvert::toVO);
     }
 
+    /**
+     * 根据ID查询设备详情
+     *
+     * @param id 设备ID
+     * @return 设备详情
+     * @throws BusinessException 数据不存在时抛出
+     */
     @Override
     public DeviceVO getDeviceById(Long id) {
         DeviceEntity entity = getById(id);
@@ -60,6 +84,13 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         return DeviceConvert.toVO(entity);
     }
 
+    /**
+     * 手动创建设备
+     *
+     * @param dto 创建参数
+     * @return 新创建的设备ID
+     * @throws BusinessException 设备编号已存在时抛出
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createDevice(CreateDeviceDTO dto) {
@@ -78,6 +109,13 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         return entity.getId();
     }
 
+    /**
+     * 手动更新设备状态
+     *
+     * @param id 设备ID
+     * @param state 新状态（0=空闲，1=占用）
+     * @throws BusinessException 数据不存在时抛出
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateDeviceState(Long id, Integer state) {
@@ -90,6 +128,7 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         entity.setState(state);
         updateById(entity);
 
+        // 状态发生变化时记录状态变更日志
         if (!oldState.equals(state)) {
             DeviceStateLogEntity log = new DeviceStateLogEntity();
             log.setDeviceId(entity.getDeviceId());
@@ -103,8 +142,16 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         log.info("更新设备状态: deviceId={}, {} -> {}", entity.getDeviceId(), oldState, state);
     }
 
+    /**
+     * 查询空闲设备列表（用于任务分配）
+     *
+     * @param centerId 加工中心ID（可选）
+     * @param deviceType 设备类型（可选）
+     * @return 空闲且在线的设备列表
+     */
     @Override
     public List<DeviceVO> listIdleDevices(Long centerId, String deviceType) {
+        // 查询条件：空闲(state=0) 且 在线(connectionStatus=1)
         LambdaQueryWrapper<DeviceEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(centerId != null, DeviceEntity::getCenterId, centerId)
                .eq(StrUtil.isNotBlank(deviceType), DeviceEntity::getDeviceType, deviceType)
@@ -117,6 +164,16 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 批量更新设备状态（WebSocket推送触发）
+     *
+     * 功能说明：
+     * 1. 根据加工中心名称查询加工中心信息
+     * 2. 遍历设备列表，自动创建不存在的设备或更新已有设备状态
+     * 3. 记录状态变更日志
+     *
+     * @param dto WebSocket推送的设备状态数据（包含加工中心名称和设备列表）
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void batchUpdateDeviceStatus(DeviceStatusPushDTO dto) {
@@ -130,10 +187,23 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
             return;
         }
 
+        List<String> deviceIds = dto.getDevices().stream()
+                .map(DeviceStatusPushDTO.DeviceStatus::getId)
+                .collect(Collectors.toList());
+
+        LambdaQueryWrapper<DeviceEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(DeviceEntity::getDeviceId, deviceIds);
+        List<DeviceEntity> existingDevices = list(wrapper);
+        Map<String, DeviceEntity> deviceMap = existingDevices.stream()
+                .collect(Collectors.toMap(DeviceEntity::getDeviceId, d -> d));
+
+        List<DeviceEntity> toCreate = new ArrayList<>();
+        List<DeviceEntity> toUpdate = new ArrayList<>();
+        List<DeviceStateLogEntity> stateLogs = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+
         for (DeviceStatusPushDTO.DeviceStatus deviceStatus : dto.getDevices()) {
-            LambdaQueryWrapper<DeviceEntity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(DeviceEntity::getDeviceId, deviceStatus.getId());
-            DeviceEntity device = getOne(wrapper);
+            DeviceEntity device = deviceMap.get(deviceStatus.getId());
 
             if (device == null) {
                 device = new DeviceEntity();
@@ -144,32 +214,46 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
                 device.setCenterName(center.getCenterName());
                 device.setState(deviceStatus.getState());
                 device.setConnectionStatus(1);
-                device.setLastHeartbeat(LocalDateTime.now());
-                save(device);
-
-                log.info("自动创建设备: deviceId={}, centerId={}", device.getDeviceId(), center.getId());
+                device.setLastHeartbeat(now);
+                toCreate.add(device);
             } else {
                 Integer oldState = device.getState();
                 device.setState(deviceStatus.getState());
                 device.setConnectionStatus(1);
-                device.setLastHeartbeat(LocalDateTime.now());
-                updateById(device);
+                device.setLastHeartbeat(now);
+                toUpdate.add(device);
 
                 if (!oldState.equals(deviceStatus.getState())) {
                     DeviceStateLogEntity stateLog = new DeviceStateLogEntity();
                     stateLog.setDeviceId(device.getDeviceId());
                     stateLog.setOldState(oldState);
                     stateLog.setNewState(deviceStatus.getState());
-                    stateLog.setChangeTime(LocalDateTime.now());
+                    stateLog.setChangeTime(now);
                     stateLog.setChangeType("auto");
-                    deviceStateLogService.save(stateLog);
+                    stateLogs.add(stateLog);
                 }
             }
         }
 
-        log.info("批量更新设备状态: centerName={}, deviceCount={}", dto.getCenterName(), dto.getDevices().size());
+        for (DeviceEntity device : toCreate) {
+            save(device);
+        }
+        for (DeviceEntity device : toUpdate) {
+            updateById(device);
+        }
+        for (DeviceStateLogEntity log : stateLogs) {
+            deviceStateLogService.save(log);
+        }
+
+        log.info("批量更新设备状态: centerName={}, deviceCount={}, 新增={}, 更新={}",
+            dto.getCenterName(), dto.getDevices().size(), toCreate.size(), toUpdate.size());
     }
 
+    /**
+     * 标记加工中心的所有设备为离线状态
+     *
+     * @param centerId 加工中心ID
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void markDevicesOffline(Long centerId) {
@@ -177,15 +261,21 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         wrapper.eq(DeviceEntity::getCenterId, centerId)
                .eq(DeviceEntity::getConnectionStatus, 1);
 
-        List<DeviceEntity> devices = list(wrapper);
-        for (DeviceEntity device : devices) {
-            device.setConnectionStatus(0);
-            updateById(device);
+        long count = count(wrapper);
+        if (count > 0) {
+            DeviceEntity updateEntity = new DeviceEntity();
+            updateEntity.setConnectionStatus(0);
+            update(updateEntity, wrapper);
         }
 
-        log.info("标记加工中心设备离线: centerId={}, deviceCount={}", centerId, devices.size());
+        log.info("标记加工中心设备离线: centerId={}, deviceCount={}", centerId, count);
     }
 
+    /**
+     * 检测离线设备（定时任务调用）
+     *
+     * 检测规则：最后心跳时间超过5分钟的在线设备标记为离线
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void detectOfflineDevices() {
@@ -196,13 +286,15 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
                .lt(DeviceEntity::getLastHeartbeat, threshold);
 
         List<DeviceEntity> devices = list(wrapper);
-        for (DeviceEntity device : devices) {
-            device.setConnectionStatus(0);
-            updateById(device);
-            log.warn("设备离线: deviceId={}, lastHeartbeat={}", device.getDeviceId(), device.getLastHeartbeat());
-        }
-
         if (!devices.isEmpty()) {
+            for (DeviceEntity device : devices) {
+                log.warn("设备离线: deviceId={}, lastHeartbeat={}", device.getDeviceId(), device.getLastHeartbeat());
+            }
+
+            DeviceEntity updateEntity = new DeviceEntity();
+            updateEntity.setConnectionStatus(0);
+            update(updateEntity, wrapper);
+
             log.info("离线检测完成: 检测到{}个离线设备", devices.size());
         }
     }

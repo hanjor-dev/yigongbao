@@ -103,6 +103,16 @@ public class UserVO implements Serializable {
     private String roleCode;
 
     /**
+     * 所属加工中心ID（生产员角色专用）
+     */
+    private Long centerId;
+
+    /**
+     * 所属加工中心名称（生产员角色专用）
+     */
+    private String centerName;
+
+    /**
      * 数据权限范围（来自关联角色），前端通过 dataScopeType == 'hospitals' 判断是否显示医院选择区域
      */
     private String dataScopeType;

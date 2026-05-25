@@ -89,6 +89,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     private final DeptOrgMapper deptOrgMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final StringRedisTemplate stringRedisTemplate;
+    private final com.yigongbao.module.basic.processingCenter.mapper.ProcessingCenterMapper processingCenterMapper;
 
     /**
      * 分页查询用户列表
@@ -433,6 +434,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             // 角色业务规则校验（hospitals范围 + 设计师specialty）
             validateHospitalScope(roleEntity, dto.getHospitalIds());
             validateSpecialty(roleEntity, dto.getSpecialtyList());
+            // 生产员角色校验加工中心
+            validateProcessingCenter(roleEntity, dto.getCenterId());
             // DTO转换为实体对象
             UserEntity entity = UserConvert.toEntity(dto);
             // specialty 在 DB 中以逗号分隔字符串存储: 前端传 List 需在此转换
@@ -586,6 +589,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 validateDeptRequired(effectiveRole, effectiveDept);
                 validateHospitalScope(effectiveRole, dto.getHospitalIds());
                 validateSpecialty(effectiveRole, dto.getSpecialtyList());
+            }
+            // 生产员角色校验加工中心
+            Long effectiveCenterId = dto.getCenterId() != null ? dto.getCenterId() : entity.getCenterId();
+            validateProcessingCenter(effectiveRole, effectiveCenterId);
+            // 校验加工中心是否存在并更新冗余字段
+            if (dto.getCenterId() != null && !dto.getCenterId().equals(entity.getCenterId())) {
+                com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity center =
+                    processingCenterMapper.selectById(dto.getCenterId());
+                if (center == null) {
+                    log.warn("加工中心不存在: centerId={}", dto.getCenterId());
+                    throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "加工中心");
+                }
+                entity.setCenterName(center.getCenterName());
             }
             // 更新角色冗余字段: 并处理医院范围权限变更
             if (newRole != null) {
@@ -861,6 +877,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     }
 
     /**
+     * 校验生产员角色的加工中心绑定
+     */
+    private void validateProcessingCenter(RoleEntity role, Long centerId) {
+        if (role == null || role.getRoleCode() == null) {
+            return;
+        }
+        // 生产员角色必须绑定加工中心
+        if ("producer".equals(role.getRoleCode())) {
+            if (centerId == null) {
+                log.warn("生产员角色必须绑定加工中心: roleId={}", role.getId());
+                throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "加工中心");
+            }
+            // 校验加工中心是否存在
+            com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity center =
+                processingCenterMapper.selectById(centerId);
+            if (center == null) {
+                log.warn("加工中心不存在: centerId={}", centerId);
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "加工中心");
+            }
+        }
+    }
+
+    /**
      * 填充用户实体冗余字段
      * <p>
      * 冗余字段（orgName/deptName/roleName/roleCode）存储在用户表中: 目的是避免列表查询时
@@ -884,6 +923,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         if (entity.getRoleId() != null && roleEntity != null) {
             entity.setRoleName(roleEntity.getRoleName());
             entity.setRoleCode(roleEntity.getRoleCode());
+        }
+        // 冗余加工中心名称: 避免查询时 JOIN processing_center
+        if (entity.getCenterId() != null) {
+            com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity center =
+                processingCenterMapper.selectById(entity.getCenterId());
+            if (center != null) {
+                entity.setCenterName(center.getCenterName());
+            }
         }
     }
 

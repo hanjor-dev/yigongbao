@@ -72,6 +72,11 @@ public class UpdateUserDTO implements Serializable {
     private Long roleId;
 
     /**
+     * 所属加工中心ID（生产员角色专用）
+     */
+    private Long centerId;
+
+    /**
      * 医院ID列表（当角色 dataScopeType=hospitals 时，用于分配医院范围权限）
      * 管理员可先选择模板（预览模板医院列表），再微调后提交
      */

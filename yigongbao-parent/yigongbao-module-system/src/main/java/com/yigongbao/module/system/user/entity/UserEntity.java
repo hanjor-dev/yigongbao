@@ -98,6 +98,16 @@ public class UserEntity extends BaseEntity implements Serializable {
     private String roleCode;
 
     /**
+     * 所属加工中心ID（生产员角色专用）
+     */
+    private Long centerId;
+
+    /**
+     * 所属加工中心名称（冗余字段，生产员角色专用）
+     */
+    private String centerName;
+
+    /**
      * 工号
      */
     private String employeeNo;

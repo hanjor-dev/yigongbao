@@ -25,6 +25,7 @@ import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.vo.UserVO;
+import com.yigongbao.module.basic.processingCenter.mapper.ProcessingCenterMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -81,6 +82,18 @@ class UserServiceImplTest {
 
     @Mock
     private DictService dictService;
+
+    @Mock
+    private ProcessingCenterMapper processingCenterMapper;
+
+    @Mock
+    private com.yigongbao.module.system.dept.mapper.DeptOrgMapper deptOrgMapper;
+
+    @Mock
+    private com.yigongbao.module.basic.code.service.CodeGeneratorService codeGeneratorService;
+
+    @Mock
+    private org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
 
     @InjectMocks
     private UserServiceImpl userService;

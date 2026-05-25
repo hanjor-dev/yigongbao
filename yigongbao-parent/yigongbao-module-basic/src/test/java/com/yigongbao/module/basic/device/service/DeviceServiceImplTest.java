@@ -1,5 +1,6 @@
 package com.yigongbao.module.basic.device.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.device.dto.CreateDeviceDTO;
@@ -93,7 +94,7 @@ class DeviceServiceImplTest {
         center.setCenterName("武汉嘉一");
 
         when(processingCenterMapper.selectOne(any())).thenReturn(center);
-        when(deviceMapper.selectOne(any())).thenReturn(null);
+        when(deviceMapper.selectList(any())).thenReturn(Arrays.asList());
         when(deviceMapper.insert(any(DeviceEntity.class))).thenAnswer(invocation -> {
             DeviceEntity entity = invocation.getArgument(0);
             entity.setId(1L);
