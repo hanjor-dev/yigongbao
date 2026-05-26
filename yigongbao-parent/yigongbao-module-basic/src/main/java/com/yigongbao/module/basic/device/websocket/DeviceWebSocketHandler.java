@@ -1,8 +1,11 @@
 package com.yigongbao.module.basic.device.websocket;
 
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.module.basic.device.dto.DeviceStatusPushDTO;
 import com.yigongbao.module.basic.device.service.IDeviceService;
+import com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity;
+import com.yigongbao.module.basic.processingCenter.mapper.ProcessingCenterMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -18,6 +21,7 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
 
     private final IDeviceService deviceService;
     private final DeviceConnectionManager connectionManager;
+    private final ProcessingCenterMapper processingCenterMapper;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -46,6 +50,18 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        log.info("WebSocket连接关闭: sessionId={}, status={}", session.getId(), status);
+        String centerName = connectionManager.getCenterNameBySessionId(session.getId());
+        connectionManager.removeSession(session.getId());
+
+        if (centerName != null) {
+            ProcessingCenterEntity center = processingCenterMapper.selectOne(
+                new LambdaQueryWrapper<ProcessingCenterEntity>()
+                    .eq(ProcessingCenterEntity::getCenterName, centerName)
+                    .last("LIMIT 1"));
+            if (center != null) {
+                deviceService.markDevicesOffline(center.getId());
+            }
+        }
+        log.info("WebSocket连接关闭: sessionId={}, centerName={}, status={}", session.getId(), centerName, status);
     }
 }

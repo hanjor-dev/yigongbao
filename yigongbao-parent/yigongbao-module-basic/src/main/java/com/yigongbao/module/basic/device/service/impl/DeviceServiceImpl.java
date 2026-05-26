@@ -1,6 +1,9 @@
 package com.yigongbao.module.basic.device.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONArray;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -184,6 +187,9 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
             return;
         }
 
+        // 解析该中心的设备ID范围，用于过滤越界设备
+        List<String[]> allowedRanges = parseDeviceIdRanges(center.getDeviceIdRanges());
+
         List<String> deviceIds = dto.getDevices().stream()
                 .map(DeviceStatusPushDTO.DeviceStatus::getId)
                 .collect(Collectors.toList());
@@ -200,6 +206,11 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         LocalDateTime now = LocalDateTime.now();
 
         for (DeviceStatusPushDTO.DeviceStatus deviceStatus : dto.getDevices()) {
+            // 校验设备ID是否在该中心的允许范围内
+            if (!allowedRanges.isEmpty() && !isDeviceIdInRanges(deviceStatus.getId(), allowedRanges)) {
+                log.warn("设备ID不在加工中心允许范围内，跳过: deviceId={}, centerName={}", deviceStatus.getId(), dto.getCenterName());
+                continue;
+            }
             DeviceEntity device = deviceMap.get(deviceStatus.getId());
 
             if (device == null) {
@@ -267,25 +278,38 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
     }
 
     /**
-     * 检测离线设备（定时任务调用）
-     *
-     * 检测规则：最后心跳时间超过5分钟的在线设备标记为离线
+     * 解析 deviceIdRanges JSON 为 [start, end] 对列表
+     * 格式：[{"start":"P001","end":"P099"}]
      */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void detectOfflineDevices() {
-        LocalDateTime threshold = LocalDateTime.now().minusMinutes(5);
-
-        LambdaQueryWrapper<DeviceEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(DeviceEntity::getConnectionStatus, 1)
-               .lt(DeviceEntity::getLastHeartbeat, threshold);
-
-        long offlineCount = count(wrapper);
-        if (offlineCount > 0) {
-            DeviceEntity updateEntity = new DeviceEntity();
-            updateEntity.setConnectionStatus(0);
-            update(updateEntity, wrapper);
-            log.info("离线检测完成: 检测到{}个离线设备", offlineCount);
+    private List<String[]> parseDeviceIdRanges(String deviceIdRanges) {
+        if (StrUtil.isBlank(deviceIdRanges)) {
+            return java.util.Collections.emptyList();
         }
+        try {
+            JSONArray arr = JSONUtil.parseArray(deviceIdRanges);
+            List<String[]> result = new ArrayList<>();
+            for (Object obj : arr) {
+                JSONObject item = (JSONObject) obj;
+                String start = item.getStr("start");
+                String end = item.getStr("end");
+                if (StrUtil.isNotBlank(start) && StrUtil.isNotBlank(end)) {
+                    result.add(new String[]{start, end});
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("解析 deviceIdRanges 失败，跳过范围校验: {}", deviceIdRanges);
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    /** 判断 deviceId 是否落在任意一个允许范围内（字典序比较） */
+    private boolean isDeviceIdInRanges(String deviceId, List<String[]> ranges) {
+        for (String[] range : ranges) {
+            if (deviceId.compareTo(range[0]) >= 0 && deviceId.compareTo(range[1]) <= 0) {
+                return true;
+            }
+        }
+        return false;
     }
 }
