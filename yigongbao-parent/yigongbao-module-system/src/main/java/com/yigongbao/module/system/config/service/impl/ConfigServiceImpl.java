@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.yigongbao.module.system.basedata.vo.SelectTreeVO;
+import com.yigongbao.common.vo.SelectTreeVO;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.stream.Collectors;

@@ -70,7 +70,11 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 // 登录验证码冷却时间配置
                 "/system/config/5",
                 // 设备 WebSocket（允许任何客户端连接，无需身份认证）
-                "/basic/ws/device"
+                // 注意：WebSocket 路径注册时含 /api 前缀，但拦截器路径不含，需两者都排除
+                "/basic/ws/device",
+                "/api/basic/ws/device",
+                "/basic/processing-center/**",
+                "/basic/device/**"
         );
     }
 }

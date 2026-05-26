@@ -4,7 +4,6 @@ import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.result.Result;
-import com.yigongbao.framework.annotation.RequireSign;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.basic.area.service.AreaService;
@@ -12,7 +11,7 @@ import com.yigongbao.module.basic.area.vo.AreaVO;
 import com.yigongbao.module.system.basedata.dto.BizTypeListDTO;
 import com.yigongbao.module.system.basedata.dto.SelectOptionsDTO;
 import com.yigongbao.module.system.basedata.dto.SelectTreeDTO;
-import com.yigongbao.module.system.basedata.vo.SelectTreeVO;
+import com.yigongbao.common.vo.SelectTreeVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
@@ -25,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**

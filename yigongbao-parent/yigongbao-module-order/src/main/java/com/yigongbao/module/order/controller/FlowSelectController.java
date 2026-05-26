@@ -4,7 +4,7 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.framework.annotation.RequireSign;
-import com.yigongbao.module.system.basedata.vo.SelectTreeVO;
+import com.yigongbao.common.vo.SelectTreeVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;

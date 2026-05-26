@@ -3,6 +3,7 @@ package com.yigongbao.module.basic.device.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.common.vo.SelectTreeVO;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.device.dto.CreateDeviceDTO;
@@ -20,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -102,10 +102,16 @@ public class DeviceController {
      */
     @Operation(summary = "查询设备类型下拉列表")
     @GetMapping("/types")
-    public Result<List<Map<String, String>>> listDeviceTypes() {
-        List<Map<String, String>> types = Arrays.stream(DeviceTypeEnum.values())
-                .map(e -> Map.of("code", e.getCode(), "name", e.getName()))
-                .collect(Collectors.toList());
-        return Result.success(types);
+    public Result<List<SelectTreeVO>> listDeviceTypes() {
+        return Result.success(DEVICE_TYPE_OPTIONS);
     }
+
+    private static final List<SelectTreeVO> DEVICE_TYPE_OPTIONS = Arrays.stream(DeviceTypeEnum.values())
+            .map(e -> {
+                SelectTreeVO vo = new SelectTreeVO();
+                vo.setValue(e.getCode());
+                vo.setName(e.getName());
+                return vo;
+            })
+            .collect(Collectors.toUnmodifiableList());
 }

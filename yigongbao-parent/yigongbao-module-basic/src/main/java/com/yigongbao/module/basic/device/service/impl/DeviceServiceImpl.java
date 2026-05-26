@@ -30,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -97,9 +98,12 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createDevice(CreateDeviceDTO dto) {
-        // 3D打印类设备由WebSocket自动注册，禁止手动创建
-        if (StrUtil.isNotBlank(dto.getDeviceType()) && dto.getDeviceType().startsWith("PRINTER_")) {
-            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "3D打印类设备不允许手动创建，请通过设备端WebSocket接入");
+        if (StrUtil.isNotBlank(dto.getDeviceType())) {
+            boolean autoRegistered = Arrays.stream(DeviceTypeEnum.values())
+                    .anyMatch(e -> e.getCode().equals(dto.getDeviceType()) && e.isAutoRegistered());
+            if (autoRegistered) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "3D打印类设备不允许手动创建，请通过设备端WebSocket接入");
+            }
         }
         LambdaQueryWrapper<DeviceEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(DeviceEntity::getDeviceId, dto.getDeviceId());
@@ -108,6 +112,13 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         }
 
         DeviceEntity entity = DeviceConvert.toEntity(dto);
+        if (dto.getCenterId() != null) {
+            ProcessingCenterEntity center = processingCenterMapper.selectById(dto.getCenterId());
+            if (center == null) {
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "加工中心");
+            }
+            entity.setCenterName(center.getCenterName());
+        }
         save(entity);
 
         log.info("创建设备: id={}, deviceId={}, deviceType={}",
@@ -180,7 +191,7 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void batchUpdateDeviceStatus(DeviceStatusPushDTO dto) {
+    public boolean batchUpdateDeviceStatus(DeviceStatusPushDTO dto) {
         LambdaQueryWrapper<ProcessingCenterEntity> centerWrapper = new LambdaQueryWrapper<>();
         centerWrapper.eq(ProcessingCenterEntity::getCenterName, dto.getCenterName())
                      .eq(ProcessingCenterEntity::getStatus, StatusConstants.NORMAL);
@@ -188,7 +199,7 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
 
         if (center == null) {
             log.warn("加工中心不存在或已禁用: centerName={}", dto.getCenterName());
-            return;
+            return false;
         }
 
         // 解析该中心的设备ID范围，用于过滤越界设备
@@ -259,6 +270,7 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
 
         log.info("批量更新设备状态: centerName={}, deviceCount={}, 新增={}, 更新={}",
             dto.getCenterName(), dto.getDevices().size(), toCreate.size(), toUpdate.size());
+        return true;
     }
 
     /**

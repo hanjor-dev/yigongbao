@@ -35,9 +35,12 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
             DeviceStatusPushDTO dto = JSONUtil.toBean(payload, DeviceStatusPushDTO.class);
 
             connectionManager.addSession(dto.getCenterName(), session);
-            deviceService.batchUpdateDeviceStatus(dto);
-
-            session.sendMessage(new TextMessage("{\"code\":200,\"message\":\"success\"}"));
+            boolean success = deviceService.batchUpdateDeviceStatus(dto);
+            if (success) {
+                session.sendMessage(new TextMessage("{\"code\":200,\"message\":\"success\"}"));
+            } else {
+                session.sendMessage(new TextMessage("{\"code\":404,\"message\":\"加工中心不存在或已禁用\"}"));
+            }
         } catch (Exception e) {
             log.error("处理WebSocket消息失败: sessionId={}", session.getId(), e);
             try {

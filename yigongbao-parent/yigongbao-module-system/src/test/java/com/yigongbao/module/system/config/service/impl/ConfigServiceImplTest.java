@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.vo.SelectTreeVO;
 import com.yigongbao.module.system.config.dto.ConfigPageDTO;
 import com.yigongbao.module.system.config.dto.CreateConfigDTO;
 import com.yigongbao.module.system.config.dto.UpdateConfigDTO;
@@ -334,7 +335,7 @@ class ConfigServiceImplTest {
     @Test
     @DisplayName("listConfigGroups: 返回预设分组")
     void listConfigGroups_shouldReturnGroups() {
-        List<com.yigongbao.module.system.basedata.vo.SelectTreeVO> result = configService.listConfigGroups();
+        List<SelectTreeVO> result = configService.listConfigGroups();
 
         assertNotNull(result);
         assertEquals(3, result.size());

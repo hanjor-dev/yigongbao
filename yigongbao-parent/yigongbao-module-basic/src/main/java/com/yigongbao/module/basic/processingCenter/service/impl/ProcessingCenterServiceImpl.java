@@ -239,7 +239,7 @@ public class ProcessingCenterServiceImpl extends ServiceImpl<ProcessingCenterMap
                     if (!(np[1].compareTo(os) < 0 || oe.compareTo(np[0]) < 0)) {
                         log.warn("设备ID范围与加工中心[{}]存在重叠: newRange=[{},{}], existingRange=[{},{}]",
                             other.getCenterCode(), np[0], np[1], os, oe);
-                        throw new BusinessException(ErrorCodeEnum.PARAM_ERROR,
+                        throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER,
                             "设备ID范围与加工中心[" + other.getCenterName() + "]存在重叠");
                     }
                 }

@@ -520,6 +520,8 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         vo.setOrgName(entity.getOrgName());
         vo.setHospitalId(entity.getHospitalId());
         vo.setHospitalName(entity.getHospitalName());
+        vo.setHospitalDeptId(entity.getHospitalDeptId());
+        vo.setHospitalDeptName(entity.getHospitalDeptName());
         vo.setPatientName(entity.getPatientName());
         vo.setPatientGender(entity.getPatientGender());
         vo.setPatientGenderName(getGenderName(entity.getPatientGender()));
@@ -554,6 +556,8 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         vo.setOperatorPhone(entity.getOperatorPhone());
         vo.setHospitalId(entity.getHospitalId());
         vo.setHospitalName(entity.getHospitalName());
+        vo.setHospitalDeptId(entity.getHospitalDeptId());
+        vo.setHospitalDeptName(entity.getHospitalDeptName());
         vo.setDoctorId(entity.getDoctorId());
         vo.setDoctorName(entity.getDoctorName());
         vo.setDoctorPhone(entity.getDoctorPhone());

@@ -1,4 +1,4 @@
-package com.yigongbao.module.system.basedata.vo;
+package com.yigongbao.common.vo;
 
 import lombok.Data;
 

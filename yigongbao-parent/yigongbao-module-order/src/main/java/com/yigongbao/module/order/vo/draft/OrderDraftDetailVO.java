@@ -93,6 +93,16 @@ public class OrderDraftDetailVO implements Serializable {
      */
     private String hospitalName;
 
+    /**
+     * 医院科室ID
+     */
+    private Long hospitalDeptId;
+
+    /**
+     * 医院科室名称（冗余）
+     */
+    private String hospitalDeptName;
+
     // ==================== 医生信息 ====================
     /**
      * 医生ID

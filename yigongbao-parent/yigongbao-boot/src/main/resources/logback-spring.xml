@@ -73,7 +73,7 @@
 
     <!-- 开发环境：DEBUG 级别，便于调试 -->
     <springProfile name="dev">
-        <logger name="com.yigongbao" level="DEBUG" />
+        <logger name="com.yigongbao" level="INFO" />
         <logger name="org.springframework" level="INFO" />
     </springProfile>
 

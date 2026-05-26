@@ -166,6 +166,10 @@ CREATE TABLE sys_user (
     role_name           VARCHAR(64)     COMMENT '关联角色名称（冗余字段）',
     role_code           VARCHAR(32)     COMMENT '关联角色编码（冗余字段）',
 
+    -- 加工中心
+    center_id BIGINT NULL COMMENT '所属加工中心ID（生产员角色专用）',
+    center_name VARCHAR(64) NULL COMMENT '所属加工中心名称（冗余字段，生产员角色专用）',
+
     -- 扩展字段
     employee_no         VARCHAR(32)     COMMENT '工号',
     asset_number        VARCHAR(64)     COMMENT '资产编码（企业账户选填）',
@@ -202,6 +206,7 @@ CREATE TABLE sys_user (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 CREATE UNIQUE INDEX uk_username ON sys_user ((CASE WHEN is_deleted = 0 THEN username ELSE NULL END));
 CREATE UNIQUE INDEX uk_phone ON sys_user ((CASE WHEN is_deleted = 0 THEN phone ELSE NULL END));
+CREATE INDEX idx_sys_user_center_id ON sys_user(center_id);
 
 -- email 唯一（逻辑删除兼容）
 CREATE UNIQUE INDEX uk_email
