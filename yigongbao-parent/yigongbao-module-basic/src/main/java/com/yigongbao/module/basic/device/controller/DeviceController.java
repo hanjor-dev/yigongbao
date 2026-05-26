@@ -84,12 +84,12 @@ public class DeviceController {
     }
 
     /**
-     * 查询空闲设备列表（用于任务分配）
+     * 查询指定加工中心下某类型的所有设备（用于任务分配）
      */
-    @Operation(summary = "查询空闲设备列表")
-    @GetMapping("/idle")
-    public Result<List<DeviceVO>> listIdle(@RequestParam(required = false) Long centerId,
-                                            @RequestParam(required = false) String deviceType) {
-        return Result.success(deviceService.listIdleDevices(centerId, deviceType));
+    @Operation(summary = "查询中心设备列表")
+    @GetMapping("/by-center")
+    public Result<List<DeviceVO>> listByCenterAndType(@RequestParam(required = false) Long centerId,
+                                                       @RequestParam(required = false) String deviceType) {
+        return Result.success(deviceService.listDevicesByCenterAndType(centerId, deviceType));
     }
 }

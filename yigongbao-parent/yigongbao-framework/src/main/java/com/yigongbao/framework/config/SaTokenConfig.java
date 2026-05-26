@@ -68,7 +68,9 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 // 文件访问接口（静态资源，无需登录）
                 "/files/public/**",
                 // 登录验证码冷却时间配置
-                "/system/config/5"
+                "/system/config/5",
+                // 设备 WebSocket（允许任何客户端连接，无需身份认证）
+                "/basic/ws/device"
         );
     }
 }

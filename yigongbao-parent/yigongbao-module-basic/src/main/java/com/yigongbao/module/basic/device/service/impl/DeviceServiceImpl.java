@@ -143,20 +143,17 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
     }
 
     /**
-     * 查询空闲设备列表（用于任务分配）
+     * 查询指定加工中心下某类型的所有设备（用于任务分配）
      *
-     * @param centerId 加工中心ID（可选）
+     * @param centerId   加工中心ID（可选）
      * @param deviceType 设备类型（可选）
-     * @return 空闲且在线的设备列表
+     * @return 设备列表
      */
     @Override
-    public List<DeviceVO> listIdleDevices(Long centerId, String deviceType) {
-        // 查询条件：空闲(state=0) 且 在线(connectionStatus=1)
+    public List<DeviceVO> listDevicesByCenterAndType(Long centerId, String deviceType) {
         LambdaQueryWrapper<DeviceEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(centerId != null, DeviceEntity::getCenterId, centerId)
                .eq(StrUtil.isNotBlank(deviceType), DeviceEntity::getDeviceType, deviceType)
-               .eq(DeviceEntity::getState, 0)
-               .eq(DeviceEntity::getConnectionStatus, 1)
                .orderByAsc(DeviceEntity::getDeviceId);
 
         return list(wrapper).stream()

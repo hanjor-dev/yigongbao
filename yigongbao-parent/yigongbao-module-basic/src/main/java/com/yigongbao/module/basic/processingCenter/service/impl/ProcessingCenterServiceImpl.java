@@ -1,6 +1,9 @@
 package com.yigongbao.module.basic.processingCenter.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONArray;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -20,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -85,6 +89,10 @@ public class ProcessingCenterServiceImpl extends ServiceImpl<ProcessingCenterMap
             throw new BusinessException(ErrorCodeEnum.DATA_EXISTS);
         }
 
+        if (StrUtil.isNotBlank(dto.getDeviceIdRanges())) {
+            validateDeviceIdRangesNoOverlap(dto.getDeviceIdRanges(), null);
+        }
+
         ProcessingCenterEntity entity = ProcessingCenterConvert.toEntity(dto);
         entity.setStatus(StatusConstants.NORMAL);
         save(entity);
@@ -123,6 +131,7 @@ public class ProcessingCenterServiceImpl extends ServiceImpl<ProcessingCenterMap
             entity.setAddress(dto.getAddress());
         }
         if (StrUtil.isNotBlank(dto.getDeviceIdRanges())) {
+            validateDeviceIdRangesNoOverlap(dto.getDeviceIdRanges(), dto.getId());
             entity.setDeviceIdRanges(dto.getDeviceIdRanges());
         }
         if (dto.getStatus() != null) {
@@ -169,5 +178,72 @@ public class ProcessingCenterServiceImpl extends ServiceImpl<ProcessingCenterMap
         return list(wrapper).stream()
                 .map(ProcessingCenterConvert::toVO)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 校验设备ID范围与其他加工中心不重叠
+     * <p>
+     * deviceIdRanges 格式：[{"start":"P001","end":"P099"}]
+     * 范围比较基于字符串字典序，要求 start <= end，且与其他中心的任意范围无交叉。
+     *
+     * @param deviceIdRanges 待校验的范围 JSON 字符串
+     * @param excludeId      更新时排除自身 ID，创建时传 null
+     */
+    private void validateDeviceIdRangesNoOverlap(String deviceIdRanges, Long excludeId) {
+        JSONArray newRanges;
+        try {
+            newRanges = JSONUtil.parseArray(deviceIdRanges);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "deviceIdRanges 格式不合法");
+        }
+
+        // 收集新范围的 [start, end] 对
+        List<String[]> newPairs = new ArrayList<>();
+        for (Object obj : newRanges) {
+            JSONObject item = (JSONObject) obj;
+            String start = item.getStr("start");
+            String end = item.getStr("end");
+            if (StrUtil.isBlank(start) || StrUtil.isBlank(end) || start.compareTo(end) > 0) {
+                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "设备ID范围 start 必须 <= end");
+            }
+            newPairs.add(new String[]{start, end});
+        }
+
+        if (newPairs.isEmpty()) {
+            return;
+        }
+
+        // 查询其他所有加工中心的范围
+        LambdaQueryWrapper<ProcessingCenterEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.isNotNull(ProcessingCenterEntity::getDeviceIdRanges)
+               .ne(ProcessingCenterEntity::getDeviceIdRanges, "");
+        if (excludeId != null) {
+            wrapper.ne(ProcessingCenterEntity::getId, excludeId);
+        }
+
+        for (ProcessingCenterEntity other : list(wrapper)) {
+            if (StrUtil.isBlank(other.getDeviceIdRanges())) continue;
+            JSONArray otherRanges;
+            try {
+                otherRanges = JSONUtil.parseArray(other.getDeviceIdRanges());
+            } catch (Exception e) {
+                continue;
+            }
+            for (Object obj : otherRanges) {
+                JSONObject item = (JSONObject) obj;
+                String os = item.getStr("start");
+                String oe = item.getStr("end");
+                if (StrUtil.isBlank(os) || StrUtil.isBlank(oe)) continue;
+                for (String[] np : newPairs) {
+                    // 两个区间 [a,b] 和 [c,d] 不重叠的条件：b < c 或 d < a
+                    if (!(np[1].compareTo(os) < 0 || oe.compareTo(np[0]) < 0)) {
+                        log.warn("设备ID范围与加工中心[{}]存在重叠: newRange=[{},{}], existingRange=[{},{}]",
+                            other.getCenterCode(), np[0], np[1], os, oe);
+                        throw new BusinessException(ErrorCodeEnum.PARAM_ERROR,
+                            "设备ID范围与加工中心[" + other.getCenterName() + "]存在重叠");
+                    }
+                }
+            }
+        }
     }
 }

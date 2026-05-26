@@ -14,7 +14,7 @@ public interface IDeviceService extends IService<DeviceEntity> {
     DeviceVO getDeviceById(Long id);
     Long createDevice(CreateDeviceDTO dto);
     void updateDeviceState(Long id, Integer state);
-    List<DeviceVO> listIdleDevices(Long centerId, String deviceType);
+    List<DeviceVO> listDevicesByCenterAndType(Long centerId, String deviceType);
     void batchUpdateDeviceStatus(DeviceStatusPushDTO dto);
     void markDevicesOffline(Long centerId);
     void detectOfflineDevices();
