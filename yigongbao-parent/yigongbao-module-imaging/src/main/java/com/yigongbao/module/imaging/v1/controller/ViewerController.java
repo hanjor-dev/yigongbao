@@ -1,6 +1,7 @@
 package com.yigongbao.module.imaging.v1.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaIgnore;
 import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -45,6 +46,7 @@ public class ViewerController {
         return Result.success(viewerService.getViewerConfig(orderId, token));
     }
 
+    @SaIgnore
     @Operation(summary = "dcmPath - DCM影像压缩包URL列表")
     @PostMapping("/dcm")
     public Result<List<String>> getDcm(@RequestBody Map<String, Object> params) {
@@ -55,6 +57,7 @@ public class ViewerController {
         return Result.success(viewerService.getDcmUrls(orderId));
     }
 
+    @SaIgnore
     @Operation(summary = "stlPath - STL模型数据（按数据包分组）")
     @PostMapping("/stl")
     public Result<ViewerStlVO> getStl(@RequestBody Map<String, Object> params) {
@@ -65,6 +68,7 @@ public class ViewerController {
         return Result.success(viewerService.getStlData(orderId));
     }
 
+    @SaIgnore
     @Operation(summary = "markPath - 提交标注截图")
     @PostMapping("/mark")
     public Result<Void> saveMark(

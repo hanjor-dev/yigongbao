@@ -74,7 +74,11 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 "/basic/ws/device",
                 "/api/basic/ws/device",
                 "/basic/processing-center/**",
-                "/basic/device/**"
+                "/basic/device/**",
+                // 影像查看器适配接口（二维码传播，无需登录）
+                "/imaging/v1/dcm",
+                "/imaging/v1/stl",
+                "/imaging/v1/mark"
         );
     }
 }

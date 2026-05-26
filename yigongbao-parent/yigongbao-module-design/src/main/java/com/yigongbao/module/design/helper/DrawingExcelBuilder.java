@@ -1,5 +1,6 @@
 package com.yigongbao.module.design.helper;
 
+import cn.hutool.extra.qrcode.QrCodeUtil;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -65,6 +66,8 @@ public class DrawingExcelBuilder {
         private String designerName;
         /** 展开后的产品×文件行列表 */
         private List<ProductRow> rows;
+        /** 影像查看器二维码URL（null 时跳过二维码嵌入） */
+        private String viewerQrUrl;
     }
 
     /**
@@ -86,6 +89,9 @@ public class DrawingExcelBuilder {
         {24, 11, 25, 10},  // 槽10：L25 / K26
         {24, 15, 25, 14},  // 槽11：P25 / O26
     };
+
+    /** 二维码槽位坐标：{col1, row1, col2, row2}，对应 M1:P10 */
+    private static final int[] QR_COORDS = {12, 0, 16, 10};
 
     /** footer 行（0-indexed）：原模板行37=row36 */
     private static final int FOOTER_ROW = 36;
@@ -122,6 +128,16 @@ public class DrawingExcelBuilder {
 
         log.info("开始生成图纸，orderCode={}, rowCount={}, totalPages={}",
                 ctx.getOrderCode(), n, totalPages);
+
+        // 提前生成二维码字节，多页复用
+        byte[] qrBytes = null;
+        if (ctx.getViewerQrUrl() != null) {
+            try {
+                qrBytes = QrCodeUtil.generatePng(ctx.getViewerQrUrl(), 300, 300);
+            } catch (Exception e) {
+                log.warn("二维码生成失败，url={}, error={}", ctx.getViewerQrUrl(), e.getMessage());
+            }
+        }
 
         try (InputStream is = new ClassPathResource(TEMPLATE_PATH).getInputStream();
              Workbook wb = new XSSFWorkbook(is)) {
@@ -165,6 +181,11 @@ public class DrawingExcelBuilder {
                     }
                 }
 
+                // 嵌入二维码（右上角，每页相同）
+                if (qrBytes != null) {
+                    insertQrCode((XSSFSheet) sheet, (XSSFWorkbook) wb, qrBytes);
+                }
+
                 // 填充 footer
                 setCell(sheet, FOOTER_ROW, REMARK_COL, strOrEmpty(ctx.getRemark()));
                 setCell(sheet, FOOTER_ROW, PKG_CODE_COL, strOrEmpty(ctx.getPackageCode()));
@@ -184,6 +205,23 @@ public class DrawingExcelBuilder {
             wb.write(baos);
             log.info("图纸生成完成，size={}", baos.size());
             return baos.toByteArray();
+        }
+    }
+
+    private void insertQrCode(XSSFSheet sheet, XSSFWorkbook wb, byte[] qrBytes) {
+        try {
+            int pictureIdx = wb.addPicture(qrBytes, Workbook.PICTURE_TYPE_PNG);
+            XSSFDrawing drawing = sheet.getDrawingPatriarch() != null
+                    ? sheet.getDrawingPatriarch() : sheet.createDrawingPatriarch();
+            ClientAnchor anchor = wb.getCreationHelper().createClientAnchor();
+            anchor.setCol1(QR_COORDS[0]);
+            anchor.setRow1(QR_COORDS[1]);
+            anchor.setCol2(QR_COORDS[2]);
+            anchor.setRow2(QR_COORDS[3]);
+            anchor.setAnchorType(ClientAnchor.AnchorType.MOVE_AND_RESIZE);
+            drawing.createPicture(anchor, pictureIdx);
+        } catch (Exception e) {
+            log.warn("二维码嵌入失败，error={}", e.getMessage());
         }
     }
 

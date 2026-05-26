@@ -56,6 +56,11 @@ public class OrderDetailVO implements Serializable {
      */
     private String businessType;
 
+    /**
+     * 业务类型名称（翻译后展示）
+     */
+    private String businessTypeName;
+
     // ==================== 机构信息 ====================
     /**
      * 提单机构ID

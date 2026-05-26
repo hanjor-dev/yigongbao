@@ -224,7 +224,14 @@ public enum SystemConfigKeyEnum {
      * 用户名自动生成开关
      * true=后端按机构前缀+序号自动生成，false=前端手动输入
      */
-    USER_USERNAME_AUTO_GENERATE("user.username.auto.generate", "用户名自动生成开关");
+    USER_USERNAME_AUTO_GENERATE("user.username.auto.generate", "用户名自动生成开关"),
+
+    // ==================== 影像调阅配置 ====================
+    /**
+     * 影像阅片器查看器URL前缀（含协议、端口和路由路径）
+     * 示例：http://127.0.0.1:81/#/viewer
+     */
+    IMAGING_VIEWER_BASE_URL("imaging.viewer.base_url", "影像阅片器查看器URL前缀");
 
     /**
      * 配置键

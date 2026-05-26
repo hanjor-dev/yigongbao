@@ -41,6 +41,7 @@
         <junrar.version>7.5.5</junrar.version>
         <commons-compress.version>1.26.1</commons-compress.version>
         <xz.version>1.9</xz.version>
+        <zxing.version>3.5.3</zxing.version>
 
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
@@ -228,6 +229,18 @@
                 <groupId>org.tukaani</groupId>
                 <artifactId>xz</artifactId>
                 <version>${xz.version}</version>
+            </dependency>
+
+            <!-- ZXing：二维码生成 -->
+            <dependency>
+                <groupId>com.google.zxing</groupId>
+                <artifactId>core</artifactId>
+                <version>${zxing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.zxing</groupId>
+                <artifactId>javase</artifactId>
+                <version>${zxing.version}</version>
             </dependency>
         </dependencies>
 

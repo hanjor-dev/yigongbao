@@ -426,9 +426,6 @@ public class OrderQueryHelper {
      * 填充订单详情 VO 的显示名称字段
      * 直接翻译 entity 中的枚举/字典码，不走 toOrderListVO 完整路径
      *
-     * 注意：OrderDetailVO.businessType 用于存储人可读的字典名称（而非 dict_code），
-     * 与 OrderListVO 中 businessType（dict_code）+businessTypeName（名称）的设计不同。
-     *
      * @param entity 订单主表实体
      * @param vo     订单详情 VO（待填充 xxxName 字段）
      */
@@ -438,8 +435,7 @@ public class OrderQueryHelper {
         vo.setPatientGenderName(getGenderName(entity.getPatientGender()));
         vo.setPhaseName(getPhaseName(entity.getPhase()));
         vo.setStatusName(getStatusName(entity.getStatus()));
-        // OrderDetailVO 无独立 businessTypeName 字段，将翻译后的名称写入 businessType
-        vo.setBusinessType(getDictName(entity.getBusinessType()));
+        vo.setBusinessTypeName(getDictName(entity.getBusinessType()));
     }
 
     /**

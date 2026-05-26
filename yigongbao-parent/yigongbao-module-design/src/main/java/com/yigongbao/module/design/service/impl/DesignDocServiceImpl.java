@@ -10,6 +10,9 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
+import cn.hutool.core.util.StrUtil;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
+import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.design.entity.DesignDrawingEntity;
 import com.yigongbao.module.design.entity.DesignInstructionEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
@@ -40,6 +43,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -76,6 +80,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     private final DesignScreenshotService screenshotService;
     private final DesignPackageFileScreenshotMapper screenshotMapper;
     private final com.yigongbao.module.design.helper.DesignQueryHelper designQueryHelper;
+    private final ConfigService configService;
 
     // ==================== 线下模式：下载接口 ====================
 
@@ -854,7 +859,25 @@ public class DesignDocServiceImpl implements DesignDocService {
         ctx.setRows(rows);
         ctx.setDesignerName(order.getDesignerName());
         ctx.setGenerateDate(generateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        ctx.setViewerQrUrl(buildViewerQrUrl(order.getId()));
         return ctx;
+    }
+
+    /**
+     * 构造影像查看器二维码URL
+     * 格式：{baseUrl}{viewerPath}?kv={base64(stlPath配置JSON)}
+     * 配置缺失时返回 null，跳过二维码嵌入
+     */
+    private String buildViewerQrUrl(Long orderId) {
+        String baseUrl = configService.getConfigValue(SystemConfigKeyEnum.IMAGING_VIEWER_BASE_URL.getKey());
+        if (StrUtil.isBlank(baseUrl)) {
+            log.warn("影像查看器配置未设置，跳过二维码生成: orderId={}", orderId);
+            return null;
+        }
+        String stlPathJson = String.format(
+                "{\"path\":\"/api/imaging/v1/stl\",\"params\":{\"orderId\":%d},\"type\":\"post\"}", orderId);
+        String kv = Base64.getEncoder().encodeToString(stlPathJson.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return baseUrl + "?kv=" + kv;
     }
 
     /** DesignInstructionEntity → DocItemVO */
