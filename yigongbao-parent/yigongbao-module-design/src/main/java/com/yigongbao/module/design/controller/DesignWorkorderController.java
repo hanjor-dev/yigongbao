@@ -1,7 +1,9 @@
 package com.yigongbao.module.design.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
 import com.yigongbao.module.design.service.DesignWorkorderService;
@@ -52,6 +54,7 @@ public class DesignWorkorderController {
      * 仅分配给本人的订单，状态必须为待设计（PENDING_DESIGN）
      */
     @Operation(summary = "设计师开始设计")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "开始设计")
     @RequirePermission(value = "design:StartDesign")
     @PostMapping("/{orderId}/start-design")
     public Result<Void> startDesign(@PathVariable Long orderId) {
@@ -64,6 +67,7 @@ public class DesignWorkorderController {
      * POST /design/workorder/{orderId}/continue-design
      */
     @Operation(summary = "驳回后继续修改")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "继续修改设计")
     @RequirePermission(value = "design:StartDesign")
     @PostMapping("/{orderId}/continue-design")
     public Result<Void> continueDesign(@PathVariable Long orderId) {
@@ -76,6 +80,7 @@ public class DesignWorkorderController {
      * POST /design/workorder/{orderId}/submit-design
      */
     @Operation(summary = "提交设计审核")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.SUBMIT, operation = "提交设计审核")
     @RequirePermission(value = "design:SubmitCheck")
     @PostMapping("/{orderId}/submit-design")
     public Result<Void> submitDesign(@PathVariable Long orderId) {

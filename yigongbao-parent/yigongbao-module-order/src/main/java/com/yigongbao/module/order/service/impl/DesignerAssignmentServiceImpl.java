@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
@@ -40,7 +41,7 @@ import java.util.stream.Collectors;
 @Service
 public class DesignerAssignmentServiceImpl implements DesignerAssignmentService {
 
-    private static final List<String> DESIGNER_ROLES = List.of("designer", "designer-manager");
+    private static final List<String> DESIGNER_ROLES = List.of(RoleCodeEnum.DESIGNER.getCode(), RoleCodeEnum.DESIGNER_MANAGER.getCode());
     /** 专业方向二级编码严格白名单正则：仅允许 \d+\.\d+ 格式，如 7.1 */
     private static final Pattern SPECIALTY_PATTERN = Pattern.compile("^\\d+\\.\\d+$");
 

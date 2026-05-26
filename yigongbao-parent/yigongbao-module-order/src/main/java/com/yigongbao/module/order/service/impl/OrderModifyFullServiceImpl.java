@@ -10,7 +10,6 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.module.order.dto.draft.OrderItemDraftItemDTO;
-import com.yigongbao.module.order.dto.modify.ModifyFullConfigDTO;
 import com.yigongbao.module.order.dto.modify.ObjectChange;
 import com.yigongbao.module.order.dto.modify.OrderModifyFullDTO;
 import com.yigongbao.module.order.entity.OrderFileEntity;
@@ -24,15 +23,16 @@ import com.yigongbao.module.order.service.OrderModifyFullService;
 import com.yigongbao.module.order.validator.OrderDataValidator;
 import com.yigongbao.module.basic.hospitalDept.service.HospitalDeptService;
 import com.yigongbao.module.basic.hospitalDept.vo.HospitalDeptVO;
-import com.yigongbao.module.system.config.service.ConfigService;
-import com.yigongbao.module.system.doctor.service.DoctorService;
-import com.yigongbao.module.system.doctor.vo.DoctorVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
+import com.yigongbao.common.enums.RoleCodeEnum;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.service.UserService;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +40,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 订单全量修改 Service 实现类
@@ -54,19 +53,19 @@ import java.util.List;
 @Slf4j
 public class OrderModifyFullServiceImpl implements OrderModifyFullService {
 
-    private static final String CONFIG_KEY = "order.modify.full.config";
     private static final int MAX_FIELD_VALUE_LENGTH = 20;
+    private static final Set<String> ADMIN_ROLES = Set.of(RoleCodeEnum.ADMIN.getCode(), RoleCodeEnum.COMPANY_ADMIN.getCode());
+    private static final Set<String> DESIGNER_ROLES = Set.of(RoleCodeEnum.DESIGNER.getCode(), RoleCodeEnum.DESIGNER_MANAGER.getCode());
 
     private final OrderMainMapper orderMainMapper;
     private final OrderItemMapper orderItemMapper;
     private final OrderFileMapper orderFileMapper;
     private final OrderModificationLogMapper orderModificationLogMapper;
-    private final ConfigService configService;
     private final OrderDataValidator orderDataValidator;
     private final FlowFacade flowFacade;
     private final OrgService orgService;
     private final HospitalDeptService hospitalDeptService;
-    private final DoctorService doctorService;
+    private final UserService userService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -77,38 +76,49 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "订单不存在");
         }
 
-        // 2. 加载配置
-        ModifyFullConfigDTO config = loadConfig();
+        // 2. 获取当前用户角色
+        Long userId = StpUtil.getLoginIdAsLong();
+        UserEntity currentUser = userService.getById(userId);
+        String roleCode = currentUser != null ? currentUser.getRoleCode() : "";
 
-        // 3. 获取当前阶段配置
-        String phaseName = FlowPhaseEnum.getByValue(order.getPhase()).name();
-        ModifyFullConfigDTO.PhaseConfig phaseConfig = config.getPhases().get(phaseName);
-        if (phaseConfig == null) {
-            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "当前阶段不支持修改");
+        boolean isAdmin = ADMIN_ROLES.contains(roleCode);
+        boolean isDesigner = DESIGNER_ROLES.contains(roleCode);
+        int phase = order.getPhase();
+        boolean isDesignPhase = phase == FlowPhaseEnum.DESIGN.getValue();
+        boolean isOrderPhase = phase == FlowPhaseEnum.ORDER.getValue();
+
+        // 3. 权限校验
+        if (!isAdmin) {
+            if (isDesigner) {
+                // 设计师管理员：仅设计阶段可改重建项目
+                if (!isDesignPhase) {
+                    throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED, "设计师仅可在设计阶段修改重建项目");
+                }
+            } else {
+                // 普通业务员：仅订单阶段（未提交）可改
+                if (!isOrderPhase) {
+                    throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED, "订单提交后不允许修改");
+                }
+            }
         }
 
-        // 4. 按对象 diff
+        // 4. 按对象 diff（设计师只 diff items）
         List<ObjectChange> changes = new ArrayList<>();
 
-        if (phaseConfig.getObjects().containsKey(OrderModifyObjectType.PATIENT)) {
-            changes.add(diffPatient(order, dto, phaseConfig.getObjects().get(OrderModifyObjectType.PATIENT)));
+        boolean onlyItems = isDesigner && !isAdmin;
+
+        if (!onlyItems) {
+            changes.add(diffOrderInfo(order, dto));
+            changes.add(diffPatient(order, dto));
+            changes.add(diffDoctor(order, dto));
+            changes.add(diffHospital(order, dto));
+            changes.add(diffDelivery(order, dto));
         }
-        if (phaseConfig.getObjects().containsKey(OrderModifyObjectType.DOCTOR)) {
-            changes.add(diffDoctor(order, dto, phaseConfig.getObjects().get(OrderModifyObjectType.DOCTOR)));
+        if (dto.getItems() != null) {
+            changes.add(diffItems(orderId, dto.getItems()));
         }
-        if (phaseConfig.getObjects().containsKey(OrderModifyObjectType.HOSPITAL)) {
-            changes.add(diffHospital(order, dto, phaseConfig.getObjects().get(OrderModifyObjectType.HOSPITAL)));
-        }
-        if (phaseConfig.getObjects().containsKey(OrderModifyObjectType.DELIVERY)) {
-            changes.add(diffDelivery(order, dto, phaseConfig.getObjects().get(OrderModifyObjectType.DELIVERY)));
-        }
-        if (phaseConfig.getObjects().containsKey(OrderModifyObjectType.ITEMS) && dto.getItems() != null) {
-            changes.add(diffItems(orderId, dto.getItems(), phaseConfig.getObjects().get(OrderModifyObjectType.ITEMS)));
-        }
-        if (phaseConfig.getObjects().containsKey(OrderModifyObjectType.IMAGES) &&
-            (dto.getImageDataFileIds() != null || dto.getImageReportFileIds() != null)) {
-            changes.add(diffImages(orderId, dto.getImageDataFileIds(), dto.getImageReportFileIds(),
-                phaseConfig.getObjects().get(OrderModifyObjectType.IMAGES)));
+        if (!onlyItems && (dto.getImageDataFileIds() != null || dto.getImageReportFileIds() != null)) {
+            changes.add(diffImages(orderId, dto.getImageDataFileIds(), dto.getImageReportFileIds()));
         }
 
         // 5. 过滤无变化
@@ -121,29 +131,21 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             return;
         }
 
-        // 6. 校验变更
-        for (ObjectChange change : actualChanges) {
-            if (!phaseConfig.getAllowedObjects().contains(change.getObjectType())) {
-                throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED,
-                    "当前阶段不允许修改" + change.getObjectLabel());
-            }
-        }
-
-        // 7. 应用变更
+        // 6. 应用变更
         for (ObjectChange change : actualChanges) {
             String objectType = change.getObjectType();
-            if ("patient".equals(objectType) || "doctor".equals(objectType) ||
-                "hospital".equals(objectType) || "delivery".equals(objectType)) {
+            if (OrderModifyObjectType.PATIENT.equals(objectType) || OrderModifyObjectType.DOCTOR.equals(objectType) ||
+                OrderModifyObjectType.HOSPITAL.equals(objectType) || OrderModifyObjectType.DELIVERY.equals(objectType) ||
+                OrderModifyObjectType.ORDER_INFO.equals(objectType)) {
                 applySimpleObjectChange(order, dto, change);
-            } else if ("items".equals(objectType)) {
+            } else if (OrderModifyObjectType.ITEMS.equals(objectType)) {
                 applyItemsChange(orderId, order.getOrderCode(), dto.getItems());
-            } else if ("images".equals(objectType)) {
+            } else if (OrderModifyObjectType.IMAGES.equals(objectType)) {
                 applyImagesChange(orderId, order.getOrderCode(), dto.getImageDataFileIds(), dto.getImageReportFileIds());
             }
         }
 
-        // 8. 记录日志
-        Long userId = StpUtil.getLoginIdAsLong();
+        // 7. 记录日志
         for (ObjectChange change : actualChanges) {
             OrderModificationLogEntity logEntity = new OrderModificationLogEntity();
             logEntity.setOrderId(orderId);
@@ -156,7 +158,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             orderModificationLogMapper.insert(logEntity);
         }
 
-        // 9. 递增版本号并更新订单
+        // 8. 递增版本号并更新订单
         order.setVersion(order.getVersion() + 1);
         orderMainMapper.updateById(order);
 
@@ -164,18 +166,28 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     }
 
     /**
-     * 加载配置
+     * 对比订单基本信息（订单类型/业务类型）
      */
-    private ModifyFullConfigDTO loadConfig() {
-        String configValue = configService.getConfigValue(CONFIG_KEY);
-        return ModifyFullConfigDTO.parseFromJson(configValue);
+    private ObjectChange diffOrderInfo(OrderMainEntity order, OrderModifyFullDTO dto) {
+        boolean changed = !Objects.equals(order.getOrderType(), dto.getOrderType())
+                || !Objects.equals(order.getBusinessType(), dto.getBusinessType())
+                || !Objects.equals(order.getIsPostal(), dto.getIsPostal())
+                || !Objects.equals(order.getEstimatedCost(), dto.getEstimatedCost())
+                || !Objects.equals(order.getDataEvaluationOpinion(), dto.getDataEvaluationOpinion());
+        if (!changed) {
+            return ObjectChange.noChange();
+        }
+        String oldValue = String.format("orderType=%s,businessType=%s,isPostal=%s,estimatedCost=%s,dataEvaluationOpinion=%s",
+                order.getOrderType(), order.getBusinessType(), order.getIsPostal(), order.getEstimatedCost(), order.getDataEvaluationOpinion());
+        String newValue = String.format("orderType=%s,businessType=%s,isPostal=%s,estimatedCost=%s,dataEvaluationOpinion=%s",
+                dto.getOrderType(), dto.getBusinessType(), dto.getIsPostal(), dto.getEstimatedCost(), dto.getDataEvaluationOpinion());
+        return ObjectChange.of(OrderModifyObjectType.ORDER_INFO, "订单基本信息", oldValue, newValue);
     }
 
     /**
      * 对比患者信息
      */
-    private ObjectChange diffPatient(OrderMainEntity order, OrderModifyFullDTO dto,
-                                     ModifyFullConfigDTO.ObjectConfig config) {
+    private ObjectChange diffPatient(OrderMainEntity order, OrderModifyFullDTO dto) {
         String oldValue = formatPatient(order.getPatientName(), order.getPatientGender(), order.getPatientAge());
         String newValue = formatPatient(dto.getPatientName(), dto.getPatientGender(), dto.getPatientAge());
 
@@ -183,7 +195,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             return ObjectChange.noChange();
         }
 
-        return ObjectChange.of(OrderModifyObjectType.PATIENT, config.getLabel(), oldValue, newValue);
+        return ObjectChange.of(OrderModifyObjectType.PATIENT, "患者信息", oldValue, newValue);
     }
 
     /**
@@ -199,8 +211,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     /**
      * 对比医生信息
      */
-    private ObjectChange diffDoctor(OrderMainEntity order, OrderModifyFullDTO dto,
-                                    ModifyFullConfigDTO.ObjectConfig config) {
+    private ObjectChange diffDoctor(OrderMainEntity order, OrderModifyFullDTO dto) {
         String oldValue = formatDoctor(order.getDoctorName(), order.getDoctorPhone());
         String newValue = formatDoctor(dto.getDoctorName(), dto.getDoctorPhone());
 
@@ -208,7 +219,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             return ObjectChange.noChange();
         }
 
-        return ObjectChange.of(OrderModifyObjectType.DOCTOR, config.getLabel(), oldValue, newValue);
+        return ObjectChange.of(OrderModifyObjectType.DOCTOR, "医生信息", oldValue, newValue);
     }
 
     /**
@@ -223,8 +234,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     /**
      * 对比医院科室
      */
-    private ObjectChange diffHospital(OrderMainEntity order, OrderModifyFullDTO dto,
-                                      ModifyFullConfigDTO.ObjectConfig config) {
+    private ObjectChange diffHospital(OrderMainEntity order, OrderModifyFullDTO dto) {
         // 对比 ID 是否变化
         boolean hospitalChanged = !Objects.equals(order.getHospitalId(), dto.getHospitalId());
         boolean deptChanged = !Objects.equals(order.getHospitalDeptId(), dto.getHospitalDeptId());
@@ -254,7 +264,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         String oldValue = formatHospital(order.getHospitalName(), order.getHospitalDeptName());
         String newValue = formatHospital(newHospitalName, newDeptName);
 
-        return ObjectChange.of(OrderModifyObjectType.HOSPITAL, config.getLabel(), oldValue, newValue);
+        return ObjectChange.of(OrderModifyObjectType.HOSPITAL, "医院科室", oldValue, newValue);
     }
 
     /**
@@ -269,8 +279,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     /**
      * 对比交付信息
      */
-    private ObjectChange diffDelivery(OrderMainEntity order, OrderModifyFullDTO dto,
-                                      ModifyFullConfigDTO.ObjectConfig config) {
+    private ObjectChange diffDelivery(OrderMainEntity order, OrderModifyFullDTO dto) {
         String oldValue = formatDelivery(order.getNeedsPhysicalDelivery(), order.getPostalAddress(), order.getIsUrgent());
         String newValue = formatDelivery(dto.getNeedsPhysicalDelivery(), dto.getPostalAddress(), dto.getIsUrgent());
 
@@ -278,7 +287,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             return ObjectChange.noChange();
         }
 
-        return ObjectChange.of(OrderModifyObjectType.DELIVERY, config.getLabel(), oldValue, newValue);
+        return ObjectChange.of(OrderModifyObjectType.DELIVERY, "交付信息", oldValue, newValue);
     }
 
     /**
@@ -294,8 +303,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     /**
      * 对比重建项目（详细模式）
      */
-    private ObjectChange diffItems(Long orderId, List<OrderItemDraftItemDTO> newItems,
-                                   ModifyFullConfigDTO.ObjectConfig config) {
+    private ObjectChange diffItems(Long orderId, List<OrderItemDraftItemDTO> newItems) {
         // 查询当前项目
         List<OrderItemEntity> oldItems = orderItemMapper.selectList(
             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderItemEntity>()
@@ -322,7 +330,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                 changes.add("删除[" + oldItem.getProjectName() + "]");
             } else {
                 // 修改
-                String changeDesc = diffSingleItem(oldItem, newItem, config);
+                String changeDesc = diffSingleItem(oldItem, newItem);
                 if (StrUtil.isNotBlank(changeDesc)) {
                     changes.add("修改[" + changeDesc + "]");
                 }
@@ -342,14 +350,13 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
 
         String oldValue = oldItems.size() + "个项目";
         String newValue = String.join("；", changes);
-        return ObjectChange.of(OrderModifyObjectType.ITEMS, config.getLabel(), oldValue, newValue);
+        return ObjectChange.of(OrderModifyObjectType.ITEMS, "重建项目", oldValue, newValue);
     }
 
     /**
      * 对比单个重建项目
      */
-    private String diffSingleItem(OrderItemEntity oldItem, OrderItemDraftItemDTO newItem,
-                                  ModifyFullConfigDTO.ObjectConfig config) {
+    private String diffSingleItem(OrderItemEntity oldItem, OrderItemDraftItemDTO newItem) {
         List<String> changes = new ArrayList<>();
 
         // 对比核心字段（项目名称）
@@ -415,8 +422,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     /**
      * 对比影像文件
      */
-    private ObjectChange diffImages(Long orderId, List<String> newDataFileIds, List<String> newReportFileIds,
-                                    ModifyFullConfigDTO.ObjectConfig config) {
+    private ObjectChange diffImages(Long orderId, List<String> newDataFileIds, List<String> newReportFileIds) {
         // 查询当前影像文件
         List<OrderFileEntity> oldFiles = orderFileMapper.selectList(
             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderFileEntity>()
@@ -441,7 +447,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
 
         String oldValue = String.format("影像数据%d个，影像报告%d个", oldDataCount, oldReportCount);
         String newValue = String.format("影像数据%d个，影像报告%d个", newDataCount, newReportCount);
-        return ObjectChange.of(OrderModifyObjectType.IMAGES, config.getLabel(), oldValue, newValue);
+        return ObjectChange.of(OrderModifyObjectType.IMAGES, "影像文件", oldValue, newValue);
     }
 
     /**
@@ -490,6 +496,14 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                 order.setPostalAddress(dto.getPostalAddress());
                 order.setExpectedDeliveryDate(dto.getExpectedDeliveryDate());
                 order.setIsUrgent(dto.getIsUrgent());
+                break;
+            case OrderModifyObjectType.ORDER_INFO:
+                log.info("修改订单基本信息: orderId={}, {} -> {}", order.getId(), change.getOldValue(), change.getNewValue());
+                order.setOrderType(dto.getOrderType());
+                order.setBusinessType(dto.getBusinessType());
+                order.setIsPostal(dto.getIsPostal());
+                order.setEstimatedCost(dto.getEstimatedCost());
+                order.setDataEvaluationOpinion(dto.getDataEvaluationOpinion());
                 break;
         }
     }

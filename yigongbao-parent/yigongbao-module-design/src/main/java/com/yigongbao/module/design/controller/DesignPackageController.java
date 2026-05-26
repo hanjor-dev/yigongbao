@@ -1,6 +1,8 @@
 package com.yigongbao.module.design.controller;
 
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.service.DesignFileService;
 import com.yigongbao.module.design.vo.DesignPackageFileVO;
@@ -36,6 +38,7 @@ public class DesignPackageController {
      * 上传打印文件数据包（ZIP/RAR/7Z/TAR，后端自动解析有效文件）
      */
     @Operation(summary = "上传打印文件数据包")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPLOAD, operation = "上传打印文件数据包")
     @RequirePermission(value = "design:Upload")
     @PostMapping("/package/upload")
     public Result<DesignPackageVO> uploadPackage(
@@ -48,6 +51,7 @@ public class DesignPackageController {
      * 删除数据包（若已有打印信息则拒绝）
      */
     @Operation(summary = "删除数据包")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.DELETE, operation = "删除数据包")
     @RequirePermission(value = "design:Upload")
     @DeleteMapping("/package/{packageId}")
     public Result<Void> deletePackage(

@@ -1,7 +1,9 @@
 package com.yigongbao.module.order.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.order.dto.modify.ExecuteModifyDTO;
@@ -46,6 +48,7 @@ public class OrderModifyApplyController {
                     + "① infoFields（14.1 基础信息）：差量列表，只传需要修改的字段\n"
                     + "② items（14.3 重建项目）：全量替换列表\n"
                     + "③ imageDataFileIds / imageReportFileIds（14.2 影像文件）：全量替换文件ID列表")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "直接修改订单")
     @RequirePermission(value = "order:Modify")
     @PutMapping("/{orderId}/direct")
     public Result<Void> directModify(@PathVariable Long orderId,
@@ -55,11 +58,8 @@ public class OrderModifyApplyController {
     }
 
     @Operation(summary = "全量修改订单",
-            description = "前端传入完整订单数据，后端自动判断变更内容并应用。\n"
-                    + "支持修改：患者信息、医生信息、医院科室、交付信息、重建项目、影像文件\n"
-                    + "根据订单当前阶段判断允许的修改对象：\n"
-                    + "订单阶段（phase=10）：允许修改所有对象\n"
-                    + "设计阶段（phase=20）：仅允许修改重建项目")
+            description = "前端传入完整订单数据，后端自动判断变更内容并应用。")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "全量修改订单")
     @RequirePermission(value = "order:Modify")
     @PutMapping("/{orderId}/full")
     public Result<Void> modifyOrderFull(@PathVariable Long orderId,

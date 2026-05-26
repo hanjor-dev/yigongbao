@@ -3,6 +3,8 @@ package com.yigongbao.module.order.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.common.enums.OperationTypeEnum;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.order.dto.draft.CreateOrderDraftDTO;
@@ -68,6 +70,7 @@ public class OrderController {
     }
 
     @Operation(summary = "创建或更新草稿")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.CREATE, operation = "创建或更新草稿")
     @RequirePermission(value = "draft:Edit")
     @PostMapping("/draft")
     public Result<Long> saveDraft(@Valid @RequestBody CreateOrderDraftDTO dto) {
@@ -75,6 +78,7 @@ public class OrderController {
     }
 
     @Operation(summary = "删除草稿")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.DELETE, operation = "删除草稿")
     @RequirePermission(value = "draft:Delete")
     @DeleteMapping("/draft/{id}")
     public Result<Void> removeDraft(@PathVariable Long id) {
@@ -83,6 +87,7 @@ public class OrderController {
     }
 
     @Operation(summary = "提交草稿，转为正式订单")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.SUBMIT, operation = "提交草稿")
     @RequirePermission(value = "draft:Submit")
     @PostMapping("/draft/{id}/submit")
     public Result<Long> submitDraft(@PathVariable Long id) {
@@ -92,6 +97,7 @@ public class OrderController {
     // ==================== 订单接口 ====================
 
     @Operation(summary = "直接创建订单（直提，不经过草稿）")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.CREATE, operation = "创建订单")
     @RequirePermission(value = "order:Add")
     @PostMapping
     public Result<Long> createOrder(@Valid @RequestBody CreateOrderDTO dto) {
@@ -113,6 +119,7 @@ public class OrderController {
     }
 
     @Operation(summary = "提交订单")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.SUBMIT, operation = "提交订单")
     @RequirePermission(value = "order:Add")
     @PostMapping("/{id}/submit")
     public Result<Void> submitOrder(@PathVariable Long id) {
@@ -121,6 +128,7 @@ public class OrderController {
     }
 
     @Operation(summary = "撤回订单")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "撤回订单")
     @RequirePermission(value = "order:TabDraft")
     @PostMapping("/{id}/withdraw")
     public Result<Void> withdrawOrder(@PathVariable Long id) {
@@ -129,6 +137,7 @@ public class OrderController {
     }
 
     @Operation(summary = "审核通过")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.AUDIT, operation = "审核通过")
     @RequirePermission(value = "order:Approve")
     @PostMapping("/{id}/audit-pass")
     public Result<Void> auditPass(@PathVariable Long id, @Valid @RequestBody AuditOrderDTO dto) {
@@ -137,6 +146,7 @@ public class OrderController {
     }
 
     @Operation(summary = "审核驳回")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.AUDIT, operation = "审核驳回")
     @RequirePermission(value = "order:Reject")
     @PostMapping("/{id}/audit-reject")
     public Result<Void> auditReject(@PathVariable Long id, @Valid @RequestBody AuditOrderDTO dto) {
@@ -145,6 +155,7 @@ public class OrderController {
     }
 
     @Operation(summary = "取消订单")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.CANCEL, operation = "取消订单")
     @RequirePermission(value = "order:Cancel")
     @PostMapping("/{id}/cancel")
     public Result<Void> cancelOrder(@PathVariable Long id) {
@@ -165,6 +176,7 @@ public class OrderController {
     }
 
     @Operation(summary = "手动分配设计师（管理员）")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.ASSIGN, operation = "分配设计师")
     @RequirePermission(value = "design:AssignDesigner")
     @PostMapping("/{id}/assign-designer")
     public Result<Void> assignDesigner(@PathVariable Long id, @Valid @RequestBody AssignDesignerDTO dto) {
@@ -181,6 +193,7 @@ public class OrderController {
     }
 
     @Operation(summary = "保存用户列配置")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "保存列配置")
     @PutMapping("/column-config")
     public Result<Void> saveColumnConfig(@Valid @RequestBody OrderColumnConfigVO config) {
         orderMainService.saveColumnConfig(config);
@@ -188,6 +201,7 @@ public class OrderController {
     }
 
     @Operation(summary = "重置用户列配置（恢复系统默认）")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "重置列配置")
     @DeleteMapping("/column-config")
     public Result<Void> resetColumnConfig() {
         orderMainService.resetColumnConfig();
@@ -197,6 +211,7 @@ public class OrderController {
     // ==================== 导出接口 ====================
 
     @Operation(summary = "导出订单列表（Excel）")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.EXPORT, operation = "导出订单")
     @RequirePermission(value = "order:BatchExport")
     @PostMapping("/export")
     public void exportOrders(@RequestBody OrderExportQueryDTO dto, HttpServletResponse response) {

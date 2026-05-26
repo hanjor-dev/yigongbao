@@ -1,6 +1,8 @@
 package com.yigongbao.module.design.controller;
 
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.dto.SavePrintInfoDTO;
 import com.yigongbao.module.design.service.DesignPrintInfoService;
@@ -52,6 +54,7 @@ public class DesignPrintInfoController {
      * 保存打印信息（整包替换，空列表=清空）
      */
     @Operation(summary = "保存打印信息（整包替换）")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "保存打印信息")
     @RequirePermission(value = "design:PrintInfo")
     @PostMapping("/{orderId}/package/{packageId}/print-info")
     public Result<Void> savePrintInfo(@PathVariable Long orderId,
@@ -65,6 +68,7 @@ public class DesignPrintInfoController {
      * 删除单条打印信息
      */
     @Operation(summary = "删除单条打印信息")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.DELETE, operation = "删除打印信息")
     @RequirePermission(value = "design:PrintInfo")
     @DeleteMapping("/{orderId}/package/{packageId}/print-info/{printInfoId}")
     public Result<Void> deletePrintInfo(@PathVariable Long orderId,

@@ -29,4 +29,7 @@ public final class OrderModifyObjectType {
 
     /** 影像文件 */
     public static final String IMAGES = "images";
+
+    /** 订单基本信息（类型/业务类型） */
+    public static final String ORDER_INFO = "orderInfo";
 }

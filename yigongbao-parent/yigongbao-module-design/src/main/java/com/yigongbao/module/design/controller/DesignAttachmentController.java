@@ -1,6 +1,8 @@
 package com.yigongbao.module.design.controller;
 
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.design.dto.LinkFilesDTO;
@@ -39,6 +41,7 @@ public class DesignAttachmentController {
      * 批量关联可视化模型（fileIds 通过通用文件上传接口获得）
      */
     @Operation(summary = "批量关联可视化模型")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPLOAD, operation = "关联可视化模型")
     @RequirePermission(value = "design:Upload")
     @PostMapping("/models/link")
     public Result<List<DesignModelVO>> linkModels(@Valid @RequestBody LinkFilesDTO dto) {
@@ -49,6 +52,7 @@ public class DesignAttachmentController {
      * 删除可视化模型
      */
     @Operation(summary = "删除可视化模型")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.DELETE, operation = "删除可视化模型")
     @RequirePermission(value = "design:Upload")
     @DeleteMapping("/model/{modelId}")
     public Result<Void> deleteModel(
@@ -75,6 +79,7 @@ public class DesignAttachmentController {
      * 关联设计报告（每订单仅保留一份，重复关联自动覆盖）
      */
     @Operation(summary = "关联设计报告")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPLOAD, operation = "关联设计报告")
     @RequirePermission(value = "design:Upload")
     @PostMapping("/report/link")
     public Result<FileVO> linkReport(@Valid @RequestBody LinkFilesDTO dto) {
@@ -85,6 +90,7 @@ public class DesignAttachmentController {
      * 删除设计报告
      */
     @Operation(summary = "删除设计报告")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.DELETE, operation = "删除设计报告")
     @RequirePermission(value = "design:Upload")
     @DeleteMapping("/report/{fileId}")
     public Result<Void> deleteReport(

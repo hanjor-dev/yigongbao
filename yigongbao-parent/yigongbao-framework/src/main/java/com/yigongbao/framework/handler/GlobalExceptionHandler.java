@@ -49,7 +49,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleBusinessException(BusinessException e) {
-        log.warn("业务异常：{}", e.getMessage());
+        log.warn("业务异常：{}", e.getMessage(), e);
         return Result.error(e.getCode(), e.getMessage());
     }
 
@@ -62,7 +62,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(NotLoginException.class)
     public Result<Void> handleNotLoginException(NotLoginException e) {
-        log.warn("未登录：{}", e.getMessage());
+        log.warn("未登录：{}", e.getMessage(), e);
         return Result.error(ErrorCodeEnum.UNAUTHORIZED);
     }
 
@@ -80,7 +80,7 @@ public class GlobalExceptionHandler {
         String errorMessage = e.getBindingResult().getFieldErrors().stream()
             .map(FieldError::getDefaultMessage)
             .collect(Collectors.joining(", "));
-        log.warn("参数校验失败：{}", errorMessage);
+        log.warn("参数校验失败：{}", errorMessage, e);
         return Result.error(ErrorCodeEnum.PARAM_ERROR, errorMessage);
     }
 
@@ -97,7 +97,7 @@ public class GlobalExceptionHandler {
         String errorMessage = e.getConstraintViolations().stream()
             .map(ConstraintViolation::getMessage)
             .collect(Collectors.joining(", "));
-        log.warn("参数校验失败：{}", errorMessage);
+        log.warn("参数校验失败：{}", errorMessage, e);
         return Result.error(ErrorCodeEnum.PARAM_ERROR, errorMessage);
     }
 
@@ -114,7 +114,7 @@ public class GlobalExceptionHandler {
         String errorMessage = e.getAllErrors().stream()
             .map(error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : error.toString())
             .collect(Collectors.joining(", "));
-        log.warn("参数校验失败：{}", errorMessage);
+        log.warn("参数校验失败：{}", errorMessage, e);
         return Result.error(ErrorCodeEnum.PARAM_ERROR, errorMessage);
     }
 
@@ -130,7 +130,7 @@ public class GlobalExceptionHandler {
         String errorMessage = e.getBindingResult().getFieldErrors().stream()
             .map(FieldError::getDefaultMessage)
             .collect(Collectors.joining(", "));
-        log.warn("参数绑定失败：{}", errorMessage);
+        log.warn("参数绑定失败：{}", errorMessage, e);
         return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), errorMessage);
     }
 
@@ -143,7 +143,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingServletRequestParameterException.class)
     @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleMissingServletRequestParameterException(MissingServletRequestParameterException e) {
-        log.warn("缺少请求参数：{}", e.getParameterName());
+        log.warn("缺少请求参数：{}", e.getParameterName(), e);
         return Result.error(ErrorCodeEnum.MISSING_PARAMETER,
             ErrorCodeEnum.MISSING_PARAMETER.getMessage(e.getParameterName()));
     }
@@ -158,7 +158,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingPathVariableException.class)
     @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleMissingPathVariableException(MissingPathVariableException e) {
-        log.warn("路径变量缺失：参数名={}", e.getVariableName());
+        log.warn("路径变量缺失：参数名={}", e.getVariableName(), e);
         return Result.error(ErrorCodeEnum.PARAM_ERROR, "请求的路径参数不完整，请检查URL是否正确");
     }
 
@@ -174,7 +174,7 @@ public class GlobalExceptionHandler {
     public Result<Void> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e) {
         String paramName = e.getName();
         String paramValue = e.getValue() != null ? e.getValue().toString() : "空";
-        log.warn("参数类型不匹配：参数名={}, 传入值={}, 期望类型={}", paramName, paramValue, e.getRequiredType());
+        log.warn("参数类型不匹配：参数名={}, 传入值={}, 期望类型={}", paramName, paramValue, e.getRequiredType(), e);
         return Result.error(ErrorCodeEnum.INVALID_PARAMETER,
             ErrorCodeEnum.INVALID_PARAMETER.getMessage(paramName));
     }
@@ -196,7 +196,7 @@ public class GlobalExceptionHandler {
         } else {
             userMessage = "请求参数格式错误，请检查数据格式后重试";
         }
-        log.warn("参数格式错误：{}", message);
+        log.warn("参数格式错误：{}", message, e);
         return Result.error(ErrorCodeEnum.PARAM_ERROR, userMessage);
     }
 
@@ -209,7 +209,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public Result<Void> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e) {
-        log.warn("请求方法不支持：{}", e.getMethod());
+        log.warn("请求方法不支持：{}", e.getMethod(), e);
         return Result.error(ErrorCodeEnum.METHOD_NOT_ALLOWED);
     }
 
@@ -222,7 +222,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoHandlerFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public Result<Void> handleNoHandlerFoundException(NoHandlerFoundException e) {
-        log.warn("请求路径不存在：{}", e.getRequestURL());
+        log.warn("请求路径不存在：{}", e.getRequestURL(), e);
         return Result.error(ErrorCodeEnum.REQUEST_NOT_FOUND);
     }
 
@@ -237,7 +237,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
-        log.warn("文件大小超出系统限制：{}", e.getMessage());
+        log.warn("文件大小超出系统限制：{}", e.getMessage(), e);
         return Result.error(ErrorCodeEnum.ATTACHMENT_SIZE_EXCEEDED);
     }
 
@@ -251,7 +251,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MultipartException.class)
     @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleMultipartException(MultipartException e) {
-        log.warn("文件上传请求解析失败：{}", e.getMessage());
+        log.warn("文件上传请求解析失败：{}", e.getMessage(), e);
         return Result.error(ErrorCodeEnum.ATTACHMENT_UPLOAD_FAILED);
     }
 
@@ -269,7 +269,7 @@ public class GlobalExceptionHandler {
         if (cause instanceof SQLIntegrityConstraintViolationException sqlEx) {
             String message = sqlEx.getMessage();
             if (message != null && message.contains("Duplicate entry")) {
-                log.warn("唯一键冲突：{}", message);
+                log.warn("唯一键冲突：{}", message, e);
                 return Result.error(ErrorCodeEnum.DATA_EXISTS);
             }
         }

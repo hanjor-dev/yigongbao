@@ -1,6 +1,8 @@
 package com.yigongbao.module.design.controller;
 
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.dto.SaveDesignColumnConfigDTO;
 import com.yigongbao.module.design.service.DesignWorkorderService;
@@ -39,6 +41,7 @@ public class DesignColumnConfigController {
      * 保存当前用户的列配置
      */
     @Operation(summary = "保存列配置")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "保存列配置")
     @RequirePermission(value = "design:View")
     @PostMapping
     public Result<Void> saveColumnConfig(@Validated @RequestBody SaveDesignColumnConfigDTO dto) {

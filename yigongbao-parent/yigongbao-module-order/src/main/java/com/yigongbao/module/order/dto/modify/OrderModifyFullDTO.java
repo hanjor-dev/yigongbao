@@ -4,6 +4,7 @@ import com.yigongbao.module.order.dto.draft.OrderItemDraftItemDTO;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -18,6 +19,13 @@ import java.util.List;
 public class OrderModifyFullDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
+
+    // ==================== 订单基本信息 ====================
+    private Integer orderType;
+    private String businessType;
+    private Integer isPostal;
+    private BigDecimal estimatedCost;
+    private String dataEvaluationOpinion;
 
     // ==================== 患者信息 ====================
     private String patientName;

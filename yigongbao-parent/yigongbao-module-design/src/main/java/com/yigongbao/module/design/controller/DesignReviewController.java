@@ -1,7 +1,9 @@
 package com.yigongbao.module.design.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
 import com.yigongbao.module.design.dto.ReviewPassDTO;
@@ -58,6 +60,7 @@ public class DesignReviewController {
     @PostMapping("/{orderId}/pass")
     @RequirePermission(value = "design:Approve")
     @Operation(summary = "审核通过")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.AUDIT, operation = "设计审核通过")
     public Result<Void> reviewPass(@PathVariable Long orderId,
                                    @RequestBody(required = false) ReviewPassDTO dto) {
         designReviewService.reviewPass(orderId, dto != null ? dto : new ReviewPassDTO());
@@ -71,6 +74,7 @@ public class DesignReviewController {
     @PostMapping("/{orderId}/reject")
     @RequirePermission(value = "design:Reject")
     @Operation(summary = "审核驳回")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.AUDIT, operation = "设计审核驳回")
     public Result<Void> reviewReject(@PathVariable Long orderId,
                                      @Valid @RequestBody ReviewRejectDTO dto) {
         designReviewService.reviewReject(orderId, dto);

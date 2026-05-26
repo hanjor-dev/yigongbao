@@ -17,6 +17,7 @@ import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.config.service.ConfigService;
@@ -77,7 +78,7 @@ import java.util.stream.Collectors;
 public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> implements UserService {
 
     /** 需要填写专业方向的角色编码 */
-    private static final List<String> SPECIALTY_REQUIRED_ROLES = List.of("designer", "designer-manager");
+    private static final List<String> SPECIALTY_REQUIRED_ROLES = List.of(RoleCodeEnum.DESIGNER.getCode(), RoleCodeEnum.DESIGNER_MANAGER.getCode());
 
     private final OrgService orgService;
     private final DeptService deptService;
@@ -592,7 +593,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             }
             // 生产员角色校验加工中心，并复用查询结果更新冗余字段
             Long effectiveCenterId = dto.getCenterId() != null ? dto.getCenterId() : entity.getCenterId();
-            if (effectiveRole != null && "producer".equals(effectiveRole.getRoleCode())) {
+            if (effectiveRole != null && RoleCodeEnum.PRODUCTION_WORKER.getCode().equals(effectiveRole.getRoleCode())) {
                 if (effectiveCenterId == null) {
                     log.warn("生产员角色必须绑定加工中心: roleId={}", effectiveRole.getId());
                     throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "加工中心");
@@ -888,7 +889,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             return;
         }
         // 生产员角色必须绑定加工中心
-        if ("producer".equals(role.getRoleCode())) {
+        if (RoleCodeEnum.PRODUCTION_WORKER.getCode().equals(role.getRoleCode())) {
             if (centerId == null) {
                 log.warn("生产员角色必须绑定加工中心: roleId={}", role.getId());
                 throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "加工中心");
@@ -929,7 +930,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             entity.setRoleCode(roleEntity.getRoleCode());
         }
         // 冗余加工中心名称（仅生产员角色需要）
-        if (entity.getCenterId() != null && roleEntity != null && "producer".equals(roleEntity.getRoleCode())) {
+        if (entity.getCenterId() != null && roleEntity != null && RoleCodeEnum.PRODUCTION_WORKER.getCode().equals(roleEntity.getRoleCode())) {
             com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity center =
                 processingCenterMapper.selectById(entity.getCenterId());
             if (center != null) {
