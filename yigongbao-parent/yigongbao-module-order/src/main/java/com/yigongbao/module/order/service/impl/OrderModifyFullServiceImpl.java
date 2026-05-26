@@ -66,6 +66,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     private final OrgService orgService;
     private final HospitalDeptService hospitalDeptService;
     private final UserService userService;
+    private final com.yigongbao.module.system.dict.service.DictService dictService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -155,6 +156,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             logEntity.setOldValue(change.getOldValue());
             logEntity.setNewValue(change.getNewValue());
             logEntity.setModifierId(userId);
+            logEntity.setModifierName(currentUser != null ? currentUser.getRealName() : null);
             orderModificationLogMapper.insert(logEntity);
         }
 
@@ -169,19 +171,35 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
      * 对比订单基本信息（订单类型/业务类型）
      */
     private ObjectChange diffOrderInfo(OrderMainEntity order, OrderModifyFullDTO dto) {
-        boolean changed = !Objects.equals(order.getOrderType(), dto.getOrderType())
-                || !Objects.equals(order.getBusinessType(), dto.getBusinessType())
-                || !Objects.equals(order.getIsPostal(), dto.getIsPostal())
-                || !Objects.equals(order.getEstimatedCost(), dto.getEstimatedCost())
-                || !Objects.equals(order.getDataEvaluationOpinion(), dto.getDataEvaluationOpinion());
-        if (!changed) {
+        List<String> oldParts = new ArrayList<>();
+        List<String> newParts = new ArrayList<>();
+
+        if (!Objects.equals(order.getOrderType(), dto.getOrderType())) {
+            oldParts.add("订单类型=" + order.getOrderType());
+            newParts.add("订单类型=" + dto.getOrderType());
+        }
+        if (!Objects.equals(order.getBusinessType(), dto.getBusinessType())) {
+            oldParts.add("业务类型=" + order.getBusinessType());
+            newParts.add("业务类型=" + dto.getBusinessType());
+        }
+        if (!Objects.equals(order.getIsPostal(), dto.getIsPostal())) {
+            oldParts.add("邮寄=" + (order.getIsPostal() != null && order.getIsPostal() == 1 ? "是" : "否"));
+            newParts.add("邮寄=" + (dto.getIsPostal() != null && dto.getIsPostal() == 1 ? "是" : "否"));
+        }
+        if (!Objects.equals(order.getEstimatedCost(), dto.getEstimatedCost())) {
+            oldParts.add("预估费用=" + (order.getEstimatedCost() != null ? order.getEstimatedCost() : "无"));
+            newParts.add("预估费用=" + (dto.getEstimatedCost() != null ? dto.getEstimatedCost() : "无"));
+        }
+        if (!Objects.equals(order.getDataEvaluationOpinion(), dto.getDataEvaluationOpinion())) {
+            oldParts.add("数据评估意见=" + formatFieldValue(order.getDataEvaluationOpinion()));
+            newParts.add("数据评估意见=" + formatFieldValue(dto.getDataEvaluationOpinion()));
+        }
+
+        if (oldParts.isEmpty()) {
             return ObjectChange.noChange();
         }
-        String oldValue = String.format("orderType=%s,businessType=%s,isPostal=%s,estimatedCost=%s,dataEvaluationOpinion=%s",
-                order.getOrderType(), order.getBusinessType(), order.getIsPostal(), order.getEstimatedCost(), order.getDataEvaluationOpinion());
-        String newValue = String.format("orderType=%s,businessType=%s,isPostal=%s,estimatedCost=%s,dataEvaluationOpinion=%s",
-                dto.getOrderType(), dto.getBusinessType(), dto.getIsPostal(), dto.getEstimatedCost(), dto.getDataEvaluationOpinion());
-        return ObjectChange.of(OrderModifyObjectType.ORDER_INFO, "订单基本信息", oldValue, newValue);
+        return ObjectChange.of(OrderModifyObjectType.ORDER_INFO, "订单基本信息",
+                String.join("，", oldParts), String.join("，", newParts));
     }
 
     /**
@@ -202,9 +220,14 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
      * 格式化患者信息
      */
     private String formatPatient(String name, String gender, Integer age) {
+        String genderText = "无";
+        if (StrUtil.isNotBlank(gender)) {
+            com.yigongbao.module.system.dict.vo.DictVO dictVO = dictService.getByDictCode(gender);
+            genderText = dictVO != null ? dictVO.getDictName() : gender;
+        }
         return String.format("%s(%s,%d岁)",
             StrUtil.blankToDefault(name, "无"),
-            StrUtil.blankToDefault(gender, "无"),
+            genderText,
             age == null ? 0 : age);
     }
 
