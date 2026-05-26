@@ -590,18 +590,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 validateHospitalScope(effectiveRole, dto.getHospitalIds());
                 validateSpecialty(effectiveRole, dto.getSpecialtyList());
             }
-            // 生产员角色校验加工中心
+            // 生产员角色校验加工中心，并复用查询结果更新冗余字段
             Long effectiveCenterId = dto.getCenterId() != null ? dto.getCenterId() : entity.getCenterId();
-            validateProcessingCenter(effectiveRole, effectiveCenterId);
-            // 校验加工中心是否存在并更新冗余字段
-            if (dto.getCenterId() != null && !dto.getCenterId().equals(entity.getCenterId())) {
+            if (effectiveRole != null && "producer".equals(effectiveRole.getRoleCode())) {
+                if (effectiveCenterId == null) {
+                    log.warn("生产员角色必须绑定加工中心: roleId={}", effectiveRole.getId());
+                    throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "加工中心");
+                }
                 com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity center =
-                    processingCenterMapper.selectById(dto.getCenterId());
+                    processingCenterMapper.selectById(effectiveCenterId);
                 if (center == null) {
-                    log.warn("加工中心不存在: centerId={}", dto.getCenterId());
+                    log.warn("加工中心不存在: centerId={}", effectiveCenterId);
                     throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "加工中心");
                 }
-                entity.setCenterName(center.getCenterName());
+                if (dto.getCenterId() != null && !dto.getCenterId().equals(entity.getCenterId())) {
+                    entity.setCenterName(center.getCenterName());
+                }
             }
             // 更新角色冗余字段: 并处理医院范围权限变更
             if (newRole != null) {
@@ -924,8 +928,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             entity.setRoleName(roleEntity.getRoleName());
             entity.setRoleCode(roleEntity.getRoleCode());
         }
-        // 冗余加工中心名称: 避免查询时 JOIN processing_center
-        if (entity.getCenterId() != null) {
+        // 冗余加工中心名称（仅生产员角色需要）
+        if (entity.getCenterId() != null && roleEntity != null && "producer".equals(roleEntity.getRoleCode())) {
             com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity center =
                 processingCenterMapper.selectById(entity.getCenterId());
             if (center != null) {

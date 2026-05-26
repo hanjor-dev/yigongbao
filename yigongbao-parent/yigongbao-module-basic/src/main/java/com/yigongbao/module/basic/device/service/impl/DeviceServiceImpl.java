@@ -235,14 +235,14 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
             }
         }
 
-        for (DeviceEntity device : toCreate) {
-            save(device);
+        if (!toCreate.isEmpty()) {
+            saveBatch(toCreate);
         }
         for (DeviceEntity device : toUpdate) {
             updateById(device);
         }
-        for (DeviceStateLogEntity log : stateLogs) {
-            deviceStateLogService.save(log);
+        if (!stateLogs.isEmpty()) {
+            deviceStateLogService.saveBatch(stateLogs);
         }
 
         log.info("批量更新设备状态: centerName={}, deviceCount={}, 新增={}, 更新={}",
@@ -261,14 +261,12 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         wrapper.eq(DeviceEntity::getCenterId, centerId)
                .eq(DeviceEntity::getConnectionStatus, 1);
 
-        long count = count(wrapper);
-        if (count > 0) {
-            DeviceEntity updateEntity = new DeviceEntity();
-            updateEntity.setConnectionStatus(0);
-            update(updateEntity, wrapper);
+        DeviceEntity updateEntity = new DeviceEntity();
+        updateEntity.setConnectionStatus(0);
+        boolean updated = update(updateEntity, wrapper);
+        if (updated) {
+            log.info("标记加工中心设备离线: centerId={}", centerId);
         }
-
-        log.info("标记加工中心设备离线: centerId={}, deviceCount={}", centerId, count);
     }
 
     /**
@@ -285,17 +283,12 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         wrapper.eq(DeviceEntity::getConnectionStatus, 1)
                .lt(DeviceEntity::getLastHeartbeat, threshold);
 
-        List<DeviceEntity> devices = list(wrapper);
-        if (!devices.isEmpty()) {
-            for (DeviceEntity device : devices) {
-                log.warn("设备离线: deviceId={}, lastHeartbeat={}", device.getDeviceId(), device.getLastHeartbeat());
-            }
-
+        long offlineCount = count(wrapper);
+        if (offlineCount > 0) {
             DeviceEntity updateEntity = new DeviceEntity();
             updateEntity.setConnectionStatus(0);
             update(updateEntity, wrapper);
-
-            log.info("离线检测完成: 检测到{}个离线设备", devices.size());
+            log.info("离线检测完成: 检测到{}个离线设备", offlineCount);
         }
     }
 }
