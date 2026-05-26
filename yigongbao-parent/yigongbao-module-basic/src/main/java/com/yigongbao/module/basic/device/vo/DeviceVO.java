@@ -39,6 +39,9 @@ public class DeviceVO {
     /** 最后心跳时间 */
     private LocalDateTime lastHeartbeat;
 
+    /** 加工耗时（单位：分钟） */
+    private Integer processingMinutes;
+
     /** 备注 */
     private String remark;
 

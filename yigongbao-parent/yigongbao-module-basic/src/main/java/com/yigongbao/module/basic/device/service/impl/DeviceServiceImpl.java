@@ -97,6 +97,10 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createDevice(CreateDeviceDTO dto) {
+        // 3D打印类设备由WebSocket自动注册，禁止手动创建
+        if (StrUtil.isNotBlank(dto.getDeviceType()) && dto.getDeviceType().startsWith("PRINTER_")) {
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "3D打印类设备不允许手动创建，请通过设备端WebSocket接入");
+        }
         LambdaQueryWrapper<DeviceEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(DeviceEntity::getDeviceId, dto.getDeviceId());
         if (count(wrapper) > 0) {

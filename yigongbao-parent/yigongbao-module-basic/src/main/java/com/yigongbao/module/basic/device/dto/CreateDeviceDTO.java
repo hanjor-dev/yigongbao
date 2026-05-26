@@ -19,11 +19,17 @@ public class CreateDeviceDTO {
     /** 设备名称 */
     private String deviceName;
 
-    /** 设备类型（如 PRINTER_SLA、PRINTER_FDM 等） */
+    /**
+     * 设备类型（如 WASH_CONTAINER、UV_CURING 等）
+     * 注意：3D打印类设备（PRINTER_SLA、PRINTER_FDM）由 WebSocket 自动注册，禁止手动创建
+     */
     private String deviceType;
 
     /** 所属加工中心ID */
     private Long centerId;
+
+    /** 加工耗时（单位：分钟） */
+    private Integer processingMinutes;
 
     /** 备注 */
     private String remark;

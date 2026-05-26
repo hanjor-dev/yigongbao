@@ -1552,6 +1552,7 @@ CREATE TABLE device (
     state TINYINT DEFAULT 0 COMMENT '设备状态（0=空闲，1=占用）',
     connection_status TINYINT DEFAULT 0 COMMENT '连接状态（0=离线，1=在线）',
     last_heartbeat DATETIME COMMENT '最后心跳时间',
+    processing_minutes INT COMMENT '加工耗时（单位：分钟）',
     remark VARCHAR(500) COMMENT '备注',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

@@ -7,6 +7,7 @@ import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.device.dto.CreateDeviceDTO;
 import com.yigongbao.module.basic.device.dto.DevicePageDTO;
+import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.service.IDeviceService;
 import com.yigongbao.module.basic.device.vo.DeviceVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,7 +18,10 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 设备管理控制器
@@ -91,5 +95,17 @@ public class DeviceController {
     public Result<List<DeviceVO>> listByCenterAndType(@RequestParam(required = false) Long centerId,
                                                        @RequestParam(required = false) String deviceType) {
         return Result.success(deviceService.listDevicesByCenterAndType(centerId, deviceType));
+    }
+
+    /**
+     * 查询设备类型下拉列表
+     */
+    @Operation(summary = "查询设备类型下拉列表")
+    @GetMapping("/types")
+    public Result<List<Map<String, String>>> listDeviceTypes() {
+        List<Map<String, String>> types = Arrays.stream(DeviceTypeEnum.values())
+                .map(e -> Map.of("code", e.getCode(), "name", e.getName()))
+                .collect(Collectors.toList());
+        return Result.success(types);
     }
 }
