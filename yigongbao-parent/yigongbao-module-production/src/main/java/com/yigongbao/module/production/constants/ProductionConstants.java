@@ -17,6 +17,9 @@ public class ProductionConstants {
     public static final Integer ORDER_TYPE_MEDICAL = 1;
     public static final Integer ORDER_TYPE_NON_MEDICAL = 2;
 
+    // 设备类型常量
+    public static final String DEVICE_TYPE_PRINTER = "PRINTER";
+
     // 设备状态常量
     public static final Integer DEVICE_STATE_IDLE = 0;
     public static final Integer DEVICE_STATE_BUSY = 1;

@@ -9,6 +9,7 @@ import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import com.yigongbao.module.production.record.vo.PrinterVO;
+import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -95,9 +96,9 @@ public class ProductionRecordController {
         return Result.success(recordService.getDeviceConfig(id));
     }
 
-    @Operation(summary = "获取打印机列表")
+    @Operation(summary = "获取打印机列表（按加工中心分组）")
     @GetMapping("/printers")
-    public Result<List<PrinterVO>> listPrinters() {
+    public Result<List<ProcessingCenterPrintersVO>> listPrinters() {
         return Result.success(recordService.listPrinters());
     }
 

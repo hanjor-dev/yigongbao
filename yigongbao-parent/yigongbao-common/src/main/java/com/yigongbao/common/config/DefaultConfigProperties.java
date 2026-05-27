@@ -183,6 +183,24 @@ public class DefaultConfigProperties {
      */
     private Integer configDesignMode = 1;
 
+    // ==================== 生产管理配置 ====================
+    /**
+     * 待打印超时阈值（分钟）
+     * 分配设备后超过此时间未收到打印开始推送，触发超时提醒
+     */
+    private Integer configProductionPendingPrintTimeoutMinutes = 10;
+
+    /**
+     * 打印中超时阈值（分钟）
+     * 打印开始后超过此时间未收到打印完成推送，触发超时提醒
+     */
+    private Integer configProductionPrintingTimeoutMinutes = 240;
+
+    /**
+     * 工序参数配置字典（JSON格式）
+     */
+    private String configProductionProcessParamsConfig = "{\"wash\":{\"temperature\":{\"label\":\"温度(℃)\",\"type\":\"number\",\"required\":true},\"time\":{\"label\":\"时间(秒)\",\"type\":\"number\",\"required\":true}},\"cure\":{\"power\":{\"label\":\"功率(W)\",\"type\":\"number\",\"required\":true},\"time\":{\"label\":\"时间(秒)\",\"type\":\"number\",\"required\":true}},\"clean_dry\":{\"temperature\":{\"label\":\"温度(℃)\",\"type\":\"number\",\"required\":true},\"time\":{\"label\":\"时间(秒)\",\"type\":\"number\",\"required\":true}}}";
+
     // ==================== 设计工单列配置 ====================
     /**
      * 设计工单列表默认列配置（JSON 格式）

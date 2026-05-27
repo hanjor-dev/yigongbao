@@ -157,8 +157,8 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             return new PhaseAndStatus(FlowPhaseEnum.DESIGN, FlowStatusEnum.PENDING_DESIGN);
         }
 
-        // 设计审核通过 → 根据是否需要实体交付进入不同阶段
-        if (targetStatus == FlowStatusEnum.DESIGN_REVIEW_PASSED) {
+        // 下载数据包 → 根据是否需要实体交付进入不同阶段
+        if (action == FlowActionEnum.START_PRINT) {
             if (needsProduction) {
                 return new PhaseAndStatus(FlowPhaseEnum.PRINT, FlowStatusEnum.PENDING_PRINT);
             } else {
@@ -204,7 +204,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      * @return true-不可见状态，false-正常状态
      */
     public static boolean isInvisibleStatus(FlowStatusEnum status) {
-        return status == FlowStatusEnum.DESIGN_REVIEW_PASSED;
+        return false;
     }
 
     /**
@@ -216,7 +216,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      */
     public static boolean isPhaseChangeAction(FlowActionEnum action) {
         return switch (action) {
-            case DATA_AUDIT_PASS, DESIGN_REVIEW_PASS, COMPLETE_PRINT,
+            case DATA_AUDIT_PASS, START_PRINT, COMPLETE_PRINT,
                  COMPLETE_POST_PROCESSING, QC_PASS, REWORK_COMPLETE,
                  COMPLETE_WAREHOUSE_IN, USER_CONFIRM -> true;
             default -> false;

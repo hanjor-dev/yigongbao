@@ -231,7 +231,28 @@ public enum SystemConfigKeyEnum {
      * 影像阅片器查看器URL前缀（含协议、端口和路由路径）
      * 示例：http://127.0.0.1:81/#/viewer
      */
-    IMAGING_VIEWER_BASE_URL("imaging.viewer.base_url", "影像阅片器查看器URL前缀");
+    IMAGING_VIEWER_BASE_URL("imaging.viewer.base_url", "影像阅片器查看器URL前缀"),
+
+    // ==================== 生产管理配置 ====================
+    /**
+     * 待打印超时阈值（分钟）
+     * 分配设备后超过此时间未收到打印开始推送，触发超时提醒
+     * 默认：10 分钟
+     */
+    PRODUCTION_PENDING_PRINT_TIMEOUT_MINUTES("production.pending.print.timeout.minutes", "待打印超时阈值（分钟）"),
+
+    /**
+     * 打印中超时阈值（分钟）
+     * 打印开始后超过此时间未收到打印完成推送，触发超时提醒
+     * 默认：240 分钟（4小时）
+     */
+    PRODUCTION_PRINTING_TIMEOUT_MINUTES("production.printing.timeout.minutes", "打印中超时阈值（分钟）"),
+
+    /**
+     * 工序参数配置字典（JSON格式）
+     * 定义各工序的参数字段（key/label/type/options/unit），前端据此动态渲染参数表单
+     */
+    PRODUCTION_PROCESS_PARAMS_CONFIG("production.process.params.config", "工序参数配置字典（JSON）");
 
     /**
      * 配置键

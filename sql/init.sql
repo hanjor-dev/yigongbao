@@ -320,7 +320,7 @@ VALUES
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
 VALUES
 ('system.name', '系统名称', '医工宝', 'string', 'system', '系统显示名称', 1, 1, 1, 1),
-('order.image.required', '提交订单是否必须上传影像文件', 'true', 'boolean', 'system', 'true-必须上传，false-非必填', 1, 0, 2, 1),
+('order.image.required', '提交订单是否必须上传影像文件', 'false', 'boolean', 'system', 'true-必须上传，false-非必填', 1, 0, 2, 1),
 ('order.draft.expire.days', '草稿自动过期天数', '30', 'number', 'system', '草稿超过此天数自动过期（天）', 1, 0, 3, 1),
 ('order.modify.window.minutes', '订单提交后修改窗口期', '10', 'number', 'system', '订单提交后允许修改的时间窗口（分钟）', 1, 0, 4, 1),
 ('flow.max.audit.reject', '最大允许的审核驳回次数', '3', 'number', 'system', '审核驳回超过此次数后不再允许提交', 1, 0, 5, 1),
@@ -329,23 +329,19 @@ VALUES
 ('design.assign.mode', '设计师分配模式', 'auto', 'string', 'system', 'auto-自动分配，manual-手动分配', 1, 0, 8, 1),
 ('design.mode', '设计模式', '2', 'number', 'system', '设计模式：1=线下修改（需上传修订版），2=在线编辑', 1, 1, 9, 1);
 
--- 影像查看器配置（group=system）
-INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
-VALUES
-('imaging.viewer.base_url', '影像阅片器查看器URL前缀', 'http://127.0.0.1:81/#/viewer', 'string', 'system', '影像阅片器查看器完整URL前缀（含协议、端口和路由路径），如 http://127.0.0.1:81/#/viewer', 1, 0, 11, 1);
 
 -- 订单列表默认列配置（独立 INSERT，避免 JSON 跨行问题）
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
 VALUES ('order.column.config', '订单列表默认列配置', '{"module":"order","columns":[{"field":"orderCode","label":"订单编号","visible":true,"sort":1,"width":160,"fixed":null},{"field":"statusName","label":"当前状态","visible":true,"sort":3,"width":120,"fixed":null},{"field":"isUrgent","label":"加急","visible":true,"sort":4,"width":70,"fixed":null},{"field":"businessTypeName","label":"业务类型","visible":true,"sort":5,"width":100,"fixed":null},{"field":"orderTypeName","label":"订单类型","visible":true,"sort":6,"width":110,"fixed":null},{"field":"needsPhysicalDeliveryName","label":"实体交付","visible":true,"sort":7,"width":90,"fixed":null},{"field":"orgName","label":"提单机构","visible":true,"sort":8,"width":150,"fixed":null},{"field":"operatorName","label":"业务员","visible":true,"sort":9,"width":100,"fixed":null},{"field":"operatorPhone","label":"业务员电话","visible":true,"sort":10,"width":120,"fixed":null},{"field":"operatorDeptName","label":"部门","visible":true,"sort":11,"width":120,"fixed":null},{"field":"hospitalName","label":"医院","visible":true,"sort":12,"width":180,"fixed":null},{"field":"areaName","label":"地区","visible":true,"sort":13,"width":100,"fixed":null},{"field":"hospitalDeptName","label":"科室","visible":true,"sort":15,"width":100,"fixed":null},{"field":"doctorName","label":"医生","visible":true,"sort":16,"width":100,"fixed":null},{"field":"doctorPhone","label":"医生电话","visible":true,"sort":17,"width":120,"fixed":null},{"field":"patientName","label":"患者姓名","visible":true,"sort":18,"width":100,"fixed":null},{"field":"patientAge","label":"患者年龄","visible":true,"sort":19,"width":80,"fixed":null},{"field":"patientGenderName","label":"患者性别","visible":true,"sort":20,"width":80,"fixed":null},{"field":"isPostal","label":"是否邮寄","visible":true,"sort":21,"width":80,"fixed":null},{"field":"postalAddress","label":"邮寄地址","visible":true,"sort":22,"width":160,"fixed":null},{"field":"designerName","label":"设计师","visible":true,"sort":23,"width":100,"fixed":null},{"field":"expectedDeliveryDate","label":"期望交付时间","visible":true,"sort":24,"width":160,"fixed":null},{"field":"estimatedCost","label":"预估费用","visible":true,"sort":25,"width":100,"fixed":null},{"field":"dataEvaluationOpinion","label":"影像评估意见","visible":true,"sort":26,"width":160,"fixed":null},{"field":"rebuildProjectList","label":"重建项目","visible":true,"sort":27,"width":200,"fixed":null},{"field":"createTime","label":"创建时间","visible":true,"sort":28,"width":160,"fixed":null},{"field":"action","label":"操作","visible":true,"sort":29,"width":150,"fixed":null}]}', 'json', 'system', '订单列表默认显示的列（JSON格式）', 1, 0, 10, 1);
 
--- 订单修改申请字段配置（独立 INSERT）
-INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
-VALUES ('order.modify.field.config', '订单修改字段配置（废弃）', '{"14.1":{"name":"基础信息","fields":[{"field":"hospitalId","label":"医院","type":"autocomplete","required":false,"group":"hospital_doctor"},{"field":"hospitalDeptId","label":"科室","type":"autocomplete","required":false,"group":"hospital_doctor"},{"field":"doctorId","label":"关联医生","type":"autocomplete","required":false,"group":"hospital_doctor"},{"field":"doctorName","label":"医生姓名","type":"text","required":false,"group":"hospital_doctor"},{"field":"doctorPhone","label":"医生电话","type":"text","required":false,"group":"hospital_doctor"},{"field":"patientName","label":"患者姓名","type":"text","required":false},{"field":"patientAge","label":"患者年龄","type":"number","required":false},{"field":"patientGender","label":"患者性别","type":"select","required":false,"options":[{"value":"12.1","label":"男"},{"value":"12.2","label":"女"}]},{"field":"isUrgent","label":"是否加急","type":"switch","required":false},{"field":"isPostal","label":"是否邮寄","type":"switch","required":false},{"field":"postalAddress","label":"邮寄地址","type":"textarea","required":false},{"field":"expectedDeliveryDate","label":"期望交付时间","type":"datetime","required":false}]},"14.2":{"name":"影像文件","fields":[{"field":"imageDataFileIds","label":"影像数据文件","type":"file","required":false},{"field":"imageReportFileIds","label":"影像报告文件","type":"file","required":false}]},"14.3":{"name":"重建项目","fields":[{"field":"items","label":"重建项目明细","type":"array","required":false,"subFields":[{"field":"bodyPartId","label":"部位","type":"select"},{"field":"projectId","label":"重建项目","type":"select"},{"field":"projectDesc","label":"项目说明","type":"textarea"},{"field":"formingRequirement","label":"成形需求","type":"textarea"},{"field":"otherRequirement","label":"其他要求","type":"textarea"}]}]}}', 'json', 'system', '订单修改申请各类型允许修改的字段配置', 1, 0, 11, 1);
+-- -- 订单可修改内容配置
+-- INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
+-- VALUES ('order.modify.full.config', '订单可修改字段配置', '{"ORDER":{"allowedObjects":["patient","doctor","hospital","delivery","items","images"],"objects":{"patient":{"label":"患者信息","fields":["patientName","patientGender","patientAge"]},"doctor":{"label":"医生信息","fields":["doctorId","doctorName","doctorPhone"]},"hospital":{"label":"医院科室","fields":["hospitalId","hospitalDeptId"]},"delivery":{"label":"交付信息","fields":["isMailDelivery","deliveryAddress","expectedDeliveryTime","isUrgent"]},"items":{"label":"重建项目","coreFields":["bodyPartId","projectId"],"descFields":["projectDesc","moldingRequirement","otherRequirement"]},"images":{"label":"影像文件"}}},"DESIGN":{"allowedObjects":["items"]}}', 'json', 'system', '订单修改允许修改的内容配置', 1, 0, 12, 1);
 
--- 订单可修改内容配置
+-- 影像查看器配置（group=system）
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
-VALUES ('order.modify.full.config', '订单可修改字段配置', '{"ORDER":{"allowedObjects":["patient","doctor","hospital","delivery","items","images"],"objects":{"patient":{"label":"患者信息","fields":["patientName","patientGender","patientAge"]},"doctor":{"label":"医生信息","fields":["doctorId","doctorName","doctorPhone"]},"hospital":{"label":"医院科室","fields":["hospitalId","hospitalDeptId"]},"delivery":{"label":"交付信息","fields":["isMailDelivery","deliveryAddress","expectedDeliveryTime","isUrgent"]},"items":{"label":"重建项目","coreFields":["bodyPartId","projectId"],"descFields":["projectDesc","moldingRequirement","otherRequirement"]},"images":{"label":"影像文件"}}},"DESIGN":{"allowedObjects":["items"]}}', 'json', 'system', '订单修改允许修改的内容配置', 1, 0, 12, 1);
-
+VALUES
+('imaging.viewer.base_url', '影像阅片器查看器URL前缀', 'http://81.70.104.108:81/#/viewer', 'string', 'system', '影像阅片器查看器完整URL前缀（含协议、端口和路由路径），如 http://127.0.0.1:81/#/viewer', 1, 0, 11, 1);
 
 
 -- 设计工单列表默认列配置（独立 INSERT）
@@ -378,6 +374,17 @@ VALUES
 ('unknown.hospital.org.id', '其他医院机构ID', '2', 'number', 'system', '提单时用于隐藏具体客户信息的占位医院ID，权限校验豁免', 1, 0, 11, 1),
 ('user.username.auto.generate', '用户名自动生成开关', 'true', 'boolean', 'system', 'true=后端按机构前缀+序号自动生成，false=前端手动输入', 1, 0, 21, 1);
 
+-- ------------------------------------------------------------
+-- 生产管理配置（group=production）
+-- ------------------------------------------------------------
+INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
+VALUES
+('production.pending.print.timeout.minutes', '待打印超时阈值（分钟）', '10', 'number', 'production', '分配设备后超过此时间未收到打印开始推送，触发超时提醒', 1, 0, 1, 1),
+('production.printing.timeout.minutes', '打印中超时阈值（分钟）', '240', 'number', 'production', '打印开始后超过此时间未收到打印完成推送，触发超时提醒', 1, 0, 2, 1);
+
+INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
+VALUES ('production.process.params.config', '工序参数配置字典', '{"wash":{"temperature":{"label":"温度(℃)","type":"number","required":true},"time":{"label":"时间(秒)","type":"number","required":true}},"cure":{"power":{"label":"功率(W)","type":"number","required":true},"time":{"label":"时间(秒)","type":"number","required":true}},"clean_dry":{"temperature":{"label":"温度(℃)","type":"number","required":true},"time":{"label":"时间(秒)","type":"number","required":true}}}', 'json', 'production', '各工序参数字段定义（JSON），前端据此动态渲染参数表单', 1, 0, 3, 1);
+
 
 
 -- ============================================================
@@ -396,8 +403,7 @@ VALUES
 (6, 0, '资料管理', 'Datum', 1, NULL, '/datum', NULL, '/datum/index', 6, 1, 1),
 (7, 0, '系统配置', 'System', 1, NULL, '/system', NULL, '/system/dict', 7, 1, 1),
 (8, 0, '统计报表', 'Statistical', 1, '&#xe6d6;', '/statistical', NULL, '/statistical/index', 8, 1, 1),
-(9, 0, '备份管理', 'Backup', 1, '&#xe7a0;', '/backup', NULL, '/backup/index', 9, 1, 1),
-(10, 0, '个人中心', 'Personal', 1, '&#xe651;', '/personal', NULL, '/personal/index', 10, 1, 1);
+(9, 0, '备份管理', 'Backup', 1, '&#xe7a0;', '/backup', NULL, '/backup/index', 9, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：业务运营（parent_id=2）
@@ -425,12 +431,12 @@ VALUES
 (301, 4, '机构管理', 'Org', 2, '&#xe61a;', '/org', 'module/org.vue', 1, 1, 1),
 (302, 4, '部门管理', 'Branch', 2, '&#xe62b;', '/branch', 'module/branch.vue', 2, 1, 1),
 (303, 4, '科室管理', 'Department', 2, '&#xe69f;', '/department', 'module/department.vue', 3, 1, 1),
-
-
 (304, 4, '项目管理', 'Project', 2, '&#xe620;', '/project', 'module/project.vue', 4, 1, 1),
 (305, 4, '产品管理', 'Product', 2, '&#xe601;', '/product', 'module/product.vue', 5, 1, 1),
 (306, 4, '医院范围模板管理', 'Template', 2, '&#xe605;', '/template', 'module/template.vue', 7, 1, 1),
-(307, 4, '注册证管理', 'RegCertificate', 2, '&#xe76a;', '/regCertificate', 'module/regCertificate.vue', 6, 1, 1);
+(307, 4, '注册证管理', 'RegCertificate', 2, '&#xe76a;', '/regCertificate', 'module/regCertificate.vue', 6, 1, 1),
+(308, 4, '加工中心管理', 'MacCenter', 2, NULL, '/center', 'module/center.vue', 8, 1, 1),
+(309, 4, '设备管理', 'Device', 2, NULL, '/device', 'module/device.vue', 9, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：用户和权限（parent_id=5）
@@ -439,8 +445,7 @@ INSERT INTO sys_resource (id, parent_id, resource_name, resource_code, resource_
 VALUES
 (401, 5, '账户管理', 'Account', 2, '&#xe602;', '/account', 'auth/account.vue', 1, 1, 1),
 (402, 5, '角色管理', 'Role', 2, '&#xe6a0;', '/role', 'auth/role.vue', 2, 1, 1),
-(403, 5, '资源管理', 'Resource', 2, '&#xe607;', '/resource', 'auth/resource.vue', 3, 1, 1),
-(404, 5, '注册审核', 'RegReview', 2, '&#xe76a;', '/regReview', 'auth/regReview.vue', 4, 1, 1);
+(403, 5, '资源管理', 'Resource', 2, '&#xe607;', '/resource', 'auth/resource.vue', 3, 1, 1);
 
 -- ------------------------------------------------------------
 -- 二级菜单：系统配置（parent_id=7）
@@ -518,21 +523,18 @@ VALUES
 (1101, 101, '我的草稿Tab',     'order:TabDraft',          3, 1,  1),
 (1102, 101, '订单列表Tab',     'order:TabOrderList',      3, 2,  1),
 (1103, 101, '审核列表Tab',     'order:TabModifyAudit',    3, 3,  1),
-(1104, 101, '我的修改申请Tab', 'order:TabMyModifyApply',  3, 4,  1),
 (1105, 101, '新建订单',        'order:Add',               3, 5,  1),
 (1106, 101, '批量导出',        'order:BatchExport',       3, 6,  1),
 (1107, 101, '查看详情',        'order:View',              3, 7,  1),
 (1108, 101, '影像调阅',        'order:ImageView',         3, 8,  1),
 (1109, 101, '修改',            'order:Modify',            3, 9,  1),
 (1110, 101, '修改历史',        'order:ModifyHistory',     3, 10, 1),
-(1111, 101, '申请修改',        'order:ApplyModify',       3, 11, 1),
 (1112, 101, '审核通过',        'order:Approve',           3, 12, 1),
 (1113, 101, '审核驳回',        'order:Reject',            3, 13, 1),
 (1114, 101, '编辑草稿',        'draft:Edit',              3, 14, 1),
 (1115, 101, '查看草稿',        'draft:View',              3, 15, 1),
 (1116, 101, '删除草稿',        'draft:Delete',            3, 16, 1),
 (1117, 101, '审核查看',        'order:AuditView',         3, 17, 1),
-(1118, 101, '我的申请查看',    'order:MyApplyView',       3, 18, 1),
 (1119, 101, '撤回申请',        'order:MyApplyWithdraw',   3, 19, 1),
 (1121, 101, '取消订单',        'order:Cancel',            3, 21, 1),
 -- 我的工单页按钮（parent_id=102）
@@ -607,46 +609,47 @@ SELECT 1, id FROM sys_resource;
 -- 各角色菜单+按钮权限关联
 -- 菜单ID速查：
 --   1=数据概览, 2=业务运营(父), 3=客户管理(父), 4=模块管理(父), 5=用户和权限(父)
---   6=资料管理, 7=系统配置(父), 8=统计报表, 9=备份管理, 10=个人中心
+--   6=资料管理, 7=系统配置(父), 8=统计报表, 9=备份管理
 --   101=订单管理, 102=我的工单, 103=生产管理, 104=质检管理, 105=仓储管理
 --   301=机构管理, 302=部门管理, 303=科室管理, 304=项目管理, 305=产品管理, 307=注册证管理, 306=医院范围模板
---   401=账户管理, 402=角色管理, 403=资源管理, 404=注册审核
+--   308=加工中心管理, 309=设备管理
+--   401=账户管理, 402=角色管理, 403=资源管理
 --   501=字典管理, 502=参数配置, 503=操作日志
 -- ============================================================
 
 -- 业务员（role_id=2）
--- 菜单：数据概览、订单管理、资料管理、个人中心
+-- 菜单：数据概览、订单管理、资料管理
 -- 按钮：订单管理页（我的草稿Tab/订单列表Tab/我的修改申请Tab/新建订单/查看详情/影像调阅/修改/修改历史/申请修改/编辑草稿/查看草稿/删除草稿/我的申请查看/撤回申请）
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
-(2, 1), (2, 2), (2, 6), (2, 10),
+(2, 1), (2, 2), (2, 6),
 (2, 101),
-(2, 1101), (2, 1102), (2, 1104), (2, 1105), (2, 1107), (2, 1108),
-(2, 1109), (2, 1110), (2, 1111), (2, 1114), (2, 1115), (2, 1116),
-(2, 1118), (2, 1119), (2, 1121);
+(2, 1101), (2, 1102), (2, 1105), (2, 1107), (2, 1108),
+(2, 1109), (2, 1110), (2, 1114), (2, 1115), (2, 1116),
+(2, 1119), (2, 1121);
 
 -- 区域管理员（role_id=3）
--- 菜单：数据概览、订单管理、资料管理、个人中心
+-- 菜单：数据概览、订单管理、资料管理
 -- 按钮：订单管理页全部按钮
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
-(3, 1), (3, 2), (3, 6), (3, 10),
+(3, 1), (3, 2), (3, 6),
 (3, 101),
-(3, 1101), (3, 1102), (3, 1103), (3, 1104), (3, 1105), (3, 1106),
-(3, 1107), (3, 1108), (3, 1109), (3, 1110), (3, 1111), (3, 1112),
-(3, 1113), (3, 1114), (3, 1115), (3, 1116), (3, 1117), (3, 1118), (3, 1119), (3, 1120), (3, 1121);
+(3, 1101), (3, 1102), (3, 1103), (3, 1105), (3, 1106),
+(3, 1107), (3, 1108), (3, 1109), (3, 1110), (3, 1112),
+(3, 1113), (3, 1114), (3, 1115), (3, 1116), (3, 1117), (3, 1119), (3, 1120), (3, 1121);
 
 -- 设计师（role_id=4）
--- 菜单：数据概览、我的工单、资料管理、个人中心
+-- 菜单：数据概览、我的工单、资料管理
 -- 按钮：工单页（查看详情/上传设计文件/填写打印信息/图纸指令单预览/影像在线预览/生成二维码/开始设计/提交设计审核）
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
-(4, 1), (4, 2), (4, 6), (4, 10),
+(4, 1), (4, 2), (4, 6),
 (4, 102),
 (4, 1202), (4, 1203), (4, 1204), (4, 1205), (4, 1206), (4, 1207), (4, 1208), (4, 1209), (4, 1121);
 
 -- 设计管理员（role_id=5）
--- 菜单：数据概览、我的工单、项目管理、产品管理、资料管理、统计报表、个人中心
+-- 菜单：数据概览、我的工单、项目管理、产品管理、资料管理、统计报表
 -- 按钮：工单页全部按钮、项目管理/产品管理全量按钮、订单管理页（订单列表Tab/批量导出/查看详情/影像调阅/修改历史）
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
-(5, 1), (5, 2), (5, 4), (5, 6), (5, 8), (5, 10),
+(5, 1), (5, 2), (5, 4), (5, 6), (5, 8),
 (5, 102), (5, 303), (5, 304),
 -- 订单管理页按钮
 (5, 1102), (5, 1106), (5, 1107), (5, 1108), (5, 1110), (5, 1120), (5, 1121),
@@ -657,40 +660,40 @@ INSERT INTO sys_role_resource (role_id, resource_id) VALUES
 (5, 1038), (5, 1039), (5, 1040), (5, 1041);
 
 -- 生产员（role_id=6）
--- 菜单：数据概览、生产管理、资料管理、个人中心
+-- 菜单：数据概览、生产管理、资料管理
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
-(6, 1), (6, 2), (6, 6), (6, 10),
+(6, 1), (6, 2), (6, 6),
 (6, 103);
 
 -- 生产管理员（role_id=7）
--- 菜单：数据概览、生产管理、仓储管理、物料管理、资料管理、统计报表、个人中心
+-- 菜单：数据概览、生产管理、仓储管理、物料管理、资料管理、统计报表
 -- 按钮：物料管理全量按钮
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
-(7, 1), (7, 2), (7, 4), (7, 6), (7, 8), (7, 10),
+(7, 1), (7, 2), (7, 4), (7, 6), (7, 8),
 (7, 103), (7, 105), (7, 305),
 (7, 1042), (7, 1043), (7, 1044), (7, 1045);
 
 -- 质管（role_id=8）
--- 菜单：数据概览、质检管理、资料管理、个人中心
+-- 菜单：数据概览、质检管理、资料管理
 -- 按钮：订单管理页（订单列表Tab/查看详情/影像调阅/修改历史）
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
-(8, 1), (8, 2), (8, 6), (8, 10),
+(8, 1), (8, 2), (8, 6),
 (8, 104),
 (8, 1102), (8, 1107), (8, 1108), (8, 1110);
 
 -- 库管（role_id=9）
--- 菜单：数据概览、仓储管理、资料管理、统计报表、个人中心
+-- 菜单：数据概览、仓储管理、资料管理、统计报表
 -- 按钮：订单管理页（订单列表Tab/查看详情）、仓储管理页全部按钮（待模块完善后补充）
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
-(9, 1), (9, 2), (9, 6), (9, 8), (9, 10),
+(9, 1), (9, 2), (9, 6), (9, 8),
 (9, 105),
 (9, 1102), (9, 1107);
 
 -- 财务（role_id=10）
--- 菜单：数据概览、订单管理、资料管理、统计报表、个人中心
+-- 菜单：数据概览、订单管理、资料管理、统计报表
 -- 按钮：订单管理页（订单列表Tab/批量导出/查看详情）
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
-(10, 1), (10, 2), (10, 6), (10, 8), (10, 10),
+(10, 1), (10, 2), (10, 6), (10, 8),
 (10, 101),
 (10, 1102), (10, 1106), (10, 1107);
 
@@ -698,16 +701,16 @@ INSERT INTO sys_role_resource (role_id, resource_id) VALUES
 -- 菜单：除系统配置（字典/参数/日志/备份）和资源管理外的所有菜单
 -- 按钮：全部业务操作按钮
 INSERT INTO sys_role_resource (role_id, resource_id) VALUES
-(11, 1), (11, 6), (11, 8), (11, 10),
+(11, 1), (11, 6), (11, 8),
 -- 父级菜单节点（前端路由渲染需要）
 (11, 2), (11, 3), (11, 4), (11, 5),
 (11, 101), (11, 102), (11, 103), (11, 104), (11, 105),
-(11, 301), (11, 302), (11, 303), (11, 304), (11, 305), (11, 306), (11, 307),
-(11, 401), (11, 404),
+(11, 301), (11, 302), (11, 303), (11, 304), (11, 305), (11, 306), (11, 307), (11, 308), (11, 309),
+(11, 401),
 -- 订单管理页全部按钮
-(11, 1101), (11, 1102), (11, 1103), (11, 1104), (11, 1105), (11, 1106),
-(11, 1107), (11, 1108), (11, 1109), (11, 1110), (11, 1111), (11, 1112),
-(11, 1113), (11, 1114), (11, 1115), (11, 1116), (11, 1117), (11, 1118), (11, 1119), (11, 1120), (11, 1121),
+(11, 1101), (11, 1102), (11, 1103), (11, 1105), (11, 1106),
+(11, 1107), (11, 1108), (11, 1109), (11, 1110), (11, 1112),
+(11, 1113), (11, 1114), (11, 1115), (11, 1116), (11, 1117), (11, 1119), (11, 1120), (11, 1121),
 -- 工单页全部按钮
 (11, 1201), (11, 1202), (11, 1203), (11, 1204), (11, 1205), (11, 1206), (11, 1207), (11, 1208), (11, 1209), (11, 1210), (11, 1211),
 -- 其他菜单页全量按钮（科室/医生/机构/部门/项目/产品/注册证/医院范围模板/账户）
@@ -739,7 +742,12 @@ VALUES
 ('PROJECT_NO',     '重建项目编码',   'RP-',    NULL,             4, 'NEVER', 1),  -- RebuildProjectServiceImpl
 -- 系统模块编码
 ('DEPT_NO',        '部门编码',       'DEPT-',  NULL,             4, 'NEVER', 1),  -- DeptServiceImpl
-('USER_NO',        '用户名序号',     NULL,     NULL,             3, 'NEVER', 1);  -- UserServiceImpl（generateWithSeqSuffix，按机构前缀隔离序号池）
+('USER_NO',        '用户名序号',     NULL,     NULL,             3, 'NEVER', 1),  -- UserServiceImpl（generateWithSeqSuffix，按机构前缀隔离序号池）
+-- 生产模块编码
+('PRODUCTION_RECORD_NO', '生产流转卡编号', 'PR-', NULL,         6, 'NEVER', 1),  -- ProductionRecordServiceImpl
+('PRODUCTION_BATCH_NO',  '生产批号',       'PB-', '{yyyyMMdd}', 4, 'DAY',   1),  -- ProductionRecordServiceImpl
+('PRODUCT_NO',           '产品编号',       'PD-', NULL,         6, 'NEVER', 1),  -- ProductionRecordServiceImpl
+('UDI_CODE',             'UDI编码',        'UDI-',NULL,         8, 'NEVER', 1);  -- 产品唯一标识码
 
 
 -- ============================================================

@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.RoleCodeEnum;
+import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.facade.FlowFacade;
@@ -20,6 +22,8 @@ import com.yigongbao.module.design.entity.DesignPackageFileEntity;
 import com.yigongbao.module.design.mapper.DesignPackageFileMapper;
 import com.yigongbao.module.design.mapper.DesignPackageMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.production.constants.ProductionConstants;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProcessTypeEnum;
@@ -39,8 +43,8 @@ import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import com.yigongbao.module.production.record.vo.PrinterVO;
+import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
-import com.yigongbao.module.production.util.QrCodeUtil;
 import cn.hutool.core.bean.BeanUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +52,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -68,6 +75,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final DesignPackageFileMapper designPackageFileMapper;
     private final OrderMainMapper orderMainMapper;
     private final DeviceMapper deviceMapper;
+    private final UserMapper userMapper;
     private final ProductionProductMapper productMapper;
     private final ProductionProcessMapper processMapper;
     private final FlowFacade flowFacade;
@@ -119,9 +127,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         // 按订单类型生成工序记录
         createProcessRecords(record.getId(), order.getOrderType());
 
-        // 生成二维码
+        // 生成二维码内容（前端根据此内容生成图片）
         String qrContent = String.format("RECORD:%s|BATCH:%s", recordNo, batchNo);
-        record.setQrCodeUrl("data:image/png;base64," + QrCodeUtil.generateQrCodeBase64(qrContent));
+        record.setQrCodeUrl(qrContent);
         updateById(record);
 
         log.info("创建生产流转卡: recordId={}, recordNo={}, orderId={}, orderType={}, productCount={}",
@@ -268,7 +276,34 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             return;
         }
         triggerFlowAndSync(order.getId(), FlowActionEnum.START_PRINT);
-        log.info("下载设计数据包，触发待打印状态流转: orderId={}, designPackageId={}", order.getId(), designPackageId);
+
+        // 自动创建流转卡（不含设备信息）
+        String recordNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_RECORD_NO);
+        String batchNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_BATCH_NO);
+
+        ProductionRecordEntity record = new ProductionRecordEntity();
+        record.setRecordNo(recordNo);
+        record.setOrderId(order.getId());
+        record.setOrderCode(order.getOrderCode());
+        record.setOrderType(order.getOrderType());
+        record.setDesignPackageId(designPackage.getId());
+        record.setDesignPackageCode(designPackage.getPackageCode());
+        record.setProductionBatchNo(batchNo);
+        record.setStatus(RecordStatusEnum.PENDING_PRINT.getCode());
+        save(record);
+
+        // 创建产品记录和工序记录
+        int totalCount = createProductRecords(record, designPackage);
+        record.setTotalProductCount(totalCount);
+        createProcessRecords(record.getId(), order.getOrderType());
+
+        // 生成二维码内容（前端根据此内容生成图片）
+        String qrContent = String.format("RECORD:%s|BATCH:%s", recordNo, batchNo);
+        record.setQrCodeUrl(qrContent);
+        updateById(record);
+
+        log.info("下载设计数据包，触发待打印状态流转并创建流转卡: orderId={}, designPackageId={}, recordId={}, productCount={}",
+            order.getId(), designPackageId, record.getId(), totalCount);
     }
 
     @Override
@@ -372,27 +407,73 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     }
 
     @Override
-    public List<PrinterVO> listPrinters() {
-        List<DeviceEntity> devices = deviceMapper.selectList(
-                new LambdaQueryWrapper<DeviceEntity>()
-                        .eq(DeviceEntity::getDeviceType, "PRINTER"));
-        return devices.stream().map(d -> {
-            PrinterVO vo = new PrinterVO();
-            vo.setId(d.getId());
-            vo.setDeviceNo(d.getDeviceId());
-            vo.setDeviceName(d.getDeviceName());
-            if (d.getConnectionStatus() == null || d.getConnectionStatus() == 0) {
-                vo.setStatus(0);
-                vo.setStatusName("离线");
-            } else if (Integer.valueOf(1).equals(d.getState())) {
-                vo.setStatus(2);
-                vo.setStatusName("使用中");
-            } else {
-                vo.setStatus(1);
-                vo.setStatusName("可使用");
+    public List<ProcessingCenterPrintersVO> listPrinters() {
+        // 1. 获取当前登录用户
+        Long userId = StpUtil.getLoginIdAsLong();
+        UserEntity currentUser = userMapper.selectById(userId);
+
+        // 2. 查询设备列表（根据角色权限过滤）
+        List<DeviceEntity> devices;
+        if (RoleCodeEnum.PRODUCTION_WORKER.getCode().equals(currentUser.getRoleCode())) {
+            // 生产员：只查询自己绑定的加工中心下的设备
+            if (currentUser.getCenterId() == null) {
+                log.warn("生产员未绑定加工中心: userId={}", userId);
+                return Collections.emptyList();
             }
-            return vo;
-        }).collect(Collectors.toList());
+            devices = deviceMapper.selectList(new LambdaQueryWrapper<DeviceEntity>()
+                .eq(DeviceEntity::getDeviceType, ProductionConstants.DEVICE_TYPE_PRINTER)
+                .eq(DeviceEntity::getCenterId, currentUser.getCenterId())
+                .eq(DeviceEntity::getIsDeleted, StatusConstants.NO));
+        } else {
+            // 其他角色：查询所有打印机
+            devices = deviceMapper.selectList(
+                new LambdaQueryWrapper<DeviceEntity>()
+                    .eq(DeviceEntity::getDeviceType, ProductionConstants.DEVICE_TYPE_PRINTER)
+                    .eq(DeviceEntity::getIsDeleted, StatusConstants.NO));
+        }
+
+        // 3. 转换为 PrinterVO 并按加工中心分组
+        Map<Long, List<PrinterVO>> centerPrintersMap = devices.stream()
+            .map(d -> {
+                PrinterVO vo = new PrinterVO();
+                vo.setId(d.getId());
+                vo.setDeviceNo(d.getDeviceId());
+                vo.setDeviceName(d.getDeviceName());
+                if (d.getConnectionStatus() == null || d.getConnectionStatus() == 0) {
+                    vo.setStatus(0);
+                    vo.setStatusName("离线");
+                } else if (Integer.valueOf(1).equals(d.getState())) {
+                    vo.setStatus(2);
+                    vo.setStatusName("使用中");
+                } else {
+                    vo.setStatus(1);
+                    vo.setStatusName("可使用");
+                }
+                return new Object[]{d.getCenterId(), d.getCenterName(), vo};
+            })
+            .collect(Collectors.groupingBy(
+                arr -> (Long) arr[0],
+                Collectors.mapping(arr -> (PrinterVO) arr[2], Collectors.toList())
+            ));
+
+        // 4. 构建返回结果（保留加工中心名称）
+        Map<Long, String> centerNameMap = devices.stream()
+            .collect(Collectors.toMap(
+                DeviceEntity::getCenterId,
+                DeviceEntity::getCenterName,
+                (v1, v2) -> v1
+            ));
+
+        return centerPrintersMap.entrySet().stream()
+            .map(entry -> {
+                ProcessingCenterPrintersVO vo = new ProcessingCenterPrintersVO();
+                vo.setCenterId(entry.getKey());
+                vo.setCenterName(centerNameMap.get(entry.getKey()));
+                vo.setPrinters(entry.getValue());
+                return vo;
+            })
+            .sorted(Comparator.comparing(ProcessingCenterPrintersVO::getCenterId))
+            .collect(Collectors.toList());
     }
 
     @Override

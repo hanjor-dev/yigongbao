@@ -10,6 +10,7 @@ import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import com.yigongbao.module.production.record.vo.PrinterVO;
+import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import java.util.List;
 
@@ -41,7 +42,7 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
 
     DeviceConfigVO getDeviceConfig(Long recordId);
 
-    List<PrinterVO> listPrinters();
+    List<ProcessingCenterPrintersVO> listPrinters();
 
     void assignDevice(Long recordId, AssignDeviceDTO dto);
 

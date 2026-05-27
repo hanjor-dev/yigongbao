@@ -63,7 +63,7 @@ public enum FlowStatusEnum {
     DESIGN_REVIEWING(2040, "设计审核中"),
 
     /**
-     * 设计审核通过（不可见状态，系统自动推进到下一阶段）
+     * 设计审核通过（等待生产员下载数据包）
      */
     DESIGN_REVIEW_PASSED(2050, "设计审核通过"),
 

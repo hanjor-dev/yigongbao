@@ -15,12 +15,6 @@ import java.util.*;
  * 【核心改进】：所有转换规则集中定义，清晰易维护
  * 新增/删除状态只需修改此文件
  *
- * 【设计审核通过的不可见状态】：
- * - DESIGN_REVIEW_PASSED(2050) 为不可见状态
- * - 审核通过后系统自动将订单推进到下一阶段
- * - order_flow_status_history 表中仍记录完整的审核通过动作，便于追溯
- * - 前端不显示"设计审核通过"这个状态
- *
  * 【订单分类逻辑】：
  * - 订单类型（orderType）：仅区分医疗器械/非医疗器械，用于法规相关判断
  * - 是否需要实体交付（needsPhysicalDelivery）：用于流程分支判断
@@ -159,7 +153,7 @@ public class FlowStatusTransitionRules {
                 case DESIGN_COMPLETED -> List.of(FlowActionEnum.SUBMIT_DESIGN);
                 case DESIGN_REVIEWING -> List.of(FlowActionEnum.DESIGN_REVIEW_PASS, FlowActionEnum.DESIGN_REVIEW_REJECT);
                 case DESIGN_REVIEW_REJECTED -> List.of(FlowActionEnum.CONTINUE_DESIGN);
-                // DESIGN_REVIEW_PASSED 为不可见状态，不会出现在 phase=DESIGN 的订单中
+                case DESIGN_REVIEW_PASSED -> List.of(FlowActionEnum.START_PRINT);
                 default -> List.of();
             };
 
@@ -253,7 +247,7 @@ public class FlowStatusTransitionRules {
             // 设计阶段动作
             case START_DESIGN -> FlowStatusEnum.DESIGN_IN_PROGRESS.getValue();
             case SUBMIT_DESIGN -> FlowStatusEnum.DESIGN_REVIEWING.getValue();
-            case DESIGN_REVIEW_PASS -> FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue(); // 不可见状态
+            case DESIGN_REVIEW_PASS -> FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue();
             case DESIGN_REVIEW_REJECT -> FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue();
             case CONTINUE_DESIGN -> FlowStatusEnum.DESIGN_IN_PROGRESS.getValue();
 
@@ -297,16 +291,6 @@ public class FlowStatusTransitionRules {
             FlowStatusEnum targetStatus,
             Integer needsPhysicalDelivery) {
 
-        // 特殊处理：设计审核通过后的跳转根据是否需要实体交付不同
-        if (currentStatus == FlowStatusEnum.DESIGN_REVIEW_PASSED) {
-            boolean needsProduction = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
-            if (!needsProduction) {
-                return targetStatus == FlowStatusEnum.AWAITING_CONFIRM;
-            } else {
-                return targetStatus == FlowStatusEnum.PENDING_PRINT;
-            }
-        }
-
         Set<FlowStatusEnum> allowedStatuses = STATUS_TRANSITIONS.get(
                 statusKey(phase, currentStatus));
 
@@ -338,17 +322,6 @@ public class FlowStatusTransitionRules {
             allowed.addAll(baseAllowed);
         }
 
-        // 特殊处理：设计审核通过（不可见状态）
-        if (currentStatus == FlowStatusEnum.DESIGN_REVIEW_PASSED) {
-            allowed.remove(FlowStatusEnum.DESIGN_REVIEW_PASSED);
-            boolean needsProduction = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
-            if (!needsProduction) {
-                allowed.add(FlowStatusEnum.AWAITING_CONFIRM);
-            } else {
-                allowed.add(FlowStatusEnum.PENDING_PRINT);
-            }
-        }
-
         return Collections.unmodifiableSet(allowed);
     }
 
@@ -368,10 +341,9 @@ public class FlowStatusTransitionRules {
             case ORDER -> Set.of(FlowStatusEnum.DRAFT, FlowStatusEnum.PENDING_DATA_AUDIT,
                     FlowStatusEnum.DATA_AUDIT_PASSED, FlowStatusEnum.DATA_AUDIT_REJECTED);
 
-            // 注意：DESIGN_REVIEW_PASSED 为不可见状态，不包含在可见状态列表中
             case DESIGN -> Set.of(FlowStatusEnum.PENDING_DESIGN, FlowStatusEnum.DESIGN_IN_PROGRESS,
                     FlowStatusEnum.DESIGN_COMPLETED, FlowStatusEnum.DESIGN_REVIEWING,
-                    FlowStatusEnum.DESIGN_REVIEW_REJECTED);
+                    FlowStatusEnum.DESIGN_REVIEW_PASSED, FlowStatusEnum.DESIGN_REVIEW_REJECTED);
 
             case PRINT -> needsProduction
                     ? Set.of(FlowStatusEnum.PENDING_PRINT, FlowStatusEnum.PRINTING, FlowStatusEnum.PRINT_COMPLETED)

@@ -885,12 +885,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         } else if (!check.getHasDrawing()) {
             check.setCanSubmit(false);
             check.setBlockReason("请生成图纸");
-        } else if (!check.getHasModel()) {
-            check.setCanSubmit(false);
-            check.setBlockReason("请上传可视化模型文件");
-        } else if (!check.getHasReport()) {
-            check.setCanSubmit(false);
-            check.setBlockReason("请上传设计报告");
         } else if (!Boolean.TRUE.equals(check.getHasDrawingConfirmed())) {
             check.setCanSubmit(false);
             check.setBlockReason("请确认图纸");
