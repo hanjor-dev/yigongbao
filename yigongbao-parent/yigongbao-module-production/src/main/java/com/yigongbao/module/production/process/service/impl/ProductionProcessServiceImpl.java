@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 工序操作服务实现
@@ -75,10 +76,12 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                 p.setRedoProcessType(null);
                 productMapper.updateById(p);
             });
-            // 若无剩余 redo 产品，清除流转卡的 hasRedoProduct 标记
+            // 用已恢复的列表直接判断，避免再次查库
             long remainRedo = productMapper.selectCount(new LambdaQueryWrapper<ProductionProductEntity>()
                     .eq(ProductionProductEntity::getProductionRecordId, process.getProductionRecordId())
-                    .eq(ProductionProductEntity::getStatus, ProductStatusEnum.REDO.getCode()));
+                    .eq(ProductionProductEntity::getStatus, ProductStatusEnum.REDO.getCode())
+                    .notIn(ProductionProductEntity::getId,
+                            redoProducts.stream().map(ProductionProductEntity::getId).collect(Collectors.toList())));
             if (remainRedo == 0) {
                 ProductionRecordEntity record = new ProductionRecordEntity();
                 record.setId(process.getProductionRecordId());
@@ -139,57 +142,40 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                 recordId, record.getRecordNo(), fromProcess, toProcess, transfer.getScanUserName());
     }
 
-    /**
-     * 打印失败处理
-     * recreate=false：修复后继续，仅记录日志
-     * recreate=true：废弃原流转卡（print_failed），逻辑删除产品记录
-     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long handlePrintFailure(Long recordId, String failureReason, boolean recreate) {
-        ProductionRecordEntity record = recordMapper.selectById(recordId);
-        if (record == null) {
-            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
-        }
-        if (!recreate) {
-            log.info("打印失败-修复后继续: recordId={}, recordNo={}, reason={}", recordId, record.getRecordNo(), failureReason);
-            return null;
-        }
-        record.setStatus(RecordStatusEnum.PRINT_FAILED.getCode());
-        recordMapper.updateById(record);
-        List<ProductionProductEntity> products = productMapper.selectList(
-                new LambdaQueryWrapper<ProductionProductEntity>()
-                        .eq(ProductionProductEntity::getProductionRecordId, recordId));
-        products.forEach(p -> productMapper.deleteById(p.getId()));
-        log.info("打印失败-废弃流转卡: recordId={}, recordNo={}, reason={}, voidedProductCount={}",
-                recordId, record.getRecordNo(), failureReason, products.size());
-        return null;
+        return handlePrintAbandon(recordId, failureReason, recreate, RecordStatusEnum.PRINT_FAILED, "打印失败");
     }
 
-    /**
-     * 打印检验不合格处理
-     * recreate=false：重打后继续，仅记录日志
-     * recreate=true：废弃原流转卡（abandoned），逻辑删除产品记录
-     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long handlePrintInspectionFail(Long recordId, String failureReason, boolean recreate) {
+        return handlePrintAbandon(recordId, failureReason, recreate, RecordStatusEnum.ABANDONED, "打印检验不合格");
+    }
+
+    private Long handlePrintAbandon(Long recordId, String failureReason, boolean recreate,
+                                    RecordStatusEnum abandonStatus, String logPrefix) {
         ProductionRecordEntity record = recordMapper.selectById(recordId);
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
         if (!recreate) {
-            log.info("打印检验不合格-重打后继续: recordId={}, recordNo={}, reason={}", recordId, record.getRecordNo(), failureReason);
+            log.info("{}-修复后继续: recordId={}, recordNo={}, reason={}", logPrefix, recordId, record.getRecordNo(), failureReason);
             return null;
         }
-        record.setStatus(RecordStatusEnum.ABANDONED.getCode());
+        record.setStatus(abandonStatus.getCode());
         recordMapper.updateById(record);
-        List<ProductionProductEntity> products = productMapper.selectList(
+        List<Long> productIds = productMapper.selectList(
                 new LambdaQueryWrapper<ProductionProductEntity>()
-                        .eq(ProductionProductEntity::getProductionRecordId, recordId));
-        products.forEach(p -> productMapper.deleteById(p.getId()));
-        log.info("打印检验不合格-废弃流转卡: recordId={}, recordNo={}, reason={}, voidedProductCount={}",
-                recordId, record.getRecordNo(), failureReason, products.size());
+                        .eq(ProductionProductEntity::getProductionRecordId, recordId)
+                        .select(ProductionProductEntity::getId))
+                .stream().map(ProductionProductEntity::getId).collect(Collectors.toList());
+        if (!productIds.isEmpty()) {
+            productMapper.deleteBatchIds(productIds);
+        }
+        log.info("{}-废弃流转卡: recordId={}, recordNo={}, reason={}, voidedProductCount={}",
+                logPrefix, recordId, record.getRecordNo(), failureReason, productIds.size());
         return null;
     }
 }

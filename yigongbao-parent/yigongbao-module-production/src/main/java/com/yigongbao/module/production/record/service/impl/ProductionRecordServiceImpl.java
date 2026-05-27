@@ -36,14 +36,15 @@ import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import com.yigongbao.module.production.util.QrCodeUtil;
+import cn.hutool.core.bean.BeanUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 生产流转卡服务实现
@@ -110,7 +111,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         // 按打印文件列表生成产品记录
         int totalCount = createProductRecords(record, designPackage);
         record.setTotalProductCount(totalCount);
-
         // 按订单类型生成工序记录
         createProcessRecords(record.getId(), order.getOrderType());
 
@@ -145,10 +145,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             product.setStatus(RecordStatusEnum.PENDING_PRINT.getCode());
             products.add(product);
         }
-        productMapper.insert(products.get(0));
-        for (int i = 1; i < products.size(); i++) {
-            productMapper.insert(products.get(i));
-        }
+        products.forEach(productMapper::insert);
         return products.size();
     }
 
@@ -186,18 +183,11 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
         ProductionRecordVO vo = new ProductionRecordVO();
-        BeanUtils.copyProperties(record, vo);
-        // 填充产品列表
+        BeanUtil.copyProperties(record, vo);
         List<ProductionProductEntity> products = productMapper.selectList(
                 new LambdaQueryWrapper<ProductionProductEntity>()
                         .eq(ProductionProductEntity::getProductionRecordId, id));
-        List<ProductionProductVO> productVOs = new ArrayList<>();
-        for (ProductionProductEntity p : products) {
-            ProductionProductVO pvo = new ProductionProductVO();
-            BeanUtils.copyProperties(p, pvo);
-            productVOs.add(pvo);
-        }
-        vo.setProducts(productVOs);
+        vo.setProducts(BeanUtil.copyToList(products, ProductionProductVO.class));
         return vo;
     }
 
@@ -233,7 +223,26 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (dto.getProcessingCenterId() != null) {
             wrapper.eq(ProductionRecordEntity::getProcessingCenterId, dto.getProcessingCenterId());
         }
-        return page(page, wrapper).convert(e -> getRecordDetail(e.getId()));
+        Page<ProductionRecordEntity> result = page(page, wrapper);
+        if (result.getRecords().isEmpty()) {
+            return result.convert(e -> new ProductionRecordVO());
+        }
+        // 批量查询产品，避免 N+1
+        List<Long> recordIds = result.getRecords().stream()
+                .map(ProductionRecordEntity::getId).collect(Collectors.toList());
+        List<ProductionProductEntity> allProducts = productMapper.selectList(
+                new LambdaQueryWrapper<ProductionProductEntity>()
+                        .in(ProductionProductEntity::getProductionRecordId, recordIds));
+        java.util.Map<Long, List<ProductionProductVO>> productMap = allProducts.stream()
+                .collect(Collectors.groupingBy(
+                        ProductionProductEntity::getProductionRecordId,
+                        Collectors.mapping(p -> BeanUtil.copyProperties(p, ProductionProductVO.class), Collectors.toList())));
+        return result.convert(e -> {
+            ProductionRecordVO vo = new ProductionRecordVO();
+            BeanUtil.copyProperties(e, vo);
+            vo.setProducts(productMap.getOrDefault(e.getId(), java.util.Collections.emptyList()));
+            return vo;
+        });
     }
 
     @Override

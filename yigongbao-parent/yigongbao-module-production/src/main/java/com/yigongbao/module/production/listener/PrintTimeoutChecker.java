@@ -63,8 +63,8 @@ public class PrintTimeoutChecker {
         try {
             String value = configService.getConfigValue(key.getKey());
             return Integer.parseInt(value);
-        } catch (Exception e) {
-            log.warn("读取配置失败，使用默认值: configKey={}, defaultValue={}", key.getKey(), defaultValue);
+        } catch (NumberFormatException e) {
+            log.warn("配置值非整数，使用默认值: configKey={}, defaultValue={}", key.getKey(), defaultValue);
             return defaultValue;
         }
     }
