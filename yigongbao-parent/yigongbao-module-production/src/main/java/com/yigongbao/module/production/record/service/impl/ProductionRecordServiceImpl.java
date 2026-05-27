@@ -29,11 +29,15 @@ import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
+import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.CreateRecordDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
+import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
+import com.yigongbao.module.production.record.vo.DeviceConfigVO;
+import com.yigongbao.module.production.record.vo.PrinterVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import com.yigongbao.module.production.util.QrCodeUtil;
 import cn.hutool.core.bean.BeanUtil;
@@ -284,6 +288,102 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             log.info("聚合条件未满足，暂不触发Flow: orderId={}, requiredStatus={}, active={}, reached={}",
                     orderId, requiredStatus, totalActive, reachedCount);
         }
+    }
+
+    @Override
+    public String generateBatchNo(Long recordId) {
+        ProductionRecordEntity record = getById(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        // 预览生成，不写库
+        return codeGeneratorService.generate(ProductionConstants.PRODUCTION_BATCH_NO);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void submitBatchNo(Long recordId, SubmitBatchNoDTO dto) {
+        ProductionRecordEntity record = getById(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        record.setProductionBatchNo(dto.getProductionBatchNo());
+        record.setMaterialBatchNo(dto.getMaterialBatchNo());
+        updateById(record);
+        log.info("提交生产批号: recordId={}, batchNo={}", recordId, dto.getProductionBatchNo());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void submitToQc(Long recordId) {
+        ProductionRecordEntity record = getById(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        record.setStatus(RecordStatusEnum.QC_IN_PROGRESS.getCode());
+        updateById(record);
+        log.info("提交质检管理: recordId={}, recordNo={}", recordId, record.getRecordNo());
+    }
+
+    @Override
+    public DeviceConfigVO getDeviceConfig(Long recordId) {
+        ProductionRecordEntity record = getById(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        DeviceConfigVO vo = new DeviceConfigVO();
+        BeanUtil.copyProperties(record, vo);
+        return vo;
+    }
+
+    @Override
+    public List<PrinterVO> listPrinters() {
+        List<DeviceEntity> devices = deviceMapper.selectList(
+                new LambdaQueryWrapper<DeviceEntity>()
+                        .eq(DeviceEntity::getDeviceType, "PRINTER"));
+        return devices.stream().map(d -> {
+            PrinterVO vo = new PrinterVO();
+            vo.setId(d.getId());
+            vo.setDeviceNo(d.getDeviceId());
+            vo.setDeviceName(d.getDeviceName());
+            if (d.getConnectionStatus() == null || d.getConnectionStatus() == 0) {
+                vo.setStatus(0);
+                vo.setStatusName("离线");
+            } else if (Integer.valueOf(1).equals(d.getState())) {
+                vo.setStatus(2);
+                vo.setStatusName("使用中");
+            } else {
+                vo.setStatus(1);
+                vo.setStatusName("可使用");
+            }
+            return vo;
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignDevice(Long recordId, AssignDeviceDTO dto) {
+        ProductionRecordEntity record = getById(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        DeviceEntity device = deviceMapper.selectById(dto.getDeviceId());
+        if (device == null) {
+            throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
+        }
+        record.setPrintDeviceId(device.getId());
+        record.setPrintDeviceCode(device.getDeviceId());
+        record.setPrintDeviceName(device.getDeviceName());
+        record.setStatus(RecordStatusEnum.PRINTING.getCode());
+        updateById(record);
+        processMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionProcessEntity>()
+                .eq(ProductionProcessEntity::getProductionRecordId, recordId)
+                .eq(ProductionProcessEntity::getProcessType, "print")
+                .set(ProductionProcessEntity::getDeviceId, device.getId())
+                .set(ProductionProcessEntity::getDeviceNo, device.getDeviceId())
+                .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.IN_PROGRESS.getCode())
+                .set(ProductionProcessEntity::getStartTime, java.time.LocalDateTime.now()));
+        log.info("分配打印机: recordId={}, deviceId={}, deviceNo={}", recordId, device.getId(), device.getDeviceId());
     }
 
     /**

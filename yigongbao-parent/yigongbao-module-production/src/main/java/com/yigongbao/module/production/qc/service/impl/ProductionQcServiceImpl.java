@@ -10,9 +10,12 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.production.constants.ProductionConstants;
+import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
 import com.yigongbao.module.production.enums.QcResultEnum;
 import com.yigongbao.module.production.enums.RecordStatusEnum;
+import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
+import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
@@ -45,6 +48,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
 
     private final ProductionProductMapper productMapper;
     private final ProductionRecordMapper recordMapper;
+    private final ProductionProcessMapper processMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final IProductionRecordService recordService;
 
@@ -86,7 +90,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void markProductRedo(Long productId, String reason) {
+    public void markProductRedo(Long productId, String reason, String handleType) {
         ProductionProductEntity product = productMapper.selectById(productId);
         if (product == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
@@ -104,7 +108,30 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             record.setHasRedoProduct(1);
             recordMapper.updateById(record);
         }
-        log.info("标记产品质检不合格: productId={}, productNo={}, reason={}", productId, product.getProductNo(), reason);
+        log.info("标记产品质检不合格: productId={}, productNo={}, reason={}, handleType={}", productId, product.getProductNo(), reason, handleType);
+
+        // REWORK_TO_PRINT：将该产品所在流转卡的所有工序重置为 PENDING，流转卡回退到待打印
+        if ("REWORK_TO_PRINT".equals(handleType)) {
+            List<ProductionProcessEntity> processes = processMapper.selectList(
+                    new LambdaQueryWrapper<ProductionProcessEntity>()
+                            .eq(ProductionProcessEntity::getProductionRecordId, product.getProductionRecordId()));
+            processes.forEach(p -> {
+                p.setStatus(ProcessStatusEnum.PENDING.getCode());
+                p.setDeviceId(null);
+                p.setDeviceNo(null);
+                p.setStartTime(null);
+                p.setEndTime(null);
+                p.setProcessParams(null);
+                processMapper.updateById(p);
+            });
+            ProductionRecordEntity rec = recordMapper.selectById(product.getProductionRecordId());
+            if (rec != null) {
+                rec.setStatus(RecordStatusEnum.PENDING_PRINT.getCode());
+                rec.setCurrentProcess(null);
+                recordMapper.updateById(rec);
+            }
+            log.info("REWORK_TO_PRINT: productId={}, 重置所有工序为PENDING", productId);
+        }
     }
 
     @Override

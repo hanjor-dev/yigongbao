@@ -47,4 +47,7 @@ public class ProductionRecordEntity extends BaseEntity {
     private Long packOperatorId;
     private String packOperatorName;
     private LocalDateTime packTime;
+    private String materialBatchNo;        // 原材料批号
+    private LocalDateTime printStartTime;  // 打印开始时间
+    private LocalDateTime printFinishTime; // 打印完成时间
 }

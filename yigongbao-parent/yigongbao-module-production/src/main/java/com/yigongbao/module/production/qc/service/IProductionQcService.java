@@ -10,7 +10,7 @@ import java.util.List;
 
 public interface IProductionQcService {
     void markProductPass(Long productId);
-    void markProductRedo(Long productId, String reason);
+    void markProductRedo(Long productId, String reason, String handleType);
     void assignRedoProcess(Long productId, String processType);
     void transferToPacking(Long recordId);
     List<ProductionProductVO> listProductsByRecordId(Long recordId);

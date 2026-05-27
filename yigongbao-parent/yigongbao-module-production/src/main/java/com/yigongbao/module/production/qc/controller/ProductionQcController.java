@@ -49,8 +49,10 @@ public class ProductionQcController {
 
     @Operation(summary = "标记产品质检不合格")
     @PostMapping("/product/{productId}/redo")
-    public Result<Void> markProductRedo(@PathVariable Long productId, @RequestParam String reason) {
-        qcService.markProductRedo(productId, reason);
+    public Result<Void> markProductRedo(@PathVariable Long productId,
+                                        @RequestParam String reason,
+                                        @RequestParam(defaultValue = "REDO_CURRENT") String handleType) {
+        qcService.markProductRedo(productId, reason, handleType);
         return Result.success();
     }
 

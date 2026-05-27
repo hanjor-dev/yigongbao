@@ -1,6 +1,7 @@
 package com.yigongbao.module.production.process.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -11,9 +12,11 @@ import com.yigongbao.module.production.enums.ProcessTypeEnum;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
 import com.yigongbao.module.production.enums.RecordStatusEnum;
 import com.yigongbao.module.production.process.dto.FillProcessDTO;
+import com.yigongbao.module.production.process.dto.StartProcessDTO;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.process.service.IProductionProcessService;
+import com.yigongbao.module.production.process.vo.ProcessVO;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
@@ -177,5 +180,59 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         log.info("{}-废弃流转卡: recordId={}, recordNo={}, reason={}, voidedProductCount={}",
                 logPrefix, recordId, record.getRecordNo(), failureReason, productIds.size());
         return null;
+    }
+
+    @Override
+    public List<ProcessVO> listProcesses(Long recordId) {
+        List<ProductionProcessEntity> processes = list(
+                new LambdaQueryWrapper<ProductionProcessEntity>()
+                        .eq(ProductionProcessEntity::getProductionRecordId, recordId)
+                        .orderByAsc(ProductionProcessEntity::getProcessOrder));
+        return processes.stream().map(p -> {
+            ProcessVO vo = new ProcessVO();
+            BeanUtil.copyProperties(p, vo);
+            return vo;
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void startProcess(Long recordId, StartProcessDTO dto) {
+        ProductionRecordEntity record = recordMapper.selectById(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        ProductionProcessEntity process = getOne(new LambdaQueryWrapper<ProductionProcessEntity>()
+                .eq(ProductionProcessEntity::getProductionRecordId, recordId)
+                .eq(ProductionProcessEntity::getProcessType, dto.getProcessType()));
+        if (process == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        process.setDeviceId(dto.getPrimaryDeviceId());
+        process.setProcessParams(dto.getProcessParams());
+        process.setStartTime(LocalDateTime.now());
+        process.setOperatorId(StpUtil.getLoginIdAsLong());
+        process.setOperatorName(StpUtil.getSession().get("username", "").toString());
+        process.setStatus(ProcessStatusEnum.IN_PROGRESS.getCode());
+        updateById(process);
+        record.setCurrentProcess(dto.getProcessType());
+        record.setStatus(RecordStatusEnum.POST_PROCESSING.getCode());
+        recordMapper.updateById(record);
+        log.info("开始工序: recordId={}, processType={}, deviceId={}", recordId, dto.getProcessType(), dto.getPrimaryDeviceId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void finishProcess(Long recordId, String processType) {
+        ProductionProcessEntity process = getOne(new LambdaQueryWrapper<ProductionProcessEntity>()
+                .eq(ProductionProcessEntity::getProductionRecordId, recordId)
+                .eq(ProductionProcessEntity::getProcessType, processType));
+        if (process == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        process.setEndTime(LocalDateTime.now());
+        process.setStatus(ProcessStatusEnum.COMPLETED.getCode());
+        updateById(process);
+        log.info("完成工序: recordId={}, processType={}", recordId, processType);
     }
 }
