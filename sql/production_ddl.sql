@@ -154,3 +154,9 @@ CREATE TABLE IF NOT EXISTS production_process_transfer (
     KEY idx_production_record_id (production_record_id),
     KEY idx_transfer_time (transfer_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工序流转记录表';
+
+-- 补充 production_record 缺失字段
+ALTER TABLE production_record
+    ADD COLUMN material_batch_no VARCHAR(80) COMMENT '原材料批号' AFTER pack_time,
+    ADD COLUMN print_start_time DATETIME COMMENT '打印开始时间' AFTER material_batch_no,
+    ADD COLUMN print_finish_time DATETIME COMMENT '打印完成时间' AFTER print_start_time;
