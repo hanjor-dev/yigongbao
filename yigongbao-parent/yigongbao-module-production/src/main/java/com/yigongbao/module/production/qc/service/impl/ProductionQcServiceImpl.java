@@ -62,6 +62,11 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         if (product == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
         }
+        // 幂等校验：只有 in_process 状态的产品才能质检
+        if (!ProductStatusEnum.IN_PROCESS.getCode().equals(product.getStatus())) {
+            log.warn("产品状态不允许质检: productId={}, currentStatus={}", productId, product.getStatus());
+            throw new BusinessException(400, "产品当前状态不允许质检");
+        }
         ProductionRecordEntity record = recordMapper.selectById(product.getProductionRecordId());
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
@@ -124,13 +129,13 @@ public class ProductionQcServiceImpl implements IProductionQcService {
                 p.setProcessParams(null);
                 processMapper.updateById(p);
             });
-            ProductionRecordEntity rec = recordMapper.selectById(product.getProductionRecordId());
-            if (rec != null) {
-                rec.setStatus(RecordStatusEnum.PENDING_PRINT.getCode());
-                rec.setCurrentProcess(null);
-                recordMapper.updateById(rec);
+            // 复用已查询的 record，无需再次查库
+            if (record != null) {
+                record.setStatus(RecordStatusEnum.PENDING_PRINT.getCode());
+                record.setCurrentProcess(null);
+                recordMapper.updateById(record);
             }
-            log.info("REWORK_TO_PRINT: productId={}, 重置所有工序为PENDING", productId);
+            log.info("REWORK_TO_PRINT: productId={}, recordId={}, 重置所有工序为PENDING", productId, product.getProductionRecordId());
         }
     }
 
@@ -186,10 +191,11 @@ public class ProductionQcServiceImpl implements IProductionQcService {
     @Override
     public IPage<ProductionRecordVO> listQcRecords(ProductionQcPageDTO dto) {
         Page<ProductionRecordEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
-        LambdaQueryWrapper<ProductionRecordEntity> wrapper = new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getStatus, RecordStatusEnum.QC_IN_PROGRESS.getCode());
+        LambdaQueryWrapper<ProductionRecordEntity> wrapper = new LambdaQueryWrapper<>();
         if (dto.getStatus() != null) {
             wrapper.eq(ProductionRecordEntity::getStatus, dto.getStatus());
+        } else {
+            wrapper.eq(ProductionRecordEntity::getStatus, RecordStatusEnum.QC_IN_PROGRESS.getCode());
         }
         return recordMapper.selectPage(page, wrapper)
                 .convert(e -> BeanUtil.copyProperties(e, ProductionRecordVO.class));

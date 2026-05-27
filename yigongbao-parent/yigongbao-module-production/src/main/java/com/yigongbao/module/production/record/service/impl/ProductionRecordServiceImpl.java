@@ -23,6 +23,7 @@ import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.constants.ProductionConstants;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProcessTypeEnum;
+import com.yigongbao.module.production.enums.ProductStatusEnum;
 import com.yigongbao.module.production.enums.RecordStatusEnum;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
@@ -146,7 +147,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             product.setProductNo(codeGeneratorService.generate(ProductionConstants.PRODUCT_NO));
             product.setProductName(file.getFileName());
             product.setFileName(file.getFileName());
-            product.setStatus(RecordStatusEnum.PENDING_PRINT.getCode());
+            product.setStatus(ProductStatusEnum.IN_PROCESS.getCode());
             products.add(product);
         }
         products.forEach(productMapper::insert);
@@ -272,22 +273,43 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
     @Override
     public void triggerFlowIfAllReach(Long orderId, String requiredStatus, FlowActionEnum action) {
-        // 活跃流转卡（排除失败和废弃）
         long totalActive = count(new LambdaQueryWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getOrderId, orderId)
                 .notIn(ProductionRecordEntity::getStatus,
                         RecordStatusEnum.PRINT_FAILED.getCode(),
                         RecordStatusEnum.ABANDONED.getCode()));
+        if (totalActive == 0) {
+            return;
+        }
+        // 已达到或超过 requiredStatus 的状态集合（状态机单向推进）
+        List<String> reachedStatuses = getReachedOrBeyondStatuses(requiredStatus);
         long reachedCount = count(new LambdaQueryWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getOrderId, orderId)
-                .eq(ProductionRecordEntity::getStatus, requiredStatus));
-        if (totalActive > 0 && totalActive == reachedCount) {
+                .in(ProductionRecordEntity::getStatus, reachedStatuses));
+        if (totalActive == reachedCount) {
             triggerFlowAndSync(orderId, action);
             log.info("聚合条件满足，触发Flow: orderId={}, requiredStatus={}, action={}", orderId, requiredStatus, action);
         } else {
             log.info("聚合条件未满足，暂不触发Flow: orderId={}, requiredStatus={}, active={}, reached={}",
                     orderId, requiredStatus, totalActive, reachedCount);
         }
+    }
+
+    /** 返回已达到或超过指定状态的所有状态码（状态机单向推进） */
+    private List<String> getReachedOrBeyondStatuses(String requiredStatus) {
+        List<String> ordered = List.of(
+                RecordStatusEnum.PRINT_COMPLETED.getCode(),
+                RecordStatusEnum.POST_PROCESSING.getCode(),
+                RecordStatusEnum.QC_IN_PROGRESS.getCode(),
+                RecordStatusEnum.PACKING.getCode(),
+                RecordStatusEnum.WAREHOUSE_IN.getCode(),
+                RecordStatusEnum.COMPLETED.getCode()
+        );
+        int idx = ordered.indexOf(requiredStatus);
+        if (idx < 0) {
+            return List.of(requiredStatus);
+        }
+        return ordered.subList(idx, ordered.size());
     }
 
     @Override
@@ -319,6 +341,19 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         ProductionRecordEntity record = getById(recordId);
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        // 校验流转卡状态：必须是后处理中才能提交终检
+        if (!RecordStatusEnum.POST_PROCESSING.getCode().equals(record.getStatus())) {
+            throw new BusinessException(400, "流转卡未完成后处理，无法提交终检");
+        }
+        // 校验所有后处理工序已完成
+        long incompleteCount = processMapper.selectCount(new LambdaQueryWrapper<ProductionProcessEntity>()
+                .eq(ProductionProcessEntity::getProductionRecordId, recordId)
+                .ne(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PRINT.getCode())
+                .ne(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PACK.getCode())
+                .ne(ProductionProcessEntity::getStatus, ProcessStatusEnum.COMPLETED.getCode()));
+        if (incompleteCount > 0) {
+            throw new BusinessException(400, "存在未完成的后处理工序，无法提交终检");
         }
         record.setStatus(RecordStatusEnum.QC_IN_PROGRESS.getCode());
         updateById(record);
@@ -371,14 +406,21 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (device == null) {
             throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
         }
+        // 校验设备在线且未被占用
+        if (device.getConnectionStatus() == null || device.getConnectionStatus() == 0) {
+            throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
+        }
+        if (Integer.valueOf(1).equals(device.getState())) {
+            throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
+        }
         record.setPrintDeviceId(device.getId());
         record.setPrintDeviceCode(device.getDeviceId());
         record.setPrintDeviceName(device.getDeviceName());
-        record.setStatus(RecordStatusEnum.PRINTING.getCode());
+        record.setStatus(RecordStatusEnum.PENDING_PRINT.getCode());
         updateById(record);
         processMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionProcessEntity>()
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)
-                .eq(ProductionProcessEntity::getProcessType, "print")
+                .eq(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PRINT.getCode())
                 .set(ProductionProcessEntity::getDeviceId, device.getId())
                 .set(ProductionProcessEntity::getDeviceNo, device.getDeviceId())
                 .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.IN_PROGRESS.getCode())

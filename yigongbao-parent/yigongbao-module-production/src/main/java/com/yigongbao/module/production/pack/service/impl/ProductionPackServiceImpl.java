@@ -44,6 +44,10 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
+        // 校验流转卡状态：必须是包装中才能填写包装信息
+        if (!RecordStatusEnum.PACKING.getCode().equals(record.getStatus())) {
+            throw new BusinessException(400, "流转卡不在包装阶段，无法填写包装信息");
+        }
         DeviceEntity device = deviceMapper.selectById(dto.getPackDeviceId());
         if (device == null) {
             throw new BusinessException(ErrorCodeEnum.PACK_DEVICE_NOT_FOUND);

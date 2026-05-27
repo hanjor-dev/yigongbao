@@ -208,6 +208,10 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         if (process == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
+        // 校验工序状态：只有 PENDING 状态才能开始
+        if (!ProcessStatusEnum.PENDING.getCode().equals(process.getStatus())) {
+            throw new BusinessException(400, "工序已开始或已完成，无法重复开始");
+        }
         process.setDeviceId(dto.getPrimaryDeviceId());
         process.setProcessParams(dto.getProcessParams());
         process.setStartTime(LocalDateTime.now());
@@ -215,9 +219,12 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         process.setOperatorName(StpUtil.getSession().get("username", "").toString());
         process.setStatus(ProcessStatusEnum.IN_PROGRESS.getCode());
         updateById(process);
-        record.setCurrentProcess(dto.getProcessType());
-        record.setStatus(RecordStatusEnum.POST_PROCESSING.getCode());
-        recordMapper.updateById(record);
+        // 仅后处理工序更新流转卡状态
+        if (!ProcessTypeEnum.PRINT.getCode().equals(dto.getProcessType())) {
+            record.setStatus(RecordStatusEnum.POST_PROCESSING.getCode());
+            record.setCurrentProcess(dto.getProcessType());
+            recordMapper.updateById(record);
+        }
         log.info("开始工序: recordId={}, processType={}, deviceId={}", recordId, dto.getProcessType(), dto.getPrimaryDeviceId());
     }
 
@@ -229,6 +236,10 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                 .eq(ProductionProcessEntity::getProcessType, processType));
         if (process == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        // 校验工序状态：只有 IN_PROGRESS 状态才能完成
+        if (!ProcessStatusEnum.IN_PROGRESS.getCode().equals(process.getStatus())) {
+            throw new BusinessException(400, "工序未在进行中，无法完成");
         }
         process.setEndTime(LocalDateTime.now());
         process.setStatus(ProcessStatusEnum.COMPLETED.getCode());
