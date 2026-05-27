@@ -7,10 +7,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProcessTypeEnum;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
-import com.yigongbao.module.production.enums.RecordStatusEnum;
 import com.yigongbao.module.production.process.dto.FillProcessDTO;
 import com.yigongbao.module.production.process.dto.StartProcessDTO;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
@@ -123,22 +123,22 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         transferMapper.insert(transfer);
 
         if (ProcessTypeEnum.PRINT.getCode().equals(fromProcess)) {
-            record.setStatus(RecordStatusEnum.PRINT_COMPLETED.getCode());
+            record.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
             record.setCurrentProcess(null);
             recordMapper.updateById(record);
             recordService.triggerFlowIfAllReach(record.getOrderId(),
-                    RecordStatusEnum.PRINT_COMPLETED.getCode(), FlowActionEnum.COMPLETE_PRINT);
+                    FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
         } else if (ProcessTypeEnum.WASH.getCode().equals(fromProcess)
                 || ProcessTypeEnum.CURE.getCode().equals(fromProcess)) {
-            record.setStatus(RecordStatusEnum.POST_PROCESSING.getCode());
+            record.setStatus(FlowStatusEnum.POST_PROCESSING.getValue());
             record.setCurrentProcess(toProcess);
             recordMapper.updateById(record);
         } else if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(fromProcess)) {
-            record.setStatus(RecordStatusEnum.QC_IN_PROGRESS.getCode());
+            record.setStatus(FlowStatusEnum.QC_IN_PROGRESS.getValue());
             record.setCurrentProcess(null);
             recordMapper.updateById(record);
             recordService.triggerFlowIfAllReach(record.getOrderId(),
-                    RecordStatusEnum.QC_IN_PROGRESS.getCode(), FlowActionEnum.COMPLETE_POST_PROCESSING);
+                    FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
         }
 
         log.info("工序流转: recordId={}, recordNo={}, {} -> {}, scanUser={}",
@@ -148,17 +148,17 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long handlePrintFailure(Long recordId, String failureReason, boolean recreate) {
-        return handlePrintAbandon(recordId, failureReason, recreate, RecordStatusEnum.PRINT_FAILED, "打印失败");
+        return handlePrintAbandon(recordId, failureReason, recreate, FlowStatusEnum.PRINT_FAILED, "打印失败");
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long handlePrintInspectionFail(Long recordId, String failureReason, boolean recreate) {
-        return handlePrintAbandon(recordId, failureReason, recreate, RecordStatusEnum.ABANDONED, "打印检验不合格");
+        return handlePrintAbandon(recordId, failureReason, recreate, FlowStatusEnum.CANCELLED, "打印检验不合格");
     }
 
     private Long handlePrintAbandon(Long recordId, String failureReason, boolean recreate,
-                                    RecordStatusEnum abandonStatus, String logPrefix) {
+                                    FlowStatusEnum abandonStatus, String logPrefix) {
         ProductionRecordEntity record = recordMapper.selectById(recordId);
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
@@ -167,7 +167,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             log.info("{}-修复后继续: recordId={}, recordNo={}, reason={}", logPrefix, recordId, record.getRecordNo(), failureReason);
             return null;
         }
-        record.setStatus(abandonStatus.getCode());
+        record.setStatus(abandonStatus.getValue());
         recordMapper.updateById(record);
         List<Long> productIds = productMapper.selectList(
                 new LambdaQueryWrapper<ProductionProductEntity>()
@@ -221,7 +221,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         updateById(process);
         // 仅后处理工序更新流转卡状态
         if (!ProcessTypeEnum.PRINT.getCode().equals(dto.getProcessType())) {
-            record.setStatus(RecordStatusEnum.POST_PROCESSING.getCode());
+            record.setStatus(FlowStatusEnum.POST_PROCESSING.getValue());
             record.setCurrentProcess(dto.getProcessType());
             recordMapper.updateById(record);
         }

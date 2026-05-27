@@ -6,10 +6,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProcessTypeEnum;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
-import com.yigongbao.module.production.enums.RecordStatusEnum;
 import com.yigongbao.module.production.process.dto.FillProcessDTO;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
@@ -127,8 +127,8 @@ class ProductionProcessServiceImplTest {
             processService.transferToNext(1L, ProcessTypeEnum.PRINT.getCode(), ProcessTypeEnum.WASH.getCode());
         }
         verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
-                RecordStatusEnum.PRINT_COMPLETED.getCode().equals(((ProductionRecordEntity) r).getStatus())));
-        verify(recordService).triggerFlowIfAllReach(10L, RecordStatusEnum.PRINT_COMPLETED.getCode(), FlowActionEnum.COMPLETE_PRINT);
+                FlowStatusEnum.PRINT_COMPLETED.getValue().equals(((ProductionRecordEntity) r).getStatus())));
+        verify(recordService).triggerFlowIfAllReach(10L, FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
     }
 
     @Test
@@ -165,8 +165,8 @@ class ProductionProcessServiceImplTest {
             processService.transferToNext(1L, ProcessTypeEnum.CLEAN_DRY.getCode(), ProcessTypeEnum.PACK.getCode());
         }
         verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
-                RecordStatusEnum.QC_IN_PROGRESS.getCode().equals(((ProductionRecordEntity) r).getStatus())));
-        verify(recordService).triggerFlowIfAllReach(10L, RecordStatusEnum.QC_IN_PROGRESS.getCode(), FlowActionEnum.COMPLETE_POST_PROCESSING);
+                FlowStatusEnum.QC_IN_PROGRESS.getValue().equals(((ProductionRecordEntity) r).getStatus())));
+        verify(recordService).triggerFlowIfAllReach(10L, FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
     }
 
     @Test

@@ -5,11 +5,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.production.constants.ProductionConstants;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
 import com.yigongbao.module.production.enums.QcResultEnum;
-import com.yigongbao.module.production.enums.RecordStatusEnum;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
@@ -107,7 +107,7 @@ class ProductionQcServiceImplTest {
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
             assertEquals(ErrorCodeEnum.PRODUCT_NOT_FOUND.getCode(),
-                    assertThrows(BusinessException.class, () -> qcService.markProductRedo(99L, "r")).getCode());
+                    assertThrows(BusinessException.class, () -> qcService.markProductRedo(99L, "r", "SCRAP")).getCode());
         }
     }
 
@@ -185,9 +185,9 @@ class ProductionQcServiceImplTest {
         qcService.transferToPacking(1L);
 
         verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
-                RecordStatusEnum.PACKING.getCode().equals(((ProductionRecordEntity) r).getStatus())));
+                FlowStatusEnum.PACKING.getValue().equals(((ProductionRecordEntity) r).getStatus())));
         verify(recordService).triggerFlowIfAllReach(10L,
-                RecordStatusEnum.PACKING.getCode(), FlowActionEnum.QC_PASS);
+                FlowStatusEnum.PACKING.getValue(), FlowActionEnum.QC_PASS);
     }
 
     // ---- listProductsByRecordId ----

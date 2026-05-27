@@ -2,7 +2,7 @@ package com.yigongbao.module.production.listener;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
-import com.yigongbao.module.production.enums.RecordStatusEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.system.config.service.ConfigService;
@@ -42,7 +42,7 @@ public class PrintTimeoutChecker {
         LocalDateTime pendingThreshold = LocalDateTime.now().minusMinutes(pendingTimeoutMinutes);
         List<ProductionRecordEntity> pendingTimeout = recordMapper.selectList(
                 new LambdaQueryWrapper<ProductionRecordEntity>()
-                        .eq(ProductionRecordEntity::getStatus, RecordStatusEnum.PENDING_PRINT.getCode())
+                        .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue())
                         .isNotNull(ProductionRecordEntity::getPrintDeviceId)
                         .lt(ProductionRecordEntity::getUpdateTime, pendingThreshold));
         pendingTimeout.forEach(record ->
@@ -52,7 +52,7 @@ public class PrintTimeoutChecker {
         LocalDateTime printingThreshold = LocalDateTime.now().minusMinutes(printingTimeoutMinutes);
         List<ProductionRecordEntity> printingTimeout = recordMapper.selectList(
                 new LambdaQueryWrapper<ProductionRecordEntity>()
-                        .eq(ProductionRecordEntity::getStatus, RecordStatusEnum.PRINTING.getCode())
+                        .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINTING.getValue())
                         .lt(ProductionRecordEntity::getUpdateTime, printingThreshold));
         printingTimeout.forEach(record ->
                 log.warn("打印中超时提醒: recordId={}, recordNo={}, deviceId={}, 超过{}分钟未收到打印完成推送",

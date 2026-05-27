@@ -49,5 +49,5 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
     /**
      * 聚合触发：同订单所有活跃流转卡均达到 requiredStatus 时触发 Flow 并回写 order_main
      */
-    void triggerFlowIfAllReach(Long orderId, String requiredStatus, FlowActionEnum action);
+    void triggerFlowIfAllReach(Long orderId, Integer requiredStatus, FlowActionEnum action);
 }

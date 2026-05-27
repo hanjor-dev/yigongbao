@@ -35,7 +35,7 @@ public class ProductionRecordEntity extends BaseEntity {
     private Integer qualifiedCount;
     private Integer unqualifiedCount;
     private Integer hasRedoProduct;
-    private String status;
+    private Integer status;
     private String currentProcess;
     private String qrCodeUrl;
     private Long packDeviceId;

@@ -11,11 +11,13 @@ import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
+import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignPackageFileEntity;
@@ -28,7 +30,6 @@ import com.yigongbao.module.production.constants.ProductionConstants;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProcessTypeEnum;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
-import com.yigongbao.module.production.enums.RecordStatusEnum;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
@@ -118,7 +119,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         record.setPrintDeviceName(device.getDeviceName());
         record.setProcessingCenterId(device.getCenterId());
         record.setProcessingCenterName(device.getCenterName());
-        record.setStatus(RecordStatusEnum.PENDING_PRINT.getCode());
+        record.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
         save(record);
 
         // 按打印文件列表生成产品记录
@@ -277,47 +278,31 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
         triggerFlowAndSync(order.getId(), FlowActionEnum.START_PRINT);
 
-        // 自动创建流转卡（不含设备信息）
-        String recordNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_RECORD_NO);
-        String batchNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_BATCH_NO);
+        // 回写订单操作人信息（当前生产员）
+        Long userId = StpUtil.getLoginIdAsLong();
+        String userName = (String) StpUtil.getSession().get("username");
+        OrderMainEntity orderUpdate = new OrderMainEntity();
+        orderUpdate.setId(order.getId());
+        orderUpdate.setCurrentHandlerId(userId);
+        orderUpdate.setCurrentHandlerName(userName);
+        orderUpdate.setProducerId(userId);
+        orderMainMapper.updateById(orderUpdate);
 
-        ProductionRecordEntity record = new ProductionRecordEntity();
-        record.setRecordNo(recordNo);
-        record.setOrderId(order.getId());
-        record.setOrderCode(order.getOrderCode());
-        record.setOrderType(order.getOrderType());
-        record.setDesignPackageId(designPackage.getId());
-        record.setDesignPackageCode(designPackage.getPackageCode());
-        record.setProductionBatchNo(batchNo);
-        record.setStatus(RecordStatusEnum.PENDING_PRINT.getCode());
-        save(record);
-
-        // 创建产品记录和工序记录
-        int totalCount = createProductRecords(record, designPackage);
-        record.setTotalProductCount(totalCount);
-        createProcessRecords(record.getId(), order.getOrderType());
-
-        // 生成二维码内容（前端根据此内容生成图片）
-        String qrContent = String.format("RECORD:%s|BATCH:%s", recordNo, batchNo);
-        record.setQrCodeUrl(qrContent);
-        updateById(record);
-
-        log.info("下载设计数据包，触发待打印状态流转并创建流转卡: orderId={}, designPackageId={}, recordId={}, productCount={}",
-            order.getId(), designPackageId, record.getId(), totalCount);
+        log.info("下载设计数据包，触发待打印状态流转: orderId={}, designPackageId={}", order.getId(), designPackageId);
     }
 
     @Override
-    public void triggerFlowIfAllReach(Long orderId, String requiredStatus, FlowActionEnum action) {
+    public void triggerFlowIfAllReach(Long orderId, Integer requiredStatus, FlowActionEnum action) {
         long totalActive = count(new LambdaQueryWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getOrderId, orderId)
                 .notIn(ProductionRecordEntity::getStatus,
-                        RecordStatusEnum.PRINT_FAILED.getCode(),
-                        RecordStatusEnum.ABANDONED.getCode()));
+                        FlowStatusEnum.PRINT_FAILED.getValue(),
+                        FlowStatusEnum.CANCELLED.getValue()));
         if (totalActive == 0) {
             return;
         }
         // 已达到或超过 requiredStatus 的状态集合（状态机单向推进）
-        List<String> reachedStatuses = getReachedOrBeyondStatuses(requiredStatus);
+        List<Integer> reachedStatuses = getReachedOrBeyondStatuses(requiredStatus);
         long reachedCount = count(new LambdaQueryWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getOrderId, orderId)
                 .in(ProductionRecordEntity::getStatus, reachedStatuses));
@@ -331,14 +316,14 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     }
 
     /** 返回已达到或超过指定状态的所有状态码（状态机单向推进） */
-    private List<String> getReachedOrBeyondStatuses(String requiredStatus) {
-        List<String> ordered = List.of(
-                RecordStatusEnum.PRINT_COMPLETED.getCode(),
-                RecordStatusEnum.POST_PROCESSING.getCode(),
-                RecordStatusEnum.QC_IN_PROGRESS.getCode(),
-                RecordStatusEnum.PACKING.getCode(),
-                RecordStatusEnum.WAREHOUSE_IN.getCode(),
-                RecordStatusEnum.COMPLETED.getCode()
+    private List<Integer> getReachedOrBeyondStatuses(Integer requiredStatus) {
+        List<Integer> ordered = List.of(
+                FlowStatusEnum.PRINT_COMPLETED.getValue(),
+                FlowStatusEnum.POST_PROCESSING.getValue(),
+                FlowStatusEnum.QC_IN_PROGRESS.getValue(),
+                FlowStatusEnum.PACKING.getValue(),
+                FlowStatusEnum.WAREHOUSE_IN.getValue(),
+                FlowStatusEnum.COMPLETED.getValue()
         );
         int idx = ordered.indexOf(requiredStatus);
         if (idx < 0) {
@@ -378,7 +363,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
         // 校验流转卡状态：必须是后处理中才能提交终检
-        if (!RecordStatusEnum.POST_PROCESSING.getCode().equals(record.getStatus())) {
+        if (!FlowStatusEnum.POST_PROCESSING.getValue().equals(record.getStatus())) {
             throw new BusinessException(400, "流转卡未完成后处理，无法提交终检");
         }
         // 校验所有后处理工序已完成
@@ -390,7 +375,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (incompleteCount > 0) {
             throw new BusinessException(400, "存在未完成的后处理工序，无法提交终检");
         }
-        record.setStatus(RecordStatusEnum.QC_IN_PROGRESS.getCode());
+        record.setStatus(FlowStatusEnum.QC_IN_PROGRESS.getValue());
         updateById(record);
         log.info("提交质检管理: recordId={}, recordNo={}", recordId, record.getRecordNo());
     }
@@ -421,14 +406,14 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 return Collections.emptyList();
             }
             devices = deviceMapper.selectList(new LambdaQueryWrapper<DeviceEntity>()
-                .eq(DeviceEntity::getDeviceType, ProductionConstants.DEVICE_TYPE_PRINTER)
+                .eq(DeviceEntity::getDeviceType, DeviceTypeEnum.PRINTER_SLA.getCode())
                 .eq(DeviceEntity::getCenterId, currentUser.getCenterId())
                 .eq(DeviceEntity::getIsDeleted, StatusConstants.NO));
         } else {
             // 其他角色：查询所有打印机
             devices = deviceMapper.selectList(
                 new LambdaQueryWrapper<DeviceEntity>()
-                    .eq(DeviceEntity::getDeviceType, ProductionConstants.DEVICE_TYPE_PRINTER)
+                    .eq(DeviceEntity::getDeviceType, DeviceTypeEnum.PRINTER_SLA.getCode())
                     .eq(DeviceEntity::getIsDeleted, StatusConstants.NO));
         }
 
@@ -444,10 +429,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                     vo.setStatusName("离线");
                 } else if (Integer.valueOf(1).equals(d.getState())) {
                     vo.setStatus(2);
-                    vo.setStatusName("使用中");
+                    vo.setStatusName("繁忙");
                 } else {
                     vo.setStatus(1);
-                    vo.setStatusName("可使用");
+                    vo.setStatusName("空闲");
                 }
                 return new Object[]{d.getCenterId(), d.getCenterName(), vo};
             })
@@ -497,7 +482,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         record.setPrintDeviceId(device.getId());
         record.setPrintDeviceCode(device.getDeviceId());
         record.setPrintDeviceName(device.getDeviceName());
-        record.setStatus(RecordStatusEnum.PENDING_PRINT.getCode());
+        record.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
         updateById(record);
         processMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionProcessEntity>()
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)

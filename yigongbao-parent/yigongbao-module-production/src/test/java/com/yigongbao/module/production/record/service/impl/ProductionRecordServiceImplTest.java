@@ -7,6 +7,7 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
@@ -19,7 +20,6 @@ import com.yigongbao.module.design.mapper.DesignPackageFileMapper;
 import com.yigongbao.module.design.mapper.DesignPackageMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.constants.ProductionConstants;
-import com.yigongbao.module.production.enums.RecordStatusEnum;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
@@ -280,14 +280,14 @@ class ProductionRecordServiceImplTest {
     @Test
     void triggerFlowIfAllReach_totalActiveZero_doesNotTrigger() {
         when(recordMapper.selectCount(any())).thenReturn(0L);
-        recordService.triggerFlowIfAllReach(10L, RecordStatusEnum.PRINT_COMPLETED.getCode(), FlowActionEnum.COMPLETE_PRINT);
+        recordService.triggerFlowIfAllReach(10L, FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
         verify(flowFacade, never()).executeFlow(any(), any(), any());
     }
 
     @Test
     void triggerFlowIfAllReach_notAllReached_doesNotTrigger() {
         when(recordMapper.selectCount(any())).thenReturn(3L).thenReturn(2L);
-        recordService.triggerFlowIfAllReach(10L, RecordStatusEnum.PRINT_COMPLETED.getCode(), FlowActionEnum.COMPLETE_PRINT);
+        recordService.triggerFlowIfAllReach(10L, FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
         verify(flowFacade, never()).executeFlow(any(), any(), any());
     }
 
@@ -299,7 +299,7 @@ class ProductionRecordServiceImplTest {
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             mockStp(stp);
-            recordService.triggerFlowIfAllReach(10L, RecordStatusEnum.PRINT_COMPLETED.getCode(), FlowActionEnum.COMPLETE_PRINT);
+            recordService.triggerFlowIfAllReach(10L, FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
         }
 
         verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.COMPLETE_PRINT), any(FlowOperator.class));

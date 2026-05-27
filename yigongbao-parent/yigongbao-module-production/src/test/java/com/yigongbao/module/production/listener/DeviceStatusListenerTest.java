@@ -2,8 +2,8 @@ package com.yigongbao.module.production.listener;
 
 import com.yigongbao.common.event.DeviceStateChangeEvent;
 import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.production.constants.ProductionConstants;
-import com.yigongbao.module.production.enums.RecordStatusEnum;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
@@ -62,9 +62,9 @@ class DeviceStatusListenerTest {
         listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_BUSY, ProductionConstants.DEVICE_STATE_IDLE));
 
         verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
-                RecordStatusEnum.PRINT_COMPLETED.getCode().equals(((ProductionRecordEntity) r).getStatus())));
+                FlowStatusEnum.PRINT_COMPLETED.getValue().equals(((ProductionRecordEntity) r).getStatus())));
         verify(recordService).triggerFlowIfAllReach(10L,
-                RecordStatusEnum.PRINT_COMPLETED.getCode(), FlowActionEnum.COMPLETE_PRINT);
+                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
     }
 
     @Test

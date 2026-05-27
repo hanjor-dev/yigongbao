@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.event.DesignReviewPassedEvent;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -30,6 +31,7 @@ import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +55,7 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
     private final UserService userService;
     private final DesignWorkorderService designWorkorderService;
     private final FlowFacade flowFacade;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 分页查询待审核工单列表
@@ -151,6 +154,9 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
             update.setCurrentHandlerId(null);
             update.setCurrentHandlerName(null);
             orderMainService.updateById(update);
+
+            // 6. 发布设计审核通过事件（触发生产模块自动创建流转卡）
+            eventPublisher.publishEvent(new DesignReviewPassedEvent(this, orderId));
 
             log.info("设计审核通过: orderId={}, {} -> {}, reviewerId={}",
                 orderId, FlowStatusEnum.DESIGN_REVIEWING.getName(),

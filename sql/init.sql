@@ -745,7 +745,7 @@ VALUES
 ('USER_NO',        '用户名序号',     NULL,     NULL,             3, 'NEVER', 1),  -- UserServiceImpl（generateWithSeqSuffix，按机构前缀隔离序号池）
 -- 生产模块编码
 ('PRODUCTION_RECORD_NO', '生产流转卡编号', 'PR-', NULL,         6, 'NEVER', 1),  -- ProductionRecordServiceImpl
-('PRODUCTION_BATCH_NO',  '生产批号',       'PB-', '{yyyyMMdd}', 4, 'DAY',   1),  -- ProductionRecordServiceImpl
+('PRODUCTION_BATCH_NO',  '生产批号',       'PB-', '{yyyy}{MM}{dd}', 4, 'DAY',   1),  -- ProductionRecordServiceImpl
 ('PRODUCT_NO',           '产品编号',       'PD-', NULL,         6, 'NEVER', 1),  -- ProductionRecordServiceImpl
 ('UDI_CODE',             'UDI编码',        'UDI-',NULL,         8, 'NEVER', 1);  -- 产品唯一标识码
 

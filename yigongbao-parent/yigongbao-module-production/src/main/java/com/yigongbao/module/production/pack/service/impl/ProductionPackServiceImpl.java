@@ -4,9 +4,9 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
-import com.yigongbao.module.production.enums.RecordStatusEnum;
 import com.yigongbao.module.production.pack.dto.FillPackDTO;
 import com.yigongbao.module.production.pack.service.IProductionPackService;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
@@ -45,7 +45,7 @@ public class ProductionPackServiceImpl implements IProductionPackService {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
         // 校验流转卡状态：必须是包装中才能填写包装信息
-        if (!RecordStatusEnum.PACKING.getCode().equals(record.getStatus())) {
+        if (!FlowStatusEnum.PACKING.getValue().equals(record.getStatus())) {
             throw new BusinessException(400, "流转卡不在包装阶段，无法填写包装信息");
         }
         DeviceEntity device = deviceMapper.selectById(dto.getPackDeviceId());
@@ -77,10 +77,10 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         if (record.getPackDeviceId() == null) {
             throw new BusinessException(ErrorCodeEnum.PACK_INFO_NOT_FILLED);
         }
-        record.setStatus(RecordStatusEnum.WAREHOUSE_IN.getCode());
+        record.setStatus(FlowStatusEnum.WAREHOUSE_IN.getValue());
         recordMapper.updateById(record);
         recordService.triggerFlowIfAllReach(record.getOrderId(),
-                RecordStatusEnum.WAREHOUSE_IN.getCode(), FlowActionEnum.COMPLETE_WAREHOUSE_IN);
+                FlowStatusEnum.WAREHOUSE_IN.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_IN);
         log.info("包装完成，流转到入库: recordId={}, recordNo={}, orderId={}", recordId, record.getRecordNo(), record.getOrderId());
     }
 }

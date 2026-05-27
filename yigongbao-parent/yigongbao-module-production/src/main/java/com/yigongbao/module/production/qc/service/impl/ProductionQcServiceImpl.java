@@ -8,12 +8,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.production.constants.ProductionConstants;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
 import com.yigongbao.module.production.enums.QcResultEnum;
-import com.yigongbao.module.production.enums.RecordStatusEnum;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
@@ -131,7 +131,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             });
             // 复用已查询的 record，无需再次查库
             if (record != null) {
-                record.setStatus(RecordStatusEnum.PENDING_PRINT.getCode());
+                record.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
                 record.setCurrentProcess(null);
                 recordMapper.updateById(record);
             }
@@ -169,11 +169,11 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         if (notPassCount > 0) {
             throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_ALL_PASS);
         }
-        record.setStatus(RecordStatusEnum.PACKING.getCode());
+        record.setStatus(FlowStatusEnum.PACKING.getValue());
         recordMapper.updateById(record);
         // 聚合判断：所有流转卡均到达 packing 时触发 QC_PASS
         recordService.triggerFlowIfAllReach(record.getOrderId(),
-                RecordStatusEnum.PACKING.getCode(), FlowActionEnum.QC_PASS);
+                FlowStatusEnum.PACKING.getValue(), FlowActionEnum.QC_PASS);
         log.info("质检完成，流转到包装: recordId={}, recordNo={}, orderId={}",
                 recordId, record.getRecordNo(), record.getOrderId());
     }
@@ -195,7 +195,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         if (dto.getStatus() != null) {
             wrapper.eq(ProductionRecordEntity::getStatus, dto.getStatus());
         } else {
-            wrapper.eq(ProductionRecordEntity::getStatus, RecordStatusEnum.QC_IN_PROGRESS.getCode());
+            wrapper.eq(ProductionRecordEntity::getStatus, FlowStatusEnum.QC_IN_PROGRESS.getValue());
         }
         return recordMapper.selectPage(page, wrapper)
                 .convert(e -> BeanUtil.copyProperties(e, ProductionRecordVO.class));

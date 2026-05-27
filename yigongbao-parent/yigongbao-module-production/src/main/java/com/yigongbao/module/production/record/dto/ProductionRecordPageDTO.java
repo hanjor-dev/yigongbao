@@ -13,6 +13,6 @@ public class ProductionRecordPageDTO {
     private Integer pageNum = 1;
     private Integer pageSize = 10;
     private String recordNo;
-    private String status;
+    private Integer status;
     private Long processingCenterId;
 }

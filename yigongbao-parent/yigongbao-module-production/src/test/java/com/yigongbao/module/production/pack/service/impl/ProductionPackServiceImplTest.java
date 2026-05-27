@@ -4,9 +4,9 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
-import com.yigongbao.module.production.enums.RecordStatusEnum;
 import com.yigongbao.module.production.pack.dto.FillPackDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
@@ -108,9 +108,9 @@ class ProductionPackServiceImplTest {
         packService.transferToWarehouse(1L);
 
         verify(recordMapper).updateById((ProductionRecordEntity) argThat(rec ->
-                RecordStatusEnum.WAREHOUSE_IN.getCode().equals(((ProductionRecordEntity) rec).getStatus())));
+                FlowStatusEnum.WAREHOUSE_IN.getValue().equals(((ProductionRecordEntity) rec).getStatus())));
         verify(recordService).triggerFlowIfAllReach(10L,
-                RecordStatusEnum.WAREHOUSE_IN.getCode(), FlowActionEnum.COMPLETE_WAREHOUSE_IN);
+                FlowStatusEnum.WAREHOUSE_IN.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_IN);
     }
 
     private ProductionRecordEntity record(Long id) {
