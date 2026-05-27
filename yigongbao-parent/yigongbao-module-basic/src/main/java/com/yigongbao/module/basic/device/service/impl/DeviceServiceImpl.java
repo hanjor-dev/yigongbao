@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.StatusConstants;
+import com.yigongbao.common.event.DeviceStateChangeEvent;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.module.basic.device.convert.DeviceConvert;
@@ -27,6 +28,7 @@ import com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity
 import com.yigongbao.module.basic.processingCenter.mapper.ProcessingCenterMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
@@ -51,6 +53,7 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
 
     private final ProcessingCenterMapper processingCenterMapper;
     private final IDeviceStateLogService deviceStateLogService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 分页查询设备列表
@@ -255,6 +258,7 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
                     stateLog.setChangeTime(now);
                     stateLog.setChangeType("auto");
                     stateLogs.add(stateLog);
+                    eventPublisher.publishEvent(new DeviceStateChangeEvent(this, device.getId(), oldState, deviceStatus.getState()));
                 }
             }
         }
