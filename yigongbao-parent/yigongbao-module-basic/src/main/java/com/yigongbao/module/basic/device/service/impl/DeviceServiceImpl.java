@@ -15,6 +15,7 @@ import com.yigongbao.module.basic.device.convert.DeviceConvert;
 import com.yigongbao.module.basic.device.dto.CreateDeviceDTO;
 import com.yigongbao.module.basic.device.dto.DevicePageDTO;
 import com.yigongbao.module.basic.device.dto.DeviceStatusPushDTO;
+import com.yigongbao.module.basic.device.dto.UpdateDeviceDTO;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.entity.DeviceStateLogEntity;
 import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
@@ -327,5 +328,64 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
             }
         }
         return false;
+    }
+
+    /**
+     * 编辑设备信息
+     *
+     * @param dto 编辑参数（不允许修改设备编号和设备类型）
+     * @throws BusinessException 设备不存在或加工中心不存在时抛出
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateDevice(UpdateDeviceDTO dto) {
+        DeviceEntity entity = getById(dto.getId());
+        if (entity == null) {
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+        }
+
+        if (dto.getCenterId() != null && !dto.getCenterId().equals(entity.getCenterId())) {
+            ProcessingCenterEntity center = processingCenterMapper.selectById(dto.getCenterId());
+            if (center == null) {
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "加工中心");
+            }
+            entity.setCenterId(dto.getCenterId());
+            entity.setCenterName(center.getCenterName());
+        }
+
+        if (StrUtil.isNotBlank(dto.getDeviceName())) {
+            entity.setDeviceName(dto.getDeviceName());
+        }
+        if (dto.getProcessingMinutes() != null) {
+            entity.setProcessingMinutes(dto.getProcessingMinutes());
+        }
+        if (dto.getRemark() != null) {
+            entity.setRemark(dto.getRemark());
+        }
+
+        updateById(entity);
+        log.info("编辑设备信息: id={}, deviceId={}", entity.getId(), entity.getDeviceId());
+    }
+
+    /**
+     * 删除设备
+     *
+     * @param id 设备ID
+     * @throws BusinessException 设备不存在或设备处于占用状态时抛出
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removeDevice(Long id) {
+        DeviceEntity entity = getById(id);
+        if (entity == null) {
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+        }
+        // 占用中的设备不允许删除
+        if (Integer.valueOf(1).equals(entity.getState())) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "设备当前处于占用状态，不允许删除");
+        }
+
+        removeById(id);
+        log.info("删除设备: id={}, deviceId={}", entity.getId(), entity.getDeviceId());
     }
 }

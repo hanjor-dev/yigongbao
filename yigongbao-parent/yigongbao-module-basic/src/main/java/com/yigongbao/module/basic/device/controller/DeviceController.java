@@ -8,6 +8,7 @@ import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.basic.device.dto.CreateDeviceDTO;
 import com.yigongbao.module.basic.device.dto.DevicePageDTO;
+import com.yigongbao.module.basic.device.dto.UpdateDeviceDTO;
 import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.service.IDeviceService;
 import com.yigongbao.module.basic.device.vo.DeviceVO;
@@ -104,6 +105,36 @@ public class DeviceController {
     @GetMapping("/types")
     public Result<List<SelectTreeVO>> listDeviceTypes() {
         return Result.success(DEVICE_TYPE_OPTIONS);
+    }
+
+    /**
+     * 编辑设备信息
+     */
+    @Operation(summary = "编辑设备信息")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.UPDATE,
+            operation = "编辑设备信息"
+    )
+    @PutMapping
+    public Result<Void> update(@Valid @RequestBody UpdateDeviceDTO dto) {
+        deviceService.updateDevice(dto);
+        return Result.success();
+    }
+
+    /**
+     * 删除设备
+     */
+    @Operation(summary = "删除设备")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.DELETE,
+            operation = "删除设备"
+    )
+    @DeleteMapping("/{id}")
+    public Result<Void> remove(@PathVariable Long id) {
+        deviceService.removeDevice(id);
+        return Result.success();
     }
 
     private static final List<SelectTreeVO> DEVICE_TYPE_OPTIONS = Arrays.stream(DeviceTypeEnum.values())

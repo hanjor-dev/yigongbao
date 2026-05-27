@@ -62,7 +62,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(NotLoginException.class)
     public Result<Void> handleNotLoginException(NotLoginException e) {
-        log.warn("未登录：{}", e.getMessage(), e);
+        log.warn("未登录：{}", e.getMessage());
         return Result.error(ErrorCodeEnum.UNAUTHORIZED);
     }
 
