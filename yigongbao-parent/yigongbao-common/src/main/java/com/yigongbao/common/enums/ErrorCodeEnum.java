@@ -305,7 +305,17 @@ public enum ErrorCodeEnum {
     SIGN_PARAM_MISSING(783, "请求不合法", 2),
     SIGN_TIMESTAMP_EXPIRED(784, "请求已过期，请检查系统时间", 2),
     SIGN_NONCE_USED(785, "重复请求", 2),
-    SIGN_INVALID(786, "签名验证失败", 2);
+    SIGN_INVALID(786, "签名验证失败", 2),
+
+    // ==================== 生产模块错误码 (800-808) ====================
+    PRODUCTION_RECORD_NOT_FOUND(800, "生产流转卡不存在", 3),
+    PRINT_DEVICE_NOT_FOUND(801, "打印设备不存在", 3),
+    PROCESSING_CENTER_NOT_FOUND(802, "加工中心不存在", 3),
+    PACK_DEVICE_NOT_FOUND(803, "包装设备不存在", 3),
+    PRODUCT_NOT_ALL_PASS(804, "存在未通过质检的产品，无法流转", 3),
+    PACK_INFO_NOT_FILLED(805, "请先填写包装信息", 3),
+    DEVICE_NOT_AVAILABLE(806, "设备不可用", 3),
+    SYSTEM_ERROR(808, "系统内部错误", 3);
 
     /**
      * 错误码
