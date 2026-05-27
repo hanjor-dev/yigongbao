@@ -1,0 +1,182 @@
+package com.yigongbao.module.production.qc.service.impl;
+
+import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.module.basic.code.service.CodeGeneratorService;
+import com.yigongbao.module.production.constants.ProductionConstants;
+import com.yigongbao.module.production.enums.ProductStatusEnum;
+import com.yigongbao.module.production.enums.QcResultEnum;
+import com.yigongbao.module.production.enums.RecordStatusEnum;
+import com.yigongbao.module.production.product.entity.ProductionProductEntity;
+import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
+import com.yigongbao.module.production.product.vo.ProductionProductVO;
+import com.yigongbao.module.production.qc.dto.ProductionQcPageDTO;
+import com.yigongbao.module.production.qc.dto.ProductionRedoPageDTO;
+import com.yigongbao.module.production.qc.service.IProductionQcService;
+import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
+import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
+import com.yigongbao.module.production.record.service.IProductionRecordService;
+import com.yigongbao.module.production.record.vo.ProductionRecordVO;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * 质检服务实现
+ *
+ * @author hanjor
+ * @date 2026-05-27
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ProductionQcServiceImpl implements IProductionQcService {
+
+    private final ProductionProductMapper productMapper;
+    private final ProductionRecordMapper recordMapper;
+    private final CodeGeneratorService codeGeneratorService;
+    private final IProductionRecordService recordService;
+
+    /**
+     * 标记产品质检合格；医疗器械同步生成 UDI 码；回写流转卡合格计数
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void markProductPass(Long productId) {
+        ProductionProductEntity product = productMapper.selectById(productId);
+        if (product == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
+        }
+        ProductionRecordEntity record = recordMapper.selectById(product.getProductionRecordId());
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        product.setStatus(ProductStatusEnum.PASS.getCode());
+        product.setQcResult(QcResultEnum.PASS.getCode());
+        product.setQcTime(LocalDateTime.now());
+        product.setQcUserId(StpUtil.getLoginIdAsLong());
+        // 医疗器械订单同步生成 UDI 码
+        if (ProductionConstants.ORDER_TYPE_MEDICAL.equals(record.getOrderType())) {
+            String udiCode = codeGeneratorService.generate(ProductionConstants.UDI_CODE);
+            product.setUdiCode(udiCode);
+            product.setUdiGenerateTime(LocalDateTime.now());
+            log.info("生成UDI码: productId={}, productNo={}, udiCode={}", productId, product.getProductNo(), udiCode);
+        }
+        productMapper.updateById(product);
+        // 回写流转卡合格计数
+        record.setQualifiedCount(record.getQualifiedCount() + 1);
+        recordMapper.updateById(record);
+        log.info("标记产品质检合格: productId={}, productNo={}, orderType={}, hasUDI={}",
+                productId, product.getProductNo(), record.getOrderType(), product.getUdiCode() != null);
+    }
+
+    /**
+     * 标记产品质检不合格（redo），同步更新流转卡 has_redo_product 标志和不合格计数
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void markProductRedo(Long productId, String reason) {
+        ProductionProductEntity product = productMapper.selectById(productId);
+        if (product == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
+        }
+        product.setStatus(ProductStatusEnum.REDO.getCode());
+        product.setQcResult(QcResultEnum.REDO.getCode());
+        product.setQcRemark(reason);
+        product.setQcTime(LocalDateTime.now());
+        product.setQcUserId(StpUtil.getLoginIdAsLong());
+        productMapper.updateById(product);
+        // 回写流转卡不合格计数和 redo 标志
+        ProductionRecordEntity record = recordMapper.selectById(product.getProductionRecordId());
+        if (record != null) {
+            record.setUnqualifiedCount(record.getUnqualifiedCount() + 1);
+            record.setHasRedoProduct(1);
+            recordMapper.updateById(record);
+        }
+        log.info("标记产品质检不合格: productId={}, productNo={}, reason={}", productId, product.getProductNo(), reason);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignRedoProcess(Long productId, String processType) {
+        ProductionProductEntity product = productMapper.selectById(productId);
+        if (product == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
+        }
+        product.setRedoProcessType(processType);
+        productMapper.updateById(product);
+        log.info("指定产品重做工序: productId={}, processType={}", productId, processType);
+    }
+
+    /**
+     * 质检完成，流转到包装
+     * 校验本张流转卡所有产品均已 pass → 更新状态为 packing → 聚合触发 QC_PASS
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void transferToPacking(Long recordId) {
+        ProductionRecordEntity record = recordMapper.selectById(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        // 校验所有产品均已合格
+        long notPassCount = productMapper.selectCount(new LambdaQueryWrapper<ProductionProductEntity>()
+                .eq(ProductionProductEntity::getProductionRecordId, recordId)
+                .ne(ProductionProductEntity::getStatus, ProductStatusEnum.PASS.getCode()));
+        if (notPassCount > 0) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_ALL_PASS);
+        }
+        record.setStatus(RecordStatusEnum.PACKING.getCode());
+        recordMapper.updateById(record);
+        // 聚合判断：所有流转卡均到达 packing 时触发 QC_PASS
+        recordService.triggerFlowIfAllReach(record.getOrderId(),
+                RecordStatusEnum.PACKING.getCode(), FlowActionEnum.QC_PASS);
+        log.info("质检完成，流转到包装: recordId={}, recordNo={}, orderId={}",
+                recordId, record.getRecordNo(), record.getOrderId());
+    }
+
+    @Override
+    public List<ProductionProductVO> listProductsByRecordId(Long recordId) {
+        return productMapper.selectList(new LambdaQueryWrapper<ProductionProductEntity>()
+                        .eq(ProductionProductEntity::getProductionRecordId, recordId)
+                        .orderByAsc(ProductionProductEntity::getId))
+                .stream()
+                .map(p -> BeanUtil.copyProperties(p, ProductionProductVO.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public IPage<ProductionRecordVO> listQcRecords(ProductionQcPageDTO dto) {
+        Page<ProductionRecordEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
+        LambdaQueryWrapper<ProductionRecordEntity> wrapper = new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getStatus, RecordStatusEnum.QC_IN_PROGRESS.getCode());
+        if (dto.getStatus() != null) {
+            wrapper.eq(ProductionRecordEntity::getStatus, dto.getStatus());
+        }
+        return recordMapper.selectPage(page, wrapper)
+                .convert(e -> BeanUtil.copyProperties(e, ProductionRecordVO.class));
+    }
+
+    @Override
+    public IPage<ProductionProductVO> listRedoProducts(ProductionRedoPageDTO dto) {
+        Page<ProductionProductEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
+        LambdaQueryWrapper<ProductionProductEntity> wrapper = new LambdaQueryWrapper<ProductionProductEntity>()
+                .eq(ProductionProductEntity::getStatus, ProductStatusEnum.REDO.getCode());
+        if (dto.getRecordId() != null) {
+            wrapper.eq(ProductionProductEntity::getProductionRecordId, dto.getRecordId());
+        }
+        return productMapper.selectPage(page, wrapper)
+                .convert(p -> BeanUtil.copyProperties(p, ProductionProductVO.class));
+    }
+}
