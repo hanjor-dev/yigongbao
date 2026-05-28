@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
- * 分配打印机DTO
+ * 分配打印机 DTO
  *
  * @author hanjor
  * @date 2026-05-27
@@ -13,9 +13,8 @@ import lombok.Data;
 public class AssignDeviceDTO {
     @NotNull(message = "打印机ID不能为空")
     private Long deviceId;
-
+    /** 打印材质 */
     private String material;
-
     /** 打印参数（JSON格式，如层厚、支撑密度等） */
     private String printParams;
 }

@@ -16,12 +16,20 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 @TableName("production_process_product_result")
 public class ProductionProcessProductResultEntity extends BaseEntity {
+    /** 所属工序记录ID */
     private Long productionProcessId;
+    /** 被检验的产品ID */
     private Long productionProductId;
+    /** 检验结果（pass/redo） */
     private String result;
+    /** 不合格原因 */
     private String remark;
+    /** 本产品第几次检验（从1开始） */
     private Integer attemptNo;
+    /** 是否为最新一次检验记录（0=否，1=是） */
     private Integer isLatest;
+    /** 检验员ID */
     private Long inspectorId;
+    /** 检验时间 */
     private LocalDateTime inspectTime;
 }
