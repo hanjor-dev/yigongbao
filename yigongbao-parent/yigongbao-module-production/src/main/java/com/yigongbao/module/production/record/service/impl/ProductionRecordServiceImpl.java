@@ -325,22 +325,11 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
-        // 校验流转卡状态：必须是后处理中才能提交终检
-        if (!FlowStatusEnum.POST_PROCESSING.getValue().equals(record.getStatus())) {
+        // 校验流转卡状态：必须已进入质检中（由 finishProcess(clean_dry) 自动推进）
+        if (!FlowStatusEnum.QC_IN_PROGRESS.getValue().equals(record.getStatus())) {
             throw new BusinessException(400, "流转卡未完成后处理，无法提交终检");
         }
-        // 校验所有后处理工序已完成
-        long incompleteCount = processMapper.selectCount(new LambdaQueryWrapper<ProductionProcessEntity>()
-                .eq(ProductionProcessEntity::getProductionRecordId, recordId)
-                .ne(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PRINT.getCode())
-                .ne(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PACK.getCode())
-                .ne(ProductionProcessEntity::getStatus, ProcessStatusEnum.COMPLETED.getCode()));
-        if (incompleteCount > 0) {
-            throw new BusinessException(400, "存在未完成的后处理工序，无法提交终检");
-        }
-        // 通过 Flow 驱动状态流转（POST_PROCESSING → QC_IN_PROGRESS），同步回写 order_main
-        triggerFlowAndSync(record.getOrderId(), FlowActionEnum.COMPLETE_POST_PROCESSING);
-        log.info("提交质检管理: recordId={}, recordNo={}", recordId, record.getRecordNo());
+        log.info("确认提交质检管理: recordId={}, recordNo={}", recordId, record.getRecordNo());
     }
 
     @Override
@@ -484,9 +473,14 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
      */
     @Override
     public void triggerFlowAndSync(Long orderId, FlowActionEnum action) {
-        Long operatorId = StpUtil.getLoginIdAsLong();
-        String operatorName = (String) StpUtil.getSession().get("username");
-        FlowOperator operator = FlowOperator.of(operatorId, operatorName != null ? operatorName : "system");
+        FlowOperator operator;
+        try {
+            Long operatorId = StpUtil.getLoginIdAsLong();
+            UserEntity user = userMapper.selectById(operatorId);
+            operator = FlowOperator.of(operatorId, user != null ? user.getRealName() : "system");
+        } catch (Exception e) {
+            operator = FlowOperator.of(0L, "system");
+        }
         TransitionResult result = flowFacade.executeFlow(orderId, action, operator);
         OrderMainEntity order = new OrderMainEntity();
         order.setId(orderId);

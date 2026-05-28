@@ -1,9 +1,11 @@
 package com.yigongbao.module.production.listener;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.event.DeviceStateChangeEvent;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
+import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.constants.ProductionConstants;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
@@ -29,6 +31,7 @@ public class DeviceStatusListener {
 
     private final ProductionRecordMapper recordMapper;
     private final IProductionRecordService recordService;
+    private final OrderMainMapper orderMainMapper;
 
     @EventListener
     @Transactional(rollbackFor = Exception.class)
@@ -56,8 +59,11 @@ public class DeviceStatusListener {
             record.setCurrentProcess(com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode());
             record.setPrintStartTime(LocalDateTime.now());
             recordMapper.updateById(record);
-            // 打印开始无聚合条件，直接同步 order_main
-            recordService.triggerFlowAndSync(record.getOrderId(), FlowActionEnum.START_PRINT);
+            // 打印开始直接更新 order_main（设备驱动，无用户上下文，不走 Flow）
+            OrderMainEntity orderUpdate = new OrderMainEntity();
+            orderUpdate.setId(record.getOrderId());
+            orderUpdate.setStatus(FlowStatusEnum.PRINTING.getValue());
+            orderMainMapper.updateById(orderUpdate);
             log.info("设备状态变更触发打印开始: recordId={}, recordNo={}, deviceId={}",
                     record.getId(), record.getRecordNo(), deviceId);
         }

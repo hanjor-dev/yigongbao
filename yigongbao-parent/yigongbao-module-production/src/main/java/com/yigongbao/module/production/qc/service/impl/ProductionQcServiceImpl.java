@@ -13,6 +13,7 @@ import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.production.constants.ProductionConstants;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
+import com.yigongbao.module.production.enums.QcHandleTypeEnum;
 import com.yigongbao.module.production.enums.QcResultEnum;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
@@ -125,7 +126,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         log.info("标记产品质检不合格: productId={}, productNo={}, reason={}, handleType={}", productId, product.getProductNo(), reason, handleType);
 
         // REWORK_TO_PRINT：将该产品所在流转卡的所有工序重置为 PENDING，流转卡回退到待打印
-        if ("REWORK_TO_PRINT".equals(handleType)) {
+        if (QcHandleTypeEnum.REWORK_TO_PRINT.getCode().equals(handleType)) {
             List<ProductionProcessEntity> processes = processMapper.selectList(
                     new LambdaQueryWrapper<ProductionProcessEntity>()
                             .eq(ProductionProcessEntity::getProductionRecordId, product.getProductionRecordId()));
@@ -141,8 +142,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
                 p.setProcessParams(null);
                 processMapper.updateById(p);
             });
-            // 复用已查询的 record，无需再次查库
-            // TODO: Flow 层缺少跨阶段回退到打印的动作，暂时直接设置状态；待 FlowActionEnum 补充 REWORK_TO_PRINT 后改为 triggerFlowAndSync
+            // 复用已查询的 record，无需再次查库；Flow 层暂无跨阶段回退动作，直接设置状态
             if (record != null) {
                 record.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
                 record.setCurrentProcess(null);
