@@ -25,8 +25,6 @@ import com.yigongbao.module.production.qc.dto.ProductionRedoPageDTO;
 import com.yigongbao.module.production.qc.service.IProductionQcService;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
-import com.yigongbao.common.entity.OrderMainEntity;
-import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import lombok.RequiredArgsConstructor;
@@ -54,7 +52,6 @@ public class ProductionQcServiceImpl implements IProductionQcService {
     private final ProductionProcessMapper processMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final IProductionRecordService recordService;
-    private final OrderMainMapper orderMainMapper;
 
     /**
      * 标记产品质检合格；医疗器械同步生成 UDI 码；回写流转卡合格计数
@@ -105,6 +102,11 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         if (product == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
         }
+        boolean validHandleType = java.util.Arrays.stream(QcHandleTypeEnum.values())
+                .anyMatch(e -> e.getCode().equals(handleType));
+        if (!validHandleType) {
+            throw new BusinessException(400, "无效的处理方式: " + handleType);
+        }
         if (!ProductStatusEnum.IN_PROCESS.getCode().equals(product.getStatus())) {
             log.warn("产品状态不允许标记不合格: productId={}, currentStatus={}", productId, product.getStatus());
             throw new BusinessException(400, "产品当前状态不允许标记不合格");
@@ -142,17 +144,12 @@ public class ProductionQcServiceImpl implements IProductionQcService {
                 p.setProcessParams(null);
                 processMapper.updateById(p);
             });
-            // 复用已查询的 record，无需再次查库；Flow 层暂无跨阶段回退动作，直接设置状态
             if (record != null) {
                 record.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
                 record.setCurrentProcess(null);
                 recordMapper.updateById(record);
-                // 同步回写 order_main 状态
-                OrderMainEntity orderUpdate = new OrderMainEntity();
-                orderUpdate.setId(record.getOrderId());
-                orderUpdate.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
-                orderUpdate.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.PRINT.getValue());
-                orderMainMapper.updateById(orderUpdate);
+                // 通过 Flow 驱动 order_main 状态回退
+                recordService.triggerFlowAndSync(record.getOrderId(), FlowActionEnum.REWORK_TO_PRINT);
             }
             log.info("REWORK_TO_PRINT: productId={}, recordId={}, 重置所有工序为PENDING", productId, product.getProductionRecordId());
         }

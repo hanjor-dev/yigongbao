@@ -2,6 +2,7 @@ package com.yigongbao.module.production.listener;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
+import java.util.List;
 import com.yigongbao.common.event.DeviceStateChangeEvent;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -40,14 +41,13 @@ public class DeviceStatusListener {
         Integer oldState = event.getOldState();
         Integer newState = event.getNewState();
 
-        ProductionRecordEntity record = recordMapper.selectOne(
+        List<ProductionRecordEntity> records = recordMapper.selectList(
                 new LambdaQueryWrapper<ProductionRecordEntity>()
                         .eq(ProductionRecordEntity::getPrintDeviceId, deviceId)
                         .in(ProductionRecordEntity::getStatus,
                                 FlowStatusEnum.PENDING_PRINT.getValue(),
-                                FlowStatusEnum.PRINTING.getValue())
-                        .last("LIMIT 1"));
-        if (record == null) {
+                                FlowStatusEnum.PRINTING.getValue()));
+        if (records.isEmpty()) {
             log.debug("设备状态变更，未找到关联的生产流转卡: deviceId={}", deviceId);
             return;
         }
@@ -55,29 +55,35 @@ public class DeviceStatusListener {
         // 空闲 → 占用：打印开始，更新流转卡状态和 order_main
         if (ProductionConstants.DEVICE_STATE_IDLE.equals(oldState)
                 && ProductionConstants.DEVICE_STATE_BUSY.equals(newState)) {
-            record.setStatus(FlowStatusEnum.PRINTING.getValue());
-            record.setCurrentProcess(com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode());
-            record.setPrintStartTime(LocalDateTime.now());
-            recordMapper.updateById(record);
+            LocalDateTime now = LocalDateTime.now();
+            records.forEach(record -> {
+                record.setStatus(FlowStatusEnum.PRINTING.getValue());
+                record.setCurrentProcess(com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode());
+                record.setPrintStartTime(now);
+                recordMapper.updateById(record);
+                log.info("设备状态变更触发打印开始: recordId={}, recordNo={}, deviceId={}",
+                        record.getId(), record.getRecordNo(), deviceId);
+            });
             // 打印开始直接更新 order_main（设备驱动，无用户上下文，不走 Flow）
             OrderMainEntity orderUpdate = new OrderMainEntity();
-            orderUpdate.setId(record.getOrderId());
+            orderUpdate.setId(records.get(0).getOrderId());
             orderUpdate.setStatus(FlowStatusEnum.PRINTING.getValue());
             orderMainMapper.updateById(orderUpdate);
-            log.info("设备状态变更触发打印开始: recordId={}, recordNo={}, deviceId={}",
-                    record.getId(), record.getRecordNo(), deviceId);
         }
         // 占用 → 空闲：打印完成，更新状态并聚合触发 Flow
         else if (ProductionConstants.DEVICE_STATE_BUSY.equals(oldState)
                 && ProductionConstants.DEVICE_STATE_IDLE.equals(newState)) {
-            record.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
-            record.setCurrentProcess(null);
-            record.setPrintFinishTime(LocalDateTime.now());
-            recordMapper.updateById(record);
-            recordService.triggerFlowIfAllReach(record.getOrderId(),
+            LocalDateTime now = LocalDateTime.now();
+            records.forEach(record -> {
+                record.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
+                record.setCurrentProcess(null);
+                record.setPrintFinishTime(now);
+                recordMapper.updateById(record);
+                log.info("设备状态变更触发打印完成: recordId={}, recordNo={}, deviceId={}",
+                        record.getId(), record.getRecordNo(), deviceId);
+            });
+            recordService.triggerFlowIfAllReach(records.get(0).getOrderId(),
                     FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-            log.info("设备状态变更触发打印完成: recordId={}, recordNo={}, deviceId={}",
-                    record.getId(), record.getRecordNo(), deviceId);
         }
     }
 }

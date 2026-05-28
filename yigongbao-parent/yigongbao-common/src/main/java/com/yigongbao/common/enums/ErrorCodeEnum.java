@@ -315,6 +315,7 @@ public enum ErrorCodeEnum {
     PRODUCT_NOT_ALL_PASS(804, "存在未通过质检的产品，无法流转", 3),
     PACK_INFO_NOT_FILLED(805, "请先填写包装信息", 3),
     DEVICE_NOT_AVAILABLE(806, "设备不可用", 3),
+    PRODUCTION_PROCESS_NOT_FOUND(807, "工序记录不存在", 3),
     SYSTEM_ERROR(808, "系统内部错误", 3);
 
     /**

@@ -118,6 +118,11 @@ public enum FlowActionEnum {
      */
     REWORK_COMPLETE("REWORK_COMPLETE", "返工完成"),
 
+    /**
+     * 质检不合格回退到打印
+     */
+    REWORK_TO_PRINT("REWORK_TO_PRINT", "回退到打印"),
+
     // ==================== 仓储阶段动作 ====================
     /**
      * 完成入库

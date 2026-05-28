@@ -61,7 +61,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
     public void fillProcess(Long processId, FillProcessDTO dto) {
         ProductionProcessEntity process = getById(processId);
         if (process == null) {
-            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_PROCESS_NOT_FOUND);
         }
         process.setDeviceId(dto.getDeviceId());
         process.setProcessParams(dto.getProcessParams());
@@ -131,7 +131,9 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                         .select(ProductionProductEntity::getId))
                 .stream().map(ProductionProductEntity::getId).collect(Collectors.toList());
         if (!productIds.isEmpty()) {
-            productMapper.deleteBatchIds(productIds);
+            productMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionProductEntity>()
+                    .in(ProductionProductEntity::getId, productIds)
+                    .set(ProductionProductEntity::getStatus, ProductStatusEnum.CANCELLED.getCode()));
         }
         log.info("{}-废弃流转卡: recordId={}, recordNo={}, reason={}, voidedProductCount={}",
                 logPrefix, recordId, record.getRecordNo(), failureReason, productIds.size());
@@ -162,7 +164,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)
                 .eq(ProductionProcessEntity::getProcessType, dto.getProcessType()));
         if (process == null) {
-            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_PROCESS_NOT_FOUND);
         }
         // 校验工序状态：只有 PENDING 状态才能开始
         if (!ProcessStatusEnum.PENDING.getCode().equals(process.getStatus())) {

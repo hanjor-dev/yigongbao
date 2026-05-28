@@ -61,8 +61,9 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         record.setPackSealTime(dto.getPackSealTime());
         record.setPackSterilizationMethod(dto.getPackSterilizationMethod());
         record.setPackSterilizationBatchNo(dto.getPackSterilizationBatchNo());
-        record.setPackOperatorId(StpUtil.getLoginIdAsLong());
-        UserEntity user = userMapper.selectById(StpUtil.getLoginIdAsLong());
+        Long userId = StpUtil.getLoginIdAsLong();
+        record.setPackOperatorId(userId);
+        UserEntity user = userMapper.selectById(userId);
         record.setPackOperatorName(user != null ? user.getRealName() : null);
         record.setPackTime(LocalDateTime.now());
         recordMapper.updateById(record);

@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @Data
 public class ProductionRecordPageDTO {
     private Integer pageNum = 1;
-    @Max(100)
+
     @Min(1)
     private Integer pageSize = 10;
     /** 关键词：模糊匹配订单号、数据包编号、指令单编号、患者姓名 */

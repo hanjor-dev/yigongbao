@@ -17,7 +17,8 @@ public enum ProductStatusEnum {
     IN_PROCESS("in_process", "生产中"),
     REDO("redo", "待重做"),
     PASS("pass", "质检合格"),
-    COMPLETED("completed", "已完成入库");
+    COMPLETED("completed", "已完成入库"),
+    CANCELLED("cancelled", "已废弃");
 
     @EnumValue
     @JsonValue

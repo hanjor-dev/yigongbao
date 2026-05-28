@@ -156,10 +156,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                         Collectors.mapping(p -> toProductVO(p), Collectors.toList())));
 
         // 批量查询订单信息
-        List<Long> orderIds = result.getRecords().stream()
+        List<Long> orderIdsForBatch = result.getRecords().stream()
                 .map(ProductionRecordEntity::getOrderId).distinct().collect(Collectors.toList());
         java.util.Map<Long, OrderMainEntity> orderMap = orderMainMapper.selectList(
-                new LambdaQueryWrapper<OrderMainEntity>().in(OrderMainEntity::getId, orderIds))
+                new LambdaQueryWrapper<OrderMainEntity>().in(OrderMainEntity::getId, orderIdsForBatch))
                 .stream().collect(Collectors.toMap(OrderMainEntity::getId, o -> o, (a, b) -> a));
 
         // 批量查询生产员姓名（producerId → realName）
@@ -417,11 +417,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (device == null) {
             throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
         }
-        // 校验设备在线且未被占用
-        if (resolveDeviceStatus(device) == 0) {
-            throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
+        // 校验流转卡状态：只有 PENDING_PRINT 才能分配打印机
+        if (!FlowStatusEnum.PENDING_PRINT.getValue().equals(record.getStatus())) {
+            throw new BusinessException(400, "流转卡当前状态不允许分配打印机");
         }
-        if (resolveDeviceStatus(device) == 2) {
+        // 校验设备在线且未被占用
+        if (resolveDeviceStatus(device) != 1) {
             throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
         }
         record.setPrintDeviceId(device.getId());
@@ -481,7 +482,13 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         } catch (Exception e) {
             operator = FlowOperator.of(0L, "system");
         }
-        TransitionResult result = flowFacade.executeFlow(orderId, action, operator);
+        TransitionResult result;
+        try {
+            result = flowFacade.executeFlow(orderId, action, operator);
+        } catch (com.yigongbao.common.exception.BusinessException e) {
+            log.info("Flow状态流转被拒绝（可能已被并发触发）: orderId={}, action={}, reason={}", orderId, action, e.getMessage());
+            return;
+        }
         OrderMainEntity order = new OrderMainEntity();
         order.setId(orderId);
         order.setPhase(result.getTargetPhase());
