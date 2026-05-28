@@ -144,7 +144,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (result.getRecords().isEmpty()) {
             return result.convert(e -> new ProductionRecordVO());
         }
-        // 批量查询产品，避免 N+1
+        // 批量查询关联数据，避免 N+1
         List<Long> recordIds = result.getRecords().stream()
                 .map(ProductionRecordEntity::getId).collect(Collectors.toList());
         List<ProductionProductEntity> allProducts = productMapper.selectList(
@@ -154,10 +154,47 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .collect(Collectors.groupingBy(
                         ProductionProductEntity::getProductionRecordId,
                         Collectors.mapping(p -> toProductVO(p), Collectors.toList())));
+
+        // 批量查询订单信息
+        List<Long> orderIds = result.getRecords().stream()
+                .map(ProductionRecordEntity::getOrderId).distinct().collect(Collectors.toList());
+        java.util.Map<Long, OrderMainEntity> orderMap = orderMainMapper.selectList(
+                new LambdaQueryWrapper<OrderMainEntity>().in(OrderMainEntity::getId, orderIds))
+                .stream().collect(Collectors.toMap(OrderMainEntity::getId, o -> o, (a, b) -> a));
+
+        // 批量查询生产员姓名（producerId → realName）
+        java.util.Set<Long> producerIds = orderMap.values().stream()
+                .filter(o -> o.getProducerId() != null)
+                .map(OrderMainEntity::getProducerId).collect(Collectors.toSet());
+        java.util.Map<Long, String> producerNameMap = producerIds.isEmpty()
+                ? java.util.Collections.emptyMap()
+                : userMapper.selectList(new LambdaQueryWrapper<UserEntity>().in(UserEntity::getId, producerIds))
+                        .stream().collect(Collectors.toMap(UserEntity::getId, UserEntity::getRealName, (a, b) -> a));
+
         return result.convert(e -> {
             ProductionRecordVO vo = new ProductionRecordVO();
             BeanUtil.copyProperties(e, vo);
             vo.setProducts(productMap.getOrDefault(e.getId(), java.util.Collections.emptyList()));
+            OrderMainEntity order = orderMap.get(e.getOrderId());
+            if (order != null) {
+                vo.setOrderStatus(order.getStatus());
+                vo.setOrderPhase(order.getPhase());
+                vo.setOrgName(order.getOrgName());
+                vo.setOperatorName(order.getOperatorName());
+                vo.setOperatorPhone(order.getOperatorPhone());
+                vo.setAreaName(order.getAreaName());
+                vo.setFullAreaName(order.getFullAreaName());
+                vo.setOperatorDeptName(order.getOperatorDeptName());
+                vo.setPatientAge(order.getPatientAge());
+                vo.setPatientGender(order.getPatientGender());
+                vo.setPostalAddress(order.getPostalAddress());
+                vo.setDesignerName(order.getDesignerName());
+                vo.setEstimatedCost(order.getEstimatedCost());
+                vo.setActualCompleteTime(order.getActualCompleteTime());
+                if (order.getProducerId() != null) {
+                    vo.setProducerName(producerNameMap.get(order.getProducerId()));
+                }
+            }
             return vo;
         });
     }
