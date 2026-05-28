@@ -24,8 +24,6 @@ import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
-import com.yigongbao.module.production.transfer.entity.ProductionProcessTransferEntity;
-import com.yigongbao.module.production.transfer.mapper.ProductionProcessTransferMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -49,7 +47,6 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
 
     private final ProductionRecordMapper recordMapper;
     private final ProductionProductMapper productMapper;
-    private final ProductionProcessTransferMapper transferMapper;
     private final IProductionRecordService recordService;
     private final DeviceMapper deviceMapper;
 
@@ -99,61 +96,6 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                     processId, process.getProcessType(), redoProducts.size());
         }
         log.info("填写工序信息: processId={}, deviceId={}", processId, dto.getDeviceId());
-    }
-
-    /**
-     * 工序流转：记录流转日志，更新流转卡状态，并聚合判断是否触发 Flow
-     * PRINT完成 → print_completed → 聚合触发 COMPLETE_PRINT
-     * WASH/CURE完成 → post_processing（更新 current_process）
-     * CLEAN_DRY完成 → qc_in_progress → 聚合触发 COMPLETE_POST_PROCESSING
-     * PACK完成 → 由 ProductionPackServiceImpl.transferToWarehouse() 处理
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void transferToNext(Long recordId, String fromProcess, String toProcess) {
-        // 校验 fromProcess 合法性
-        boolean validFrom = java.util.Arrays.stream(ProcessTypeEnum.values())
-                .anyMatch(e -> e.getCode().equals(fromProcess));
-        if (!validFrom) {
-            throw new BusinessException(400, "无效的工序类型: " + fromProcess);
-        }
-
-        ProductionRecordEntity record = recordMapper.selectById(recordId);
-        if (record == null) {
-            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
-        }
-
-        // 记录流转日志
-        ProductionProcessTransferEntity transfer = new ProductionProcessTransferEntity();
-        transfer.setProductionRecordId(recordId);
-        transfer.setFromProcessType(fromProcess);
-        transfer.setToProcessType(toProcess);
-        transfer.setTransferTime(LocalDateTime.now());
-        transfer.setScanUserId(StpUtil.getLoginIdAsLong());
-        transfer.setScanUserName(StpUtil.getSession().get("username", "").toString());
-        transferMapper.insert(transfer);
-
-        if (ProcessTypeEnum.PRINT.getCode().equals(fromProcess)) {
-            record.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
-            record.setCurrentProcess(null);
-            recordMapper.updateById(record);
-            recordService.triggerFlowIfAllReach(record.getOrderId(),
-                    FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-        } else if (ProcessTypeEnum.WASH.getCode().equals(fromProcess)
-                || ProcessTypeEnum.CURE.getCode().equals(fromProcess)) {
-            record.setStatus(FlowStatusEnum.POST_PROCESSING.getValue());
-            record.setCurrentProcess(toProcess);
-            recordMapper.updateById(record);
-        } else if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(fromProcess)) {
-            record.setStatus(FlowStatusEnum.QC_IN_PROGRESS.getValue());
-            record.setCurrentProcess(null);
-            recordMapper.updateById(record);
-            recordService.triggerFlowIfAllReach(record.getOrderId(),
-                    FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
-        }
-
-        log.info("工序流转: recordId={}, recordNo={}, {} -> {}, scanUser={}",
-                recordId, record.getRecordNo(), fromProcess, toProcess, transfer.getScanUserName());
     }
 
     @Override
@@ -253,13 +195,37 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         if (process == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
-        // 校验工序状态：只有 IN_PROGRESS 状态才能完成
         if (!ProcessStatusEnum.IN_PROGRESS.getCode().equals(process.getStatus())) {
             throw new BusinessException(400, "工序未在进行中，无法完成");
         }
         process.setEndTime(LocalDateTime.now());
         process.setStatus(ProcessStatusEnum.COMPLETED.getCode());
         updateById(process);
-        log.info("完成工序: recordId={}, processType={}", recordId, processType);
+
+        // 完成工序后自动推进流转卡状态
+        ProductionRecordEntity record = recordMapper.selectById(recordId);
+        if (record == null) {
+            return;
+        }
+        if (ProcessTypeEnum.PRINT.getCode().equals(processType)) {
+            record.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
+            record.setCurrentProcess(null);
+            recordMapper.updateById(record);
+            recordService.triggerFlowIfAllReach(record.getOrderId(),
+                    FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
+        } else if (ProcessTypeEnum.WASH.getCode().equals(processType)) {
+            record.setCurrentProcess(ProcessTypeEnum.CURE.getCode());
+            recordMapper.updateById(record);
+        } else if (ProcessTypeEnum.CURE.getCode().equals(processType)) {
+            record.setCurrentProcess(ProcessTypeEnum.CLEAN_DRY.getCode());
+            recordMapper.updateById(record);
+        } else if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(processType)) {
+            record.setStatus(FlowStatusEnum.QC_IN_PROGRESS.getValue());
+            record.setCurrentProcess(null);
+            recordMapper.updateById(record);
+            recordService.triggerFlowIfAllReach(record.getOrderId(),
+                    FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
+        }
+        log.info("完成工序并自动流转: recordId={}, processType={}", recordId, processType);
     }
 }

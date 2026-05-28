@@ -34,15 +34,6 @@ public class ProductionProcessController {
         return Result.success();
     }
 
-    @Operation(summary = "工序流转")
-    @PostMapping("/{recordId}/transfer")
-    public Result<Void> transferToNext(@PathVariable Long recordId,
-                                       @RequestParam String fromProcess,
-                                       @RequestParam String toProcess) {
-        processService.transferToNext(recordId, fromProcess, toProcess);
-        return Result.success();
-    }
-
     @Operation(summary = "打印失败处理")
     @PostMapping("/{recordId}/print-failure")
     public Result<Void> handlePrintFailure(@PathVariable Long recordId,

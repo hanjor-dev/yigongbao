@@ -17,8 +17,6 @@ public interface IProductionProcessService extends IService<ProductionProcessEnt
 
     void fillProcess(Long processId, FillProcessDTO dto);
 
-    void transferToNext(Long recordId, String fromProcess, String toProcess);
-
     Long handlePrintFailure(Long recordId, String failureReason, boolean recreate);
 
     Long handlePrintInspectionFail(Long recordId, String failureReason, boolean recreate);
