@@ -16,7 +16,6 @@ import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProcessTypeEnum;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
-import com.yigongbao.module.production.process.dto.FillProcessDTO;
 import com.yigongbao.module.production.process.dto.StartProcessDTO;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
@@ -53,24 +52,6 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
     private final IProductionRecordService recordService;
     private final DeviceMapper deviceMapper;
     private final UserMapper userMapper;
-
-    /**
-     * 填写工序补充信息（设备、参数等），不触发推进
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void fillProcess(Long processId, FillProcessDTO dto) {
-        ProductionProcessEntity process = getById(processId);
-        if (process == null) {
-            throw new BusinessException(ErrorCodeEnum.PRODUCTION_PROCESS_NOT_FOUND);
-        }
-        process.setDeviceId(dto.getDeviceId());
-        process.setProcessParams(dto.getProcessParams());
-        process.setHasRedo(dto.getHasRedo());
-        process.setRedoRemark(dto.getRedoRemark());
-        updateById(process);
-        log.info("填写工序信息: processId={}, deviceId={}", processId, dto.getDeviceId());
-    }
 
     @Override
     public List<ProcessVO> listProcesses(Long recordId) {
@@ -137,7 +118,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)
                 .eq(ProductionProcessEntity::getProcessType, processType));
         if (process == null) {
-            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_PROCESS_NOT_FOUND);
         }
         if (!ProcessStatusEnum.IN_PROGRESS.getCode().equals(process.getStatus())) {
             throw new BusinessException(400, "工序未在进行中，无法完成");

@@ -1,6 +1,7 @@
 package com.yigongbao.module.production.listener;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import java.util.List;
 import com.yigongbao.common.event.DeviceStateChangeEvent;
@@ -83,13 +84,13 @@ public class DeviceStatusListener {
                         record.getId(), record.getRecordNo(), deviceId);
             });
             Long orderId = records.get(0).getOrderId();
+            // 非医疗器械订单打印完成后 Flow 直接跳 QC，需同步更新流转卡状态
+            boolean isNonMedical = ProductionConstants.ORDER_TYPE_NON_MEDICAL.equals(records.get(0).getOrderType());
             recordService.triggerFlowIfAllReach(orderId,
                     FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-            // 非医疗器械订单：COMPLETE_PRINT 后 Flow 直接跳到 QC 阶段，同步更新流转卡状态
-            OrderMainEntity order = orderMainMapper.selectById(orderId);
-            if (order != null && Integer.valueOf(2).equals(order.getOrderType())) {
+            if (isNonMedical) {
                 recordMapper.update(null,
-                        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+                        new LambdaUpdateWrapper<ProductionRecordEntity>()
                                 .eq(ProductionRecordEntity::getOrderId, orderId)
                                 .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINT_COMPLETED.getValue())
                                 .set(ProductionRecordEntity::getStatus, FlowStatusEnum.QC_IN_PROGRESS.getValue()));

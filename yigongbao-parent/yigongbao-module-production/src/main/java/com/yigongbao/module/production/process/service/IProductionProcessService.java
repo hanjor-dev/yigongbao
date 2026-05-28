@@ -1,7 +1,6 @@
 package com.yigongbao.module.production.process.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.yigongbao.module.production.process.dto.FillProcessDTO;
 import com.yigongbao.module.production.process.dto.StartProcessDTO;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.vo.ProcessVO;
@@ -14,8 +13,6 @@ import java.util.List;
  * @date 2026-05-27
  */
 public interface IProductionProcessService extends IService<ProductionProcessEntity> {
-
-    void fillProcess(Long processId, FillProcessDTO dto);
 
     List<ProcessVO> listProcesses(Long recordId);
 

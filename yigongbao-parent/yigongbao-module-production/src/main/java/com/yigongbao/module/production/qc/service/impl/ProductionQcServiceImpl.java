@@ -120,6 +120,9 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
+        if (!FlowStatusEnum.QC_IN_PROGRESS.getValue().equals(record.getStatus())) {
+            throw new BusinessException(400, "流转卡当前状态不允许流转到包装");
+        }
         long notPassCount = productMapper.selectCount(new LambdaQueryWrapper<ProductionProductEntity>()
                 .eq(ProductionProductEntity::getProductionRecordId, recordId)
                 .ne(ProductionProductEntity::getStatus, ProductStatusEnum.PASS.getCode())

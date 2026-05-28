@@ -35,8 +35,6 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
 
     void submitBatchNo(Long recordId, SubmitBatchNoDTO dto);
 
-    void submitToQc(Long recordId);
-
     DeviceConfigVO getDeviceConfig(Long recordId);
 
     List<ProcessingCenterPrintersVO> listPrinters();

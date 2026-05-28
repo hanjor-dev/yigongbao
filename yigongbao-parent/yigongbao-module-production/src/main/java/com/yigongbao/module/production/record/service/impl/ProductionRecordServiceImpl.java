@@ -354,20 +354,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void submitToQc(Long recordId) {
-        ProductionRecordEntity record = getById(recordId);
-        if (record == null) {
-            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
-        }
-        // 校验流转卡状态：必须已进入质检中（由 finishProcess(clean_dry) 自动推进）
-        if (!FlowStatusEnum.QC_IN_PROGRESS.getValue().equals(record.getStatus())) {
-            throw new BusinessException(400, "流转卡未完成后处理，无法提交终检");
-        }
-        log.info("确认提交质检管理: recordId={}, recordNo={}", recordId, record.getRecordNo());
-    }
-
-    @Override
     public DeviceConfigVO getDeviceConfig(Long recordId) {
         ProductionRecordEntity record = getById(recordId);
         if (record == null) {

@@ -5,7 +5,8 @@
       "Bash(gh --version)",
       "Bash(xargs grep:*)",
       "Bash(mvn clean:*)",
-      "Bash(mvn compile:*)"
+      "Bash(mvn compile:*)",
+      "Bash(iconv -f UTF-8 -t UTF-8//IGNORE)"
     ]
   }
 }

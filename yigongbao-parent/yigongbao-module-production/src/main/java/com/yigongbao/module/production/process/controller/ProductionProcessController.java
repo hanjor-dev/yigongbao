@@ -1,7 +1,6 @@
 package com.yigongbao.module.production.process.controller;
 
 import com.yigongbao.common.result.Result;
-import com.yigongbao.module.production.process.dto.FillProcessDTO;
 import com.yigongbao.module.production.process.dto.StartProcessDTO;
 import com.yigongbao.module.production.process.service.IProductionProcessService;
 import com.yigongbao.module.production.process.vo.ProcessVO;
@@ -26,13 +25,6 @@ import java.util.List;
 public class ProductionProcessController {
 
     private final IProductionProcessService processService;
-
-    @Operation(summary = "填写工序信息")
-    @PutMapping("/{id}/fill")
-    public Result<Void> fillProcess(@PathVariable Long id, @Valid @RequestBody FillProcessDTO dto) {
-        processService.fillProcess(id, dto);
-        return Result.success();
-    }
 
     @Operation(summary = "获取工序列表")
     @GetMapping("/{recordId}/list")

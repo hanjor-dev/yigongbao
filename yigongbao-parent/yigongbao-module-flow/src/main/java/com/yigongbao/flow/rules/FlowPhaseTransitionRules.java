@@ -168,6 +168,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
         }
 
         // 打印完成 → 医疗器械进入后处理，非医疗器械直接进入质检
+        // orderType: 1=医疗器械，2=非医疗器械；null 时按医疗器械处理
         if (targetStatus == FlowStatusEnum.PRINT_COMPLETED) {
             boolean isMedical = !Integer.valueOf(2).equals(orderType);
             if (isMedical) {

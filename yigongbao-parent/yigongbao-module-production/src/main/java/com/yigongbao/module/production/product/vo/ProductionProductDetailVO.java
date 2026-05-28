@@ -22,7 +22,7 @@ public class ProductionProductDetailVO {
     private String fileName;
     /** 产品状态代码 */
     private String status;
-    /** 质检结果（pass/redo） */
+    /** 质检结果（pass/fail） */
     private String qcResult;
     /** UDI码（医疗器械） */
     private String udiCode;

@@ -75,13 +75,6 @@ public class ProductionRecordController {
         return Result.success();
     }
 
-    @Operation(summary = "提交质检管理（后处理完成后）")
-    @PostMapping("/{id}/submit-to-qc")
-    public Result<Void> submitToQc(@PathVariable Long id) {
-        recordService.submitToQc(id);
-        return Result.success();
-    }
-
     @Operation(summary = "设备配置详情")
     @GetMapping("/{id}/device-config")
     public Result<DeviceConfigVO> getDeviceConfig(@PathVariable Long id) {
