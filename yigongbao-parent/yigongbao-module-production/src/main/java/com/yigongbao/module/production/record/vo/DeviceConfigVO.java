@@ -14,7 +14,7 @@ public class DeviceConfigVO {
     private String recordNo;
     private String productionBatchNo;
     private String designPackageCode;
-    private String status;
+    private Integer status;
     private Long printDeviceId;
     private String printDeviceCode;
     private String printDeviceName;

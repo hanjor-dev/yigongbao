@@ -49,12 +49,15 @@ public class DeviceStatusListener {
             return;
         }
 
-        // 空闲 → 占用：打印开始，仅更新流转卡状态
+        // 空闲 → 占用：打印开始，更新流转卡状态和 order_main
         if (ProductionConstants.DEVICE_STATE_IDLE.equals(oldState)
                 && ProductionConstants.DEVICE_STATE_BUSY.equals(newState)) {
             record.setStatus(FlowStatusEnum.PRINTING.getValue());
+            record.setCurrentProcess(com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode());
             record.setPrintStartTime(LocalDateTime.now());
             recordMapper.updateById(record);
+            // 打印开始无聚合条件，直接同步 order_main
+            recordService.triggerFlowAndSync(record.getOrderId(), FlowActionEnum.START_PRINT);
             log.info("设备状态变更触发打印开始: recordId={}, recordNo={}, deviceId={}",
                     record.getId(), record.getRecordNo(), deviceId);
         }
@@ -62,6 +65,7 @@ public class DeviceStatusListener {
         else if (ProductionConstants.DEVICE_STATE_BUSY.equals(oldState)
                 && ProductionConstants.DEVICE_STATE_IDLE.equals(newState)) {
             record.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
+            record.setCurrentProcess(null);
             record.setPrintFinishTime(LocalDateTime.now());
             recordMapper.updateById(record);
             recordService.triggerFlowIfAllReach(record.getOrderId(),

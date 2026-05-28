@@ -177,9 +177,20 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         List<String> availableActions = flowFacade.getAvailableActions(order.getId());
         if (!availableActions.contains(FlowActionEnum.START_PRINT.name())) {
             log.info("下载数据包幂等跳过，订单已推进: orderId={}, designPackageId={}", order.getId(), designPackageId);
+            // 即使订单已推进，仍需确保本条流转卡状态正确
+            baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+                    .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
+                    .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue())
+                    .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue()));
             return;
         }
-        triggerFlowAndSync(order.getId(), FlowActionEnum.START_PRINT);
+
+        // 聚合判断：只有订单下所有流转卡都已下载（即全部从 DESIGN_REVIEW_PASSED 推进）才触发 Flow
+        // 先更新本条流转卡状态
+        baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
+                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue())
+                .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue()));
 
         // 回写订单操作人信息（当前生产员）
         Long userId = StpUtil.getLoginIdAsLong();
@@ -191,6 +202,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         orderUpdate.setCurrentHandlerName(realName);
         orderUpdate.setProducerId(userId);
         orderMainMapper.updateById(orderUpdate);
+
+        // 聚合触发：所有流转卡都已推进到 PENDING_PRINT 或更后状态时才触发 Flow
+        triggerFlowIfAllReach(order.getId(), FlowStatusEnum.PENDING_PRINT.getValue(), FlowActionEnum.START_PRINT);
 
         log.info("下载设计数据包，触发待打印状态流转: orderId={}, designPackageId={}", order.getId(), designPackageId);
     }
@@ -228,6 +242,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     /** 返回已达到或超过指定状态的所有状态码（状态机单向推进） */
     private List<Integer> getReachedOrBeyondStatuses(Integer requiredStatus) {
         List<Integer> ordered = List.of(
+                FlowStatusEnum.PENDING_PRINT.getValue(),
+                FlowStatusEnum.PRINTING.getValue(),
                 FlowStatusEnum.PRINT_COMPLETED.getValue(),
                 FlowStatusEnum.POST_PROCESSING.getValue(),
                 FlowStatusEnum.QC_IN_PROGRESS.getValue(),
@@ -429,7 +445,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     /**
      * 执行 Flow 状态流转并回写 order_main
      */
-    private void triggerFlowAndSync(Long orderId, FlowActionEnum action) {
+    @Override
+    public void triggerFlowAndSync(Long orderId, FlowActionEnum action) {
         Long operatorId = StpUtil.getLoginIdAsLong();
         String operatorName = (String) StpUtil.getSession().get("username");
         FlowOperator operator = FlowOperator.of(operatorId, operatorName != null ? operatorName : "system");

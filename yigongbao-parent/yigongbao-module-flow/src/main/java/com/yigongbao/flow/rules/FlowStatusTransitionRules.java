@@ -252,7 +252,7 @@ public class FlowStatusTransitionRules {
             case CONTINUE_DESIGN -> FlowStatusEnum.DESIGN_IN_PROGRESS.getValue();
 
             // 打印阶段动作
-            case START_PRINT -> FlowStatusEnum.PRINTING.getValue();
+            case START_PRINT -> FlowStatusEnum.PENDING_PRINT.getValue();
             case COMPLETE_PRINT -> FlowStatusEnum.PRINT_COMPLETED.getValue(); // 过渡状态，自动推进
 
             // 后处理动作
