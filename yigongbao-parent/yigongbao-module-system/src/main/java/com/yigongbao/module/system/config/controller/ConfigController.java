@@ -58,6 +58,18 @@ public class ConfigController {
     }
 
     /**
+     * 根据key查询配置详情
+     *
+     * @param key 配置key
+     * @return 配置详情
+     */
+    @Operation(summary = "根据ID查询配置详情")
+    @GetMapping("/key/{key}")
+    public Result<ConfigVO> getByKey(@PathVariable String key) {
+        return Result.success(configService.getConfigByKey(key));
+    }
+
+    /**
      * 创建配置
      *
      * @param dto 创建配置请求参数

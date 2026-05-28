@@ -6,9 +6,11 @@ import com.yigongbao.common.event.DesignReviewPassedEvent;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
-import com.yigongbao.module.design.entity.DesignPackageFileEntity;
-import com.yigongbao.module.design.mapper.DesignPackageFileMapper;
 import com.yigongbao.module.design.mapper.DesignPackageMapper;
+import com.yigongbao.module.design.mapper.DesignProductFileMapper;
+import com.yigongbao.module.design.mapper.DesignProductMapper;
+import com.yigongbao.module.design.entity.DesignProductEntity;
+import com.yigongbao.module.design.entity.DesignProductFileEntity;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.constants.ProductionConstants;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
@@ -43,7 +45,8 @@ public class DesignReviewPassedListener {
 
     private final OrderMainMapper orderMainMapper;
     private final DesignPackageMapper designPackageMapper;
-    private final DesignPackageFileMapper designPackageFileMapper;
+    private final DesignProductMapper designProductMapper;
+    private final DesignProductFileMapper designProductFileMapper;
     private final ProductionRecordMapper recordMapper;
     private final ProductionProductMapper productMapper;
     private final ProductionProcessMapper processMapper;
@@ -115,25 +118,37 @@ public class DesignReviewPassedListener {
     }
 
     private int createProductRecords(ProductionRecordEntity record, DesignPackageEntity pkg) {
-        List<DesignPackageFileEntity> files = designPackageFileMapper.selectList(
-                new LambdaQueryWrapper<DesignPackageFileEntity>()
-                        .eq(DesignPackageFileEntity::getPackageId, pkg.getId()));
+        List<DesignProductEntity> designProducts = designProductMapper.selectList(
+                new LambdaQueryWrapper<DesignProductEntity>()
+                        .eq(DesignProductEntity::getPackageId, pkg.getId()));
 
-        if (files.isEmpty()) {
+        if (designProducts.isEmpty()) {
             return 0;
         }
 
-        for (DesignPackageFileEntity file : files) {
-            ProductionProductEntity product = new ProductionProductEntity();
-            product.setProductionRecordId(record.getId());
-            product.setPrintFileId(file.getId());
-            product.setProductNo(codeGeneratorService.generate(ProductionConstants.PRODUCT_NO));
-            product.setProductName(file.getFileName());
-            product.setFileName(file.getFileName());
-            product.setStatus(ProductStatusEnum.IN_PROCESS.getCode());
-            productMapper.insert(product);
+        int totalCount = 0;
+        for (DesignProductEntity dp : designProducts) {
+            // 取该产品关联的第一个文件作为打印文件
+            DesignProductFileEntity dpFile = designProductFileMapper.selectOne(
+                    new LambdaQueryWrapper<DesignProductFileEntity>()
+                            .eq(DesignProductFileEntity::getDesignProductId, dp.getId())
+                            .orderByAsc(DesignProductFileEntity::getSortOrder)
+                            .last("LIMIT 1"));
+
+            int qty = dp.getQuantity() != null && dp.getQuantity() > 0 ? dp.getQuantity() : 1;
+            for (int i = 0; i < qty; i++) {
+                ProductionProductEntity product = new ProductionProductEntity();
+                product.setProductionRecordId(record.getId());
+                product.setPrintFileId(dpFile != null ? dpFile.getPackageFileId() : null);
+                product.setProductNo(codeGeneratorService.generate(ProductionConstants.PRODUCT_NO));
+                product.setProductName(dp.getProductName());
+                product.setFileName(dpFile != null ? dpFile.getPackageFileName() : null);
+                product.setStatus(ProductStatusEnum.IN_PROCESS.getCode());
+                productMapper.insert(product);
+            }
+            totalCount += qty;
         }
-        return files.size();
+        return totalCount;
     }
 
     private void createProcessRecords(Long recordId, Integer orderType) {
