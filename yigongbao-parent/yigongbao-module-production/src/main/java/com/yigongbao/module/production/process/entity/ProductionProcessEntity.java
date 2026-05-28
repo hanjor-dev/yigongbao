@@ -23,6 +23,7 @@ public class ProductionProcessEntity extends BaseEntity {
     private String deviceType;
     private Long deviceId;
     private String deviceNo;
+    private String deviceName;
     private String processParams;
     private LocalDateTime startTime;
     private LocalDateTime endTime;

@@ -1686,6 +1686,7 @@ CREATE TABLE IF NOT EXISTS production_process (
     device_type VARCHAR(100) COMMENT '关键设备类型',
     device_id BIGINT COMMENT '设备ID',
     device_no VARCHAR(50) COMMENT '设备编号',
+    device_name VARCHAR(100) COMMENT '设备名称',
     process_params JSON COMMENT '关键参数（JSON格式）',
     start_time DATETIME COMMENT '开始时间',
     end_time DATETIME COMMENT '结束时间',

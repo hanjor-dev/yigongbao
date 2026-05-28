@@ -8,6 +8,8 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
+import com.yigongbao.module.basic.device.entity.DeviceEntity;
+import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProcessTypeEnum;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
@@ -49,6 +51,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
     private final ProductionProductMapper productMapper;
     private final ProductionProcessTransferMapper transferMapper;
     private final IProductionRecordService recordService;
+    private final DeviceMapper deviceMapper;
 
     /**
      * 填写工序信息，完成后检查是否有 redo 产品在此工序重做，自动恢复为 in_process
@@ -221,6 +224,11 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             throw new BusinessException(400, "工序已开始或已完成，无法重复开始");
         }
         process.setDeviceId(dto.getPrimaryDeviceId());
+        DeviceEntity device = deviceMapper.selectById(dto.getPrimaryDeviceId());
+        if (device != null) {
+            process.setDeviceNo(device.getDeviceId());
+            process.setDeviceName(device.getDeviceName());
+        }
         process.setProcessParams(dto.getProcessParams());
         process.setStartTime(LocalDateTime.now());
         process.setOperatorId(StpUtil.getLoginIdAsLong());
