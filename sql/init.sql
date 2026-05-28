@@ -341,7 +341,7 @@ VALUES ('order.column.config', '订单列表默认列配置', '{"module":"order"
 -- 影像查看器配置（group=system）
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
 VALUES
-('imaging.viewer.base_url', '影像阅片器查看器URL前缀', 'http://81.70.104.108:81/#/viewer', 'string', 'system', '影像阅片器查看器完整URL前缀（含协议、端口和路由路径），如 http://127.0.0.1:81/#/viewer', 1, 0, 11, 1);
+('imaging.viewer.base_url', '影像阅片器查看器URL前缀', 'http://81.70.104.108:8080/#/aiView', 'string', 'system', '影像阅片器查看器完整URL前缀（含协议、端口和路由路径），如 http://127.0.0.1:81/#/viewer', 1, 0, 11, 1);
 
 
 -- 设计工单列表默认列配置（独立 INSERT）
