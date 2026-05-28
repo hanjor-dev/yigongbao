@@ -100,4 +100,12 @@ public class ProductionRecordController {
         recordService.assignDevice(id, dto);
         return Result.success();
     }
+
+    @Operation(summary = "打印首检确认")
+    @PostMapping("/{id}/confirm-print-inspection")
+    public Result<Void> confirmPrintInspection(@PathVariable Long id,
+            @Valid @RequestBody com.yigongbao.module.production.process.dto.SubmitProcessQcDTO dto) {
+        recordService.confirmPrintInspection(id, dto);
+        return Result.success();
+    }
 }

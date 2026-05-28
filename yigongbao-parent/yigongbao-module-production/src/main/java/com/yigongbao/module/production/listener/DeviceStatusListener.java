@@ -70,7 +70,7 @@ public class DeviceStatusListener {
             orderUpdate.setStatus(FlowStatusEnum.PRINTING.getValue());
             orderMainMapper.updateById(orderUpdate);
         }
-        // 占用 → 空闲：打印完成，更新状态并聚合触发 Flow
+        // 占用 → 空闲：打印完成，更新状态为 PRINT_COMPLETED，等待操作员首检确认
         else if (ProductionConstants.DEVICE_STATE_BUSY.equals(oldState)
                 && ProductionConstants.DEVICE_STATE_IDLE.equals(newState)) {
             LocalDateTime now = LocalDateTime.now();
@@ -82,8 +82,7 @@ public class DeviceStatusListener {
                 log.info("设备状态变更触发打印完成: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
             });
-            recordService.triggerFlowIfAllReach(records.get(0).getOrderId(),
-                    FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
+            // 不在此处触发 COMPLETE_PRINT，由操作员调用首检确认接口后触发
         }
     }
 }
