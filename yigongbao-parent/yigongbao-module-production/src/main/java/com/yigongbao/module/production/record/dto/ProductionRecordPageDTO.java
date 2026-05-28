@@ -1,5 +1,7 @@
 package com.yigongbao.module.production.record.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.Data;
 
 /**
@@ -11,6 +13,8 @@ import lombok.Data;
 @Data
 public class ProductionRecordPageDTO {
     private Integer pageNum = 1;
+    @Max(100)
+    @Min(1)
     private Integer pageSize = 10;
     private String recordNo;
     private Integer status;

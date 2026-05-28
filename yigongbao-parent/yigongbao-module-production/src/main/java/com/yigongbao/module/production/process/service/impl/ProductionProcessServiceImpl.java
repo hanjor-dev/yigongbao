@@ -65,6 +65,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         process.setHasRedo(dto.getHasRedo());
         process.setRedoRemark(dto.getRedoRemark());
         process.setStatus(ProcessStatusEnum.COMPLETED.getCode());
+        process.setEndTime(LocalDateTime.now());
         updateById(process);
 
         // redo 产品重做完成后自动恢复为 in_process
@@ -107,6 +108,13 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void transferToNext(Long recordId, String fromProcess, String toProcess) {
+        // 校验 fromProcess 合法性
+        boolean validFrom = java.util.Arrays.stream(ProcessTypeEnum.values())
+                .anyMatch(e -> e.getCode().equals(fromProcess));
+        if (!validFrom) {
+            throw new BusinessException(400, "无效的工序类型: " + fromProcess);
+        }
+
         ProductionRecordEntity record = recordMapper.selectById(recordId);
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);

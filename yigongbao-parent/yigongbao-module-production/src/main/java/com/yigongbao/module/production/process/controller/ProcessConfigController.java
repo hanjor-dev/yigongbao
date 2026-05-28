@@ -9,6 +9,7 @@ import com.yigongbao.module.system.config.service.ConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,6 +30,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/production/process-config")
 @RequiredArgsConstructor
+@Slf4j
 public class ProcessConfigController {
 
     private final ConfigService configService;
@@ -58,6 +60,7 @@ public class ProcessConfigController {
         try {
             return Result.success(objectMapper.readValue(json, new TypeReference<Object>() {}));
         } catch (Exception e) {
+            log.warn("工序参数配置JSON解析失败: {}", e.getMessage());
             return Result.success(json);
         }
     }

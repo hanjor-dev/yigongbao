@@ -24,6 +24,8 @@ import com.yigongbao.module.production.qc.dto.ProductionRedoPageDTO;
 import com.yigongbao.module.production.qc.service.IProductionQcService;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
+import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +53,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
     private final ProductionProcessMapper processMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final IProductionRecordService recordService;
+    private final OrderMainMapper orderMainMapper;
 
     /**
      * 标记产品质检合格；医疗器械同步生成 UDI 码；回写流转卡合格计数
@@ -83,9 +86,10 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             log.info("生成UDI码: productId={}, productNo={}, udiCode={}", productId, product.getProductNo(), udiCode);
         }
         productMapper.updateById(product);
-        // 回写流转卡合格计数
-        record.setQualifiedCount(record.getQualifiedCount() + 1);
-        recordMapper.updateById(record);
+        // 回写流转卡合格计数（原子自增，避免并发覆盖）
+        recordMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getId, record.getId())
+                .setSql("qualified_count = qualified_count + 1"));
         log.info("标记产品质检合格: productId={}, productNo={}, orderType={}, hasUDI={}",
                 productId, product.getProductNo(), record.getOrderType(), product.getUdiCode() != null);
     }
@@ -100,6 +104,10 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         if (product == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_FOUND);
         }
+        if (!ProductStatusEnum.IN_PROCESS.getCode().equals(product.getStatus())) {
+            log.warn("产品状态不允许标记不合格: productId={}, currentStatus={}", productId, product.getStatus());
+            throw new BusinessException(400, "产品当前状态不允许标记不合格");
+        }
         product.setStatus(ProductStatusEnum.REDO.getCode());
         product.setQcResult(QcResultEnum.REDO.getCode());
         product.setQcRemark(reason);
@@ -109,9 +117,10 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         // 回写流转卡不合格计数和 redo 标志
         ProductionRecordEntity record = recordMapper.selectById(product.getProductionRecordId());
         if (record != null) {
-            record.setUnqualifiedCount(record.getUnqualifiedCount() + 1);
-            record.setHasRedoProduct(1);
-            recordMapper.updateById(record);
+            recordMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+                    .eq(ProductionRecordEntity::getId, record.getId())
+                    .setSql("unqualified_count = unqualified_count + 1")
+                    .set(ProductionRecordEntity::getHasRedoProduct, 1));
         }
         log.info("标记产品质检不合格: productId={}, productNo={}, reason={}, handleType={}", productId, product.getProductNo(), reason, handleType);
 
@@ -130,10 +139,16 @@ public class ProductionQcServiceImpl implements IProductionQcService {
                 processMapper.updateById(p);
             });
             // 复用已查询的 record，无需再次查库
+            // TODO: Flow 层缺少跨阶段回退到打印的动作，暂时直接设置状态；待 FlowActionEnum 补充 REWORK_TO_PRINT 后改为 triggerFlowAndSync
             if (record != null) {
                 record.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
                 record.setCurrentProcess(null);
                 recordMapper.updateById(record);
+                // 同步回写 order_main 状态
+                OrderMainEntity orderUpdate = new OrderMainEntity();
+                orderUpdate.setId(record.getOrderId());
+                orderUpdate.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
+                orderMainMapper.updateById(orderUpdate);
             }
             log.info("REWORK_TO_PRINT: productId={}, recordId={}, 重置所有工序为PENDING", productId, product.getProductionRecordId());
         }

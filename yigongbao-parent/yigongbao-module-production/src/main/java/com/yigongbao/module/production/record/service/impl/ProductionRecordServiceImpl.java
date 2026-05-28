@@ -307,6 +307,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .eq(ProductionRecordEntity::getOrderId, orderId)
                 .in(ProductionRecordEntity::getStatus, reachedStatuses));
         if (totalActive == reachedCount) {
+            // 幂等保护：再次确认 action 仍可执行（防止并发重复触发）
+            List<String> availableActions = flowFacade.getAvailableActions(orderId);
+            if (!availableActions.contains(action.name())) {
+                log.info("聚合条件满足但Flow已推进，跳过: orderId={}, action={}", orderId, action);
+                return;
+            }
             triggerFlowAndSync(orderId, action);
             log.info("聚合条件满足，触发Flow: orderId={}, requiredStatus={}, action={}", orderId, requiredStatus, action);
         } else {
@@ -375,8 +381,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (incompleteCount > 0) {
             throw new BusinessException(400, "存在未完成的后处理工序，无法提交终检");
         }
-        record.setStatus(FlowStatusEnum.QC_IN_PROGRESS.getValue());
-        updateById(record);
+        // 通过 Flow 驱动状态流转（POST_PROCESSING → QC_IN_PROGRESS），同步回写 order_main
+        triggerFlowAndSync(record.getOrderId(), FlowActionEnum.COMPLETE_POST_PROCESSING);
         log.info("提交质检管理: recordId={}, recordNo={}", recordId, record.getRecordNo());
     }
 
@@ -424,16 +430,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 vo.setId(d.getId());
                 vo.setDeviceNo(d.getDeviceId());
                 vo.setDeviceName(d.getDeviceName());
-                if (d.getConnectionStatus() == null || d.getConnectionStatus() == 0) {
-                    vo.setStatus(0);
-                    vo.setStatusName("离线");
-                } else if (Integer.valueOf(1).equals(d.getState())) {
-                    vo.setStatus(2);
-                    vo.setStatusName("繁忙");
-                } else {
-                    vo.setStatus(1);
-                    vo.setStatusName("空闲");
-                }
+                int statusCode = resolveDeviceStatus(d);
+                vo.setStatus(statusCode);
+                vo.setStatusName(statusCode == 0 ? "离线" : statusCode == 2 ? "繁忙" : "空闲");
                 return new Object[]{d.getCenterId(), d.getCenterName(), vo};
             })
             .collect(Collectors.groupingBy(
@@ -473,10 +472,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
         }
         // 校验设备在线且未被占用
-        if (device.getConnectionStatus() == null || device.getConnectionStatus() == 0) {
+        if (resolveDeviceStatus(device) == 0) {
             throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
         }
-        if (Integer.valueOf(1).equals(device.getState())) {
+        if (resolveDeviceStatus(device) == 2) {
             throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
         }
         record.setPrintDeviceId(device.getId());
@@ -492,6 +491,19 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.IN_PROGRESS.getCode())
                 .set(ProductionProcessEntity::getStartTime, java.time.LocalDateTime.now()));
         log.info("分配打印机: recordId={}, deviceId={}, deviceNo={}", recordId, device.getId(), device.getDeviceId());
+    }
+
+    /**
+     * 解析设备状态：0=离线，1=空闲，2=繁忙
+     */
+    private int resolveDeviceStatus(DeviceEntity device) {
+        if (device.getConnectionStatus() == null || device.getConnectionStatus() == 0) {
+            return 0;
+        }
+        if (Integer.valueOf(1).equals(device.getState())) {
+            return 2;
+        }
+        return 1;
     }
 
     /**

@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 设备状态监听器
@@ -29,6 +30,7 @@ public class DeviceStatusListener {
     private final IProductionRecordService recordService;
 
     @EventListener
+    @Transactional(rollbackFor = Exception.class)
     public void onDeviceStateChange(DeviceStateChangeEvent event) {
         Long deviceId = event.getDeviceId();
         Integer oldState = event.getOldState();
