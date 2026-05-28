@@ -84,6 +84,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
         ProductionRecordVO vo = new ProductionRecordVO();
         BeanUtil.copyProperties(record, vo);
+        fillCurrentProcessName(vo);
         List<ProductionProductEntity> products = productMapper.selectList(
                 new LambdaQueryWrapper<ProductionProductEntity>()
                         .eq(ProductionProductEntity::getProductionRecordId, id));
@@ -180,6 +181,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         return result.convert(e -> {
             ProductionRecordVO vo = new ProductionRecordVO();
             BeanUtil.copyProperties(e, vo);
+            fillCurrentProcessName(vo);
             vo.setProducts(productMap.getOrDefault(e.getId(), java.util.Collections.emptyList()));
             OrderMainEntity order = orderMap.get(e.getOrderId());
             if (order != null) {
@@ -491,6 +493,16 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .findFirst().orElse(null);
         vo.setStatusName(statusEnum != null ? statusEnum.getDesc() : p.getStatus());
         return vo;
+    }
+
+    private void fillCurrentProcessName(ProductionRecordVO vo) {
+        if (vo.getCurrentProcess() == null) {
+            return;
+        }
+        java.util.Arrays.stream(ProcessTypeEnum.values())
+                .filter(e -> e.getCode().equals(vo.getCurrentProcess()))
+                .findFirst()
+                .ifPresent(e -> vo.setCurrentProcessName(e.getDesc()));
     }
 
     /**

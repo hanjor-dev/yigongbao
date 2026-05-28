@@ -36,6 +36,7 @@ public class ProductionRecordVO {
     private Integer hasRedoProduct;
     private Integer status;
     private String currentProcess;
+    private String currentProcessName;
     private String qrCodeUrl;
     private LocalDateTime printStartTime;
     private LocalDateTime printFinishTime;
