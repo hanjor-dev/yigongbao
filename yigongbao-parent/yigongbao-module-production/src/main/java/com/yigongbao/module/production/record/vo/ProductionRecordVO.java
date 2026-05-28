@@ -33,7 +33,6 @@ public class ProductionRecordVO {
     private Integer totalProductCount;
     private Integer qualifiedCount;
     private Integer unqualifiedCount;
-    private Integer hasRedoProduct;
     private Integer status;
     private String currentProcess;
     private String currentProcessName;

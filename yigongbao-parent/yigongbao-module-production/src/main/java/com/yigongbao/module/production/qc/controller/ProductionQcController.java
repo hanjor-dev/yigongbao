@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.qc.dto.ProductionQcPageDTO;
-import com.yigongbao.module.production.qc.dto.ProductionRedoPageDTO;
 import com.yigongbao.module.production.qc.service.IProductionQcService;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,11 +47,9 @@ public class ProductionQcController {
     }
 
     @Operation(summary = "标记产品质检不合格")
-    @PostMapping("/product/{productId}/redo")
-    public Result<Void> markProductRedo(@PathVariable Long productId,
-                                        @RequestParam String reason,
-                                        @RequestParam(defaultValue = "REDO_CURRENT") String handleType) {
-        qcService.markProductRedo(productId, reason, handleType);
+    @PostMapping("/product/{productId}/fail")
+    public Result<Void> markProductFail(@PathVariable Long productId, @RequestParam String reason) {
+        qcService.markProductFail(productId, reason);
         return Result.success();
     }
 
@@ -60,19 +57,6 @@ public class ProductionQcController {
     @PostMapping("/{recordId}/transfer-to-pack")
     public Result<Void> transferToPacking(@PathVariable Long recordId) {
         qcService.transferToPacking(recordId);
-        return Result.success();
-    }
-
-    @Operation(summary = "redo产品列表")
-    @PostMapping("/redo/list")
-    public Result<IPage<ProductionProductVO>> listRedoProducts(@RequestBody ProductionRedoPageDTO dto) {
-        return Result.success(qcService.listRedoProducts(dto));
-    }
-
-    @Operation(summary = "指定redo重做工序")
-    @PostMapping("/redo/{productId}/assign")
-    public Result<Void> assignRedoProcess(@PathVariable Long productId, @RequestParam String processType) {
-        qcService.assignRedoProcess(productId, processType);
         return Result.success();
     }
 }

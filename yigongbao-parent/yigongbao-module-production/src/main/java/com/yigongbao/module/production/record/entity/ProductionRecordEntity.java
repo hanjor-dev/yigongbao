@@ -49,10 +49,8 @@ public class ProductionRecordEntity extends BaseEntity {
     private Integer totalProductCount;
     /** 质检合格数量（每次 markProductPass 时原子自增） */
     private Integer qualifiedCount;
-    /** 质检不合格数量（每次 markProductRedo 时原子自增） */
+    /** 质检不合格数量（每次 markProductFail 时原子自增，累计值） */
     private Integer unqualifiedCount;
-    /** 是否存在待重做产品（0=否，1=是） */
-    private Integer hasRedoProduct;
     /** 流转卡状态（对应 FlowStatusEnum 值） */
     private Integer status;
     /** 当前所在工序类型（后处理阶段有值，其他阶段为 null） */

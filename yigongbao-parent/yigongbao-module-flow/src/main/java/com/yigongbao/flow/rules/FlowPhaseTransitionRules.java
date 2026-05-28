@@ -148,7 +148,8 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             FlowPhaseEnum currentPhase,
             FlowStatusEnum targetStatus,
             FlowActionEnum action,
-            Integer needsPhysicalDelivery) {
+            Integer needsPhysicalDelivery,
+            Integer orderType) {
 
         boolean needsProduction = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
 
@@ -166,9 +167,14 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             }
         }
 
-        // 打印完成 → 进入后处理阶段，初始状态为 POST_PROCESSING
+        // 打印完成 → 医疗器械进入后处理，非医疗器械直接进入质检
         if (targetStatus == FlowStatusEnum.PRINT_COMPLETED) {
-            return new PhaseAndStatus(FlowPhaseEnum.POST_PROCESSING, FlowStatusEnum.POST_PROCESSING);
+            boolean isMedical = !Integer.valueOf(2).equals(orderType);
+            if (isMedical) {
+                return new PhaseAndStatus(FlowPhaseEnum.POST_PROCESSING, FlowStatusEnum.POST_PROCESSING);
+            } else {
+                return new PhaseAndStatus(FlowPhaseEnum.QC, FlowStatusEnum.QC_IN_PROGRESS);
+            }
         }
 
         // 后处理完成 → 进入质检阶段，初始状态为 QC_IN_PROGRESS

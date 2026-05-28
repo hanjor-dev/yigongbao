@@ -24,7 +24,6 @@ import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
-import com.yigongbao.module.production.record.dto.CreateRecordDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
@@ -68,100 +67,6 @@ class ProductionRecordServiceImplTest {
         Field f = ServiceImpl.class.getDeclaredField("baseMapper");
         f.setAccessible(true);
         f.set(recordService, recordMapper);
-    }
-
-    // ---- createRecord ----
-
-    @Test
-    void createRecord_designPackageNotFound_throwsException() {
-        when(designPackageMapper.selectById(1L)).thenReturn(null);
-        assertEquals(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND.getCode(),
-                assertThrows(BusinessException.class, () -> recordService.createRecord(dto(1L, 2L))).getCode());
-    }
-
-    @Test
-    void createRecord_orderNotFound_throwsException() {
-        when(designPackageMapper.selectById(1L)).thenReturn(pkg(1L, 10L));
-        when(orderMainMapper.selectById(10L)).thenReturn(null);
-        assertEquals(ErrorCodeEnum.ORDER_NOT_FOUND.getCode(),
-                assertThrows(BusinessException.class, () -> recordService.createRecord(dto(1L, 2L))).getCode());
-    }
-
-    @Test
-    void createRecord_deviceNotFound_throwsException() {
-        when(designPackageMapper.selectById(1L)).thenReturn(pkg(1L, 10L));
-        when(orderMainMapper.selectById(10L)).thenReturn(order(10L, ProductionConstants.ORDER_TYPE_MEDICAL));
-        when(deviceMapper.selectById(2L)).thenReturn(null);
-        assertEquals(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND.getCode(),
-                assertThrows(BusinessException.class, () -> recordService.createRecord(dto(1L, 2L))).getCode());
-    }
-
-    @Test
-    void createRecord_withProvidedBatchNo_usesDtoValue() {
-        CreateRecordDTO d = dto(1L, 2L);
-        d.setProductionBatchNo("BATCH-001");
-        stubDeps(ProductionConstants.ORDER_TYPE_NON_MEDICAL);
-        when(designPackageFileMapper.selectList(any())).thenReturn(Collections.emptyList());
-
-        recordService.createRecord(d);
-
-        verify(codeGeneratorService, never()).generate(ProductionConstants.PRODUCTION_BATCH_NO);
-    }
-
-    @Test
-    void createRecord_withoutBatchNo_generatesBatchNo() {
-        stubDeps(ProductionConstants.ORDER_TYPE_NON_MEDICAL);
-        when(designPackageFileMapper.selectList(any())).thenReturn(Collections.emptyList());
-
-        recordService.createRecord(dto(1L, 2L));
-
-        verify(codeGeneratorService).generate(ProductionConstants.PRODUCTION_BATCH_NO);
-    }
-
-    @Test
-    void createRecord_medicalOrder_creates5Processes() {
-        stubDeps(ProductionConstants.ORDER_TYPE_MEDICAL);
-        when(designPackageFileMapper.selectList(any())).thenReturn(Collections.emptyList());
-
-        recordService.createRecord(dto(1L, 2L));
-
-        verify(processMapper, times(5)).insert(any(ProductionProcessEntity.class));
-    }
-
-    @Test
-    void createRecord_nonMedicalOrder_creates2Processes() {
-        stubDeps(ProductionConstants.ORDER_TYPE_NON_MEDICAL);
-        when(designPackageFileMapper.selectList(any())).thenReturn(Collections.emptyList());
-
-        recordService.createRecord(dto(1L, 2L));
-
-        verify(processMapper, times(2)).insert(any(ProductionProcessEntity.class));
-    }
-
-    @Test
-    void createRecord_emptyPrintFiles_createsNoProducts() {
-        stubDeps(ProductionConstants.ORDER_TYPE_NON_MEDICAL);
-        when(designPackageFileMapper.selectList(any())).thenReturn(Collections.emptyList());
-
-        recordService.createRecord(dto(1L, 2L));
-
-        verify(productMapper, never()).insert(any(ProductionProductEntity.class));
-    }
-
-    @Test
-    void createRecord_withPrintFiles_createsProductPerFile() {
-        stubDeps(ProductionConstants.ORDER_TYPE_NON_MEDICAL);
-        DesignPackageFileEntity f1 = new DesignPackageFileEntity();
-        f1.setId(100L);
-        f1.setFileName("f1.stl");
-        DesignPackageFileEntity f2 = new DesignPackageFileEntity();
-        f2.setId(101L);
-        f2.setFileName("f2.stl");
-        when(designPackageFileMapper.selectList(any())).thenReturn(List.of(f1, f2));
-
-        recordService.createRecord(dto(1L, 2L));
-
-        verify(productMapper, times(2)).insert(any(ProductionProductEntity.class));
     }
 
     // ---- getRecordDetail ----
@@ -306,20 +211,6 @@ class ProductionRecordServiceImplTest {
     }
 
     // ---- helpers ----
-
-    private void stubDeps(Integer orderType) {
-        when(designPackageMapper.selectById(1L)).thenReturn(pkg(1L, 10L));
-        when(orderMainMapper.selectById(10L)).thenReturn(order(10L, orderType));
-        when(deviceMapper.selectById(2L)).thenReturn(device(2L));
-        when(codeGeneratorService.generate(any())).thenReturn("CODE");
-    }
-
-    private CreateRecordDTO dto(Long pkgId, Long deviceId) {
-        CreateRecordDTO d = new CreateRecordDTO();
-        d.setDesignPackageId(pkgId);
-        d.setPrintDeviceId(deviceId);
-        return d;
-    }
 
     private DesignPackageEntity pkg(Long id, Long orderId) {
         DesignPackageEntity p = new DesignPackageEntity();

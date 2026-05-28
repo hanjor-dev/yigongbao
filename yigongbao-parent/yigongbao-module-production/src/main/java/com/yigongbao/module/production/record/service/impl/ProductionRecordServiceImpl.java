@@ -485,44 +485,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         log.info("分配打印机: recordId={}, deviceId={}, deviceNo={}", recordId, device.getId(), device.getDeviceId());
     }
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void confirmPrintInspection(Long recordId, com.yigongbao.module.production.process.dto.SubmitProcessQcDTO dto) {
-        ProductionRecordEntity record = getById(recordId);
-        if (record == null) {
-            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
-        }
-        if (!FlowStatusEnum.PRINT_COMPLETED.getValue().equals(record.getStatus())) {
-            throw new BusinessException(400, "流转卡当前状态不允许提交打印首检");
-        }
-
-        boolean hasRedo = false;
-        for (com.yigongbao.module.production.process.dto.ProcessProductResultDTO r : dto.getProductResults()) {
-            if (com.yigongbao.module.production.enums.QcResultEnum.REDO.getCode().equals(r.getResult())) {
-                hasRedo = true;
-                com.yigongbao.module.production.product.entity.ProductionProductEntity product =
-                        productMapper.selectById(r.getProductId());
-                if (product != null) {
-                    product.setStatus(com.yigongbao.module.production.enums.ProductStatusEnum.REDO.getCode());
-                    product.setRedoProcessType(com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode());
-                    productMapper.updateById(product);
-                }
-            }
-        }
-
-        if (hasRedo) {
-            update(new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
-                    .eq(ProductionRecordEntity::getId, recordId)
-                    .set(ProductionRecordEntity::getHasRedoProduct, 1));
-            log.info("打印首检存在不合格产品: recordId={}", recordId);
-            return;
-        }
-
-        triggerFlowIfAllReach(record.getOrderId(),
-                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-        log.info("打印首检全部合格，触发后处理流转: recordId={}, orderId={}", recordId, record.getOrderId());
-    }
-
     private ProductionProductVO toProductVO(ProductionProductEntity p) {
         ProductionProductVO vo = new ProductionProductVO();
         BeanUtil.copyProperties(p, vo);

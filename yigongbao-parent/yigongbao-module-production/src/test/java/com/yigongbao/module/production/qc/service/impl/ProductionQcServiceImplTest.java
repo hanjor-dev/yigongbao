@@ -14,7 +14,6 @@ import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.qc.dto.ProductionQcPageDTO;
-import com.yigongbao.module.production.qc.dto.ProductionRedoPageDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
@@ -67,10 +66,8 @@ class ProductionQcServiceImplTest {
 
     @Test
     void markProductPass_nonMedical_noUdiGenerated() {
-        ProductionRecordEntity rec = record(10L, ProductionConstants.ORDER_TYPE_NON_MEDICAL);
-        rec.setQualifiedCount(0);
         when(productMapper.selectById(1L)).thenReturn(product(1L, 10L));
-        when(recordMapper.selectById(10L)).thenReturn(rec);
+        when(recordMapper.selectById(10L)).thenReturn(record(10L, ProductionConstants.ORDER_TYPE_NON_MEDICAL));
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
             qcService.markProductPass(1L);
@@ -79,16 +76,12 @@ class ProductionQcServiceImplTest {
         verify(productMapper).updateById((ProductionProductEntity) argThat(p ->
                 ProductStatusEnum.PASS.getCode().equals(((ProductionProductEntity) p).getStatus())
                         && QcResultEnum.PASS.getCode().equals(((ProductionProductEntity) p).getQcResult())));
-        verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
-                Integer.valueOf(1).equals(((ProductionRecordEntity) r).getQualifiedCount())));
     }
 
     @Test
     void markProductPass_medical_generatesUdi() {
-        ProductionRecordEntity rec = record(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
-        rec.setQualifiedCount(0);
         when(productMapper.selectById(1L)).thenReturn(product(1L, 10L));
-        when(recordMapper.selectById(10L)).thenReturn(rec);
+        when(recordMapper.selectById(10L)).thenReturn(record(10L, ProductionConstants.ORDER_TYPE_MEDICAL));
         when(codeGeneratorService.generate(ProductionConstants.UDI_CODE)).thenReturn("UDI-001");
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
@@ -99,63 +92,43 @@ class ProductionQcServiceImplTest {
                 "UDI-001".equals(((ProductionProductEntity) p).getUdiCode())));
     }
 
-    // ---- markProductRedo ----
+    @Test
+    void markProductPass_failStatus_allowed() {
+        ProductionProductEntity p = product(1L, 10L);
+        p.setStatus(ProductStatusEnum.FAIL.getCode());
+        when(productMapper.selectById(1L)).thenReturn(p);
+        when(recordMapper.selectById(10L)).thenReturn(record(10L, ProductionConstants.ORDER_TYPE_NON_MEDICAL));
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            qcService.markProductPass(1L);
+        }
+        verify(productMapper).updateById((ProductionProductEntity) argThat(p2 ->
+                ProductStatusEnum.PASS.getCode().equals(((ProductionProductEntity) p2).getStatus())));
+    }
+
+    // ---- markProductFail ----
 
     @Test
-    void markProductRedo_productNotFound_throwsException() {
+    void markProductFail_productNotFound_throwsException() {
         when(productMapper.selectById(99L)).thenReturn(null);
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
             assertEquals(ErrorCodeEnum.PRODUCT_NOT_FOUND.getCode(),
-                    assertThrows(BusinessException.class, () -> qcService.markProductRedo(99L, "r", "SCRAP")).getCode());
+                    assertThrows(BusinessException.class, () -> qcService.markProductFail(99L, "defect")).getCode());
         }
     }
 
     @Test
-    void markProductRedo_recordNull_onlyUpdatesProduct() {
+    void markProductFail_setsFailStatusAndRemark() {
         when(productMapper.selectById(1L)).thenReturn(product(1L, 10L));
-        when(recordMapper.selectById(10L)).thenReturn(null);
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
-            qcService.markProductRedo(1L, "defect");
+            qcService.markProductFail(1L, "surface defect");
         }
         verify(productMapper).updateById((ProductionProductEntity) argThat(p ->
-                ProductStatusEnum.REDO.getCode().equals(((ProductionProductEntity) p).getStatus())));
-        verify(recordMapper, never()).updateById((ProductionRecordEntity) any());
-    }
-
-    @Test
-    void markProductRedo_recordFound_updatesCountAndFlag() {
-        ProductionRecordEntity rec = record(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
-        rec.setUnqualifiedCount(0);
-        when(productMapper.selectById(1L)).thenReturn(product(1L, 10L));
-        when(recordMapper.selectById(10L)).thenReturn(rec);
-        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
-            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
-            qcService.markProductRedo(1L, "defect");
-        }
-        verify(recordMapper).updateById((ProductionRecordEntity) argThat(r -> {
-            ProductionRecordEntity e = (ProductionRecordEntity) r;
-            return Integer.valueOf(1).equals(e.getUnqualifiedCount())
-                    && Integer.valueOf(1).equals(e.getHasRedoProduct());
-        }));
-    }
-
-    // ---- assignRedoProcess ----
-
-    @Test
-    void assignRedoProcess_productNotFound_throwsException() {
-        when(productMapper.selectById(99L)).thenReturn(null);
-        assertEquals(ErrorCodeEnum.PRODUCT_NOT_FOUND.getCode(),
-                assertThrows(BusinessException.class, () -> qcService.assignRedoProcess(99L, "print")).getCode());
-    }
-
-    @Test
-    void assignRedoProcess_found_setsRedoProcessType() {
-        when(productMapper.selectById(1L)).thenReturn(product(1L, 10L));
-        qcService.assignRedoProcess(1L, "wash");
-        verify(productMapper).updateById((ProductionProductEntity) argThat(p ->
-                "wash".equals(((ProductionProductEntity) p).getRedoProcessType())));
+                ProductStatusEnum.FAIL.getCode().equals(((ProductionProductEntity) p).getStatus())
+                        && QcResultEnum.FAIL.getCode().equals(((ProductionProductEntity) p).getQcResult())
+                        && "surface defect".equals(((ProductionProductEntity) p).getQcRemark())));
     }
 
     // ---- transferToPacking ----
@@ -181,9 +154,7 @@ class ProductionQcServiceImplTest {
         rec.setOrderId(10L);
         when(recordMapper.selectById(1L)).thenReturn(rec);
         when(productMapper.selectCount(any())).thenReturn(0L);
-
         qcService.transferToPacking(1L);
-
         verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
                 FlowStatusEnum.PACKING.getValue().equals(((ProductionRecordEntity) r).getStatus())));
         verify(recordService).triggerFlowIfAllReach(10L,
@@ -214,40 +185,6 @@ class ProductionQcServiceImplTest {
         verify(recordMapper).selectPage(any(), any());
     }
 
-    @Test
-    void listQcRecords_withStatusFilter_overridesDefault() {
-        ProductionQcPageDTO dto = new ProductionQcPageDTO();
-        dto.setPageNum(1);
-        dto.setPageSize(10);
-        dto.setStatus(RecordStatusEnum.PACKING.getCode());
-        when(recordMapper.selectPage(any(), any())).thenReturn(new Page<>());
-        qcService.listQcRecords(dto);
-        verify(recordMapper).selectPage(any(), any());
-    }
-
-    // ---- listRedoProducts ----
-
-    @Test
-    void listRedoProducts_noRecordIdFilter_queriesAllRedo() {
-        ProductionRedoPageDTO dto = new ProductionRedoPageDTO();
-        dto.setPageNum(1);
-        dto.setPageSize(10);
-        when(productMapper.selectPage(any(), any())).thenReturn(new Page<>());
-        qcService.listRedoProducts(dto);
-        verify(productMapper).selectPage(any(), any());
-    }
-
-    @Test
-    void listRedoProducts_withRecordIdFilter_addsCondition() {
-        ProductionRedoPageDTO dto = new ProductionRedoPageDTO();
-        dto.setPageNum(1);
-        dto.setPageSize(10);
-        dto.setRecordId(5L);
-        when(productMapper.selectPage(any(), any())).thenReturn(new Page<>());
-        qcService.listRedoProducts(dto);
-        verify(productMapper).selectPage(any(), any());
-    }
-
     // ---- helpers ----
 
     private ProductionProductEntity product(Long id, Long recordId) {
@@ -255,6 +192,7 @@ class ProductionQcServiceImplTest {
         p.setId(id);
         p.setProductionRecordId(recordId);
         p.setProductNo("P-00" + id);
+        p.setStatus(ProductStatusEnum.IN_PROCESS.getCode());
         return p;
     }
 

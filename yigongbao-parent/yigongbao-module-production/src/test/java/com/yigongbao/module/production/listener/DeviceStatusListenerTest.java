@@ -51,7 +51,7 @@ class DeviceStatusListenerTest {
         listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE, ProductionConstants.DEVICE_STATE_BUSY));
 
         verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
-                RecordStatusEnum.PRINTING.getCode().equals(((ProductionRecordEntity) r).getStatus())));
+                FlowStatusEnum.PRINTING.getValue().equals(((ProductionRecordEntity) r).getStatus())));
         verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
     }
 

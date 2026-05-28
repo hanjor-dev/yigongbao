@@ -15,7 +15,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum ProductStatusEnum {
     IN_PROCESS("in_process", "生产中"),
-    REDO("redo", "待重做"),
+    FAIL("fail", "质检不合格"),
     PASS("pass", "质检合格"),
     COMPLETED("completed", "已完成入库"),
     CANCELLED("cancelled", "已废弃");

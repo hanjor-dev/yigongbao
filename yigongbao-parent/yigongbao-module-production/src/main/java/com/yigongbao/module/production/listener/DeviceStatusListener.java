@@ -70,7 +70,7 @@ public class DeviceStatusListener {
             orderUpdate.setStatus(FlowStatusEnum.PRINTING.getValue());
             orderMainMapper.updateById(orderUpdate);
         }
-        // 占用 → 空闲：打印完成，更新状态为 PRINT_COMPLETED，等待操作员首检确认
+        // 占用 → 空闲：打印完成，更新状态并聚合触发 Flow
         else if (ProductionConstants.DEVICE_STATE_BUSY.equals(oldState)
                 && ProductionConstants.DEVICE_STATE_IDLE.equals(newState)) {
             LocalDateTime now = LocalDateTime.now();
@@ -82,7 +82,18 @@ public class DeviceStatusListener {
                 log.info("设备状态变更触发打印完成: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
             });
-            // 不在此处触发 COMPLETE_PRINT，由操作员调用首检确认接口后触发
+            Long orderId = records.get(0).getOrderId();
+            recordService.triggerFlowIfAllReach(orderId,
+                    FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
+            // 非医疗器械订单：COMPLETE_PRINT 后 Flow 直接跳到 QC 阶段，同步更新流转卡状态
+            OrderMainEntity order = orderMainMapper.selectById(orderId);
+            if (order != null && Integer.valueOf(2).equals(order.getOrderType())) {
+                recordMapper.update(null,
+                        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+                                .eq(ProductionRecordEntity::getOrderId, orderId)
+                                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINT_COMPLETED.getValue())
+                                .set(ProductionRecordEntity::getStatus, FlowStatusEnum.QC_IN_PROGRESS.getValue()));
+            }
         }
     }
 }

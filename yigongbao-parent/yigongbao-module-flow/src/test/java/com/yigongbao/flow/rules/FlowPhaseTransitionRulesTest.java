@@ -259,7 +259,7 @@ class FlowPhaseTransitionRulesTest {
                     FlowPhaseEnum.ORDER,
                     FlowStatusEnum.DATA_AUDIT_PASSED,
                     FlowActionEnum.DATA_AUDIT_PASS,
-                    1);
+                    1, null);
             assertEquals(FlowPhaseEnum.DESIGN, result.phase());
             assertEquals(FlowStatusEnum.PENDING_DESIGN, result.initialStatus());
         }
@@ -271,7 +271,7 @@ class FlowPhaseTransitionRulesTest {
                     FlowPhaseEnum.DESIGN,
                     FlowStatusEnum.DESIGN_REVIEW_PASSED,
                     FlowActionEnum.DESIGN_REVIEW_PASS,
-                    1);
+                    1, null);
             assertEquals(FlowPhaseEnum.PRINT, result.phase());
             assertEquals(FlowStatusEnum.PENDING_PRINT, result.initialStatus());
         }
@@ -283,21 +283,33 @@ class FlowPhaseTransitionRulesTest {
                     FlowPhaseEnum.DESIGN,
                     FlowStatusEnum.DESIGN_REVIEW_PASSED,
                     FlowActionEnum.DESIGN_REVIEW_PASS,
-                    0);
+                    0, null);
             assertEquals(FlowPhaseEnum.CONFIRM, result.phase());
             assertEquals(FlowStatusEnum.AWAITING_CONFIRM, result.initialStatus());
         }
 
         @Test
-        @DisplayName("PRINT_COMPLETED(3030) → POST_PROCESSING + POST_PROCESSING(4010)")
-        void printCompleted_shouldAdvanceToPostProcessing() {
+        @DisplayName("PRINT_COMPLETED(3030) 医疗器械 → POST_PROCESSING + POST_PROCESSING(4010)")
+        void printCompleted_medical_shouldAdvanceToPostProcessing() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.PRINT,
                     FlowStatusEnum.PRINT_COMPLETED,
                     FlowActionEnum.COMPLETE_PRINT,
-                    1);
+                    1, 1);
             assertEquals(FlowPhaseEnum.POST_PROCESSING, result.phase());
             assertEquals(FlowStatusEnum.POST_PROCESSING, result.initialStatus());
+        }
+
+        @Test
+        @DisplayName("PRINT_COMPLETED(3030) 非医疗器械 → QC + QC_IN_PROGRESS(5010)")
+        void printCompleted_nonMedical_shouldAdvanceToQc() {
+            PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
+                    FlowPhaseEnum.PRINT,
+                    FlowStatusEnum.PRINT_COMPLETED,
+                    FlowActionEnum.COMPLETE_PRINT,
+                    1, 2);
+            assertEquals(FlowPhaseEnum.QC, result.phase());
+            assertEquals(FlowStatusEnum.QC_IN_PROGRESS, result.initialStatus());
         }
 
         @Test
@@ -307,7 +319,7 @@ class FlowPhaseTransitionRulesTest {
                     FlowPhaseEnum.QC,
                     FlowStatusEnum.QC_PASSED,
                     FlowActionEnum.QC_PASS,
-                    1);
+                    1, null);
             assertEquals(FlowPhaseEnum.WAREHOUSE, result.phase());
             assertEquals(FlowStatusEnum.WAREHOUSE_IN, result.initialStatus());
         }
@@ -319,7 +331,7 @@ class FlowPhaseTransitionRulesTest {
                     FlowPhaseEnum.WAREHOUSE,
                     FlowStatusEnum.WAREHOUSED,
                     FlowActionEnum.COMPLETE_WAREHOUSE_IN,
-                    1);
+                    1, null);
             assertEquals(FlowPhaseEnum.COMPLETED, result.phase());
             assertEquals(FlowStatusEnum.COMPLETED, result.initialStatus());
         }
@@ -331,7 +343,7 @@ class FlowPhaseTransitionRulesTest {
                     FlowPhaseEnum.CONFIRM,
                     FlowStatusEnum.COMPLETED,
                     FlowActionEnum.USER_CONFIRM,
-                    0);
+                    0, null);
             assertEquals(FlowPhaseEnum.COMPLETED, result.phase());
             assertEquals(FlowStatusEnum.COMPLETED, result.initialStatus());
         }
@@ -343,7 +355,7 @@ class FlowPhaseTransitionRulesTest {
                     FlowPhaseEnum.QC,
                     FlowStatusEnum.REWORK,
                     FlowActionEnum.REWORK,
-                    1);
+                    1, null);
             assertNull(result.phase());
             assertNull(result.initialStatus());
         }
@@ -355,7 +367,7 @@ class FlowPhaseTransitionRulesTest {
                     FlowPhaseEnum.ORDER,
                     FlowStatusEnum.DATA_AUDIT_REJECTED,
                     FlowActionEnum.DATA_AUDIT_REJECT,
-                    1);
+                    1, null);
             assertNull(result.phase());
             assertNull(result.initialStatus());
         }

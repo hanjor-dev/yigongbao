@@ -44,11 +44,6 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
     void assignDevice(Long recordId, AssignDeviceDTO dto);
 
     /**
-     * 打印首检：逐产品提交检验结果，全部合格触发 COMPLETE_PRINT 聚合流转
-     */
-    void confirmPrintInspection(Long recordId, com.yigongbao.module.production.process.dto.SubmitProcessQcDTO dto);
-
-    /**
      * 聚合触发：同订单所有活跃流转卡均达到 requiredStatus 时触发 Flow 并回写 order_main
      */
     void triggerFlowIfAllReach(Long orderId, Integer requiredStatus, FlowActionEnum action);

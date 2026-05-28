@@ -1615,8 +1615,7 @@ CREATE TABLE IF NOT EXISTS production_record (
     print_device_name VARCHAR(100) COMMENT '打印机名称（冗余）',
     total_product_count INT NOT NULL DEFAULT 0 COMMENT '产品总数',
     qualified_count INT NOT NULL DEFAULT 0 COMMENT '合格数量',
-    unqualified_count INT NOT NULL DEFAULT 0 COMMENT '不合格数量',
-    has_redo_product TINYINT NOT NULL DEFAULT 0 COMMENT '是否存在待重做产品（0=否，1=是）',
+    unqualified_count INT NOT NULL DEFAULT 0 COMMENT '不合格数量（累计不合格标记次数）',
     status INT NOT NULL COMMENT '当前状态（FlowStatusEnum值）',
     current_process VARCHAR(50) COMMENT '当前工序',
     qr_code_url VARCHAR(255) COMMENT '流转卡二维码URL',
@@ -1668,7 +1667,6 @@ CREATE TABLE IF NOT EXISTS production_product (
     qc_remark VARCHAR(500) COMMENT '质检不合格原因',
     qc_time DATETIME COMMENT '质检时间',
     qc_user_id BIGINT COMMENT '质检员ID',
-    redo_process_type VARCHAR(50) COMMENT '指定的重做工序',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     create_by BIGINT COMMENT '创建人ID',
@@ -1710,26 +1708,6 @@ CREATE TABLE IF NOT EXISTS production_process (
     KEY idx_production_record_id (production_record_id),
     KEY idx_process_type (process_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工序记录表';
-
--- 质检产品记录表
-CREATE TABLE IF NOT EXISTS production_process_product_result (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
-    production_process_id BIGINT NOT NULL COMMENT '工序记录ID',
-    production_product_id BIGINT NOT NULL COMMENT '产品ID',
-    result VARCHAR(50) NOT NULL COMMENT '检验结果（qualified/unqualified）',
-    remark VARCHAR(500) COMMENT '不合格原因',
-    attempt_no INT NOT NULL DEFAULT 1 COMMENT '尝试次数',
-    is_latest TINYINT NOT NULL DEFAULT 1 COMMENT '是否最新记录',
-    inspector_id BIGINT COMMENT '检验员ID',
-    inspect_time DATETIME COMMENT '检验时间',
-    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    create_by BIGINT COMMENT '创建人ID',
-    update_by BIGINT COMMENT '更新人ID',
-    is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
-    KEY idx_process_id (production_process_id),
-    KEY idx_product_id (production_product_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='质检产品记录表';
 
 -- 工序流转记录表
 CREATE TABLE IF NOT EXISTS production_process_transfer (

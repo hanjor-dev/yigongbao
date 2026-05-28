@@ -42,11 +42,11 @@ public class ProductionProductEntity extends BaseEntity {
     private String udiPi;
     /** UDI生成时间 */
     private LocalDateTime udiGenerateTime;
-    /** 产品状态（in_process/redo/pass/completed/cancelled） */
+    /** 产品状态（in_process/fail/pass/completed/cancelled） */
     private String status;
     /** 当前所在工序类型 */
     private String currentProcessType;
-    /** 质检结果（pass/redo） */
+    /** 质检结果（pass/fail） */
     private String qcResult;
     /** 质检不合格原因 */
     private String qcRemark;
@@ -54,6 +54,4 @@ public class ProductionProductEntity extends BaseEntity {
     private LocalDateTime qcTime;
     /** 质检员ID */
     private Long qcUserId;
-    /** 指定重做工序类型（ASSIGN_PROCESS 处理方式时设置） */
-    private String redoProcessType;
 }

@@ -15,7 +15,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum QcResultEnum {
     PASS("pass", "合格"),
-    REDO("redo", "不合格");
+    FAIL("fail", "不合格");
 
     @EnumValue
     @JsonValue

@@ -145,7 +145,7 @@ public class FlowStateMachineServiceImpl implements FlowStateMachineService {
 
             // ========== Step 6: 决策下一阶段及初始状态 ==========
             PhaseAndStatus phaseAndStatus = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
-                    currentPhase, targetStatus, action, order.getNeedsPhysicalDelivery());
+                    currentPhase, targetStatus, action, order.getNeedsPhysicalDelivery(), order.getOrderType());
             Integer nextPhase = phaseAndStatus != null && phaseAndStatus.phase() != null
                     ? phaseAndStatus.phase().getValue() : null;
             Integer initialStatus = phaseAndStatus != null && phaseAndStatus.initialStatus() != null
