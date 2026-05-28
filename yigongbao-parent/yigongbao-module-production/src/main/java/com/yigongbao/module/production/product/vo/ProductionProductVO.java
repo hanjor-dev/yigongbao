@@ -13,6 +13,10 @@ public class ProductionProductVO {
     private Long id;
     private String productNo;
     private String productName;
+    private String specName;
+    private String certNo;
+    private String materialName;
+    private String colorName;
     private String status;
     private String statusName;
     private String qcResult;

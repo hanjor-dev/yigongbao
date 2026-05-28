@@ -142,6 +142,10 @@ public class DesignReviewPassedListener {
                 product.setPrintFileId(dpFile != null ? dpFile.getPackageFileId() : null);
                 product.setProductNo(codeGeneratorService.generate(ProductionConstants.PRODUCT_NO));
                 product.setProductName(dp.getProductName());
+                product.setSpecName(dp.getSpecName());
+                product.setCertNo(dp.getCertNo());
+                product.setMaterialName(dp.getMaterialName());
+                product.setColorName(dp.getColorName());
                 product.setFileName(dpFile != null ? dpFile.getPackageFileName() : null);
                 product.setStatus(ProductStatusEnum.IN_PROCESS.getCode());
                 productMapper.insert(product);

@@ -20,6 +20,10 @@ public class ProductionProductEntity extends BaseEntity {
     private Long printFileId;
     private String productNo;
     private String productName;
+    private String specName;
+    private String certNo;
+    private String materialName;
+    private String colorName;
     private String fileName;
     private String udiCode;
     private String udiDi;
