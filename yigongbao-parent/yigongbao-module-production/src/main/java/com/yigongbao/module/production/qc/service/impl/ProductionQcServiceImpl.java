@@ -138,6 +138,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
                 recordId, record.getRecordNo(), record.getOrderId());
     }
 
+    /** 查询流转卡下所有产品列表，按 ID 升序排列 */
     @Override
     public List<ProductionProductVO> listProductsByRecordId(Long recordId) {
         return productMapper.selectList(new LambdaQueryWrapper<ProductionProductEntity>()
@@ -148,6 +149,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
                 .collect(Collectors.toList());
     }
 
+    /** 分页查询质检流转卡列表；未指定状态时默认查询质检中的流转卡 */
     @Override
     public IPage<ProductionRecordVO> listQcRecords(ProductionQcPageDTO dto) {
         ProductionRecordPageDTO pageDTO = new ProductionRecordPageDTO();

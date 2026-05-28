@@ -35,6 +35,7 @@ public class DeviceStatusListener {
     private final IProductionRecordService recordService;
     private final OrderMainMapper orderMainMapper;
 
+    /** 监听设备状态变更：IDLE→BUSY 触发打印开始并更新流转卡状态；BUSY→IDLE 触发打印完成并聚合推进 Flow */
     @EventListener
     @Transactional(rollbackFor = Exception.class)
     public void onDeviceStateChange(DeviceStateChangeEvent event) {

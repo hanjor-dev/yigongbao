@@ -57,6 +57,7 @@ import java.util.stream.Collectors;
 
 /**
  * 生产流转卡服务实现
+ * 负责流转卡的查询、状态流转、设备分配、批号管理，以及 Flow 聚合触发逻辑
  *
  * @author hanjor
  * @date 2026-05-27
@@ -76,6 +77,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final ProductionProcessMapper processMapper;
     private final FlowFacade flowFacade;
 
+    /** 查询流转卡详情，包含产品列表和当前工序中文名 */
     @Override
     public ProductionRecordVO getRecordDetail(Long id) {
         ProductionRecordEntity record = getById(id);
@@ -92,6 +94,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         return vo;
     }
 
+    /** 通过流转卡编号查询详情（扫码入口） */
     @Override
     public ProductionRecordVO getByRecordNo(String recordNo) {
         ProductionRecordEntity record = getOne(new LambdaQueryWrapper<ProductionRecordEntity>()
@@ -102,6 +105,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         return getRecordDetail(record.getId());
     }
 
+    /** 获取流转卡二维码内容 */
     @Override
     public String getQrCodeUrl(Long id) {
         ProductionRecordEntity record = getById(id);
@@ -111,6 +115,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         return record.getQrCodeUrl();
     }
 
+    /** 分页查询流转卡列表；生产员自动限定到自己绑定的加工中心，支持关键字和时间范围过滤，批量关联查询避免 N+1 */
     @Override
     public IPage<ProductionRecordVO> pageRecords(ProductionRecordPageDTO dto) {
         // 数据权限：生产员只能查看自己绑定的加工中心数据
@@ -340,6 +345,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         return codeGeneratorService.generate(ProductionConstants.PRODUCTION_BATCH_NO);
     }
 
+    /** 提交生产批号和原材料批号，写入流转卡 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void submitBatchNo(Long recordId, SubmitBatchNoDTO dto) {
@@ -353,6 +359,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         log.info("提交生产批号: recordId={}, batchNo={}", recordId, dto.getProductionBatchNo());
     }
 
+    /** 获取流转卡的设备配置信息（已分配的打印机编号、名称等） */
     @Override
     public DeviceConfigVO getDeviceConfig(Long recordId) {
         ProductionRecordEntity record = getById(recordId);
@@ -364,6 +371,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         return vo;
     }
 
+    /** 按加工中心分组返回打印机列表；生产员只能看到自己绑定加工中心的设备 */
     @Override
     public List<ProcessingCenterPrintersVO> listPrinters() {
         // 1. 获取当前登录用户
@@ -427,6 +435,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             .collect(Collectors.toList());
     }
 
+    /** 为流转卡分配打印机；校验流转卡状态为待打印、设备在线且空闲，同步更新打印工序记录 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void assignDevice(Long recordId, AssignDeviceDTO dto) {
@@ -471,6 +480,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         log.info("分配打印机: recordId={}, deviceId={}, deviceNo={}", recordId, device.getId(), device.getDeviceId());
     }
 
+    /** 将产品 Entity 转为 VO，并填充状态中文名 */
     private ProductionProductVO toProductVO(ProductionProductEntity p) {
         ProductionProductVO vo = new ProductionProductVO();
         BeanUtil.copyProperties(p, vo);
@@ -481,6 +491,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         return vo;
     }
 
+    /** 根据 currentProcess 枚举码填充流转卡 VO 的当前工序中文名 */
     private void fillCurrentProcessName(ProductionRecordVO vo) {
         if (vo.getCurrentProcess() == null) {
             return;

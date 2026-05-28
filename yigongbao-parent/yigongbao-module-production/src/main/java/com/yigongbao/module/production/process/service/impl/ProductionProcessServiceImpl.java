@@ -53,6 +53,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
     private final DeviceMapper deviceMapper;
     private final UserMapper userMapper;
 
+    /** 查询流转卡的工序列表，按工序顺序升序排列 */
     @Override
     public List<ProcessVO> listProcesses(Long recordId) {
         List<ProductionProcessEntity> processes = list(
@@ -66,6 +67,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         }).collect(Collectors.toList());
     }
 
+    /** 开始工序：记录设备、操作员、开始时间；非打印工序同步更新流转卡状态为后处理中 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void startProcess(Long recordId, StartProcessDTO dto) {
@@ -157,6 +159,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         log.info("完成工序: recordId={}, processType={}", recordId, processType);
     }
 
+    /** 根据工序类型返回期望的设备类型码，用于校验分配设备是否匹配；打印工序由设备监听器驱动，此处返回 null */
     private String getExpectedDeviceType(String processType) {
         return switch (processType) {
             case "wash" -> DeviceTypeEnum.WASH_CONTAINER.getCode();

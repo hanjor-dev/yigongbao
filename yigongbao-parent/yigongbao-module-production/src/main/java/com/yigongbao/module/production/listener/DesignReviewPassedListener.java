@@ -52,6 +52,7 @@ public class DesignReviewPassedListener {
     private final ProductionProcessMapper processMapper;
     private final CodeGeneratorService codeGeneratorService;
 
+    /** 监听设计审核通过事件，为订单下每个数据包创建流转卡、产品记录和工序记录 */
     @EventListener
     @Transactional(rollbackFor = Exception.class)
     public void onDesignReviewPassed(DesignReviewPassedEvent event) {
@@ -93,6 +94,7 @@ public class DesignReviewPassedListener {
             orderId, packages.size(), createdCount);
     }
 
+    /** 创建单张流转卡，生成流转卡编号和生产批号，初始状态为设计审核通过 */
     private ProductionRecordEntity createProductionRecord(OrderMainEntity order, DesignPackageEntity pkg) {
         String recordNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_RECORD_NO);
         String batchNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_BATCH_NO);
@@ -117,6 +119,7 @@ public class DesignReviewPassedListener {
         return record;
     }
 
+    /** 按设计产品列表创建生产产品记录，按 quantity 字段展开数量，返回总产品数 */
     private int createProductRecords(ProductionRecordEntity record, DesignPackageEntity pkg) {
         List<DesignProductEntity> designProducts = designProductMapper.selectList(
                 new LambdaQueryWrapper<DesignProductEntity>()
@@ -155,6 +158,7 @@ public class DesignReviewPassedListener {
         return totalCount;
     }
 
+    /** 按订单类型创建工序记录：医疗器械5个（打印+清洗+固化+清洁干燥+包装），非医疗器械2个（打印+包装） */
     private void createProcessRecords(Long recordId, Integer orderType) {
         List<ProcessTypeEnum> processTypes = new ArrayList<>();
         processTypes.add(ProcessTypeEnum.PRINT);
