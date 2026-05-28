@@ -102,6 +102,13 @@ public class DesignReviewPassedListener {
         record.setDesignPackageId(pkg.getId());
         record.setDesignPackageCode(pkg.getPackageCode());
         record.setProductionBatchNo(batchNo);
+        record.setHospitalName(order.getHospitalName());
+        record.setHospitalDeptName(order.getHospitalDeptName());
+        record.setDoctorName(order.getDoctorName());
+        record.setPatientName(order.getPatientName());
+        record.setIsUrgent(order.getIsUrgent());
+        record.setIsPostal(order.getIsPostal());
+        record.setExpectedDeliveryDate(order.getExpectedDeliveryDate());
         record.setStatus(FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue());
         recordMapper.insert(record);
         return record;

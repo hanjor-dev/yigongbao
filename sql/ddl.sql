@@ -1617,7 +1617,7 @@ CREATE TABLE IF NOT EXISTS production_record (
     qualified_count INT NOT NULL DEFAULT 0 COMMENT '合格数量',
     unqualified_count INT NOT NULL DEFAULT 0 COMMENT '不合格数量',
     has_redo_product TINYINT NOT NULL DEFAULT 0 COMMENT '是否存在待重做产品（0=否，1=是）',
-    status VARCHAR(50) NOT NULL COMMENT '当前状态',
+    status INT NOT NULL COMMENT '当前状态（FlowStatusEnum值）',
     current_process VARCHAR(50) COMMENT '当前工序',
     qr_code_url VARCHAR(255) COMMENT '流转卡二维码URL',
     pack_device_id BIGINT COMMENT '包装设备ID',

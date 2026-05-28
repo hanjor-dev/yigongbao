@@ -87,7 +87,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         List<ProductionProductEntity> products = productMapper.selectList(
                 new LambdaQueryWrapper<ProductionProductEntity>()
                         .eq(ProductionProductEntity::getProductionRecordId, id));
-        vo.setProducts(BeanUtil.copyToList(products, ProductionProductVO.class));
+        vo.setProducts(products.stream().map(this::toProductVO).collect(Collectors.toList()));
         return vo;
     }
 
@@ -117,11 +117,28 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (dto.getStatus() != null) {
             wrapper.eq(ProductionRecordEntity::getStatus, dto.getStatus());
         }
-        if (dto.getRecordNo() != null) {
-            wrapper.like(ProductionRecordEntity::getRecordNo, dto.getRecordNo());
-        }
         if (dto.getProcessingCenterId() != null) {
             wrapper.eq(ProductionRecordEntity::getProcessingCenterId, dto.getProcessingCenterId());
+        }
+        if (dto.getKeyword() != null && !dto.getKeyword().isBlank()) {
+            String kw = dto.getKeyword();
+            wrapper.and(w -> w
+                    .like(ProductionRecordEntity::getOrderCode, kw)
+                    .or().like(ProductionRecordEntity::getDesignPackageCode, kw)
+                    .or().like(ProductionRecordEntity::getPatientName, kw));
+        }
+        // 按订单创建时间范围过滤（join order_main）
+        if (dto.getOrderCreateTimeStart() != null || dto.getOrderCreateTimeEnd() != null) {
+            List<Long> orderIds = orderMainMapper.selectList(
+                    new LambdaQueryWrapper<OrderMainEntity>()
+                            .ge(dto.getOrderCreateTimeStart() != null, OrderMainEntity::getCreateTime, dto.getOrderCreateTimeStart())
+                            .le(dto.getOrderCreateTimeEnd() != null, OrderMainEntity::getCreateTime, dto.getOrderCreateTimeEnd())
+                            .select(OrderMainEntity::getId))
+                    .stream().map(OrderMainEntity::getId).collect(Collectors.toList());
+            if (orderIds.isEmpty()) {
+                return page.convert(e -> new ProductionRecordVO());
+            }
+            wrapper.in(ProductionRecordEntity::getOrderId, orderIds);
         }
         Page<ProductionRecordEntity> result = page(page, wrapper);
         if (result.getRecords().isEmpty()) {
@@ -136,7 +153,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         java.util.Map<Long, List<ProductionProductVO>> productMap = allProducts.stream()
                 .collect(Collectors.groupingBy(
                         ProductionProductEntity::getProductionRecordId,
-                        Collectors.mapping(p -> BeanUtil.copyProperties(p, ProductionProductVO.class), Collectors.toList())));
+                        Collectors.mapping(p -> toProductVO(p), Collectors.toList())));
         return result.convert(e -> {
             ProductionRecordVO vo = new ProductionRecordVO();
             BeanUtil.copyProperties(e, vo);
@@ -166,11 +183,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         // 回写订单操作人信息（当前生产员）
         Long userId = StpUtil.getLoginIdAsLong();
-        String userName = (String) StpUtil.getSession().get("username");
+        UserEntity currentUser = userMapper.selectById(userId);
+        String realName = currentUser != null ? currentUser.getRealName() : null;
         OrderMainEntity orderUpdate = new OrderMainEntity();
         orderUpdate.setId(order.getId());
         orderUpdate.setCurrentHandlerId(userId);
-        orderUpdate.setCurrentHandlerName(userName);
+        orderUpdate.setCurrentHandlerName(realName);
         orderUpdate.setProducerId(userId);
         orderMainMapper.updateById(orderUpdate);
 
@@ -377,6 +395,16 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.IN_PROGRESS.getCode())
                 .set(ProductionProcessEntity::getStartTime, java.time.LocalDateTime.now()));
         log.info("分配打印机: recordId={}, deviceId={}, deviceNo={}", recordId, device.getId(), device.getDeviceId());
+    }
+
+    private ProductionProductVO toProductVO(ProductionProductEntity p) {
+        ProductionProductVO vo = new ProductionProductVO();
+        BeanUtil.copyProperties(p, vo);
+        ProductStatusEnum statusEnum = java.util.Arrays.stream(ProductStatusEnum.values())
+                .filter(e -> e.getCode().equals(p.getStatus()))
+                .findFirst().orElse(null);
+        vo.setStatusName(statusEnum != null ? statusEnum.getDesc() : p.getStatus());
+        return vo;
     }
 
     /**

@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
 /**
  * 生产流转卡实体
  *
@@ -50,4 +49,12 @@ public class ProductionRecordEntity extends BaseEntity {
     private String materialBatchNo;        // 原材料批号
     private LocalDateTime printStartTime;  // 打印开始时间
     private LocalDateTime printFinishTime; // 打印完成时间
+    // 订单基础信息冗余字段
+    private String hospitalName;
+    private String hospitalDeptName;
+    private String doctorName;
+    private String patientName;
+    private Integer isUrgent;
+    private Integer isPostal;
+    private LocalDateTime expectedDeliveryDate;
 }

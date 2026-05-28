@@ -14,6 +14,7 @@ public class ProductionProductVO {
     private String productNo;
     private String productName;
     private String status;
+    private String statusName;
     private String qcResult;
     private String udiCode;
 }
