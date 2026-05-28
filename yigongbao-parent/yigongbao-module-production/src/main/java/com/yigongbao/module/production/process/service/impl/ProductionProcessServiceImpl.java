@@ -10,6 +10,8 @@ import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProcessTypeEnum;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
@@ -49,6 +51,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
     private final ProductionProductMapper productMapper;
     private final IProductionRecordService recordService;
     private final DeviceMapper deviceMapper;
+    private final UserMapper userMapper;
 
     /**
      * 填写工序信息，完成后检查是否有 redo 产品在此工序重做，自动恢复为 in_process
@@ -173,8 +176,10 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         }
         process.setProcessParams(dto.getProcessParams());
         process.setStartTime(LocalDateTime.now());
-        process.setOperatorId(StpUtil.getLoginIdAsLong());
-        process.setOperatorName(StpUtil.getSession().get("username", "").toString());
+        Long userId = StpUtil.getLoginIdAsLong();
+        UserEntity operator = userMapper.selectById(userId);
+        process.setOperatorId(userId);
+        process.setOperatorName(operator != null ? operator.getRealName() : null);
         process.setStatus(ProcessStatusEnum.IN_PROGRESS.getCode());
         updateById(process);
         // 仅后处理工序更新流转卡状态

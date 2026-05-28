@@ -11,6 +11,7 @@ import com.yigongbao.module.production.record.service.IProductionRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
+import java.time.LocalDateTime;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,6 +53,7 @@ public class DeviceStatusListener {
         if (ProductionConstants.DEVICE_STATE_IDLE.equals(oldState)
                 && ProductionConstants.DEVICE_STATE_BUSY.equals(newState)) {
             record.setStatus(FlowStatusEnum.PRINTING.getValue());
+            record.setPrintStartTime(LocalDateTime.now());
             recordMapper.updateById(record);
             log.info("设备状态变更触发打印开始: recordId={}, recordNo={}, deviceId={}",
                     record.getId(), record.getRecordNo(), deviceId);
@@ -60,6 +62,7 @@ public class DeviceStatusListener {
         else if (ProductionConstants.DEVICE_STATE_BUSY.equals(oldState)
                 && ProductionConstants.DEVICE_STATE_IDLE.equals(newState)) {
             record.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
+            record.setPrintFinishTime(LocalDateTime.now());
             recordMapper.updateById(record);
             recordService.triggerFlowIfAllReach(record.getOrderId(),
                     FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);

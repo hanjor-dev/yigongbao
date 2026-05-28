@@ -7,6 +7,8 @@ import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.production.pack.dto.FillPackDTO;
 import com.yigongbao.module.production.pack.service.IProductionPackService;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
@@ -33,6 +35,7 @@ public class ProductionPackServiceImpl implements IProductionPackService {
     private final ProductionRecordMapper recordMapper;
     private final DeviceMapper deviceMapper;
     private final IProductionRecordService recordService;
+    private final UserMapper userMapper;
 
     /**
      * 填写包装信息
@@ -59,6 +62,8 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         record.setPackSterilizationMethod(dto.getPackSterilizationMethod());
         record.setPackSterilizationBatchNo(dto.getPackSterilizationBatchNo());
         record.setPackOperatorId(StpUtil.getLoginIdAsLong());
+        UserEntity user = userMapper.selectById(StpUtil.getLoginIdAsLong());
+        record.setPackOperatorName(user != null ? user.getRealName() : null);
         record.setPackTime(LocalDateTime.now());
         recordMapper.updateById(record);
         log.info("填写包装信息: recordId={}, recordNo={}, packDeviceId={}", recordId, record.getRecordNo(), dto.getPackDeviceId());

@@ -133,6 +133,9 @@ public class ProductionQcServiceImpl implements IProductionQcService {
                 p.setStatus(ProcessStatusEnum.PENDING.getCode());
                 p.setDeviceId(null);
                 p.setDeviceNo(null);
+                p.setDeviceName(null);
+                p.setOperatorId(null);
+                p.setOperatorName(null);
                 p.setStartTime(null);
                 p.setEndTime(null);
                 p.setProcessParams(null);
@@ -148,6 +151,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
                 OrderMainEntity orderUpdate = new OrderMainEntity();
                 orderUpdate.setId(record.getOrderId());
                 orderUpdate.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
+                orderUpdate.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.PRINT.getValue());
                 orderMainMapper.updateById(orderUpdate);
             }
             log.info("REWORK_TO_PRINT: productId={}, recordId={}, 重置所有工序为PENDING", productId, product.getProductionRecordId());

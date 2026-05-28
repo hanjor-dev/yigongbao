@@ -387,11 +387,17 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         record.setPrintDeviceName(device.getDeviceName());
         record.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
         updateById(record);
+        Long userId = StpUtil.getLoginIdAsLong();
+        com.yigongbao.module.system.user.entity.UserEntity currentUser = userMapper.selectById(userId);
+        String realName = currentUser != null ? currentUser.getRealName() : null;
         processMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionProcessEntity>()
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)
                 .eq(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PRINT.getCode())
                 .set(ProductionProcessEntity::getDeviceId, device.getId())
                 .set(ProductionProcessEntity::getDeviceNo, device.getDeviceId())
+                .set(ProductionProcessEntity::getDeviceName, device.getDeviceName())
+                .set(ProductionProcessEntity::getOperatorId, userId)
+                .set(ProductionProcessEntity::getOperatorName, realName)
                 .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.IN_PROGRESS.getCode())
                 .set(ProductionProcessEntity::getStartTime, java.time.LocalDateTime.now()));
         log.info("分配打印机: recordId={}, deviceId={}, deviceNo={}", recordId, device.getId(), device.getDeviceId());
@@ -432,6 +438,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         order.setId(orderId);
         order.setPhase(result.getTargetPhase());
         order.setStatus(result.getFinalStatus());
+        if (FlowActionEnum.COMPLETE_WAREHOUSE_IN.equals(action)) {
+            order.setActualCompleteTime(java.time.LocalDateTime.now());
+        }
         orderMainMapper.updateById(order);
         log.info("Flow状态流转完成: orderId={}, action={}, targetPhase={}, targetStatus={}",
                 orderId, action, result.getTargetPhase(), result.getFinalStatus());
