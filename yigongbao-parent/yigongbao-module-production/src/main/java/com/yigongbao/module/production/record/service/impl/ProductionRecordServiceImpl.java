@@ -112,6 +112,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
     @Override
     public IPage<ProductionRecordVO> pageRecords(ProductionRecordPageDTO dto) {
+        // 数据权限：生产员只能查看自己绑定的加工中心数据
+        UserEntity currentUser = userMapper.selectById(StpUtil.getLoginIdAsLong());
+        if (RoleCodeEnum.PRODUCTION_WORKER.getCode().equals(currentUser.getRoleCode())) {
+            dto.setProcessingCenterId(currentUser.getCenterId());
+        }
+
         Page<ProductionRecordEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
         LambdaQueryWrapper<ProductionRecordEntity> wrapper = new LambdaQueryWrapper<>();
         if (dto.getStatus() != null) {
@@ -273,6 +279,33 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         } else {
             log.info("聚合条件未满足，暂不触发Flow: orderId={}, requiredStatus={}, active={}, reached={}",
                     orderId, requiredStatus, totalActive, reachedCount);
+        }
+    }
+
+    @Override
+    public void triggerFlowIfAllExact(Long orderId, Integer exactStatus, FlowActionEnum action) {
+        long totalActive = count(new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getOrderId, orderId)
+                .notIn(ProductionRecordEntity::getStatus,
+                        FlowStatusEnum.PRINT_FAILED.getValue(),
+                        FlowStatusEnum.CANCELLED.getValue()));
+        if (totalActive == 0) {
+            return;
+        }
+        long matchCount = count(new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getOrderId, orderId)
+                .eq(ProductionRecordEntity::getStatus, exactStatus));
+        if (totalActive == matchCount) {
+            List<String> availableActions = flowFacade.getAvailableActions(orderId);
+            if (!availableActions.contains(action.name())) {
+                log.info("聚合条件满足但Flow已推进，跳过: orderId={}, action={}", orderId, action);
+                return;
+            }
+            triggerFlowAndSync(orderId, action);
+            log.info("聚合条件满足（精确匹配），触发Flow: orderId={}, exactStatus={}, action={}", orderId, exactStatus, action);
+        } else {
+            log.info("聚合条件未满足，暂不触发Flow: orderId={}, exactStatus={}, active={}, matched={}",
+                    orderId, exactStatus, totalActive, matchCount);
         }
     }
 

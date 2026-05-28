@@ -192,6 +192,11 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             return new PhaseAndStatus(FlowPhaseEnum.COMPLETED, FlowStatusEnum.COMPLETED);
         }
 
+        // 质检不合格回退到打印 → 回退到打印阶段，初始状态为 PENDING_PRINT
+        if (action == FlowActionEnum.REWORK_TO_PRINT) {
+            return new PhaseAndStatus(FlowPhaseEnum.PRINT, FlowStatusEnum.PENDING_PRINT);
+        }
+
         // 其他状态不推进阶段
         return new PhaseAndStatus(null, null);
     }
@@ -218,7 +223,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
         return switch (action) {
             case DATA_AUDIT_PASS, START_PRINT, COMPLETE_PRINT,
                  COMPLETE_POST_PROCESSING, QC_PASS, REWORK_COMPLETE,
-                 COMPLETE_WAREHOUSE_IN, USER_CONFIRM -> true;
+                 COMPLETE_WAREHOUSE_IN, USER_CONFIRM, REWORK_TO_PRINT -> true;
             default -> false;
         };
     }

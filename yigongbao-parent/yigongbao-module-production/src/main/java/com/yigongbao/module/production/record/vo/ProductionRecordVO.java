@@ -20,6 +20,7 @@ public class ProductionRecordVO {
     private Long orderId;
     private String orderCode;
     private Integer orderType;
+    private Long designPackageId;
     private String designPackageCode;
     private String productionBatchNo;
     private String material;

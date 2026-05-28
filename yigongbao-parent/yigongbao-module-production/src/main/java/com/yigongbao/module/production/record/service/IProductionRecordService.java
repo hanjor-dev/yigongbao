@@ -49,6 +49,12 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
     void triggerFlowIfAllReach(Long orderId, Integer requiredStatus, FlowActionEnum action);
 
     /**
+     * 聚合触发（精确匹配）：同订单所有活跃流转卡状态均精确等于 exactStatus 时触发 Flow
+     * 用于回退场景（REWORK_TO_PRINT），不能用 ≥ 判断
+     */
+    void triggerFlowIfAllExact(Long orderId, Integer exactStatus, FlowActionEnum action);
+
+    /**
      * 直接触发 Flow 状态流转并回写 order_main（无聚合条件）
      */
     void triggerFlowAndSync(Long orderId, FlowActionEnum action);

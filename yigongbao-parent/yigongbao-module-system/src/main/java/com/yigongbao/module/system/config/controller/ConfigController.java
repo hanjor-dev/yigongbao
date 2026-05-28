@@ -64,8 +64,8 @@ public class ConfigController {
      * @return 配置详情
      */
     @Operation(summary = "根据ID查询配置详情")
-    @GetMapping("/key/{key}")
-    public Result<ConfigVO> getByKey(@PathVariable String key) {
+    @GetMapping("/key")
+    public Result<ConfigVO> getByKey(@RequestParam String key) {
         return Result.success(configService.getConfigByKey(key));
     }
 

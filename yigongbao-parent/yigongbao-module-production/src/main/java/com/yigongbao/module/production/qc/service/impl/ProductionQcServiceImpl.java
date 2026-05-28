@@ -23,6 +23,7 @@ import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.qc.dto.ProductionQcPageDTO;
 import com.yigongbao.module.production.qc.dto.ProductionRedoPageDTO;
 import com.yigongbao.module.production.qc.service.IProductionQcService;
+import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
@@ -147,9 +148,15 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             if (record != null) {
                 record.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
                 record.setCurrentProcess(null);
+                record.setPrintStartTime(null);
+                record.setPrintFinishTime(null);
+                record.setPrintDeviceId(null);
+                record.setPrintDeviceCode(null);
+                record.setPrintDeviceName(null);
                 recordMapper.updateById(record);
-                // 通过 Flow 驱动 order_main 状态回退
-                recordService.triggerFlowAndSync(record.getOrderId(), FlowActionEnum.REWORK_TO_PRINT);
+                // 聚合判断：所有活跃流转卡都精确等于 PENDING_PRINT 时才触发 Flow 回退订单
+                recordService.triggerFlowIfAllExact(record.getOrderId(),
+                        FlowStatusEnum.PENDING_PRINT.getValue(), FlowActionEnum.REWORK_TO_PRINT);
             }
             log.info("REWORK_TO_PRINT: productId={}, recordId={}, 重置所有工序为PENDING", productId, product.getProductionRecordId());
         }
@@ -178,10 +185,11 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
-        // 校验所有产品均已合格
+        // 校验所有产品均已合格（废弃产品不参与校验）
         long notPassCount = productMapper.selectCount(new LambdaQueryWrapper<ProductionProductEntity>()
                 .eq(ProductionProductEntity::getProductionRecordId, recordId)
-                .ne(ProductionProductEntity::getStatus, ProductStatusEnum.PASS.getCode()));
+                .ne(ProductionProductEntity::getStatus, ProductStatusEnum.PASS.getCode())
+                .ne(ProductionProductEntity::getStatus, ProductStatusEnum.CANCELLED.getCode()));
         if (notPassCount > 0) {
             throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_ALL_PASS);
         }
@@ -206,15 +214,13 @@ public class ProductionQcServiceImpl implements IProductionQcService {
 
     @Override
     public IPage<ProductionRecordVO> listQcRecords(ProductionQcPageDTO dto) {
-        Page<ProductionRecordEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
-        LambdaQueryWrapper<ProductionRecordEntity> wrapper = new LambdaQueryWrapper<>();
-        if (dto.getStatus() != null) {
-            wrapper.eq(ProductionRecordEntity::getStatus, dto.getStatus());
-        } else {
-            wrapper.eq(ProductionRecordEntity::getStatus, FlowStatusEnum.QC_IN_PROGRESS.getValue());
-        }
-        return recordMapper.selectPage(page, wrapper)
-                .convert(e -> BeanUtil.copyProperties(e, ProductionRecordVO.class));
+        ProductionRecordPageDTO pageDTO = new ProductionRecordPageDTO();
+        pageDTO.setPageNum(dto.getPageNum());
+        pageDTO.setPageSize(dto.getPageSize());
+        pageDTO.setKeyword(dto.getKeyword());
+        // 不传 status 时默认查质检中
+        pageDTO.setStatus(dto.getStatus() != null ? dto.getStatus() : FlowStatusEnum.QC_IN_PROGRESS.getValue());
+        return recordService.pageRecords(pageDTO);
     }
 
     @Override
