@@ -20,8 +20,6 @@ import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
-import com.yigongbao.module.design.entity.DesignPackageFileEntity;
-import com.yigongbao.module.design.mapper.DesignPackageFileMapper;
 import com.yigongbao.module.design.mapper.DesignPackageMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -36,7 +34,6 @@ import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
-import com.yigongbao.module.production.record.dto.CreateRecordDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
@@ -52,7 +49,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -73,122 +69,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
     private final CodeGeneratorService codeGeneratorService;
     private final DesignPackageMapper designPackageMapper;
-    private final DesignPackageFileMapper designPackageFileMapper;
     private final OrderMainMapper orderMainMapper;
     private final DeviceMapper deviceMapper;
     private final UserMapper userMapper;
     private final ProductionProductMapper productMapper;
     private final ProductionProcessMapper processMapper;
     private final FlowFacade flowFacade;
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public Long createRecord(CreateRecordDTO dto) {
-        // 校验数据包
-        DesignPackageEntity designPackage = designPackageMapper.selectById(dto.getDesignPackageId());
-        if (designPackage == null) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
-        }
-        // 校验订单
-        OrderMainEntity order = orderMainMapper.selectById(designPackage.getOrderId());
-        if (order == null) {
-            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
-        }
-        // 校验打印设备
-        DeviceEntity device = deviceMapper.selectById(dto.getPrintDeviceId());
-        if (device == null) {
-            throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
-        }
-
-        String recordNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_RECORD_NO);
-        String batchNo = dto.getProductionBatchNo() != null
-                ? dto.getProductionBatchNo()
-                : codeGeneratorService.generate(ProductionConstants.PRODUCTION_BATCH_NO);
-
-        ProductionRecordEntity record = new ProductionRecordEntity();
-        record.setRecordNo(recordNo);
-        record.setOrderId(order.getId());
-        record.setOrderCode(order.getOrderCode());
-        record.setOrderType(order.getOrderType());
-        record.setDesignPackageId(designPackage.getId());
-        record.setDesignPackageCode(designPackage.getPackageCode());
-        record.setProductionBatchNo(batchNo);
-        record.setMaterial(dto.getMaterial());
-        record.setPrintDeviceId(device.getId());
-        record.setPrintDeviceCode(device.getDeviceId());
-        record.setPrintDeviceName(device.getDeviceName());
-        record.setProcessingCenterId(device.getCenterId());
-        record.setProcessingCenterName(device.getCenterName());
-        record.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
-        save(record);
-
-        // 按打印文件列表生成产品记录
-        int totalCount = createProductRecords(record, designPackage);
-        record.setTotalProductCount(totalCount);
-        // 按订单类型生成工序记录
-        createProcessRecords(record.getId(), order.getOrderType());
-
-        // 生成二维码内容（前端根据此内容生成图片）
-        String qrContent = String.format("RECORD:%s|BATCH:%s", recordNo, batchNo);
-        record.setQrCodeUrl(qrContent);
-        updateById(record);
-
-        log.info("创建生产流转卡: recordId={}, recordNo={}, orderId={}, orderType={}, productCount={}",
-                record.getId(), recordNo, order.getId(), order.getOrderType(), totalCount);
-        return record.getId();
-    }
-
-    /**
-     * 根据数据包内文件列表创建产品记录
-     */
-    private int createProductRecords(ProductionRecordEntity record, DesignPackageEntity designPackage) {
-        List<DesignPackageFileEntity> printFiles = designPackageFileMapper.selectList(
-                new LambdaQueryWrapper<DesignPackageFileEntity>()
-                        .eq(DesignPackageFileEntity::getPackageId, designPackage.getId()));
-        if (printFiles.isEmpty()) {
-            return 0;
-        }
-        List<ProductionProductEntity> products = new ArrayList<>();
-        for (DesignPackageFileEntity file : printFiles) {
-            ProductionProductEntity product = new ProductionProductEntity();
-            product.setProductionRecordId(record.getId());
-            product.setPrintFileId(file.getId());
-            product.setProductNo(codeGeneratorService.generate(ProductionConstants.PRODUCT_NO));
-            product.setProductName(file.getFileName());
-            product.setFileName(file.getFileName());
-            product.setStatus(ProductStatusEnum.IN_PROCESS.getCode());
-            products.add(product);
-        }
-        products.forEach(productMapper::insert);
-        return products.size();
-    }
-
-    /**
-     * 按订单类型创建工序记录
-     * 医疗器械订单：打印→酒精初洗→UV固化→超声清洗+干燥→包装
-     * 非医疗器械订单：打印→包装
-     */
-    private void createProcessRecords(Long recordId, Integer orderType) {
-        List<ProcessTypeEnum> processTypes = new ArrayList<>();
-        processTypes.add(ProcessTypeEnum.PRINT);
-        if (ProductionConstants.ORDER_TYPE_MEDICAL.equals(orderType)) {
-            processTypes.add(ProcessTypeEnum.WASH);
-            processTypes.add(ProcessTypeEnum.CURE);
-            processTypes.add(ProcessTypeEnum.CLEAN_DRY);
-        }
-        processTypes.add(ProcessTypeEnum.PACK);
-        for (int i = 0; i < processTypes.size(); i++) {
-            ProcessTypeEnum pt = processTypes.get(i);
-            ProductionProcessEntity process = new ProductionProcessEntity();
-            process.setProductionRecordId(recordId);
-            process.setProcessType(pt.getCode());
-            process.setProcessName(pt.getDesc());
-            process.setProcessOrder(i + 1);
-            process.setStatus(ProcessStatusEnum.PENDING.getCode());
-            processMapper.insert(process);
-        }
-        log.info("自动创建工序记录: recordId={}, orderType={}, processCount={}", recordId, orderType, processTypes.size());
-    }
 
     @Override
     public ProductionRecordVO getRecordDetail(Long id) {

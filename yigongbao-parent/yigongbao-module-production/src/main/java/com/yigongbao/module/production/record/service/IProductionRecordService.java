@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
-import com.yigongbao.module.production.record.dto.CreateRecordDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
@@ -21,8 +20,6 @@ import java.util.List;
  * @date 2026-05-27
  */
 public interface IProductionRecordService extends IService<ProductionRecordEntity> {
-
-    Long createRecord(CreateRecordDTO dto);
 
     ProductionRecordVO getRecordDetail(Long id);
 

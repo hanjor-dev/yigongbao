@@ -3,12 +3,10 @@ package com.yigongbao.module.production.record.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
-import com.yigongbao.module.production.record.dto.CreateRecordDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
-import com.yigongbao.module.production.record.vo.PrinterVO;
 import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,12 +41,6 @@ public class ProductionRecordController {
     @GetMapping("/scan")
     public Result<ProductionRecordVO> scanRecord(@RequestParam String recordNo) {
         return Result.success(recordService.getByRecordNo(recordNo));
-    }
-
-    @Operation(summary = "创建生产流转卡")
-    @PostMapping("/create")
-    public Result<Long> createRecord(@Valid @RequestBody CreateRecordDTO dto) {
-        return Result.success(recordService.createRecord(dto));
     }
 
     @Operation(summary = "查询流转卡详情")
