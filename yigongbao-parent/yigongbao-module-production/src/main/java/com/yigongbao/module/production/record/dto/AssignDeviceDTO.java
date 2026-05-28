@@ -13,4 +13,9 @@ import lombok.Data;
 public class AssignDeviceDTO {
     @NotNull(message = "打印机ID不能为空")
     private Long deviceId;
+
+    private String material;
+
+    /** 打印参数（JSON格式，如层厚、支撑密度等） */
+    private String printParams;
 }

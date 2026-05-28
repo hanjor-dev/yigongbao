@@ -429,6 +429,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         record.setPrintDeviceCode(device.getDeviceId());
         record.setPrintDeviceName(device.getDeviceName());
         record.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
+        if (dto.getMaterial() != null) {
+            record.setMaterial(dto.getMaterial());
+        }
         updateById(record);
         Long userId = StpUtil.getLoginIdAsLong();
         com.yigongbao.module.system.user.entity.UserEntity currentUser = userMapper.selectById(userId);
@@ -442,7 +445,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .set(ProductionProcessEntity::getOperatorId, userId)
                 .set(ProductionProcessEntity::getOperatorName, realName)
                 .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.IN_PROGRESS.getCode())
-                .set(ProductionProcessEntity::getStartTime, java.time.LocalDateTime.now()));
+                .set(ProductionProcessEntity::getStartTime, java.time.LocalDateTime.now())
+                .set(dto.getPrintParams() != null, ProductionProcessEntity::getProcessParams, dto.getPrintParams()));
         log.info("分配打印机: recordId={}, deviceId={}, deviceNo={}", recordId, device.getId(), device.getDeviceId());
     }
 

@@ -9,6 +9,7 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
+import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
@@ -173,6 +174,11 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         process.setDeviceId(dto.getPrimaryDeviceId());
         DeviceEntity device = deviceMapper.selectById(dto.getPrimaryDeviceId());
         if (device != null) {
+            // 校验设备类型与工序类型匹配
+            String expectedDeviceType = getExpectedDeviceType(dto.getProcessType());
+            if (expectedDeviceType != null && !expectedDeviceType.equals(device.getDeviceType())) {
+                throw new BusinessException(400, "设备类型与工序不匹配，请选择正确的设备");
+            }
             process.setDeviceNo(device.getDeviceId());
             process.setDeviceName(device.getDeviceName());
         }
@@ -205,7 +211,19 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         if (!ProcessStatusEnum.IN_PROGRESS.getCode().equals(process.getStatus())) {
             throw new BusinessException(400, "工序未在进行中，无法完成");
         }
-        process.setEndTime(LocalDateTime.now());
+        // 结束时间 = 开始时间 + 设备配置耗时，未配置则降级为当前时间
+        LocalDateTime endTime;
+        if (process.getDeviceId() != null) {
+            DeviceEntity device = deviceMapper.selectById(process.getDeviceId());
+            if (device != null && device.getProcessingMinutes() != null && device.getProcessingMinutes() > 0) {
+                endTime = process.getStartTime().plusMinutes(device.getProcessingMinutes());
+            } else {
+                endTime = LocalDateTime.now();
+            }
+        } else {
+            endTime = LocalDateTime.now();
+        }
+        process.setEndTime(endTime);
         process.setStatus(ProcessStatusEnum.COMPLETED.getCode());
         updateById(process);
 
@@ -234,5 +252,15 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                     FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
         }
         log.info("完成工序并自动流转: recordId={}, processType={}", recordId, processType);
+    }
+
+    private String getExpectedDeviceType(String processType) {
+        return switch (processType) {
+            case "wash" -> DeviceTypeEnum.WASH_CONTAINER.getCode();
+            case "cure" -> DeviceTypeEnum.UV_CURING.getCode();
+            case "clean_dry" -> DeviceTypeEnum.ULTRASONIC_CLEANER.getCode();
+            case "pack" -> DeviceTypeEnum.SEALING_MACHINE.getCode();
+            default -> null;
+        };
     }
 }
