@@ -10,7 +10,6 @@ import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProcessTypeEnum;
-import com.yigongbao.module.production.process.dto.FillProcessDTO;
 import com.yigongbao.module.production.process.dto.StartProcessDTO;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
@@ -56,23 +55,6 @@ class ProductionProcessServiceImplTest {
         Field f = ServiceImpl.class.getDeclaredField("baseMapper");
         f.setAccessible(true);
         f.set(processService, processMapper);
-    }
-
-    // ---- fillProcess ----
-
-    @Test
-    void fillProcess_processNotFound_throwsException() {
-        when(processMapper.selectById(99L)).thenReturn(null);
-        assertEquals(ErrorCodeEnum.PRODUCTION_PROCESS_NOT_FOUND.getCode(),
-                assertThrows(BusinessException.class, () -> processService.fillProcess(99L, new FillProcessDTO())).getCode());
-    }
-
-    @Test
-    void fillProcess_updatesDeviceAndParams() {
-        when(processMapper.selectById(1L)).thenReturn(proc(1L, 10L, ProcessTypeEnum.WASH.getCode()));
-        processService.fillProcess(1L, fillDto(5L));
-        verify(processMapper).updateById((ProductionProcessEntity) argThat(p ->
-                Long.valueOf(5L).equals(((ProductionProcessEntity) p).getDeviceId())));
     }
 
     // ---- startProcess ----
@@ -182,12 +164,6 @@ class ProductionProcessServiceImplTest {
         r.setOrderId(orderId);
         r.setRecordNo("REC-00" + id);
         return r;
-    }
-
-    private FillProcessDTO fillDto(Long deviceId) {
-        FillProcessDTO dto = new FillProcessDTO();
-        dto.setDeviceId(deviceId);
-        return dto;
     }
 
     private StartProcessDTO startDto(String processType, Long deviceId) {
