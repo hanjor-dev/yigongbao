@@ -221,6 +221,10 @@ public class OrderExportServiceImpl implements OrderExportService {
             case "orderCode":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getOrderCode()));
                 break;
+            case "orderType":
+            case "orderTypeName":
+                cell.setCellValue(StrUtil.nullToEmpty(order.getOrderTypeName()));
+                break;
             case "hospitalName":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getHospitalName()));
                 break;
@@ -269,6 +273,7 @@ public class OrderExportServiceImpl implements OrderExportService {
                 cell.setCellValue(StrUtil.nullToEmpty(orderQueryHelper.getPhaseName(order.getPhase())));
                 break;
             case "status":
+            case "statusName":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getStatusName()));
                 break;
             case "operatorName":

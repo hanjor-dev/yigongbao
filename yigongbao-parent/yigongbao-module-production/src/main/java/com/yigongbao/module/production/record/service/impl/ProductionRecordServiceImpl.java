@@ -118,19 +118,30 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     /** 分页查询流转卡列表；生产员自动限定到自己绑定的加工中心，支持关键字和时间范围过滤，批量关联查询避免 N+1 */
     @Override
     public IPage<ProductionRecordVO> pageRecords(ProductionRecordPageDTO dto) {
-        // 数据权限：生产员只能查看自己绑定的加工中心数据
         UserEntity currentUser = userMapper.selectById(StpUtil.getLoginIdAsLong());
-        if (RoleCodeEnum.PRODUCTION_WORKER.getCode().equals(currentUser.getRoleCode())) {
-            dto.setProcessingCenterId(currentUser.getCenterId());
-        }
 
         Page<ProductionRecordEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
-        LambdaQueryWrapper<ProductionRecordEntity> wrapper = new LambdaQueryWrapper<>();
-        if (dto.getStatus() != null) {
+        LambdaQueryWrapper<ProductionRecordEntity> wrapper = new LambdaQueryWrapper<ProductionRecordEntity>()
+                .orderByDesc(ProductionRecordEntity::getCreateTime);
+        if (dto.getStatuses() != null && !dto.getStatuses().isEmpty()) {
+            wrapper.in(ProductionRecordEntity::getStatus, dto.getStatuses());
+        } else if (dto.getStatus() != null) {
             wrapper.eq(ProductionRecordEntity::getStatus, dto.getStatus());
         }
         if (dto.getProcessingCenterId() != null) {
+            // 前端或管理员指定加工中心时精确过滤
             wrapper.eq(ProductionRecordEntity::getProcessingCenterId, dto.getProcessingCenterId());
+        } else if (RoleCodeEnum.PRODUCTION_WORKER.getCode().equals(currentUser.getRoleCode())) {
+            // 生产员：已分配加工中心的数据只看自己的，未分配（设计审核通过状态）的数据所有人可见
+            Long centerId = currentUser.getCenterId();
+            if (centerId != null) {
+                wrapper.and(w -> w
+                        .eq(ProductionRecordEntity::getProcessingCenterId, centerId)
+                        .or().isNull(ProductionRecordEntity::getProcessingCenterId));
+            } else {
+                // 生产员未绑定加工中心，只能看未分配的数据
+                wrapper.isNull(ProductionRecordEntity::getProcessingCenterId);
+            }
         }
         if (dto.getKeyword() != null && !dto.getKeyword().isBlank()) {
             String kw = dto.getKeyword();

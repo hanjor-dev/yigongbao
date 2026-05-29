@@ -156,7 +156,13 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         pageDTO.setPageNum(dto.getPageNum());
         pageDTO.setPageSize(dto.getPageSize());
         pageDTO.setKeyword(dto.getKeyword());
-        pageDTO.setStatus(dto.getStatus() != null ? dto.getStatus() : FlowStatusEnum.QC_IN_PROGRESS.getValue());
+        if (dto.getStatus() != null) {
+            pageDTO.setStatus(dto.getStatus());
+        } else {
+            pageDTO.setStatuses(List.of(
+                    FlowStatusEnum.QC_IN_PROGRESS.getValue(),
+                    FlowStatusEnum.PACKING.getValue()));
+        }
         return recordService.pageRecords(pageDTO);
     }
 }
