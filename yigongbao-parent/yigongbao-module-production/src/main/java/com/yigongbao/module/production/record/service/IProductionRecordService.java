@@ -9,7 +9,6 @@ import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.vo.CancelPreviewVO;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
-import com.yigongbao.module.production.record.vo.PrinterVO;
 import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import com.yigongbao.module.basic.file.vo.FileVO;
@@ -31,7 +30,7 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
 
     IPage<ProductionRecordVO> pageRecords(ProductionRecordPageDTO dto);
 
-    void downloadDataPackage(Long designPackageId);
+    String downloadDataPackage(Long designPackageId);
 
     String generateBatchNo(Long recordId);
 

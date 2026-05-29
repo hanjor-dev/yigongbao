@@ -225,7 +225,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void downloadDataPackage(Long designPackageId) {
+    public String downloadDataPackage(Long designPackageId) {
         DesignPackageEntity designPackage = designPackageMapper.selectById(designPackageId);
         if (designPackage == null) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
@@ -243,7 +243,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                     .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
                     .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue())
                     .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue()));
-            return;
+            return designPackage.getFileUrl();
         }
 
         // 聚合判断：只有订单下所有流转卡都已下载（即全部从 DESIGN_REVIEW_PASSED 推进）才触发 Flow
@@ -268,6 +268,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         triggerFlowIfAllExact(order.getId(), FlowStatusEnum.PENDING_PRINT.getValue(), FlowActionEnum.START_PRINT);
 
         log.info("下载设计数据包，触发待打印状态流转: orderId={}, designPackageId={}", order.getId(), designPackageId);
+        return designPackage.getFileUrl();
     }
 
     @Override
@@ -427,7 +428,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 vo.setDeviceName(d.getDeviceName());
                 int statusCode = resolveDeviceStatus(d);
                 vo.setStatus(statusCode);
-                vo.setStatusName(statusCode == 0 ? "离线" : statusCode == 2 ? "繁忙" : "空闲");
+                vo.setStatusName(statusCode == 0 ? "空闲" : "占用");
                 return new Object[]{d.getCenterId(), d.getCenterName(), vo};
             })
             .collect(Collectors.groupingBy(
@@ -523,30 +524,24 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     }
 
     /**
-     * 解析设备状态：0=离线，1=空闲/可用，2=繁忙/不可用
+     * 解析设备状态：0=空闲，1=占用（包括离线、繁忙、不可用）
      *
      * 打印设备（PRINTER_SLA）：state=0表示空闲，state=1表示繁忙
      * 其他设备：state=0表示可用，state=1表示不可用
      */
     private int resolveDeviceStatus(DeviceEntity device) {
-        // 校验连接状态
+        // 离线视为占用
         if (device.getConnectionStatus() == null || device.getConnectionStatus() == 0) {
-            return 0; // 离线
+            return 1;
         }
 
         // 根据设备类型区分state字段含义
         if (DeviceTypeEnum.PRINTER_SLA.getCode().equals(device.getDeviceType())) {
             // 打印设备：state=0空闲，state=1繁忙
-            if (Integer.valueOf(1).equals(device.getState())) {
-                return 2; // 繁忙
-            }
-            return 1; // 空闲
+            return Integer.valueOf(1).equals(device.getState()) ? 1 : 0;
         } else {
             // 其他设备：state=0可用，state=1不可用
-            if (Integer.valueOf(1).equals(device.getState())) {
-                return 2; // 不可用
-            }
-            return 1; // 可用
+            return Integer.valueOf(1).equals(device.getState()) ? 1 : 0;
         }
     }
 

@@ -53,9 +53,8 @@ public class ProductionRecordController {
 
     @Operation(summary = "下载设计数据包")
     @PostMapping("/{designPackageId}/download-package")
-    public Result<Void> downloadDataPackage(@PathVariable Long designPackageId) {
-        recordService.downloadDataPackage(designPackageId);
-        return Result.success();
+    public Result<String> downloadDataPackage(@PathVariable Long designPackageId) {
+        return Result.success(recordService.downloadDataPackage(designPackageId));
     }
 
     @Operation(summary = "自动生成生产批号（预览，不写库）")
