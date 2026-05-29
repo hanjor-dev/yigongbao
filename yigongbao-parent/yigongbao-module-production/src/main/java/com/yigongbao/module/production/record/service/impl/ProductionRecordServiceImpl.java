@@ -19,7 +19,11 @@ import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
+import com.yigongbao.module.design.entity.DesignDrawingEntity;
+import com.yigongbao.module.design.entity.DesignInstructionEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
+import com.yigongbao.module.design.mapper.DesignDrawingMapper;
+import com.yigongbao.module.design.mapper.DesignInstructionMapper;
 import com.yigongbao.module.design.mapper.DesignPackageMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.record.vo.*;
@@ -68,6 +72,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
     private final CodeGeneratorService codeGeneratorService;
     private final DesignPackageMapper designPackageMapper;
+    private final DesignInstructionMapper designInstructionMapper;
+    private final DesignDrawingMapper designDrawingMapper;
     private final OrderMainMapper orderMainMapper;
     private final DeviceMapper deviceMapper;
     private final UserMapper userMapper;
@@ -77,7 +83,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final FlowCardExcelBuilder flowCardExcelBuilder;
     private final com.yigongbao.module.basic.file.service.FileService fileService;
 
-    /** 查询流转卡详情，包含产品列表和当前工序中文名 */
+    /** 查询流转卡详情，包含产品列表、当前工序中文名和设计文件信息 */
     @Override
     public ProductionRecordVO getRecordDetail(Long id) {
         ProductionRecordEntity record = getById(id);
@@ -91,7 +97,46 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 new LambdaQueryWrapper<ProductionProductEntity>()
                         .eq(ProductionProductEntity::getProductionRecordId, id));
         vo.setProducts(products.stream().map(this::toProductVO).collect(Collectors.toList()));
+        fillDesignFiles(vo, record.getDesignPackageId());
         return vo;
+    }
+
+    private void fillDesignFiles(ProductionRecordVO vo, Long designPackageId) {
+        if (designPackageId == null) return;
+        DesignPackageEntity pkg = designPackageMapper.selectById(designPackageId);
+        if (pkg != null) {
+            com.yigongbao.module.basic.file.vo.FileVO pkgFile = new com.yigongbao.module.basic.file.vo.FileVO();
+            pkgFile.setFileName(pkg.getFileName());
+            pkgFile.setFileUrl(pkg.getFileUrl());
+            pkgFile.setFileSize(pkg.getFileSize());
+            vo.setDataPackageFile(pkgFile);
+
+            DesignInstructionEntity instruction = designInstructionMapper.selectOne(
+                    new LambdaQueryWrapper<DesignInstructionEntity>()
+                            .eq(DesignInstructionEntity::getPackageId, designPackageId)
+                            .orderByDesc(DesignInstructionEntity::getVersionSeq)
+                            .last("LIMIT 1"));
+            if (instruction != null) {
+                String url = cn.hutool.core.util.StrUtil.isNotBlank(instruction.getRevisedFileUrl())
+                        ? instruction.getRevisedFileUrl() : instruction.getTemplateFileUrl();
+                com.yigongbao.module.basic.file.vo.FileVO instrFile = new com.yigongbao.module.basic.file.vo.FileVO();
+                instrFile.setFileUrl(url);
+                vo.setInstructionFile(instrFile);
+            }
+
+            DesignDrawingEntity drawing = designDrawingMapper.selectOne(
+                    new LambdaQueryWrapper<DesignDrawingEntity>()
+                            .eq(DesignDrawingEntity::getPackageId, designPackageId)
+                            .orderByDesc(DesignDrawingEntity::getVersionSeq)
+                            .last("LIMIT 1"));
+            if (drawing != null) {
+                String url = cn.hutool.core.util.StrUtil.isNotBlank(drawing.getRevisedFileUrl())
+                        ? drawing.getRevisedFileUrl() : drawing.getTemplateFileUrl();
+                com.yigongbao.module.basic.file.vo.FileVO drawFile = new com.yigongbao.module.basic.file.vo.FileVO();
+                drawFile.setFileUrl(url);
+                vo.setDrawingFile(drawFile);
+            }
+        }
     }
 
     /** 通过流转卡编号查询详情（扫码入口） */

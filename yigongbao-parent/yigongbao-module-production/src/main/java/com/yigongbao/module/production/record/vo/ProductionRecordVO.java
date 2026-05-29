@@ -1,5 +1,6 @@
 package com.yigongbao.module.production.record.vo;
 
+import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -65,4 +66,8 @@ public class ProductionRecordVO {
     private BigDecimal estimatedCost;
     private LocalDateTime actualCompleteTime;
     private List<ProductionProductVO> products;
+    // 设计文件（来自 design 模块关联查询）
+    private FileVO instructionFile;
+    private FileVO drawingFile;
+    private FileVO dataPackageFile;
 }
