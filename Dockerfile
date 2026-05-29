@@ -13,6 +13,7 @@ COPY yigongbao-parent/yigongbao-module-flow/pom.xml ./yigongbao-module-flow/
 COPY yigongbao-parent/yigongbao-module-order/pom.xml ./yigongbao-module-order/
 COPY yigongbao-parent/yigongbao-module-design/pom.xml ./yigongbao-module-design/
 COPY yigongbao-parent/yigongbao-module-imaging/pom.xml ./yigongbao-module-imaging/
+COPY yigongbao-parent/yigongbao-module-production/pom.xml ./yigongbao-module-production/
 COPY yigongbao-parent/yigongbao-boot/pom.xml ./yigongbao-boot/
 
 # 下载依赖（利用 Docker 缓存）
