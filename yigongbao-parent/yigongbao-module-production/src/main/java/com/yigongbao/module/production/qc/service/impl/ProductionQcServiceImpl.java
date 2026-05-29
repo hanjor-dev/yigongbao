@@ -123,16 +123,22 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         if (!FlowStatusEnum.QC_IN_PROGRESS.getValue().equals(record.getStatus())) {
             throw new BusinessException(400, "流转卡当前状态不允许流转到包装");
         }
-        long notPassCount = productMapper.selectCount(new LambdaQueryWrapper<ProductionProductEntity>()
+        // 校验产品状态：必须全部合格或已取消
+        long inProcessCount = productMapper.selectCount(new LambdaQueryWrapper<ProductionProductEntity>()
                 .eq(ProductionProductEntity::getProductionRecordId, recordId)
-                .ne(ProductionProductEntity::getStatus, ProductStatusEnum.PASS.getCode())
-                .ne(ProductionProductEntity::getStatus, ProductStatusEnum.CANCELLED.getCode()));
-        if (notPassCount > 0) {
-            throw new BusinessException(ErrorCodeEnum.PRODUCT_NOT_ALL_PASS);
+                .eq(ProductionProductEntity::getStatus, ProductStatusEnum.IN_PROCESS.getCode()));
+        if (inProcessCount > 0) {
+            throw new BusinessException(400, "存在未质检的产品，无法流转到包装");
+        }
+        long failCount = productMapper.selectCount(new LambdaQueryWrapper<ProductionProductEntity>()
+                .eq(ProductionProductEntity::getProductionRecordId, recordId)
+                .eq(ProductionProductEntity::getStatus, ProductStatusEnum.FAIL.getCode()));
+        if (failCount > 0) {
+            throw new BusinessException(400, "存在质检不合格的产品，无法流转到包装");
         }
         record.setStatus(FlowStatusEnum.PACKING.getValue());
         recordMapper.updateById(record);
-        recordService.triggerFlowIfAllReach(record.getOrderId(),
+        recordService.triggerFlowIfAllExact(record.getOrderId(),
                 FlowStatusEnum.PACKING.getValue(), FlowActionEnum.QC_PASS);
         log.info("质检完成，流转到包装: recordId={}, recordNo={}, orderId={}",
                 recordId, record.getRecordNo(), record.getOrderId());

@@ -7,6 +7,7 @@ import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
+import com.yigongbao.module.production.record.vo.CancelPreviewVO;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import com.yigongbao.module.production.record.vo.PrinterVO;
 import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
@@ -56,4 +57,9 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
      * 直接触发 Flow 状态流转并回写 order_main（无聚合条件）
      */
     void triggerFlowAndSync(Long orderId, FlowActionEnum action);
+
+    /**
+     * 获取流转卡取消预查询信息
+     */
+    CancelPreviewVO getCancelPreview(Long recordId);
 }

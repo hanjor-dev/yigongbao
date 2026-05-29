@@ -83,9 +83,15 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         if (record.getPackDeviceId() == null) {
             throw new BusinessException(ErrorCodeEnum.PACK_INFO_NOT_FILLED);
         }
+        // 幂等性保护：只有在包装状态下才能流转到入库
+        if (!FlowStatusEnum.PACKING.getValue().equals(record.getStatus())) {
+            log.warn("流转卡状态不允许流转到入库: recordId={}, currentStatus={}",
+                recordId, record.getStatus());
+            throw new BusinessException(400, "流转卡当前状态不允许流转到入库");
+        }
         record.setStatus(FlowStatusEnum.WAREHOUSE_IN.getValue());
         recordMapper.updateById(record);
-        recordService.triggerFlowIfAllReach(record.getOrderId(),
+        recordService.triggerFlowIfAllExact(record.getOrderId(),
                 FlowStatusEnum.WAREHOUSE_IN.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_IN);
         log.info("包装完成，流转到入库: recordId={}, recordNo={}, orderId={}", recordId, record.getRecordNo(), record.getOrderId());
     }

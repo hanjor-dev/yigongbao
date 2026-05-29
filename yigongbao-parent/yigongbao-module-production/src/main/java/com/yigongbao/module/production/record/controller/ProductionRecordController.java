@@ -6,6 +6,7 @@ import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
+import com.yigongbao.module.production.record.vo.CancelPreviewVO;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
@@ -37,12 +38,6 @@ public class ProductionRecordController {
         return Result.success(recordService.pageRecords(dto));
     }
 
-    @Operation(summary = "扫码查询流转卡")
-    @GetMapping("/scan")
-    public Result<ProductionRecordVO> scanRecord(@RequestParam String recordNo) {
-        return Result.success(recordService.getByRecordNo(recordNo));
-    }
-
     @Operation(summary = "查询流转卡详情")
     @GetMapping("/{id}")
     public Result<ProductionRecordVO> getRecordDetail(@PathVariable Long id) {
@@ -54,12 +49,6 @@ public class ProductionRecordController {
     public Result<Void> downloadDataPackage(@PathVariable Long designPackageId) {
         recordService.downloadDataPackage(designPackageId);
         return Result.success();
-    }
-
-    @Operation(summary = "获取流转卡二维码")
-    @GetMapping("/{id}/qr-code")
-    public Result<String> getQrCode(@PathVariable Long id) {
-        return Result.success(recordService.getQrCodeUrl(id));
     }
 
     @Operation(summary = "自动生成生产批号（预览，不写库）")
@@ -92,5 +81,11 @@ public class ProductionRecordController {
     public Result<Void> assignDevice(@PathVariable Long id, @Valid @RequestBody AssignDeviceDTO dto) {
         recordService.assignDevice(id, dto);
         return Result.success();
+    }
+
+    @Operation(summary = "流转卡取消预查询")
+    @GetMapping("/{id}/cancel-preview")
+    public Result<CancelPreviewVO> getCancelPreview(@PathVariable Long id) {
+        return Result.success(recordService.getCancelPreview(id));
     }
 }

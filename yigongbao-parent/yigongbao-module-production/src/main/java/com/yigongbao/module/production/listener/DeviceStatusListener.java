@@ -87,7 +87,7 @@ public class DeviceStatusListener {
             Long orderId = records.get(0).getOrderId();
             // 非医疗器械订单打印完成后 Flow 直接跳 QC，需同步更新流转卡状态
             boolean isNonMedical = ProductionConstants.ORDER_TYPE_NON_MEDICAL.equals(records.get(0).getOrderType());
-            recordService.triggerFlowIfAllReach(orderId,
+            recordService.triggerFlowIfAllExact(orderId,
                     FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
             if (isNonMedical) {
                 recordMapper.update(null,

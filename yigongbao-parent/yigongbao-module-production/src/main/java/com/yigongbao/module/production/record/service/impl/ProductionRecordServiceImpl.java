@@ -264,8 +264,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         orderUpdate.setProducerId(userId);
         orderMainMapper.updateById(orderUpdate);
 
-        // 聚合触发：所有流转卡都已推进到 PENDING_PRINT 或更后状态时才触发 Flow
-        triggerFlowIfAllReach(order.getId(), FlowStatusEnum.PENDING_PRINT.getValue(), FlowActionEnum.START_PRINT);
+        // 聚合触发：所有流转卡都精确到达 PENDING_PRINT 状态时才触发 Flow
+        triggerFlowIfAllExact(order.getId(), FlowStatusEnum.PENDING_PRINT.getValue(), FlowActionEnum.START_PRINT);
 
         log.info("下载设计数据包，触发待打印状态流转: orderId={}, designPackageId={}", order.getId(), designPackageId);
     }
@@ -363,6 +363,15 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         ProductionRecordEntity record = getById(recordId);
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        // 批号唯一性校验
+        if (cn.hutool.core.util.StrUtil.isNotBlank(dto.getProductionBatchNo())) {
+            long existCount = count(new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getProductionBatchNo, dto.getProductionBatchNo())
+                .ne(ProductionRecordEntity::getId, recordId));
+            if (existCount > 0) {
+                throw new BusinessException(400, "生产批号已存在，请重新生成");
+            }
         }
         record.setProductionBatchNo(dto.getProductionBatchNo());
         record.setMaterialBatchNo(dto.getMaterialBatchNo());
@@ -514,16 +523,54 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     }
 
     /**
-     * 解析设备状态：0=离线，1=空闲，2=繁忙
+     * 解析设备状态：0=离线，1=空闲/可用，2=繁忙/不可用
+     *
+     * 打印设备（PRINTER_SLA）：state=0表示空闲，state=1表示繁忙
+     * 其他设备：state=0表示可用，state=1表示不可用
      */
     private int resolveDeviceStatus(DeviceEntity device) {
+        // 校验连接状态
         if (device.getConnectionStatus() == null || device.getConnectionStatus() == 0) {
-            return 0;
+            return 0; // 离线
         }
-        if (Integer.valueOf(1).equals(device.getState())) {
-            return 2;
+
+        // 根据设备类型区分state字段含义
+        if (DeviceTypeEnum.PRINTER_SLA.getCode().equals(device.getDeviceType())) {
+            // 打印设备：state=0空闲，state=1繁忙
+            if (Integer.valueOf(1).equals(device.getState())) {
+                return 2; // 繁忙
+            }
+            return 1; // 空闲
+        } else {
+            // 其他设备：state=0可用，state=1不可用
+            if (Integer.valueOf(1).equals(device.getState())) {
+                return 2; // 不可用
+            }
+            return 1; // 可用
         }
-        return 1;
+    }
+
+    @Override
+    public CancelPreviewVO getCancelPreview(Long recordId) {
+        ProductionRecordEntity record = getById(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        OrderMainEntity order = orderMainMapper.selectById(record.getOrderId());
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        long totalRecordCount = count(new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getOrderId, record.getOrderId())
+                .notIn(ProductionRecordEntity::getStatus,
+                        FlowStatusEnum.CANCELLED.getValue(),
+                        FlowStatusEnum.PRINT_FAILED.getValue()));
+        CancelPreviewVO vo = new CancelPreviewVO();
+        vo.setOrderId(order.getId());
+        vo.setOrderCode(order.getOrderCode());
+        vo.setTotalRecordCount((int) totalRecordCount);
+        vo.setMessage(String.format("订单 %s 共有 %d 张流转卡，取消后将全部作废", order.getOrderCode(), totalRecordCount));
+        return vo;
     }
 
     /**

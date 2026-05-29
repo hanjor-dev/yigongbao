@@ -84,6 +84,24 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         if (!ProcessStatusEnum.PENDING.getCode().equals(process.getStatus())) {
             throw new BusinessException(400, "工序已开始或已完成，无法重复开始");
         }
+        // 校验流转卡状态：拒绝已取消或打印失败的流转卡
+        if (FlowStatusEnum.CANCELLED.getValue().equals(record.getStatus()) ||
+            FlowStatusEnum.PRINT_FAILED.getValue().equals(record.getStatus())) {
+            throw new BusinessException(400, "流转卡状态异常，无法开始工序");
+        }
+        // 根据工序类型校验流转卡状态
+        if (ProcessTypeEnum.PRINT.getCode().equals(dto.getProcessType())) {
+            if (!FlowStatusEnum.PENDING_PRINT.getValue().equals(record.getStatus()) &&
+                !FlowStatusEnum.PRINTING.getValue().equals(record.getStatus())) {
+                throw new BusinessException(400, "流转卡状态不允许开始打印工序");
+            }
+        } else {
+            // 后处理工序（洗、固化、清洗干燥）需要在打印完成或后处理中状态
+            if (!FlowStatusEnum.PRINT_COMPLETED.getValue().equals(record.getStatus()) &&
+                !FlowStatusEnum.POST_PROCESSING.getValue().equals(record.getStatus())) {
+                throw new BusinessException(400, "流转卡状态不允许开始后处理工序");
+            }
+        }
         process.setDeviceId(dto.getPrimaryDeviceId());
         DeviceEntity device = deviceMapper.selectById(dto.getPrimaryDeviceId());
         if (device != null) {
@@ -150,18 +168,27 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             record.setCurrentProcess(ProcessTypeEnum.CLEAN_DRY.getCode());
             recordMapper.updateById(record);
         } else if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(processType)) {
+            // 校验产品数量：确保流转卡有产品才能进入质检
+            long productCount = productMapper.selectCount(
+                new LambdaQueryWrapper<ProductionProductEntity>()
+                    .eq(ProductionProductEntity::getProductionRecordId, recordId)
+                    .ne(ProductionProductEntity::getStatus, ProductStatusEnum.CANCELLED.getCode()));
+            if (productCount == 0) {
+                throw new BusinessException(400, "流转卡无产品，无法进入质检");
+            }
             record.setStatus(FlowStatusEnum.QC_IN_PROGRESS.getValue());
             record.setCurrentProcess(null);
             recordMapper.updateById(record);
-            recordService.triggerFlowIfAllReach(record.getOrderId(),
+            recordService.triggerFlowIfAllExact(record.getOrderId(),
                     FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
         }
         log.info("完成工序: recordId={}, processType={}", recordId, processType);
     }
 
-    /** 根据工序类型返回期望的设备类型码，用于校验分配设备是否匹配；打印工序由设备监听器驱动，此处返回 null */
+    /** 根据工序类型返回期望的设备类型码，用于校验分配设备是否匹配 */
     private String getExpectedDeviceType(String processType) {
         return switch (processType) {
+            case "print" -> DeviceTypeEnum.PRINTER_SLA.getCode();
             case "wash" -> DeviceTypeEnum.WASH_CONTAINER.getCode();
             case "cure" -> DeviceTypeEnum.UV_CURING.getCode();
             case "clean_dry" -> DeviceTypeEnum.ULTRASONIC_CLEANER.getCode();
