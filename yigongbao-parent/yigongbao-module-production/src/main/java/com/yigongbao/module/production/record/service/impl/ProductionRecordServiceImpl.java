@@ -22,6 +22,7 @@ import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.mapper.DesignPackageMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
+import com.yigongbao.module.production.record.vo.*;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.production.constants.ProductionConstants;
@@ -39,10 +40,7 @@ import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
-import com.yigongbao.module.production.record.vo.DeviceConfigVO;
-import com.yigongbao.module.production.record.vo.PrinterVO;
-import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
-import com.yigongbao.module.production.record.vo.ProductionRecordVO;
+import com.yigongbao.module.production.helper.FlowCardExcelBuilder;
 import cn.hutool.core.bean.BeanUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -76,6 +74,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final ProductionProductMapper productMapper;
     private final ProductionProcessMapper processMapper;
     private final FlowFacade flowFacade;
+    private final FlowCardExcelBuilder flowCardExcelBuilder;
+    private final com.yigongbao.module.basic.file.service.FileService fileService;
 
     /** 查询流转卡详情，包含产品列表和当前工序中文名 */
     @Override
@@ -370,7 +370,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .eq(ProductionRecordEntity::getProductionBatchNo, dto.getProductionBatchNo())
                 .ne(ProductionRecordEntity::getId, recordId));
             if (existCount > 0) {
-                throw new BusinessException(400, "生产批号已存在，请重新生成");
+                throw new BusinessException(ErrorCodeEnum.PRODUCTION_BATCH_NO_EXISTS);
             }
         }
         record.setProductionBatchNo(dto.getProductionBatchNo());
@@ -469,7 +469,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
         // 校验流转卡状态：只有 PENDING_PRINT 才能分配打印机
         if (!FlowStatusEnum.PENDING_PRINT.getValue().equals(record.getStatus())) {
-            throw new BusinessException(400, "流转卡当前状态不允许分配打印机");
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_ASSIGN_DEVICE);
         }
         // 校验设备在线且未被占用
         if (resolveDeviceStatus(device) != 1) {
@@ -603,5 +603,88 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         orderMainMapper.updateById(order);
         log.info("Flow状态流转完成: orderId={}, action={}, targetPhase={}, targetStatus={}",
                 orderId, action, result.getTargetPhase(), result.getFinalStatus());
+    }
+
+    @Override
+    public com.yigongbao.module.basic.file.vo.FileVO generateFlowCardExcel(Long recordId) {
+        log.info("生成流转卡Excel: recordId={}", recordId);
+
+        ProductionRecordVO recordVO = getRecordDetail(recordId);
+        if (recordVO == null) {
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+        }
+
+        List<ProductionProcessEntity> processes = processMapper.selectList(
+            new LambdaQueryWrapper<ProductionProcessEntity>()
+                .eq(ProductionProcessEntity::getProductionRecordId, recordId)
+                .orderByAsc(ProductionProcessEntity::getProcessOrder)
+        );
+
+        String designerAssetNo = queryDesignerAssetNo(recordVO.getOrderId());
+
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        context.setRecordNo(recordVO.getRecordNo());
+        context.setVersionNo("A/0");
+        context.setDesignPackageCode(recordVO.getDesignPackageCode());
+        context.setTotalProductCount(recordVO.getTotalProductCount());
+        context.setProductionBatchNo(recordVO.getProductionBatchNo());
+        context.setMaterial(recordVO.getMaterial());
+        context.setMaterialBatchNo(recordVO.getMaterialBatchNo());
+        context.setPrintStartTime(recordVO.getPrintStartTime());
+        context.setPrintFinishTime(recordVO.getPrintFinishTime());
+        context.setDesignerAssetNo(designerAssetNo);
+
+        List<FlowCardExcelBuilder.ProcessInfo> processInfos = processes.stream()
+            .map(p -> {
+                FlowCardExcelBuilder.ProcessInfo info = new FlowCardExcelBuilder.ProcessInfo();
+                info.setProcessType(p.getProcessType());
+                info.setDeviceNo(p.getDeviceNo());
+                info.setSecondaryDeviceNo(p.getSecondaryDeviceNo());
+                info.setProcessParams(p.getProcessParams());
+                return info;
+            })
+            .collect(Collectors.toList());
+        context.setProcesses(processInfos);
+
+        List<FlowCardExcelBuilder.ProductInfo> productInfos = Collections.emptyList();
+        if (recordVO.getProducts() != null) {
+            productInfos = recordVO.getProducts().stream()
+                .map(p -> {
+                    FlowCardExcelBuilder.ProductInfo info = new FlowCardExcelBuilder.ProductInfo();
+                    info.setProductNo(p.getProductNo());
+                    info.setProductName(p.getProductName());
+                    info.setSpecName(p.getSpecName());
+                    info.setMaterialName(p.getMaterialName());
+                    info.setColorName(p.getColorName());
+                    return info;
+                })
+                .collect(Collectors.toList());
+        }
+        context.setProducts(productInfos);
+
+        try {
+            byte[] excelBytes = flowCardExcelBuilder.build(context);
+            String filename = "流转卡_" + recordVO.getRecordNo() + ".xlsx";
+            com.yigongbao.module.basic.file.vo.FileVO fileVO = fileService.uploadBytes(
+                excelBytes, filename, com.yigongbao.common.enums.FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
+            log.info("流转卡Excel生成并上传成功: recordId={}, recordNo={}, fileUrl={}",
+                recordId, recordVO.getRecordNo(), fileVO.getFileUrl());
+            return fileVO;
+        } catch (Exception e) {
+            log.error("流转卡Excel生成失败: recordId={}", recordId, e);
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR);
+        }
+    }
+
+    private String queryDesignerAssetNo(Long orderId) {
+        if (orderId == null) {
+            return null;
+        }
+        OrderMainEntity order = orderMainMapper.selectById(orderId);
+        if (order == null || order.getDesignerId() == null) {
+            return null;
+        }
+        UserEntity designer = userMapper.selectById(order.getDesignerId());
+        return designer != null ? designer.getAssetNumber() : null;
     }
 }

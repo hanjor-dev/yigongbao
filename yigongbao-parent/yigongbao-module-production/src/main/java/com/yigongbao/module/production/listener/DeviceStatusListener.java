@@ -54,7 +54,7 @@ public class DeviceStatusListener {
             return;
         }
 
-        // 空闲 → 占用：打印开始，更新流转卡状态和 order_main
+        // 空闲 → 占用：打印开始，更新流转卡状态并触发 Flow
         if (ProductionConstants.DEVICE_STATE_IDLE.equals(oldState)
                 && ProductionConstants.DEVICE_STATE_BUSY.equals(newState)) {
             LocalDateTime now = LocalDateTime.now();
@@ -66,21 +66,21 @@ public class DeviceStatusListener {
                 log.info("设备状态变更触发打印开始: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
             });
-            // 打印开始直接更新 order_main（设备驱动，无用户上下文，不走 Flow）
-            OrderMainEntity orderUpdate = new OrderMainEntity();
-            orderUpdate.setId(records.get(0).getOrderId());
-            orderUpdate.setStatus(FlowStatusEnum.PRINTING.getValue());
-            orderMainMapper.updateById(orderUpdate);
+            Long orderId = records.get(0).getOrderId();
+            recordService.triggerFlowIfAllExact(orderId,
+                    FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
         }
         // 占用 → 空闲：打印完成，更新状态并聚合触发 Flow
         else if (ProductionConstants.DEVICE_STATE_BUSY.equals(oldState)
                 && ProductionConstants.DEVICE_STATE_IDLE.equals(newState)) {
             LocalDateTime now = LocalDateTime.now();
             records.forEach(record -> {
-                record.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
-                record.setCurrentProcess(null);
-                record.setPrintFinishTime(now);
-                recordMapper.updateById(record);
+                recordMapper.update(null,
+                        new LambdaUpdateWrapper<ProductionRecordEntity>()
+                                .eq(ProductionRecordEntity::getId, record.getId())
+                                .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINT_COMPLETED.getValue())
+                                .set(ProductionRecordEntity::getCurrentProcess, null)
+                                .set(ProductionRecordEntity::getPrintFinishTime, now));
                 log.info("设备状态变更触发打印完成: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
             });

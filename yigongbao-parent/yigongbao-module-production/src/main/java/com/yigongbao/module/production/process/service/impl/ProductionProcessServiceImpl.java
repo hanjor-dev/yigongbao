@@ -3,6 +3,7 @@ package com.yigongbao.module.production.process.service.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -82,24 +83,24 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_PROCESS_NOT_FOUND);
         }
         if (!ProcessStatusEnum.PENDING.getCode().equals(process.getStatus())) {
-            throw new BusinessException(400, "工序已开始或已完成，无法重复开始");
+            throw new BusinessException(ErrorCodeEnum.PROCESS_ALREADY_STARTED);
         }
         // 校验流转卡状态：拒绝已取消或打印失败的流转卡
         if (FlowStatusEnum.CANCELLED.getValue().equals(record.getStatus()) ||
             FlowStatusEnum.PRINT_FAILED.getValue().equals(record.getStatus())) {
-            throw new BusinessException(400, "流转卡状态异常，无法开始工序");
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL);
         }
         // 根据工序类型校验流转卡状态
         if (ProcessTypeEnum.PRINT.getCode().equals(dto.getProcessType())) {
             if (!FlowStatusEnum.PENDING_PRINT.getValue().equals(record.getStatus()) &&
                 !FlowStatusEnum.PRINTING.getValue().equals(record.getStatus())) {
-                throw new BusinessException(400, "流转卡状态不允许开始打印工序");
+                throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_START_PRINT);
             }
         } else {
             // 后处理工序（洗、固化、清洗干燥）需要在打印完成或后处理中状态
             if (!FlowStatusEnum.PRINT_COMPLETED.getValue().equals(record.getStatus()) &&
                 !FlowStatusEnum.POST_PROCESSING.getValue().equals(record.getStatus())) {
-                throw new BusinessException(400, "流转卡状态不允许开始后处理工序");
+                throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_START_POST_PROCESS);
             }
         }
         process.setDeviceId(dto.getPrimaryDeviceId());
@@ -107,10 +108,18 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         if (device != null) {
             String expectedDeviceType = getExpectedDeviceType(dto.getProcessType());
             if (expectedDeviceType != null && !expectedDeviceType.equals(device.getDeviceType())) {
-                throw new BusinessException(400, "设备类型与工序不匹配，请选择正确的设备");
+                throw new BusinessException(ErrorCodeEnum.DEVICE_TYPE_MISMATCH);
             }
             process.setDeviceNo(device.getDeviceId());
             process.setDeviceName(device.getDeviceName());
+        }
+        if (dto.getSecondaryDeviceId() != null) {
+            process.setSecondaryDeviceId(dto.getSecondaryDeviceId());
+            DeviceEntity secondaryDevice = deviceMapper.selectById(dto.getSecondaryDeviceId());
+            if (secondaryDevice != null) {
+                process.setSecondaryDeviceNo(secondaryDevice.getDeviceId());
+                process.setSecondaryDeviceName(secondaryDevice.getDeviceName());
+            }
         }
         process.setProcessParams(dto.getProcessParams());
         process.setStartTime(LocalDateTime.now());
@@ -141,7 +150,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_PROCESS_NOT_FOUND);
         }
         if (!ProcessStatusEnum.IN_PROGRESS.getCode().equals(process.getStatus())) {
-            throw new BusinessException(400, "工序未在进行中，无法完成");
+            throw new BusinessException(ErrorCodeEnum.PROCESS_NOT_IN_PROGRESS);
         }
         LocalDateTime endTime;
         if (process.getDeviceId() != null) {
@@ -174,11 +183,13 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                     .eq(ProductionProductEntity::getProductionRecordId, recordId)
                     .ne(ProductionProductEntity::getStatus, ProductStatusEnum.CANCELLED.getCode()));
             if (productCount == 0) {
-                throw new BusinessException(400, "流转卡无产品，无法进入质检");
+                throw new BusinessException(ErrorCodeEnum.RECORD_NO_PRODUCT_FOR_QC);
             }
-            record.setStatus(FlowStatusEnum.QC_IN_PROGRESS.getValue());
-            record.setCurrentProcess(null);
-            recordMapper.updateById(record);
+            recordMapper.update(null,
+                    new LambdaUpdateWrapper<ProductionRecordEntity>()
+                            .eq(ProductionRecordEntity::getId, recordId)
+                            .set(ProductionRecordEntity::getStatus, FlowStatusEnum.QC_IN_PROGRESS.getValue())
+                            .set(ProductionRecordEntity::getCurrentProcess, null));
             recordService.triggerFlowIfAllExact(record.getOrderId(),
                     FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
         }

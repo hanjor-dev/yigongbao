@@ -1,0 +1,220 @@
+package com.yigongbao.module.production.helper;
+
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Component;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+/**
+ * 流转卡 Excel 填充器
+ *
+ * @author hanjor
+ * @date 2026-05-29
+ */
+@Slf4j
+@Component
+public class FlowCardExcelBuilder {
+
+    private static final String TEMPLATE_PATH = "template/流转卡模板.xlsx";
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    @Data
+    public static class BuildContext {
+        private String recordNo;
+        private String versionNo;
+        private String designPackageCode;
+        private Integer totalProductCount;
+        private String productionBatchNo;
+        private String material;
+        private String materialBatchNo;
+        private LocalDateTime printStartTime;
+        private LocalDateTime printFinishTime;
+        private String designerAssetNo;
+        private List<ProcessInfo> processes;
+        private List<ProductInfo> products;
+    }
+
+    @Data
+    public static class ProcessInfo {
+        private String processType;
+        private String deviceNo;
+        private String secondaryDeviceNo;
+        private String processParams;
+    }
+
+    @Data
+    public static class ProductInfo {
+        private String productNo;
+        private String productName;
+        private String specName;
+        private String materialName;
+        private String colorName;
+    }
+
+    public byte[] build(BuildContext context) throws IOException {
+        try (InputStream is = new ClassPathResource(TEMPLATE_PATH).getInputStream();
+             XSSFWorkbook workbook = new XSSFWorkbook(is);
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+
+            fillHeader(sheet, context);
+            fillProcesses(sheet, context);
+            fillProducts(sheet, context);
+
+            workbook.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    private void fillHeader(Sheet sheet, BuildContext context) {
+        setCellValue(sheet, 1, 0, "编号：" + context.getRecordNo() + "   版本号：" +
+            StrUtil.blankToDefault(context.getVersionNo(), "A/0"));
+        setCellValue(sheet, 2, 2, context.getDesignPackageCode());
+        setCellValue(sheet, 2, 5, String.valueOf(context.getTotalProductCount()));
+        setCellValue(sheet, 3, 2, context.getProductionBatchNo());
+        setCellValue(sheet, 3, 5, context.getMaterial());
+        setCellValue(sheet, 4, 2, "开始时间: " + formatDateTime(context.getPrintStartTime()));
+        setCellValue(sheet, 4, 5, context.getMaterialBatchNo());
+        setCellValue(sheet, 5, 2, "结束: " + formatDateTime(context.getPrintFinishTime()));
+    }
+
+    private void fillProcesses(Sheet sheet, BuildContext context) {
+        // 填充设计工序（第8行）- 设计师资产编号
+        setCellValue(sheet, 7, 3, StrUtil.blankToDefault(context.getDesignerAssetNo(), "-"));
+        setCellValue(sheet, 7, 4, "/");
+
+        List<ProcessInfo> processes = context.getProcesses();
+        if (processes == null) return;
+
+        for (ProcessInfo process : processes) {
+            if ("clean_dry".equals(process.getProcessType())) {
+                setCellValue(sheet, 11, 3, StrUtil.blankToDefault(process.getDeviceNo(), "-"));
+                String params = convertProcessParams(process.getProcessType(), process.getProcessParams());
+                setCellValue(sheet, 11, 4, params);
+                setCellValue(sheet, 12, 3, StrUtil.blankToDefault(process.getSecondaryDeviceNo(), "-"));
+                setCellValue(sheet, 12, 4, "-");
+            } else {
+                int rowIndex = getProcessRowIndex(process.getProcessType());
+                if (rowIndex == -1) continue;
+
+                setCellValue(sheet, rowIndex, 3, StrUtil.blankToDefault(process.getDeviceNo(), "-"));
+                String params = convertProcessParams(process.getProcessType(), process.getProcessParams());
+                setCellValue(sheet, rowIndex, 4, params);
+            }
+        }
+    }
+
+    private void fillProducts(Sheet sheet, BuildContext context) {
+        List<ProductInfo> products = context.getProducts();
+        if (products == null || products.isEmpty()) return;
+
+        Row templateRow = sheet.getRow(16);
+
+        if (products.size() > 1) {
+            sheet.shiftRows(17, sheet.getLastRowNum(), products.size() - 1);
+        }
+
+        for (int i = 0; i < products.size(); i++) {
+            ProductInfo product = products.get(i);
+            int rowIndex = 16 + i;
+
+            Row row = sheet.getRow(rowIndex);
+            if (row == null) {
+                row = sheet.createRow(rowIndex);
+                if (templateRow != null && i > 0) {
+                    copyRowStyle(templateRow, row);
+                }
+            }
+
+            setCellValue(sheet, rowIndex, 0, product.getProductNo());
+            setCellValue(sheet, rowIndex, 2, product.getProductName());
+            setCellValue(sheet, rowIndex, 3, product.getSpecName());
+            setCellValue(sheet, rowIndex, 4, "1");
+            setCellValue(sheet, rowIndex, 5,
+                StrUtil.blankToDefault(product.getMaterialName(), "") + " " +
+                StrUtil.blankToDefault(product.getColorName(), ""));
+        }
+    }
+
+    private void copyRowStyle(Row sourceRow, Row targetRow) {
+        targetRow.setHeight(sourceRow.getHeight());
+        for (int i = 0; i < 6; i++) {
+            Cell sourceCell = sourceRow.getCell(i);
+            if (sourceCell != null) {
+                Cell targetCell = targetRow.createCell(i);
+                targetCell.setCellStyle(sourceCell.getCellStyle());
+            }
+        }
+    }
+
+    private int getProcessRowIndex(String processType) {
+        switch (processType) {
+            case "print": return 8;
+            case "wash": return 9;
+            case "cure": return 10;
+            case "pack": return 13;
+            default: return -1;
+        }
+    }
+
+    private String convertProcessParams(String processType, String processParams) {
+        if (StrUtil.isBlank(processParams)) return "-";
+
+        try {
+            JSONObject params = JSONUtil.parseObj(processParams);
+            switch (processType) {
+                case "print":
+                    return String.format("层厚：%smm，激光器功率：%smW",
+                        params.getStr("layerThickness", "-"), params.getStr("laserPower", "-"));
+                case "wash":
+                    return String.format("酒精批号：%s，浸泡程度：%s",
+                        params.getStr("alcoholBatchNo", "-"), params.getStr("soakLevel", "-"));
+                case "cure":
+                    return String.format("固化模式：%s",
+                        params.getStr("cureMode", "-"));
+                case "clean_dry":
+                    return String.format("酒精批号：%s，清洗模式：%s，加热：%s",
+                        params.getStr("alcoholBatchNo", "-"),
+                        params.getStr("cleanMode", "-"),
+                        params.getStr("heating", "-"));
+                case "pack":
+                    return String.format("热封温度：%s℃，热封时间：%ss",
+                        params.getStr("sealTemperature", "-"), params.getStr("sealTime", "-"));
+                default:
+                    return "-";
+            }
+        } catch (Exception e) {
+            log.warn("解析工序参数失败: processType={}, processParams={}", processType, processParams, e);
+            return "-";
+        }
+    }
+
+    private void setCellValue(Sheet sheet, int rowIndex, int colIndex, String value) {
+        Row row = sheet.getRow(rowIndex);
+        if (row == null) {
+            row = sheet.createRow(rowIndex);
+        }
+        Cell cell = row.getCell(colIndex);
+        if (cell == null) {
+            cell = row.createCell(colIndex);
+        }
+        cell.setCellValue(StrUtil.blankToDefault(value, "-"));
+    }
+
+    private String formatDateTime(LocalDateTime dateTime) {
+        return dateTime == null ? "-" : dateTime.format(DATE_FORMATTER);
+    }
+}

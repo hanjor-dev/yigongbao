@@ -1,6 +1,8 @@
 package com.yigongbao.module.production.record.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
@@ -10,12 +12,17 @@ import com.yigongbao.module.production.record.vo.CancelPreviewVO;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
+import com.yigongbao.module.basic.file.vo.FileVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -87,5 +94,12 @@ public class ProductionRecordController {
     @GetMapping("/{id}/cancel-preview")
     public Result<CancelPreviewVO> getCancelPreview(@PathVariable Long id) {
         return Result.success(recordService.getCancelPreview(id));
+    }
+
+    @Operation(summary = "生成流转卡Excel")
+    @GetMapping("/{id}/excel")
+    public Result<FileVO> generateFlowCardExcel(@PathVariable Long id) {
+        FileVO fileVO = recordService.generateFlowCardExcel(id);
+        return Result.success(fileVO);
     }
 }

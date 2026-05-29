@@ -307,7 +307,7 @@ public enum ErrorCodeEnum {
     SIGN_NONCE_USED(785, "重复请求", 2),
     SIGN_INVALID(786, "签名验证失败", 2),
 
-    // ==================== 生产模块错误码 (800-808) ====================
+    // ==================== 生产模块错误码 (800-824) ====================
     PRODUCTION_RECORD_NOT_FOUND(800, "生产流转卡不存在", 3),
     PRINT_DEVICE_NOT_FOUND(801, "打印设备不存在", 3),
     PROCESSING_CENTER_NOT_FOUND(802, "加工中心不存在", 3),
@@ -316,7 +316,23 @@ public enum ErrorCodeEnum {
     PACK_INFO_NOT_FILLED(805, "请先填写包装信息", 3),
     DEVICE_NOT_AVAILABLE(806, "设备不可用", 3),
     PRODUCTION_PROCESS_NOT_FOUND(807, "工序记录不存在", 3),
-    SYSTEM_ERROR(808, "系统内部错误", 3);
+    SYSTEM_ERROR(808, "系统内部错误", 3),
+    RECORD_NOT_IN_PACKING_STATUS(809, "流转卡不在包装阶段，无法填写包装信息", 3),
+    RECORD_STATUS_NOT_ALLOW_WAREHOUSE_IN(810, "流转卡当前状态不允许流转到入库", 3),
+    PRODUCTION_BATCH_NO_EXISTS(811, "生产批号已存在，请重新生成", 3),
+    RECORD_STATUS_NOT_ALLOW_ASSIGN_DEVICE(812, "流转卡当前状态不允许分配打印机", 3),
+    PROCESS_ALREADY_STARTED(813, "工序已开始或已完成，无法重复开始", 3),
+    RECORD_STATUS_ABNORMAL(814, "流转卡状态异常，无法开始工序", 3),
+    RECORD_STATUS_NOT_ALLOW_START_PRINT(815, "流转卡状态不允许开始打印工序", 3),
+    RECORD_STATUS_NOT_ALLOW_START_POST_PROCESS(816, "流转卡状态不允许开始后处理工序", 3),
+    DEVICE_TYPE_MISMATCH(817, "设备类型与工序不匹配，请选择正确的设备", 3),
+    PROCESS_NOT_IN_PROGRESS(818, "工序未在进行中，无法完成", 3),
+    RECORD_NO_PRODUCT_FOR_QC(819, "流转卡无产品，无法进入质检", 3),
+    PRODUCT_STATUS_NOT_ALLOW_QC(820, "产品当前状态不允许质检", 3),
+    PRODUCT_STATUS_NOT_ALLOW_MARK_FAIL(821, "产品当前状态不允许标记不合格", 3),
+    RECORD_STATUS_NOT_ALLOW_TRANSFER_TO_PACK(822, "流转卡当前状态不允许流转到包装", 3),
+    PRODUCT_HAS_NOT_QC(823, "存在未质检的产品，无法流转到包装", 3),
+    PRODUCT_HAS_FAIL(824, "存在质检不合格的产品，无法流转到包装", 3);
 
     /**
      * 错误码

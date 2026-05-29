@@ -12,6 +12,7 @@ import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import com.yigongbao.module.production.record.vo.PrinterVO;
 import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
+import com.yigongbao.module.basic.file.vo.FileVO;
 import java.util.List;
 
 /**
@@ -62,4 +63,11 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
      * 获取流转卡取消预查询信息
      */
     CancelPreviewVO getCancelPreview(Long recordId);
+
+    /**
+     * 生成流转卡Excel文件
+     * @param recordId 流转卡ID
+     * @return 文件信息
+     */
+    FileVO generateFlowCardExcel(Long recordId);
 }

@@ -61,7 +61,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         if (!ProductStatusEnum.IN_PROCESS.getCode().equals(product.getStatus())
                 && !ProductStatusEnum.FAIL.getCode().equals(product.getStatus())) {
             log.warn("产品状态不允许质检: productId={}, currentStatus={}", productId, product.getStatus());
-            throw new BusinessException(400, "产品当前状态不允许质检");
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_STATUS_NOT_ALLOW_QC);
         }
         ProductionRecordEntity record = recordMapper.selectById(product.getProductionRecordId());
         if (record == null) {
@@ -96,7 +96,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         }
         if (!ProductStatusEnum.IN_PROCESS.getCode().equals(product.getStatus())) {
             log.warn("产品状态不允许标记不合格: productId={}, currentStatus={}", productId, product.getStatus());
-            throw new BusinessException(400, "产品当前状态不允许标记不合格");
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_STATUS_NOT_ALLOW_MARK_FAIL);
         }
         product.setStatus(ProductStatusEnum.FAIL.getCode());
         product.setQcResult(QcResultEnum.FAIL.getCode());
@@ -121,20 +121,20 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
         if (!FlowStatusEnum.QC_IN_PROGRESS.getValue().equals(record.getStatus())) {
-            throw new BusinessException(400, "流转卡当前状态不允许流转到包装");
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_TRANSFER_TO_PACK);
         }
         // 校验产品状态：必须全部合格或已取消
         long inProcessCount = productMapper.selectCount(new LambdaQueryWrapper<ProductionProductEntity>()
                 .eq(ProductionProductEntity::getProductionRecordId, recordId)
                 .eq(ProductionProductEntity::getStatus, ProductStatusEnum.IN_PROCESS.getCode()));
         if (inProcessCount > 0) {
-            throw new BusinessException(400, "存在未质检的产品，无法流转到包装");
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_HAS_NOT_QC);
         }
         long failCount = productMapper.selectCount(new LambdaQueryWrapper<ProductionProductEntity>()
                 .eq(ProductionProductEntity::getProductionRecordId, recordId)
                 .eq(ProductionProductEntity::getStatus, ProductStatusEnum.FAIL.getCode()));
         if (failCount > 0) {
-            throw new BusinessException(400, "存在质检不合格的产品，无法流转到包装");
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_HAS_FAIL);
         }
         record.setStatus(FlowStatusEnum.PACKING.getValue());
         recordMapper.updateById(record);

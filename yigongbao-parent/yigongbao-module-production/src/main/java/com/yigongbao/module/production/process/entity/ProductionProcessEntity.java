@@ -32,6 +32,12 @@ public class ProductionProcessEntity extends BaseEntity {
     private String deviceNo;
     /** 设备名称 */
     private String deviceName;
+    /** 辅助设备ID（用于 clean_dry 工序的干燥设备） */
+    private Long secondaryDeviceId;
+    /** 辅助设备编号 */
+    private String secondaryDeviceNo;
+    /** 辅助设备名称 */
+    private String secondaryDeviceName;
     /** 工序参数（JSON格式） */
     private String processParams;
     /** 工序开始时间 */

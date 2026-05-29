@@ -49,7 +49,7 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         }
         // 校验流转卡状态：必须是包装中才能填写包装信息
         if (!FlowStatusEnum.PACKING.getValue().equals(record.getStatus())) {
-            throw new BusinessException(400, "流转卡不在包装阶段，无法填写包装信息");
+            throw new BusinessException(ErrorCodeEnum.RECORD_NOT_IN_PACKING_STATUS);
         }
         DeviceEntity device = deviceMapper.selectById(dto.getPackDeviceId());
         if (device == null) {
@@ -87,7 +87,7 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         if (!FlowStatusEnum.PACKING.getValue().equals(record.getStatus())) {
             log.warn("流转卡状态不允许流转到入库: recordId={}, currentStatus={}",
                 recordId, record.getStatus());
-            throw new BusinessException(400, "流转卡当前状态不允许流转到入库");
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_WAREHOUSE_IN);
         }
         record.setStatus(FlowStatusEnum.WAREHOUSE_IN.getValue());
         recordMapper.updateById(record);
