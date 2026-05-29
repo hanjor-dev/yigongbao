@@ -681,6 +681,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 info.setDeviceNo(p.getDeviceNo());
                 info.setSecondaryDeviceNo(p.getSecondaryDeviceNo());
                 info.setProcessParams(p.getProcessParams());
+                info.setStartTime(p.getStartTime());
+                info.setEndTime(p.getEndTime());
                 return info;
             })
             .collect(Collectors.toList());

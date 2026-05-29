@@ -10,11 +10,13 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
+import com.yigongbao.module.production.enums.ProcessTypeEnum;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -52,6 +54,8 @@ public class FlowCardExcelBuilder {
         private String deviceNo;
         private String secondaryDeviceNo;
         private String processParams;
+        private LocalDateTime startTime;
+        private LocalDateTime endTime;
     }
 
     @Data
@@ -80,10 +84,11 @@ public class FlowCardExcelBuilder {
     }
 
     private void fillHeader(Sheet sheet, BuildContext context) {
-        setCellValue(sheet, 1, 0, "编号：" + context.getRecordNo() + "   版本号：" +
-            StrUtil.blankToDefault(context.getVersionNo(), "A/0"));
+        setCellValue(sheet, 1, 0, "编号：" + StrUtil.blankToDefault(context.getRecordNo(), "-") +
+            "   版本号：" + StrUtil.blankToDefault(context.getVersionNo(), "A/0"));
         setCellValue(sheet, 2, 2, context.getDesignPackageCode());
-        setCellValue(sheet, 2, 5, String.valueOf(context.getTotalProductCount()));
+        setCellValue(sheet, 2, 5, context.getTotalProductCount() != null ?
+            String.valueOf(context.getTotalProductCount()) : "-");
         setCellValue(sheet, 3, 2, context.getProductionBatchNo());
         setCellValue(sheet, 3, 5, context.getMaterial());
         setCellValue(sheet, 4, 2, "开始时间: " + formatDateTime(context.getPrintStartTime()));
@@ -97,21 +102,26 @@ public class FlowCardExcelBuilder {
         setCellValue(sheet, 7, 4, "/");
 
         List<ProcessInfo> processes = context.getProcesses();
-        if (processes == null) return;
+        if (processes == null || processes.isEmpty()) return;
 
         for (ProcessInfo process : processes) {
-            if ("clean_dry".equals(process.getProcessType())) {
+            if (process == null) continue;
+
+            String processType = process.getProcessType();
+            if (StrUtil.isBlank(processType)) continue;
+
+            if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(processType)) {
                 setCellValue(sheet, 11, 3, StrUtil.blankToDefault(process.getDeviceNo(), "-"));
-                String params = convertProcessParams(process.getProcessType(), process.getProcessParams());
+                String params = convertProcessParams(process, processType, process.getProcessParams());
                 setCellValue(sheet, 11, 4, params);
                 setCellValue(sheet, 12, 3, StrUtil.blankToDefault(process.getSecondaryDeviceNo(), "-"));
                 setCellValue(sheet, 12, 4, "-");
             } else {
-                int rowIndex = getProcessRowIndex(process.getProcessType());
+                int rowIndex = getProcessRowIndex(processType);
                 if (rowIndex == -1) continue;
 
                 setCellValue(sheet, rowIndex, 3, StrUtil.blankToDefault(process.getDeviceNo(), "-"));
-                String params = convertProcessParams(process.getProcessType(), process.getProcessParams());
+                String params = convertProcessParams(process, processType, process.getProcessParams());
                 setCellValue(sheet, rowIndex, 4, params);
             }
         }
@@ -123,7 +133,7 @@ public class FlowCardExcelBuilder {
 
         Row templateRow = sheet.getRow(16);
 
-        if (products.size() > 1) {
+        if (products.size() > 1 && sheet.getLastRowNum() >= 17) {
             sheet.shiftRows(17, sheet.getLastRowNum(), products.size() - 1);
         }
 
@@ -143,9 +153,12 @@ public class FlowCardExcelBuilder {
             setCellValue(sheet, rowIndex, 2, product.getProductName());
             setCellValue(sheet, rowIndex, 3, product.getSpecName());
             setCellValue(sheet, rowIndex, 4, "1");
-            setCellValue(sheet, rowIndex, 5,
-                StrUtil.blankToDefault(product.getMaterialName(), "") + " " +
-                StrUtil.blankToDefault(product.getColorName(), ""));
+
+            String material = StrUtil.blankToDefault(product.getMaterialName(), "");
+            String color = StrUtil.blankToDefault(product.getColorName(), "");
+            String desc = StrUtil.isBlank(material) && StrUtil.isBlank(color) ? "-" :
+                StrUtil.trim(material + " " + color);
+            setCellValue(sheet, rowIndex, 5, desc);
         }
     }
 
@@ -161,45 +174,48 @@ public class FlowCardExcelBuilder {
     }
 
     private int getProcessRowIndex(String processType) {
-        switch (processType) {
-            case "print": return 8;
-            case "wash": return 9;
-            case "cure": return 10;
-            case "pack": return 13;
-            default: return -1;
-        }
+        if (ProcessTypeEnum.PRINT.getCode().equals(processType)) return 8;
+        if (ProcessTypeEnum.WASH.getCode().equals(processType)) return 9;
+        if (ProcessTypeEnum.CURE.getCode().equals(processType)) return 10;
+        if (ProcessTypeEnum.PACK.getCode().equals(processType)) return 13;
+        return -1;
     }
 
-    private String convertProcessParams(String processType, String processParams) {
-        if (StrUtil.isBlank(processParams)) return "-";
-
+    private String convertProcessParams(ProcessInfo process, String processType, String processParams) {
+        List<String> lines = new ArrayList<>();
         try {
-            JSONObject params = JSONUtil.parseObj(processParams);
-            switch (processType) {
-                case "print":
-                    return String.format("层厚：%smm，激光器功率：%smW",
-                        params.getStr("layerThickness", "-"), params.getStr("laserPower", "-"));
-                case "wash":
-                    return String.format("酒精批号：%s，浸泡程度：%s",
-                        params.getStr("alcoholBatchNo", "-"), params.getStr("soakLevel", "-"));
-                case "cure":
-                    return String.format("固化模式：%s",
-                        params.getStr("cureMode", "-"));
-                case "clean_dry":
-                    return String.format("酒精批号：%s，清洗模式：%s，加热：%s",
-                        params.getStr("alcoholBatchNo", "-"),
-                        params.getStr("cleanMode", "-"),
-                        params.getStr("heating", "-"));
-                case "pack":
-                    return String.format("热封温度：%s℃，热封时间：%ss",
-                        params.getStr("sealTemperature", "-"), params.getStr("sealTime", "-"));
-                default:
-                    return "-";
+            if (StrUtil.isNotBlank(processParams)) {
+                JSONObject p = JSONUtil.parseObj(processParams);
+                if (ProcessTypeEnum.PRINT.getCode().equals(processType)) {
+                    lines.add("层厚：" + p.getStr("layerThickness", "-") + "mm");
+                    lines.add("激光器功率：" + p.getStr("laserPower", "-") + "mW");
+                } else if (ProcessTypeEnum.WASH.getCode().equals(processType)) {
+                    lines.add("酒精批号：" + p.getStr("alcoholBatchNo", "-"));
+                    lines.add("浸泡程度：" + p.getStr("soakLevel", "-"));
+                } else if (ProcessTypeEnum.CURE.getCode().equals(processType)) {
+                    lines.add("固化模式：" + p.getStr("cureMode", "-"));
+                } else if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(processType)) {
+                    lines.add("酒精批号：" + p.getStr("alcoholBatchNo", "-"));
+                    lines.add("清洗模式：" + p.getStr("cleanMode", "-"));
+                    lines.add("加热：" + p.getStr("heating", "-"));
+                } else if (ProcessTypeEnum.PACK.getCode().equals(processType)) {
+                    lines.add("热封温度：" + p.getStr("sealTemperature", "-") + "℃");
+                    lines.add("热封时间：" + p.getStr("sealTime", "-") + "s");
+                }
             }
         } catch (Exception e) {
             log.warn("解析工序参数失败: processType={}, processParams={}", processType, processParams, e);
-            return "-";
         }
+
+        // wash/cure/clean_dry 追加开始和结束时间
+        if (ProcessTypeEnum.WASH.getCode().equals(processType)
+                || ProcessTypeEnum.CURE.getCode().equals(processType)
+                || ProcessTypeEnum.CLEAN_DRY.getCode().equals(processType)) {
+            lines.add("开始：" + formatDateTime(process.getStartTime()));
+            lines.add("结束：" + formatDateTime(process.getEndTime()));
+        }
+
+        return lines.isEmpty() ? "-" : String.join("\n", lines);
     }
 
     private void setCellValue(Sheet sheet, int rowIndex, int colIndex, String value) {
