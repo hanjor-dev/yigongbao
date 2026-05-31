@@ -76,13 +76,16 @@ public class ProductionPackServiceImpl implements IProductionPackService {
 
         // 同步更新包装工序记录，供 Excel 生成时读取
         String packParams = buildPackParams(dto);
-        processMapper.update(null, new LambdaUpdateWrapper<ProductionProcessEntity>()
+        var updateWrapper = new LambdaUpdateWrapper<ProductionProcessEntity>()
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)
                 .eq(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PACK.getCode())
                 .set(ProductionProcessEntity::getDeviceId, dto.getPackDeviceId())
                 .set(ProductionProcessEntity::getDeviceNo, device.getDeviceId())
-                .set(ProductionProcessEntity::getDeviceName, device.getDeviceName())
-                .set(ProductionProcessEntity::getProcessParams, packParams));
+                .set(ProductionProcessEntity::getDeviceName, device.getDeviceName());
+        if (packParams != null) {
+            updateWrapper.set(ProductionProcessEntity::getProcessParams, packParams);
+        }
+        processMapper.update(null, updateWrapper);
         log.info("填写包装信息: recordId={}, recordNo={}, packDeviceId={}", recordId, record.getRecordNo(), dto.getPackDeviceId());
     }
 

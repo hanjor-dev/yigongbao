@@ -613,6 +613,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
      * 执行 Flow 状态流转并回写 order_main
      */
     @Override
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public void triggerFlowAndSync(Long orderId, FlowActionEnum action) {
         FlowOperator operator;
         try {
