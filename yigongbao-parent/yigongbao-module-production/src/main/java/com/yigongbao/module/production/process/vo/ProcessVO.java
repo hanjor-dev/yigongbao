@@ -34,4 +34,18 @@ public class ProcessVO {
     private String operatorName;
     /** 工序状态（pending/in_progress/completed） */
     private String status;
+    /** 辅助设备ID（clean_dry 工序的干燥设备） */
+    private Long secondaryDeviceId;
+    /** 辅助设备编号 */
+    private String secondaryDeviceNo;
+    /** 辅助设备名称 */
+    private String secondaryDeviceName;
+    /** 是否有重做（0=否，1=是） */
+    private Integer hasRedo;
+    /** 重做备注 */
+    private String redoRemark;
+    /** 检验结果 */
+    private String inspectionResult;
+    /** 检验员姓名 */
+    private String inspectorName;
 }

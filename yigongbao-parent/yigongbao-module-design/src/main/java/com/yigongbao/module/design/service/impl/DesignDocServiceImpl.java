@@ -874,9 +874,13 @@ public class DesignDocServiceImpl implements DesignDocService {
             log.warn("影像查看器配置未设置，跳过二维码生成: orderId={}", orderId);
             return null;
         }
-        String stlPathJson = String.format(
-                "{\"path\":\"/api/imaging/v1/stl\",\"params\":{\"orderId\":%d},\"type\":\"post\"}", orderId);
-        String kv = Base64.getEncoder().encodeToString(stlPathJson.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String json = String.format(
+                "{\"paths\":{\"dcmPath\":{\"path\":\"/api/imaging/v1/dcm\",\"params\":{\"orderId\":%d},\"type\":\"post\"}," +
+                "\"stlPath\":{\"path\":\"/api/imaging/v1/stl\",\"params\":{\"orderId\":%d},\"type\":\"post\"}," +
+                "\"markPath\":{\"path\":\"/api/imaging/v1/mark\",\"params\":{},\"type\":\"post\"}}," +
+                "\"token\":{\"Authorization\":\"\"}}",
+                orderId, orderId);
+        String kv = Base64.getEncoder().encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         return baseUrl + "?kv=" + kv;
     }
 

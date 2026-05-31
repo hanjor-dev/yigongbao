@@ -9,8 +9,12 @@ import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.yigongbao.module.production.enums.ProcessTypeEnum;
 import com.yigongbao.module.production.pack.dto.FillPackDTO;
 import com.yigongbao.module.production.pack.service.IProductionPackService;
+import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
+import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
@@ -19,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import cn.hutool.json.JSONObject;
 import java.time.LocalDateTime;
 
 /**
@@ -36,6 +41,7 @@ public class ProductionPackServiceImpl implements IProductionPackService {
     private final DeviceMapper deviceMapper;
     private final IProductionRecordService recordService;
     private final UserMapper userMapper;
+    private final ProductionProcessMapper processMapper;
 
     /**
      * 填写包装信息
@@ -67,7 +73,24 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         record.setPackOperatorName(user != null ? user.getRealName() : null);
         record.setPackTime(LocalDateTime.now());
         recordMapper.updateById(record);
+
+        // 同步更新包装工序记录，供 Excel 生成时读取
+        String packParams = buildPackParams(dto);
+        processMapper.update(null, new LambdaUpdateWrapper<ProductionProcessEntity>()
+                .eq(ProductionProcessEntity::getProductionRecordId, recordId)
+                .eq(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PACK.getCode())
+                .set(ProductionProcessEntity::getDeviceId, dto.getPackDeviceId())
+                .set(ProductionProcessEntity::getDeviceNo, device.getDeviceId())
+                .set(ProductionProcessEntity::getDeviceName, device.getDeviceName())
+                .set(ProductionProcessEntity::getProcessParams, packParams));
         log.info("填写包装信息: recordId={}, recordNo={}, packDeviceId={}", recordId, record.getRecordNo(), dto.getPackDeviceId());
+    }
+
+    private String buildPackParams(FillPackDTO dto) {
+        JSONObject p = new JSONObject();
+        if (dto.getPackSealTemperature() != null) p.set("sealTemperature", dto.getPackSealTemperature().toPlainString());
+        if (dto.getPackSealTime() != null) p.set("sealTime", dto.getPackSealTime().toString());
+        return p.isEmpty() ? null : p.toStringPretty();
     }
 
     /**

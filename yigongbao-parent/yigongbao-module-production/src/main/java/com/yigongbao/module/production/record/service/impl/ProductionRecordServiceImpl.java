@@ -532,6 +532,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         Long userId = StpUtil.getLoginIdAsLong();
         com.yigongbao.module.system.user.entity.UserEntity currentUser = userMapper.selectById(userId);
         String realName = currentUser != null ? currentUser.getRealName() : null;
+        java.time.LocalDateTime printStartTime = java.time.LocalDateTime.now();
+        record.setPrintStartTime(printStartTime);
+        updateById(record);
         processMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionProcessEntity>()
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)
                 .eq(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PRINT.getCode())
@@ -541,7 +544,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .set(ProductionProcessEntity::getOperatorId, userId)
                 .set(ProductionProcessEntity::getOperatorName, realName)
                 .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.IN_PROGRESS.getCode())
-                .set(ProductionProcessEntity::getStartTime, java.time.LocalDateTime.now())
+                .set(ProductionProcessEntity::getStartTime, printStartTime)
                 .set(dto.getPrintParams() != null, ProductionProcessEntity::getProcessParams, dto.getPrintParams()));
         log.info("分配打印机: recordId={}, deviceId={}, deviceNo={}", recordId, device.getId(), device.getDeviceId());
     }
