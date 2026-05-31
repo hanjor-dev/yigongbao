@@ -518,7 +518,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_ASSIGN_DEVICE);
         }
         // 校验设备在线且未被占用
-        if (resolveDeviceStatus(device) != 1) {
+        if (resolveDeviceStatus(device) != 0) {
             throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
         }
         record.setPrintDeviceId(device.getId());
@@ -577,20 +577,13 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
      * 打印设备（PRINTER_SLA）：state=0表示空闲，state=1表示繁忙
      * 其他设备：state=0表示可用，state=1表示不可用
      */
+    /** 返回设备可用状态：0=空闲可用，1=占用不可用 */
     private int resolveDeviceStatus(DeviceEntity device) {
-        // 离线视为占用
         if (device.getConnectionStatus() == null || device.getConnectionStatus() == 0) {
             return 1;
         }
-
-        // 根据设备类型区分state字段含义
-        if (DeviceTypeEnum.PRINTER_SLA.getCode().equals(device.getDeviceType())) {
-            // 打印设备：state=0空闲，state=1繁忙
-            return Integer.valueOf(1).equals(device.getState()) ? 1 : 0;
-        } else {
-            // 其他设备：state=0可用，state=1不可用
-            return Integer.valueOf(1).equals(device.getState()) ? 1 : 0;
-        }
+        // state=0 空闲，state=1 占用
+        return Integer.valueOf(1).equals(device.getState()) ? 1 : 0;
     }
 
     @Override
