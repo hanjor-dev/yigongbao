@@ -152,7 +152,7 @@ dromara:
         # SecretKey（从环境变量注入，禁止硬编码）
         secret-key: ${OSS_SECRET_KEY}
         # Endpoint（如：oss-cn-hangzhou.aliyuncs.com）
-        endpoint: ${OSS_ENDPOINT}
+        end-point: ${OSS_ENDPOINT}
         # Bucket 名称
         bucket-name: ${OSS_BUCKET:yigongbao}
         # 文件访问域名（CDN 域名或 OSS 公网域名）
