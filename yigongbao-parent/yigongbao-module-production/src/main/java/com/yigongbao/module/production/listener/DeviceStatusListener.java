@@ -67,7 +67,7 @@ public class DeviceStatusListener {
                 record.setPrintStartTime(now);
                 record.setContentUpdateTime(now);
                 recordMapper.updateById(record);
-                updatePrintProcessStatus(record.getId(), ProcessStatusEnum.IN_PROGRESS.getCode(), now, true);
+                updatePrintProcessStartTime(record.getId(), now);
 
                 log.info("设备状态变更触发打印开始: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
@@ -88,7 +88,7 @@ public class DeviceStatusListener {
                                 .set(ProductionRecordEntity::getCurrentProcess, null)
                                 .set(ProductionRecordEntity::getPrintFinishTime, now)
                                 .set(ProductionRecordEntity::getContentUpdateTime, now));
-                updatePrintProcessStatus(record.getId(), ProcessStatusEnum.COMPLETED.getCode(), now, false);
+                updatePrintProcessEndTime(record.getId(), now);
 
                 log.info("设备状态变更触发打印完成: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
@@ -108,19 +108,27 @@ public class DeviceStatusListener {
         }
     }
 
-    /** 更新打印工序状态和时间 */
-    private void updatePrintProcessStatus(Long recordId, String statusCode, LocalDateTime time, boolean isStart) {
-        LambdaUpdateWrapper<com.yigongbao.module.production.process.entity.ProductionProcessEntity> wrapper =
+    /** 更新打印工序开始时间 */
+    private void updatePrintProcessStartTime(Long recordId, LocalDateTime startTime) {
+        processMapper.update(null,
                 new LambdaUpdateWrapper<com.yigongbao.module.production.process.entity.ProductionProcessEntity>()
                         .eq(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getProductionRecordId, recordId)
                         .eq(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getProcessType,
                                 com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode())
-                        .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getStatus, statusCode);
-        if (isStart) {
-            wrapper.set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getStartTime, time);
-        } else {
-            wrapper.set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getEndTime, time);
-        }
-        processMapper.update(null, wrapper);
+                        .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getStatus,
+                                ProcessStatusEnum.IN_PROGRESS.getCode())
+                        .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getStartTime, startTime));
+    }
+
+    /** 更新打印工序结束时间 */
+    private void updatePrintProcessEndTime(Long recordId, LocalDateTime endTime) {
+        processMapper.update(null,
+                new LambdaUpdateWrapper<com.yigongbao.module.production.process.entity.ProductionProcessEntity>()
+                        .eq(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getProductionRecordId, recordId)
+                        .eq(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getProcessType,
+                                com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode())
+                        .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getStatus,
+                                ProcessStatusEnum.COMPLETED.getCode())
+                        .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getEndTime, endTime));
     }
 }
