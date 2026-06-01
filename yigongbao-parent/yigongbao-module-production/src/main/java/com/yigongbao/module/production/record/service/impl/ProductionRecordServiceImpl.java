@@ -11,6 +11,7 @@ import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.operator.FlowOperator;
@@ -316,6 +317,40 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         orderMainMapper.updateById(orderUpdate);
 
         log.info("下载设计数据包，流转卡推进到待打印: orderId={}, designPackageId={}", order.getId(), designPackageId);
+
+        // 聚合逻辑：检查是否所有流转卡都已下载，如果是则推进订单状态
+        if (order.getStatus().equals(FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue())) {
+            long totalActive = count(new LambdaQueryWrapper<ProductionRecordEntity>()
+                    .eq(ProductionRecordEntity::getOrderId, order.getId())
+                    .notIn(ProductionRecordEntity::getStatus,
+                            FlowStatusEnum.PRINT_FAILED.getValue(),
+                            FlowStatusEnum.CANCELLED.getValue()));
+            long reachedCount = count(new LambdaQueryWrapper<ProductionRecordEntity>()
+                    .eq(ProductionRecordEntity::getOrderId, order.getId())
+                    .ge(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue())
+                    .notIn(ProductionRecordEntity::getStatus,
+                            FlowStatusEnum.PRINT_FAILED.getValue(),
+                            FlowStatusEnum.CANCELLED.getValue()));
+
+            if (totalActive > 0 && totalActive == reachedCount) {
+                Integer targetPhase = order.getNeedsPhysicalDelivery() == 1
+                        ? FlowPhaseEnum.PRINT.getValue()
+                        : FlowPhaseEnum.CONFIRM.getValue();
+                Integer targetStatus = order.getNeedsPhysicalDelivery() == 1
+                        ? FlowStatusEnum.PENDING_PRINT.getValue()
+                        : FlowStatusEnum.AWAITING_CONFIRM.getValue();
+
+                OrderMainEntity phaseUpdate = new OrderMainEntity();
+                phaseUpdate.setId(order.getId());
+                phaseUpdate.setPhase(targetPhase);
+                phaseUpdate.setStatus(targetStatus);
+                orderMainMapper.updateById(phaseUpdate);
+
+                log.info("所有流转卡已下载，订单推进到下一阶段: orderId={}, {} -> {}",
+                        order.getId(), FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue(), targetStatus);
+            }
+        }
+
         return designPackage.getFileUrl();
     }
 

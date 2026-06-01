@@ -160,7 +160,7 @@ public class DesignReviewServiceImpl extends ServiceImpl<DesignReviewMapper, Des
 
             log.info("设计审核通过: orderId={}, {} -> {}, reviewerId={}",
                 orderId, FlowStatusEnum.DESIGN_REVIEWING.getName(),
-                result.getTargetPhase() == 30 ? "待打印" : "待客户确认", reviewerId);
+                FlowStatusEnum.DESIGN_REVIEW_PASSED.getName(), reviewerId);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {

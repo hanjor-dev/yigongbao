@@ -72,9 +72,9 @@ public class FlowStatusTransitionRules {
         transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_REVIEWING),
                 Set.of(FlowStatusEnum.DESIGN_REVIEW_PASSED, FlowStatusEnum.DESIGN_REVIEW_REJECTED));
 
-        // 审核驳回后可重新开始设计
+        // 审核驳回后可重新开始设计或重新提交审核
         transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_REVIEW_REJECTED),
-                Set.of(FlowStatusEnum.DESIGN_IN_PROGRESS));
+                Set.of(FlowStatusEnum.DESIGN_IN_PROGRESS, FlowStatusEnum.DESIGN_REVIEWING));
 
         // DESIGN_REVIEW_PASSED 为不可见状态，自动推进阶段；合法跳转由 decideNextPhaseAndStatus 决定
         transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_REVIEW_PASSED),
@@ -142,7 +142,7 @@ public class FlowStatusTransitionRules {
         boolean needsProduction = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
 
         // 以阶段为外层 switch，精确区分不同阶段中相同状态码的含义
-        return switch (phaseEnum) {
+        List<FlowActionEnum> actions = switch (phaseEnum) {
             case ORDER -> switch (status) {
                 case DRAFT -> List.of(FlowActionEnum.SUBMIT_ORDER);
                 case PENDING_DATA_AUDIT -> List.of(FlowActionEnum.DATA_AUDIT_PASS, FlowActionEnum.DATA_AUDIT_REJECT);
@@ -156,8 +156,8 @@ public class FlowStatusTransitionRules {
                 case DESIGN_IN_PROGRESS -> List.of(FlowActionEnum.SUBMIT_DESIGN);
                 case DESIGN_COMPLETED -> List.of(FlowActionEnum.SUBMIT_DESIGN);
                 case DESIGN_REVIEWING -> List.of(FlowActionEnum.DESIGN_REVIEW_PASS, FlowActionEnum.DESIGN_REVIEW_REJECT);
-                case DESIGN_REVIEW_REJECTED -> List.of(FlowActionEnum.CONTINUE_DESIGN);
-                case DESIGN_REVIEW_PASSED -> List.of(); // 不可见状态，由状态机自动推进，无需手动触发
+                case DESIGN_REVIEW_REJECTED -> List.of(FlowActionEnum.CONTINUE_DESIGN, FlowActionEnum.SUBMIT_DESIGN);
+                case DESIGN_REVIEW_PASSED -> List.of(); // 等待下载数据包后聚合流转
                 default -> List.of();
             };
 
@@ -202,6 +202,15 @@ public class FlowStatusTransitionRules {
 
             case COMPLETED -> List.of();
         };
+
+        // 添加全局可用动作：取消（排除终态）
+        if (status != FlowStatusEnum.COMPLETED && status != FlowStatusEnum.CANCELLED) {
+            List<FlowActionEnum> result = new ArrayList<>(actions);
+            result.add(FlowActionEnum.CANCEL);
+            return result;
+        }
+
+        return actions;
     }
 
     /**

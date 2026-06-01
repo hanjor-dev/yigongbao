@@ -158,13 +158,9 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             return new PhaseAndStatus(FlowPhaseEnum.DESIGN, FlowStatusEnum.PENDING_DESIGN);
         }
 
-        // 设计审核通过（不可见状态）→ 根据是否需要实体交付进入不同阶段
+        // 设计审核通过 → 停留在设计阶段，等待生产员下载数据包后再推进
         if (targetStatus == FlowStatusEnum.DESIGN_REVIEW_PASSED) {
-            if (needsProduction) {
-                return new PhaseAndStatus(FlowPhaseEnum.PRINT, FlowStatusEnum.PENDING_PRINT);
-            } else {
-                return new PhaseAndStatus(FlowPhaseEnum.CONFIRM, FlowStatusEnum.AWAITING_CONFIRM);
-            }
+            return new PhaseAndStatus(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_REVIEW_PASSED);
         }
 
         // 打印完成 → 医疗器械进入后处理，非医疗器械直接进入质检
@@ -216,7 +212,8 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      * @return true-不可见状态，false-正常状态
      */
     public static boolean isInvisibleStatus(FlowStatusEnum status) {
-        return status == FlowStatusEnum.DESIGN_REVIEW_PASSED;
+        // DESIGN_REVIEW_PASSED 改为可见状态，订单停留在此状态直到下载数据包
+        return false;
     }
 
     /**
