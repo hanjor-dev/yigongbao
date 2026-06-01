@@ -279,20 +279,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
-        // 幂等：仅当 START_PRINT 在可用动作列表中时才触发
-        List<String> availableActions = flowFacade.getAvailableActions(order.getId());
-        if (!availableActions.contains(FlowActionEnum.START_PRINT.name())) {
-            log.info("下载数据包幂等跳过，订单已推进: orderId={}, designPackageId={}", order.getId(), designPackageId);
-            // 即使订单已推进，仍需确保本条流转卡状态正确
-            baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
-                    .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
-                    .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue())
-                    .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue()));
-            return designPackage.getFileUrl();
-        }
-
-        // 聚合判断：只有订单下所有流转卡都已下载（即全部从 DESIGN_REVIEW_PASSED 推进）才触发 Flow
-        // 先更新本条流转卡状态
+        // 更新本条流转卡状态：DESIGN_REVIEW_PASSED → PENDING_PRINT（幂等）
         baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
                 .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue())
@@ -309,10 +296,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         orderUpdate.setProducerId(userId);
         orderMainMapper.updateById(orderUpdate);
 
-        // 聚合触发：所有流转卡都精确到达 PENDING_PRINT 状态时才触发 Flow
-        triggerFlowIfAllExact(order.getId(), FlowStatusEnum.PENDING_PRINT.getValue(), FlowActionEnum.START_PRINT);
-
-        log.info("下载设计数据包，触发待打印状态流转: orderId={}, designPackageId={}", order.getId(), designPackageId);
+        log.info("下载设计数据包，流转卡推进到待打印: orderId={}, designPackageId={}", order.getId(), designPackageId);
         return designPackage.getFileUrl();
     }
 
@@ -532,9 +516,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         Long userId = StpUtil.getLoginIdAsLong();
         com.yigongbao.module.system.user.entity.UserEntity currentUser = userMapper.selectById(userId);
         String realName = currentUser != null ? currentUser.getRealName() : null;
-        java.time.LocalDateTime printStartTime = java.time.LocalDateTime.now();
-        record.setPrintStartTime(printStartTime);
-        updateById(record);
         processMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionProcessEntity>()
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)
                 .eq(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PRINT.getCode())
@@ -543,8 +524,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .set(ProductionProcessEntity::getDeviceName, device.getDeviceName())
                 .set(ProductionProcessEntity::getOperatorId, userId)
                 .set(ProductionProcessEntity::getOperatorName, realName)
-                .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.IN_PROGRESS.getCode())
-                .set(ProductionProcessEntity::getStartTime, printStartTime)
                 .set(dto.getPrintParams() != null, ProductionProcessEntity::getProcessParams, dto.getPrintParams()));
         log.info("分配打印机: recordId={}, deviceId={}, deviceNo={}", recordId, device.getId(), device.getDeviceId());
     }

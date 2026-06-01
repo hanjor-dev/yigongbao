@@ -76,6 +76,10 @@ public class FlowStatusTransitionRules {
         transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_REVIEW_REJECTED),
                 Set.of(FlowStatusEnum.DESIGN_IN_PROGRESS));
 
+        // DESIGN_REVIEW_PASSED 为不可见状态，自动推进阶段；合法跳转由 decideNextPhaseAndStatus 决定
+        transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_REVIEW_PASSED),
+                Set.of(FlowStatusEnum.PENDING_PRINT, FlowStatusEnum.AWAITING_CONFIRM));
+
         // ==================== 打印阶段状态转换（3010-3090）====================
         transitions.put(statusKey(FlowPhaseEnum.PRINT, FlowStatusEnum.PENDING_PRINT),
                 Set.of(FlowStatusEnum.PRINTING));
@@ -153,7 +157,7 @@ public class FlowStatusTransitionRules {
                 case DESIGN_COMPLETED -> List.of(FlowActionEnum.SUBMIT_DESIGN);
                 case DESIGN_REVIEWING -> List.of(FlowActionEnum.DESIGN_REVIEW_PASS, FlowActionEnum.DESIGN_REVIEW_REJECT);
                 case DESIGN_REVIEW_REJECTED -> List.of(FlowActionEnum.CONTINUE_DESIGN);
-                case DESIGN_REVIEW_PASSED -> List.of(FlowActionEnum.START_PRINT);
+                case DESIGN_REVIEW_PASSED -> List.of(); // 不可见状态，由状态机自动推进，无需手动触发
                 default -> List.of();
             };
 
@@ -173,7 +177,7 @@ public class FlowStatusTransitionRules {
 
             case QC -> switch (status) {
                 case QC_IN_PROGRESS -> needsProduction
-                        ? List.of(FlowActionEnum.QC_PASS, FlowActionEnum.QC_FAIL, FlowActionEnum.REWORK_TO_PRINT)
+                        ? List.of(FlowActionEnum.QC_PASS, FlowActionEnum.QC_FAIL)
                         : List.of();
                 case QC_FAILED -> List.of(FlowActionEnum.REWORK);
                 case REWORK -> List.of(FlowActionEnum.REWORK_COMPLETE);
@@ -252,7 +256,7 @@ public class FlowStatusTransitionRules {
             case CONTINUE_DESIGN -> FlowStatusEnum.DESIGN_IN_PROGRESS.getValue();
 
             // 打印阶段动作
-            case START_PRINT -> FlowStatusEnum.PENDING_PRINT.getValue();
+            case START_PRINT -> FlowStatusEnum.PRINTING.getValue();
             case COMPLETE_PRINT -> FlowStatusEnum.PRINT_COMPLETED.getValue(); // 过渡状态，自动推进
 
             // 后处理动作
@@ -344,7 +348,7 @@ public class FlowStatusTransitionRules {
 
             case DESIGN -> Set.of(FlowStatusEnum.PENDING_DESIGN, FlowStatusEnum.DESIGN_IN_PROGRESS,
                     FlowStatusEnum.DESIGN_COMPLETED, FlowStatusEnum.DESIGN_REVIEWING,
-                    FlowStatusEnum.DESIGN_REVIEW_PASSED, FlowStatusEnum.DESIGN_REVIEW_REJECTED);
+                    FlowStatusEnum.DESIGN_REVIEW_REJECTED);
 
             case PRINT -> needsProduction
                     ? Set.of(FlowStatusEnum.PENDING_PRINT, FlowStatusEnum.PRINTING, FlowStatusEnum.PRINT_COMPLETED)
