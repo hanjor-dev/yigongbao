@@ -92,4 +92,10 @@ public class ProductionRecordEntity extends BaseEntity {
     private Integer isPostal;
     /** 期望交付时间 */
     private LocalDateTime expectedDeliveryDate;
+    /** 流转卡Excel文件URL */
+    private String flowCardFileUrl;
+    /** 流转卡Excel生成时间 */
+    private LocalDateTime flowCardGenerateTime;
+    /** 流转卡内容最后更新时间 */
+    private LocalDateTime contentUpdateTime;
 }

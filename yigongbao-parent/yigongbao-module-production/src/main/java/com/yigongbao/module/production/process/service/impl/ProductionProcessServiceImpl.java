@@ -132,6 +132,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         if (!ProcessTypeEnum.PRINT.getCode().equals(dto.getProcessType())) {
             record.setStatus(FlowStatusEnum.POST_PROCESSING.getValue());
             record.setCurrentProcess(dto.getProcessType());
+            record.setContentUpdateTime(LocalDateTime.now());
             recordMapper.updateById(record);
         }
         log.info("开始工序: recordId={}, processType={}, deviceId={}", recordId, dto.getProcessType(), dto.getPrimaryDeviceId());
@@ -172,9 +173,11 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
 
         if (ProcessTypeEnum.WASH.getCode().equals(processType)) {
             record.setCurrentProcess(ProcessTypeEnum.CURE.getCode());
+            record.setContentUpdateTime(LocalDateTime.now());
             recordMapper.updateById(record);
         } else if (ProcessTypeEnum.CURE.getCode().equals(processType)) {
             record.setCurrentProcess(ProcessTypeEnum.CLEAN_DRY.getCode());
+            record.setContentUpdateTime(LocalDateTime.now());
             recordMapper.updateById(record);
         } else if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(processType)) {
             // 校验产品数量：确保流转卡有产品才能进入质检
@@ -189,7 +192,8 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                     new LambdaUpdateWrapper<ProductionRecordEntity>()
                             .eq(ProductionRecordEntity::getId, recordId)
                             .set(ProductionRecordEntity::getStatus, FlowStatusEnum.QC_IN_PROGRESS.getValue())
-                            .set(ProductionRecordEntity::getCurrentProcess, null));
+                            .set(ProductionRecordEntity::getCurrentProcess, null)
+                            .set(ProductionRecordEntity::getContentUpdateTime, LocalDateTime.now()));
             recordService.triggerFlowIfAllExact(record.getOrderId(),
                     FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
         }

@@ -98,6 +98,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                         .eq(ProductionProductEntity::getProductionRecordId, id));
         vo.setProducts(products.stream().map(this::toProductVO).collect(Collectors.toList()));
         fillDesignFiles(vo, record.getDesignPackageId());
+        fillFlowCardFile(vo, record);
         return vo;
     }
 
@@ -136,6 +137,24 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 drawFile.setFileUrl(url);
                 vo.setDrawingFile(drawFile);
             }
+        }
+    }
+
+    /** 填充流转卡Excel文件，使用缓存机制避免重复生成 */
+    private void fillFlowCardFile(ProductionRecordVO vo, ProductionRecordEntity record) {
+        boolean needRegenerate = record.getFlowCardFileUrl() == null
+                || record.getFlowCardGenerateTime() == null
+                || record.getContentUpdateTime() == null
+                || record.getContentUpdateTime().isAfter(record.getFlowCardGenerateTime());
+
+        if (needRegenerate) {
+            com.yigongbao.module.basic.file.vo.FileVO fileVO = generateFlowCardExcel(record.getId());
+            vo.setFlowCardFile(fileVO);
+        } else {
+            com.yigongbao.module.basic.file.vo.FileVO fileVO = new com.yigongbao.module.basic.file.vo.FileVO();
+            fileVO.setFileUrl(record.getFlowCardFileUrl());
+            fileVO.setFileName("流转卡_" + record.getRecordNo() + ".xlsx");
+            vo.setFlowCardFile(fileVO);
         }
     }
 
@@ -405,6 +424,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
         record.setProductionBatchNo(dto.getProductionBatchNo());
         record.setMaterialBatchNo(dto.getMaterialBatchNo());
+        record.setContentUpdateTime(java.time.LocalDateTime.now());
         updateById(record);
         log.info("提交生产批号: recordId={}, batchNo={}", recordId, dto.getProductionBatchNo());
     }
@@ -512,6 +532,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (dto.getMaterial() != null) {
             record.setMaterial(dto.getMaterial());
         }
+        record.setContentUpdateTime(java.time.LocalDateTime.now());
         updateById(record);
         Long userId = StpUtil.getLoginIdAsLong();
         com.yigongbao.module.system.user.entity.UserEntity currentUser = userMapper.selectById(userId);
@@ -626,6 +647,28 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     }
 
     @Override
+    public com.yigongbao.module.basic.file.vo.FileVO getOrGenerateFlowCardExcel(Long recordId) {
+        ProductionRecordEntity record = getById(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+
+        boolean needRegenerate = record.getFlowCardFileUrl() == null
+                || record.getFlowCardGenerateTime() == null
+                || record.getContentUpdateTime() == null
+                || record.getContentUpdateTime().isAfter(record.getFlowCardGenerateTime());
+
+        if (needRegenerate) {
+            return generateFlowCardExcel(recordId);
+        } else {
+            com.yigongbao.module.basic.file.vo.FileVO fileVO = new com.yigongbao.module.basic.file.vo.FileVO();
+            fileVO.setFileUrl(record.getFlowCardFileUrl());
+            fileVO.setFileName("流转卡_" + record.getRecordNo() + ".xlsx");
+            return fileVO;
+        }
+    }
+
+    @Override
     public com.yigongbao.module.basic.file.vo.FileVO generateFlowCardExcel(Long recordId) {
         log.info("生成流转卡Excel: recordId={}", recordId);
 
@@ -689,6 +732,14 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             String filename = "流转卡_" + recordVO.getRecordNo() + ".xlsx";
             com.yigongbao.module.basic.file.vo.FileVO fileVO = fileService.uploadBytes(
                 excelBytes, filename, com.yigongbao.common.enums.FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
+
+            // 保存生成时间和URL到数据库
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            update(new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+                    .eq(ProductionRecordEntity::getId, recordId)
+                    .set(ProductionRecordEntity::getFlowCardFileUrl, fileVO.getFileUrl())
+                    .set(ProductionRecordEntity::getFlowCardGenerateTime, now));
+
             log.info("流转卡Excel生成并上传成功: recordId={}, recordNo={}, fileUrl={}",
                 recordId, recordVO.getRecordNo(), fileVO.getFileUrl());
             return fileVO;

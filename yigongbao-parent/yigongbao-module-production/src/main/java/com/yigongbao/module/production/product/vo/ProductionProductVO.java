@@ -23,6 +23,8 @@ public class ProductionProductVO {
     private String materialName;
     /** 颜色名称 */
     private String colorName;
+    /** 打印文件名 */
+    private String fileName;
     /** 产品状态代码（in_process/fail/pass/completed/cancelled） */
     private String status;
     /** 产品状态中文名 */

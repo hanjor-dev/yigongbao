@@ -70,4 +70,5 @@ public class ProductionRecordVO {
     private FileVO instructionFile;
     private FileVO drawingFile;
     private FileVO dataPackageFile;
+    private FileVO flowCardFile;
 }

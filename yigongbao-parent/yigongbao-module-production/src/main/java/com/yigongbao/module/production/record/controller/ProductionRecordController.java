@@ -98,7 +98,7 @@ public class ProductionRecordController {
     @Operation(summary = "生成流转卡Excel")
     @GetMapping("/{id}/excel")
     public Result<FileVO> generateFlowCardExcel(@PathVariable Long id) {
-        FileVO fileVO = recordService.generateFlowCardExcel(id);
+        FileVO fileVO = recordService.getOrGenerateFlowCardExcel(id);
         return Result.success(fileVO);
     }
 }

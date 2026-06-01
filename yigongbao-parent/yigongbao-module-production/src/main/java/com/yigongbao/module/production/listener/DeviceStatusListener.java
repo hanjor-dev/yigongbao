@@ -62,6 +62,7 @@ public class DeviceStatusListener {
                 record.setStatus(FlowStatusEnum.PRINTING.getValue());
                 record.setCurrentProcess(com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode());
                 record.setPrintStartTime(now);
+                record.setContentUpdateTime(now);
                 recordMapper.updateById(record);
                 log.info("设备状态变更触发打印开始: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
@@ -80,7 +81,8 @@ public class DeviceStatusListener {
                                 .eq(ProductionRecordEntity::getId, record.getId())
                                 .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINT_COMPLETED.getValue())
                                 .set(ProductionRecordEntity::getCurrentProcess, null)
-                                .set(ProductionRecordEntity::getPrintFinishTime, now));
+                                .set(ProductionRecordEntity::getPrintFinishTime, now)
+                                .set(ProductionRecordEntity::getContentUpdateTime, now));
                 log.info("设备状态变更触发打印完成: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
             });

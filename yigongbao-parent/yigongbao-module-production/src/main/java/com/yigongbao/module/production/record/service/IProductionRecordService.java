@@ -64,7 +64,15 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
     CancelPreviewVO getCancelPreview(Long recordId);
 
     /**
-     * 生成流转卡Excel文件
+     * 获取或生成流转卡Excel文件（使用缓存）
+     * 如果缓存有效则返回缓存的文件，否则生成新文件
+     * @param recordId 流转卡ID
+     * @return 文件信息
+     */
+    FileVO getOrGenerateFlowCardExcel(Long recordId);
+
+    /**
+     * 生成流转卡Excel文件（强制生成，不使用缓存）
      * @param recordId 流转卡ID
      * @return 文件信息
      */

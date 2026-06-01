@@ -72,6 +72,7 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         UserEntity user = userMapper.selectById(userId);
         record.setPackOperatorName(user != null ? user.getRealName() : null);
         record.setPackTime(LocalDateTime.now());
+        record.setContentUpdateTime(LocalDateTime.now());
         recordMapper.updateById(record);
 
         // 同步更新包装工序记录，供 Excel 生成时读取
