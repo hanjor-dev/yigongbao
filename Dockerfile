@@ -45,8 +45,8 @@ RUN mkdir -p /app/files && chown -R appuser:appgroup /app
 # 切换到非 root 用户
 USER appuser
 
-# 暴露端口
-EXPOSE 8081
+# 暴露端口（HTTP API）
+EXPOSE 8082
 
 # JVM 参数优化
 ENV JAVA_OPTS="-Xms512m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"

@@ -1,6 +1,6 @@
 server:
-  # 服务器端口
-  port: 8081
+  # 服务器端口（HTTP API）
+  port: 8082
   servlet:
     # 项目 context-path
     context-path: /api
@@ -55,6 +55,34 @@ spring:
     serialization:
       # 忽略 Map 中的 null 值
       write-null-map-values: false
+
+  # 邮件配置（生产环境，发件邮箱和密码通过环境变量注入）
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    protocol: smtp
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+  # 文件上传配置
+  servlet:
+    multipart:
+      # 启用 multipart 上传
+      enabled: true
+      # 最大单个文件大小（全局上限 2GB，各业务类型由业务层单独校验）
+      max-file-size: 2GB
+      # 最大请求总大小（全局上限 2GB）
+      max-request-size: 2GB
+      # 文件写入磁盘的阈值
+      file-size-threshold: 512KB
 
 # MyBatis-Plus 配置
 mybatis-plus:
@@ -128,8 +156,58 @@ dromara:
         base-path:
         # URL 路径匹配模式（SaToken 中需放行此路径）
         path-patterns: /files/public/**
-        # 存储根路径（映射到 URL /files/public/**）
-        storage-path: D:/yigongbao-files/
+        # 存储根路径（Docker容器内路径）
+        storage-path: /app/files/
+
+# 应用安全配置
+app:
+  sign:
+    # 请求签名密钥，生产环境通过环境变量 APP_SIGN_SECRET 注入
+    secret: ${APP_SIGN_SECRET}
+  rate-limit:
+    # 全局默认限流：每个接口独立计数，60次/分钟（约5次/秒）
+    default-limit: 60
+    # 时间窗口（秒）
+    default-window: 60
+
+# 短信配置（生产环境）
+sms:
+  mock:
+    # 生产环境短信 Mock 重定向邮箱（留空则仅打印日志）
+    redirect-email: ${SMS_MOCK_REDIRECT_EMAIL:}
+
+# 行为验证码配置
+captcha:
+  # 如果项目中使用到了redis，滑块验证码会自动把验证码数据存到redis中， 这里配置redis的key的前缀,默认是captcha:slider
+  prefix: captcha
+  # 验证码过期时间，默认是2分钟,单位毫秒， 可以根据自身业务进行调整
+  expire:
+    # 默认缓存时间 2分钟
+    default: 120000
+    # 针对 点选验证码 过期时间设置为 2分钟， 因为点选验证码验证比较慢，把过期时间调整大一些
+    WORD_IMAGE_CLICK: 120000
+  # 使用加载系统自带的资源， 默认是 false(这里系统的默认资源包含 滑动验证码模板/旋转验证码模板,如果想使用系统的模板，这里设置为true)
+  init-default-resource: true
+  # 缓存控制， 默认为false不开启
+  local-cache-enabled: false
+  # 缓存开启后，验证码会提前缓存一些生成好的验证数据， 默认是20
+  local-cache-size: 20
+  # 缓存开启后，缓存拉取失败后等待时间 默认是 5秒钟
+  local-cache-wait-time: 5000
+  # 缓存开启后，缓存检查间隔 默认是2秒钟
+  local-cache-period: 2000
+  # 缓存开启后，忽略的字段，默认是 ""(不忽略任何字段)
+  local-cache-ignored-cache-fields: ""
+  # 配置字体包，供文字点选验证码使用,可以配置多个，不配置使用默认的字体
+  font-path:
+    - classpath:font/SimHei.ttf
+  secondary:
+    # 二次验证，默认开启（验证码校验成功后生成 token，登录时必须验证 token）
+    enabled: true
+    # 二次验证过期时间， 默认 2分钟
+    expire: 120000
+    # 二次验证缓存key前缀，默认是 captcha:secondary
+    keyPrefix: "captcha:secondary"
 
 # 医工宝系统配置
 yigongbao:
