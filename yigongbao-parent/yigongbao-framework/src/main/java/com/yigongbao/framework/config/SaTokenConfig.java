@@ -70,7 +70,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 // 登录验证码冷却时间配置
                 "/system/config/key/**",
                 // 设备 WebSocket（允许任何客户端连接，无需身份认证）
-                "/",
+                "/ws/device",
                 // 基础数据加工中心和设备接口（无需登录）
                 "/basic/processing-center/**",
                 "/basic/device/**",
