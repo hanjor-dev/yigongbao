@@ -68,11 +68,10 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 // 文件访问接口（静态资源，无需登录）
                 "/files/public/**",
                 // 登录验证码冷却时间配置
-                "/system/config/5",
+                "/system/config/key/**",
                 // 设备 WebSocket（允许任何客户端连接，无需身份认证）
-                // 注意：WebSocket 路径注册时含 /api 前缀，但拦截器路径不含，需两者都排除
-                "/basic/ws/device",
-                "/api/basic/ws/device",
+                "/",
+                // 基础数据加工中心和设备接口（无需登录）
                 "/basic/processing-center/**",
                 "/basic/device/**",
                 // 影像查看器适配接口（二维码传播，无需登录）
