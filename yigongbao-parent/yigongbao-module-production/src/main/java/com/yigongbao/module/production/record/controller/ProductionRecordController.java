@@ -2,8 +2,10 @@ package com.yigongbao.module.production.record.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
@@ -52,6 +54,7 @@ public class ProductionRecordController {
     }
 
     @Operation(summary = "下载设计数据包")
+    @OperationLog(module = "生产管理", businessType = OperationTypeEnum.DOWNLOAD, operation = "下载设计数据包")
     @PostMapping("/{designPackageId}/download-package")
     public Result<String> downloadDataPackage(@PathVariable Long designPackageId) {
         return Result.success(recordService.downloadDataPackage(designPackageId));
@@ -64,6 +67,7 @@ public class ProductionRecordController {
     }
 
     @Operation(summary = "提交生产批号")
+    @OperationLog(module = "生产管理", businessType = OperationTypeEnum.SUBMIT, operation = "提交生产批号")
     @PostMapping("/{id}/submit-batch-no")
     public Result<Void> submitBatchNo(@PathVariable Long id, @Valid @RequestBody SubmitBatchNoDTO dto) {
         recordService.submitBatchNo(id, dto);
@@ -83,6 +87,7 @@ public class ProductionRecordController {
     }
 
     @Operation(summary = "提交打印机配置")
+    @OperationLog(module = "生产管理", businessType = OperationTypeEnum.ASSIGN, operation = "分配打印设备")
     @PostMapping("/{id}/assign-device")
     public Result<Void> assignDevice(@PathVariable Long id, @Valid @RequestBody AssignDeviceDTO dto) {
         recordService.assignDevice(id, dto);

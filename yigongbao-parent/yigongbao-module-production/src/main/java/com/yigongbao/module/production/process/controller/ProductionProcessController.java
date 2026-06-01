@@ -1,6 +1,8 @@
 package com.yigongbao.module.production.process.controller;
 
+import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.production.process.dto.StartProcessDTO;
 import com.yigongbao.module.production.process.service.IProductionProcessService;
 import com.yigongbao.module.production.process.vo.ProcessVO;
@@ -33,6 +35,7 @@ public class ProductionProcessController {
     }
 
     @Operation(summary = "开始工序")
+    @OperationLog(module = "工序管理", businessType = OperationTypeEnum.UPDATE, operation = "开始工序")
     @PostMapping("/{recordId}/start")
     public Result<Void> startProcess(@PathVariable Long recordId, @Valid @RequestBody StartProcessDTO dto) {
         processService.startProcess(recordId, dto);
@@ -40,6 +43,7 @@ public class ProductionProcessController {
     }
 
     @Operation(summary = "完成工序")
+    @OperationLog(module = "工序管理", businessType = OperationTypeEnum.UPDATE, operation = "完成工序")
     @PostMapping("/{recordId}/finish")
     public Result<Void> finishProcess(@PathVariable Long recordId, @RequestParam String processType) {
         processService.finishProcess(recordId, processType);
