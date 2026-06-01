@@ -347,6 +347,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (dto.getHospitalId() != null) {
             fillAreaFromHospital(entity, dto.getHospitalId());
         }
+
+        // 保存旧状态，用于判断是否需要自动流转
+        Integer oldStatus = entity.getStatus();
+
         // 更新订单
         updateById(entity);
         log.info("更新订单: orderId={}", id);
@@ -356,7 +360,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         UserEntity currentUser = userService.getById(currentUserId);
         String operatorName = currentUser != null ? currentUser.getRealName() : null;
 
-        if (entity.getStatus().equals(FlowStatusEnum.DATA_AUDIT_REJECTED.getValue())) {
+        if (FlowStatusEnum.DATA_AUDIT_REJECTED.getValue().equals(oldStatus)) {
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.RESUBMIT,
                     new FlowOperator(currentUserId, operatorName, "修改后自动重新提交"));
@@ -365,7 +369,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             updateById(entity);
             log.info("订单修改后自动重新提交审核: orderId={}, {} -> {}", id,
                     FlowStatusEnum.DATA_AUDIT_REJECTED.getValue(), result.getFinalStatus());
-        } else if (entity.getStatus().equals(FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue())) {
+        } else if (FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue().equals(oldStatus)) {
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.SUBMIT_DESIGN,
                     new FlowOperator(currentUserId, operatorName, "修改后自动重新提交设计审核"));

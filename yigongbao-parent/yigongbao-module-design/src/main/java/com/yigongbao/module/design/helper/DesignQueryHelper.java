@@ -65,6 +65,17 @@ public class DesignQueryHelper {
         SORT_FIELD_MAP = Collections.unmodifiableMap(map);
     }
 
+    /**
+     * 设计阶段允许操作的状态白名单
+     */
+    private static final Set<FlowStatusEnum> ALLOWED_DESIGN_STATUSES = Set.of(
+            FlowStatusEnum.DATA_AUDIT_PASSED,
+            FlowStatusEnum.PENDING_DESIGN,
+            FlowStatusEnum.DESIGN_IN_PROGRESS,
+            FlowStatusEnum.DESIGN_COMPLETED,
+            FlowStatusEnum.DESIGN_REVIEW_REJECTED
+    );
+
     private final UserService userService;
     private final ConfigService configService;
     private final DictService dictService;
@@ -349,7 +360,8 @@ public class DesignQueryHelper {
     // ==================== 设计阶段公共校验 ====================
 
     /**
-     * 校验订单存在且处于可操作的设计阶段（DESIGN_IN_PROGRESS 或 DESIGN_REVIEW_REJECTED）
+     * 校验订单存在且处于可操作的设计阶段
+     * 允许的状态：数据审核通过、待设计、设计中、设计完成、设计审核不通过
      */
     public OrderMainEntity checkDesignPhase(Long orderId) {
         OrderMainEntity order = orderMainService.getById(orderId);
@@ -357,11 +369,7 @@ public class DesignQueryHelper {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
         FlowStatusEnum status = FlowStatusEnum.getByValue(order.getStatus());
-        if (status == null || !status.belongsTo(FlowPhaseEnum.DESIGN)) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
-        }
-        if (status != FlowStatusEnum.DESIGN_IN_PROGRESS
-                && status != FlowStatusEnum.DESIGN_REVIEW_REJECTED) {
+        if (status == null || !ALLOWED_DESIGN_STATUSES.contains(status)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
         }
         return order;

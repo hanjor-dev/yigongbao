@@ -9,6 +9,8 @@ import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.constants.ProductionConstants;
+import com.yigongbao.module.production.enums.ProcessStatusEnum;
+import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
@@ -32,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class DeviceStatusListener {
 
     private final ProductionRecordMapper recordMapper;
+    private final ProductionProcessMapper processMapper;
     private final IProductionRecordService recordService;
     private final OrderMainMapper orderMainMapper;
 
@@ -64,6 +67,8 @@ public class DeviceStatusListener {
                 record.setPrintStartTime(now);
                 record.setContentUpdateTime(now);
                 recordMapper.updateById(record);
+                updatePrintProcessStatus(record.getId(), ProcessStatusEnum.IN_PROGRESS.getCode(), now, true);
+
                 log.info("设备状态变更触发打印开始: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
             });
@@ -83,6 +88,8 @@ public class DeviceStatusListener {
                                 .set(ProductionRecordEntity::getCurrentProcess, null)
                                 .set(ProductionRecordEntity::getPrintFinishTime, now)
                                 .set(ProductionRecordEntity::getContentUpdateTime, now));
+                updatePrintProcessStatus(record.getId(), ProcessStatusEnum.COMPLETED.getCode(), now, false);
+
                 log.info("设备状态变更触发打印完成: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
             });
@@ -99,5 +106,21 @@ public class DeviceStatusListener {
                                 .set(ProductionRecordEntity::getStatus, FlowStatusEnum.QC_IN_PROGRESS.getValue()));
             }
         }
+    }
+
+    /** 更新打印工序状态和时间 */
+    private void updatePrintProcessStatus(Long recordId, String statusCode, LocalDateTime time, boolean isStart) {
+        LambdaUpdateWrapper<com.yigongbao.module.production.process.entity.ProductionProcessEntity> wrapper =
+                new LambdaUpdateWrapper<com.yigongbao.module.production.process.entity.ProductionProcessEntity>()
+                        .eq(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getProductionRecordId, recordId)
+                        .eq(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getProcessType,
+                                com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode())
+                        .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getStatus, statusCode);
+        if (isStart) {
+            wrapper.set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getStartTime, time);
+        } else {
+            wrapper.set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getEndTime, time);
+        }
+        processMapper.update(null, wrapper);
     }
 }
