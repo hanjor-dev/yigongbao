@@ -672,29 +672,41 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     public com.yigongbao.module.basic.file.vo.FileVO generateFlowCardExcel(Long recordId) {
         log.info("生成流转卡Excel: recordId={}", recordId);
 
-        ProductionRecordVO recordVO = getRecordDetail(recordId);
-        if (recordVO == null) {
-            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+        // 直接查询数据库，避免调用 getRecordDetail 导致无限递归
+        // 并行执行三个独立查询以提升性能
+        java.util.concurrent.CompletableFuture<ProductionRecordEntity> recordFuture =
+            java.util.concurrent.CompletableFuture.supplyAsync(() -> getById(recordId));
+
+        java.util.concurrent.CompletableFuture<List<ProductionProductEntity>> productsFuture =
+            java.util.concurrent.CompletableFuture.supplyAsync(() ->
+                productMapper.selectList(new LambdaQueryWrapper<ProductionProductEntity>()
+                    .eq(ProductionProductEntity::getProductionRecordId, recordId)));
+
+        java.util.concurrent.CompletableFuture<List<ProductionProcessEntity>> processesFuture =
+            java.util.concurrent.CompletableFuture.supplyAsync(() ->
+                processMapper.selectList(new LambdaQueryWrapper<ProductionProcessEntity>()
+                    .eq(ProductionProcessEntity::getProductionRecordId, recordId)
+                    .orderByAsc(ProductionProcessEntity::getProcessOrder)));
+
+        ProductionRecordEntity record = recordFuture.join();
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
 
-        List<ProductionProcessEntity> processes = processMapper.selectList(
-            new LambdaQueryWrapper<ProductionProcessEntity>()
-                .eq(ProductionProcessEntity::getProductionRecordId, recordId)
-                .orderByAsc(ProductionProcessEntity::getProcessOrder)
-        );
-
-        String designerAssetNo = queryDesignerAssetNo(recordVO.getOrderId());
+        List<ProductionProductEntity> products = productsFuture.join();
+        List<ProductionProcessEntity> processes = processesFuture.join();
+        String designerAssetNo = queryDesignerAssetNo(record.getOrderId());
 
         FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
-        context.setRecordNo(recordVO.getRecordNo());
+        context.setRecordNo(record.getRecordNo());
         context.setVersionNo("A/0");
-        context.setDesignPackageCode(recordVO.getDesignPackageCode());
-        context.setTotalProductCount(recordVO.getTotalProductCount());
-        context.setProductionBatchNo(recordVO.getProductionBatchNo());
-        context.setMaterial(recordVO.getMaterial());
-        context.setMaterialBatchNo(recordVO.getMaterialBatchNo());
-        context.setPrintStartTime(recordVO.getPrintStartTime());
-        context.setPrintFinishTime(recordVO.getPrintFinishTime());
+        context.setDesignPackageCode(record.getDesignPackageCode());
+        context.setTotalProductCount(record.getTotalProductCount());
+        context.setProductionBatchNo(record.getProductionBatchNo());
+        context.setMaterial(record.getMaterial());
+        context.setMaterialBatchNo(record.getMaterialBatchNo());
+        context.setPrintStartTime(record.getPrintStartTime());
+        context.setPrintFinishTime(record.getPrintFinishTime());
         context.setDesignerAssetNo(designerAssetNo);
 
         List<FlowCardExcelBuilder.ProcessInfo> processInfos = processes.stream()
@@ -711,37 +723,43 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             .collect(Collectors.toList());
         context.setProcesses(processInfos);
 
-        List<FlowCardExcelBuilder.ProductInfo> productInfos = Collections.emptyList();
-        if (recordVO.getProducts() != null) {
-            productInfos = recordVO.getProducts().stream()
-                .map(p -> {
-                    FlowCardExcelBuilder.ProductInfo info = new FlowCardExcelBuilder.ProductInfo();
-                    info.setProductNo(p.getProductNo());
-                    info.setProductName(p.getProductName());
-                    info.setSpecName(p.getSpecName());
-                    info.setMaterialName(p.getMaterialName());
-                    info.setColorName(p.getColorName());
-                    return info;
-                })
-                .collect(Collectors.toList());
-        }
+        List<FlowCardExcelBuilder.ProductInfo> productInfos = products.stream()
+            .map(p -> {
+                FlowCardExcelBuilder.ProductInfo info = new FlowCardExcelBuilder.ProductInfo();
+                info.setProductNo(p.getProductNo());
+                info.setProductName(p.getProductName());
+                info.setSpecName(p.getSpecName());
+                info.setMaterialName(p.getMaterialName());
+                info.setColorName(p.getColorName());
+                return info;
+            })
+            .collect(Collectors.toList());
         context.setProducts(productInfos);
 
         try {
             byte[] excelBytes = flowCardExcelBuilder.build(context);
-            String filename = "流转卡_" + recordVO.getRecordNo() + ".xlsx";
+            String filename = "流转卡_" + record.getRecordNo() + ".xlsx";
             com.yigongbao.module.basic.file.vo.FileVO fileVO = fileService.uploadBytes(
                 excelBytes, filename, com.yigongbao.common.enums.FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
 
             // 保存生成时间和URL到数据库
             java.time.LocalDateTime now = java.time.LocalDateTime.now();
-            update(new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+            com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity> updateWrapper =
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
                     .eq(ProductionRecordEntity::getId, recordId)
                     .set(ProductionRecordEntity::getFlowCardFileUrl, fileVO.getFileUrl())
-                    .set(ProductionRecordEntity::getFlowCardGenerateTime, now));
+                    .set(ProductionRecordEntity::getFlowCardGenerateTime, now);
+            // contentUpdateTime 可能为 null 的情况：
+            // 1. 新创建的流转卡尚未执行任何内容修改操作（submitBatchNo、assignDevice等）
+            // 2. 数据库迁移前的旧记录（已通过 SQL UPDATE 初始化，但可能存在遗漏）
+            // 初始化为当前时间，避免后续每次查询都重新生成 Excel
+            if (record.getContentUpdateTime() == null) {
+                updateWrapper.set(ProductionRecordEntity::getContentUpdateTime, now);
+            }
+            update(updateWrapper);
 
             log.info("流转卡Excel生成并上传成功: recordId={}, recordNo={}, fileUrl={}",
-                recordId, recordVO.getRecordNo(), fileVO.getFileUrl());
+                recordId, record.getRecordNo(), fileVO.getFileUrl());
             return fileVO;
         } catch (Exception e) {
             log.error("流转卡Excel生成失败: recordId={}", recordId, e);
