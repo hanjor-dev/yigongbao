@@ -28,6 +28,44 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class SaTokenConfig implements WebMvcConfigurer {
 
     /**
+     * 注册 Sa-Token 过滤器（Servlet Filter）
+     * 只负责路径过滤，不执行认证检查（认证由 Interceptor 负责）
+     * 主要用于排除 WebSocket 等特殊请求
+     */
+    @Bean
+    @Order(-100)
+    public SaServletFilter getSaServletFilter() {
+        return new SaServletFilter()
+                .addInclude("/**")
+                .addExclude("/static/**")
+                .addExclude("/favicon.ico")
+                .addExclude("/common/**")
+                .addExclude("/error")
+                .addExclude("/test/**")
+                .addExclude("/system/auth/login")
+                .addExclude("/system/auth/logout")
+                .addExclude("/system/auth/info")
+                .addExclude("/system/auth/password")
+                .addExclude("/system/auth/captcha")
+                .addExclude("/system/auth/forgot-password/**")
+                .addExclude("/image-captch/**")
+                .addExclude("/doc.html")
+                .addExclude("/swagger-ui/**")
+                .addExclude("/swagger-ui.html")
+                .addExclude("/v3/api-docs/**")
+                .addExclude("/webjars/**")
+                .addExclude("/files/public/**")
+                .addExclude("/system/config/key/**")
+                .addExclude("/ws/device")
+                .addExclude("/basic/processing-center/**")
+                .addExclude("/basic/device/**")
+                .addExclude("/imaging/v1/dcm")
+                .addExclude("/imaging/v1/stl")
+                .addExclude("/imaging/v1/mark");
+                // 注意：不设置 setAuth()，Filter 只做路径过滤，认证由 Interceptor 负责
+    }
+
+    /**
      * 注册 Sa-Token 拦截器
      * 拦截所有请求，进行登录认证
      *

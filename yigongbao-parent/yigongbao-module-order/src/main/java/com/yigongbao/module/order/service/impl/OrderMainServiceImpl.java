@@ -781,7 +781,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
         // Step 3：构建订单主表
         OrderMainEntity order = new OrderMainEntity();
-        BeanUtils.copyProperties(dto, order);
+        BeanUtils.copyProperties(dto, order, "id");
         order.setOrderCode(orderCode);
         order.setPhase(FlowPhaseEnum.ORDER.getValue());
         order.setStatus(FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
