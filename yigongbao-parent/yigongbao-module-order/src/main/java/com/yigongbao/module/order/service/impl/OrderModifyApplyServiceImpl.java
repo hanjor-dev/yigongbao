@@ -214,9 +214,6 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         // 递增版本号，使持有旧版本的审核操作失效
         flowOrderService.incrementVersion(orderId);
 
-        // 11. 执行修改后流转
-        triggerPostModifyFlow(orderId, order.getPhase(), order.getStatus(), modifierId, modifierName);
-
         log.info("直接修改订单: orderId={}", orderId);
     }
 
@@ -619,30 +616,6 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 JSONUtil.toJsonStr(oldFileIds),
                 JSONUtil.toJsonStr(newFileIds),
                 modifierId, modifierName);
-    }
-
-    // ==================== 辅助方法：修改后流转 ====================
-
-    /**
-     * 订单修改完成后，根据当前阶段和状态决定是否触发流转
-     * ORDER 阶段：DATA_AUDIT_REJECTED → RESUBMIT
-     * DESIGN 阶段：DESIGN_REVIEW_REJECTED → CONTINUE_DESIGN + SUBMIT_DESIGN
-     */
-    private void triggerPostModifyFlow(Long orderId, Integer phase, Integer status,
-            Long modifierId, String modifierName) {
-        if (FlowPhaseEnum.ORDER.getValue().equals(phase)) {
-            if (FlowStatusEnum.DATA_AUDIT_REJECTED.getValue().equals(status)) {
-                flowFacade.executeFlow(orderId, FlowActionEnum.RESUBMIT,
-                        new FlowOperator(modifierId, modifierName, "修改后重新提交审核"));
-            }
-        } else if (FlowPhaseEnum.DESIGN.getValue().equals(phase)) {
-            if (FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue().equals(status)) {
-                flowFacade.executeFlow(orderId, FlowActionEnum.CONTINUE_DESIGN,
-                        new FlowOperator(modifierId, modifierName, "修改后继续设计"));
-                flowFacade.executeFlow(orderId, FlowActionEnum.SUBMIT_DESIGN,
-                        new FlowOperator(modifierId, modifierName, "修改后重新提交设计审核"));
-            }
-        }
     }
 
     // ==================== 查询方法 ====================

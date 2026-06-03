@@ -390,31 +390,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         // 更新订单
         updateById(entity);
         log.info("更新订单: orderId={}", id);
-
-        // 自动流转：驳回后修改订单自动重新提交审核
-        Long currentUserId = getCurrentUserId();
-        UserEntity currentUser = userService.getById(currentUserId);
-        String operatorName = currentUser != null ? currentUser.getRealName() : null;
-
-        if (FlowStatusEnum.DATA_AUDIT_REJECTED.getValue().equals(oldStatus)) {
-            TransitionResult result = flowFacade.executeFlow(
-                    id, FlowActionEnum.RESUBMIT,
-                    new FlowOperator(currentUserId, operatorName, "修改后自动重新提交"));
-            entity.setPhase(result.getTargetPhase());
-            entity.setStatus(result.getFinalStatus());
-            updateById(entity);
-            log.info("订单修改后自动重新提交审核: orderId={}, {} -> {}", id,
-                    FlowStatusEnum.DATA_AUDIT_REJECTED.getValue(), result.getFinalStatus());
-        } else if (FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue().equals(oldStatus)) {
-            TransitionResult result = flowFacade.executeFlow(
-                    id, FlowActionEnum.SUBMIT_DESIGN,
-                    new FlowOperator(currentUserId, operatorName, "修改后自动重新提交设计审核"));
-            entity.setPhase(result.getTargetPhase());
-            entity.setStatus(result.getFinalStatus());
-            updateById(entity);
-            log.info("订单修改后自动重新提交设计审核: orderId={}, {} -> {}", id,
-                    FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue(), result.getFinalStatus());
-        }
     }
 
     /**
