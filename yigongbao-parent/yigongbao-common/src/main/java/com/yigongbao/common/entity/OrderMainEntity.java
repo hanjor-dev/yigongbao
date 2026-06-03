@@ -254,6 +254,27 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
      */
     private String dataEvaluationOpinion;
 
+    // ==================== 经典案例 ====================
+    /**
+     * 是否经典案例：0-否，1-是
+     */
+    private Integer isClassicCase;
+
+    /**
+     * 标记为经典案例的时间
+     */
+    private LocalDateTime classicCaseTime;
+
+    /**
+     * 标记为经典案例的操作人ID
+     */
+    private Long classicCaseBy;
+
+    /**
+     * 标记为经典案例的备注
+     */
+    private String classicCaseRemark;
+
     // ==================== 乐观锁 ====================
     /**
      * 版本号（乐观锁）

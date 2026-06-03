@@ -244,6 +244,12 @@ public enum ErrorCodeEnum {
     // 导出
     ORDER_EXPORT_FAILED(714, "订单导出失败", 3),
 
+    // 经典案例（715, 718-720）
+    CLASSIC_CASE_PROTECTED(715, "经典案例订单受保护，不可删除或修改", 3),
+    CLASSIC_CASE_ALREADY_MARKED(718, "订单已标记为经典案例", 3),
+    CLASSIC_CASE_ORDER_NOT_COMPLETED(719, "只有已完成订单才能标记为经典案例", 3),
+    CLASSIC_CASE_FILE_MIGRATE_FAILED(720, "经典案例文件迁移失败", 3),
+
     // 修改字段校验错误码（716 起）
     ORDER_MODIFY_FIELD_NOT_ALLOWED(716, "该字段不在申请范围内，请检查申请类型", 3),
     ORDER_NOT_APPLICABLE_STATUS(717, "当前订单状态不适用修改申请功能", 3),

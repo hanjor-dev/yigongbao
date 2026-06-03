@@ -1010,6 +1010,12 @@ CREATE TABLE order_main (
     estimated_cost  DECIMAL(10,2)   COMMENT '预估费用',
     data_evaluation_opinion TEXT     COMMENT '影像数据评估意见',
 
+    -- ==================== 经典案例 ====================
+    is_classic_case TINYINT         DEFAULT 0 COMMENT '是否经典案例：0-否，1-是',
+    classic_case_time DATETIME      COMMENT '标记为经典案例的时间',
+    classic_case_by BIGINT          COMMENT '标记为经典案例的操作人ID',
+    classic_case_remark VARCHAR(500) COMMENT '标记为经典案例的备注',
+
     -- ==================== 乐观锁 ====================
     version         INT             DEFAULT 0 COMMENT '版本号（乐观锁）',
 
@@ -1029,6 +1035,7 @@ CREATE TABLE order_main (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单主表';
 CREATE UNIQUE INDEX uk_order_main_code ON order_main ((CASE WHEN is_deleted = 0 THEN order_code ELSE NULL END));
 ALTER TABLE order_main ADD FULLTEXT INDEX ft_order_search (order_code, org_name, operator_name, hospital_name, patient_name);
+CREATE INDEX idx_order_classic_case ON order_main(is_classic_case, create_time DESC);
 
 
 -- ============================================================
