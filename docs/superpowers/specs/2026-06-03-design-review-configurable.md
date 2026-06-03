@@ -197,6 +197,100 @@ void manualCompleteOrder(Long orderId);
   → 订单完成(8010)
 ```
 
+### 3.6 详细代码影响分析
+
+#### 3.6.1 Flow 模块（核心流转规则）
+
+| 文件 | 位置 | 变更类型 | 说明 |
+|-----|------|---------|------|
+| FlowStatusEnum.java | 60-73行 | 删除 | 删除 DESIGN_REVIEWING(2040)、DESIGN_REVIEW_PASSED(2050)、DESIGN_REVIEW_REJECTED(2060) 三个状态 |
+| FlowActionEnum.java | 64-81行 | 修改 | 删除 SUBMIT_DESIGN、DESIGN_REVIEW_PASS、DESIGN_REVIEW_REJECT；新增 COMPLETE_DESIGN |
+| FlowStatusTransitionRules.java | 69-77行 | 修改 | 删除 DESIGN_COMPLETED→DESIGN_REVIEWING 的转换规则；删除审核相关的转换规则 |
+| FlowStatusTransitionRules.java | 156-160行 | 修改 | getAvailableActions 方法中删除审核相关动作 |
+| FlowStatusTransitionRules.java | 262行 | 修改 | getTargetStatus 方法中删除 SUBMIT_DESIGN→DESIGN_REVIEWING 映射 |
+| FlowPhaseTransitionRules.java | 162-164行 | 删除 | decideNextPhaseAndStatus 中删除 DESIGN_REVIEW_PASSED 的处理逻辑 |
+| FlowPhaseTransitionRules.java | 228行 | 修改 | isPhaseChangeAction 中删除 DESIGN_REVIEW_PASS |
+| FlowContext.java | - | 修改 | 删除 incrementDesignReject() 方法及相关计数逻辑 |
+| FlowStateMachineServiceImpl.java | 222行 | 修改 | applyContextAction 中删除 DESIGN_REVIEW_REJECT 的处理 |
+
+#### 3.6.2 Production 模块（生产流转）
+
+| 文件 | 位置 | 变更类型 | 说明 |
+|-----|------|---------|------|
+| DesignReviewPassedListener.java | 整个文件 | 删除 | 删除整个监听器，不再监听 DesignReviewPassedEvent |
+| ProductionRecordServiceImpl.java | 305行 | 修改 | 下载数据包时，检查状态从 DESIGN_REVIEW_PASSED 改为 DESIGN_COMPLETED |
+| ProductionRecordServiceImpl.java | 322行 | 修改 | 聚合判断从 DESIGN_REVIEW_PASSED 改为 DESIGN_COMPLETED |
+| - | 新增 | 新增 | 新增 DesignCompletedListener 监听 DesignCompletedEvent，创建生产流转卡 |
+
+**关键逻辑变更：**
+- 流转卡创建时机：从"审核通过"改为"设计完成"
+- 流转卡初始状态：从 DESIGN_REVIEW_PASSED(2050) 改为 DESIGN_COMPLETED(2030)
+- 数据包下载条件：从检查 2050 状态改为检查 2030 状态
+
+**⚠️ 关键技术决策：生产流转卡状态复用**
+
+当前设计中，生产流转卡（production_record）的 status 字段直接使用订单的流程状态枚举值：
+- 旧流程：流转卡状态 = DESIGN_REVIEW_PASSED(2050)，表示"等待下载数据包"
+- 新流程：流转卡状态 = DESIGN_COMPLETED(2030)，表示"等待下载数据包"
+
+这个设计是合理的，因为：
+1. 生产流转卡与订单状态保持同步，便于追踪
+2. 下载数据包后，流转卡状态更新为 PENDING_PRINT(3010)，订单也推进到该状态
+3. 避免引入新的生产专属状态枚举
+
+但需要注意：
+- DESIGN_COMPLETED(2030) 原本语义是"设计已完成"，现在复用为"等待生产下载"
+- 这个状态在生产流转卡中的语义是"已创建流转卡，等待下载数据包"
+- 文档和代码注释需要明确说明这一点
+
+#### 3.6.3 Design 模块（设计工单与审核）
+
+| 文件 | 位置 | 变更类型 | 说明 |
+|-----|------|---------|------|
+| DesignReviewController.java | 整个文件 | 删除 | 删除整个 Controller（listReviewWorkorders、getReviewDetail、reviewPass、reviewReject） |
+| DesignReviewService.java | 整个文件 | 删除 | 删除 Service 接口 |
+| DesignReviewServiceImpl.java | 整个文件 | 删除 | 删除 Service 实现类 |
+| ReviewPassDTO.java | 整个文件 | 删除 | 删除审核通过 DTO |
+| ReviewRejectDTO.java | 整个文件 | 删除 | 删除审核驳回 DTO |
+| DesignReviewDetailVO.java | 整个文件 | 删除 | 删除审核详情 VO |
+| DesignReviewHistoryVO.java | 整个文件 | 删除 | 删除审核历史 VO |
+| DesignWorkorderController.java | 86行 | 删除 | 删除 submitDesign 接口 |
+| DesignWorkorderController.java | - | 新增 | 新增 completeDesign 接口 |
+| DesignWorkorderServiceImpl.java | 452-504行 | 删除 | 删除 submitDesign 方法 |
+| DesignWorkorderServiceImpl.java | - | 新增 | 新增 completeDesign 方法 |
+| DesignWorkorderServiceImpl.java | 385-437行 | 删除 | 删除 continueDesign 方法（审核驳回后继续修改） |
+| DesignWorkorderServiceImpl.java | 140-144行 | 修改 | 查询过滤器中删除 DESIGN_REVIEW_PASSED 的特殊处理 |
+| DesignQueryHelper.java | 77行 | 修改 | 状态列表中删除 DESIGN_REVIEW_REJECTED |
+
+#### 3.6.4 Order 模块（订单管理）
+
+| 文件 | 位置 | 变更类型 | 说明 |
+|-----|------|---------|------|
+| OrderMainServiceImpl.java | 408-417行 | 删除 | 删除订单修改后自动重新提交设计审核的逻辑 |
+| OrderModifyApplyServiceImpl.java | 639-642行 | 删除 | 删除修改申请通过后自动触发 CONTINUE_DESIGN + SUBMIT_DESIGN 的逻辑 |
+| OrderController.java | - | 新增 | 新增 manualCompleteOrder 接口（手动完成订单） |
+| OrderService.java | - | 新增 | 新增 manualCompleteOrder 方法定义 |
+| OrderMainServiceImpl.java | - | 新增 | 实现 manualCompleteOrder 方法 |
+
+#### 3.6.5 Common 模块（事件定义）
+
+| 文件 | 位置 | 变更类型 | 说明 |
+|-----|------|---------|------|
+| DesignReviewPassedEvent.java | 整个文件 | 保留 | 暂时保留（生产模块不再监听，但不删除以免编译错误） |
+| DesignCompletedEvent.java | - | 新增 | 新增设计完成事件，由生产模块监听 |
+
+#### 3.6.6 测试文件影响
+
+| 文件 | 变更类型 | 说明 |
+|-----|---------|------|
+| FlowStatusTransitionRulesTest.java | 修改 | 删除审核状态相关的测试用例 |
+| FlowPhaseTransitionRulesTest.java | 修改 | 删除 DESIGN_REVIEW_PASSED 相关测试 |
+| FlowStateMachineServiceImplTest.java | 修改 | 删除审核动作相关测试 |
+| FlowContextTest.java | 修改 | 删除 incrementDesignReject 相关测试 |
+| DesignReviewServiceImplTest.java | 删除 | 删除整个测试类 |
+| DesignWorkorderServiceImplTest.java | 修改 | 删除 submitDesign、continueDesign 测试；新增 completeDesign 测试 |
+| OrderModifyDirectServiceTest.java | 修改 | 删除审核相关的修改后自动提交测试 |
+
 ## 4. 影响范围
 
 ### 4.1 代码变更
