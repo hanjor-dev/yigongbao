@@ -124,26 +124,36 @@ public class DesignReviewPassedListener {
         return record;
     }
 
-    /** 从设计产品中提取材质信息（所有材质相同则返回该材质，多种材质则用逗号分隔） */
+    /** 从设计产品中提取材质信息（拼接颜色+材质，多种组合则用顿号分隔） */
     private String extractMaterialFromDesignProducts(Long packageId) {
         List<DesignProductEntity> designProducts = designProductMapper.selectList(
                 new LambdaQueryWrapper<DesignProductEntity>()
                         .eq(DesignProductEntity::getPackageId, packageId)
-                        .select(DesignProductEntity::getMaterialName));
+                        .select(DesignProductEntity::getMaterialName, DesignProductEntity::getColorName));
 
         if (designProducts.isEmpty()) {
             return null;
         }
 
-        java.util.Set<String> materials = designProducts.stream()
-                .map(DesignProductEntity::getMaterialName)
-                .filter(m -> m != null && !m.isBlank())
+        java.util.Set<String> materialDescriptions = designProducts.stream()
+                .map(dp -> {
+                    String color = dp.getColorName();
+                    String material = dp.getMaterialName();
+                    if (material == null || material.isBlank()) {
+                        return null;
+                    }
+                    if (color != null && !color.isBlank()) {
+                        return color + material;
+                    }
+                    return material;
+                })
+                .filter(desc -> desc != null)
                 .collect(java.util.stream.Collectors.toSet());
 
-        if (materials.isEmpty()) {
+        if (materialDescriptions.isEmpty()) {
             return null;
         }
-        return String.join("、", materials);
+        return String.join("、", materialDescriptions);
     }
 
     /** 按设计产品列表创建生产产品记录，按 quantity 字段展开数量，返回总产品数 */
