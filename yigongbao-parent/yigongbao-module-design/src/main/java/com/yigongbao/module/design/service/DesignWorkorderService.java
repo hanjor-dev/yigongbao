@@ -83,4 +83,15 @@ public interface DesignWorkorderService {
      * @return 分配历史列表
      */
     java.util.List<com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO> listAssignmentHistory(Long orderId);
+
+    /**
+     * 完成设计
+     * 根据 needsPhysicalDelivery 执行不同的校验：
+     * - 需要实体交付：校验数据包、打印信息、指令单、图纸及确认状态
+     * - 不需要实体交付：只校验 STL 重建模型
+     *
+     * @param orderId 订单ID
+     * @throws BusinessException 订单不存在或状态错误或校验失败
+     */
+    void completeDesign(Long orderId);
 }

@@ -102,6 +102,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     private final DesignDocService designDocService;
     private final OrderFileMapper orderFileMapper;
     private final com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     /**
      * 分页查询设计工单列表
@@ -932,5 +933,154 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             cn.hutool.core.bean.BeanUtil.copyProperties(log, vo);
             return vo;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * 完成设计
+     * 根据 needsPhysicalDelivery 标志执行不同的校验路径：
+     * - 需要实体交付(needsPhysicalDelivery=1)：校验数据包、打印信息、指令单、图纸及确认状态
+     * - 不需要实体交付(needsPhysicalDelivery=0)：只校验 STL 重建模型
+     *
+     * @param orderId 订单ID
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void completeDesign(Long orderId) {
+        // 根据ID查询订单实体
+        OrderMainEntity order = orderMainService.getById(orderId);
+        // 校验订单是否存在
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+
+        // 校验订单状态必须为设计中
+        if (!FlowStatusEnum.DESIGN_IN_PROGRESS.getValue().equals(order.getStatus())) {
+            log.warn("订单状态不允许完成设计: orderId={}, status={}", orderId, order.getStatus());
+            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR);
+        }
+
+        // 根据是否需要实体交付执行不同校验
+        log.info("开始完成设计校验: orderId={}, needsPhysicalDelivery={}, currentStatus={}",
+            orderId, order.getNeedsPhysicalDelivery(), order.getStatus());
+
+        if (Integer.valueOf(StatusConstants.YES).equals(order.getNeedsPhysicalDelivery())) {
+            // 校验实体交付所需的完整数据
+            log.info("执行实体交付校验: orderId={}", orderId);
+            validatePhysicalDelivery(orderId);
+        } else {
+            // 校验非实体交付所需的最小数据
+            log.info("执行非实体交付校验: orderId={}", orderId);
+            validateNonPhysicalDelivery(orderId);
+        }
+
+        // 获取当前操作用户ID
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        UserEntity currentUser = userService.getById(currentUserId);
+        String currentUserName = currentUser != null ? currentUser.getRealName() : null;
+
+        // 执行状态流转：设计中 → 设计完成
+        TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.COMPLETE_DESIGN,
+                FlowOperator.of(currentUserId, currentUserName));
+
+        // 回写订单表：更新阶段和状态
+        OrderMainEntity update = new OrderMainEntity();
+        update.setId(orderId);
+        update.setPhase(result.getTargetPhase());
+        update.setStatus(result.getFinalStatus());
+        update.setCurrentHandlerId(currentUserId);
+        update.setCurrentHandlerName(currentUserName);
+        orderMainService.updateById(update);
+
+        // 发布设计完成事件，触发生产流转卡创建
+        eventPublisher.publishEvent(new com.yigongbao.common.event.DesignCompletedEvent(this, orderId));
+
+        log.info("完成设计: orderId={}, needsPhysicalDelivery={}, {} -> {}, userId={}",
+                orderId, order.getNeedsPhysicalDelivery(),
+                FlowStatusEnum.DESIGN_IN_PROGRESS.getName(), FlowStatusEnum.DESIGN_COMPLETED.getName(), currentUserId);
+    }
+
+    /**
+     * 校验实体交付订单：数据包 → 打印信息 → 指令单 → 图纸 → 图纸确认 → 指令单确认
+     */
+    private void validatePhysicalDelivery(Long orderId) {
+        // 查询所有未删除数据包
+        List<DesignPackageEntity> packages = designPackageMapper.selectList(
+                new LambdaQueryWrapper<DesignPackageEntity>()
+                        .eq(DesignPackageEntity::getOrderId, orderId)
+                        .eq(DesignPackageEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+        if (packages.isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请先上传打印文件数据包");
+        }
+
+        Set<Long> packageIds = packages.stream().map(DesignPackageEntity::getId).collect(Collectors.toSet());
+
+        // 打印信息：每个数据包都有至少一条 design_product 记录
+        List<DesignProductEntity> products = designProductMapper.selectList(
+                new LambdaQueryWrapper<DesignProductEntity>()
+                        .in(DesignProductEntity::getPackageId, packageIds)
+                        .eq(DesignProductEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+        Set<Long> pkgsWithProduct = products.stream().map(DesignProductEntity::getPackageId).collect(Collectors.toSet());
+        if (!pkgsWithProduct.containsAll(packageIds)) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请完善数据包的打印信息");
+        }
+
+        // 指令单：每个数据包都有 design_instruction 记录
+        List<DesignInstructionEntity> instructions = designInstructionMapper.selectList(
+                new LambdaQueryWrapper<DesignInstructionEntity>()
+                        .in(DesignInstructionEntity::getPackageId, packageIds)
+                        .eq(DesignInstructionEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+        Set<Long> pkgsWithInstruction = instructions.stream().map(DesignInstructionEntity::getPackageId).collect(Collectors.toSet());
+        if (!pkgsWithInstruction.containsAll(packageIds)) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请生成指令单");
+        }
+
+        // 图纸：每个数据包都有 design_drawing 记录
+        List<DesignDrawingEntity> drawings = designDrawingMapper.selectList(
+                new LambdaQueryWrapper<DesignDrawingEntity>()
+                        .in(DesignDrawingEntity::getPackageId, packageIds)
+                        .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+        Set<Long> pkgsWithDrawing = drawings.stream().map(DesignDrawingEntity::getPackageId).collect(Collectors.toSet());
+        if (!pkgsWithDrawing.containsAll(packageIds)) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请生成图纸");
+        }
+
+        // 图纸确认状态：按 versionSeq 倒序取各包最新版
+        Map<Long, DesignDrawingEntity> latestDrawingByPkg = new java.util.LinkedHashMap<>();
+        drawings.stream()
+                .sorted((a, b) -> Integer.compare(b.getVersionSeq(), a.getVersionSeq()))
+                .forEach(d -> latestDrawingByPkg.putIfAbsent(d.getPackageId(), d));
+        boolean allDrawingConfirmed = packageIds.stream().allMatch(pkgId -> {
+            DesignDrawingEntity drawing = latestDrawingByPkg.get(pkgId);
+            return drawing != null && Objects.equals(StatusConstants.CONFIRMED, drawing.getIsConfirmed());
+        });
+        if (!allDrawingConfirmed) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请确认图纸");
+        }
+
+        // 指令单确认状态：按 versionSeq 倒序取各包最新版
+        Map<Long, DesignInstructionEntity> latestInstructionByPkg = new java.util.LinkedHashMap<>();
+        instructions.stream()
+                .sorted((a, b) -> Integer.compare(b.getVersionSeq(), a.getVersionSeq()))
+                .forEach(i -> latestInstructionByPkg.putIfAbsent(i.getPackageId(), i));
+        boolean allInstructionConfirmed = packageIds.stream().allMatch(pkgId -> {
+            DesignInstructionEntity inst = latestInstructionByPkg.get(pkgId);
+            return inst != null && Objects.equals(StatusConstants.CONFIRMED, inst.getIsConfirmed());
+        });
+        if (!allInstructionConfirmed) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请确认指令单");
+        }
+    }
+
+    /**
+     * 校验非实体交付订单：只检查 STL 重建模型
+     */
+    private void validateNonPhysicalDelivery(Long orderId) {
+        long modelCount = designModelMapper.selectCount(
+                new LambdaQueryWrapper<DesignModelEntity>()
+                        .eq(DesignModelEntity::getOrderId, orderId)
+                        .eq(DesignModelEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+        if (modelCount == 0) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请上传 STL 重建模型");
+        }
     }
 }
