@@ -68,7 +68,7 @@ public class FlowStatusTransitionRules {
 
         // DESIGN_COMPLETED 可跨阶段流转
         transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_COMPLETED),
-                Set.of(FlowStatusEnum.PENDING_PRINT, FlowStatusEnum.ORDER_COMPLETED));
+                Set.of(FlowStatusEnum.PENDING_PRINT, FlowStatusEnum.AWAITING_CONFIRM));
 
         // ==================== 打印阶段状态转换（3010-3090）====================
         transitions.put(statusKey(FlowPhaseEnum.PRINT, FlowStatusEnum.PENDING_PRINT),
@@ -143,7 +143,7 @@ public class FlowStatusTransitionRules {
 
             case DESIGN -> switch (status) {
                 case PENDING_DESIGN -> List.of(FlowActionEnum.START_DESIGN);
-                case DESIGN_IN_PROGRESS -> List.of(FlowActionEnum.COMPLETE_DESIGN);
+                case DESIGN_IN_PROGRESS -> List.of(FlowActionEnum.SUBMIT_DESIGN);
                 case DESIGN_COMPLETED -> List.of();
                 default -> List.of();
             };
@@ -246,7 +246,7 @@ public class FlowStatusTransitionRules {
 
             // 设计阶段动作
             case START_DESIGN -> FlowStatusEnum.DESIGN_IN_PROGRESS.getValue();
-            case COMPLETE_DESIGN -> FlowStatusEnum.DESIGN_COMPLETED.getValue();
+            case SUBMIT_DESIGN -> FlowStatusEnum.DESIGN_COMPLETED.getValue();
 
             // 打印阶段动作
             case START_PRINT -> FlowStatusEnum.PRINTING.getValue();

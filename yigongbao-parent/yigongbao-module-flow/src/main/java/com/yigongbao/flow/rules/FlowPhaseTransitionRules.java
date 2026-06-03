@@ -158,11 +158,6 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             return new PhaseAndStatus(FlowPhaseEnum.DESIGN, FlowStatusEnum.PENDING_DESIGN);
         }
 
-        // 设计审核通过 → 停留在设计阶段，等待生产员下载数据包后再推进
-        if (targetStatus == FlowStatusEnum.DESIGN_REVIEW_PASSED) {
-            return new PhaseAndStatus(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_REVIEW_PASSED);
-        }
-
         // 打印完成 → 医疗器械进入后处理，非医疗器械直接进入质检
         // orderType: 1=医疗器械，2=非医疗器械；null 时按医疗器械处理
         if (targetStatus == FlowStatusEnum.PRINT_COMPLETED) {
