@@ -15,9 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.x.file.storage.core.FileInfo;
 import org.dromara.x.file.storage.core.FileStorageService;
 import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +23,10 @@ import java.util.stream.Collectors;
 
 /**
  * 经典案例文件迁移监听器（Design模块）
- * 处理7类设计文件的迁移，使用x-file-storage的move()方法真正迁移OSS/COS文件
+ * <p>
+ * 处理7类设计文件的迁移，使用x-file-storage的move()方法真正迁移OSS/COS文件。
+ * 同步执行（非@Async），确保文件迁移在标记事务中完成，失败时自动回滚。
+ * </p>
  */
 @Slf4j
 @Component
@@ -42,9 +43,7 @@ public class DesignClassicCaseFileListener {
     private final FileStorageService fileStorageService;
     private final FileRecorderService fileRecorderService;
 
-    @Async
     @EventListener
-    @Transactional(rollbackFor = Exception.class)
     public void handleClassicCaseMarked(ClassicCaseMarkedEvent event) {
         log.info("Design模块开始处理经典案例文件迁移: orderId={}, orderCode={}",
             event.getOrderId(), event.getOrderCode());
