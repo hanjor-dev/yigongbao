@@ -208,6 +208,8 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public void uploadRevisedInstruction(Long orderId, Long packageId, Long id, MultipartFile file) {
         log.info("上传修订版指令单，orderId={}, packageId={}, id={}", orderId, packageId, id);
+        // 经典案例保护：经典案例订单不允许上传新的指令单文件
+        orderMainService.checkNotClassicCase(orderId, "上传指令单");
         checkDesignPhase(orderId);
         validatePackage(orderId, packageId);
 
@@ -253,6 +255,8 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public void uploadRevisedDrawing(Long orderId, Long packageId, Long id, MultipartFile file) {
         log.info("上传修订版图纸，orderId={}, packageId={}, id={}", orderId, packageId, id);
+        // 经典案例保护：经典案例订单不允许上传新的图纸文件
+        orderMainService.checkNotClassicCase(orderId, "上传图纸");
         checkDesignPhase(orderId);
         validatePackage(orderId, packageId);
 

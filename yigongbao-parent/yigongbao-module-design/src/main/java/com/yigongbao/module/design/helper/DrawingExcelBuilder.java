@@ -187,7 +187,7 @@ public class DrawingExcelBuilder {
                 }
 
                 // 填充 footer
-                setCell(sheet, FOOTER_ROW, REMARK_COL, strOrEmpty(ctx.getRemark()));
+                setCellWithWrap(sheet, FOOTER_ROW, REMARK_COL, strOrEmpty(ctx.getRemark()));
                 setCell(sheet, FOOTER_ROW, PKG_CODE_COL, strOrEmpty(ctx.getPackageCode()));
                 setCell(sheet, FOOTER_ROW, ORDER_CODE_COL, strOrEmpty(ctx.getOrderCode()));
                 setCell(sheet, PAGE_TEXT_ROW, PAGE_TEXT_COL,
@@ -312,6 +312,35 @@ public class DrawingExcelBuilder {
             }
         }
         cell.setCellValue(value != null ? value : "");
+    }
+
+    /** 向指定行列写入字符串值，启用自动换行并调整行高（用于长文本如备注） */
+    private void setCellWithWrap(Sheet sheet, int rowIdx, int colIdx, String value) {
+        Row row = sheet.getRow(rowIdx);
+        if (row == null) row = sheet.createRow(rowIdx);
+        Cell cell = row.getCell(colIdx);
+        if (cell == null) {
+            cell = row.createCell(colIdx);
+        }
+
+        Workbook wb = sheet.getWorkbook();
+        CellStyle existingStyle = cell.getCellStyle();
+        CellStyle newStyle = wb.createCellStyle();
+
+        if (existingStyle != null && existingStyle.getIndex() != 0) {
+            newStyle.cloneStyleFrom(existingStyle);
+        }
+        newStyle.setWrapText(true);
+        cell.setCellStyle(newStyle);
+        cell.setCellValue(value != null ? value : "");
+
+        if (value != null && !value.isEmpty()) {
+            int charCount = value.length();
+            int lines = (charCount / 20) + 1;
+            if (lines > 1) {
+                row.setHeightInPoints(20 * lines);
+            }
+        }
     }
 
     /** 确保单元格有居中样式（水平和垂直居中） */

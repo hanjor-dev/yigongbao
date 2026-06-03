@@ -154,10 +154,10 @@ public class InstructionExcelBuilder {
 
             // 2. 填充基本信息区
             setCell(wb, sheet, 3, 1, strOrEmpty(ctx.getOrderCode()));            // B4：订单编号
-            setCell(wb, sheet, 3, 4, strOrEmpty(ctx.getOrgName()));              // E4：客户名称（机构名）
+            setCellWithWrap(wb, sheet, 3, 4, strOrEmpty(ctx.getOrgName()));      // E4：客户名称（机构名）
             setCell(wb, sheet, 3, 8, strOrEmpty(ctx.getContactName()));          // I4：联系人
             setCell(wb, sheet, 4, 1, strOrEmpty(ctx.getPackageCode()));          // B5：数据包编号
-            setCell(wb, sheet, 4, 4, strOrEmpty(ctx.getHospitalName()));         // E5：医院名称
+            setCellWithWrap(wb, sheet, 4, 4, strOrEmpty(ctx.getHospitalName())); // E5：医院名称
             setCell(wb, sheet, 4, 8, strOrEmpty(ctx.getExpectedDeliveryDate())); // I5：预交货时间
 
             // 3. 清除产品数据区合并（row7-24，共18行）
@@ -375,6 +375,43 @@ public class InstructionExcelBuilder {
             cell.setCellStyle(style);
         }
         cell.setCellValue(value != null ? value : "");
+    }
+
+    /** 向指定行列写入字符串值，启用自动换行并调整行高（用于长文本如客户名称、医院名称） */
+    private void setCellWithWrap(Workbook wb, Sheet sheet, int rowIdx, int colIdx, String value) {
+        Row row = sheet.getRow(rowIdx);
+        if (row == null) {
+            row = sheet.createRow(rowIdx);
+        }
+        Cell cell = row.getCell(colIdx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (cell == null) {
+            cell = row.createCell(colIdx);
+        }
+
+        CellStyle existingStyle = cell.getCellStyle();
+        CellStyle newStyle = wb.createCellStyle();
+
+        if (existingStyle != null && existingStyle.getIndex() != 0) {
+            newStyle.cloneStyleFrom(existingStyle);
+        } else {
+            newStyle.setBorderTop(BorderStyle.THIN);
+            newStyle.setBorderBottom(BorderStyle.THIN);
+            newStyle.setBorderLeft(BorderStyle.THIN);
+            newStyle.setBorderRight(BorderStyle.THIN);
+            newStyle.setAlignment(HorizontalAlignment.CENTER);
+            newStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+        }
+        newStyle.setWrapText(true);
+        cell.setCellStyle(newStyle);
+        cell.setCellValue(value != null ? value : "");
+
+        if (value != null && !value.isEmpty()) {
+            int charCount = value.length();
+            int lines = (charCount / 15) + 1;
+            if (lines > 1) {
+                row.setHeightInPoints(20 * lines);
+            }
+        }
     }
 
     /** 向指定行列写入字符串值，只设置居中对齐，不设置边框（用于版本号等特殊单元格） */

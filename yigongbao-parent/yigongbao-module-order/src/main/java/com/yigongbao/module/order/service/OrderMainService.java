@@ -54,6 +54,15 @@ public interface OrderMainService extends IService<OrderMainEntity> {
     void removeOrder(Long id);
 
     /**
+     * 校验订单是否为经典案例，如果是则抛出异常
+     *
+     * @param orderId 订单ID
+     * @param operation 操作描述（用于日志）
+     * @throws BusinessException 订单为经典案例时抛出CLASSIC_CASE_PROTECTED
+     */
+    void checkNotClassicCase(Long orderId, String operation);
+
+    /**
      * 提交订单（提交审核）
      *
      * @param id 订单ID

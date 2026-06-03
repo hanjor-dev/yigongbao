@@ -10,6 +10,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.DictCodeConstants;
+import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -142,9 +143,42 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         scopeWrapper.eq(OrderMainEntity::getId, orderId);
         orderQueryHelper.buildDataScopeCondition(scopeWrapper, currentUserId, scopeType);
         if (count(scopeWrapper) == 0) {
-            log.warn("订单不在当前用户数据权限范围内，id={}, userId={}, scopeType={}", orderId, currentUserId, scopeType);
+            log.warn("订单不在当前用户数据权限范围内，id=, userId={}, scopeType={}", orderId, currentUserId, scopeType);
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
+    }
+
+    /**
+     * 校验订单是否为经典案例，如果是则抛出异常
+     * <p>
+     * 经典案例订单的所有数据（订单、设计、生产）和文件（影像、设计包、模型、报告等）
+     * 均受保护，不允许进行修改、删除等操作。
+     * </p>
+     *
+     * @param orderId 订单ID
+     * @param operation 操作描述（用于日志和错误提示），如"上传设计数据包"、"删除STL模型"
+     * @throws BusinessException 订单为经典案例时抛出 CLASSIC_CASE_PROTECTED 错误
+     */
+    @Override
+    public void checkNotClassicCase(Long orderId, String operation) {
+        // 查询订单实体
+        OrderMainEntity order = getById(orderId);
+
+        // 订单不存在时不做校验（后续业务逻辑会抛出 ORDER_NOT_FOUND）
+        if (order == null) {
+            return;
+        }
+
+        // 检查是否为经典案例（is_classic_case = 1）
+        if (StatusConstants.YES == order.getIsClassicCase()) {
+            log.warn("经典案例保护拦截: operation={}, orderId={}, orderCode={}",
+                operation, orderId, order.getOrderCode());
+            throw new BusinessException(ErrorCodeEnum.CLASSIC_CASE_PROTECTED);
+        }
+
+        // 校验通过，记录 DEBUG 日志
+        log.debug("经典案例校验通过: operation={}, orderId={}, isClassicCase={}",
+            operation, orderId, order.getIsClassicCase());
     }
 
     // ==================== 查询操作 ====================
@@ -339,6 +373,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         // 数据权限校验（含存在性校验）：无权访问时抛 ORDER_NOT_FOUND
         validateDataScope(id);
         OrderMainEntity entity = getById(id);
+        // 经典案例保护校验
+        checkNotClassicCase(id, "修改");
         // 校验 needsPhysicalDelivery 变更规则（不在订单阶段不允许修改，不允许从需要改为不需要）
         validateNeedsPhysicalDeliveryChange(entity, dto);
         // 排除不可变更字段后复制属性
@@ -428,6 +464,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             log.warn("订单不存在: orderId={}", id);
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
+        // 经典案例保护校验
+        checkNotClassicCase(id, "删除");
         // 数据权限校验：只有创建人可删除（草稿状态订单）
         Long currentUserId = getCurrentUserId();
         if (!Objects.equals(entity.getCreateBy(), currentUserId)) {

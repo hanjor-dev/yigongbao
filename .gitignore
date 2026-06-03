@@ -77,3 +77,5 @@ docker-compose.override.yml
 
 ### Deployment Docs（部署文档，可选忽略）###
 DEPLOYMENT_CHECKLIST.md
+
+/frontend

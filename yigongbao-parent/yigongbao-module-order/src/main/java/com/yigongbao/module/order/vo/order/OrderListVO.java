@@ -175,6 +175,11 @@ public class OrderListVO implements Serializable {
     // ==================== 业务标识 ====================
 
     /**
+     * 是否为经典案例：0-否，1-是
+     */
+    private Integer isClassicCase;
+
+    /**
      * 是否加急：0-否，1-是
      */
     private Integer isUrgent;

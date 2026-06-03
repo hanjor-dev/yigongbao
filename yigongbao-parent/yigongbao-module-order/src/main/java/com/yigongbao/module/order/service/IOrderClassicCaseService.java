@@ -29,4 +29,9 @@ public interface IOrderClassicCaseService {
      * 检查订单是否为经典案例
      */
     boolean isClassicCase(Long orderId);
+
+    /**
+     * 取消经典案例标记（文件迁移失败时的补偿操作）
+     */
+    void cancelClassicCaseMark(Long orderId, String reason);
 }

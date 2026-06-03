@@ -79,6 +79,8 @@ public class DesignFileServiceImpl implements DesignFileService {
         }
 
         // 1. 校验工单状态和操作权限
+        // 经典案例保护：经典案例订单不允许上传新的设计数据包
+        orderMainService.checkNotClassicCase(orderId, "上传设计数据包");
         OrderMainEntity order = checkDesignPhase(orderId);
         checkIsAssignedDesigner(order);
 
@@ -181,6 +183,8 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Transactional(rollbackFor = Exception.class)
     public void deletePackage(Long orderId, Long packageId) {
         // 1. 校验工单状态和操作权限
+        // 经典案例保护：经典案例订单不允许删除设计数据包
+        orderMainService.checkNotClassicCase(orderId, "删除设计数据包");
         checkIsAssignedDesigner(checkDesignPhase(orderId));
 
         // 2. 查询数据包
@@ -339,6 +343,8 @@ public class DesignFileServiceImpl implements DesignFileService {
         log.info("批量关联可视化模型, orderId={}, fileIds={}", orderId, fileIds);
 
         // 1. 校验工单状态和操作权限
+        // 经典案例保护：经典案例订单不允许关联新的STL模型文件
+        orderMainService.checkNotClassicCase(orderId, "关联STL模型");
         checkIsAssignedDesigner(checkDesignPhase(orderId));
 
         // 2. 批量校验文件是否存在（类型和大小已在上传时由 FileService/Provider 校验）
@@ -377,6 +383,8 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Transactional(rollbackFor = Exception.class)
     public void deleteModel(Long orderId, Long modelId) {
         // 1. 校验工单状态和操作权限
+        // 经典案例保护：经典案例订单不允许删除STL模型文件
+        orderMainService.checkNotClassicCase(orderId, "删除STL模型");
         checkIsAssignedDesigner(checkDesignPhase(orderId));
 
         // 2. 查询模型
@@ -426,6 +434,8 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Transactional(rollbackFor = Exception.class)
     public FileVO linkReport(Long orderId, String fileId) {
         // 1. 校验工单状态和操作权限
+        // 经典案例保护：经典案例订单不允许关联新的设计报告文件
+        orderMainService.checkNotClassicCase(orderId, "关联设计报告");
         checkIsAssignedDesigner(checkDesignPhase(orderId));
 
         // 2. 校验文件是否存在（类型和大小已在上传时由 FileService/Provider 校验）
@@ -448,6 +458,8 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Transactional(rollbackFor = Exception.class)
     public void deleteReport(Long orderId, String fileId) {
         // 1. 校验工单状态和操作权限
+        // 经典案例保护：经典案例订单不允许删除设计报告文件
+        orderMainService.checkNotClassicCase(orderId, "删除设计报告");
         checkIsAssignedDesigner(checkDesignPhase(orderId));
 
         // 2. 校验文件归属
