@@ -291,6 +291,13 @@ void manualCompleteOrder(Long orderId);
 | DesignWorkorderServiceImplTest.java | 修改 | 删除 submitDesign、continueDesign 测试；新增 completeDesign 测试 |
 | OrderModifyDirectServiceTest.java | 修改 | 删除审核相关的修改后自动提交测试 |
 
+#### 3.6.7 其他小修改
+
+| 文件 | 位置 | 变更类型 | 说明 |
+|-----|------|---------|------|
+| DesignWorkorderQueryDTO.java | 28行 | 修改注释 | 注释示例从"2010/2020/2040/2060"改为"2010/2020/2030" |
+| ErrorCodeEnum.java | 233行 | 保留 | ORDER_EXCESSIVE_DESIGN_REJECT 错误码变为未使用，但保留不删除（历史兼容） |
+
 ## 4. 影响范围
 
 ### 4.1 代码变更
