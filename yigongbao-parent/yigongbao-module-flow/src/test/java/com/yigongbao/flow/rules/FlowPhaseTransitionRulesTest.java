@@ -265,24 +265,24 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASSED(2050) + needsPhysicalDelivery=1 → PRINT + PENDING_PRINT(3010)")
-        void designReviewPassed_needDelivery_shouldAdvanceToPrint() {
+        @DisplayName("DESIGN_COMPLETED(2030) + needsPhysicalDelivery=1 → PRINT + PENDING_PRINT(3010)")
+        void designCompleted_needDelivery_shouldAdvanceToPrint() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.DESIGN,
-                    FlowStatusEnum.DESIGN_REVIEW_PASSED,
-                    FlowActionEnum.DESIGN_REVIEW_PASS,
+                    FlowStatusEnum.DESIGN_COMPLETED,
+                    FlowActionEnum.COMPLETE_DESIGN,
                     1, null);
             assertEquals(FlowPhaseEnum.PRINT, result.phase());
             assertEquals(FlowStatusEnum.PENDING_PRINT, result.initialStatus());
         }
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASSED(2050) + needsPhysicalDelivery=0 → CONFIRM + AWAITING_CONFIRM(7010)")
-        void designReviewPassed_noDelivery_shouldAdvanceToConfirm() {
+        @DisplayName("DESIGN_COMPLETED(2030) + needsPhysicalDelivery=0 → CONFIRM + AWAITING_CONFIRM(7010)")
+        void designCompleted_noDelivery_shouldAdvanceToConfirm() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.DESIGN,
-                    FlowStatusEnum.DESIGN_REVIEW_PASSED,
-                    FlowActionEnum.DESIGN_REVIEW_PASS,
+                    FlowStatusEnum.DESIGN_COMPLETED,
+                    FlowActionEnum.COMPLETE_DESIGN,
                     0, null);
             assertEquals(FlowPhaseEnum.CONFIRM, result.phase());
             assertEquals(FlowStatusEnum.AWAITING_CONFIRM, result.initialStatus());
@@ -380,17 +380,12 @@ class FlowPhaseTransitionRulesTest {
     class IsInvisibleStatusTests {
 
         @Test
-        @DisplayName("DESIGN_REVIEW_PASSED(2050) → true（不可见状态）")
-        void designReviewPassed_shouldBeInvisible() {
-            assertTrue(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.DESIGN_REVIEW_PASSED));
-        }
-
-        @Test
-        @DisplayName("其他所有状态 → false（可见状态）")
-        void otherStatuses_shouldBeVisible() {
+        @DisplayName("所有状态 → false（可见状态）")
+        void allStatuses_shouldBeVisible() {
             assertFalse(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.DRAFT));
             assertFalse(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.PENDING_DATA_AUDIT));
             assertFalse(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.DESIGN_IN_PROGRESS));
+            assertFalse(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.DESIGN_COMPLETED));
             assertFalse(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.PRINTING));
             assertFalse(FlowPhaseTransitionRules.isInvisibleStatus(FlowStatusEnum.COMPLETED));
         }
@@ -406,7 +401,7 @@ class FlowPhaseTransitionRulesTest {
         @DisplayName("会触发阶段推进的动作 → true")
         void phaseChangeActions_shouldReturn_true() {
             assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.DATA_AUDIT_PASS));
-            assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.DESIGN_REVIEW_PASS));
+            assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.COMPLETE_DESIGN));
             assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.COMPLETE_PRINT));
             assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.COMPLETE_POST_PROCESSING));
             assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.QC_PASS));
@@ -421,8 +416,6 @@ class FlowPhaseTransitionRulesTest {
             assertFalse(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.DATA_AUDIT_REJECT));
             assertFalse(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.WITHDRAW));
             assertFalse(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.START_DESIGN));
-            assertFalse(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.SUBMIT_DESIGN));
-            assertFalse(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.DESIGN_REVIEW_REJECT));
             assertFalse(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.START_PRINT));
             assertFalse(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.QC_FAIL));
             assertFalse(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.REWORK));
