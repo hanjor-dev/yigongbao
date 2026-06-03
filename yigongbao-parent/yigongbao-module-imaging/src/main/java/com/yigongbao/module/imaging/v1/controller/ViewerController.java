@@ -7,6 +7,7 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.imaging.v1.service.ViewerService;
+import com.yigongbao.module.imaging.v1.vo.StlFileVO;
 import com.yigongbao.module.imaging.v1.vo.ViewerConfigVO;
 import com.yigongbao.module.imaging.v1.vo.ViewerStlVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -66,6 +67,13 @@ public class ViewerController {
         }
         Long orderId = Long.valueOf(params.get("orderId").toString());
         return Result.success(viewerService.getStlData(orderId));
+    }
+
+    @SaIgnore
+    @Operation(summary = "stlList - STL文件列表")
+    @GetMapping("/stl-list")
+    public Result<List<StlFileVO>> getStlList(@RequestParam Long orderId) {
+        return Result.success(viewerService.getStlFileList(orderId));
     }
 
     @SaIgnore

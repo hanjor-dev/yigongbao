@@ -20,6 +20,7 @@ public class ViewerConfigVO {
     public static class Paths {
         private PathItem dcmPath;
         private PathItem stlPath;
+        private PathItem stlList;
         private PathItem markPath;
     }
 

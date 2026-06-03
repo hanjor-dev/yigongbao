@@ -1,5 +1,6 @@
 package com.yigongbao.module.imaging.v1.service;
 
+import com.yigongbao.module.imaging.v1.vo.StlFileVO;
 import com.yigongbao.module.imaging.v1.vo.ViewerConfigVO;
 import com.yigongbao.module.imaging.v1.vo.ViewerStlVO;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,6 +23,9 @@ public interface ViewerService {
 
     /** stlPath：返回STL模型数据（按数据包分组） */
     ViewerStlVO getStlData(Long orderId);
+
+    /** stlList：返回STL文件列表 */
+    List<StlFileVO> getStlFileList(Long orderId);
 
     /** markPath：保存标注截图（关联到数据包+模型文件） */
     void saveMark(String groupId, String modelFileId, MultipartFile file);

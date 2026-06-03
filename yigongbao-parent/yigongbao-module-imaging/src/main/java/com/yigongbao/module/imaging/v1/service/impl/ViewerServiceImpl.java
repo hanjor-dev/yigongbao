@@ -17,6 +17,7 @@ import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.imaging.entity.PartColorEntity;
 import com.yigongbao.module.imaging.mapper.PartColorMapper;
 import com.yigongbao.module.imaging.v1.service.ViewerService;
+import com.yigongbao.module.imaging.v1.vo.StlFileVO;
 import com.yigongbao.module.imaging.v1.vo.ViewerConfigVO;
 import com.yigongbao.module.imaging.v1.vo.ViewerStlVO;
 import com.yigongbao.module.order.entity.OrderFileEntity;
@@ -46,6 +47,7 @@ public class ViewerServiceImpl implements ViewerService {
     private static final String CONTEXT_PATH = "/api";
     private static final String DCM_PATH = CONTEXT_PATH + "/imaging/v1/dcm";
     private static final String STL_PATH = CONTEXT_PATH + "/imaging/v1/stl";
+    private static final String STL_LIST_PATH = CONTEXT_PATH + "/imaging/v1/stl-list";
     private static final String MARK_PATH = CONTEXT_PATH + "/imaging/v1/mark";
 
     private final OrderFileService orderFileService;
@@ -69,6 +71,12 @@ public class ViewerServiceImpl implements ViewerService {
         stlItem.setParams(Map.of("orderId", orderId));
         stlItem.setType("post");
 
+        // stlList：查看器用此接口获取 STL 文件列表
+        ViewerConfigVO.PathItem stlListItem = new ViewerConfigVO.PathItem();
+        stlListItem.setPath(STL_LIST_PATH);
+        stlListItem.setParams(Map.of("orderId", orderId));
+        stlListItem.setType("get");
+
         // markPath：查看器提交标注截图时调用，groupId/id 由查看器自动附带（对应 stlPath 返回的 groupId/id）
         ViewerConfigVO.PathItem markItem = new ViewerConfigVO.PathItem();
         markItem.setPath(MARK_PATH);
@@ -78,6 +86,7 @@ public class ViewerServiceImpl implements ViewerService {
         ViewerConfigVO.Paths paths = new ViewerConfigVO.Paths();
         paths.setDcmPath(dcmItem);
         paths.setStlPath(stlItem);
+        paths.setStlList(stlListItem);
         paths.setMarkPath(markItem);
 
         ViewerConfigVO vo = new ViewerConfigVO();
@@ -155,6 +164,30 @@ public class ViewerServiceImpl implements ViewerService {
 
         vo.setList(groups);
         return vo;
+    }
+
+    @Override
+    public List<StlFileVO> getStlFileList(Long orderId) {
+        List<DesignPackageEntity> packages = designPackageService.list(
+                new LambdaQueryWrapper<DesignPackageEntity>()
+                        .eq(DesignPackageEntity::getOrderId, orderId));
+        if (CollUtil.isEmpty(packages)) {
+            return new ArrayList<>();
+        }
+        List<Long> packageIds = packages.stream().map(DesignPackageEntity::getId).collect(Collectors.toList());
+        return designPackageFileService.list(
+                new LambdaQueryWrapper<DesignPackageFileEntity>()
+                        .in(DesignPackageFileEntity::getPackageId, packageIds)
+                        .orderByAsc(DesignPackageFileEntity::getSortOrder))
+                .stream()
+                .filter(f -> StrUtil.isNotBlank(f.getFileUrl()))
+                .map(f -> {
+                    StlFileVO vo = new StlFileVO();
+                    vo.setStlName(f.getFileName());
+                    vo.setUrl(f.getFileUrl());
+                    return vo;
+                })
+                .collect(Collectors.toList());
     }
 
     @Override
