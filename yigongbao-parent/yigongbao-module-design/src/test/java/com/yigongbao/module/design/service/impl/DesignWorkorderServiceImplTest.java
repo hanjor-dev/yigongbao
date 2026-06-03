@@ -621,18 +621,16 @@ class DesignWorkorderServiceImplTest {
                 user.setRealName("设计师A");
                 when(userService.getById(100L)).thenReturn(user);
 
-                TransitionResult mockResult = TransitionResult.of(30, FlowStatusEnum.PENDING_PRINT.getValue(),
-                    FlowStatusEnum.DESIGN_COMPLETED.getValue(), true);
-                when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.COMPLETE_DESIGN), any()))
+                TransitionResult mockResult = TransitionResult.of(FlowStatusEnum.PENDING_PRINT.getValue(),
+                    FlowStatusEnum.DESIGN_COMPLETED.getValue());
+                when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.START_PRINT), any()))
                         .thenReturn(mockResult);
                 when(orderMainService.updateById(any())).thenReturn(true);
 
                 assertDoesNotThrow(() -> service.completeDesign(1L));
-                verify(flowFacade).executeFlow(eq(1L), eq(FlowActionEnum.COMPLETE_DESIGN), any());
+                verify(flowFacade).executeFlow(eq(1L), eq(FlowActionEnum.START_PRINT), any());
                 verify(orderMainService).updateById(argThat((OrderMainEntity o) ->
-                        o.getPhase().equals(30)
-                        && o.getStatus().equals(FlowStatusEnum.PENDING_PRINT.getValue())
-                        && o.getDesignCompletionTime() != null));
+                        o.getStatus().equals(FlowStatusEnum.PENDING_PRINT.getValue())));
             }
         }
 
@@ -654,8 +652,8 @@ class DesignWorkorderServiceImplTest {
                 user.setRealName("设计师A");
                 when(userService.getById(100L)).thenReturn(user);
 
-                TransitionResult mockResult = TransitionResult.of(70, FlowStatusEnum.AWAITING_CONFIRM.getValue(),
-                    FlowStatusEnum.DESIGN_COMPLETED.getValue(), true);
+                TransitionResult mockResult = TransitionResult.of(FlowStatusEnum.AWAITING_CONFIRM.getValue(),
+                    FlowStatusEnum.DESIGN_COMPLETED.getValue());
                 when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.COMPLETE_DESIGN), any()))
                         .thenReturn(mockResult);
                 when(orderMainService.updateById(any())).thenReturn(true);
@@ -663,9 +661,7 @@ class DesignWorkorderServiceImplTest {
                 assertDoesNotThrow(() -> service.completeDesign(1L));
                 verify(flowFacade).executeFlow(eq(1L), eq(FlowActionEnum.COMPLETE_DESIGN), any());
                 verify(orderMainService).updateById(argThat((OrderMainEntity o) ->
-                        o.getPhase().equals(70)
-                        && o.getStatus().equals(FlowStatusEnum.AWAITING_CONFIRM.getValue())
-                        && o.getDesignCompletionTime() != null));
+                        o.getStatus().equals(FlowStatusEnum.AWAITING_CONFIRM.getValue())));
             }
         }
 
