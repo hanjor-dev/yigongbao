@@ -163,6 +163,15 @@ public class OrderController {
         return Result.success();
     }
 
+    @Operation(summary = "手动完成订单")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "手动完成订单")
+    @RequirePermission(value = "order:ManualComplete")
+    @PostMapping("/{id}/manual-complete")
+    public Result<Void> manualCompleteOrder(@PathVariable Long id) {
+        orderMainService.manualCompleteOrder(id);
+        return Result.success();
+    }
+
     @Operation(summary = "查询可执行的动作")
     @GetMapping("/{id}/actions")
     public Result<List<String>> listAvailableActions(@PathVariable Long id) {

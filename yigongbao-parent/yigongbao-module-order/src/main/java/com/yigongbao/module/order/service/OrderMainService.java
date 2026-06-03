@@ -142,4 +142,13 @@ public interface OrderMainService extends IService<OrderMainEntity> {
      * 重置当前用户列配置（删除个人配置，恢复系统默认）
      */
     void resetColumnConfig();
+
+    /**
+     * 手动完成订单（仅限不需要实体交付的订单）
+     * 前置条件：订单状态为设计完成(2030)，needsPhysicalDelivery=0
+     *
+     * @param orderId 订单ID
+     * @throws BusinessException 订单不存在、状态错误或需要实体交付
+     */
+    void manualCompleteOrder(Long orderId);
 }
