@@ -73,8 +73,7 @@ public class DesignQueryHelper {
             FlowStatusEnum.DATA_AUDIT_PASSED,
             FlowStatusEnum.PENDING_DESIGN,
             FlowStatusEnum.DESIGN_IN_PROGRESS,
-            FlowStatusEnum.DESIGN_COMPLETED,
-            FlowStatusEnum.DESIGN_REVIEW_REJECTED
+            FlowStatusEnum.DESIGN_COMPLETED
     );
 
     private final UserService userService;

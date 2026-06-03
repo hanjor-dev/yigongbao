@@ -63,32 +63,6 @@ public class DesignWorkorderController {
     }
 
     /**
-     * 驳回后继续修改
-     * POST /design/workorder/{orderId}/continue-design
-     */
-    @Operation(summary = "驳回后继续修改")
-    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "继续修改设计")
-    @RequirePermission(value = "design:StartDesign")
-    @PostMapping("/{orderId}/continue-design")
-    public Result<Void> continueDesign(@PathVariable Long orderId) {
-        designWorkorderService.continueDesign(orderId);
-        return Result.success();
-    }
-
-    /**
-     * 提交设计审核
-     * POST /design/workorder/{orderId}/submit-design
-     */
-    @Operation(summary = "提交设计审核")
-    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.SUBMIT, operation = "提交设计审核")
-    @RequirePermission(value = "design:SubmitCheck")
-    @PostMapping("/{orderId}/submit-design")
-    public Result<Void> submitDesign(@PathVariable Long orderId) {
-        designWorkorderService.submitDesign(orderId);
-        return Result.success();
-    }
-
-    /**
      * 查询订单设计师分配历史
      * GET /design/workorder/{orderId}/assignment-history
      */
