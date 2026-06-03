@@ -7,6 +7,101 @@
 
 ---
 
+## ⚠️ 实施前必读
+
+**【强制要求】开始实施前必须完整阅读编码规范文档：**
+
+📖 **编码规范文档路径**: `.docs/技术实现/java-coding-standards.mdc`
+
+### 关键编码规范强调
+
+#### 1. 注释规范（必须严格遵守）
+
+**ServiceImpl 层注释要求**：
+- ✅ **方法级注释**：每个公共方法必须添加 Javadoc 注释（功能、参数、返回值、异常）
+- ✅ **行级注释**：关键业务逻辑必须添加行内注释说明
+
+```java
+/**
+ * 完成设计
+ * 根据 needsPhysicalDelivery 执行不同的校验
+ *
+ * @param orderId 订单ID
+ * @throws BusinessException 订单不存在或状态错误
+ */
+@Override
+@Transactional(rollbackFor = Exception.class)
+public void completeDesign(Long orderId) {
+    // 根据ID查询订单实体
+    OrderMainEntity order = orderMainService.getById(orderId);
+    // 校验订单是否存在
+    if (order == null) {
+        throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+    }
+    // ... 其他逻辑
+}
+```
+
+#### 2. 日志规范（必须严格遵守）
+
+**【强制】Controller 层禁止输出日志**，日志记录由 ServiceImpl 负责：
+
+```java
+// ❌ 错误：Controller 不应记录日志
+@PostMapping("/complete-design")
+public Result<Void> completeDesign(@PathVariable Long orderId) {
+    log.info("完成设计请求，orderId={}", orderId);  // 删除此行
+    designWorkorderService.completeDesign(orderId);
+    return Result.success();
+}
+
+// ✅ 正确：ServiceImpl 记录日志
+@Override
+public void completeDesign(Long orderId) {
+    log.info("完成设计: orderId={}", orderId);
+    // 业务逻辑...
+    log.info("完成设计成功: orderId={}, status={}", orderId, newStatus);
+}
+```
+
+#### 3. 禁止魔法值（必须严格遵守）
+
+**状态值常量**：
+```java
+// ❌ 错误
+entity.setStatus(1);
+if (order.getNeedsPhysicalDelivery() == 1) { }
+
+// ✅ 正确
+entity.setStatus(StatusConstants.NORMAL);
+if (order.getNeedsPhysicalDelivery() == StatusConstants.YES) { }
+```
+
+**异常处理优先使用 ErrorCodeEnum**：
+```java
+// ✅ 优先使用
+throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR);
+
+// ⚠️ 备选（仅当 ErrorCodeEnum 无合适枚举值时）
+throw new BusinessException(400, "订单状态不允许完成设计");
+```
+
+#### 4. 命名规范
+
+- 方法命名：`completeDesign`、`manualCompleteOrder`（驼峰命名）
+- 类命名：`DesignCompletedEvent`、`DesignCompletedListener`（帕斯卡命名）
+- 变量命名：`orderId`、`needsPhysical`（驼峰命名）
+
+#### 5. 其他关键规范
+
+- ✅ 使用 `@RequiredArgsConstructor` 注入依赖
+- ✅ 统一返回 `Result.success()` / `Result.error()`
+- ✅ 事务注解：`@Transactional(rollbackFor = Exception.class)`
+- ✅ 优先使用 Hutool 工具类（`StrUtil`、`CollUtil` 等）
+
+---
+
 ## 实施策略
 
 **顺序说明**:
