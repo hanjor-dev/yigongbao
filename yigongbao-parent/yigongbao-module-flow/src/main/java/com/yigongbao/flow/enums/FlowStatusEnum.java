@@ -57,21 +57,6 @@ public enum FlowStatusEnum {
      */
     DESIGN_COMPLETED(2030, "设计完成"),
 
-    /**
-     * 设计审核中
-     */
-    DESIGN_REVIEWING(2040, "设计审核中"),
-
-    /**
-     * 设计审核通过（等待生产员下载数据包）
-     */
-    DESIGN_REVIEW_PASSED(2050, "设计审核通过"),
-
-    /**
-     * 设计审核不通过
-     */
-    DESIGN_REVIEW_REJECTED(2060, "设计审核不通过"),
-
     // ==================== 打印阶段（3010-3090）====================
     /**
      * 待打印

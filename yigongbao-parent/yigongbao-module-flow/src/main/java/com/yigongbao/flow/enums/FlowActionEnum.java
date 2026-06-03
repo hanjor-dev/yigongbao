@@ -61,24 +61,9 @@ public enum FlowActionEnum {
     START_DESIGN("START_DESIGN", "开始设计"),
 
     /**
-     * 提交设计
+     * 完成设计
      */
-    SUBMIT_DESIGN("SUBMIT_DESIGN", "提交设计"),
-
-    /**
-     * 设计审核通过
-     */
-    DESIGN_REVIEW_PASS("DESIGN_REVIEW_PASS", "设计审核通过"),
-
-    /**
-     * 设计审核驳回
-     */
-    DESIGN_REVIEW_REJECT("DESIGN_REVIEW_REJECT", "设计审核驳回"),
-
-    /**
-     * 继续修改（审核驳回后重新进入设计中）
-     */
-    CONTINUE_DESIGN("CONTINUE_DESIGN", "继续修改"),
+    COMPLETE_DESIGN("COMPLETE_DESIGN", "完成设计"),
 
     // ==================== 打印阶段动作 ====================
     /**
