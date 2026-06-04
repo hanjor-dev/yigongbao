@@ -952,7 +952,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
                         .eq(DesignModelEntity::getOrderId, orderId)
                         .eq(DesignModelEntity::getIsDeleted, StatusConstants.NOT_DELETED));
         if (modelCount == 0) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请上传 STL 重建模型");
+            throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请上传重建模型");
         }
     }
 }

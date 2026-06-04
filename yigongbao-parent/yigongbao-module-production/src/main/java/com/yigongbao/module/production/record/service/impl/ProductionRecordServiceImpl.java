@@ -320,26 +320,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         // 聚合逻辑：检查是否所有流转卡都已下载，如果是则通过状态机推进订单状态
         if (order.getStatus().equals(FlowStatusEnum.DESIGN_COMPLETED.getValue())) {
-            long totalActive = count(new LambdaQueryWrapper<ProductionRecordEntity>()
-                    .eq(ProductionRecordEntity::getOrderId, order.getId())
-                    .notIn(ProductionRecordEntity::getStatus,
-                            FlowStatusEnum.PRINT_FAILED.getValue(),
-                            FlowStatusEnum.CANCELLED.getValue()));
-            long reachedCount = count(new LambdaQueryWrapper<ProductionRecordEntity>()
-                    .eq(ProductionRecordEntity::getOrderId, order.getId())
-                    .ge(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue())
-                    .notIn(ProductionRecordEntity::getStatus,
-                            FlowStatusEnum.PRINT_FAILED.getValue(),
-                            FlowStatusEnum.CANCELLED.getValue()));
-
-            if (totalActive > 0 && totalActive == reachedCount) {
-                // 所有流转卡都已下载，通过状态机推进订单到打印阶段
-                flowFacade.executeFlow(order.getId(), FlowActionEnum.DOWNLOAD_DATA_PACKAGE,
-                        FlowOperator.of(userId, realName));
-                log.info("所有流转卡已下载，订单推进到打印阶段: orderId={}, {} -> {}",
-                        order.getId(), FlowStatusEnum.DESIGN_COMPLETED.getValue(),
-                        FlowStatusEnum.PENDING_PRINT.getValue());
-            }
+            triggerFlowIfAllReach(order.getId(), FlowStatusEnum.PENDING_PRINT.getValue(),
+                    FlowActionEnum.DOWNLOAD_DATA_PACKAGE);
         }
 
         return designPackage.getFileUrl();

@@ -160,7 +160,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
         // - needsPhysicalDelivery=1: 等待生产员下载数据包后手动推进到打印阶段
         // - needsPhysicalDelivery=0: 等待业务员线下确认后手动完成
         if (targetStatus == FlowStatusEnum.DESIGN_COMPLETED) {
-            // 不自动推进阶段，保持在设计阶段
+            return new PhaseAndStatus(null, null);
         }
 
         // 下载数据包 → 推进到打印阶段，初始状态为 PENDING_PRINT
