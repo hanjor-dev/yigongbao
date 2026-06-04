@@ -1,6 +1,6 @@
 package com.yigongbao.module.order.vo;
 
-import com.yigongbao.module.order.vo.order.OrderListVO;
+import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -10,8 +10,8 @@ import java.time.LocalDateTime;
 /**
  * 经典案例视图对象VO
  * <p>
- * 继承订单列表VO的所有字段，并增加经典案例特有字段。
- * 经典案例包含订单的完整信息，以及标记相关的元数据。
+ * 继承订单详情VO的所有字段（包含订单明细、文件列表等完整信息），
+ * 并增加经典案例特有字段（标记时间、标记人、备注）。
  * </p>
  *
  * @author hanjor
@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Schema(description = "经典案例详情")
-public class ClassicCaseVO extends OrderListVO {
+public class ClassicCaseVO extends OrderDetailVO {
 
     private static final long serialVersionUID = 1L;
 

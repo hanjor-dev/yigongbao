@@ -16,7 +16,9 @@ import com.yigongbao.module.order.dto.ClassicCaseQueryDTO;
 import com.yigongbao.module.order.dto.MarkClassicCaseDTO;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.service.IOrderClassicCaseService;
+import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.ClassicCaseVO;
+import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
 
     private final OrderMainMapper orderMainMapper;
+    private final OrderMainService orderMainService;
     private final ApplicationEventPublisher eventPublisher;
     private final com.yigongbao.module.order.helper.OrderQueryHelper orderQueryHelper;
 
@@ -144,8 +147,8 @@ public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
                 .map(entity -> {
                     // 先使用 OrderQueryHelper 获取包含所有翻译字段的 OrderListVO
                     OrderListVO orderListVO = orderQueryHelper.toOrderListVO(entity);
-                    // 再转换为 ClassicCaseVO，添加经典案例特有字段
-                    return ClassicCaseConvert.toClassicCaseVO(orderListVO, entity);
+                    // 再转换为 ClassicCaseVO，添加经典案例特有字段（列表查询不包含订单明细和文件）
+                    return ClassicCaseConvert.toClassicCaseVOFromList(orderListVO, entity);
                 })
                 .collect(Collectors.toList());
 
@@ -158,30 +161,30 @@ public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
     /**
      * 查询经典案例详情
      * <p>
-     * 根据订单ID查询经典案例的详细信息。
+     * 根据订单ID查询经典案例的详细信息，包含完整的订单信息、订单明细、文件列表等。
      * 如果订单不存在或未标记为经典案例，则抛出异常。
      * </p>
      *
      * @param orderId 订单ID
-     * @return 经典案例详情VO
+     * @return 经典案例详情VO（包含订单明细、文件列表、可执行动作等完整信息）
      * @throws BusinessException 订单不存在或非经典案例时抛出 DATA_NOT_FOUND
      */
     @Override
     public ClassicCaseVO getClassicCaseDetail(Long orderId) {
-        // 查询订单实体
-        OrderMainEntity order = orderMainMapper.selectById(orderId);
-
-        // 校验订单存在且为经典案例（is_classic_case = 1）
-        if (order == null || StatusConstants.YES != order.getIsClassicCase()) {
+        // 校验订单是否为经典案例
+        if (!isClassicCase(orderId)) {
             log.warn("查询经典案例详情失败，订单不存在或非经典案例: orderId={}", orderId);
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
 
-        // 使用 OrderQueryHelper 获取包含所有翻译字段的 OrderListVO
-        OrderListVO orderListVO = orderQueryHelper.toOrderListVO(order);
+        // 调用 OrderMainService 获取完整的订单详情（包含订单明细、文件列表、可执行动作）
+        OrderDetailVO orderDetail = orderMainService.getOrderDetail(orderId);
 
-        // 转换为 ClassicCaseVO，添加经典案例特有字段
-        return ClassicCaseConvert.toClassicCaseVO(orderListVO, order);
+        // 查询订单实体，获取经典案例特有字段
+        OrderMainEntity order = orderMainMapper.selectById(orderId);
+
+        // 转换为 ClassicCaseVO，继承订单详情的所有字段并添加经典案例特有字段
+        return ClassicCaseConvert.toClassicCaseVO(orderDetail, order);
     }
 
     /**
