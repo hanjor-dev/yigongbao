@@ -155,23 +155,28 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      */
     private void validateDepartmentPermission(OrderMainEntity order, Long currentUserDeptId) {
         if (!Objects.equals(order.getOperatorDeptId(), currentUserDeptId)) {
-            log.warn("无权审核非本部门订单: orderId={}, orderDeptId={}, userDeptId=",
+            log.warn("无权审核非本部门订单: orderId={}, orderDeptId={}, userDeptId={}",
                 order.getId(), order.getOperatorDeptId(), currentUserDeptId);
             throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
         }
     }
 
     /**
-     * 校验区域审核前置条件：设计审核前必须区域审核通过
+     * 校验区域审核前置条件：设计审核前必须区域审核通过且订单在待审核状态
      *
      * @param order 订单实体
-     * @throws BusinessException 区域审核未通过时抛出
+     * @throws BusinessException 区域审核未通过或订单状态不正确时抛出
      */
     private void validateRegionalAuditPassed(OrderMainEntity order) {
         if (!Objects.equals(order.getRegionalAuditStatus(), AuditStatusConstants.PASSED)) {
             log.warn("区域审核未通过，无法进行设计审核: orderId={}, regionalAuditStatus={}",
                 order.getId(), order.getRegionalAuditStatus());
             throw new BusinessException(ErrorCodeEnum.REGIONAL_AUDIT_PENDING);
+        }
+        if (!Objects.equals(order.getStatus(), FlowStatusEnum.PENDING_DATA_AUDIT.getValue())) {
+            log.warn("订单状态不正确，无法进行设计审核: orderId={}, status={}",
+                order.getId(), order.getStatus());
+            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR);
         }
     }
 
@@ -658,7 +663,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                   .set(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PASSED)
                   .set(OrderMainEntity::getRegionalAuditTime, LocalDateTime.now())
                   .set(OrderMainEntity::getRegionalAuditBy, currentUserId)
-                  .set(OrderMainEntity::getRegionalAuditRemark, dto.getRemark());
+                  .set(OrderMainEntity::getRegionalAuditRemark, dto.getRemark())
+                  .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING);
                 if (!update(uw)) {
                     throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
                 }
@@ -689,7 +695,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 if (StrUtil.isNotBlank(dto.getDataEvaluationOpinion())) {
                     uw.set(OrderMainEntity::getDataEvaluationOpinion, dto.getDataEvaluationOpinion());
                 }
-                update(uw);
+                if (!update(uw)) {
+                    throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+                }
 
                 designerAssignmentService.triggerAssignmentAfterAudit(id);
                 log.info("试用订单设计审核通过: orderId={}, {} -> {}, designAuditBy={}",
@@ -724,7 +732,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             if (StrUtil.isNotBlank(dto.getDataEvaluationOpinion())) {
                 uw.set(OrderMainEntity::getDataEvaluationOpinion, dto.getDataEvaluationOpinion());
             }
-            update(uw);
+            if (!update(uw)) {
+                throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+            }
 
             designerAssignmentService.triggerAssignmentAfterAudit(id);
             log.info("订单审核通过: orderId={}, {} -> {}, designAuditBy={}",
@@ -776,6 +786,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<>();
                 uw.eq(OrderMainEntity::getId, id)
                   .eq(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PENDING)
+                  .eq(OrderMainEntity::getStatus, FlowStatusEnum.PENDING_DATA_AUDIT.getValue())
                   .set(OrderMainEntity::getPhase, result.getTargetPhase())
                   .set(OrderMainEntity::getStatus, result.getFinalStatus())
                   .set(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.REJECTED)
@@ -802,6 +813,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                         .eq(OrderMainEntity::getId, id)
                         .eq(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PASSED)
                         .eq(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
+                        .eq(OrderMainEntity::getStatus, FlowStatusEnum.PENDING_DATA_AUDIT.getValue())
                         .set(OrderMainEntity::getPhase, result.getTargetPhase())
                         .set(OrderMainEntity::getStatus, result.getFinalStatus())
                         .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.REJECTED)
@@ -829,6 +841,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             update(new LambdaUpdateWrapper<OrderMainEntity>()
                     .eq(OrderMainEntity::getId, id)
                     .eq(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
+                    .eq(OrderMainEntity::getStatus, FlowStatusEnum.PENDING_DATA_AUDIT.getValue())
                     .set(OrderMainEntity::getPhase, result.getTargetPhase())
                     .set(OrderMainEntity::getStatus, result.getFinalStatus())
                     .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.REJECTED)
@@ -869,56 +882,77 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
 
         boolean isTrialOrder = DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(entity.getBusinessType());
+        String operatorName = getUserRealName(currentUserId);
 
-        LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<>();
-        uw.eq(OrderMainEntity::getId, id);
+        // 调用流程引擎流转状态：DATA_AUDIT_REJECTED → PENDING_DATA_AUDIT
+        TransitionResult result = flowFacade.executeFlow(
+                id, FlowActionEnum.RESUBMIT, new FlowOperator(currentUserId, operatorName, "重新提交"));
 
+        // 根据订单类型和驳回级别，原子性更新审核状态和订单状态
+        boolean updated = false;
         if (isTrialOrder) {
-            // 试用订单：判断是区域驳回还是设计驳回
-            if (entity.getDesignAuditStatus() != null && entity.getDesignAuditStatus() == AuditStatusConstants.REJECTED) {
-                // 设计驳回：重置所有审核字段
-                uw.set(OrderMainEntity::getRegionalAuditStatus, null)
+            // 试用订单：先尝试设计驳回路径（重置所有审核字段）
+            LambdaUpdateWrapper<OrderMainEntity> designRejectUw = new LambdaUpdateWrapper<>();
+            designRejectUw.eq(OrderMainEntity::getId, id)
+                  .eq(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.REJECTED)
+                  .set(OrderMainEntity::getRegionalAuditStatus, null)
                   .set(OrderMainEntity::getRegionalAuditTime, null)
                   .set(OrderMainEntity::getRegionalAuditBy, null)
                   .set(OrderMainEntity::getRegionalAuditRemark, null)
                   .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
                   .set(OrderMainEntity::getDesignAuditTime, null)
                   .set(OrderMainEntity::getDesignAuditBy, null)
-                  .set(OrderMainEntity::getDesignAuditRemark, null);
-                log.info("重新提交订单（试用订单设计驳回，重置所有审核状态）: orderId={}", id);
+                  .set(OrderMainEntity::getDesignAuditRemark, null)
+                  .set(OrderMainEntity::getPhase, result.getTargetPhase())
+                  .set(OrderMainEntity::getStatus, result.getFinalStatus())
+                  .set(OrderMainEntity::getCurrentHandlerId, currentUserId);
+            updated = update(designRejectUw);
+
+            if (updated) {
+                log.info("重新提交订单（试用订单设计驳回，重置所有审核状态）: orderId={}, {} -> {}",
+                    id, entity.getStatus(), result.getFinalStatus());
             } else {
-                // 区域驳回：只重置区域审核字段
-                uw.set(OrderMainEntity::getRegionalAuditStatus, null)
-                  .set(OrderMainEntity::getRegionalAuditTime, null)
-                  .set(OrderMainEntity::getRegionalAuditBy, null)
-                  .set(OrderMainEntity::getRegionalAuditRemark, null);
-                log.info("重新提交订单（试用订单区域驳回，重置区域审核状态）: orderId={}", id);
+                // 设计驳回路径失败，尝试区域驳回路径（只重置区域审核字段）
+                LambdaUpdateWrapper<OrderMainEntity> regionalRejectUw = new LambdaUpdateWrapper<>();
+                regionalRejectUw.eq(OrderMainEntity::getId, id)
+                      .eq(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.REJECTED)
+                      .set(OrderMainEntity::getRegionalAuditStatus, null)
+                      .set(OrderMainEntity::getRegionalAuditTime, null)
+                      .set(OrderMainEntity::getRegionalAuditBy, null)
+                      .set(OrderMainEntity::getRegionalAuditRemark, null)
+                      .set(OrderMainEntity::getPhase, result.getTargetPhase())
+                      .set(OrderMainEntity::getStatus, result.getFinalStatus())
+                      .set(OrderMainEntity::getCurrentHandlerId, currentUserId);
+                updated = update(regionalRejectUw);
+
+                if (updated) {
+                    log.info("重新提交订单（试用订单区域驳回，重置区域审核状态）: orderId={}, {} -> {}",
+                        id, entity.getStatus(), result.getFinalStatus());
+                }
             }
         } else {
             // 非试用订单：只重置设计审核字段
-            uw.set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
+            LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<>();
+            uw.eq(OrderMainEntity::getId, id)
+              .eq(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.REJECTED)
+              .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
               .set(OrderMainEntity::getDesignAuditTime, null)
               .set(OrderMainEntity::getDesignAuditBy, null)
-              .set(OrderMainEntity::getDesignAuditRemark, null);
-            log.info("重新提交订单（重置设计审核状态）: orderId={}", id);
+              .set(OrderMainEntity::getDesignAuditRemark, null)
+              .set(OrderMainEntity::getPhase, result.getTargetPhase())
+              .set(OrderMainEntity::getStatus, result.getFinalStatus())
+              .set(OrderMainEntity::getCurrentHandlerId, currentUserId);
+            updated = update(uw);
+
+            if (updated) {
+                log.info("重新提交订单（重置设计审核状态）: orderId={}, {} -> {}",
+                    id, entity.getStatus(), result.getFinalStatus());
+            }
         }
 
-        update(uw);
-
-        // 调用流程引擎流转状态：DATA_AUDIT_REJECTED → PENDING_DATA_AUDIT
-        String operatorName = getUserRealName(currentUserId);
-        TransitionResult result = flowFacade.executeFlow(
-                id, FlowActionEnum.RESUBMIT, new FlowOperator(currentUserId, operatorName, "重新提交"));
-
-        // 更新订单状态
-        LambdaUpdateWrapper<OrderMainEntity> statusUpdate = new LambdaUpdateWrapper<>();
-        statusUpdate.eq(OrderMainEntity::getId, id)
-                .set(OrderMainEntity::getPhase, result.getTargetPhase())
-                .set(OrderMainEntity::getStatus, result.getFinalStatus())
-                .set(OrderMainEntity::getCurrentHandlerId, currentUserId);
-        update(statusUpdate);
-
-        log.info("重新提交订单完成: orderId={}, {} -> {}", id, entity.getStatus(), result.getFinalStatus());
+        if (!updated) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+        }
     }
 
     @Override
