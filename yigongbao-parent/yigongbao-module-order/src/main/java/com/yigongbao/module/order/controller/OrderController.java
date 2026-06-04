@@ -154,6 +154,15 @@ public class OrderController {
         return Result.success();
     }
 
+    @Operation(summary = "重新提交订单")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "重新提交订单")
+    @RequirePermission(value = "order:Resubmit")
+    @PostMapping("/{id}/resubmit")
+    public Result<Void> resubmit(@PathVariable Long id) {
+        orderMainService.resubmit(id);
+        return Result.success();
+    }
+
     @Operation(summary = "取消订单")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.CANCEL, operation = "取消订单")
     @RequirePermission(value = "order:Cancel")

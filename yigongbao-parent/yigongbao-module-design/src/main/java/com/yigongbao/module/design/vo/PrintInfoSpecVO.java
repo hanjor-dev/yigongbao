@@ -15,4 +15,5 @@ public class PrintInfoSpecVO {
     private String specName;
     private Long certId;
     private String certNo;
+    private String remark;
 }

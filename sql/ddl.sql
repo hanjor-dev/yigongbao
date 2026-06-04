@@ -1010,6 +1010,16 @@ CREATE TABLE order_main (
     estimated_cost  DECIMAL(10,2)   COMMENT '预估费用',
     data_evaluation_opinion TEXT     COMMENT '影像数据评估意见',
 
+    -- ==================== 两级审核字段 ====================
+    regional_audit_status TINYINT DEFAULT NULL COMMENT '区域管理员审核状态：0-未审核，1-已通过，2-已驳回（仅试用订单）',
+    regional_audit_remark VARCHAR(500) DEFAULT NULL COMMENT '区域管理员审核备注',
+    regional_audit_time DATETIME DEFAULT NULL COMMENT '区域管理员审核时间',
+    regional_audit_by BIGINT DEFAULT NULL COMMENT '区域管理员审核人ID',
+    design_audit_status TINYINT DEFAULT 0 COMMENT '设计管理员审核状态：0-未审核，1-已通过，2-已驳回',
+    design_audit_remark VARCHAR(500) DEFAULT NULL COMMENT '设计管理员审核备注',
+    design_audit_time DATETIME DEFAULT NULL COMMENT '设计管理员审核时间',
+    design_audit_by BIGINT DEFAULT NULL COMMENT '设计管理员审核人ID',
+
     -- ==================== 经典案例 ====================
     is_classic_case TINYINT         DEFAULT 0 COMMENT '是否经典案例：0-否，1-是',
     classic_case_time DATETIME      COMMENT '标记为经典案例的时间',
@@ -1031,7 +1041,9 @@ CREATE TABLE order_main (
     KEY idx_order_main_hospital_id (hospital_id),
     KEY idx_order_main_operator_id (operator_id),
     KEY idx_order_main_phase_status (phase, status),
-    KEY idx_order_main_create_time (create_time)
+    KEY idx_order_main_create_time (create_time),
+    KEY idx_order_regional_audit (business_type, regional_audit_status, status, operator_dept_id),
+    KEY idx_order_design_audit (design_audit_status, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单主表';
 CREATE UNIQUE INDEX uk_order_main_code ON order_main ((CASE WHEN is_deleted = 0 THEN order_code ELSE NULL END));
 ALTER TABLE order_main ADD FULLTEXT INDEX ft_order_search (order_code, org_name, operator_name, hospital_name, patient_name);

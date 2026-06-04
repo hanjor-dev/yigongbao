@@ -1,5 +1,6 @@
 package com.yigongbao.module.order.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -8,8 +9,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yigongbao.common.constant.AuditStatusConstants;
 import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.DictCodeConstants;
+import com.yigongbao.common.constant.RoleCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
@@ -64,6 +67,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -131,6 +135,15 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      */
     private Long getCurrentUserId() {
         return orderQueryHelper.getCurrentUserId();
+    }
+
+    /**
+     * 获取当前登录用户的角色编码
+     *
+     * @return 角色编码（REGIONAL_ADMIN/DESIGN_ADMIN等），未找到返回 null
+     */
+    private String getCurrentUserRoleCode() {
+        return (String) StpUtil.getSession().get("roleCode");
     }
 
     /**
@@ -334,6 +347,36 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     }
 
     /**
+     * 构建订单详情（不进行数据权限校验）
+     * <p>
+     * 用于经典案例等公开场景，所有用户均可查看。
+     * 直接构建 OrderDetailVO，跳过 validateDataScope() 校验。
+     * </p>
+     *
+     * @param orderId 订单ID
+     * @param order   订单实体（调用方已查询）
+     * @return 订单详情 VO
+     */
+    @Override
+    public OrderDetailVO buildOrderDetailWithoutPermissionCheck(Long orderId, OrderMainEntity order) {
+        // 转换为详情 VO，补充性别名称等显示字段
+        OrderDetailVO vo = toOrderDetailVO(order);
+        // 查询订单明细列表，按排序字段升序
+        List<OrderItemEntity> items = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItemEntity>()
+                        .eq(OrderItemEntity::getOrderId, orderId)
+                        .eq(OrderItemEntity::getIsDeleted, 0)
+                        .orderByAsc(OrderItemEntity::getSortOrder));
+        vo.setItems(items.stream().map(this::toOrderItemVO).collect(Collectors.toList()));
+        vo.setItemCount(items.size());
+        // 查询当前可执行的动作列表，用于前端按钮展示
+        vo.setAvailableActions(flowFacade.getAvailableActions(order.getId()));
+        // 查询订单关联的影像文件列表
+        fillOrderFiles(vo, orderId);
+        return vo;
+    }
+
+    /**
      * 查询订单可执行的动作列表
      *
      * @param id 订单ID
@@ -383,9 +426,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (dto.getHospitalId() != null) {
             fillAreaFromHospital(entity, dto.getHospitalId());
         }
-
-        // 保存旧状态，用于判断是否需要自动流转
-        Integer oldStatus = entity.getStatus();
 
         // 更新订单
         updateById(entity);
@@ -539,96 +579,332 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     }
 
     /**
-     * 审核通过
-     * 审核人确认订单数据无误，流程推进至下一阶段
+     * 审核通过（两级审核）
      *
-     * 【流转逻辑】
-     * - 执行 DATA_AUDIT_PASS 动作，数据审核通过
-     * - 根据 needsPhysicalDelivery 决定后续流程分支
+     * 【审核规则】
+     * - 试用订单（11.3）：
+     *   - 区域管理员审核：只更新 regionalAuditStatus=1
+     *   - 设计管理员审核：更新 designAuditStatus=1，调用 flowFacade 推进流程
+     * - 其他订单：只有设计管理员可审核，直接调用 flowFacade 推进流程
      *
      * @param id 订单ID
-     * @param dto 审核参数（含驳回原因remark）
-     * @throws BusinessException 订单不存在
+     * @param dto 审核参数
+     * @throws BusinessException 订单不存在、权限不足
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void auditPass(Long id, AuditOrderDTO dto) {
         Long currentUserId = getCurrentUserId();
-        // 校验订单存在
         OrderMainEntity entity = getById(id);
         if (entity == null) {
             log.warn("订单不存在: orderId={}", id);
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
-        // 获取当前用户姓名
-        UserEntity currentUser = userService.getById(currentUserId);
-        String operatorName = currentUser != null ? currentUser.getRealName() : null;
-        // 通过 FlowFacade 执行审核通过动作
-        TransitionResult result = flowFacade.executeFlow(
-                id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
-                dto.getVersion());
-        // 更新订单状态和业务字段
-        LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<OrderMainEntity>()
-                .eq(OrderMainEntity::getId, id)
-                .set(OrderMainEntity::getPhase, result.getTargetPhase())
-                .set(OrderMainEntity::getStatus, result.getFinalStatus())
-                .set(OrderMainEntity::getCurrentHandlerId, currentUserId);
-        if (dto.getEstimatedCost() != null) {
-            uw.set(OrderMainEntity::getEstimatedCost, dto.getEstimatedCost());
+
+        String roleCode = getCurrentUserRoleCode();
+        boolean isTrialOrder = DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(entity.getBusinessType());
+
+        // 试用订单两级审核
+        if (isTrialOrder) {
+            if (RoleCodeConstants.REGIONAL_ADMIN.equals(roleCode)) {
+                // 区域管理员审核：只更新区域审核状态
+                // 部门权限校验：只能审核本部门的订单
+                Long currentUserDeptId = (Long) StpUtil.getSession().get("deptId");
+                if (!Objects.equals(entity.getOperatorDeptId(), currentUserDeptId)) {
+                    log.warn("无权审核非本部门订单: orderId={}, orderDeptId={}, userDeptId={}",
+                        id, entity.getOperatorDeptId(), currentUserDeptId);
+                    throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+                }
+
+                LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<>();
+                uw.eq(OrderMainEntity::getId, id)
+                  .eq(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PENDING)
+                  .eq(OrderMainEntity::getVersion, dto.getVersion())
+                  .set(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PASSED)
+                  .set(OrderMainEntity::getRegionalAuditTime, LocalDateTime.now())
+                  .set(OrderMainEntity::getRegionalAuditBy, currentUserId)
+                  .set(OrderMainEntity::getRegionalAuditRemark, dto.getRemark());
+                if (!update(uw)) {
+                    throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+                }
+                log.info("试用订单区域审核通过: orderId={}, regionalAuditBy={}", id, currentUserId);
+            } else if (RoleCodeConstants.DESIGN_ADMIN.equals(roleCode)) {
+                // 设计管理员审核：更新设计审核状态并推进流程
+                // 前置校验：区域审核必须已通过
+                if (!Objects.equals(entity.getRegionalAuditStatus(), AuditStatusConstants.PASSED)) {
+                    log.warn("区域审核未通过，无法进行设计审核: orderId={}, regionalAuditStatus={}",
+                        id, entity.getRegionalAuditStatus());
+                    throw new BusinessException(ErrorCodeEnum.REGIONAL_AUDIT_PENDING);
+                }
+
+                UserEntity currentUser = userService.getById(currentUserId);
+                String operatorName = currentUser != null ? currentUser.getRealName() : null;
+                TransitionResult result = flowFacade.executeFlow(
+                        id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
+                        dto.getVersion());
+
+                LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<>();
+                uw.eq(OrderMainEntity::getId, id)
+                  .eq(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PASSED)
+                  .eq(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
+                  .set(OrderMainEntity::getPhase, result.getTargetPhase())
+                  .set(OrderMainEntity::getStatus, result.getFinalStatus())
+                  .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PASSED)
+                  .set(OrderMainEntity::getDesignAuditTime, LocalDateTime.now())
+                  .set(OrderMainEntity::getDesignAuditBy, currentUserId)
+                  .set(OrderMainEntity::getDesignAuditRemark, dto.getRemark())
+                  .set(OrderMainEntity::getCurrentHandlerId, currentUserId);
+                if (dto.getEstimatedCost() != null) {
+                    uw.set(OrderMainEntity::getEstimatedCost, dto.getEstimatedCost());
+                }
+                if (StrUtil.isNotBlank(dto.getDataEvaluationOpinion())) {
+                    uw.set(OrderMainEntity::getDataEvaluationOpinion, dto.getDataEvaluationOpinion());
+                }
+                update(uw);
+
+                designerAssignmentService.triggerAssignmentAfterAudit(id);
+                log.info("试用订单设计审核通过: orderId={}, {} -> {}, designAuditBy={}",
+                    id, entity.getStatus(), result.getFinalStatus(), currentUserId);
+            } else {
+                throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+            }
+        } else {
+            // 非试用订单：只有设计管理员可审核
+            if (!RoleCodeConstants.DESIGN_ADMIN.equals(roleCode)) {
+                throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+            }
+
+            UserEntity currentUser = userService.getById(currentUserId);
+            String operatorName = currentUser != null ? currentUser.getRealName() : null;
+            TransitionResult result = flowFacade.executeFlow(
+                    id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
+                    dto.getVersion());
+
+            LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<>();
+            uw.eq(OrderMainEntity::getId, id)
+              .eq(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
+              .set(OrderMainEntity::getPhase, result.getTargetPhase())
+              .set(OrderMainEntity::getStatus, result.getFinalStatus())
+              .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PASSED)
+              .set(OrderMainEntity::getDesignAuditTime, LocalDateTime.now())
+              .set(OrderMainEntity::getDesignAuditBy, currentUserId)
+              .set(OrderMainEntity::getDesignAuditRemark, dto.getRemark())
+              .set(OrderMainEntity::getCurrentHandlerId, currentUserId);
+            if (dto.getEstimatedCost() != null) {
+                uw.set(OrderMainEntity::getEstimatedCost, dto.getEstimatedCost());
+            }
+            if (StrUtil.isNotBlank(dto.getDataEvaluationOpinion())) {
+                uw.set(OrderMainEntity::getDataEvaluationOpinion, dto.getDataEvaluationOpinion());
+            }
+            update(uw);
+
+            designerAssignmentService.triggerAssignmentAfterAudit(id);
+            log.info("订单审核通过: orderId={}, {} -> {}, designAuditBy={}",
+                id, entity.getStatus(), result.getFinalStatus(), currentUserId);
         }
-        if (StrUtil.isNotBlank(dto.getDataEvaluationOpinion())) {
-            uw.set(OrderMainEntity::getDataEvaluationOpinion, dto.getDataEvaluationOpinion());
-        }
-        update(uw);
-        // 触发设计师分配（分配失败不影响审核结果）
-        designerAssignmentService.triggerAssignmentAfterAudit(id);
-        log.info("审核通过: orderId={}, {} -> {}, operator={}", id, entity.getStatus(), result.getFinalStatus(), currentUserId);
     }
 
     /**
-     * 审核驳回
-     * 审核人驳回订单，订单退回可编辑状态，申请人可修改后重新提交
+     * 审核驳回（两级审核）
      *
      * 【驳回规则】
      * - 必须填写驳回原因（remark）
-     *
-     * 【流转逻辑】
-     * - 执行 DATA_AUDIT_REJECT 动作，订单退回草稿状态
+     * - 试用订单：区域管理员和设计管理员均可驳回
+     * - 其他订单：只有设计管理员可驳回
      *
      * @param id 订单ID
      * @param dto 审核参数（含驳回原因remark）
-     * @throws BusinessException 订单不存在、驳回原因未填写
+     * @throws BusinessException 订单不存在、驳回原因未填写、权限不足
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void auditReject(Long id, AuditOrderDTO dto) {
         Long currentUserId = getCurrentUserId();
-        // 校验订单存在
         OrderMainEntity entity = getById(id);
         if (entity == null) {
             log.warn("订单不存在: orderId={}", id);
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
-        // 驳回时必须填写驳回原因
         if (StrUtil.isBlank(dto.getRemark())) {
             log.warn("审核驳回时必须填写驳回原因");
             throw new BusinessException(ErrorCodeEnum.ORDER_AUDIT_REMARK_REQUIRED);
         }
-        // 获取当前用户姓名
+
+        String roleCode = getCurrentUserRoleCode();
+        boolean isTrialOrder = DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(entity.getBusinessType());
+
+        // 试用订单两级审核
+        if (isTrialOrder) {
+            if (RoleCodeConstants.REGIONAL_ADMIN.equals(roleCode)) {
+                // 区域管理员驳回：调用 flowFacade 流转状态
+                // 部门权限校验：只能审核本部门的订单
+                Long currentUserDeptId = (Long) StpUtil.getSession().get("deptId");
+                if (!Objects.equals(entity.getOperatorDeptId(), currentUserDeptId)) {
+                    log.warn("无权驳回非本部门订单: orderId={}, orderDeptId=, userDeptId={}",
+                        id, entity.getOperatorDeptId(), currentUserDeptId);
+                    throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+                }
+
+                UserEntity currentUser = userService.getById(currentUserId);
+                String operatorName = currentUser != null ? currentUser.getRealName() : null;
+                TransitionResult result = flowFacade.executeFlow(
+                        id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
+                        dto.getVersion());
+
+                LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<>();
+                uw.eq(OrderMainEntity::getId, id)
+                  .eq(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PENDING)
+                  .set(OrderMainEntity::getPhase, result.getTargetPhase())
+                  .set(OrderMainEntity::getStatus, result.getFinalStatus())
+                  .set(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.REJECTED)
+                  .set(OrderMainEntity::getRegionalAuditTime, LocalDateTime.now())
+                  .set(OrderMainEntity::getRegionalAuditBy, currentUserId)
+                  .set(OrderMainEntity::getRegionalAuditRemark, dto.getRemark())
+                  .set(OrderMainEntity::getAuditRemark, dto.getRemark())
+                  .set(OrderMainEntity::getCurrentHandlerId, currentUserId);
+                if (!update(uw)) {
+                    throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+                }
+                log.warn("试用订单区域审核驳回: orderId={}, {} -> {}, regionalAuditBy={}, reason={}",
+                    id, entity.getStatus(), result.getFinalStatus(), currentUserId, dto.getRemark());
+            } else if (RoleCodeConstants.DESIGN_ADMIN.equals(roleCode)) {
+                // 设计管理员驳回：更新设计审核状态并推进流程
+                // 前置校验：区域审核必须已通过
+                if (!Objects.equals(entity.getRegionalAuditStatus(), AuditStatusConstants.PASSED)) {
+                    log.warn("区域审核未通过，无法进行设计驳回: orderId={}, regionalAuditStatus={}",
+                        id, entity.getRegionalAuditStatus());
+                    throw new BusinessException(ErrorCodeEnum.REGIONAL_AUDIT_PENDING);
+                }
+
+                UserEntity currentUser = userService.getById(currentUserId);
+                String operatorName = currentUser != null ? currentUser.getRealName() : null;
+                TransitionResult result = flowFacade.executeFlow(
+                        id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
+                        dto.getVersion());
+
+                update(new LambdaUpdateWrapper<OrderMainEntity>()
+                        .eq(OrderMainEntity::getId, id)
+                        .eq(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PASSED)
+                        .eq(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
+                        .set(OrderMainEntity::getPhase, result.getTargetPhase())
+                        .set(OrderMainEntity::getStatus, result.getFinalStatus())
+                        .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.REJECTED)
+                        .set(OrderMainEntity::getDesignAuditTime, LocalDateTime.now())
+                        .set(OrderMainEntity::getDesignAuditBy, currentUserId)
+                        .set(OrderMainEntity::getDesignAuditRemark, dto.getRemark())
+                        .set(OrderMainEntity::getAuditRemark, dto.getRemark())
+                        .set(OrderMainEntity::getCurrentHandlerId, currentUserId));
+                log.warn("试用订单设计审核驳回: orderId={}, {} -> {}, designAuditBy={}, reason={}",
+                    id, entity.getStatus(), result.getFinalStatus(), currentUserId, dto.getRemark());
+            } else {
+                throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+            }
+        } else {
+            // 非试用订单：只有设计管理员可驳回
+            if (!RoleCodeConstants.DESIGN_ADMIN.equals(roleCode)) {
+                throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+            }
+
+            UserEntity currentUser = userService.getById(currentUserId);
+            String operatorName = currentUser != null ? currentUser.getRealName() : null;
+            TransitionResult result = flowFacade.executeFlow(
+                    id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
+                    dto.getVersion());
+
+            update(new LambdaUpdateWrapper<OrderMainEntity>()
+                    .eq(OrderMainEntity::getId, id)
+                    .eq(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
+                    .set(OrderMainEntity::getPhase, result.getTargetPhase())
+                    .set(OrderMainEntity::getStatus, result.getFinalStatus())
+                    .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.REJECTED)
+                    .set(OrderMainEntity::getDesignAuditTime, LocalDateTime.now())
+                    .set(OrderMainEntity::getDesignAuditBy, currentUserId)
+                    .set(OrderMainEntity::getDesignAuditRemark, dto.getRemark())
+                    .set(OrderMainEntity::getAuditRemark, dto.getRemark())
+                    .set(OrderMainEntity::getCurrentHandlerId, currentUserId));
+            log.warn("订单审核驳回: orderId={}, {} -> {}, designAuditBy={}, reason={}",
+                id, entity.getStatus(), result.getFinalStatus(), currentUserId, dto.getRemark());
+        }
+    }
+
+    /**
+     * 重新提交订单（方案A：试用订单设计驳回时重置所有审核状态）
+     *
+     * 【重置规则】
+     * - 试用订单：
+     *   - 区域驳回：重置 regionalAuditStatus/Time/By/Remark
+     *   - 设计驳回：重置所有审核字段（regional + design）
+     * - 其他订单：重置 designAuditStatus/Time/By/Remark
+     *
+     * @param id 订单ID
+     * @throws BusinessException 订单不存在
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resubmit(Long id) {
+        Long currentUserId = getCurrentUserId();
+        OrderMainEntity entity = getById(id);
+        if (entity == null) {
+            log.warn("订单不存在: orderId={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        if (!Objects.equals(entity.getCreateBy(), currentUserId)) {
+            log.warn("无权重新提交他人订单: orderId={}, createBy={}, currentUserId={}", id, entity.getCreateBy(), currentUserId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+
+        boolean isTrialOrder = DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(entity.getBusinessType());
+
+        LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<>();
+        uw.eq(OrderMainEntity::getId, id);
+
+        if (isTrialOrder) {
+            // 试用订单：判断是区域驳回还是设计驳回
+            if (entity.getDesignAuditStatus() != null && entity.getDesignAuditStatus() == AuditStatusConstants.REJECTED) {
+                // 设计驳回：重置所有审核字段
+                uw.set(OrderMainEntity::getRegionalAuditStatus, null)
+                  .set(OrderMainEntity::getRegionalAuditTime, null)
+                  .set(OrderMainEntity::getRegionalAuditBy, null)
+                  .set(OrderMainEntity::getRegionalAuditRemark, null)
+                  .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
+                  .set(OrderMainEntity::getDesignAuditTime, null)
+                  .set(OrderMainEntity::getDesignAuditBy, null)
+                  .set(OrderMainEntity::getDesignAuditRemark, null);
+                log.info("重新提交订单（试用订单设计驳回，重置所有审核状态）: orderId={}", id);
+            } else {
+                // 区域驳回：只重置区域审核字段
+                uw.set(OrderMainEntity::getRegionalAuditStatus, null)
+                  .set(OrderMainEntity::getRegionalAuditTime, null)
+                  .set(OrderMainEntity::getRegionalAuditBy, null)
+                  .set(OrderMainEntity::getRegionalAuditRemark, null);
+                log.info("重新提交订单（试用订单区域驳回，重置区域审核状态）: orderId={}", id);
+            }
+        } else {
+            // 非试用订单：只重置设计审核字段
+            uw.set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
+              .set(OrderMainEntity::getDesignAuditTime, null)
+              .set(OrderMainEntity::getDesignAuditBy, null)
+              .set(OrderMainEntity::getDesignAuditRemark, null);
+            log.info("重新提交订单（重置设计审核状态）: orderId={}", id);
+        }
+
+        update(uw);
+
+        // 调用流程引擎流转状态：DATA_AUDIT_REJECTED → PENDING_DATA_AUDIT
         UserEntity currentUser = userService.getById(currentUserId);
         String operatorName = currentUser != null ? currentUser.getRealName() : null;
-        // 通过 FlowFacade 执行审核驳回动作
         TransitionResult result = flowFacade.executeFlow(
-                id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
-                dto.getVersion());
-        // 更新订单状态和业务字段
-        update(new LambdaUpdateWrapper<OrderMainEntity>()
-                .eq(OrderMainEntity::getId, id)
+                id, FlowActionEnum.RESUBMIT, new FlowOperator(currentUserId, operatorName, "重新提交"));
+
+        // 更新订单状态
+        LambdaUpdateWrapper<OrderMainEntity> statusUpdate = new LambdaUpdateWrapper<>();
+        statusUpdate.eq(OrderMainEntity::getId, id)
                 .set(OrderMainEntity::getPhase, result.getTargetPhase())
                 .set(OrderMainEntity::getStatus, result.getFinalStatus())
-                .set(OrderMainEntity::getAuditRemark, dto.getRemark())
-                .set(OrderMainEntity::getCurrentHandlerId, currentUserId));
-        log.info("审核驳回: orderId={}, {} -> {}, operator={}, reason={}", id, entity.getStatus(), result.getFinalStatus(), currentUserId, dto.getRemark());
+                .set(OrderMainEntity::getCurrentHandlerId, currentUserId);
+        update(statusUpdate);
+
+        log.info("重新提交订单完成: orderId={}, {} -> {}", id, entity.getStatus(), result.getFinalStatus());
     }
 
     @Override

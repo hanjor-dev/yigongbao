@@ -187,6 +187,12 @@ public class AuthServiceImpl implements AuthService {
         StpUtil.getSession().set("username", user.getUsername());
         StpUtil.getSession().set("realName", user.getRealName());
         StpUtil.getSession().set("permissions", resourceService.getUserPermissions(user.getId()));
+
+        // 存储用户信息到会话，避免审核时查库（提升性能）
+        StpUtil.getSession().set("roleCode", user.getRoleCode());
+        StpUtil.getSession().set("deptId", user.getDeptId());
+        StpUtil.getSession().set("userName", user.getRealName());
+
         String token = StpUtil.getTokenValue();
         saveLoginLog(user.getId(), principal, loginType, ip, userAgent, 1, null);
 

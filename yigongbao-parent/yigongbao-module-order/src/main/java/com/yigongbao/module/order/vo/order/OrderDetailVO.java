@@ -1,5 +1,6 @@
 package com.yigongbao.module.order.vo.order;
 
+import com.yigongbao.module.order.vo.AuditInfo;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -274,6 +275,28 @@ public class OrderDetailVO implements Serializable {
      * 影像数据评估意见
      */
     private String dataEvaluationOpinion;
+
+    /**
+     * 审核进度描述（前端直接展示）
+     * 如："等待区域管理员审核" / "等待设计管理员审核" / "区域管理员驳回"
+     */
+    private String auditProgress;
+
+    /**
+     * 当前审核环节（用于前端判断显示哪些操作按钮）
+     * 枚举值：REGIONAL_PENDING / DESIGN_PENDING / PASSED / REGIONAL_REJECTED / DESIGN_REJECTED
+     */
+    private String auditStage;
+
+    /**
+     * 区域审核信息（仅试用订单返回）
+     */
+    private AuditInfo regionalAudit;
+
+    /**
+     * 设计审核信息
+     */
+    private AuditInfo designAudit;
 
     // ==================== 时间信息 ====================
     /**

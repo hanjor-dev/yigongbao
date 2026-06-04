@@ -255,6 +255,14 @@ public enum ErrorCodeEnum {
     ORDER_NOT_APPLICABLE_STATUS(717, "当前订单状态不适用修改申请功能", 3),
     ORDER_MODIFY_FIELD_CONFIG_NOT_FOUND(721, "字段配置不存在，请联系管理员", 5),
 
+    // ==================== 订单两级审核（650-658）====================
+    REGIONAL_AUDIT_PENDING(651, "区域管理员尚未审核，无法操作", 3),
+    REGIONAL_AUDIT_REJECTED(652, "区域管理员已驳回该订单", 3),
+    AUDIT_PERMISSION_DENIED(653, "无权限审核该订单", 3),
+    AUDIT_STATUS_INVALID(654, "审核状态异常", 3),
+    AUDIT_ORDER_STATUS_INVALID(655, "订单状态不正确，无法执行此操作", 3),
+    AUDIT_SESSION_EXPIRED(656, "会话已过期，请重新登录", 1),
+
     // ==================== 设计师分配（723-729）====================
     DESIGNER_NOT_FOUND(723, "设计师不存在", 3),
     DESIGNER_ROLE_INVALID(724, "用户角色不是设计师或设计师管理员", 3),

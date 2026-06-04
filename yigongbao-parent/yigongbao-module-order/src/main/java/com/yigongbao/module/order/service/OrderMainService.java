@@ -39,6 +39,19 @@ public interface OrderMainService extends IService<OrderMainEntity> {
     OrderDetailVO getOrderDetail(Long id);
 
     /**
+     * 构建订单详情（不进行数据权限校验）
+     * <p>
+     * 用于经典案例等公开场景，所有用户均可查看。
+     * 直接构建 OrderDetailVO，跳过 validateDataScope() 校验。
+     * </p>
+     *
+     * @param orderId 订单ID
+     * @param order 订单实体（调用方已查询）
+     * @return 订单详情 VO
+     */
+    OrderDetailVO buildOrderDetailWithoutPermissionCheck(Long orderId, OrderMainEntity order);
+
+    /**
      * 更新订单信息（公司管理员/10分钟内）
      *
      * @param id 订单ID
@@ -91,6 +104,13 @@ public interface OrderMainService extends IService<OrderMainEntity> {
      * @param dto 审核参数
      */
     void auditReject(Long id, AuditOrderDTO dto);
+
+    /**
+     * 重新提交订单（驳回后重新提交）
+     *
+     * @param id 订单ID
+     */
+    void resubmit(Long id);
 
     /**
      * 取消订单（全阶段可用）

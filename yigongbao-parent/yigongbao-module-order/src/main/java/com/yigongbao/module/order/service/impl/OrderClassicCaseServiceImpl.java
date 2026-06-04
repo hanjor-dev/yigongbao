@@ -162,6 +162,7 @@ public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
      * 查询经典案例详情
      * <p>
      * 根据订单ID查询经典案例的详细信息，包含完整的订单信息、订单明细、文件列表等。
+     * 经典案例是公开的示例内容，不受数据权限限制，所有用户均可查看。
      * 如果订单不存在或未标记为经典案例，则抛出异常。
      * </p>
      *
@@ -171,17 +172,15 @@ public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
      */
     @Override
     public ClassicCaseVO getClassicCaseDetail(Long orderId) {
-        // 校验订单是否为经典案例
-        if (!isClassicCase(orderId)) {
+        // 查询订单实体，校验存在性和经典案例标记
+        OrderMainEntity order = orderMainMapper.selectById(orderId);
+        if (order == null || StatusConstants.YES != order.getIsClassicCase()) {
             log.warn("查询经典案例详情失败，订单不存在或非经典案例: orderId={}", orderId);
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
 
-        // 调用 OrderMainService 获取完整的订单详情（包含订单明细、文件列表、可执行动作）
-        OrderDetailVO orderDetail = orderMainService.getOrderDetail(orderId);
-
-        // 查询订单实体，获取经典案例特有字段
-        OrderMainEntity order = orderMainMapper.selectById(orderId);
+        // 直接构建订单详情，不调用 orderMainService.getOrderDetail()，避免数据权限校验
+        OrderDetailVO orderDetail = orderMainService.buildOrderDetailWithoutPermissionCheck(orderId, order);
 
         // 转换为 ClassicCaseVO，继承订单详情的所有字段并添加经典案例特有字段
         return ClassicCaseConvert.toClassicCaseVO(orderDetail, order);

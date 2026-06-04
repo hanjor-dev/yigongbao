@@ -106,6 +106,7 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                         specVO.setSpecName(s.getSpecName());
                         specVO.setCertId(s.getCertId());
                         specVO.setCertNo(s.getCertNo());
+                        specVO.setRemark(s.getRemark());
                         return specVO;
                     }).toList();
             productVO.setSpecs(specVOs);

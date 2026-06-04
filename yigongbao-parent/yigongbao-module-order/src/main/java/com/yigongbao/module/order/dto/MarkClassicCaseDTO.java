@@ -13,6 +13,5 @@ public class MarkClassicCaseDTO {
     @NotNull(message = "订单ID不能为空")
     private Long orderId;
 
-    @NotBlank(message = "备注不能为空")
     private String remark;
 }

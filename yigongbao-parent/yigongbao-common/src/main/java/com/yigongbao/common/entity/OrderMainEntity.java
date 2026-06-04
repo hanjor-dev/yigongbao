@@ -254,6 +254,47 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
      */
     private String dataEvaluationOpinion;
 
+    // ==================== 两级审核信息 ====================
+    /**
+     * 大区审核状态：0-待审核，1-通过，2-驳回
+     */
+    private Integer regionalAuditStatus;
+
+    /**
+     * 大区审核备注
+     */
+    private String regionalAuditRemark;
+
+    /**
+     * 大区审核时间
+     */
+    private LocalDateTime regionalAuditTime;
+
+    /**
+     * 大区审核人ID
+     */
+    private Long regionalAuditBy;
+
+    /**
+     * 设计审核状态：0-待审核，1-通过，2-驳回
+     */
+    private Integer designAuditStatus;
+
+    /**
+     * 设计审核备注
+     */
+    private String designAuditRemark;
+
+    /**
+     * 设计审核时间
+     */
+    private LocalDateTime designAuditTime;
+
+    /**
+     * 设计审核人ID
+     */
+    private Long designAuditBy;
+
     // ==================== 经典案例 ====================
     /**
      * 是否经典案例：0-否，1-是

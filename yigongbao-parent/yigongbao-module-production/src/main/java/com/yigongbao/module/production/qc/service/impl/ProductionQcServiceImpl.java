@@ -67,6 +67,9 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
+        // 记录之前的状态，用于判断是否需要减少不合格计数
+        boolean wasFail = ProductStatusEnum.FAIL.getCode().equals(product.getStatus());
+
         product.setStatus(ProductStatusEnum.PASS.getCode());
         product.setQcResult(QcResultEnum.PASS.getCode());
         product.setQcTime(LocalDateTime.now());
@@ -75,13 +78,22 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             String udiCode = codeGeneratorService.generate(ProductionConstants.UDI_CODE);
             product.setUdiCode(udiCode);
             product.setUdiGenerateTime(LocalDateTime.now());
-            log.info("生成UDI码: productId={}, productNo={}, udiCode={}", productId, product.getProductNo(), udiCode);
+            log.info("生成UDI码: productId={}, productNo=, udiCode={}", productId, product.getProductNo(), udiCode);
         }
         productMapper.updateById(product);
-        recordMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getId, record.getId())
-                .setSql("qualified_count = qualified_count + 1"));
-        log.info("标记产品质检合格: productId={}, productNo={}", productId, product.getProductNo());
+
+        // 如果之前是不合格状态，需要同时减少不合格计数
+        if (wasFail) {
+            recordMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+                    .eq(ProductionRecordEntity::getId, record.getId())
+                    .setSql("qualified_count = qualified_count + 1, unqualified_count = unqualified_count - 1"));
+            log.info("标记产品质检合格（从不合格转为合格）: productId={}, productNo={}", productId, product.getProductNo());
+        } else {
+            recordMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+                    .eq(ProductionRecordEntity::getId, record.getId())
+                    .setSql("qualified_count = qualified_count + 1"));
+            log.info("标记产品质检合格: productId={}, productNo={}", productId, product.getProductNo());
+        }
     }
 
     /**

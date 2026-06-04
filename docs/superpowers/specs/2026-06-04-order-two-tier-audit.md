@@ -2,7 +2,100 @@
 
 > **创建日期**: 2026-06-04  
 > **设计目标**: 基于订单业务类型实现差异化审核流程（单级/两级），通过角色权限控制实现灵活的审核机制  
-> **版本**: v1.0
+> **版本**: v1.2
+
+---
+
+## 编码规范约束
+
+### 📖 必读文档
+
+**在开始开发前，必须完整阅读项目编码规范：**
+
+- **文档路径**：`.claude/rules/java-coding-standards.md`
+- **文档路径**：`.claude/rules/logging-standards.md`
+
+### ⚠️ 重点强调规范
+
+#### 1. 注释规范（强制）
+
+- ✅ **ServiceImpl 必须添加方法级注释和行级注释**
+- ✅ 公共方法必须使用 Javadoc 注释（功能、参数、返回值、异常）
+- ✅ 关键业务逻辑必须添加行内注释说明
+
+```java
+/**
+ * 审核订单（区域管理员/设计管理员）
+ * 
+ * @param orderId 订单ID
+ * @param operatorId 操作人ID
+ * @throws BusinessException 订单不存在、权限不足、状态不正确
+ */
+@Transactional(rollbackFor = Exception.class)
+public void auditPass(Long orderId, Long operatorId) {
+    // 获取当前用户角色
+    String roleCode = getCurrentUserRoleCode(operatorId);
+    
+    // 根据订单类型和角色判断审核逻辑
+    if ("11.3".equals(order.getBusinessType())) {
+        // 试用订单：两级审核
+        // ...
+    }
+}
+```
+
+#### 2. 日志规范（强制）
+
+- ✅ **Controller 层禁止输出日志**，由 ServiceImpl 负责
+- ✅ 关键操作必须记录日志：数据创建、修改、删除、状态变更
+- ✅ 异常必须记录日志：ERROR 级别，包含堆栈信息
+
+```java
+// ✅ 正确：记录关键操作
+log.info("区域审核通过: orderId={}, auditor={}", orderId, currentUserId);
+
+// ✅ 正确：记录异常
+log.error("订单审核失败: orderId={}, reason={}", orderId, e.getMessage(), e);
+
+// ❌ 错误：不记录简单查询
+// log.info("查询订单: orderId={}", orderId);
+```
+
+#### 3. 魔法值规范（强制）
+
+- ❌ **禁止直接使用数字 0/1/2 表示状态**
+- ✅ 必须使用常量或枚举
+
+```java
+// ❌ 错误：使用魔法值
+if (order.getRegionalAuditStatus() == 0) { ... }
+
+// ✅ 正确：使用常量
+public static final int AUDIT_STATUS_PENDING = 0;
+public static final int AUDIT_STATUS_PASSED = 1;
+public static final int AUDIT_STATUS_REJECTED = 2;
+
+if (order.getRegionalAuditStatus() == AUDIT_STATUS_PENDING) { ... }
+```
+
+#### 4. 异常处理规范（强制）
+
+- ✅ 优先使用 `ErrorCodeEnum` 抛出业务异常
+- ✅ 所有审核方法必须添加 `@Transactional(rollbackFor = Exception.class)`
+- ❌ Controller 层禁止 try-catch
+
+```java
+// ✅ 正确
+throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_AUDITED);
+throw new BusinessException(ErrorCodeEnum.REGIONAL_AUDIT_PENDING);
+```
+
+#### 5. 其他关键规范
+
+- ✅ 使用 `LambdaUpdateWrapper` 进行条件更新（并发控制）
+- ✅ 审核状态字段命名：`regionalAuditStatus`, `designAuditStatus`（驼峰命名）
+- ✅ 数据库字段命名：`regional_audit_status`, `design_audit_status`（下划线分隔）
+- ✅ 优先使用 Hutool 工具类（`StrUtil`, `CollUtil` 等）
 
 ---
 
@@ -115,8 +208,10 @@ ADD COLUMN design_audit_by BIGINT DEFAULT NULL
     COMMENT '设计管理员审核人ID';
 
 -- 索引优化（用于审核列表查询）
+-- 区域管理员查询索引：包含部门ID用于数据权限过滤
 CREATE INDEX idx_order_regional_audit 
-    ON order_main(business_type, regional_audit_status, status);
+    ON order_main(business_type, regional_audit_status, status, operator_dept_id);
+-- 设计管理员查询索引
 CREATE INDEX idx_order_design_audit 
     ON order_main(design_audit_status, status);
 ```
@@ -189,10 +284,12 @@ CREATE INDEX idx_order_design_audit
   ↓ 更新：designAuditStatus=2, designAuditRemark
 审核不通过(1040)
   ↓ [RESUBMIT]
+  ↓ 重置：regionalAuditStatus=0（防止修改内容绕过区域审核）
   ↓ 重置：designAuditStatus=0, designAuditRemark=null
-  ↓ 保持：regionalAuditStatus=1（区域审核仍然有效）
-待审核(1020) - 直接回到第二级审核
+待审核(1020) - 回到第一级审核（区域管理员重新审核）
 ```
+
+**说明**：设计管理员驳回后，业务员可能修改订单的关键业务信息（金额、产品、客户资质等），这些修改可能影响区域管理员的判断。为防止审核绕过风险，重新提交时需要区域管理员重新审核。
 
 ---
 
@@ -205,38 +302,60 @@ CREATE INDEX idx_order_design_audit
 | regional-manager | 仅 11.3（试用） | regionalAuditStatus=0 | 通过/驳回（一级审核）|
 | designer-manager | 全部订单 | 11.3: regionalAuditStatus=1<br>其他: 无前置 | 通过/驳回 |
 
+**角色冲突处理策略**：如果用户同时拥有两个角色，按优先级处理：`designer-manager` > `regional-manager`，直接使用设计管理员权限审核。
+
 ### 5.2 权限判断逻辑
 
 **OrderMainServiceImpl.auditPass() 核心逻辑**:
 
 ```java
-String currentRoleCode = StpUtil.getLoginIdAsString(); // 从SaToken获取角色
+// 获取当前用户角色
+Long currentUserId = StpUtil.getLoginIdAsLong();
+String roleCode = getCurrentUserRoleCode(currentUserId); // 辅助方法获取角色编码
 String businessType = order.getBusinessType();
 
 if ("11.3".equals(businessType)) {
     // 试用订单：两级审核
-    if ("regional-manager".equals(currentRoleCode)) {
-        // 第一级：区域管理员审核
-        if (order.getRegionalAuditStatus() != null && order.getRegionalAuditStatus() != 0) {
-            throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_AUDITED);
-        }
+    if ("regional-manager".equals(roleCode)) {
+        // 第一级：区域管理员审核（使用乐观锁防止并发）
+        LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(OrderMainEntity::getId, orderId)
+               .eq(OrderMainEntity::getRegionalAuditStatus, 0)  // 前置状态必须为待审核
+               .eq(OrderMainEntity::getVersion, order.getVersion());
+        
         order.setRegionalAuditStatus(1);
         order.setRegionalAuditTime(LocalDateTime.now());
         order.setRegionalAuditBy(currentUserId);
-        // 保持 PENDING_DATA_AUDIT 状态，等待设计管理员审核
-        updateById(order);
         
-    } else if ("designer-manager".equals(currentRoleCode)) {
-        // 第二级：设计管理员审核
-        if (order.getRegionalAuditStatus() == null || order.getRegionalAuditStatus() != 1) {
-            throw new BusinessException(ErrorCodeEnum.REGIONAL_AUDIT_NOT_PASSED);
-        }
-        if (order.getDesignAuditStatus() != 0) {
+        boolean success = update(order, wrapper);
+        if (!success) {
             throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_AUDITED);
         }
+        
+        log.info("区域审核通过: orderId=, auditor={}", orderId, currentUserId);
+        // 保持 PENDING_DATA_AUDIT 状态，等待设计管理员审核
+        
+    } else if ("designer-manager".equals(roleCode)) {
+        // 第二级：设计管理员审核
+        if (order.getRegionalAuditStatus() == null || order.getRegionalAuditStatus() != 1) {
+            throw new BusinessException(ErrorCodeEnum.REGIONAL_AUDIT_PENDING);
+        }
+        
+        LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(OrderMainEntity::getId, orderId)
+               .eq(OrderMainEntity::getDesignAuditStatus, 0)
+               .eq(OrderMainEntity::getVersion, order.getVersion());
+        
         order.setDesignAuditStatus(1);
         order.setDesignAuditTime(LocalDateTime.now());
         order.setDesignAuditBy(currentUserId);
+        
+        boolean success = update(order, wrapper);
+        if (!success) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_AUDITED);
+        }
+        
+        log.info("设计审核通过: orderId={}, auditor={}", orderId, currentUserId);
         // 执行状态流转：PENDING_DATA_AUDIT → DATA_AUDIT_PASSED
         flowFacade.executeFlow(orderId, FlowActionEnum.DATA_AUDIT_PASS, operator);
         
@@ -246,15 +365,25 @@ if ("11.3".equals(businessType)) {
     
 } else {
     // 业务/测试/代理订单：单级审核（仅设计管理员）
-    if (!"designer-manager".equals(currentRoleCode)) {
+    if (!"designer-manager".equals(roleCode)) {
         throw new BusinessException(ErrorCodeEnum.NO_AUDIT_PERMISSION);
     }
-    if (order.getDesignAuditStatus() != 0) {
-        throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_AUDITED);
-    }
+    
+    LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
+    wrapper.eq(OrderMainEntity::getId, orderId)
+           .eq(OrderMainEntity::getDesignAuditStatus, 0)
+           .eq(OrderMainEntity::getVersion, order.getVersion());
+    
     order.setDesignAuditStatus(1);
     order.setDesignAuditTime(LocalDateTime.now());
     order.setDesignAuditBy(currentUserId);
+    
+    boolean success = update(order, wrapper);
+    if (!success) {
+        throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_AUDITED);
+    }
+    
+    log.info("设计审核通过: orderId={}, auditor={}", orderId, currentUserId);
     // 执行状态流转
     flowFacade.executeFlow(orderId, FlowActionEnum.DATA_AUDIT_PASS, operator);
 }
@@ -263,47 +392,111 @@ if ("11.3".equals(businessType)) {
 **OrderMainServiceImpl.auditReject() 核心逻辑**:
 
 ```java
-String currentRoleCode = StpUtil.getLoginIdAsString();
+Long currentUserId = StpUtil.getLoginIdAsLong();
+String roleCode = getCurrentUserRoleCode(currentUserId);
 String businessType = order.getBusinessType();
 
 if ("11.3".equals(businessType)) {
     // 试用订单
-    if ("regional-manager".equals(currentRoleCode)) {
-        // 区域管理员驳回
-        if (order.getRegionalAuditStatus() != 0) {
-            throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_AUDITED);
-        }
+    if ("regional-manager".equals(roleCode)) {
+        // 区域管理员驳回（使用乐观锁）
+        LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(OrderMainEntity::getId, orderId)
+               .eq(OrderMainEntity::getRegionalAuditStatus, 0)
+               .eq(OrderMainEntity::getVersion, order.getVersion());
+        
         order.setRegionalAuditStatus(2);
         order.setRegionalAuditRemark(auditRemark);
         order.setRegionalAuditTime(LocalDateTime.now());
         order.setRegionalAuditBy(currentUserId);
         
-    } else if ("designer-manager".equals(currentRoleCode)) {
-        // 设计管理员驳回
-        if (order.getRegionalAuditStatus() != 1) {
-            throw new BusinessException(ErrorCodeEnum.REGIONAL_AUDIT_NOT_PASSED);
-        }
-        if (order.getDesignAuditStatus() != 0) {
+        boolean success = update(order, wrapper);
+        if (!success) {
             throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_AUDITED);
         }
+        
+        log.warn("区域审核驳回: orderId={}, auditor={}, reason={}", orderId, currentUserId, auditRemark);
+        
+    } else if ("designer-manager".equals(roleCode)) {
+        // 设计管理员驳回
+        if (order.getRegionalAuditStatus() != 1) {
+            throw new BusinessException(ErrorCodeEnum.REGIONAL_AUDIT_PENDING);
+        }
+        
+        LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(OrderMainEntity::getId, orderId)
+               .eq(OrderMainEntity::getDesignAuditStatus, 0)
+               .eq(OrderMainEntity::getVersion, order.getVersion());
+        
         order.setDesignAuditStatus(2);
         order.setDesignAuditRemark(auditRemark);
         order.setDesignAuditTime(LocalDateTime.now());
         order.setDesignAuditBy(currentUserId);
+        
+        boolean success = update(order, wrapper);
+        if (!success) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_AUDITED);
+        }
+        
+        log.warn("设计审核驳回: orderId={}, auditor={}, reason={}", orderId, currentUserId, auditRemark);
+    } else {
+        throw new BusinessException(ErrorCodeEnum.NO_AUDIT_PERMISSION);
     }
 } else {
     // 其他订单：仅设计管理员
-    if (!"designer-manager".equals(currentRoleCode)) {
+    if (!"designer-manager".equals(roleCode)) {
         throw new BusinessException(ErrorCodeEnum.NO_AUDIT_PERMISSION);
     }
+    
+    LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
+    wrapper.eq(OrderMainEntity::getId, orderId)
+           .eq(OrderMainEntity::getDesignAuditStatus, 0)
+           .eq(OrderMainEntity::getVersion, order.getVersion());
+    
     order.setDesignAuditStatus(2);
     order.setDesignAuditRemark(auditRemark);
     order.setDesignAuditTime(LocalDateTime.now());
     order.setDesignAuditBy(currentUserId);
+    
+    boolean success = update(order, wrapper);
+    if (!success) {
+        throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_AUDITED);
+    }
+    
+    log.warn("设计审核驳回: orderId={}, auditor={}, reason={}", orderId, currentUserId, auditRemark);
 }
 
 // 执行状态流转：PENDING_DATA_AUDIT → DATA_AUDIT_REJECTED
 flowFacade.executeFlow(orderId, FlowActionEnum.DATA_AUDIT_REJECT, operator);
+```
+
+### 5.3 辅助方法
+
+```java
+/**
+ * 获取当前用户的审核角色编码
+ * 优先级：designer-manager > regional-manager
+ */
+private String getCurrentUserRoleCode(Long userId) {
+    // 从会话中获取角色编码（登录时已存入）
+    String roleCode = (String) StpUtil.getSession().get("roleCode");
+    if (StrUtil.isNotBlank(roleCode)) {
+        return roleCode;
+    }
+    
+    // 兜底：查询数据库（生产环境不应走到这里）
+    SysUser user = userService.getById(userId);
+    if (user == null) {
+        throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+    }
+    
+    SysRole role = roleService.getById(user.getRoleId());
+    if (role == null) {
+        throw new BusinessException(ErrorCodeEnum.ROLE_NOT_FOUND);
+    }
+    
+    return role.getRoleCode();
+}
 ```
 
 ---
@@ -313,15 +506,17 @@ flowFacade.executeFlow(orderId, FlowActionEnum.DATA_AUDIT_REJECT, operator);
 ### 6.1 业务规则
 
 - **试用订单**：
-  - 区域管理员驳回（regionalAuditStatus=2）：重置 regionalAuditStatus=0，回到第一级审核
-  - 设计管理员驳回（designAuditStatus=2）：重置 designAuditStatus=0，保持 regionalAuditStatus=1，直接回到第二级审核
+  - 区域管理员驳回（regionalAuditStatus=2）：重置区域审核状态，回到第一级审核
+  - 设计管理员驳回（designAuditStatus=2）：**同时重置区域和设计审核状态**，回到第一级审核
+  - **原因**：业务员重新提交时可能修改订单关键信息（金额、产品、客户资质等），必须由区域管理员重新评估，防止审核绕过风险
 
 - **其他订单**：
-  - 设计管理员驳回（designAuditStatus=2）：重置 designAuditStatus=0
+  - 设计管理员驳回（designAuditStatus=2）：重置设计审核状态
 
 ### 6.2 实现逻辑
 
 ```java
+@Transactional(rollbackFor = Exception.class)
 public void resubmit(Long orderId) {
     OrderMainEntity order = getById(orderId);
     
@@ -333,20 +528,27 @@ public void resubmit(Long orderId) {
     String businessType = order.getBusinessType();
     
     if ("11.3".equals(businessType)) {
-        // 试用订单
+        // 试用订单：所有驳回场景都需要重置所有审核状态
         if (order.getRegionalAuditStatus() != null && order.getRegionalAuditStatus() == 2) {
-            // 区域管理员驳回 → 重置区域审核状态
+            // 区域管理员驳回 → 重置区域审核相关字段
             order.setRegionalAuditStatus(0);
             order.setRegionalAuditRemark(null);
             order.setRegionalAuditTime(null);
             order.setRegionalAuditBy(null);
+            log.info("重新提交订单（区域驳回）: orderId={}, 回到区域审核", orderId);
+            
         } else if (order.getDesignAuditStatus() == 2) {
-            // 设计管理员驳回 → 只重置设计审核状态
+            // 设计管理员驳回 → 重置所有审核相关字段（防止修改内容绕过区域审核）
+            order.setRegionalAuditStatus(0);
+            order.setRegionalAuditRemark(null);
+            order.setRegionalAuditTime(null);
+            order.setRegionalAuditBy(null);
+            
             order.setDesignAuditStatus(0);
             order.setDesignAuditRemark(null);
             order.setDesignAuditTime(null);
             order.setDesignAuditBy(null);
-            // regionalAuditStatus 保持 =1，无需重新区域审核
+            log.info("重新提交订单（设计驳回）: orderId={}, 回到区域审核（防止绕过审核）", orderId);
         }
     } else {
         // 其他订单
@@ -355,8 +557,11 @@ public void resubmit(Long orderId) {
             order.setDesignAuditRemark(null);
             order.setDesignAuditTime(null);
             order.setDesignAuditBy(null);
+            log.info("重新提交订单: orderId={}, 回到设计审核", orderId);
         }
     }
+    
+    updateById(order);
     
     // 执行状态流转：DATA_AUDIT_REJECTED → PENDING_DATA_AUDIT
     FlowContext context = FlowContext.builder()
@@ -600,19 +805,19 @@ private String calculateAuditStage(OrderMainEntity order) {
  * 区域管理员查询待审核订单列表
  */
 public IPage<OrderVO> listRegionalAuditOrders(OrderQueryDTO dto) {
-    LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
+    // 从会话获取部门ID（登录时已存入，避免每次查库）
+    Long deptId = (Long) StpUtil.getSession().get("deptId");
+    if (deptId == null) {
+        throw new BusinessException(ErrorCodeEnum.SESSION_EXPIRED);
+    }
     
-    // 筛选条件
+    LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
     wrapper.eq(OrderMainEntity::getBusinessType, "11.3")  // 仅试用订单
            .eq(OrderMainEntity::getStatus, FlowStatusEnum.PENDING_DATA_AUDIT.getCode())
            .eq(OrderMainEntity::getRegionalAuditStatus, 0)  // 待区域审核
+           .eq(OrderMainEntity::getOperatorDeptId, deptId)  // 数据权限：本部门
            .eq(OrderMainEntity::getIsDeleted, 0)
            .orderByDesc(OrderMainEntity::getCreateTime);
-    
-    // 数据权限：仅查询本部门的订单
-    Long currentUserId = StpUtil.getLoginIdAsLong();
-    SysUser currentUser = userService.getById(currentUserId);
-    wrapper.eq(OrderMainEntity::getOperatorDeptId, currentUser.getDeptId());
     
     IPage<OrderMainEntity> page = page(new Page<>(dto.getCurrent(), dto.getSize()), wrapper);
     return page.convert(this::convertToVO);
@@ -658,51 +863,176 @@ public enum ErrorCodeEnum {
      * 审核相关错误码（650-659）
      */
     ORDER_ALREADY_AUDITED(650, "该订单已审核，无法重复操作"),
-    REGIONAL_AUDIT_NOT_PASSED(651, "区域管理员尚未审核通过，无法操作"),
-    NO_AUDIT_PERMISSION(652, "无权限审核该订单"),
-    AUDIT_STATUS_ERROR(653, "审核状态异常"),
-    ORDER_STATUS_ERROR(654, "订单状态不正确，无法执行此操作");
+    REGIONAL_AUDIT_PENDING(651, "区域管理员尚未审核，无法操作"),
+    REGIONAL_AUDIT_REJECTED(652, "区域管理员已驳回该订单"),
+    NO_AUDIT_PERMISSION(653, "无权限审核该订单"),
+    AUDIT_STATUS_ERROR(654, "审核状态异常"),
+    ORDER_STATUS_ERROR(655, "订单状态不正确，无法执行此操作"),
+    SESSION_EXPIRED(656, "会话已过期，请重新登录"),
+    USER_NOT_FOUND(657, "用户不存在"),
+    ROLE_NOT_FOUND(658, "角色不存在");
 }
 ```
 
 ---
 
-## 九、实施要点
+## 九、事务管理与并发控制
 
-### 9.1 核心原则
+### 9.1 事务管理
+
+所有审核操作必须使用 `@Transactional` 注解保证事务一致性：
+
+```java
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class OrderMainServiceImpl extends ServiceImpl<OrderMapper, OrderEntity> implements IOrderService {
+    
+    @Transactional(rollbackFor = Exception.class)
+    public void auditPass(Long orderId, Long operatorId) {
+        // 1. 更新审核状态字段
+        // 2. 调用 flowFacade.executeFlow()
+        // 两步必须在同一事务中，任一失败则全部回滚
+    }
+    
+    @Transactional(rollbackFor = Exception.class)
+    public void auditReject(Long orderId, String remark, Long operatorId) {
+        // 同上
+    }
+    
+    @Transactional(rollbackFor = Exception.class)
+    public void resubmit(Long orderId) {
+        // 同上
+    }
+}
+```
+
+### 9.2 并发控制策略
+
+使用 **乐观锁 + 前置状态检查** 防止并发审核：
+
+```java
+// 方案：MyBatis-Plus UpdateWrapper 前置条件检查
+LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
+wrapper.eq(OrderMainEntity::getId, orderId)
+       .eq(OrderMainEntity::getRegionalAuditStatus, 0)  // 前置状态必须为待审核
+       .eq(OrderMainEntity::getVersion, order.getVersion());  // 乐观锁
+
+order.setRegionalAuditStatus(1);
+boolean success = update(order, wrapper);
+if (!success) {
+    throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_AUDITED);
+}
+```
+
+**说明**：
+- `version` 字段由 MyBatis-Plus 自动管理，更新时自动递增
+- 前置状态检查确保只有待审核状态才能执行审核操作
+- 两者结合可有效防止并发重复审核
+
+---
+
+## 十、会话管理
+
+### 10.1 登录时存储用户信息
+
+在用户登录成功后，需要将角色编码和部门ID存入 SaToken 会话，避免后续每次查询数据库：
+
+```java
+@Service
+public class AuthServiceImpl implements IAuthService {
+    
+    @Override
+    public LoginVO login(LoginDTO dto) {
+        // 1. 验证用户名密码
+        SysUser user = validateUser(dto);
+        
+        // 2. 查询用户角色
+        SysRole role = roleService.getById(user.getRoleId());
+        
+        // 3. 登录并存储会话信息
+        StpUtil.login(user.getId());
+        StpUtil.getSession().set("roleCode", role.getRoleCode());
+        StpUtil.getSession().set("deptId", user.getDeptId());
+        StpUtil.getSession().set("userName", user.getUserName());
+        
+        // 4. 返回登录信息
+        return buildLoginVO(user, role);
+    }
+}
+```
+
+### 10.2 审核时获取会话信息
+
+```java
+// 获取角色编码（避免查库）
+String roleCode = (String) StpUtil.getSession().get("roleCode");
+
+// 获取部门ID（用于数据权限过滤）
+Long deptId = (Long) StpUtil.getSession().get("deptId");
+```
+
+**优势**：
+- 减少数据库查询，提升性能
+- 会话信息由 SaToken 管理，自动处理过期和清理
+- 登录一次，全局可用
+
+---
+
+## 十一、实施要点
+
+### 11.1 核心原则
 
 1. **不改变状态机结构**：保持 FlowStatusEnum 的 4 个审核状态不变
 2. **不修改 Flow 模块**：FlowFacade、FlowActionEnum 保持不变
 3. **不影响现有功能**：非试用订单的审核流程完全兼容
+4. **事务一致性优先**：审核状态更新和流程流转必须在同一事务中
+5. **并发控制严格**：使用乐观锁防止重复审核
 
-### 9.2 关键实现文件
+### 11.2 关键实现文件
 
-| 文件 | 修改内容 |
-|------|---------|
-| OrderMainEntity.java | 新增 8 个审核字段 |
-| OrderVO.java | 新增审核进度展示字段 |
-| OrderMainServiceImpl.java | 修改 auditPass/auditReject/resubmit 方法 |
-| OrderConvert.java | 新增审核信息转换逻辑 |
-| ErrorCodeEnum.java | 新增 5 个审核相关错误码 |
-| sql/migration/*.sql | 数据库字段迁移脚本 |
+| 文件 | 修改内容 | 关键点 |
+|------|---------|-------|
+| OrderMainEntity.java | 新增 8 个审核字段 | 确保与 BaseEntity 正确继承 |
+| OrderVO.java | 新增审核进度展示字段 | auditProgress, auditStage, AuditInfo |
+| OrderMainServiceImpl.java | 修改 auditPass/auditReject/resubmit | 添加 @Transactional，使用 UpdateWrapper |
+| OrderConvert.java | 新增审核信息转换逻辑 | 计算 auditProgress 和 auditStage |
+| AuthServiceImpl.java | 登录时存储会话信息 | roleCode, deptId 存入 Session |
+| ErrorCodeEnum.java | 新增 9 个审核相关错误码 | 651-658 |
+| sql/migration/*.sql | 数据库字段迁移脚本 | 包含索引和历史数据处理 |
 
 ### 9.3 数据迁移注意事项
 
 ```sql
--- 为现有订单初始化审核状态字段
+-- 1. 为所有已通过审核的订单（包括设计阶段、生产阶段等）设置设计审核状态为已通过
 UPDATE order_main 
-SET design_audit_status = CASE 
-    WHEN status = 1030 THEN 1  -- 已审核通过
-    WHEN status = 1040 THEN 2  -- 已驳回
-    ELSE 0  -- 待审核
-END
-WHERE status IN (1020, 1030, 1040);
+SET design_audit_status = 1
+WHERE status >= 1030 AND status != 1040 AND is_deleted = 0;
 
--- 试用订单：如果已审核通过，默认认为区域审核和设计审核都已通过
+-- 2. 为已驳回的订单设置设计审核状态为已驳回
+UPDATE order_main 
+SET design_audit_status = 2
+WHERE status = 1040 AND is_deleted = 0;
+
+-- 3. 为待审核的订单设置设计审核状态为待审核
+UPDATE order_main 
+SET design_audit_status = 0
+WHERE status = 1020 AND is_deleted = 0;
+
+-- 4. 试用订单：如果已通过审核，区域审核也标记为已通过
 UPDATE order_main 
 SET regional_audit_status = 1
 WHERE business_type = '11.3' 
-  AND status = 1030;
+  AND status >= 1030 
+  AND status != 1040
+  AND is_deleted = 0;
+
+-- 5. 试用订单：如果待审核，区域审核标记为待审核
+UPDATE order_main 
+SET regional_audit_status = 0
+WHERE business_type = '11.3' 
+  AND status = 1020
+  AND is_deleted = 0;
 ```
 
 ---
@@ -814,7 +1144,18 @@ WHERE business_type = '11.3'
 
 ---
 
-**文档版本**: v1.0  
+## 十三、修订记录
+
+| 版本 | 日期 | 修订内容 | 修订人 |
+|------|------|---------|--------|
+| v1.0 | 2026-06-04 | 初版创建 | Kiro AI |
+| v1.1 | 2026-06-04 | 修复关键问题：<br>1. 修正角色识别逻辑（使用正确API）<br>2. 添加事务管理和并发控制<br>3. 优化数据迁移SQL脚本<br>4. 完善索引设计（添加operator_dept_id）<br>5. 添加会话管理说明<br>6. 拆分错误码定义<br>7. 优化查询性能（使用会话缓存） | Kiro AI |
+| v1.2 | 2026-06-04 | 调整重新提交逻辑（采用方案A）：<br>1. 设计管理员驳回后，重置所有审核状态<br>2. 回到区域审核环节，防止修改内容绕过审核<br>3. 更新业务流程说明和实现代码<br>**原因**：防止业务员在重新提交时修改关键业务信息（金额、产品、客户资质等）绕过区域管理员审核 | Kiro AI |
+
+---
+
+**文档版本**: v1.2  
 **创建日期**: 2026-06-04  
+**最后更新**: 2026-06-04  
 **作者**: Kiro AI  
 **审核状态**: 待审核
