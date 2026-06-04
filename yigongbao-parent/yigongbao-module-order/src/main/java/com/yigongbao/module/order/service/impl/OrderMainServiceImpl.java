@@ -390,31 +390,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         // 更新订单
         updateById(entity);
         log.info("更新订单: orderId={}", id);
-
-        // 自动流转：驳回后修改订单自动重新提交审核
-        Long currentUserId = getCurrentUserId();
-        UserEntity currentUser = userService.getById(currentUserId);
-        String operatorName = currentUser != null ? currentUser.getRealName() : null;
-
-        if (FlowStatusEnum.DATA_AUDIT_REJECTED.getValue().equals(oldStatus)) {
-            TransitionResult result = flowFacade.executeFlow(
-                    id, FlowActionEnum.RESUBMIT,
-                    new FlowOperator(currentUserId, operatorName, "修改后自动重新提交"));
-            entity.setPhase(result.getTargetPhase());
-            entity.setStatus(result.getFinalStatus());
-            updateById(entity);
-            log.info("订单修改后自动重新提交审核: orderId={}, {} -> {}", id,
-                    FlowStatusEnum.DATA_AUDIT_REJECTED.getValue(), result.getFinalStatus());
-        } else if (FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue().equals(oldStatus)) {
-            TransitionResult result = flowFacade.executeFlow(
-                    id, FlowActionEnum.SUBMIT_DESIGN,
-                    new FlowOperator(currentUserId, operatorName, "修改后自动重新提交设计审核"));
-            entity.setPhase(result.getTargetPhase());
-            entity.setStatus(result.getFinalStatus());
-            updateById(entity);
-            log.info("订单修改后自动重新提交设计审核: orderId={}, {} -> {}", id,
-                    FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue(), result.getFinalStatus());
-        }
     }
 
     /**
@@ -682,6 +657,49 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         entity.setStatus(result.getFinalStatus());
         updateById(entity);
         log.info("取消订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
+    }
+
+    /**
+     * 手动完成订单（仅限不需要实体交付的订单）
+     * 允许将设计完成的非实体交付订单直接标记为完成
+     *
+     * @param orderId 订单ID
+     * @throws BusinessException 订单不存在、状态错误或需要实体交付
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void manualCompleteOrder(Long orderId) {
+        Long currentUserId = getCurrentUserId();
+        // 校验订单存在
+        OrderMainEntity entity = getById(orderId);
+        if (entity == null) {
+            log.warn("订单不存在: orderId={}", orderId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        // 校验必须是不需要实体交付的订单
+        if (!Objects.equals(entity.getNeedsPhysicalDelivery(), StatusConstants.NO)) {
+            log.warn("订单需要实体交付，不允许手动完成: orderId={}, needsPhysicalDelivery={}",
+                orderId, entity.getNeedsPhysicalDelivery());
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "只允许不需要实体交付的订单手动完成");
+        }
+        // 校验状态必须为设计完成
+        if (!Objects.equals(entity.getStatus(), FlowStatusEnum.DESIGN_COMPLETED.getValue())) {
+            log.warn("订单状态不是设计完成，不允许手动完成: orderId={}, status={}",
+                orderId, entity.getStatus());
+            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR);
+        }
+        // 获取当前用户姓名
+        UserEntity currentUser = userService.getById(currentUserId);
+        String operatorName = currentUser != null ? currentUser.getRealName() : null;
+        // 通过 FlowFacade 执行完成动作
+        TransitionResult result = flowFacade.executeFlow(
+                orderId, FlowActionEnum.COMPLETE, new FlowOperator(currentUserId, operatorName, "手动完成"));
+        // 更新订单的阶段和状态
+        entity.setPhase(result.getTargetPhase());
+        entity.setStatus(result.getFinalStatus());
+        updateById(entity);
+        log.info("手动完成订单: orderId={}, {} -> {}, operator={}",
+            orderId, FlowStatusEnum.DESIGN_COMPLETED.getValue(), result.getFinalStatus(), currentUserId);
     }
 
     // ==================== 创建操作 ====================

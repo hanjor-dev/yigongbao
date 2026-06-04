@@ -60,27 +60,21 @@ public interface DesignWorkorderService {
     void startDesign(Long orderId);
 
     /**
-     * 驳回后继续修改
-     * 状态流转：设计审核不通过(2060) → 设计中(2020)
-     *
-     * @param orderId 订单ID
-     */
-    void continueDesign(Long orderId);
-
-    /**
-     * 提交设计审核
-     * 状态流转：设计中(2020) → 设计审核中(2040)
-     * 提交前执行完整校验（7项），线下模式下额外校验修订版文件
-     *
-     * @param orderId 订单ID
-     */
-    void submitDesign(Long orderId);
-
-    /**
      * 查询订单设计师分配历史
      *
      * @param orderId 订单ID
      * @return 分配历史列表
      */
     java.util.List<com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO> listAssignmentHistory(Long orderId);
+
+    /**
+     * 完成设计
+     * 根据 needsPhysicalDelivery 执行不同的校验：
+     * - 需要实体交付：校验数据包、打印信息、指令单、图纸及确认状态
+     * - 不需要实体交付：只校验 STL 重建模型
+     *
+     * @param orderId 订单ID
+     * @throws BusinessException 订单不存在或状态错误或校验失败
+     */
+    void completeDesign(Long orderId);
 }

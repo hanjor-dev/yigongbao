@@ -219,7 +219,6 @@ public class FlowStateMachineServiceImpl implements FlowStateMachineService {
         switch (action) {
             case DATA_AUDIT_REJECT -> ctx.incrementAuditReject();
             case REWORK -> ctx.incrementRework();
-            case DESIGN_REVIEW_REJECT -> ctx.incrementDesignReject();
             default -> { }
         }
     }

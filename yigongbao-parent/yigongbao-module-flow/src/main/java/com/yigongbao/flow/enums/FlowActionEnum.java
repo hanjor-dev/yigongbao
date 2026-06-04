@@ -65,6 +65,11 @@ public enum FlowActionEnum {
      */
     COMPLETE_DESIGN("COMPLETE_DESIGN", "完成设计"),
 
+    /**
+     * 完成设计
+     */
+    COMPLETE_DESIGN("COMPLETE_DESIGN", "完成设计"),
+
     // ==================== 打印阶段动作 ====================
     /**
      * 开始打印

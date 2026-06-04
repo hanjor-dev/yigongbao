@@ -158,9 +158,14 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             return new PhaseAndStatus(FlowPhaseEnum.DESIGN, FlowStatusEnum.PENDING_DESIGN);
         }
 
-        // 设计审核通过 → 停留在设计阶段，等待生产员下载数据包后再推进
-        if (targetStatus == FlowStatusEnum.DESIGN_REVIEW_PASSED) {
-            return new PhaseAndStatus(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_REVIEW_PASSED);
+        // 设计完成 → 根据 needsPhysicalDelivery 决定下一阶段
+        if (targetStatus == FlowStatusEnum.DESIGN_COMPLETED) {
+            boolean needsPhysical = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
+            if (needsPhysical) {
+                return new PhaseAndStatus(FlowPhaseEnum.PRINT, FlowStatusEnum.PENDING_PRINT);
+            } else {
+                return new PhaseAndStatus(FlowPhaseEnum.CONFIRM, FlowStatusEnum.AWAITING_CONFIRM);
+            }
         }
 
         // 打印完成 → 医疗器械进入后处理，非医疗器械直接进入质检
@@ -225,7 +230,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      */
     public static boolean isPhaseChangeAction(FlowActionEnum action) {
         return switch (action) {
-            case DATA_AUDIT_PASS, DESIGN_REVIEW_PASS, COMPLETE_PRINT,
+            case DATA_AUDIT_PASS, COMPLETE_DESIGN, COMPLETE_PRINT,
                  COMPLETE_POST_PROCESSING, QC_PASS, REWORK_COMPLETE,
                  COMPLETE_WAREHOUSE_IN, USER_CONFIRM, REWORK_TO_PRINT -> true;
             default -> false;

@@ -66,18 +66,8 @@ public class FlowStatusTransitionRules {
         transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_IN_PROGRESS),
                 Set.of(FlowStatusEnum.DESIGN_COMPLETED));
 
+        // DESIGN_COMPLETED 可跨阶段流转
         transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_COMPLETED),
-                Set.of(FlowStatusEnum.DESIGN_REVIEWING));
-
-        transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_REVIEWING),
-                Set.of(FlowStatusEnum.DESIGN_REVIEW_PASSED, FlowStatusEnum.DESIGN_REVIEW_REJECTED));
-
-        // 审核驳回后可重新开始设计或重新提交审核
-        transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_REVIEW_REJECTED),
-                Set.of(FlowStatusEnum.DESIGN_IN_PROGRESS, FlowStatusEnum.DESIGN_REVIEWING));
-
-        // DESIGN_REVIEW_PASSED 为不可见状态，自动推进阶段；合法跳转由 decideNextPhaseAndStatus 决定
-        transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_REVIEW_PASSED),
                 Set.of(FlowStatusEnum.PENDING_PRINT, FlowStatusEnum.AWAITING_CONFIRM));
 
         // ==================== 打印阶段状态转换（3010-3090）====================
@@ -153,11 +143,8 @@ public class FlowStatusTransitionRules {
 
             case DESIGN -> switch (status) {
                 case PENDING_DESIGN -> List.of(FlowActionEnum.START_DESIGN);
-                case DESIGN_IN_PROGRESS -> List.of(FlowActionEnum.SUBMIT_DESIGN);
-                case DESIGN_COMPLETED -> List.of(FlowActionEnum.SUBMIT_DESIGN);
-                case DESIGN_REVIEWING -> List.of(FlowActionEnum.DESIGN_REVIEW_PASS, FlowActionEnum.DESIGN_REVIEW_REJECT);
-                case DESIGN_REVIEW_REJECTED -> List.of(FlowActionEnum.CONTINUE_DESIGN, FlowActionEnum.SUBMIT_DESIGN);
-                case DESIGN_REVIEW_PASSED -> List.of(); // 等待下载数据包后聚合流转
+                case DESIGN_IN_PROGRESS -> List.of(FlowActionEnum.COMPLETE_DESIGN);
+                case DESIGN_COMPLETED -> List.of();
                 default -> List.of();
             };
 
@@ -259,10 +246,7 @@ public class FlowStatusTransitionRules {
 
             // 设计阶段动作
             case START_DESIGN -> FlowStatusEnum.DESIGN_IN_PROGRESS.getValue();
-            case SUBMIT_DESIGN -> FlowStatusEnum.DESIGN_REVIEWING.getValue();
-            case DESIGN_REVIEW_PASS -> FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue();
-            case DESIGN_REVIEW_REJECT -> FlowStatusEnum.DESIGN_REVIEW_REJECTED.getValue();
-            case CONTINUE_DESIGN -> FlowStatusEnum.DESIGN_IN_PROGRESS.getValue();
+            case COMPLETE_DESIGN -> FlowStatusEnum.DESIGN_COMPLETED.getValue();
 
             // 打印阶段动作
             case START_PRINT -> FlowStatusEnum.PRINTING.getValue();
@@ -356,8 +340,7 @@ public class FlowStatusTransitionRules {
                     FlowStatusEnum.DATA_AUDIT_PASSED, FlowStatusEnum.DATA_AUDIT_REJECTED);
 
             case DESIGN -> Set.of(FlowStatusEnum.PENDING_DESIGN, FlowStatusEnum.DESIGN_IN_PROGRESS,
-                    FlowStatusEnum.DESIGN_COMPLETED, FlowStatusEnum.DESIGN_REVIEWING,
-                    FlowStatusEnum.DESIGN_REVIEW_REJECTED);
+                    FlowStatusEnum.DESIGN_COMPLETED);
 
             case PRINT -> needsProduction
                     ? Set.of(FlowStatusEnum.PENDING_PRINT, FlowStatusEnum.PRINTING, FlowStatusEnum.PRINT_COMPLETED)

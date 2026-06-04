@@ -299,10 +299,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
-        // 更新本条流转卡状态：DESIGN_REVIEW_PASSED → PENDING_PRINT（幂等）
+        // 更新本条流转卡状态：DESIGN_COMPLETED → PENDING_PRINT（幂等）
         baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
-                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue())
+                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_COMPLETED.getValue())
                 .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue()));
 
         // 回写订单操作人信息（当前生产员）
@@ -319,7 +319,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         log.info("下载设计数据包，流转卡推进到待打印: orderId={}, designPackageId={}", order.getId(), designPackageId);
 
         // 聚合逻辑：检查是否所有流转卡都已下载，如果是则推进订单状态
-        if (order.getStatus().equals(FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue())) {
+        if (order.getStatus().equals(FlowStatusEnum.DESIGN_COMPLETED.getValue())) {
             long totalActive = count(new LambdaQueryWrapper<ProductionRecordEntity>()
                     .eq(ProductionRecordEntity::getOrderId, order.getId())
                     .notIn(ProductionRecordEntity::getStatus,

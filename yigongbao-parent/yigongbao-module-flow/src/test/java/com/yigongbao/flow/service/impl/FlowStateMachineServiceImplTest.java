@@ -207,46 +207,6 @@ class FlowStateMachineServiceImplTest {
     @Nested
     @DisplayName("不可见状态自动吸收（核心）")
     class InvisibleStatusTests {
-
-        @Test
-        @DisplayName("DESIGN_REVIEW_PASS: phase=20,status=2040,needsPhysicalDelivery=0 → phase=70,finalStatus=7010")
-        void designReviewPass_noDelivery_shouldAbsorbAndAdvanceToConfirm() {
-            // DESIGN_REVIEWING(2040) 在 DESIGN 阶段允许 DESIGN_REVIEW_PASS
-            testOrder.setPhase(20);
-            testOrder.setStatus(2040);
-            testOrder.setNeedsPhysicalDelivery(0);
-            when(flowOrderService.getById(1L)).thenReturn(testOrder);
-            when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
-
-            TransitionResult result = flowStateMachineService.executeTransition(
-                    1L, FlowActionEnum.DESIGN_REVIEW_PASS, testOperator);
-
-            assertTrue(result.isPhaseChanged());
-            assertEquals(70, result.getTargetPhase()); // CONFIRM 阶段
-            assertEquals(2050, result.getTargetStatus()); // DESIGN_REVIEW_PASSED（不可见）
-            assertEquals(7010, result.getInitialStatus()); // AWAITING_CONFIRM
-            assertEquals(7010, result.getFinalStatus());
-        }
-
-        @Test
-        @DisplayName("DESIGN_REVIEW_PASS: phase=20,status=2040,needsPhysicalDelivery=1 → phase=30,finalStatus=3010")
-        void designReviewPass_needDelivery_shouldAdvanceToPrint() {
-            // DESIGN_REVIEWING(2040) 在 DESIGN 阶段允许 DESIGN_REVIEW_PASS
-            testOrder.setPhase(20);
-            testOrder.setStatus(2040);
-            testOrder.setNeedsPhysicalDelivery(1);
-            when(flowOrderService.getById(1L)).thenReturn(testOrder);
-            when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
-
-            TransitionResult result = flowStateMachineService.executeTransition(
-                    1L, FlowActionEnum.DESIGN_REVIEW_PASS, testOperator);
-
-            assertTrue(result.isPhaseChanged());
-            assertEquals(30, result.getTargetPhase()); // PRINT 阶段
-            assertEquals(2050, result.getTargetStatus()); // DESIGN_REVIEW_PASSED（不可见）
-            assertEquals(3010, result.getInitialStatus()); // PENDING_PRINT
-            assertEquals(3010, result.getFinalStatus());
-        }
     }
 
     // ==================== 打印完成推进阶段测试 ====================

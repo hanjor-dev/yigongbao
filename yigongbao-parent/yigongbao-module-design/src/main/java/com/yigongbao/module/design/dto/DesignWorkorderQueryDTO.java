@@ -25,7 +25,7 @@ public class DesignWorkorderQueryDTO {
     /** 患者姓名（模糊匹配） */
     private String patientName;
 
-    /** 状态（精确匹配，如 2010/2020/2040/2060） */
+    /** 状态（精确匹配，如 2010/2020/2030） */
     private Integer status;
 
     /** 是否加急（0=否，1=是） */

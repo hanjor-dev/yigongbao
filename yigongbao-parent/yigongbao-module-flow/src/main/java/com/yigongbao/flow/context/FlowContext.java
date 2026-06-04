@@ -11,7 +11,6 @@ import lombok.Data;
  * 使用场景：
  * - 记录审核驳回次数，防止无限循环提交-驳回
  * - 记录返工次数，防止质检反复不合格导致无限返工
- * - 记录设计审核驳回次数，防止反复驳回设计
  *
  * 上下文从订单历史中重建，在 executeTransition 执行时校验
  *
@@ -32,11 +31,6 @@ public class FlowContext {
     private int reworkCount;
 
     /**
-     * 设计审核驳回次数
-     */
-    private int designRejectCount;
-
-    /**
      * 最大允许的审核驳回次数
      */
     private static final int MAX_AUDIT_REJECT = 10;
@@ -45,11 +39,6 @@ public class FlowContext {
      * 最大允许的返工次数
      */
     private static final int MAX_REWORK = 5;
-
-    /**
-     * 最大允许的设计审核驳回次数
-     */
-    private static final int MAX_DESIGN_REJECT = 5;
 
     /**
      * 递增审核驳回计数
@@ -68,14 +57,6 @@ public class FlowContext {
     }
 
     /**
-     * 递增设计审核驳回计数
-     * 当设计审核被驳回时调用
-     */
-    public void incrementDesignReject() {
-        this.designRejectCount++;
-    }
-
-    /**
      * 校验是否超出循环次数上限
      *
      * @throws BusinessException 超出上限时抛出
@@ -90,11 +71,6 @@ public class FlowContext {
             throw new BusinessException(
                     ErrorCodeEnum.ORDER_EXCESSIVE_REWORK,
                     String.valueOf(MAX_REWORK));
-        }
-        if (designRejectCount >= MAX_DESIGN_REJECT) {
-            throw new BusinessException(
-                    ErrorCodeEnum.ORDER_EXCESSIVE_DESIGN_REJECT,
-                    String.valueOf(MAX_DESIGN_REJECT));
         }
     }
 
@@ -114,7 +90,6 @@ public class FlowContext {
             switch (action) {
                 case "DATA_AUDIT_REJECT" -> ctx.incrementAuditReject();
                 case "REWORK" -> ctx.incrementRework();
-                case "DESIGN_REVIEW_REJECT" -> ctx.incrementDesignReject();
                 default -> { }
             }
         }

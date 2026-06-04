@@ -33,7 +33,6 @@ class FlowContextTest {
             FlowContext ctx = FlowContext.buildFromHistory(List.of());
             assertEquals(0, ctx.getAuditRejectCount());
             assertEquals(0, ctx.getReworkCount());
-            assertEquals(0, ctx.getDesignRejectCount());
         }
 
         @Test
@@ -42,11 +41,10 @@ class FlowContextTest {
             FlowContext ctx = FlowContext.buildFromHistory(null);
             assertEquals(0, ctx.getAuditRejectCount());
             assertEquals(0, ctx.getReworkCount());
-            assertEquals(0, ctx.getDesignRejectCount());
         }
 
         @Test
-        @DisplayName("仅包含 DATA_AUDIT_REJECT → auditRejectCount=1")
+        @DisplayName("仅包含 DATA_AUDIT_REJECT → auditRejectCount=3")
         void onlyAuditReject_shouldIncrementAuditRejectCount() {
             List<String> history = List.of(
                     "DATA_AUDIT_REJECT",
@@ -56,11 +54,10 @@ class FlowContextTest {
             FlowContext ctx = FlowContext.buildFromHistory(history);
             assertEquals(3, ctx.getAuditRejectCount());
             assertEquals(0, ctx.getReworkCount());
-            assertEquals(0, ctx.getDesignRejectCount());
         }
 
         @Test
-        @DisplayName("仅包含 REWORK → reworkCount=1")
+        @DisplayName("仅包含 REWORK → reworkCount=2")
         void onlyRework_shouldIncrementReworkCount() {
             List<String> history = List.of(
                     "REWORK",
@@ -69,21 +66,6 @@ class FlowContextTest {
             FlowContext ctx = FlowContext.buildFromHistory(history);
             assertEquals(0, ctx.getAuditRejectCount());
             assertEquals(2, ctx.getReworkCount());
-            assertEquals(0, ctx.getDesignRejectCount());
-        }
-
-        @Test
-        @DisplayName("仅包含 DESIGN_REVIEW_REJECT → designRejectCount=1")
-        void onlyDesignReviewReject_shouldIncrementDesignRejectCount() {
-            List<String> history = List.of(
-                    "DESIGN_REVIEW_REJECT",
-                    "DESIGN_REVIEW_REJECT",
-                    "DESIGN_REVIEW_REJECT"
-            );
-            FlowContext ctx = FlowContext.buildFromHistory(history);
-            assertEquals(0, ctx.getAuditRejectCount());
-            assertEquals(0, ctx.getReworkCount());
-            assertEquals(3, ctx.getDesignRejectCount());
         }
 
         @Test
@@ -93,13 +75,11 @@ class FlowContextTest {
                     "DATA_AUDIT_REJECT",
                     "DATA_AUDIT_REJECT",
                     "REWORK",
-                    "DESIGN_REVIEW_REJECT",
                     "DATA_AUDIT_REJECT"
             );
             FlowContext ctx = FlowContext.buildFromHistory(history);
             assertEquals(3, ctx.getAuditRejectCount());
             assertEquals(1, ctx.getReworkCount());
-            assertEquals(1, ctx.getDesignRejectCount());
         }
 
         @Test
@@ -115,7 +95,6 @@ class FlowContextTest {
             FlowContext ctx = FlowContext.buildFromHistory(history);
             assertEquals(1, ctx.getAuditRejectCount());
             assertEquals(1, ctx.getReworkCount());
-            assertEquals(0, ctx.getDesignRejectCount());
         }
     }
 
@@ -184,35 +163,6 @@ class FlowContextTest {
         }
 
         @Test
-        @DisplayName("设计审核驳回次数=5（边界值） → 抛出 ORDER_EXCESSIVE_DESIGN_REJECT")
-        void designRejectCount_atBoundary_shouldNotThrow() {
-            FlowContext ctx = new FlowContext();
-            for (int i = 0; i < 5; i++) {
-                ctx.incrementDesignReject();
-            }
-            BusinessException ex = assertThrows(
-                    BusinessException.class,
-                    ctx::validateNoExcessiveLoops
-            );
-            assertEquals(ErrorCodeEnum.ORDER_EXCESSIVE_DESIGN_REJECT.getCode(), ex.getCode());
-        }
-
-        @Test
-        @DisplayName("设计审核驳回次数=6 → 抛出 ORDER_EXCESSIVE_DESIGN_REJECT")
-        void designRejectCount_exceedBoundary_shouldThrow() {
-            FlowContext ctx = new FlowContext();
-            for (int i = 0; i < 6; i++) {
-                ctx.incrementDesignReject();
-            }
-            BusinessException ex = assertThrows(
-                    BusinessException.class,
-                    ctx::validateNoExcessiveLoops
-            );
-            assertEquals(ErrorCodeEnum.ORDER_EXCESSIVE_DESIGN_REJECT.getCode(), ex.getCode());
-            assertTrue(ex.getMessage().contains("5"));
-        }
-
-        @Test
         @DisplayName("驳回和返工同时超限 → 抛出驳回异常（第一个满足条件的）")
         void auditAndReworkBothExceed_shouldThrowFirst() {
             FlowContext ctx = new FlowContext();
@@ -265,25 +215,14 @@ class FlowContextTest {
         }
 
         @Test
-        @DisplayName("incrementDesignReject 正确递增")
-        void incrementDesignReject_shouldIncrement() {
-            FlowContext ctx = new FlowContext();
-            assertEquals(0, ctx.getDesignRejectCount());
-            ctx.incrementDesignReject();
-            assertEquals(1, ctx.getDesignRejectCount());
-        }
-
-        @Test
-        @DisplayName("三种增量互不影响")
-        void threeIncrements_shouldNotAffectEachOther() {
+        @DisplayName("两种增量互不影响")
+        void twoIncrements_shouldNotAffectEachOther() {
             FlowContext ctx = new FlowContext();
             ctx.incrementAuditReject();
             ctx.incrementAuditReject();
             ctx.incrementRework();
-            ctx.incrementDesignReject();
             assertEquals(2, ctx.getAuditRejectCount());
             assertEquals(1, ctx.getReworkCount());
-            assertEquals(1, ctx.getDesignRejectCount());
         }
     }
 
