@@ -246,7 +246,7 @@ public class FlowStatusTransitionRules {
 
             // 设计阶段动作
             case START_DESIGN -> FlowStatusEnum.DESIGN_IN_PROGRESS.getValue();
-            case SUBMIT_DESIGN -> FlowStatusEnum.DESIGN_COMPLETED.getValue();
+            case COMPLETE_DESIGN -> FlowStatusEnum.DESIGN_COMPLETED.getValue();
 
             // 打印阶段动作
             case START_PRINT -> FlowStatusEnum.PRINTING.getValue();
