@@ -97,6 +97,19 @@ public class OrderQueryHelper {
     }
 
     /**
+     * 获取当前登录用户的角色编码
+     *
+     * @return 角色编码（REGIONAL_ADMIN/DESIGN_ADMIN等），未找到返回 null
+     */
+    public String getCurrentUserRoleCode() {
+        try {
+            return (String) StpUtil.getSession().get("roleCode");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * 获取当前登录用户的机构ID，未登录或无机构返回 null
      *
      * @return 当前用户所属机构ID

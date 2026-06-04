@@ -143,7 +143,47 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      * @return 角色编码（REGIONAL_ADMIN/DESIGN_ADMIN等），未找到返回 null
      */
     private String getCurrentUserRoleCode() {
-        return (String) StpUtil.getSession().get("roleCode");
+        return orderQueryHelper.getCurrentUserRoleCode();
+    }
+
+    /**
+     * 校验部门权限：区域管理员只能审核本部门的订单
+     *
+     * @param order 订单实体
+     * @param currentUserDeptId 当前用户部门ID
+     * @throws BusinessException 权限不足时抛出
+     */
+    private void validateDepartmentPermission(OrderMainEntity order, Long currentUserDeptId) {
+        if (!Objects.equals(order.getOperatorDeptId(), currentUserDeptId)) {
+            log.warn("无权审核非本部门订单: orderId={}, orderDeptId={}, userDeptId=",
+                order.getId(), order.getOperatorDeptId(), currentUserDeptId);
+            throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+        }
+    }
+
+    /**
+     * 校验区域审核前置条件：设计审核前必须区域审核通过
+     *
+     * @param order 订单实体
+     * @throws BusinessException 区域审核未通过时抛出
+     */
+    private void validateRegionalAuditPassed(OrderMainEntity order) {
+        if (!Objects.equals(order.getRegionalAuditStatus(), AuditStatusConstants.PASSED)) {
+            log.warn("区域审核未通过，无法进行设计审核: orderId={}, regionalAuditStatus={}",
+                order.getId(), order.getRegionalAuditStatus());
+            throw new BusinessException(ErrorCodeEnum.REGIONAL_AUDIT_PENDING);
+        }
+    }
+
+    /**
+     * 获取当前用户真实姓名
+     *
+     * @param userId 用户ID
+     * @return 真实姓名，用户不存在返回 null
+     */
+    private String getUserRealName(Long userId) {
+        UserEntity user = userService.getById(userId);
+        return user != null ? user.getRealName() : null;
     }
 
     /**
@@ -608,13 +648,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (isTrialOrder) {
             if (RoleCodeConstants.REGIONAL_ADMIN.equals(roleCode)) {
                 // 区域管理员审核：只更新区域审核状态
-                // 部门权限校验：只能审核本部门的订单
                 Long currentUserDeptId = (Long) StpUtil.getSession().get("deptId");
-                if (!Objects.equals(entity.getOperatorDeptId(), currentUserDeptId)) {
-                    log.warn("无权审核非本部门订单: orderId={}, orderDeptId={}, userDeptId={}",
-                        id, entity.getOperatorDeptId(), currentUserDeptId);
-                    throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
-                }
+                validateDepartmentPermission(entity, currentUserDeptId);
 
                 LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<>();
                 uw.eq(OrderMainEntity::getId, id)
@@ -630,15 +665,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.info("试用订单区域审核通过: orderId={}, regionalAuditBy={}", id, currentUserId);
             } else if (RoleCodeConstants.DESIGN_ADMIN.equals(roleCode)) {
                 // 设计管理员审核：更新设计审核状态并推进流程
-                // 前置校验：区域审核必须已通过
-                if (!Objects.equals(entity.getRegionalAuditStatus(), AuditStatusConstants.PASSED)) {
-                    log.warn("区域审核未通过，无法进行设计审核: orderId={}, regionalAuditStatus={}",
-                        id, entity.getRegionalAuditStatus());
-                    throw new BusinessException(ErrorCodeEnum.REGIONAL_AUDIT_PENDING);
-                }
+                validateRegionalAuditPassed(entity);
 
-                UserEntity currentUser = userService.getById(currentUserId);
-                String operatorName = currentUser != null ? currentUser.getRealName() : null;
+                String operatorName = getUserRealName(currentUserId);
                 TransitionResult result = flowFacade.executeFlow(
                         id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
                         dto.getVersion());
@@ -674,8 +703,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
             }
 
-            UserEntity currentUser = userService.getById(currentUserId);
-            String operatorName = currentUser != null ? currentUser.getRealName() : null;
+            String operatorName = getUserRealName(currentUserId);
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.DATA_AUDIT_PASS, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
                     dto.getVersion());
@@ -737,16 +765,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (isTrialOrder) {
             if (RoleCodeConstants.REGIONAL_ADMIN.equals(roleCode)) {
                 // 区域管理员驳回：调用 flowFacade 流转状态
-                // 部门权限校验：只能审核本部门的订单
                 Long currentUserDeptId = (Long) StpUtil.getSession().get("deptId");
-                if (!Objects.equals(entity.getOperatorDeptId(), currentUserDeptId)) {
-                    log.warn("无权驳回非本部门订单: orderId={}, orderDeptId=, userDeptId={}",
-                        id, entity.getOperatorDeptId(), currentUserDeptId);
-                    throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
-                }
+                validateDepartmentPermission(entity, currentUserDeptId);
 
-                UserEntity currentUser = userService.getById(currentUserId);
-                String operatorName = currentUser != null ? currentUser.getRealName() : null;
+                String operatorName = getUserRealName(currentUserId);
                 TransitionResult result = flowFacade.executeFlow(
                         id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
                         dto.getVersion());
@@ -769,15 +791,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     id, entity.getStatus(), result.getFinalStatus(), currentUserId, dto.getRemark());
             } else if (RoleCodeConstants.DESIGN_ADMIN.equals(roleCode)) {
                 // 设计管理员驳回：更新设计审核状态并推进流程
-                // 前置校验：区域审核必须已通过
-                if (!Objects.equals(entity.getRegionalAuditStatus(), AuditStatusConstants.PASSED)) {
-                    log.warn("区域审核未通过，无法进行设计驳回: orderId={}, regionalAuditStatus={}",
-                        id, entity.getRegionalAuditStatus());
-                    throw new BusinessException(ErrorCodeEnum.REGIONAL_AUDIT_PENDING);
-                }
+                validateRegionalAuditPassed(entity);
 
-                UserEntity currentUser = userService.getById(currentUserId);
-                String operatorName = currentUser != null ? currentUser.getRealName() : null;
+                String operatorName = getUserRealName(currentUserId);
                 TransitionResult result = flowFacade.executeFlow(
                         id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
                         dto.getVersion());
@@ -805,8 +821,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
             }
 
-            UserEntity currentUser = userService.getById(currentUserId);
-            String operatorName = currentUser != null ? currentUser.getRealName() : null;
+            String operatorName = getUserRealName(currentUserId);
             TransitionResult result = flowFacade.executeFlow(
                     id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
                     dto.getVersion());
@@ -891,8 +906,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         update(uw);
 
         // 调用流程引擎流转状态：DATA_AUDIT_REJECTED → PENDING_DATA_AUDIT
-        UserEntity currentUser = userService.getById(currentUserId);
-        String operatorName = currentUser != null ? currentUser.getRealName() : null;
+        String operatorName = getUserRealName(currentUserId);
         TransitionResult result = flowFacade.executeFlow(
                 id, FlowActionEnum.RESUBMIT, new FlowOperator(currentUserId, operatorName, "重新提交"));
 
@@ -923,8 +937,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_CANCELLED);
         }
         // 获取当前用户姓名
-        UserEntity currentUser = userService.getById(currentUserId);
-        String operatorName = currentUser != null ? currentUser.getRealName() : null;
+        String operatorName = getUserRealName(currentUserId);
         // 通过 FlowFacade 执行取消动作
         TransitionResult result = flowFacade.executeFlow(
                 id, FlowActionEnum.CANCEL, new FlowOperator(currentUserId, operatorName, null));
@@ -965,8 +978,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR);
         }
         // 获取当前用户姓名
-        UserEntity currentUser = userService.getById(currentUserId);
-        String operatorName = currentUser != null ? currentUser.getRealName() : null;
+        String operatorName = getUserRealName(currentUserId);
         // 通过 FlowFacade 执行完成动作
         TransitionResult result = flowFacade.executeFlow(
                 orderId, FlowActionEnum.COMPLETE, new FlowOperator(currentUserId, operatorName, "手动完成"));
