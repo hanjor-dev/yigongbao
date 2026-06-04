@@ -140,7 +140,9 @@ public class FlowStatusTransitionRules {
             case DESIGN -> switch (status) {
                 case PENDING_DESIGN -> List.of(FlowActionEnum.START_DESIGN);
                 case DESIGN_IN_PROGRESS -> List.of(FlowActionEnum.COMPLETE_DESIGN);
-                case DESIGN_COMPLETED -> !needsProduction ? List.of(FlowActionEnum.COMPLETE) : List.of();
+                case DESIGN_COMPLETED -> !needsProduction
+                    ? List.of(FlowActionEnum.COMPLETE)
+                    : List.of(FlowActionEnum.DOWNLOAD_DATA_PACKAGE);
                 default -> List.of();
             };
 
@@ -236,6 +238,7 @@ public class FlowStatusTransitionRules {
             // 设计阶段动作
             case START_DESIGN -> FlowStatusEnum.DESIGN_IN_PROGRESS.getValue();
             case COMPLETE_DESIGN -> FlowStatusEnum.DESIGN_COMPLETED.getValue();
+            case DOWNLOAD_DATA_PACKAGE -> FlowStatusEnum.PENDING_PRINT.getValue();
 
             // 打印阶段动作
             case START_PRINT -> FlowStatusEnum.PRINTING.getValue();

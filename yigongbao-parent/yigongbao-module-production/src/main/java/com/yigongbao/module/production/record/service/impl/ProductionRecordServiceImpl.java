@@ -318,7 +318,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         log.info("下载设计数据包，流转卡推进到待打印: orderId={}, designPackageId={}", order.getId(), designPackageId);
 
-        // 聚合逻辑：检查是否所有流转卡都已下载，如果是则推进订单状态
+        // 聚合逻辑：检查是否所有流转卡都已下载，如果是则通过状态机推进订单状态
         if (order.getStatus().equals(FlowStatusEnum.DESIGN_COMPLETED.getValue())) {
             long totalActive = count(new LambdaQueryWrapper<ProductionRecordEntity>()
                     .eq(ProductionRecordEntity::getOrderId, order.getId())
@@ -333,21 +333,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                             FlowStatusEnum.CANCELLED.getValue()));
 
             if (totalActive > 0 && totalActive == reachedCount) {
-                Integer targetPhase = order.getNeedsPhysicalDelivery() == 1
-                        ? FlowPhaseEnum.PRINT.getValue()
-                        : FlowPhaseEnum.DESIGN.getValue();
-                Integer targetStatus = order.getNeedsPhysicalDelivery() == 1
-                        ? FlowStatusEnum.PENDING_PRINT.getValue()
-                        : FlowStatusEnum.DESIGN_COMPLETED.getValue();
-
-                OrderMainEntity phaseUpdate = new OrderMainEntity();
-                phaseUpdate.setId(order.getId());
-                phaseUpdate.setPhase(targetPhase);
-                phaseUpdate.setStatus(targetStatus);
-                orderMainMapper.updateById(phaseUpdate);
-
-                log.info("所有流转卡已下载，订单推进到下一阶段: orderId={}, {} -> {}",
-                        order.getId(), FlowStatusEnum.DESIGN_COMPLETED.getValue(), targetStatus);
+                // 所有流转卡都已下载，通过状态机推进订单到打印阶段
+                flowFacade.executeFlow(order.getId(), FlowActionEnum.DOWNLOAD_DATA_PACKAGE,
+                        FlowOperator.of(userId, realName));
+                log.info("所有流转卡已下载，订单推进到打印阶段: orderId={}, {} -> {}",
+                        order.getId(), FlowStatusEnum.DESIGN_COMPLETED.getValue(),
+                        FlowStatusEnum.PENDING_PRINT.getValue());
             }
         }
 
