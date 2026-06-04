@@ -230,7 +230,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      */
     public static boolean isPhaseChangeAction(FlowActionEnum action) {
         return switch (action) {
-            case DATA_AUDIT_PASS, DESIGN_REVIEW_PASS, COMPLETE_PRINT,
+            case DATA_AUDIT_PASS, COMPLETE_DESIGN, COMPLETE_PRINT,
                  COMPLETE_POST_PROCESSING, QC_PASS, REWORK_COMPLETE,
                  COMPLETE_WAREHOUSE_IN, USER_CONFIRM, REWORK_TO_PRINT -> true;
             default -> false;

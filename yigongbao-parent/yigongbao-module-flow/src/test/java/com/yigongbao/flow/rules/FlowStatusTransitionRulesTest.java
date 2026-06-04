@@ -218,8 +218,9 @@ class FlowStatusTransitionRulesTest {
         @DisplayName("needsPhysicalDelivery=null → 视为需要实体交付（按1处理）")
         void nullNeedsPhysicalDelivery_shouldTreatAsOne() {
             List<FlowActionEnum> actions = rules.getAvailableActions(1020, 10, null);
-            assertEquals(2, actions.size());
+            assertEquals(3, actions.size());
             assertTrue(actions.contains(FlowActionEnum.DATA_AUDIT_PASS));
+            assertTrue(actions.contains(FlowActionEnum.CANCEL));
         }
 
         @Test
