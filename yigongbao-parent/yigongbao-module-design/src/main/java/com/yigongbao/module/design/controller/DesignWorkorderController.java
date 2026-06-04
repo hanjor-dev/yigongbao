@@ -79,7 +79,6 @@ public class DesignWorkorderController {
      */
     @Operation(summary = "完成设计")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "完成设计")
-    @RequirePermission(value = "design:CompleteDesign")
     @PostMapping("/{orderId}/complete-design")
     public Result<Void> completeDesign(@PathVariable Long orderId) {
         designWorkorderService.completeDesign(orderId);
