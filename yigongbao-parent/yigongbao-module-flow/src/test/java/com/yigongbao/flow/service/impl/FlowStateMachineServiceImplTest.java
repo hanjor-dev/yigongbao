@@ -297,11 +297,11 @@ class FlowStateMachineServiceImplTest {
     class UserConfirmTests {
 
         @Test
-        @DisplayName("USER_CONFIRM: phase=70,status=7010 → phase=80,status=8010")
+        @DisplayName("USER_CONFIRM: phase=20,status=2030 → phase=80,status=8010")
         void userConfirm_shouldAdvanceToCompleted() {
-            // AWAITING_CONFIRM(7010) 在 CONFIRM 阶段允许 USER_CONFIRM
-            testOrder.setPhase(70);
-            testOrder.setStatus(7010);
+            // DESIGN_COMPLETED(2030) 允许 USER_CONFIRM
+            testOrder.setPhase(20);
+            testOrder.setStatus(2030);
             testOrder.setNeedsPhysicalDelivery(0);
             when(flowOrderService.getById(1L)).thenReturn(testOrder);
             when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());

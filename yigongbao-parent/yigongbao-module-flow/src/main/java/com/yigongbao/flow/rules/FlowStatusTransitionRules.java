@@ -66,9 +66,9 @@ public class FlowStatusTransitionRules {
         transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_IN_PROGRESS),
                 Set.of(FlowStatusEnum.DESIGN_COMPLETED));
 
-        // DESIGN_COMPLETED 可跨阶段流转
+        // DESIGN_COMPLETED 可跨阶段流转（进入打印或直接完成）
         transitions.put(statusKey(FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_COMPLETED),
-                Set.of(FlowStatusEnum.PENDING_PRINT, FlowStatusEnum.AWAITING_CONFIRM));
+                Set.of(FlowStatusEnum.PENDING_PRINT, FlowStatusEnum.COMPLETED));
 
         // ==================== 打印阶段状态转换（3010-3090）====================
         transitions.put(statusKey(FlowPhaseEnum.PRINT, FlowStatusEnum.PENDING_PRINT),
@@ -99,10 +99,6 @@ public class FlowStatusTransitionRules {
                 Set.of(FlowStatusEnum.WAREHOUSED));
 
         transitions.put(statusKey(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.WAREHOUSED),
-                Set.of(FlowStatusEnum.COMPLETED));
-
-        // ==================== 确认阶段状态转换（7010-7090，服务订单专用）====================
-        transitions.put(statusKey(FlowPhaseEnum.CONFIRM, FlowStatusEnum.AWAITING_CONFIRM),
                 Set.of(FlowStatusEnum.COMPLETED));
 
         STATUS_TRANSITIONS = Map.copyOf(transitions);
@@ -144,7 +140,7 @@ public class FlowStatusTransitionRules {
             case DESIGN -> switch (status) {
                 case PENDING_DESIGN -> List.of(FlowActionEnum.START_DESIGN);
                 case DESIGN_IN_PROGRESS -> List.of(FlowActionEnum.COMPLETE_DESIGN);
-                case DESIGN_COMPLETED -> List.of();
+                case DESIGN_COMPLETED -> !needsProduction ? List.of(FlowActionEnum.USER_CONFIRM, FlowActionEnum.COMPLETE) : List.of();
                 default -> List.of();
             };
 
@@ -177,13 +173,6 @@ public class FlowStatusTransitionRules {
                         ? List.of(FlowActionEnum.COMPLETE_WAREHOUSE_IN)
                         : List.of();
                 // WAREHOUSED 为过渡状态，不会出现在 phase=WAREHOUSE 的订单中（自动推进）
-                default -> List.of();
-            };
-
-            case CONFIRM -> switch (status) {
-                case AWAITING_CONFIRM -> !needsProduction
-                        ? List.of(FlowActionEnum.USER_CONFIRM)
-                        : List.of();
                 default -> List.of();
             };
 
@@ -356,10 +345,6 @@ public class FlowStatusTransitionRules {
 
             case WAREHOUSE -> needsProduction
                     ? Set.of(FlowStatusEnum.WAREHOUSE_IN, FlowStatusEnum.WAREHOUSED)
-                    : Set.of();
-
-            case CONFIRM -> !needsProduction
-                    ? Set.of(FlowStatusEnum.AWAITING_CONFIRM)
                     : Set.of();
 
             case COMPLETED -> Set.of(FlowStatusEnum.COMPLETED);

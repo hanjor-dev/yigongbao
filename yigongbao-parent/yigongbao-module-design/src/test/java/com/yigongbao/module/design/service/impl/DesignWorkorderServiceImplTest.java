@@ -652,7 +652,7 @@ class DesignWorkorderServiceImplTest {
                 user.setRealName("设计师A");
                 when(userService.getById(100L)).thenReturn(user);
 
-                TransitionResult mockResult = TransitionResult.of(FlowStatusEnum.AWAITING_CONFIRM.getValue(),
+                TransitionResult mockResult = TransitionResult.of(FlowStatusEnum.DESIGN_COMPLETED.getValue(),
                     FlowStatusEnum.DESIGN_COMPLETED.getValue());
                 when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.COMPLETE_DESIGN), any()))
                         .thenReturn(mockResult);
@@ -661,7 +661,7 @@ class DesignWorkorderServiceImplTest {
                 assertDoesNotThrow(() -> service.completeDesign(1L));
                 verify(flowFacade).executeFlow(eq(1L), eq(FlowActionEnum.COMPLETE_DESIGN), any());
                 verify(orderMainService).updateById(argThat((OrderMainEntity o) ->
-                        o.getStatus().equals(FlowStatusEnum.AWAITING_CONFIRM.getValue())));
+                        o.getStatus().equals(FlowStatusEnum.DESIGN_COMPLETED.getValue())));
             }
         }
 

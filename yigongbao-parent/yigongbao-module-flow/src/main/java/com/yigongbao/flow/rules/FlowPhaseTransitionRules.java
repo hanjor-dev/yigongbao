@@ -25,12 +25,11 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      */
     private static final Map<FlowPhaseEnum, Set<FlowPhaseEnum>> PHASE_TRANSITIONS = Map.of(
             FlowPhaseEnum.ORDER, Set.of(FlowPhaseEnum.DESIGN),
-            FlowPhaseEnum.DESIGN, Set.of(FlowPhaseEnum.PRINT, FlowPhaseEnum.CONFIRM),
+            FlowPhaseEnum.DESIGN, Set.of(FlowPhaseEnum.PRINT, FlowPhaseEnum.COMPLETED),
             FlowPhaseEnum.PRINT, Set.of(FlowPhaseEnum.POST_PROCESSING),
             FlowPhaseEnum.POST_PROCESSING, Set.of(FlowPhaseEnum.QC),
             FlowPhaseEnum.QC, Set.of(FlowPhaseEnum.WAREHOUSE, FlowPhaseEnum.PRINT),
             FlowPhaseEnum.WAREHOUSE, Set.of(FlowPhaseEnum.COMPLETED),
-            FlowPhaseEnum.CONFIRM, Set.of(FlowPhaseEnum.COMPLETED),
             FlowPhaseEnum.COMPLETED, Set.of()
     );
 
@@ -107,12 +106,11 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
         boolean needsProduction = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
         return switch (currentPhase) {
             case ORDER -> FlowPhaseEnum.DESIGN;
-            case DESIGN -> needsProduction ? FlowPhaseEnum.PRINT : FlowPhaseEnum.CONFIRM;
+            case DESIGN -> needsProduction ? FlowPhaseEnum.PRINT : FlowPhaseEnum.COMPLETED;
             case PRINT -> FlowPhaseEnum.POST_PROCESSING;
             case POST_PROCESSING -> FlowPhaseEnum.QC;
             case QC -> FlowPhaseEnum.WAREHOUSE;
             case WAREHOUSE -> FlowPhaseEnum.COMPLETED;
-            case CONFIRM -> FlowPhaseEnum.COMPLETED;
             case COMPLETED -> null;
         };
     }
@@ -128,11 +126,11 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      *
      * 【核心修复 P1-3】：阶段推进时，必须同时确定初始可见状态
      * - DATA_AUDIT_PASSED → DESIGN + PENDING_DESIGN
-     * - DESIGN_REVIEW_PASSED → PRINT + PENDING_PRINT 或 CONFIRM + AWAITING_CONFIRM
+     * - DESIGN_COMPLETED → PRINT + PENDING_PRINT（需要实体交付）或保持在 DESIGN（不需要实体交付）
      *
      * 阶段推进规则：
      * - DATA_AUDIT_PASSED(1030) → 进入 DESIGN(20)，status 变为 PENDING_DESIGN(2010)
-     * - DESIGN_REVIEW_PASSED(2050) → 进入 PRINT(30) 或 CONFIRM(70)
+     * - DESIGN_COMPLETED(2030) → 需要实体交付时进入 PRINT(30)，不需要时保持在 DESIGN(20)
      * - PRINT_COMPLETED(3030) → 进入 POST_PROCESSING(40)
      * - QC_PASSED(5020) → 进入 WAREHOUSE(60)
      * - WAREHOUSED(6020) → 进入 COMPLETED(80)
@@ -158,14 +156,13 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             return new PhaseAndStatus(FlowPhaseEnum.DESIGN, FlowStatusEnum.PENDING_DESIGN);
         }
 
-        // 设计完成 → 根据 needsPhysicalDelivery 决定下一阶段
+        // 设计完成 → 仅需要实体交付的订单进入打印阶段，不需要实体交付的订单保持在设计阶段
         if (targetStatus == FlowStatusEnum.DESIGN_COMPLETED) {
             boolean needsPhysical = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
             if (needsPhysical) {
                 return new PhaseAndStatus(FlowPhaseEnum.PRINT, FlowStatusEnum.PENDING_PRINT);
-            } else {
-                return new PhaseAndStatus(FlowPhaseEnum.CONFIRM, FlowStatusEnum.AWAITING_CONFIRM);
             }
+            // 不需要实体交付：保持在设计阶段，等待手动完成
         }
 
         // 打印完成 → 医疗器械进入后处理，非医疗器械直接进入质检

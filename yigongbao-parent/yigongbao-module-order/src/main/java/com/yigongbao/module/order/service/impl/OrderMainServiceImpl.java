@@ -682,9 +682,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 orderId, entity.getNeedsPhysicalDelivery());
             throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "只允许不需要实体交付的订单手动完成");
         }
-        // 校验状态必须为待客户确认
-        if (!Objects.equals(entity.getStatus(), FlowStatusEnum.AWAITING_CONFIRM.getValue())) {
-            log.warn("订单状态不是待客户确认，不允许手动完成: orderId={}, status={}",
+        // 校验状态必须为设计完成
+        if (!Objects.equals(entity.getStatus(), FlowStatusEnum.DESIGN_COMPLETED.getValue())) {
+            log.warn("订单状态不是设计完成，不允许手动完成: orderId={}, status={}",
                 orderId, entity.getStatus());
             throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR);
         }
@@ -699,7 +699,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         entity.setStatus(result.getFinalStatus());
         updateById(entity);
         log.info("手动完成订单: orderId={}, {} -> {}, operator={}",
-            orderId, FlowStatusEnum.AWAITING_CONFIRM.getValue(), result.getFinalStatus(), currentUserId);
+            orderId, FlowStatusEnum.DESIGN_COMPLETED.getValue(), result.getFinalStatus(), currentUserId);
     }
 
     // ==================== 创建操作 ====================

@@ -50,11 +50,6 @@ public enum FlowPhaseEnum {
     WAREHOUSE(60, "仓储阶段"),
 
     /**
-     * 确认阶段
-     */
-    CONFIRM(70, "确认阶段"),
-
-    /**
      * 已完成
      */
     COMPLETED(80, "已完成");

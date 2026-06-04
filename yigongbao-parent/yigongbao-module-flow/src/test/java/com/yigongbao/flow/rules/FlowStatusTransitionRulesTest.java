@@ -173,22 +173,6 @@ class FlowStatusTransitionRulesTest {
             assertEquals(List.of(FlowActionEnum.CANCEL), actions);
         }
 
-        // ==================== CONFIRM 阶段测试 ====================
-
-        @Test
-        @DisplayName("phase=CONFIRM, status=AWAITING_CONFIRM(7010), needsPhysicalDelivery=0 → 返回 [USER_CONFIRM]")
-        void confirm_phase_awaiting_noDelivery_shouldReturn_userConfirm() {
-            List<FlowActionEnum> actions = rules.getAvailableActions(7010, 70, 0);
-            assertEquals(List.of(FlowActionEnum.USER_CONFIRM, FlowActionEnum.CANCEL), actions);
-        }
-
-        @Test
-        @DisplayName("phase=CONFIRM, status=AWAITING_CONFIRM(7010), needsPhysicalDelivery=1 → 返回空列表（需要生产不应进入此阶段）")
-        void confirm_phase_awaiting_needDelivery_shouldReturn_empty() {
-            List<FlowActionEnum> actions = rules.getAvailableActions(7010, 70, 1);
-            assertEquals(List.of(FlowActionEnum.CANCEL), actions);
-        }
-
         // ==================== COMPLETED 阶段测试 ====================
 
         @Test
@@ -432,11 +416,11 @@ class FlowStatusTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("DESIGN_COMPLETED + needsPhysicalDelivery=0 → 允许跳转到 AWAITING_CONFIRM")
-        void designCompleted_noDelivery_shouldAllow_confirm() {
+        @DisplayName("DESIGN_COMPLETED + needsPhysicalDelivery=0 → 允许跳转到 COMPLETED")
+        void designCompleted_noDelivery_shouldAllow_completed() {
             assertTrue(rules.isValidStatusTransition(
                     FlowPhaseEnum.DESIGN, FlowStatusEnum.DESIGN_COMPLETED,
-                    FlowStatusEnum.AWAITING_CONFIRM, 0));
+                    FlowStatusEnum.COMPLETED, 0));
         }
 
         @Test
@@ -540,20 +524,6 @@ class FlowStatusTransitionRulesTest {
             assertTrue(statuses.isEmpty());
         }
 
-        @Test
-        @DisplayName("CONFIRM 阶段 needsPhysicalDelivery=0 → 有确认状态")
-        void confirm_phase_noDelivery_hasStatuses() {
-            Set<FlowStatusEnum> statuses = rules.getValidStatusesForPhase(FlowPhaseEnum.CONFIRM, 0);
-            assertEquals(1, statuses.size());
-            assertTrue(statuses.contains(FlowStatusEnum.AWAITING_CONFIRM));
-        }
-
-        @Test
-        @DisplayName("CONFIRM 阶段 needsPhysicalDelivery=1 → 空集合")
-        void confirm_phase_needDelivery_emptyStatuses() {
-            Set<FlowStatusEnum> statuses = rules.getValidStatusesForPhase(FlowPhaseEnum.CONFIRM, 1);
-            assertTrue(statuses.isEmpty());
-        }
 
         @Test
         @DisplayName("COMPLETED 阶段 → 仅 COMPLETED 状态")

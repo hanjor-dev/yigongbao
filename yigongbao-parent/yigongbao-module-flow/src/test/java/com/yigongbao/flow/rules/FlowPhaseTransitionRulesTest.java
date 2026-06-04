@@ -49,12 +49,6 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("DESIGN → CONFIRM（合法，跳过生产）")
-        void design_to_confirm_shouldReturn_true() {
-            assertTrue(rules.canTransition(20, 70));
-        }
-
-        @Test
         @DisplayName("PRINT → POST_PROCESSING（合法）")
         void print_to_postProcessing_shouldReturn_true() {
             assertTrue(rules.canTransition(30, 40));
@@ -79,22 +73,10 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("CONFIRM → COMPLETED（合法）")
-        void confirm_to_completed_shouldReturn_true() {
-            assertTrue(rules.canTransition(70, 80));
-        }
-
-        @Test
         @DisplayName("COMPLETED → 任意阶段（非法，已完成不可跳转）")
         void completed_to_any_shouldReturn_false() {
             assertFalse(rules.canTransition(80, 10));
             assertFalse(rules.canTransition(80, 20));
-        }
-
-        @Test
-        @DisplayName("ORDER → CONFIRM（非法，跨阶段跳转）")
-        void order_to_confirm_shouldReturn_false() {
-            assertFalse(rules.canTransition(10, 70));
         }
 
         @Test
@@ -141,12 +123,12 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("DESIGN → [PRINT, CONFIRM]")
-        void design_shouldReturn_printAndConfirm() {
+        @DisplayName("DESIGN → [PRINT, COMPLETED]")
+        void design_shouldReturn_printAndCompleted() {
             List<Integer> nextPhases = rules.getAvailableNextPhases(20);
             assertEquals(2, nextPhases.size());
             assertTrue(nextPhases.contains(30));
-            assertTrue(nextPhases.contains(70));
+            assertTrue(nextPhases.contains(80));
         }
 
         @Test
@@ -191,9 +173,9 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("DESIGN + needsPhysicalDelivery=0 → CONFIRM")
-        void design_noDelivery_shouldReturn_confirm() {
-            assertEquals(FlowPhaseEnum.CONFIRM,
+        @DisplayName("DESIGN + needsPhysicalDelivery=0 → COMPLETED")
+        void design_noDelivery_shouldReturn_completed() {
+            assertEquals(FlowPhaseEnum.COMPLETED,
                     FlowPhaseTransitionRules.getNextPhase(FlowPhaseEnum.DESIGN, 0));
         }
 
@@ -230,13 +212,6 @@ class FlowPhaseTransitionRulesTest {
         void warehouse_shouldReturn_completed() {
             assertEquals(FlowPhaseEnum.COMPLETED,
                     FlowPhaseTransitionRules.getNextPhase(FlowPhaseEnum.WAREHOUSE, 1));
-        }
-
-        @Test
-        @DisplayName("CONFIRM → COMPLETED")
-        void confirm_shouldReturn_completed() {
-            assertEquals(FlowPhaseEnum.COMPLETED,
-                    FlowPhaseTransitionRules.getNextPhase(FlowPhaseEnum.CONFIRM, 1));
         }
 
         @Test
@@ -277,15 +252,15 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("DESIGN_COMPLETED(2030) + needsPhysicalDelivery=0 → CONFIRM + AWAITING_CONFIRM(7010)")
-        void designCompleted_noDelivery_shouldAdvanceToConfirm() {
+        @DisplayName("DESIGN_COMPLETED(2030) + needsPhysicalDelivery=0 → 保持在 DESIGN 阶段，不推进")
+        void designCompleted_noDelivery_shouldStayInDesignPhase() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.DESIGN,
                     FlowStatusEnum.DESIGN_COMPLETED,
                     FlowActionEnum.COMPLETE_DESIGN,
                     0, null);
-            assertEquals(FlowPhaseEnum.CONFIRM, result.phase());
-            assertEquals(FlowStatusEnum.AWAITING_CONFIRM, result.initialStatus());
+            assertNull(result.phase());
+            assertNull(result.initialStatus());
         }
 
         @Test
@@ -340,7 +315,7 @@ class FlowPhaseTransitionRulesTest {
         @DisplayName("USER_CONFIRM → COMPLETED + COMPLETED(8010)")
         void userConfirm_shouldAdvanceToCompleted() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
-                    FlowPhaseEnum.CONFIRM,
+                    FlowPhaseEnum.DESIGN,
                     FlowStatusEnum.COMPLETED,
                     FlowActionEnum.USER_CONFIRM,
                     0, null);

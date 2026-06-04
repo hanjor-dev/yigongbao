@@ -335,10 +335,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             if (totalActive > 0 && totalActive == reachedCount) {
                 Integer targetPhase = order.getNeedsPhysicalDelivery() == 1
                         ? FlowPhaseEnum.PRINT.getValue()
-                        : FlowPhaseEnum.CONFIRM.getValue();
+                        : FlowPhaseEnum.DESIGN.getValue();
                 Integer targetStatus = order.getNeedsPhysicalDelivery() == 1
                         ? FlowStatusEnum.PENDING_PRINT.getValue()
-                        : FlowStatusEnum.AWAITING_CONFIRM.getValue();
+                        : FlowStatusEnum.DESIGN_COMPLETED.getValue();
 
                 OrderMainEntity phaseUpdate = new OrderMainEntity();
                 phaseUpdate.setId(order.getId());
