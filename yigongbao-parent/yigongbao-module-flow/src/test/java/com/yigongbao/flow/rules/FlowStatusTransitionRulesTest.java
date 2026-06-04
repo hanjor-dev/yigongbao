@@ -313,12 +313,6 @@ class FlowStatusTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("USER_CONFIRM → COMPLETED(8010)")
-        void userConfirm_shouldReturn_completed() {
-            assertEquals(8010, rules.getTargetStatus(7010, FlowActionEnum.USER_CONFIRM));
-        }
-
-        @Test
         @DisplayName("CANCEL → CANCELLED(9010)")
         void cancel_shouldReturn_auditRejected() {
             assertEquals(9010, rules.getTargetStatus(1010, FlowActionEnum.CANCEL));

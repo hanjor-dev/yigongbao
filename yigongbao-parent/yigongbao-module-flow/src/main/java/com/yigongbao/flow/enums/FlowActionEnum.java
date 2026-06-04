@@ -112,13 +112,7 @@ public enum FlowActionEnum {
     /**
      * 完成入库
      */
-    COMPLETE_WAREHOUSE_IN("COMPLETE_WAREHOUSE_IN", "完成入库"),
-
-    // ==================== 确认阶段动作 ====================
-    /**
-     * 客户确认（服务订单）
-     */
-    USER_CONFIRM("USER_CONFIRM", "客户确认");
+    COMPLETE_WAREHOUSE_IN("COMPLETE_WAREHOUSE_IN", "完成入库");
 
     /**
      * 动作编码

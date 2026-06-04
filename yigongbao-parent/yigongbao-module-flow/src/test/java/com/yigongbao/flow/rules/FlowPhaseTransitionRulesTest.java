@@ -312,18 +312,6 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("USER_CONFIRM → COMPLETED + COMPLETED(8010)")
-        void userConfirm_shouldAdvanceToCompleted() {
-            PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
-                    FlowPhaseEnum.DESIGN,
-                    FlowStatusEnum.COMPLETED,
-                    FlowActionEnum.USER_CONFIRM,
-                    0, null);
-            assertEquals(FlowPhaseEnum.COMPLETED, result.phase());
-            assertEquals(FlowStatusEnum.COMPLETED, result.initialStatus());
-        }
-
-        @Test
         @DisplayName("REWORK → null, null（不推进阶段）")
         void rework_shouldNotChangePhase() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
@@ -381,7 +369,6 @@ class FlowPhaseTransitionRulesTest {
             assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.COMPLETE_POST_PROCESSING));
             assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.QC_PASS));
             assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.COMPLETE_WAREHOUSE_IN));
-            assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.USER_CONFIRM));
         }
 
         @Test

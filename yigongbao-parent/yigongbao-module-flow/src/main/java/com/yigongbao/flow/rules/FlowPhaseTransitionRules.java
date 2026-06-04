@@ -229,7 +229,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
         return switch (action) {
             case DATA_AUDIT_PASS, COMPLETE_DESIGN, COMPLETE_PRINT,
                  COMPLETE_POST_PROCESSING, QC_PASS, REWORK_COMPLETE,
-                 COMPLETE_WAREHOUSE_IN, USER_CONFIRM, REWORK_TO_PRINT -> true;
+                 COMPLETE_WAREHOUSE_IN, REWORK_TO_PRINT -> true;
             default -> false;
         };
     }

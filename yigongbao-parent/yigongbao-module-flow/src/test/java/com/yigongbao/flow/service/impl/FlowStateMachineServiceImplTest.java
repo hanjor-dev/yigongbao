@@ -290,33 +290,6 @@ class FlowStateMachineServiceImplTest {
         }
     }
 
-    // ==================== 客户确认测试 ====================
-
-    @Nested
-    @DisplayName("USER_CONFIRM 客户确认")
-    class UserConfirmTests {
-
-        @Test
-        @DisplayName("USER_CONFIRM: phase=20,status=2030 → phase=80,status=8010")
-        void userConfirm_shouldAdvanceToCompleted() {
-            // DESIGN_COMPLETED(2030) 允许 USER_CONFIRM
-            testOrder.setPhase(20);
-            testOrder.setStatus(2030);
-            testOrder.setNeedsPhysicalDelivery(0);
-            when(flowOrderService.getById(1L)).thenReturn(testOrder);
-            when(flowStatusHistoryService.listActionCodesByOrderId(1L)).thenReturn(Collections.emptyList());
-
-            TransitionResult result = flowStateMachineService.executeTransition(
-                    1L, FlowActionEnum.USER_CONFIRM, testOperator);
-
-            assertTrue(result.isPhaseChanged());
-            assertEquals(80, result.getTargetPhase());
-            assertEquals(8010, result.getTargetStatus()); // COMPLETED
-            assertEquals(8010, result.getInitialStatus());
-            assertEquals(8010, result.getFinalStatus());
-        }
-    }
-
     // ==================== 循环次数超限测试 ====================
 
     @Nested
