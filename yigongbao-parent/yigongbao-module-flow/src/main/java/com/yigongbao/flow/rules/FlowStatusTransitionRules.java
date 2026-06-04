@@ -340,8 +340,7 @@ public class FlowStatusTransitionRules {
                     FlowStatusEnum.DATA_AUDIT_PASSED, FlowStatusEnum.DATA_AUDIT_REJECTED);
 
             case DESIGN -> Set.of(FlowStatusEnum.PENDING_DESIGN, FlowStatusEnum.DESIGN_IN_PROGRESS,
-                    FlowStatusEnum.DESIGN_COMPLETED, FlowStatusEnum.DESIGN_REVIEWING,
-                    FlowStatusEnum.DESIGN_REVIEW_REJECTED);
+                    FlowStatusEnum.DESIGN_COMPLETED);
 
             case PRINT -> needsProduction
                     ? Set.of(FlowStatusEnum.PENDING_PRINT, FlowStatusEnum.PRINTING, FlowStatusEnum.PRINT_COMPLETED)
