@@ -42,30 +42,31 @@ class FlowStatusTransitionRulesTest {
         @DisplayName("phase=ORDER, status=DRAFT(1010) → 返回 [SUBMIT_ORDER]")
         void order_phase_draft_shouldReturn_submitOrder() {
             List<FlowActionEnum> actions = rules.getAvailableActions(1010, 10, 1);
-            assertEquals(List.of(FlowActionEnum.SUBMIT_ORDER), actions);
+            assertEquals(List.of(FlowActionEnum.SUBMIT_ORDER, FlowActionEnum.CANCEL), actions);
         }
 
         @Test
         @DisplayName("phase=ORDER, status=PENDING_DATA_AUDIT(1020) → 返回 [DATA_AUDIT_PASS, DATA_AUDIT_REJECT]")
         void order_phase_pendingAudit_shouldReturn_auditActions() {
             List<FlowActionEnum> actions = rules.getAvailableActions(1020, 10, 1);
-            assertEquals(2, actions.size());
+            assertEquals(3, actions.size());
             assertTrue(actions.contains(FlowActionEnum.DATA_AUDIT_PASS));
             assertTrue(actions.contains(FlowActionEnum.DATA_AUDIT_REJECT));
+            assertTrue(actions.contains(FlowActionEnum.CANCEL));
         }
 
         @Test
         @DisplayName("phase=ORDER, status=DATA_AUDIT_PASSED(1030) → 返回 [WITHDRAW]")
         void order_phase_auditPassed_shouldReturn_withdraw() {
             List<FlowActionEnum> actions = rules.getAvailableActions(1030, 10, 1);
-            assertEquals(List.of(FlowActionEnum.WITHDRAW), actions);
+            assertEquals(List.of(FlowActionEnum.WITHDRAW, FlowActionEnum.CANCEL), actions);
         }
 
         @Test
         @DisplayName("phase=ORDER, status=DATA_AUDIT_REJECTED(1040) → 返回 [RESUBMIT]")
         void order_phase_auditRejected_shouldReturn_resubmit() {
             List<FlowActionEnum> actions = rules.getAvailableActions(1040, 10, 1);
-            assertEquals(List.of(FlowActionEnum.RESUBMIT), actions);
+            assertEquals(List.of(FlowActionEnum.RESUBMIT, FlowActionEnum.CANCEL), actions);
         }
 
         // ==================== DESIGN 阶段测试 ====================
@@ -74,21 +75,21 @@ class FlowStatusTransitionRulesTest {
         @DisplayName("phase=DESIGN, status=PENDING_DESIGN(2010) → 返回 [START_DESIGN]")
         void design_phase_pendingDesign_shouldReturn_startDesign() {
             List<FlowActionEnum> actions = rules.getAvailableActions(2010, 20, 1);
-            assertEquals(List.of(FlowActionEnum.START_DESIGN), actions);
+            assertEquals(List.of(FlowActionEnum.START_DESIGN, FlowActionEnum.CANCEL), actions);
         }
 
         @Test
         @DisplayName("phase=DESIGN, status=DESIGN_IN_PROGRESS(2020) → 返回 [COMPLETE_DESIGN]")
         void design_phase_designInProgress_shouldReturn_completeDesign() {
             List<FlowActionEnum> actions = rules.getAvailableActions(2020, 20, 1);
-            assertEquals(List.of(FlowActionEnum.COMPLETE_DESIGN), actions);
+            assertEquals(List.of(FlowActionEnum.COMPLETE_DESIGN, FlowActionEnum.CANCEL), actions);
         }
 
         @Test
         @DisplayName("phase=DESIGN, status=DESIGN_COMPLETED(2030) → 返回空列表")
         void design_phase_designCompleted_shouldReturn_empty() {
             List<FlowActionEnum> actions = rules.getAvailableActions(2030, 20, 1);
-            assertTrue(actions.isEmpty());
+            assertEquals(List.of(FlowActionEnum.CANCEL), actions);
         }
 
         // ==================== PRINT 阶段测试 ====================
@@ -97,21 +98,21 @@ class FlowStatusTransitionRulesTest {
         @DisplayName("phase=PRINT, status=PENDING_PRINT(3010), needsPhysicalDelivery=1 → 返回 [START_PRINT]")
         void print_phase_pendingPrint_needDelivery_shouldReturn_startPrint() {
             List<FlowActionEnum> actions = rules.getAvailableActions(3010, 30, 1);
-            assertEquals(List.of(FlowActionEnum.START_PRINT), actions);
+            assertEquals(List.of(FlowActionEnum.START_PRINT, FlowActionEnum.CANCEL), actions);
         }
 
         @Test
         @DisplayName("phase=PRINT, status=PENDING_PRINT(3010), needsPhysicalDelivery=0 → 返回空列表")
         void print_phase_pendingPrint_noDelivery_shouldReturn_empty() {
             List<FlowActionEnum> actions = rules.getAvailableActions(3010, 30, 0);
-            assertTrue(actions.isEmpty());
+            assertEquals(List.of(FlowActionEnum.CANCEL), actions);
         }
 
         @Test
         @DisplayName("phase=PRINT, status=PRINTING(3020) → 返回 [COMPLETE_PRINT]")
         void print_phase_printing_shouldReturn_completePrint() {
             List<FlowActionEnum> actions = rules.getAvailableActions(3020, 30, 1);
-            assertEquals(List.of(FlowActionEnum.COMPLETE_PRINT), actions);
+            assertEquals(List.of(FlowActionEnum.COMPLETE_PRINT, FlowActionEnum.CANCEL), actions);
         }
 
         // ==================== POST_PROCESSING 阶段测试 ====================
@@ -120,14 +121,14 @@ class FlowStatusTransitionRulesTest {
         @DisplayName("phase=POST_PROCESSING, status=POST_PROCESSING(4010), needsPhysicalDelivery=1 → 返回 [COMPLETE_POST_PROCESSING]")
         void postProcessing_phase_needDelivery_shouldReturn_completePostProcessing() {
             List<FlowActionEnum> actions = rules.getAvailableActions(4010, 40, 1);
-            assertEquals(List.of(FlowActionEnum.COMPLETE_POST_PROCESSING), actions);
+            assertEquals(List.of(FlowActionEnum.COMPLETE_POST_PROCESSING, FlowActionEnum.CANCEL), actions);
         }
 
         @Test
         @DisplayName("phase=POST_PROCESSING, status=POST_PROCESSING(4010), needsPhysicalDelivery=0 → 返回空列表")
         void postProcessing_phase_noDelivery_shouldReturn_empty() {
             List<FlowActionEnum> actions = rules.getAvailableActions(4010, 40, 0);
-            assertTrue(actions.isEmpty());
+            assertEquals(List.of(FlowActionEnum.CANCEL), actions);
         }
 
         // ==================== QC 阶段测试 ====================
@@ -136,23 +137,24 @@ class FlowStatusTransitionRulesTest {
         @DisplayName("phase=QC, status=QC_IN_PROGRESS(5010), needsPhysicalDelivery=1 → 返回 [QC_PASS, QC_FAIL]")
         void qc_phase_inProgress_needDelivery_shouldReturn_qcActions() {
             List<FlowActionEnum> actions = rules.getAvailableActions(5010, 50, 1);
-            assertEquals(2, actions.size());
+            assertEquals(3, actions.size());
             assertTrue(actions.contains(FlowActionEnum.QC_PASS));
             assertTrue(actions.contains(FlowActionEnum.QC_FAIL));
+            assertTrue(actions.contains(FlowActionEnum.CANCEL));
         }
 
         @Test
         @DisplayName("phase=QC, status=QC_IN_PROGRESS(5010), needsPhysicalDelivery=0 → 返回空列表")
         void qc_phase_inProgress_noDelivery_shouldReturn_empty() {
             List<FlowActionEnum> actions = rules.getAvailableActions(5010, 50, 0);
-            assertTrue(actions.isEmpty());
+            assertEquals(List.of(FlowActionEnum.CANCEL), actions);
         }
 
         @Test
         @DisplayName("phase=QC, status=QC_FAILED(5030) → 返回 [REWORK]")
         void qc_phase_failed_shouldReturn_rework() {
             List<FlowActionEnum> actions = rules.getAvailableActions(5030, 50, 1);
-            assertEquals(List.of(FlowActionEnum.REWORK), actions);
+            assertEquals(List.of(FlowActionEnum.REWORK, FlowActionEnum.CANCEL), actions);
         }
 
         // ==================== WAREHOUSE 阶段测试 ====================
@@ -161,14 +163,14 @@ class FlowStatusTransitionRulesTest {
         @DisplayName("phase=WAREHOUSE, status=WAREHOUSE_IN(6010), needsPhysicalDelivery=1 → 返回 [COMPLETE_WAREHOUSE_IN]")
         void warehouse_phase_in_needDelivery_shouldReturn_completeWarehouseIn() {
             List<FlowActionEnum> actions = rules.getAvailableActions(6010, 60, 1);
-            assertEquals(List.of(FlowActionEnum.COMPLETE_WAREHOUSE_IN), actions);
+            assertEquals(List.of(FlowActionEnum.COMPLETE_WAREHOUSE_IN, FlowActionEnum.CANCEL), actions);
         }
 
         @Test
         @DisplayName("phase=WAREHOUSE, status=WAREHOUSE_IN(6010), needsPhysicalDelivery=0 → 返回空列表")
         void warehouse_phase_in_noDelivery_shouldReturn_empty() {
             List<FlowActionEnum> actions = rules.getAvailableActions(6010, 60, 0);
-            assertTrue(actions.isEmpty());
+            assertEquals(List.of(FlowActionEnum.CANCEL), actions);
         }
 
         // ==================== CONFIRM 阶段测试 ====================
@@ -177,14 +179,14 @@ class FlowStatusTransitionRulesTest {
         @DisplayName("phase=CONFIRM, status=AWAITING_CONFIRM(7010), needsPhysicalDelivery=0 → 返回 [USER_CONFIRM]")
         void confirm_phase_awaiting_noDelivery_shouldReturn_userConfirm() {
             List<FlowActionEnum> actions = rules.getAvailableActions(7010, 70, 0);
-            assertEquals(List.of(FlowActionEnum.USER_CONFIRM), actions);
+            assertEquals(List.of(FlowActionEnum.USER_CONFIRM, FlowActionEnum.CANCEL), actions);
         }
 
         @Test
         @DisplayName("phase=CONFIRM, status=AWAITING_CONFIRM(7010), needsPhysicalDelivery=1 → 返回空列表（需要生产不应进入此阶段）")
         void confirm_phase_awaiting_needDelivery_shouldReturn_empty() {
             List<FlowActionEnum> actions = rules.getAvailableActions(7010, 70, 1);
-            assertTrue(actions.isEmpty());
+            assertEquals(List.of(FlowActionEnum.CANCEL), actions);
         }
 
         // ==================== COMPLETED 阶段测试 ====================
