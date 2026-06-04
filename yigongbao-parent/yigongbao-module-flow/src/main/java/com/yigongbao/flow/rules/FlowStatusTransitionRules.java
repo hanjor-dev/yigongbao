@@ -143,7 +143,7 @@ public class FlowStatusTransitionRules {
 
             case DESIGN -> switch (status) {
                 case PENDING_DESIGN -> List.of(FlowActionEnum.START_DESIGN);
-                case DESIGN_IN_PROGRESS -> List.of(FlowActionEnum.SUBMIT_DESIGN);
+                case DESIGN_IN_PROGRESS -> List.of(FlowActionEnum.COMPLETE_DESIGN);
                 case DESIGN_COMPLETED -> List.of();
                 default -> List.of();
             };
