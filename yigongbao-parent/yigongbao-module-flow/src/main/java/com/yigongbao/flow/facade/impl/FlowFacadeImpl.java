@@ -33,9 +33,7 @@ public class FlowFacadeImpl implements FlowFacade {
 
     private static final Set<FlowActionEnum> AUDIT_ACTIONS = Set.of(
             FlowActionEnum.DATA_AUDIT_PASS,
-            FlowActionEnum.DATA_AUDIT_REJECT,
-            FlowActionEnum.DESIGN_REVIEW_PASS,
-            FlowActionEnum.DESIGN_REVIEW_REJECT
+            FlowActionEnum.DATA_AUDIT_REJECT
     );
 
     @Override

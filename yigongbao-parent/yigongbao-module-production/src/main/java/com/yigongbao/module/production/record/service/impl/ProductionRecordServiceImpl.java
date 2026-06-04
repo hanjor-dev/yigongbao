@@ -347,7 +347,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 orderMainMapper.updateById(phaseUpdate);
 
                 log.info("所有流转卡已下载，订单推进到下一阶段: orderId={}, {} -> {}",
-                        order.getId(), FlowStatusEnum.DESIGN_REVIEW_PASSED.getValue(), targetStatus);
+                        order.getId(), FlowStatusEnum.DESIGN_COMPLETED.getValue(), targetStatus);
             }
         }
 
