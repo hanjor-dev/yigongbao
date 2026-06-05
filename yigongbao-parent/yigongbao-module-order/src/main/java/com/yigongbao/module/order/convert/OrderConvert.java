@@ -55,6 +55,34 @@ public class OrderConvert {
     }
 
     /**
+     * 填充订单列表VO的审核信息
+     *
+     * @param entity 订单实体
+     * @param vo     订单列表VO
+     */
+    public void fillAuditInfo(OrderMainEntity entity, com.yigongbao.module.order.vo.order.OrderListVO vo) {
+        // 构建区域审核信息（仅试用订单）
+        if ("11.3".equals(entity.getBusinessType()) && entity.getRegionalAuditStatus() != null) {
+            vo.setRegionalAudit(buildAuditInfo(
+                entity.getRegionalAuditStatus(),
+                entity.getRegionalAuditBy(),
+                entity.getRegionalAuditTime(),
+                entity.getRegionalAuditRemark()
+            ));
+        }
+
+        // 构建设计审核信息
+        if (entity.getDesignAuditStatus() != null) {
+            vo.setDesignAudit(buildAuditInfo(
+                entity.getDesignAuditStatus(),
+                entity.getDesignAuditBy(),
+                entity.getDesignAuditTime(),
+                entity.getDesignAuditRemark()
+            ));
+        }
+    }
+
+    /**
      * 计算审核进度描述
      * 根据订单类型和审核状态返回中文描述
      *

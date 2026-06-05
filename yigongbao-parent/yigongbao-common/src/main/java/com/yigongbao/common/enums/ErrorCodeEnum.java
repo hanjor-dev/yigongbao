@@ -94,6 +94,7 @@ public enum ErrorCodeEnum {
     USER_PASSWORD_WEAK(635, "密码必须包含字母和数字，长度6-20位", 3),
     USER_DEPT_REQUIRED(636, "该角色需要选择所属部门", 3),
     USER_DEPT_TYPE_MISMATCH(637, "所选部门类型与角色账户类型不匹配", 3),
+    USER_DEPT_NOT_CONFIGURED(640, "用户未配置部门信息，请联系管理员", 3),
 
     // ==================== 邮箱相关 638 ====================
     USER_EMAIL_EXISTS(638, "邮箱已存在", 3),

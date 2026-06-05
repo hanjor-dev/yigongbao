@@ -120,6 +120,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final ObjectMapper objectMapper;
     private final OrderDataValidator orderDataValidator;
     private final OrderModifyApplyService orderModifyApplyService;
+    private final com.yigongbao.module.order.convert.OrderConvert orderConvert;
 
     /** 打破循环依赖：DesignerAssignmentServiceImpl 反向依赖 OrderMainService */
     @Lazy
@@ -348,6 +349,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             // 批量填充重建项目列表（避免 N+1）
             orderQueryHelper.fillRebuildProjectList(voList);
 
+            // 批量填充审核信息
+            for (int i = 0; i < voList.size(); i++) {
+                orderConvert.fillAuditInfo(pageResult.getRecords().get(i), voList.get(i));
+            }
+
             // 构建返回页（复用分页元信息，替换 records）
             IPage<OrderListVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
             ((Page<OrderListVO>) voPage).setRecords(voList);
@@ -388,6 +394,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         vo.setAvailableActions(flowFacade.getAvailableActions(entity.getId()));
         // 查询订单关联的影像文件列表
         fillOrderFiles(vo, id);
+        // 填充审核信息
+        orderConvert.fillAuditInfo(entity, vo);
         return vo;
     }
 
@@ -654,6 +662,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             if (RoleCodeConstants.REGIONAL_ADMIN.equals(roleCode)) {
                 // 区域管理员审核：只更新区域审核状态
                 Long currentUserDeptId = (Long) StpUtil.getSession().get("deptId");
+                if (currentUserDeptId == null) {
+                    log.error("区域管理员账号未配置部门: userId={}", currentUserId);
+                    throw new BusinessException(ErrorCodeEnum.USER_DEPT_NOT_CONFIGURED);
+                }
                 validateDepartmentPermission(entity, currentUserDeptId);
 
                 LambdaUpdateWrapper<OrderMainEntity> uw = new LambdaUpdateWrapper<>();
@@ -776,6 +788,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             if (RoleCodeConstants.REGIONAL_ADMIN.equals(roleCode)) {
                 // 区域管理员驳回：调用 flowFacade 流转状态
                 Long currentUserDeptId = (Long) StpUtil.getSession().get("deptId");
+                if (currentUserDeptId == null) {
+                    log.error("区域管理员账号未配置部门: userId={}", currentUserId);
+                    throw new BusinessException(ErrorCodeEnum.USER_DEPT_NOT_CONFIGURED);
+                }
                 validateDepartmentPermission(entity, currentUserDeptId);
 
                 String operatorName = getUserRealName(currentUserId);
@@ -816,6 +832,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                         .eq(OrderMainEntity::getStatus, FlowStatusEnum.PENDING_DATA_AUDIT.getValue())
                         .set(OrderMainEntity::getPhase, result.getTargetPhase())
                         .set(OrderMainEntity::getStatus, result.getFinalStatus())
+                        .set(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PENDING)
                         .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.REJECTED)
                         .set(OrderMainEntity::getDesignAuditTime, LocalDateTime.now())
                         .set(OrderMainEntity::getDesignAuditBy, currentUserId)
@@ -895,7 +912,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             LambdaUpdateWrapper<OrderMainEntity> designRejectUw = new LambdaUpdateWrapper<>();
             designRejectUw.eq(OrderMainEntity::getId, id)
                   .eq(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.REJECTED)
-                  .set(OrderMainEntity::getRegionalAuditStatus, null)
+                  .set(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PENDING)
                   .set(OrderMainEntity::getRegionalAuditTime, null)
                   .set(OrderMainEntity::getRegionalAuditBy, null)
                   .set(OrderMainEntity::getRegionalAuditRemark, null)
@@ -916,7 +933,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 LambdaUpdateWrapper<OrderMainEntity> regionalRejectUw = new LambdaUpdateWrapper<>();
                 regionalRejectUw.eq(OrderMainEntity::getId, id)
                       .eq(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.REJECTED)
-                      .set(OrderMainEntity::getRegionalAuditStatus, null)
+                      .set(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PENDING)
                       .set(OrderMainEntity::getRegionalAuditTime, null)
                       .set(OrderMainEntity::getRegionalAuditBy, null)
                       .set(OrderMainEntity::getRegionalAuditRemark, null)
@@ -1055,6 +1072,13 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             order.setPhase(FlowPhaseEnum.ORDER.getValue());
             order.setStatus(FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
             order.setVersion(0);
+            // 试用订单初始化两级审核状态
+            if (DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(draft.getBusinessType())) {
+                order.setRegionalAuditStatus(AuditStatusConstants.PENDING);
+                order.setDesignAuditStatus(AuditStatusConstants.PENDING);
+            } else {
+                order.setDesignAuditStatus(AuditStatusConstants.PENDING);
+            }
             // 从医院表补充地区冗余字段（草稿中已复制 hospitalId，此处补充 area 字段）
             fillAreaFromHospital(order, order.getHospitalId());
 
@@ -1164,6 +1188,13 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         order.setPhase(FlowPhaseEnum.ORDER.getValue());
         order.setStatus(FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
         order.setVersion(0);
+        // 试用订单初始化两级审核状态
+        if (DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(dto.getBusinessType())) {
+            order.setRegionalAuditStatus(AuditStatusConstants.PENDING);
+            order.setDesignAuditStatus(AuditStatusConstants.PENDING);
+        } else {
+            order.setDesignAuditStatus(AuditStatusConstants.PENDING);
+        }
 
         // 操作员信息强制从当前登录用户填充，不信任前端传入值
         UserEntity currentUser = userService.getById(currentUserId);

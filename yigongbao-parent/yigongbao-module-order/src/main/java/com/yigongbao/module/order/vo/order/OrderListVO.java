@@ -1,5 +1,6 @@
 package com.yigongbao.module.order.vo.order;
 
+import com.yigongbao.module.order.vo.AuditInfo;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -242,6 +243,18 @@ public class OrderListVO implements Serializable {
      * 当前状态名称
      */
     private String statusName;
+
+    // ==================== 审核信息 ====================
+
+    /**
+     * 区域审核信息（试用订单专用）
+     */
+    private AuditInfo regionalAudit;
+
+    /**
+     * 设计审核信息
+     */
+    private AuditInfo designAudit;
 
     // ==================== 时间 ====================
 
