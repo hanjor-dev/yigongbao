@@ -57,16 +57,32 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         if (!FlowStatusEnum.PACKING.getValue().equals(record.getStatus())) {
             throw new BusinessException(ErrorCodeEnum.RECORD_NOT_IN_PACKING_STATUS);
         }
-        DeviceEntity device = deviceMapper.selectById(dto.getPackDeviceId());
+
+        // 解析工序参数（包装参数）
+        JSONObject params = parseProcessParams(dto.getProcessParams());
+
+        // 主设备（包装设备）
+        DeviceEntity device = deviceMapper.selectById(dto.getPrimaryDeviceId());
         if (device == null) {
             throw new BusinessException(ErrorCodeEnum.PACK_DEVICE_NOT_FOUND);
         }
-        record.setPackDeviceId(dto.getPackDeviceId());
+        record.setPackDeviceId(dto.getPrimaryDeviceId());
         record.setPackDeviceNo(device.getDeviceId());
-        record.setPackSealTemperature(dto.getPackSealTemperature());
-        record.setPackSealTime(dto.getPackSealTime());
-        record.setPackSterilizationMethod(dto.getPackSterilizationMethod());
-        record.setPackSterilizationBatchNo(dto.getPackSterilizationBatchNo());
+
+        // 从参数中提取包装信息
+        if (params.containsKey("sealTemperature")) {
+            record.setPackSealTemperature(new java.math.BigDecimal(params.getStr("sealTemperature")));
+        }
+        if (params.containsKey("sealTime")) {
+            record.setPackSealTime(params.getInt("sealTime"));
+        }
+        if (params.containsKey("sterilizationMethod")) {
+            record.setPackSterilizationMethod(params.getStr("sterilizationMethod"));
+        }
+        if (params.containsKey("sterilizationBatchNo")) {
+            record.setPackSterilizationBatchNo(params.getStr("sterilizationBatchNo"));
+        }
+
         Long userId = StpUtil.getLoginIdAsLong();
         record.setPackOperatorId(userId);
         UserEntity user = userMapper.selectById(userId);
@@ -75,26 +91,43 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         record.setContentUpdateTime(LocalDateTime.now());
         recordMapper.updateById(record);
 
-        // 同步更新包装工序记录，供 Excel 生成时读取
-        String packParams = buildPackParams(dto);
+        // 同步更新包装工序记录
         var updateWrapper = new LambdaUpdateWrapper<ProductionProcessEntity>()
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)
                 .eq(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PACK.getCode())
-                .set(ProductionProcessEntity::getDeviceId, dto.getPackDeviceId())
+                .set(ProductionProcessEntity::getDeviceId, dto.getPrimaryDeviceId())
                 .set(ProductionProcessEntity::getDeviceNo, device.getDeviceId())
-                .set(ProductionProcessEntity::getDeviceName, device.getDeviceName());
-        if (packParams != null) {
-            updateWrapper.set(ProductionProcessEntity::getProcessParams, packParams);
+                .set(ProductionProcessEntity::getDeviceName, device.getDeviceName())
+                .set(ProductionProcessEntity::getOperatorId, userId)
+                .set(ProductionProcessEntity::getOperatorName, user != null ? user.getRealName() : null)
+                .set(ProductionProcessEntity::getStartTime, LocalDateTime.now())
+                .set(ProductionProcessEntity::getProcessParams, dto.getProcessParams());
+
+        // 辅助设备（可选）
+        if (dto.getSecondaryDeviceId() != null) {
+            DeviceEntity secondaryDevice = deviceMapper.selectById(dto.getSecondaryDeviceId());
+            if (secondaryDevice != null) {
+                updateWrapper.set(ProductionProcessEntity::getSecondaryDeviceId, dto.getSecondaryDeviceId())
+                            .set(ProductionProcessEntity::getSecondaryDeviceNo, secondaryDevice.getDeviceId())
+                            .set(ProductionProcessEntity::getSecondaryDeviceName, secondaryDevice.getDeviceName());
+            }
         }
+
         processMapper.update(null, updateWrapper);
-        log.info("填写包装信息: recordId={}, recordNo={}, packDeviceId={}", recordId, record.getRecordNo(), dto.getPackDeviceId());
+        log.info("填写包装信息: recordId={}, recordNo={}, primaryDeviceId={}",
+            recordId, record.getRecordNo(), dto.getPrimaryDeviceId());
     }
 
-    private String buildPackParams(FillPackDTO dto) {
-        JSONObject p = new JSONObject();
-        if (dto.getPackSealTemperature() != null) p.set("sealTemperature", dto.getPackSealTemperature().toPlainString());
-        if (dto.getPackSealTime() != null) p.set("sealTime", dto.getPackSealTime().toString());
-        return p.isEmpty() ? null : p.toStringPretty();
+    private JSONObject parseProcessParams(String processParams) {
+        if (processParams == null || processParams.isBlank()) {
+            return new JSONObject();
+        }
+        try {
+            return new JSONObject(processParams);
+        } catch (Exception e) {
+            log.warn("解析工序参数失败，使用空对象: processParams={}", processParams, e);
+            return new JSONObject();
+        }
     }
 
     /**
