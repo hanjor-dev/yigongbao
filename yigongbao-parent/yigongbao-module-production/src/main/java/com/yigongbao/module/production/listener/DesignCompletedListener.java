@@ -86,6 +86,17 @@ public class DesignCompletedListener {
         int createdCount = 0;
         for (DesignPackageEntity pkg : packages) {
             try {
+                // 幂等性检查：跳过已创建流转卡的数据包
+                ProductionRecordEntity existingRecord = recordMapper.selectOne(
+                        new LambdaQueryWrapper<ProductionRecordEntity>()
+                                .eq(ProductionRecordEntity::getDesignPackageId, pkg.getId())
+                                .last("LIMIT 1"));
+                if (existingRecord != null) {
+                    log.info("数据包已存在流转卡，跳过创建: packageId=, packageCode={}, recordNo={}",
+                        pkg.getId(), pkg.getPackageCode(), existingRecord.getRecordNo());
+                    continue;
+                }
+
                 ProductionRecordEntity record = createProductionRecord(order, pkg);
                 int productCount = createProductRecords(record, pkg);
                 createProcessRecords(record.getId(), order.getOrderType());

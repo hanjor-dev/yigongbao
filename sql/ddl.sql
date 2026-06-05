@@ -1608,8 +1608,10 @@ CREATE TABLE device_state_log (
     KEY idx_device_id (device_id),
     KEY idx_change_time (change_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备状态变更日志';
+
 -- 生产流转卡表
-CREATE TABLE IF NOT EXISTS production_record (
+DROP TABLE IF EXISTS production_record;
+CREATE TABLE production_record (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
     record_no VARCHAR(50) NOT NULL COMMENT '流转卡编号',
     order_id BIGINT NOT NULL COMMENT '订单ID',
@@ -1662,13 +1664,14 @@ CREATE TABLE IF NOT EXISTS production_record (
     KEY idx_design_package_id (design_package_id),
     KEY idx_status (status),
     KEY idx_production_batch_no (production_batch_no),
-    KEY idx_processing_center_id (processing_center_id),
-    UNIQUE KEY uk_record_no ((CASE WHEN is_deleted = 0 THEN record_no ELSE NULL END))
+    KEY idx_processing_center_id (processing_center_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产流转卡表';
+CREATE UNIQUE INDEX uk_record_no ON production_record ((CASE WHEN is_deleted = 0 THEN record_no ELSE NULL END));
 
 
 -- 生产产品记录表
-CREATE TABLE IF NOT EXISTS production_product (
+DROP TABLE IF EXISTS production_product;
+CREATE TABLE production_product (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
     production_record_id BIGINT NOT NULL COMMENT '流转卡ID',
     print_file_id BIGINT NOT NULL COMMENT '打印文件ID',
@@ -1695,13 +1698,14 @@ CREATE TABLE IF NOT EXISTS production_product (
     update_by BIGINT COMMENT '更新人ID',
     is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
     KEY idx_production_record_id (production_record_id),
-    KEY idx_status (status),
-    UNIQUE KEY uk_product_no ((CASE WHEN is_deleted = 0 THEN product_no ELSE NULL END))
+    KEY idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产产品记录表';
+CREATE UNIQUE INDEX uk_product_no ON production_product ((CASE WHEN is_deleted = 0 THEN product_no ELSE NULL END));
 
 
 -- 工序记录表
-CREATE TABLE IF NOT EXISTS production_process (
+DROP TABLE IF EXISTS production_process;
+CREATE TABLE production_process (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
     production_record_id BIGINT NOT NULL COMMENT '流转卡ID',
     process_type VARCHAR(50) NOT NULL COMMENT '工序类型',
@@ -1735,7 +1739,8 @@ CREATE TABLE IF NOT EXISTS production_process (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工序记录表';
 
 -- 工序流转记录表
-CREATE TABLE IF NOT EXISTS production_process_transfer (
+DROP TABLE IF EXISTS production_process_transfer;
+CREATE TABLE production_process_transfer (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
     production_record_id BIGINT NOT NULL COMMENT '流转卡ID',
     from_process_type VARCHAR(50) NOT NULL COMMENT '来源工序代码',
