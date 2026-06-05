@@ -31,7 +31,6 @@ public class DesignColumnConfigController {
      * 获取当前用户的列配置
      */
     @Operation(summary = "获取列配置")
-    @RequirePermission(value = "design:View")
     @GetMapping
     public Result<DesignColumnConfigVO> getColumnConfig() {
         return Result.success(designWorkorderService.getColumnConfig());
@@ -42,7 +41,6 @@ public class DesignColumnConfigController {
      */
     @Operation(summary = "保存列配置")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "保存列配置")
-    @RequirePermission(value = "design:View")
     @PostMapping
     public Result<Void> saveColumnConfig(@Validated @RequestBody SaveDesignColumnConfigDTO dto) {
         designWorkorderService.saveColumnConfig(dto);

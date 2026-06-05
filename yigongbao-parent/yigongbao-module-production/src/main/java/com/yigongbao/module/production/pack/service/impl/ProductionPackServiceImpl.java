@@ -7,6 +7,7 @@ import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
+import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -151,6 +152,14 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         }
         record.setStatus(FlowStatusEnum.WAREHOUSE_IN.getValue());
         recordMapper.updateById(record);
+
+        // 同步更新包装工序记录的完成时间和状态
+        processMapper.update(null, new LambdaUpdateWrapper<ProductionProcessEntity>()
+                .eq(ProductionProcessEntity::getProductionRecordId, recordId)
+                .eq(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PACK.getCode())
+                .set(ProductionProcessEntity::getEndTime, LocalDateTime.now())
+                .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.COMPLETED.getCode()));
+
         recordService.triggerFlowIfAllExact(record.getOrderId(),
                 FlowStatusEnum.WAREHOUSE_IN.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_IN);
         log.info("包装完成，流转到入库: recordId={}, recordNo={}, orderId={}", recordId, record.getRecordNo(), record.getOrderId());

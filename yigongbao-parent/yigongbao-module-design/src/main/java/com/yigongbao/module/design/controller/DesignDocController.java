@@ -43,7 +43,6 @@ public class DesignDocController {
      * 按需自动生成：若打印信息发生变化则重新生成，否则复用已有文件
      */
     @Operation(summary = "下载指令单（线下模式，按需自动生成）")
-    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/instruction/download")
     public void downloadInstruction(@PathVariable Long orderId,
                                     @PathVariable Long packageId,
@@ -56,7 +55,6 @@ public class DesignDocController {
      * 按需自动生成：若打印信息发生变化则重新生成，否则复用已有文件
      */
     @Operation(summary = "下载图纸（线下模式，按需自动生成）")
-    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/drawing/download")
     public void downloadDrawing(@PathVariable Long orderId,
                                 @PathVariable Long packageId,
@@ -69,7 +67,6 @@ public class DesignDocController {
      * 按需自动生成：若打印信息发生变化则重新生成，否则复用已有文件
      */
     @Operation(summary = "获取指令单预览 URL（在线模式，按需自动生成）")
-    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/instruction/preview-url")
     public Result<DocItemVO> getInstructionPreviewUrl(@PathVariable Long orderId,
                                                        @PathVariable Long packageId) {
@@ -81,7 +78,6 @@ public class DesignDocController {
      * 按需自动生成：若打印信息发生变化则重新生成，否则复用已有文件
      */
     @Operation(summary = "获取图纸预览 URL（在线模式，按需自动生成）")
-    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/drawing/preview-url")
     public Result<DocItemVO> getDrawingPreviewUrl(@PathVariable Long orderId,
                                                    @PathVariable Long packageId) {
@@ -92,7 +88,6 @@ public class DesignDocController {
      * 查询指令单历史版本列表
      */
     @Operation(summary = "查询指令单版本列表")
-    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/instruction/versions")
     public Result<List<DesignDocVersionVO>> listInstructionVersions(@PathVariable Long orderId,
                                                                      @PathVariable Long packageId) {
@@ -103,7 +98,6 @@ public class DesignDocController {
      * 查询图纸历史版本列表
      */
     @Operation(summary = "查询图纸版本列表")
-    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/drawing/versions")
     public Result<List<DesignDocVersionVO>> listDrawingVersions(@PathVariable Long orderId,
                                                                  @PathVariable Long packageId) {
@@ -115,7 +109,6 @@ public class DesignDocController {
      */
     @Operation(summary = "上传修订版指令单")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPLOAD, operation = "上传修订版指令单")
-    @RequirePermission(value = "design:Upload")
     @PostMapping("/{orderId}/package/{packageId}/instruction/upload-revised/{id}")
     public Result<Void> uploadRevisedInstruction(@PathVariable Long orderId,
                                                   @PathVariable Long packageId,
@@ -130,7 +123,6 @@ public class DesignDocController {
      */
     @Operation(summary = "上传修订版图纸")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPLOAD, operation = "上传修订版图纸")
-    @RequirePermission(value = "design:Upload")
     @PostMapping("/{orderId}/package/{packageId}/drawing/upload-revised/{id}")
     public Result<Void> uploadRevisedDrawing(@PathVariable Long orderId,
                                               @PathVariable Long packageId,
@@ -147,7 +139,6 @@ public class DesignDocController {
      */
     @Operation(summary = "确认图纸（在线模式）")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "确认图纸")
-    @RequirePermission(value = "design:Upload")
     @PostMapping("/{orderId}/package/{packageId}/drawing/confirm/{id}")
     public Result<Void> confirmDrawing(@PathVariable Long orderId,
                                        @PathVariable Long packageId,
@@ -163,7 +154,6 @@ public class DesignDocController {
      */
     @Operation(summary = "确认指令单（在线模式）")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "确认指令单")
-    @RequirePermission(value = "design:Upload")
     @PostMapping("/{orderId}/package/{packageId}/instruction/confirm/{id}")
     public Result<Void> confirmInstruction(@PathVariable Long orderId,
                                             @PathVariable Long packageId,
@@ -177,7 +167,6 @@ public class DesignDocController {
      */
     @Operation(summary = "上传数据包文件截图")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPLOAD, operation = "上传数据包文件截图")
-    @RequirePermission(value = "design:Upload")
     @PostMapping("/{orderId}/package/{packageId}/files/{packageFileId}/screenshot")
     public Result<ScreenshotVO> saveScreenshot(@PathVariable Long orderId,
                                                @PathVariable Long packageId,
@@ -190,7 +179,6 @@ public class DesignDocController {
      * 查询数据包文件截图
      */
     @Operation(summary = "查询数据包文件截图")
-    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/files/{packageFileId}/screenshot")
     public Result<ScreenshotVO> getScreenshot(@PathVariable Long orderId,
                                               @PathVariable Long packageId,

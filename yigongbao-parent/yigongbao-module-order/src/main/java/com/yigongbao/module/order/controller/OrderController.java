@@ -55,14 +55,12 @@ public class OrderController {
     // ==================== 草稿接口 ====================
 
     @Operation(summary = "分页查询我的草稿列表")
-    @RequirePermission(value = "order:TabDraft")
     @PostMapping("/draft/list")
     public Result<IPage<OrderDraftVO>> listDrafts(@Valid @RequestBody OrderDraftPageQueryDTO dto) {
         return Result.success(orderDraftService.listDrafts(dto));
     }
 
     @Operation(summary = "查询草稿详情")
-    @RequirePermission(value = "draft:View")
     @GetMapping("/draft/{id}")
     public Result<OrderDraftDetailVO> getDraftDetail(@PathVariable Long id) {
         orderDraftService.validateDraftOwner(id, StpUtil.getLoginIdAsLong());
@@ -71,7 +69,6 @@ public class OrderController {
 
     @Operation(summary = "创建或更新草稿")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.CREATE, operation = "创建或更新草稿")
-    @RequirePermission(value = "draft:Edit")
     @PostMapping("/draft")
     public Result<Long> saveDraft(@Valid @RequestBody CreateOrderDraftDTO dto) {
         return Result.success(orderDraftService.saveDraft(dto));
@@ -79,7 +76,6 @@ public class OrderController {
 
     @Operation(summary = "删除草稿")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.DELETE, operation = "删除草稿")
-    @RequirePermission(value = "draft:Delete")
     @DeleteMapping("/draft/{id}")
     public Result<Void> removeDraft(@PathVariable Long id) {
         orderDraftService.removeDraft(id);
@@ -88,7 +84,6 @@ public class OrderController {
 
     @Operation(summary = "提交草稿，转为正式订单")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.SUBMIT, operation = "提交草稿")
-    @RequirePermission(value = "draft:Submit")
     @PostMapping("/draft/{id}/submit")
     public Result<Long> submitDraft(@PathVariable Long id) {
         return Result.success(orderDraftService.submitDraft(id));
@@ -98,21 +93,18 @@ public class OrderController {
 
     @Operation(summary = "直接创建订单（直提，不经过草稿）")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.CREATE, operation = "创建订单")
-    @RequirePermission(value = "order:Add")
     @PostMapping
     public Result<Long> createOrder(@Valid @RequestBody CreateOrderDTO dto) {
         return Result.success(orderMainService.createOrder(dto));
     }
 
     @Operation(summary = "分页查询订单列表")
-    @RequirePermission(value = "order:TabOrderList")
     @PostMapping("/page")
     public Result<IPage<OrderListVO>> listOrders(@Valid @RequestBody OrderPageDTO dto) {
         return Result.success(orderMainService.listOrders(dto));
     }
 
     @Operation(summary = "查询订单详情")
-    @RequirePermission(value = "order:View")
     @GetMapping("/{id}")
     public Result<OrderDetailVO> getOrderDetail(@PathVariable Long id) {
         return Result.success(orderMainService.getOrderDetail(id));
@@ -120,7 +112,6 @@ public class OrderController {
 
     @Operation(summary = "提交订单")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.SUBMIT, operation = "提交订单")
-    @RequirePermission(value = "order:Add")
     @PostMapping("/{id}/submit")
     public Result<Void> submitOrder(@PathVariable Long id) {
         orderMainService.submitOrder(id);
@@ -129,7 +120,6 @@ public class OrderController {
 
     @Operation(summary = "撤回订单")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "撤回订单")
-    @RequirePermission(value = "order:TabDraft")
     @PostMapping("/{id}/withdraw")
     public Result<Void> withdrawOrder(@PathVariable Long id) {
         orderMainService.withdrawOrder(id);
@@ -138,7 +128,6 @@ public class OrderController {
 
     @Operation(summary = "审核通过")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.AUDIT, operation = "审核通过")
-    @RequirePermission(value = "order:Approve")
     @PostMapping("/{id}/audit-pass")
     public Result<Void> auditPass(@PathVariable Long id, @Valid @RequestBody AuditOrderDTO dto) {
         orderMainService.auditPass(id, dto);
@@ -147,7 +136,6 @@ public class OrderController {
 
     @Operation(summary = "审核驳回")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.AUDIT, operation = "审核驳回")
-    @RequirePermission(value = "order:Reject")
     @PostMapping("/{id}/audit-reject")
     public Result<Void> auditReject(@PathVariable Long id, @Valid @RequestBody AuditOrderDTO dto) {
         orderMainService.auditReject(id, dto);
@@ -156,7 +144,6 @@ public class OrderController {
 
     @Operation(summary = "重新提交订单")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "重新提交订单")
-    @RequirePermission(value = "order:Resubmit")
     @PostMapping("/{id}/resubmit")
     public Result<Void> resubmit(@PathVariable Long id) {
         orderMainService.resubmit(id);
@@ -165,7 +152,6 @@ public class OrderController {
 
     @Operation(summary = "取消订单")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.CANCEL, operation = "取消订单")
-    @RequirePermission(value = "order:Cancel")
     @PostMapping("/{id}/cancel")
     public Result<Void> cancelOrder(@PathVariable Long id) {
         orderMainService.cancelOrder(id);
@@ -194,7 +180,6 @@ public class OrderController {
 
     @Operation(summary = "手动分配设计师（管理员）")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.ASSIGN, operation = "分配设计师")
-    @RequirePermission(value = "design:AssignDesigner")
     @PostMapping("/{id}/assign-designer")
     public Result<Void> assignDesigner(@PathVariable Long id, @Valid @RequestBody AssignDesignerDTO dto) {
         designerAssignmentService.manualAssignDesigner(id, dto.getDesignerId());
@@ -229,7 +214,6 @@ public class OrderController {
 
     @Operation(summary = "导出订单列表（Excel）")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.EXPORT, operation = "导出订单")
-    @RequirePermission(value = "order:BatchExport")
     @PostMapping("/export")
     public void exportOrders(@RequestBody OrderExportQueryDTO dto, HttpServletResponse response) {
         orderExportService.exportOrders(dto, response);

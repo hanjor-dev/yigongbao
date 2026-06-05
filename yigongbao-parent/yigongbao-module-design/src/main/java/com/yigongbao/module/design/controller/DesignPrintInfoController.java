@@ -32,7 +32,6 @@ public class DesignPrintInfoController {
      * 获取打印信息选项数据（产品树、材质、颜色）以及包级已保存回显字段
      */
     @Operation(summary = "获取打印信息选项")
-    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}/package/{packageId}/print-info/options")
     public Result<PrintInfoOptionsVO> getOptions(@PathVariable Long orderId,
                                                   @PathVariable Long packageId) {
@@ -43,7 +42,6 @@ public class DesignPrintInfoController {
      * 查询数据包打印信息列表
      */
     @Operation(summary = "查询打印信息列表")
-    @RequirePermission(value = "design:PrintInfo")
     @GetMapping("/{orderId}/package/{packageId}/print-info")
     public Result<PrintInfoListVO> listPrintInfo(@PathVariable Long orderId,
                                                 @PathVariable Long packageId) {
@@ -55,7 +53,6 @@ public class DesignPrintInfoController {
      */
     @Operation(summary = "保存打印信息（整包替换）")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "保存打印信息")
-    @RequirePermission(value = "design:PrintInfo")
     @PostMapping("/{orderId}/package/{packageId}/print-info")
     public Result<Void> savePrintInfo(@PathVariable Long orderId,
                                       @PathVariable Long packageId,
@@ -69,7 +66,6 @@ public class DesignPrintInfoController {
      */
     @Operation(summary = "删除单条打印信息")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.DELETE, operation = "删除打印信息")
-    @RequirePermission(value = "design:PrintInfo")
     @DeleteMapping("/{orderId}/package/{packageId}/print-info/{printInfoId}")
     public Result<Void> deletePrintInfo(@PathVariable Long orderId,
                                          @PathVariable Long packageId,

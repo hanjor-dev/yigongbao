@@ -69,7 +69,6 @@ class OrderClassicCaseServiceImplTest {
             order.setIsClassicCase(StatusConstants.NO);
 
             when(orderMainMapper.selectById(1L)).thenReturn(order);
-            when(orderMainMapper.updateById(any())).thenReturn(1);
 
             classicCaseService.markAsClassicCase(dto);
 
@@ -139,8 +138,6 @@ class OrderClassicCaseServiceImplTest {
         ClassicCaseQueryDTO dto = new ClassicCaseQueryDTO();
         dto.setPageNum(1);
         dto.setPageSize(10);
-        dto.setOrderCode("ORD");
-        dto.setPatientName("张");
 
         OrderMainEntity order1 = new OrderMainEntity();
         order1.setId(1L);

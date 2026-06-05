@@ -76,7 +76,6 @@ public class ConfigController {
      * @return 创建结果
      */
     @Operation(summary = "创建配置")
-    @RequirePermission("param:Add")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.CREATE,
@@ -96,7 +95,6 @@ public class ConfigController {
      * @return 更新结果
      */
     @Operation(summary = "更新配置")
-    @RequirePermission("param:Edit")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -115,7 +113,6 @@ public class ConfigController {
      * @return 删除结果
      */
     @Operation(summary = "删除配置")
-    @RequirePermission("param:Delete")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.DELETE,

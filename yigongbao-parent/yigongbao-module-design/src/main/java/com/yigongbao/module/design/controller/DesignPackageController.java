@@ -39,7 +39,6 @@ public class DesignPackageController {
      */
     @Operation(summary = "上传打印文件数据包")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPLOAD, operation = "上传打印文件数据包")
-    @RequirePermission(value = "design:Upload")
     @PostMapping("/package/upload")
     public Result<DesignPackageVO> uploadPackage(
             @Parameter(description = "订单ID") @RequestParam Long orderId,
@@ -52,7 +51,6 @@ public class DesignPackageController {
      */
     @Operation(summary = "删除数据包")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.DELETE, operation = "删除数据包")
-    @RequirePermission(value = "design:Upload")
     @DeleteMapping("/package/{packageId}")
     public Result<Void> deletePackage(
             @Parameter(description = "订单ID") @RequestParam Long orderId,
@@ -65,7 +63,6 @@ public class DesignPackageController {
      * 获取订单下所有数据包列表（含包内文件）
      */
     @Operation(summary = "获取数据包列表")
-    @RequirePermission(value = "design:View")
     @GetMapping("/packages")
     public Result<List<DesignPackageVO>> listPackages(
             @Parameter(description = "订单ID") @RequestParam Long orderId) {
@@ -76,7 +73,6 @@ public class DesignPackageController {
      * 获取数据包包内文件列表
      */
     @Operation(summary = "获取数据包包内文件列表")
-    @RequirePermission(value = "design:View")
     @GetMapping("/package/{packageId}/files")
     public Result<List<DesignPackageFileVO>> listPackageFiles(
             @Parameter(description = "订单ID") @RequestParam Long orderId,

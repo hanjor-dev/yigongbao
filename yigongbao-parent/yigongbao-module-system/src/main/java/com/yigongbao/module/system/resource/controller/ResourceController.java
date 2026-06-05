@@ -65,7 +65,6 @@ public class ResourceController {
      * 新增资源
      */
     @Operation(summary = "新增资源")
-    @RequirePermission("resource:Add")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.CREATE,
@@ -81,7 +80,6 @@ public class ResourceController {
      * 更新资源
      */
     @Operation(summary = "更新资源")
-    @RequirePermission("resource:Edit")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -97,7 +95,6 @@ public class ResourceController {
      * 删除资源
      */
     @Operation(summary = "删除资源")
-    @RequirePermission("resource:Delete")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.DELETE,
@@ -117,7 +114,6 @@ public class ResourceController {
      * @return 操作结果
      */
     @Operation(summary = "修改资源状态")
-    @RequirePermission("resource:Edit")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -142,7 +138,6 @@ public class ResourceController {
      * 分配角色资源
      */
     @Operation(summary = "分配角色资源")
-    @RequirePermission("role:config")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.ASSIGN,

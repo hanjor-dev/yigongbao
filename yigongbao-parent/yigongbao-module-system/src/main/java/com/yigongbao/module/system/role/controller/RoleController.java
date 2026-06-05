@@ -65,7 +65,6 @@ public class RoleController {
      * @return 创建结果
      */
     @Operation(summary = "创建角色")
-    @RequirePermission("role:Add")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.CREATE,
@@ -85,7 +84,6 @@ public class RoleController {
      * @return 更新结果
      */
     @Operation(summary = "更新角色")
-    @RequirePermission("role:Edit")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -104,7 +102,6 @@ public class RoleController {
      * @return 删除结果
      */
     @Operation(summary = "删除角色")
-    @RequirePermission("role:Delete")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.DELETE,
@@ -124,7 +121,6 @@ public class RoleController {
      * @return 操作结果
      */
     @Operation(summary = "修改角色状态")
-    @RequirePermission("role:Status")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.UPDATE,

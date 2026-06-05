@@ -67,7 +67,6 @@ public class OrgController {
      * @return 创建结果
      */
     @Operation(summary = "创建机构")
-    @RequirePermission("org:Add")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.CREATE,
@@ -87,7 +86,6 @@ public class OrgController {
      * @return 更新结果
      */
     @Operation(summary = "更新机构")
-    @RequirePermission("org:Edit")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -106,7 +104,6 @@ public class OrgController {
      * @return 删除结果
      */
     @Operation(summary = "删除机构")
-    @RequirePermission("org:Delete")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.DELETE,
@@ -126,7 +123,6 @@ public class OrgController {
      * @return 操作结果
      */
     @Operation(summary = "修改机构状态")
-    @RequirePermission("org:Status")
     @OperationLog(
             module = "系统管理",
             businessType = OperationTypeEnum.UPDATE,

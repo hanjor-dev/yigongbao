@@ -45,7 +45,6 @@ public class OperationLogController {
      * 导出操作日志
      */
     @Operation(summary = "导出操作日志")
-    @RequirePermission(value = "log:Export")
     @PostMapping("/export")
     public void export(@RequestBody OperationLogQueryDTO dto, HttpServletResponse response) {
         operationLogService.exportLogs(dto, response);

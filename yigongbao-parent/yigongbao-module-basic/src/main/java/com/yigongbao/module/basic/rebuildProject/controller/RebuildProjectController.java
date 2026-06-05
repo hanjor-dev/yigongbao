@@ -91,7 +91,6 @@ public class RebuildProjectController {
      * 创建项目
      */
     @Operation(summary = "创建项目")
-    @RequirePermission("project:Add")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.CREATE,
@@ -107,7 +106,6 @@ public class RebuildProjectController {
      * 更新项目
      */
     @Operation(summary = "更新项目")
-    @RequirePermission("project:Edit")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -123,7 +121,6 @@ public class RebuildProjectController {
      * 删除项目
      */
     @Operation(summary = "删除项目")
-    @RequirePermission("project:Delete")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.DELETE,
@@ -139,7 +136,6 @@ public class RebuildProjectController {
      * 修改项目状态
      */
     @Operation(summary = "修改项目状态")
-    @RequirePermission("project:Status")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.UPDATE,

@@ -49,7 +49,6 @@ public class OrderModifyApplyController {
                     + "② items（14.3 重建项目）：全量替换列表\n"
                     + "③ imageDataFileIds / imageReportFileIds（14.2 影像文件）：全量替换文件ID列表")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "直接修改订单")
-    @RequirePermission(value = "order:Modify")
     @PutMapping("/{orderId}/direct")
     public Result<Void> directModify(@PathVariable Long orderId,
             @Valid @RequestBody ExecuteModifyDTO dto) {
@@ -60,7 +59,6 @@ public class OrderModifyApplyController {
     @Operation(summary = "全量修改订单",
             description = "前端传入完整订单数据，后端自动判断变更内容并应用。")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "全量修改订单")
-    @RequirePermission(value = "order:Modify")
     @PutMapping("/{orderId}/full")
     public Result<Void> modifyOrderFull(@PathVariable Long orderId,
             @Valid @RequestBody OrderModifyFullDTO dto) {
@@ -69,7 +67,6 @@ public class OrderModifyApplyController {
     }
 
     @Operation(summary = "查询订单的修改留痕记录（分页）")
-    @RequirePermission(value = "order:View")
     @PostMapping("/{orderId}/logs")
     public Result<IPage<ModificationLogVO>> listModificationLogs(@PathVariable Long orderId,
             @RequestBody ModificationLogPageQueryDTO dto) {

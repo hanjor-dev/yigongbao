@@ -15,10 +15,10 @@ public final class RoleCodeConstants {
     /**
      * 区域管理员
      */
-    public static final String REGIONAL_ADMIN = "REGIONAL_ADMIN";
+    public static final String REGIONAL_ADMIN = "regional-manager";
 
     /**
      * 设计管理员
      */
-    public static final String DESIGN_ADMIN = "DESIGN_ADMIN";
+    public static final String DESIGN_ADMIN = "designer-manager";
 }

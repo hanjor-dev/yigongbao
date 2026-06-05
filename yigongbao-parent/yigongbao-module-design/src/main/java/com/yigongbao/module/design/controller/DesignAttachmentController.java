@@ -42,7 +42,6 @@ public class DesignAttachmentController {
      */
     @Operation(summary = "批量关联可视化模型")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPLOAD, operation = "关联可视化模型")
-    @RequirePermission(value = "design:Upload")
     @PostMapping("/models/link")
     public Result<List<DesignModelVO>> linkModels(@Valid @RequestBody LinkFilesDTO dto) {
         return Result.success(designFileService.linkModels(dto.getOrderId(), dto.getFileIds()));
@@ -53,7 +52,6 @@ public class DesignAttachmentController {
      */
     @Operation(summary = "删除可视化模型")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.DELETE, operation = "删除可视化模型")
-    @RequirePermission(value = "design:Upload")
     @DeleteMapping("/model/{modelId}")
     public Result<Void> deleteModel(
             @Parameter(description = "订单ID") @RequestParam Long orderId,
@@ -66,7 +64,6 @@ public class DesignAttachmentController {
      * 获取可视化模型列表
      */
     @Operation(summary = "获取可视化模型列表")
-    @RequirePermission(value = "design:View")
     @GetMapping("/models")
     public Result<List<DesignModelVO>> listModels(
             @Parameter(description = "订单ID") @RequestParam Long orderId) {
@@ -80,7 +77,6 @@ public class DesignAttachmentController {
      */
     @Operation(summary = "关联设计报告")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPLOAD, operation = "关联设计报告")
-    @RequirePermission(value = "design:Upload")
     @PostMapping("/report/link")
     public Result<FileVO> linkReport(@Valid @RequestBody LinkFilesDTO dto) {
         return Result.success(designFileService.linkReport(dto.getOrderId(), dto.getFileIds().get(0)));
@@ -91,7 +87,6 @@ public class DesignAttachmentController {
      */
     @Operation(summary = "删除设计报告")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.DELETE, operation = "删除设计报告")
-    @RequirePermission(value = "design:Upload")
     @DeleteMapping("/report/{fileId}")
     public Result<Void> deleteReport(
             @Parameter(description = "订单ID") @RequestParam Long orderId,
@@ -104,7 +99,6 @@ public class DesignAttachmentController {
      * 获取设计报告
      */
     @Operation(summary = "获取设计报告")
-    @RequirePermission(value = "design:View")
     @GetMapping("/report")
     public Result<FileVO> getReport(
             @Parameter(description = "订单ID") @RequestParam Long orderId) {

@@ -45,7 +45,6 @@ class ProductionPackServiceImplTest {
     @Test
     void fillPackInfo_deviceNotFound_throwsException() {
         FillPackDTO dto = new FillPackDTO();
-        dto.setPackDeviceId(5L);
         when(recordMapper.selectById(1L)).thenReturn(record(1L));
         when(deviceMapper.selectById(5L)).thenReturn(null);
 
@@ -59,8 +58,7 @@ class ProductionPackServiceImplTest {
     @Test
     void fillPackInfo_success_updatesPackFields() {
         FillPackDTO dto = new FillPackDTO();
-        dto.setPackDeviceId(5L);
-        dto.setPackSterilizationBatchNo("BATCH-S-001");
+
         DeviceEntity device = new DeviceEntity();
         device.setId(5L);
         device.setDeviceId("PACK-DEV-001");

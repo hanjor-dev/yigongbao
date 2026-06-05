@@ -60,7 +60,6 @@ public class DoctorController {
     }
 
     @Operation(summary = "创建医生")
-    @RequirePermission("doctor:Add")
     @OperationLog(module = "系统管理", businessType = OperationTypeEnum.CREATE, operation = "创建医生")
     @PostMapping
     public Result<Void> create(@Validated @RequestBody CreateDoctorDTO dto) {
@@ -69,7 +68,6 @@ public class DoctorController {
     }
 
     @Operation(summary = "更新医生")
-    @RequirePermission("doctor:Edit")
     @OperationLog(module = "系统管理", businessType = OperationTypeEnum.UPDATE, operation = "更新医生")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @Validated @RequestBody UpdateDoctorDTO dto) {
@@ -78,7 +76,6 @@ public class DoctorController {
     }
 
     @Operation(summary = "删除医生")
-    @RequirePermission("doctor:Delete")
     @OperationLog(module = "系统管理", businessType = OperationTypeEnum.DELETE, operation = "删除医生")
     @DeleteMapping("/{id}")
     public Result<Void> remove(@PathVariable Long id) {
@@ -87,7 +84,6 @@ public class DoctorController {
     }
 
     @Operation(summary = "修改状态")
-    @RequirePermission("doctor:Status")
     @OperationLog(module = "系统管理", businessType = OperationTypeEnum.UPDATE, operation = "修改医生状态")
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(
@@ -104,7 +100,6 @@ public class DoctorController {
     }
 
     @Operation(summary = "快速添加医生")
-    @RequirePermission("doctor:Add")
     @OperationLog(module = "系统管理", businessType = OperationTypeEnum.CREATE, operation = "快速添加医生")
     @PostMapping("/quick-add")
     public Result<DoctorVO> quickAdd(@Validated @RequestBody QuickAddDoctorDTO dto) {

@@ -144,7 +144,7 @@ public interface UserMapper extends BaseMapper<UserEntity> {
         INNER JOIN sys_role r ON u.role_id = r.id AND r.is_deleted = 0
         INNER JOIN sys_role_resource rr ON r.id = rr.role_id
         INNER JOIN sys_resource res ON rr.resource_id = res.id
-            AND res.resource_code = 'design:StartDesign'
+            AND res.resource_code = 'design:Start'
             AND res.is_deleted = 0
         WHERE u.status = 1
           AND u.is_deleted = 0

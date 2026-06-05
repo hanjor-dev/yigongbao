@@ -62,7 +62,6 @@ public class RegistrationCertController {
      * @return 操作结果
      */
     @Operation(summary = "创建注册证")
-    @RequirePermission("registration-cert:Add")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.CREATE,
@@ -82,7 +81,6 @@ public class RegistrationCertController {
      * @return 操作结果
      */
     @Operation(summary = "更新注册证信息")
-    @RequirePermission("registration-cert:Edit")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.UPDATE,
@@ -101,7 +99,6 @@ public class RegistrationCertController {
      * @return 操作结果
      */
     @Operation(summary = "删除注册证")
-    @RequirePermission("registration-cert:Delete")
     @OperationLog(
             module = "基础管理",
             businessType = OperationTypeEnum.DELETE,

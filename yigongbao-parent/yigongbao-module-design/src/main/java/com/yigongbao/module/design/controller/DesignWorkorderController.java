@@ -33,7 +33,6 @@ public class DesignWorkorderController {
      * 分页查询设计工单列表
      */
     @Operation(summary = "分页查询设计工单列表")
-    @RequirePermission(value = "design:View")
     @PostMapping("/list")
     public Result<IPage<DesignWorkorderListVO>> listWorkorders(@Validated @RequestBody DesignWorkorderQueryDTO queryDTO) {
         return Result.success(designWorkorderService.listWorkorders(queryDTO));
@@ -43,7 +42,6 @@ public class DesignWorkorderController {
      * 获取设计工单详情
      */
     @Operation(summary = "获取设计工单详情")
-    @RequirePermission(value = "design:View")
     @GetMapping("/{orderId}")
     public Result<DesignWorkorderDetailVO> getWorkorderDetail(@PathVariable Long orderId) {
         return Result.success(designWorkorderService.getWorkorderDetail(orderId));
@@ -55,7 +53,6 @@ public class DesignWorkorderController {
      */
     @Operation(summary = "设计师开始设计")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "开始设计")
-    @RequirePermission(value = "design:StartDesign")
     @PostMapping("/{orderId}/start-design")
     public Result<Void> startDesign(@PathVariable Long orderId) {
         designWorkorderService.startDesign(orderId);
@@ -67,7 +64,6 @@ public class DesignWorkorderController {
      * GET /design/workorder/{orderId}/assignment-history
      */
     @Operation(summary = "查询订单设计师分配历史")
-    @RequirePermission(value = "design:AssignDesignerLog")
     @GetMapping("/{orderId}/assignment-history")
     public Result<java.util.List<com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO>> getAssignmentHistory(@PathVariable Long orderId) {
         return Result.success(designWorkorderService.listAssignmentHistory(orderId));
