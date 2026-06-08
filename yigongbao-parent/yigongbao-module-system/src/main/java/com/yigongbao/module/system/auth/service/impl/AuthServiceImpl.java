@@ -3,6 +3,9 @@ package com.yigongbao.module.system.auth.service.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.yigongbao.framework.util.IpLocationUtil;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -12,6 +15,7 @@ import com.yigongbao.module.system.auth.dto.ChangePasswordDTO;
 import com.yigongbao.module.system.auth.dto.ForgotPasswordResetDTO;
 import com.yigongbao.module.system.auth.dto.LoginDTO;
 import com.yigongbao.module.system.auth.dto.SendCaptchaDTO;
+import com.yigongbao.module.system.auth.convert.LoginLogConvert;
 import com.yigongbao.module.system.auth.entity.LoginLogEntity;
 import com.yigongbao.module.system.auth.enums.CaptchaSceneEnum;
 import com.yigongbao.module.system.auth.enums.LoginTypeEnum;
@@ -19,6 +23,7 @@ import com.yigongbao.module.system.auth.mapper.LoginLogMapper;
 import com.yigongbao.module.system.auth.service.AuthService;
 import com.yigongbao.module.system.auth.service.CaptchaService;
 import com.yigongbao.module.system.auth.service.ImageCaptchaService;
+import com.yigongbao.module.system.auth.vo.LoginLogVO;
 import com.yigongbao.module.system.auth.vo.LoginVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.resource.service.ResourceService;
@@ -33,6 +38,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 import java.time.LocalDateTime;
 
@@ -183,6 +190,8 @@ public class AuthServiceImpl implements AuthService {
      * 构建登录成功响应并执行 Sa-Token 登录
      */
     private LoginVO buildLoginSuccess(UserEntity user, String principal, String loginType, String ip, String userAgent) {
+        // TODO: WebSocket推送被踢出通知（需在StpUtil.login前获取旧token，登录后推送给旧会话）
+
         StpUtil.login(user.getId());
         StpUtil.getSession().set("username", user.getUsername());
         StpUtil.getSession().set("realName", user.getRealName());
@@ -348,12 +357,16 @@ public class AuthServiceImpl implements AuthService {
 
     private void saveLoginLog(Long userId, String principal, String loginType, String ip, String userAgent, Integer status, String failReason) {
         try {
+            // 解析IP归属地
+            String location = IpLocationUtil.getLocation(ip);
+
             LoginLogEntity logEntity = new LoginLogEntity();
             logEntity.setUserId(userId);
             logEntity.setUsername(principal);
             logEntity.setLoginType(loginType);
             logEntity.setIp(ip);
             logEntity.setUserAgent(userAgent);
+            logEntity.setLocation(location);
             logEntity.setLoginTime(LocalDateTime.now());
             logEntity.setLoginStatus(status);
             logEntity.setFailReason(failReason);
@@ -474,5 +487,40 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    // ==================== 登录历史查询 ====================
+
+    @Override
+    public LoginLogVO getPreviousLogin() {
+        Long userId = StpUtil.getLoginIdAsLong();
+        var logs = loginLogMapper.selectList(
+                new LambdaQueryWrapper<LoginLogEntity>()
+                        .eq(LoginLogEntity::getUserId, userId)
+                        .eq(LoginLogEntity::getLoginStatus, 1)
+                        .orderByDesc(LoginLogEntity::getLoginTime)
+                        .last("LIMIT 1 OFFSET 1")
+        );
+        return logs.isEmpty() ? null : LoginLogConvert.toVO(logs.get(0));
+    }
+
+    @Override
+    public List<LoginLogVO> getLoginHistory(Integer limit) {
+        if (limit <= 0) {
+            limit = 30;
+        }
+        if (limit > 100) {
+            limit = 100;
+        }
+        Long userId = StpUtil.getLoginIdAsLong();
+
+        Page<LoginLogEntity> page = new Page<>(1, limit);
+        page = loginLogMapper.selectPage(page,
+                new LambdaQueryWrapper<LoginLogEntity>()
+                        .eq(LoginLogEntity::getUserId, userId)
+                        .eq(LoginLogEntity::getLoginStatus, 1)
+                        .orderByDesc(LoginLogEntity::getLoginTime)
+        );
+        return page.getRecords().stream().map(LoginLogConvert::toVO).toList();
     }
 }

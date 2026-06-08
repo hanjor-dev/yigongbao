@@ -92,4 +92,13 @@ public interface ConfigService extends IService<ConfigEntity> {
      * @return 配置值，兜底值也不可能为 null（除非环境严重异常）
      */
     String getConfigValue(String configKey);
+
+    /**
+     * 根据键名获取配置值（整数类型）
+     *
+     * @param configKey 配置键
+     * @param defaultValue 默认值
+     * @return 配置值（整数），如果配置不存在或解析失败则返回默认值
+     */
+    Integer getConfigValueAsInt(String configKey, Integer defaultValue);
 }

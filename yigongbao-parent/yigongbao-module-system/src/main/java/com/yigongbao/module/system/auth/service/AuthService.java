@@ -4,7 +4,10 @@ import com.yigongbao.module.system.auth.dto.ChangePasswordDTO;
 import com.yigongbao.module.system.auth.dto.ForgotPasswordResetDTO;
 import com.yigongbao.module.system.auth.dto.LoginDTO;
 import com.yigongbao.module.system.auth.dto.SendCaptchaDTO;
+import com.yigongbao.module.system.auth.vo.LoginLogVO;
 import com.yigongbao.module.system.auth.vo.LoginVO;
+
+import java.util.List;
 
 /**
  * 认证 Service
@@ -62,4 +65,19 @@ public interface AuthService {
      * @param dto 重置密码参数
      */
     void resetPassword(ForgotPasswordResetDTO dto);
+
+    /**
+     * 获取上一次登录记录（被踢出时查看）
+     *
+     * @return 上一次登录记录，无记录返回null
+     */
+    LoginLogVO getPreviousLogin();
+
+    /**
+     * 获取登录历史记录
+     *
+     * @param limit 返回记录数，默认30，最大100
+     * @return 登录历史列表（仅成功记录）
+     */
+    List<LoginLogVO> getLoginHistory(Integer limit);
 }

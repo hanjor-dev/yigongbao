@@ -116,10 +116,10 @@ public enum SystemConfigKeyEnum {
     ORDER_COLUMN_CONFIG("order.column.config", "订单列表默认列配置"),
 
     /**
-     * 订单修改申请字段配置（JSON 格式，顶层 key 为申请类型字典编码）
-     * 例：{"14.1":{"name":"基础信息","fields":[...]}}
+     * 订单修改申请过期时间（分钟）
+     * 默认 10 分钟
      */
-    ORDER_MODIFY_FIELD_CONFIG("order.modify.field.config", "订单修改申请字段配置"),
+    ORDER_MODIFY_APPLY_EXPIRE_MINUTES("order.modify.apply.expire.minutes", "订单修改申请过期时间（分钟）"),
 
     // ==================== 流程状态机配置 ====================
     /**

@@ -365,6 +365,20 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
         return null;
     }
 
+    @Override
+    public Integer getConfigValueAsInt(String configKey, Integer defaultValue) {
+        String value = getConfigValue(configKey);
+        if (StrUtil.isBlank(value)) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            log.warn("配置值无法转换为整数: configKey={}, value={}, 使用默认值={}", configKey, value, defaultValue);
+            return defaultValue;
+        }
+    }
+
     /**
      * 从 DefaultConfigProperties 中获取兜底默认值
      * 通过 configKey 动态构建字段名，使用反射自动查找，无需手写 switch 映射

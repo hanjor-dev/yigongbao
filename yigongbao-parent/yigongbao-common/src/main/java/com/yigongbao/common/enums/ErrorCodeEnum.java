@@ -275,6 +275,14 @@ public enum ErrorCodeEnum {
     ORDER_MODIFY_INCOMPLETE(732, "申请类型 {0} 未提供修改内容，请补充后重新提交", 3),
     ORDER_VERSION_CONFLICT(733, "订单数据已被修改，请刷新页面后重新操作", 3),
 
+    // ==================== 修改申请审核（734-739）====================
+    ORDER_MODIFY_APPLY_PENDING(734, "该订单存在待审核的修改申请，请先处理", 3),
+    ORDER_MODIFY_APPLY_NOT_PENDING(735, "申请不是待审核状态", 3),
+    ORDER_MODIFY_APPLY_EXPIRED(736, "申请已过期", 3),
+    ORDER_MODIFY_DESIGNER_NOT_ALLOWED(737, "设计师不允许提交修改申请", 3),
+    ORDER_MODIFY_AUDIT_NO_PERMISSION(738, "无权限审核修改申请", 3),
+    ORDER_MODIFY_TIME_WINDOW_EXCEEDED(739, "订单修改时间已超限，请提交申请", 3),
+
     // ==================== 产品规格相关 754-756 ====================
     PRODUCT_HAS_SPECS(754, "产品下存在规格，无法删除", 4),
     PRODUCT_SPEC_NOT_FOUND(755, "产品规格不存在", 4),

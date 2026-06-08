@@ -238,10 +238,7 @@ INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, so
 VALUES (81, 0, '14', '订单修改申请类型', NULL, 1, 14, 1);
 
 INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
-VALUES
-(82, 81, '14.1', '基础信息', 'INFO', 2, 1, 1),
-(83, 81, '14.2', '影像文件', 'IMAGE', 2, 2, 1),
-(84, 81, '14.3', '重建项目', 'ITEM', 2, 3, 1);
+VALUES (82, 81, '14.1', '全量修改', 'FULL', 2, 1, 1);
 
 -- ------------------------------------------------------------
 -- 打印材质（父节点 id=85，dict_code=15）
@@ -323,7 +320,8 @@ VALUES
 ('order.image.required', '提交订单是否必须上传影像文件', 'false', 'boolean', 'system', 'true-必须上传，false-非必填', 1, 0, 2, 1),
 ('order.draft.expire.days', '草稿自动过期天数', '30', 'number', 'system', '草稿超过此天数自动过期（天）', 1, 0, 3, 1),
 ('order.modify.window.minutes', '订单提交后修改窗口期', '10', 'number', 'system', '订单提交后允许修改的时间窗口（分钟）', 1, 0, 4, 1),
-('flow.max.audit.reject', '最大允许的审核驳回次数', '3', 'number', 'system', '审核驳回超过此次数后不再允许提交', 1, 0, 5, 1),
+('order.modify.apply.expire.minutes', '订单修改申请过期时间', '10', 'number', 'system', '订单修改申请提交后的有效期（分钟）', 1, 0, 5, 1),
+('flow.max.audit.reject', '最大允许的审核驳回次数', '3', 'number', 'system', '审核驳回超过此次数后不再允许提交', 1, 0, 6, 1),
 ('flow.max.rework', '最大允许的返工次数', '2', 'number', 'system', '返工超过此次数后不再允许继续', 1, 0, 6, 1),
 ('flow.max.design.reject', '最大允许的设计审核驳回次数', '3', 'number', 'system', '设计审核驳回超过此次数后不再允许提交', 1, 0, 7, 1),
 ('design.assign.mode', '设计师分配模式', 'auto', 'string', 'system', 'auto-自动分配，manual-手动分配', 1, 0, 8, 1),

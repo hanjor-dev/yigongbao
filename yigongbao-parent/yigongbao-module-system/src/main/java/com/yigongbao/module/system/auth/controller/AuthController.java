@@ -12,10 +12,13 @@ import com.yigongbao.module.system.auth.dto.ForgotPasswordResetDTO;
 import com.yigongbao.module.system.auth.dto.LoginDTO;
 import com.yigongbao.module.system.auth.dto.SendCaptchaDTO;
 import com.yigongbao.module.system.auth.service.AuthService;
+import com.yigongbao.module.system.auth.vo.LoginLogVO;
 import com.yigongbao.module.system.auth.vo.LoginVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 认证 Controller
@@ -115,5 +118,24 @@ public class AuthController {
     public Result<Void> resetPassword(@Validated @RequestBody ForgotPasswordResetDTO dto) {
         authService.resetPassword(dto);
         return Result.success();
+    }
+
+    /**
+     * 获取上一次登录记录（用于被踢出时查看）
+     */
+    @Operation(summary = "获取上一次登录记录")
+    @GetMapping("/previous-login")
+    public Result<LoginLogVO> getPreviousLogin() {
+        return Result.success(authService.getPreviousLogin());
+    }
+
+    /**
+     * 获取登录历史记录
+     */
+    @Operation(summary = "获取登录历史")
+    @GetMapping("/login-history")
+    public Result<List<LoginLogVO>> getLoginHistory(
+            @RequestParam(defaultValue = "30") Integer limit) {
+        return Result.success(authService.getLoginHistory(limit));
     }
 }

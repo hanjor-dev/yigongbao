@@ -112,8 +112,8 @@ sa-token:
   timeout: 2592000
   # token 临时有效期（秒），指定时间后 token 失效
   active-timeout: -1
-  # 是否允许同一账号多端同时在线
-  is-concurrent: true
+  # 是否允许同一账号多端同时在线（禁止并发登录，新登录会踢出旧会话）
+  is-concurrent: false
   # token 风格
   token-style: uuid
   # 是否输出操作日志

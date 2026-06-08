@@ -52,6 +52,11 @@ public class LoginLogEntity implements Serializable {
     private String userAgent;
 
     /**
+     * IP归属地（省市信息）
+     */
+    private String location;
+
+    /**
      * 登录时间
      */
     private LocalDateTime loginTime;

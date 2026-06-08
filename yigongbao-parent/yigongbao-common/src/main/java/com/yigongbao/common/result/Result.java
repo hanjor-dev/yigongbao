@@ -140,6 +140,18 @@ public class Result<T> {
     }
 
     /**
+     * 失败响应，自定义状态码、错误信息和数据
+     *
+     * @param code    状态码
+     * @param message 错误信息
+     * @param data    响应数据
+     * @return Result 实例
+     */
+    public static <T> Result<T> error(Integer code, String message, T data) {
+        return new Result<>(code, message, data);
+    }
+
+    /**
      * 失败响应，使用错误码枚举
      *
      * @param errorCode 错误码枚举

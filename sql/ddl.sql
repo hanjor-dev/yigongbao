@@ -314,13 +314,15 @@ CREATE TABLE sys_login_log (
     login_type      VARCHAR(16)     COMMENT '登录方式（PASSWORD/PHONE/EMAIL）',
     ip              VARCHAR(64)     COMMENT '登录IP',
     user_agent      VARCHAR(512)    COMMENT 'User-Agent（浏览器/设备信息）',
+    location        VARCHAR(100)    COMMENT 'IP归属地（省市信息）',
     login_time      DATETIME        NOT NULL COMMENT '登录时间',
     login_status    TINYINT         NOT NULL COMMENT '登录结果（1=成功，0=失败）',
     fail_reason     VARCHAR(256)    COMMENT '失败原因',
 
     PRIMARY KEY (id),
     KEY idx_login_user_id (user_id),
-    KEY idx_login_time (login_time)
+    KEY idx_login_time (login_time),
+    KEY idx_user_login_time (user_id, login_time DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='登录日志表';
 
 
@@ -1759,4 +1761,80 @@ CREATE TABLE production_process_transfer (
     KEY idx_production_record_id (production_record_id),
     KEY idx_transfer_time (transfer_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工序流转记录表';
+
+-- ============================================================
+-- 订单修改申请表
+-- 用于暂存超时修改申请的内容，支持审核流程
+-- ============================================================
+DROP TABLE IF EXISTS order_modification_apply;
+CREATE TABLE order_modification_apply (
+    -- ==================== 主键 ====================
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+
+    -- ==================== 订单信息 ====================
+    order_id        BIGINT          NOT NULL COMMENT '订单ID',
+    order_code      VARCHAR(50)     COMMENT '订单编号（冗余）',
+
+    -- ==================== 申请类型 ====================
+    apply_type      INT             NOT NULL COMMENT '申请类型（存储 ModifyApplyTypeEnum.getCode() 值：141=基础信息，142=影像文件，143=重建项目，144=全量修改）',
+
+    -- ==================== 修改内容（双JSON存储）====================
+    modification_content TEXT        NOT NULL COMMENT '修改内容（完整OrderModifyFullDTO的JSON，用于审核通过后执行）',
+    modification_diff    TEXT        COMMENT '变更差异（结构化差异JSON，用于审核界面展示）',
+
+    -- ==================== 申请信息 ====================
+    apply_user_id   BIGINT          NOT NULL COMMENT '申请人ID',
+    apply_user_name VARCHAR(100)    COMMENT '申请人姓名（冗余）',
+    apply_time      DATETIME        NOT NULL COMMENT '申请时间',
+    expire_time     DATETIME        NOT NULL COMMENT '过期时间（申请时间 + 10分钟）',
+
+    -- ==================== 审核信息 ====================
+    status          TINYINT         NOT NULL DEFAULT 0 COMMENT '状态：0=待审核，1=已通过，2=已驳回，3=已过期',
+    audit_user_id   BIGINT          COMMENT '审核人ID',
+    audit_user_name VARCHAR(100)    COMMENT '审核人姓名（冗余）',
+    audit_time      DATETIME        COMMENT '审核时间',
+    audit_remark    VARCHAR(500)    COMMENT '审核备注（驳回原因）',
+
+    -- ==================== 公共字段 ====================
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          COMMENT '创建人ID',
+    update_by       BIGINT          COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    KEY idx_oma_order_id (order_id),
+    KEY idx_oma_status (status),
+    KEY idx_oma_expire_time (expire_time),
+    KEY idx_oma_apply_time (apply_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单修改申请表';
+
+-- ============================================================
+-- 系统配置项：订单修改申请功能
+-- ============================================================
+-- 订单修改时间窗口配置（分钟）
+INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, status)
+VALUES (
+    'order.modify.time.window',
+    '订单修改时间窗口',
+    '10',
+    'number',
+    'order',
+    '订单创建后允许直接修改的时间窗口，单位：分钟。超过此时间需提交申请审核。',
+    1,
+    1
+);
+
+-- 修改申请暂存期限配置（分钟）
+INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, status)
+VALUES (
+    'order.modify.apply.expire.minutes',
+    '修改申请暂存期限',
+    '10',
+    'number',
+    'order',
+    '修改申请的暂存期限，单位：分钟。超过此时间未审核的申请将自动过期。',
+    1,
+    1
+);
 
