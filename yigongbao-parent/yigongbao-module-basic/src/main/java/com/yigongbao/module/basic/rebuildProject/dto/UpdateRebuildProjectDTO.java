@@ -2,6 +2,7 @@ package com.yigongbao.module.basic.rebuildProject.dto;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -62,6 +63,12 @@ public class UpdateRebuildProjectDTO implements Serializable {
     @DecimalMin(value = "0", message = "预计耗时不能为负数")
     @DecimalMax(value = "9999.99", message = "预计耗时不能超过9999.99小时")
     private BigDecimal estimatedHours;
+
+    /**
+     * 项目积分（用于量化设计师工作量）
+     */
+    @Min(value = 0, message = "项目积分不能为负数")
+    private Integer points;
 
     /**
      * 项目说明模板

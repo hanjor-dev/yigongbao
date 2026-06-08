@@ -176,6 +176,7 @@ CREATE TABLE sys_user (
     specialty           VARCHAR(255)    COMMENT '专业方向（多选逗号拼接，如 7.1,7.2）',
     qualification       VARCHAR(512)    COMMENT '资质证书信息',
     settlement_type     TINYINT         COMMENT '结算类型（关联字典编码=8）',
+    charging_template_id BIGINT         DEFAULT NULL COMMENT '收费模板ID（业务账户必填，关联charging_template表）',
 
     -- 状态
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
@@ -202,7 +203,8 @@ CREATE TABLE sys_user (
     KEY idx_user_dept_id (dept_id),
     KEY idx_user_role_id (role_id),
     KEY idx_user_account_type (account_type),
-    KEY idx_user_status (status)
+    KEY idx_user_status (status),
+    KEY idx_user_charging_template_id (charging_template_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 CREATE UNIQUE INDEX uk_username ON sys_user ((CASE WHEN is_deleted = 0 THEN username ELSE NULL END));
 CREATE UNIQUE INDEX uk_phone ON sys_user ((CASE WHEN is_deleted = 0 THEN phone ELSE NULL END));
@@ -490,6 +492,7 @@ CREATE TABLE rebuild_project (
     category_code          VARCHAR(20)     DEFAULT NULL COMMENT '项目分类编码（字典 dict_code=13，如 13.1=模型）',
     category_name          VARCHAR(50)     DEFAULT NULL COMMENT '项目分类名称（冗余字段，与字典 dict_name 一致）',
     estimated_hours       DECIMAL(8,2)    DEFAULT NULL COMMENT '预计耗时（小时，支持小数）',
+    points                INT             DEFAULT 0 COMMENT '项目积分（用于量化设计师工作量）',
     description           TEXT            DEFAULT NULL COMMENT '项目说明模板',
     forming_requirements  TEXT            DEFAULT NULL COMMENT '成形需求模板',
     sort                  INT             NOT NULL DEFAULT 0 COMMENT '排序',
@@ -511,6 +514,55 @@ CREATE TABLE rebuild_project (
     KEY idx_project_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='重建项目表';
 CREATE UNIQUE INDEX uk_project_code ON rebuild_project ((CASE WHEN is_deleted = 0 THEN code ELSE NULL END));
+
+
+-- ============================================================
+-- 收费模板表（charging_template）
+-- 用于管理不同业务账号的收费标准模板
+-- ============================================================
+DROP TABLE IF EXISTS charging_template;
+CREATE TABLE charging_template (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    template_name   VARCHAR(100)    NOT NULL COMMENT '模板名称',
+    remark          VARCHAR(512)    DEFAULT NULL COMMENT '备注说明',
+    status          TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
+
+    -- 通用字段
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by       BIGINT          DEFAULT NULL COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    KEY idx_charging_template_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='收费模板表';
+CREATE UNIQUE INDEX uk_charging_template_name
+    ON charging_template ((CASE WHEN is_deleted = 0 THEN template_name ELSE NULL END));
+
+
+-- ============================================================
+-- 收费模板明细表（charging_template_item）
+-- 存储每个收费模板中各重建项目的价格
+-- ============================================================
+DROP TABLE IF EXISTS charging_template_item;
+CREATE TABLE charging_template_item (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    template_id         BIGINT          NOT NULL COMMENT '模板ID（关联charging_template表）',
+    rebuild_project_id  BIGINT          NOT NULL COMMENT '重建项目ID（关联rebuild_project表）',
+    price               DECIMAL(10,2)   NOT NULL COMMENT '收费价格（元）',
+
+    -- 通用字段
+    create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    update_by           BIGINT          DEFAULT NULL COMMENT '更新人ID',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_charging_template_item_template_project (template_id, rebuild_project_id),
+    KEY idx_charging_template_item_template_id (template_id),
+    KEY idx_charging_template_item_project_id (rebuild_project_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='收费模板明细表';
 
 
 -- ============================================================

@@ -83,6 +83,11 @@ public class RebuildProjectDetailVO implements Serializable {
     private BigDecimal estimatedHours;
 
     /**
+     * 项目积分（用于量化设计师工作量）
+     */
+    private Integer points;
+
+    /**
      * 项目说明模板
      */
     private String description;

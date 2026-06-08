@@ -330,6 +330,12 @@ public enum ErrorCodeEnum {
     SIGN_NONCE_USED(785, "重复请求", 2),
     SIGN_INVALID(786, "签名验证失败", 2),
 
+    // ==================== 收费模板相关 (787-792) ====================
+    CHARGING_TEMPLATE_NOT_FOUND(787, "收费模板不存在", 4),
+    CHARGING_TEMPLATE_NAME_EXISTS(788, "收费模板名称已存在", 4),
+    CHARGING_TEMPLATE_REBUILD_PROJECT_NOT_FOUND(789, "重建项目不存在或已停用", 4),
+    CHARGING_TEMPLATE_DUPLICATE_PROJECT(790, "同一模板中存在重复的重建项目", 4),
+
     // ==================== 生产模块错误码 (800-824) ====================
     PRODUCTION_RECORD_NOT_FOUND(800, "生产流转卡不存在", 3),
     PRINT_DEVICE_NOT_FOUND(801, "打印设备不存在", 3),
