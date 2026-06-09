@@ -84,13 +84,6 @@ public class OrderController {
         return Result.success();
     }
 
-    @Operation(summary = "提交草稿，转为正式订单")
-    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.SUBMIT, operation = "提交草稿")
-    @PostMapping("/draft/{id}/submit")
-    public Result<Long> submitDraft(@PathVariable Long id) {
-        return Result.success(orderDraftService.submitDraft(id));
-    }
-
     // ==================== 订单接口 ====================
 
     @Operation(summary = "直接创建订单（直提，不经过草稿）")

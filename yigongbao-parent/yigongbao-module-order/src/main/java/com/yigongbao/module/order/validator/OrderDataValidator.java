@@ -551,4 +551,37 @@ public class OrderDataValidator {
             throw new BusinessException(ErrorCodeEnum.HOSPITAL_SCOPE_DENIED);
         }
     }
+
+    /**
+     * 校验业务类型与账户类型的匹配性，以及试用订单的审批文件
+     *
+     * @param userId         用户ID
+     * @param businessType   业务类型
+     * @param approvalFileIds 审批文件ID列表
+     */
+    public void validateBusinessTypeRestrictions(Long userId, String businessType, List<String> approvalFileIds) {
+        if (userId == null || StrUtil.isBlank(businessType)) {
+            return;
+        }
+        com.yigongbao.module.system.user.entity.UserEntity user = userService.getById(userId);
+        if (user == null) {
+            return;
+        }
+        // 业务账户（6.2）不能选择"业务"（11.1）和"测试"（11.2）类型
+        if (com.yigongbao.common.constant.StatusConstants.ACCOUNT_TYPE_BUSINESS.equals(user.getAccountType())) {
+            if (com.yigongbao.common.constant.DictCodeConstants.ORDER_BUSINESS_TYPE_BUSINESS.equals(businessType)
+                    || com.yigongbao.common.constant.DictCodeConstants.ORDER_BUSINESS_TYPE_TEST.equals(businessType)) {
+                log.warn("业务账户不允许选择该业务类型: userId={}, accountType={}, businessType={}",
+                        userId, user.getAccountType(), businessType);
+                throw new BusinessException(ErrorCodeEnum.ORDER_BUSINESS_TYPE_RESTRICTED);
+            }
+        }
+        // 试用订单（11.3）必须上传审批文件
+        if (com.yigongbao.common.constant.DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(businessType)) {
+            if (approvalFileIds == null || approvalFileIds.isEmpty()) {
+                log.warn("试用订单必须上传审批文件: userId={}, businessType={}", userId, businessType);
+                throw new BusinessException(ErrorCodeEnum.ORDER_TRIAL_APPROVAL_REQUIRED);
+            }
+        }
+    }
 }

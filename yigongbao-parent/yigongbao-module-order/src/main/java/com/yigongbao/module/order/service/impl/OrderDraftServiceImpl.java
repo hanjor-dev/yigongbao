@@ -17,10 +17,12 @@ import com.yigongbao.module.order.dto.draft.CreateOrderDraftDTO;
 import com.yigongbao.module.order.dto.draft.OrderDraftPageQueryDTO;
 import com.yigongbao.module.order.dto.draft.OrderItemDraftItemDTO;
 import com.yigongbao.module.order.entity.OrderDraftEntity;
+import com.yigongbao.module.order.entity.OrderDraftFileEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
 import com.yigongbao.module.order.mapper.OrderDraftMapper;
 import com.yigongbao.module.order.mapper.OrderItemDraftMapper;
 import com.yigongbao.module.order.enums.OrderDraftStatusEnum;
+import com.yigongbao.module.order.service.OrderDraftFileService;
 import com.yigongbao.module.order.service.OrderDraftService;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.validator.OrderDataValidator;
@@ -62,6 +64,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
     private final com.yigongbao.module.system.config.service.ConfigService configService;
     private final OrderDataValidator orderDataValidator;
     private final UserService userService;
+    private final OrderDraftFileService orderDraftFileService;
 
     /**
      * 获取当前登录用户ID
@@ -167,8 +170,10 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
     @Transactional(rollbackFor = Exception.class)
     public Long saveDraft(CreateOrderDraftDTO dto) {
         Long currentUserId = getCurrentUserId();
-        // 校验业务类型
+        // 校验业务类型合法性
         validateBusinessType(dto.getBusinessType());
+        // 校验业务类型限制及试用订单审批文件
+        validateBusinessTypeRestrictions(dto);
         // 判断是新增还是更新
         OrderDraftEntity entity;
         if (dto.getId() != null) {
@@ -240,19 +245,18 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
             saveOrUpdate(entity);
             Long draftId = entity.getId();
 
-            // 关联影像文件到草稿：先解绑旧关联，再绑定本次传入的文件（前端每次传完整列表）
-            // imageDataFileIds/imageReportFileIds 为 null 表示本次不操作该分类（保留旧数据）；空列表表示清空
+            // 保存文件关联到 order_draft_file 表（分类别处理，null表示不操作该类别）
             if (dto.getImageDataFileIds() != null) {
-                fileService.unlinkByBiz(FileBizTypeEnum.IMAGE_DATA.getDictCode(), draftId);
-                linkDraftFiles(draftId, dto.getImageDataFileIds(), FileBizTypeEnum.IMAGE_DATA.getDictCode());
+                saveDraftFilesByCategory(draftId, dto.getImageDataFileIds(),
+                        FileBizTypeEnum.IMAGE_DATA.getDictCode());
             }
             if (dto.getImageReportFileIds() != null) {
-                fileService.unlinkByBiz(FileBizTypeEnum.IMAGE_REPORT.getDictCode(), draftId);
-                linkDraftFiles(draftId, dto.getImageReportFileIds(), FileBizTypeEnum.IMAGE_REPORT.getDictCode());
+                saveDraftFilesByCategory(draftId, dto.getImageReportFileIds(),
+                        FileBizTypeEnum.IMAGE_REPORT.getDictCode());
             }
             if (dto.getApprovalFileIds() != null) {
-                fileService.unlinkByBiz(FileBizTypeEnum.APPROVAL_FILE.getDictCode(), draftId);
-                linkDraftFiles(draftId, dto.getApprovalFileIds(), FileBizTypeEnum.APPROVAL_FILE.getDictCode());
+                saveDraftFilesByCategory(draftId, dto.getApprovalFileIds(),
+                        FileBizTypeEnum.APPROVAL_FILE.getDictCode());
             }
 
             // 保存重建项目列表，校验并覆盖 bodyPartName/projectName 等
@@ -342,67 +346,6 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
     }
 
     /**
-     * 提交草稿，转化为正式订单
-     * 校验内容：草稿存在/未过期/业务类型合法/有重建项目/文件完整
-     *
-     * @param id 草稿ID
-     * @return 生成的正式订单ID
-     * @throws BusinessException 草稿不存在/已过期/业务类型不合法/明细为空/文件缺失
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public Long submitDraft(Long id) {
-        Long currentUserId = getCurrentUserId();
-        OrderDraftEntity entity = getById(id);
-        if (entity == null) {
-            log.warn("草稿不存在: draftId={}", id);
-            throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_FOUND);
-        }
-        // 校验权限：只有创建人能提交
-        if (!Objects.equals(currentUserId, entity.getOperatorId())) {
-            log.warn("只能提交自己的草稿: draftId={}, operatorId={}, currentUserId={}",
-                    id, entity.getOperatorId(), currentUserId);
-            throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_NOT_MINE);
-        }
-        // 草稿已提交后不能再提交
-        if (entity.getStatus() != null && entity.getStatus() == OrderDraftStatusEnum.SUBMITTED.getCode()) {
-            log.warn("草稿已提交，不能重复提交: draftId={}", id);
-            throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_ALREADY_SUBMITTED);
-        }
-        // 校验是否过期
-        if (entity.getExpiresAt() != null && entity.getExpiresAt().isBefore(LocalDateTime.now())) {
-            log.warn("草稿已过期: draftId={}, expiresAt={}", id, entity.getExpiresAt());
-            throw new BusinessException(ErrorCodeEnum.ORDER_DRAFT_EXPIRED);
-        }
-        // 校验业务类型
-        validateBusinessType(entity.getBusinessType());
-        // 以 SUBMIT 模式全量校验主表必填字段（草稿保存时是 DRAFT 模式，允许不完整）
-        orderDataValidator.validateAndFillMaster(
-                entity,
-                entity.getOrgId(), entity.getHospitalId(), entity.getHospitalDeptId(),
-                entity.getDoctorId(), entity.getDoctorName(), entity.getDoctorPhone(),
-                currentUserId, OrderDataValidator.ValidateMode.SUBMIT);
-        // 校验重建项目至少1条
-        long itemCount = orderItemDraftMapper.selectCount(
-                new LambdaQueryWrapper<OrderItemDraftEntity>()
-                        .eq(OrderItemDraftEntity::getDraftId, id)
-                        .eq(OrderItemDraftEntity::getIsDeleted, 0));
-        if (itemCount == 0) {
-            log.warn("重建项目明细为空: draftId={}", id);
-            throw new BusinessException(ErrorCodeEnum.ORDER_ITEM_EMPTY);
-        }
-        // 校验文件
-        validateDraftFiles(id);
-        // 转为正式订单
-        Long orderId = orderMainService.createFromDraft(entity);
-        // 更新草稿状态为已提交
-        entity.setStatus(OrderDraftStatusEnum.SUBMITTED.getCode());
-        updateById(entity);
-        log.info("提交草稿: draftId={}, orderId={}", id, orderId);
-        return orderId;
-    }
-
-    /**
      * 校验草稿是否属于指定操作员
      *
      * @param id 草稿ID
@@ -438,6 +381,40 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
                 && !businessType.equals(DictCodeConstants.ORDER_BUSINESS_TYPE_AGENT)) {
             log.warn("业务类型不合法，businessType={}", businessType);
             throw new BusinessException(ErrorCodeEnum.ORDER_BUSINESS_TYPE_INVALID);
+        }
+    }
+
+    /**
+     * 校验业务类型限制及试用订单审批文件
+     */
+    private void validateBusinessTypeRestrictions(CreateOrderDraftDTO dto) {
+        Long currentUserId = getCurrentUserId();
+        orderDataValidator.validateBusinessTypeRestrictions(currentUserId, dto.getBusinessType(), dto.getApprovalFileIds());
+    }
+
+    /**
+     * 按文件类别保存草稿文件关联
+     * 先删除该类别的旧文件，再插入新文件
+     */
+    private void saveDraftFilesByCategory(Long draftId, List<String> fileIds, String fileCategory) {
+        // 删除该类别的旧文件关联
+        orderDraftFileService.remove(new LambdaQueryWrapper<OrderDraftFileEntity>()
+                .eq(OrderDraftFileEntity::getDraftId, draftId)
+                .eq(OrderDraftFileEntity::getFileCategory, fileCategory));
+
+        // 插入新文件关联
+        if (fileIds != null && !fileIds.isEmpty()) {
+            List<OrderDraftFileEntity> fileEntities = new java.util.ArrayList<>();
+            for (String fileId : fileIds) {
+                OrderDraftFileEntity file = new OrderDraftFileEntity();
+                file.setDraftId(draftId);
+                file.setFileId(fileId);
+                file.setFileCategory(fileCategory);
+                fileEntities.add(file);
+            }
+            orderDraftFileService.saveBatch(fileEntities);
+            log.info("保存草稿文件关联: draftId={}, fileCategory={}, count={}",
+                    draftId, fileCategory, fileIds.size());
         }
     }
 
@@ -480,23 +457,6 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
     private boolean isTrialOrTest(String businessType) {
         return DictCodeConstants.ORDER_BUSINESS_TYPE_TEST.equals(businessType)
                 || DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(businessType);
-    }
-
-    /**
-     * 将已上传的文件列表关联到草稿（前端先上传，后绑定 bizId）
-     *
-     * @param draftId    草稿ID
-     * @param fileIds    文件ID列表，为 null 或空时跳过
-     * @param fileCategory 文件分类 dict_code（IMAGE_DATA/IMAGE_REPORT）
-     */
-    private void linkDraftFiles(Long draftId, List<String> fileIds, String fileCategory) {
-        if (fileIds == null || fileIds.isEmpty()) {
-            return;
-        }
-        for (String fileId : fileIds) {
-            fileService.linkFile(fileId, fileCategory, draftId);
-        }
-        log.info("关联草稿影像文件，draftId={}, fileCategory={}, count={}", draftId, fileCategory, fileIds.size());
     }
 
     /**
@@ -662,26 +622,48 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
      * @param draftId 草稿ID
      */
     private void fillDraftFiles(OrderDraftDetailVO vo, Long draftId) {
-        List<FileVO> imageDataFiles = fileService.listByBiz(FileBizTypeEnum.IMAGE_DATA.getDictCode(), draftId);
-        List<FileVO> imageReportFiles = fileService.listByBiz(FileBizTypeEnum.IMAGE_REPORT.getDictCode(), draftId);
-        List<FileVO> approvalFiles = fileService.listByBiz(FileBizTypeEnum.APPROVAL_FILE.getDictCode(), draftId);
-        vo.setImageDataFiles(imageDataFiles.stream().map(this::toDraftFileVO).collect(Collectors.toList()));
-        vo.setImageReportFiles(imageReportFiles.stream().map(this::toDraftFileVO).collect(Collectors.toList()));
-        vo.setApprovalFiles(approvalFiles.stream().map(this::toDraftFileVO).collect(Collectors.toList()));
+        // 查询草稿文件关联
+        List<OrderDraftFileEntity> draftFiles = orderDraftFileService.listByDraftId(draftId);
+
+        // 按文件类别分组
+        Map<String, List<OrderDraftFileEntity>> filesByCategory = draftFiles.stream()
+                .collect(Collectors.groupingBy(OrderDraftFileEntity::getFileCategory));
+
+        // 填充影像数据文件
+        List<OrderDraftFileEntity> imageDataFiles = filesByCategory.getOrDefault(
+                FileBizTypeEnum.IMAGE_DATA.getDictCode(), List.of());
+        vo.setImageDataFiles(imageDataFiles.stream()
+                .map(f -> toDraftFileVO(fileService.getById(f.getFileId()), f.getFileCategory()))
+                .collect(Collectors.toList()));
+
+        // 填充影像报告文件
+        List<OrderDraftFileEntity> imageReportFiles = filesByCategory.getOrDefault(
+                FileBizTypeEnum.IMAGE_REPORT.getDictCode(), List.of());
+        vo.setImageReportFiles(imageReportFiles.stream()
+                .map(f -> toDraftFileVO(fileService.getById(f.getFileId()), f.getFileCategory()))
+                .collect(Collectors.toList()));
+
+        // 填充审批文件
+        List<OrderDraftFileEntity> approvalFiles = filesByCategory.getOrDefault(
+                FileBizTypeEnum.APPROVAL_FILE.getDictCode(), List.of());
+        vo.setApprovalFiles(approvalFiles.stream()
+                .map(f -> toDraftFileVO(fileService.getById(f.getFileId()), f.getFileCategory()))
+                .collect(Collectors.toList()));
     }
 
     /**
      * 将 FileVO 转换为草稿文件 VO
      *
      * @param fileVO 文件详情 VO
+     * @param fileCategory 文件类别
      * @return 草稿文件 VO
      */
-    private OrderDraftDetailVO.DraftFileVO toDraftFileVO(FileVO fileVO) {
+    private OrderDraftDetailVO.DraftFileVO toDraftFileVO(FileVO fileVO, String fileCategory) {
         OrderDraftDetailVO.DraftFileVO vo = new OrderDraftDetailVO.DraftFileVO();
         vo.setFileId(fileVO.getId());
         vo.setFileName(fileVO.getFileName());
-        vo.setFileCategory(fileVO.getBizType());
-        vo.setFileCategoryName(getFileCategoryName(fileVO.getBizType()));
+        vo.setFileCategory(fileCategory);
+        vo.setFileCategoryName(getFileCategoryName(fileCategory));
         vo.setFileUrl(fileVO.getFileUrl());
         vo.setThUrl(fileVO.getThUrl());
         vo.setFileSize(fileVO.getFileSize());

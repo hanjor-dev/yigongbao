@@ -42,6 +42,11 @@ public class ChargingTemplateVO implements Serializable {
     private String statusName;
 
     /**
+     * 部位ID（通过明细项反查，若明细项属于同一部位则返回该部位ID，否则为null）
+     */
+    private Long bodyPartId;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

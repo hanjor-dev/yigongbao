@@ -222,8 +222,8 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
                 log.warn("部位不存在，bodyPartId={}", dto.getBodyPartId());
                 throw new BusinessException(ErrorCodeEnum.BODY_PART_NOT_FOUND);
             }
-            if (isNameExistsInParent(dto.getName(), dto.getParentId())) {
-                log.warn("项目名称已存在，name={}", dto.getName());
+            if (isNameExistsInParent(dto.getName(), dto.getBodyPartId())) {
+                log.warn("项目名称在该部位下已存在，name={}, bodyPartId={}", dto.getName(), dto.getBodyPartId());
                 throw new BusinessException(ErrorCodeEnum.REBUILD_PROJECT_NAME_EXISTS);
             }
             RebuildProjectEntity entity = RebuildProjectConvert.toEntity(dto);
@@ -261,8 +261,8 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
                 log.warn("项目不存在，id={}", id);
                 throw new BusinessException(ErrorCodeEnum.REBUILD_PROJECT_NOT_FOUND);
             }
-            if (isNameExistsInParentExcludingId(dto.getName(), dto.getParentId(), id)) {
-                log.warn("项目名称已存在，name={}", dto.getName());
+            if (isNameExistsInParentExcludingId(dto.getName(), dto.getBodyPartId(), id)) {
+                log.warn("项目名称在该部位下已存在，name={}, bodyPartId={}", dto.getName(), dto.getBodyPartId());
                 throw new BusinessException(ErrorCodeEnum.REBUILD_PROJECT_NAME_EXISTS);
             }
             entity.setName(dto.getName());
@@ -475,16 +475,16 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
                 .eq(RebuildProjectEntity::getParentId, parentId)) > 0;
     }
 
-    private boolean isNameExistsInParent(String name, Long parentId) {
+    private boolean isNameExistsInParent(String name, Long bodyPartId) {
         return count(new LambdaQueryWrapper<RebuildProjectEntity>()
                 .eq(RebuildProjectEntity::getName, name)
-                .eq(RebuildProjectEntity::getParentId, parentId)) > 0;
+                .eq(RebuildProjectEntity::getBodyPartId, bodyPartId)) > 0;
     }
 
-    private boolean isNameExistsInParentExcludingId(String name, Long parentId, Long excludeId) {
+    private boolean isNameExistsInParentExcludingId(String name, Long bodyPartId, Long excludeId) {
         return count(new LambdaQueryWrapper<RebuildProjectEntity>()
                 .eq(RebuildProjectEntity::getName, name)
-                .eq(RebuildProjectEntity::getParentId, parentId)
+                .eq(RebuildProjectEntity::getBodyPartId, bodyPartId)
                 .ne(RebuildProjectEntity::getId, excludeId)) > 0;
     }
 

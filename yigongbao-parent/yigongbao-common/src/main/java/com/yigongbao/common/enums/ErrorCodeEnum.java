@@ -245,6 +245,10 @@ public enum ErrorCodeEnum {
     // 导出
     ORDER_EXPORT_FAILED(714, "订单导出失败", 3),
 
+    // 业务类型限制
+    ORDER_BUSINESS_TYPE_RESTRICTED(715, "业务账户不允许选择该业务类型", 3),
+    ORDER_TRIAL_APPROVAL_REQUIRED(716, "试用订单必须上传审批文件", 3),
+
     // 经典案例（715, 718-720）
     CLASSIC_CASE_PROTECTED(715, "经典案例订单受保护，不可删除或修改", 3),
     CLASSIC_CASE_ALREADY_MARKED(718, "订单已标记为经典案例", 3),

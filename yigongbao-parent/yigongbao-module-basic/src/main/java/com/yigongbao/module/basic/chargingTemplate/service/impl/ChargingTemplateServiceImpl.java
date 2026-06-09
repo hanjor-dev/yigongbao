@@ -57,16 +57,27 @@ public class ChargingTemplateServiceImpl extends ServiceImpl<ChargingTemplateMap
      */
     @Override
     public IPage<ChargingTemplateVO> listPage(Integer pageNum, Integer pageSize, String templateName) {
+        templateName = StrUtil.isBlank(templateName) ? null : templateName;
+
         Page<ChargingTemplateEntity> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<ChargingTemplateEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.like(StrUtil.isNotBlank(templateName), ChargingTemplateEntity::getTemplateName, templateName)
+        wrapper.like(templateName != null, ChargingTemplateEntity::getTemplateName, templateName)
                 .orderByDesc(ChargingTemplateEntity::getCreateTime);
 
         IPage<ChargingTemplateEntity> entityPage = page(page, wrapper);
+
+        List<Long> templateIds = entityPage.getRecords().stream()
+                .map(ChargingTemplateEntity::getId)
+                .collect(Collectors.toList());
+
+        Map<Long, Long> templateBodyPartMap = templateIds.isEmpty() ?
+                Map.of() : getTemplateBodyPartMap(templateIds);
+
         IPage<ChargingTemplateVO> voPage = entityPage.convert(entity -> {
             ChargingTemplateVO vo = new ChargingTemplateVO();
             BeanUtil.copyProperties(entity, vo);
             vo.setStatusName(StatusConstants.getStatusName(entity.getStatus()));
+            vo.setBodyPartId(templateBodyPartMap.get(entity.getId()));
             return vo;
         });
 
@@ -126,6 +137,7 @@ public class ChargingTemplateServiceImpl extends ServiceImpl<ChargingTemplateMap
         ChargingTemplateDetailVO vo = new ChargingTemplateDetailVO();
         BeanUtil.copyProperties(template, vo);
         vo.setStatusName(StatusConstants.getStatusName(template.getStatus()));
+        vo.setBodyPartId(getTemplateBodyPartId(items));
         vo.setTotalActiveProjects(totalActiveProjects.intValue());
         vo.setMissingCount(missingCount);
         vo.setObsoleteCount(obsoleteCount);
@@ -257,5 +269,52 @@ public class ChargingTemplateServiceImpl extends ServiceImpl<ChargingTemplateMap
                     return item;
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 从明细项中反查部位ID
+     * 若所有明细项的重建项目都属于同一部位，返回该部位ID；否则返回null
+     */
+    private Long getTemplateBodyPartId(List<ChargingTemplateItemEntity> items) {
+        if (items == null || items.isEmpty()) {
+            return null;
+        }
+
+        Set<Long> projectIds = items.stream()
+                .map(ChargingTemplateItemEntity::getRebuildProjectId)
+                .collect(Collectors.toSet());
+
+        List<RebuildProjectEntity> projects = rebuildProjectMapper.selectList(
+                new LambdaQueryWrapper<RebuildProjectEntity>()
+                        .select(RebuildProjectEntity::getId, RebuildProjectEntity::getBodyPartId)
+                        .in(RebuildProjectEntity::getId, projectIds)
+        );
+
+        Set<Long> bodyPartIds = projects.stream()
+                .map(RebuildProjectEntity::getBodyPartId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+
+        return bodyPartIds.size() == 1 ? bodyPartIds.iterator().next() : null;
+    }
+
+    /**
+     * 批量查询多个模板的部位ID映射
+     */
+    private Map<Long, Long> getTemplateBodyPartMap(List<Long> templateIds) {
+        List<ChargingTemplateItemEntity> allItems = itemMapper.selectList(
+                new LambdaQueryWrapper<ChargingTemplateItemEntity>()
+                        .in(ChargingTemplateItemEntity::getTemplateId, templateIds)
+        );
+
+        Map<Long, List<ChargingTemplateItemEntity>> itemsByTemplate = allItems.stream()
+                .collect(Collectors.groupingBy(ChargingTemplateItemEntity::getTemplateId));
+
+        Map<Long, Long> result = new java.util.HashMap<>();
+        for (Long templateId : templateIds) {
+            Long bodyPartId = getTemplateBodyPartId(itemsByTemplate.getOrDefault(templateId, List.of()));
+            result.put(templateId, bodyPartId);
+        }
+        return result;
     }
 }

@@ -985,6 +985,37 @@ CREATE TABLE order_item_draft (
 
 
 -- ============================================================
+-- 订单草稿文件关联表（order_draft_file）
+-- 设计说明：存储草稿阶段上传的文件，提交时复制到 order_file 表
+-- ============================================================
+DROP TABLE IF EXISTS order_draft_file;
+CREATE TABLE order_draft_file (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    draft_id        BIGINT          NOT NULL COMMENT '草稿ID（order_draft.id）',
+
+    -- ==================== 文件关联 ====================
+    file_id         VARCHAR(32)     NOT NULL COMMENT '文件ID（file_detail.id）',
+    file_category   VARCHAR(20)     NOT NULL COMMENT '文件类别（字典 dict_code：10.1-影像数据，10.2-影像报告，10.3-订单其他附件，10.20-免费业务审批文件）',
+    package_no      VARCHAR(50)     COMMENT '数据包编号（用于关联同一草稿下的多个数据包）',
+
+    -- ==================== 关联明细 ====================
+    order_item_draft_id BIGINT      COMMENT '关联的草稿明细ID（order_item_draft.id）',
+
+    -- ==================== 公共字段 ====================
+    create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT          COMMENT '创建人ID',
+    update_by       BIGINT          COMMENT '更新人ID',
+    is_deleted      TINYINT         DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    PRIMARY KEY (id),
+    KEY idx_order_draft_file_draft_id (draft_id),
+    KEY idx_order_draft_file_file_id (file_id),
+    KEY idx_order_draft_file_category (file_category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单草稿文件关联表';
+
+
+-- ============================================================
 -- 订单主表（order_main）
 -- 设计说明：
 -- 1. 表名改为 order_main：与 order_draft 对应，更清晰

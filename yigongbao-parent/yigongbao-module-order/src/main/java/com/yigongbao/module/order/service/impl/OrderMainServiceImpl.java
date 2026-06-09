@@ -1231,6 +1231,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 currentUserId, OrderDataValidator.ValidateMode.DIRECT);
         // 校验订单类型与机构资质是否匹配
         orderDataValidator.validateOrderType(currentUserId, dto.getOrderType());
+        // 校验业务类型限制及试用订单审批文件
+        orderDataValidator.validateBusinessTypeRestrictions(currentUserId, dto.getBusinessType(), dto.getApprovalFileIds());
 
         save(order);
         Long orderId = order.getId();

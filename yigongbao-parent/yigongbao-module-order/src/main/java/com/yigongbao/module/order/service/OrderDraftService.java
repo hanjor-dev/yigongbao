@@ -48,14 +48,6 @@ public interface OrderDraftService extends IService<OrderDraftEntity> {
     void removeDraft(Long id);
 
     /**
-     * 提交草稿，转为正式订单
-     *
-     * @param id 草稿ID
-     * @return 正式订单ID
-     */
-    Long submitDraft(Long id);
-
-    /**
      * 校验草稿是否属于当前用户
      *
      * @param id 草稿ID
