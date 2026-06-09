@@ -8,6 +8,8 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.design.dto.ArchiveFileInfo;
 import lombok.extern.slf4j.Slf4j;
+import net.sf.sevenzipjbinding.*;
+import net.sf.sevenzipjbinding.impl.RandomAccessFileInStream;
 import org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry;
 import org.apache.commons.compress.archivers.sevenz.SevenZFile;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -127,32 +129,40 @@ public final class ArchiveParserUtil {
     }
 
     /**
-     * 解析 RAR 格式（同时读取文件内容，用于后续独立上传 OSS）
+     * 解析 RAR 格式（支持 RAR 4.x 和 RAR 5.0）
      */
     private static List<ArchiveFileInfo> parseRar(InputStream inputStream,
                                                    Set<String> allowedExtensions) throws Exception {
-        List<ArchiveFileInfo> result = new ArrayList<>();
-        // junrar 需要读取完整流到内存
         byte[] bytes = inputStream.readAllBytes();
+
+        try {
+            return parseRarWithJunrar(bytes, allowedExtensions);
+        } catch (com.github.junrar.exception.UnsupportedRarV5Exception e) {
+            log.info("检测到 RAR 5.0 格式，使用 sevenzipjbinding 解析");
+            return parseRarWithSevenZip(bytes, allowedExtensions);
+        }
+    }
+
+    /**
+     * 使用 junrar 解析 RAR 4.x
+     */
+    private static List<ArchiveFileInfo> parseRarWithJunrar(byte[] bytes,
+                                                             Set<String> allowedExtensions) throws Exception {
+        List<ArchiveFileInfo> result = new ArrayList<>();
         try (Archive archive = new Archive(new java.io.ByteArrayInputStream(bytes))) {
             for (FileHeader header : archive) {
-                // 跳过目录
                 if (header.isDirectory()) {
                     continue;
                 }
-                String filePath = header.getFileName();
-                // RAR 可能使用反斜杠
-                filePath = filePath.replace('\\', '/');
+                String filePath = header.getFileName().replace('\\', '/');
                 String entryFileName = extractFileName(filePath);
                 String ext = getExtension(entryFileName);
 
-                // 按扩展名过滤
                 if (allowedExtensions != null && !allowedExtensions.isEmpty()
                         && !allowedExtensions.contains(ext)) {
                     continue;
                 }
 
-                // 直接从当前 Archive 实例提取当前条目内容，避免重复打开
                 ByteArrayOutputStream entryBaos = new ByteArrayOutputStream();
                 archive.extractFile(header, entryBaos);
                 byte[] content = entryBaos.toByteArray();
@@ -167,6 +177,107 @@ public final class ArchiveParserUtil {
             }
         }
         return result;
+    }
+
+    /**
+     * 使用 sevenzipjbinding 解析 RAR 5.0
+     */
+    private static List<ArchiveFileInfo> parseRarWithSevenZip(byte[] bytes,
+                                                               Set<String> allowedExtensions) throws Exception {
+        java.io.File tempFile = java.io.File.createTempFile("rar5_", ".rar");
+        try {
+            java.nio.file.Files.write(tempFile.toPath(), bytes);
+            List<ArchiveFileInfo> result = new ArrayList<>();
+
+            try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(tempFile, "r");
+                 IInArchive archive = SevenZip.openInArchive(null, new RandomAccessFileInStream(raf))) {
+
+                int[] indices = new int[archive.getNumberOfItems()];
+                for (int i = 0; i < indices.length; i++) {
+                    indices[i] = i;
+                }
+
+                archive.extract(indices, false, new IArchiveExtractCallback() {
+                    private int currentIndex;
+                    private ByteArrayOutputStream outputStream;
+
+                    @Override
+                    public ISequentialOutStream getStream(int index, ExtractAskMode extractAskMode) {
+                        currentIndex = index;
+                        try {
+                            Boolean isFolder = (Boolean) archive.getProperty(index, PropID.IS_FOLDER);
+                            if (isFolder != null && isFolder) {
+                                return null;
+                            }
+
+                            String path = (String) archive.getProperty(index, PropID.PATH);
+                            if (path == null) {
+                                return null;
+                            }
+
+                            String filePath = path.replace('\\', '/');
+                            String fileName = extractFileName(filePath);
+                            String ext = getExtension(fileName);
+
+                            if (allowedExtensions != null && !allowedExtensions.isEmpty()
+                                    && !allowedExtensions.contains(ext)) {
+                                return null;
+                            }
+
+                            outputStream = new ByteArrayOutputStream();
+                            return data -> {
+                                try {
+                                    outputStream.write(data);
+                                    return data.length;
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            };
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+
+                    @Override
+                    public void prepareOperation(ExtractAskMode extractAskMode) {
+                    }
+
+                    @Override
+                    public void setOperationResult(ExtractOperationResult extractOperationResult) {
+                        if (outputStream != null && extractOperationResult == ExtractOperationResult.OK) {
+                            try {
+                                String path = (String) archive.getProperty(currentIndex, PropID.PATH);
+                                String filePath = path.replace('\\', '/');
+                                String fileName = extractFileName(filePath);
+                                Long size = (Long) archive.getProperty(currentIndex, PropID.SIZE);
+
+                                result.add(ArchiveFileInfo.builder()
+                                        .fileName(fileName)
+                                        .filePath(filePath)
+                                        .fileSize(size != null ? size : (long) outputStream.size())
+                                        .extension(getExtension(fileName))
+                                        .fileContent(outputStream.toByteArray())
+                                        .build());
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                        outputStream = null;
+                    }
+
+                    @Override
+                    public void setTotal(long total) {
+                    }
+
+                    @Override
+                    public void setCompleted(long complete) {
+                    }
+                });
+            }
+            return result;
+        } finally {
+            FileUtil.del(tempFile);
+        }
     }
 
     /**

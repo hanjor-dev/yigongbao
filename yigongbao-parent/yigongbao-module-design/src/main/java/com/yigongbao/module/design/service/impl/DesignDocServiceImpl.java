@@ -731,6 +731,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             List<DesignProductFileEntity> files = fileMap.getOrDefault(p.getId(), List.of());
             for (DesignProductFileEntity f : files) {
                 InstructionExcelBuilder.ProductRow row = new InstructionExcelBuilder.ProductRow();
+                row.setDesignProductId(p.getId());
                 row.setCertNo(p.getCertNo());
                 row.setProductName(p.getProductName());
                 row.setPackageFileName(f.getPackageFileName());

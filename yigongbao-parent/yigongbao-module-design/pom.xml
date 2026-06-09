@@ -18,10 +18,20 @@
             <artifactId>yigongbao-module-order</artifactId>
         </dependency>
 
-        <!-- RAR 压缩包解析 -->
+        <!-- junrar：RAR 压缩包解析（仅支持 RAR 4.x） -->
         <dependency>
             <groupId>com.github.junrar</groupId>
             <artifactId>junrar</artifactId>
+        </dependency>
+
+        <!-- sevenzipjbinding：RAR 5.0 支持 -->
+        <dependency>
+            <groupId>net.sf.sevenzipjbinding</groupId>
+            <artifactId>sevenzipjbinding</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.sf.sevenzipjbinding</groupId>
+            <artifactId>sevenzipjbinding-all-platforms</artifactId>
         </dependency>
 
         <!-- 7Z/TAR 等压缩包解析 -->

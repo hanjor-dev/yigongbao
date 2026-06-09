@@ -68,6 +68,8 @@ public class InstructionExcelBuilder {
      */
     @Data
     public static class ProductRow {
+        /** 产品ID（用于区分不同产品，防止跨产品合并） */
+        private Long designProductId;
         /** 注册证号 */
         private String certNo;
         /** 产品名称 */
@@ -315,16 +317,10 @@ public class InstructionExcelBuilder {
     }
 
     /**
-     * 判断两个产品行是否为同一产品（通过比较产品信息字段）
+     * 判断两个产品行是否为同一产品（通过比较产品ID）
      */
     private boolean isSameProduct(ProductRow r1, ProductRow r2) {
-        return java.util.Objects.equals(r1.getCertNo(), r2.getCertNo())
-                && java.util.Objects.equals(r1.getProductName(), r2.getProductName())
-                && java.util.Objects.equals(r1.getSpecName(), r2.getSpecName())
-                && java.util.Objects.equals(r1.getMaterialName(), r2.getMaterialName())
-                && java.util.Objects.equals(r1.getQuantity(), r2.getQuantity())
-                && java.util.Objects.equals(r1.getIsUrgent(), r2.getIsUrgent())
-                && java.util.Objects.equals(r1.getColorName(), r2.getColorName());
+        return java.util.Objects.equals(r1.getDesignProductId(), r2.getDesignProductId());
     }
 
     // ==================== 私有工具方法 ====================
