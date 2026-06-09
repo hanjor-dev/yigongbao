@@ -5,8 +5,10 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.yigongbao.common.constant.AuditStatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.RoleCodeEnum;
@@ -227,6 +229,17 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             // 执行订单修改（如果失败会抛出异常，事务回滚，申请状态不会更新）
             orderModifyFullService.modifyOrderFull(apply.getOrderId(), modifyDto);
 
+            // 修改成功后，仅在订单阶段时重置审核状态（数据已变更，需要重新审核）
+            OrderMainEntity order = orderMainMapper.selectById(apply.getOrderId());
+            if (order != null && order.getPhase() == 10) {
+                LambdaUpdateWrapper<OrderMainEntity> updateWrapper = new LambdaUpdateWrapper<>();
+                updateWrapper.eq(OrderMainEntity::getId, apply.getOrderId())
+                        .set(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PENDING)
+                        .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING);
+                orderMainMapper.update(null, updateWrapper);
+                log.info("修改申请审核通过，重置订单审核状态: orderId={}, phase={}", apply.getOrderId(), order.getPhase());
+            }
+
             // 订单修改成功后才更新申请状态
             apply.setStatus(ApplyStatusEnum.APPROVED.getCode());
         } else if (ApplyStatusEnum.REJECTED.getCode().equals(dto.getResult())) {
@@ -384,7 +397,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
      * 全量修改订单（带时间窗口检查）
      */
     @Override
-    public void modifyOrderFullV2(Long orderId, OrderModifyFullDTO dto) {
+    public Integer modifyOrderFullV2(Long orderId, OrderModifyFullDTO dto) {
         checkModifyPermission();
 
         OrderMainEntity order = orderMainMapper.selectById(orderId);
@@ -395,9 +408,10 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         if (timeWindowChecker.isWithinTimeWindow(order.getCreateTime())) {
             log.info("订单在时间窗口内，直接修改: orderId={}, createTime={}", orderId, order.getCreateTime());
             orderModifyFullService.modifyOrderFull(orderId, dto);
+            return 1;
         } else {
             log.warn("订单超出时间窗口，需提交申请: orderId={}, createTime={}", orderId, order.getCreateTime());
-            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_TIME_WINDOW_EXCEEDED);
+            return -1;
         }
     }
 
@@ -457,6 +471,16 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             log.warn("获取当前用户姓名失败", e);
             return null;
         }
+    }
+
+    @Override
+    public boolean hasPendingApply(Long orderId) {
+        List<OrderModificationApplyEntity> pendingApplies = orderModificationApplyMapper.selectList(
+                new LambdaQueryWrapper<OrderModificationApplyEntity>()
+                        .eq(OrderModificationApplyEntity::getOrderId, orderId)
+                        .eq(OrderModificationApplyEntity::getStatus, ApplyStatusEnum.PENDING.getCode())
+        );
+        return CollUtil.isNotEmpty(pendingApplies);
     }
 
     // ==================== Entity → VO 转换 ====================

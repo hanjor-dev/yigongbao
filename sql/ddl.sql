@@ -1860,33 +1860,3 @@ CREATE TABLE order_modification_apply (
     KEY idx_oma_expire_time (expire_time),
     KEY idx_oma_apply_time (apply_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单修改申请表';
-
--- ============================================================
--- 系统配置项：订单修改申请功能
--- ============================================================
--- 订单修改时间窗口配置（分钟）
-INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, status)
-VALUES (
-    'order.modify.time.window',
-    '订单修改时间窗口',
-    '10',
-    'number',
-    'order',
-    '订单创建后允许直接修改的时间窗口，单位：分钟。超过此时间需提交申请审核。',
-    1,
-    1
-);
-
--- 修改申请暂存期限配置（分钟）
-INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, status)
-VALUES (
-    'order.modify.apply.expire.minutes',
-    '修改申请暂存期限',
-    '10',
-    'number',
-    'order',
-    '修改申请的暂存期限，单位：分钟。超过此时间未审核的申请将自动过期。',
-    1,
-    1
-);
-

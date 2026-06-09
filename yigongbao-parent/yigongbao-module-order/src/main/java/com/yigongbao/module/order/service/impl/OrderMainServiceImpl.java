@@ -654,6 +654,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
+        if (orderModifyApplyService.hasPendingApply(id)) {
+            log.warn("订单存在待审核的修改申请，不允许数据审核: orderId={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_PENDING);
+        }
+
         String roleCode = getCurrentUserRoleCode();
         boolean isTrialOrder = DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(entity.getBusinessType());
 
@@ -778,6 +783,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (StrUtil.isBlank(dto.getRemark())) {
             log.warn("审核驳回时必须填写驳回原因");
             throw new BusinessException(ErrorCodeEnum.ORDER_AUDIT_REMARK_REQUIRED);
+        }
+
+        if (orderModifyApplyService.hasPendingApply(id)) {
+            log.warn("订单存在待审核的修改申请，不允许数据审核: orderId={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_PENDING);
         }
 
         String roleCode = getCurrentUserRoleCode();

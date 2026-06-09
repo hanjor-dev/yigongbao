@@ -75,7 +75,7 @@ public interface OrderModifyApplyService {
      * @param orderId 订单ID
      * @param dto     修改数据
      */
-    void modifyOrderFullV2(Long orderId, OrderModifyFullDTO dto);
+    Integer modifyOrderFullV2(Long orderId, OrderModifyFullDTO dto);
 
     /**
      * 查询订单的修改留痕记录（分页）
@@ -85,4 +85,12 @@ public interface OrderModifyApplyService {
      * @return 分页列表
      */
     IPage<ModificationLogVO> listModificationLogs(Long orderId, ModificationLogPageQueryDTO dto);
+
+    /**
+     * 检查订单是否存在待审核的修改申请
+     *
+     * @param orderId 订单ID
+     * @return true=存在待审核申请, false=不存在
+     */
+    boolean hasPendingApply(Long orderId);
 }

@@ -57,14 +57,13 @@ public class OrderModifyApplyController {
 
     @Operation(summary = "全量修改订单（v2-带时间窗口检查）",
             description = "前端传入完整订单数据，后端检查时间窗口：\n"
-                    + "在窗口内：直接修改并返回成功（code=200）\n"
-                    + "超过窗口：返回错误码739，提示需要提交申请")
+                    + "在窗口内：直接修改并返回成功（code=200 data=1）\n"
+                    + "超过窗口：data=-1")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "全量修改订单（v2）")
     @PutMapping("/{orderId}/full-v2")
-    public Result<Void> modifyOrderFullV2(@PathVariable Long orderId,
+    public Result<Integer> modifyOrderFullV2(@PathVariable Long orderId,
             @Valid @RequestBody OrderModifyFullDTO dto) {
-        orderModifyApplyService.modifyOrderFullV2(orderId, dto);
-        return Result.success();
+        return Result.success(orderModifyApplyService.modifyOrderFullV2(orderId, dto));
     }
 
     @Operation(summary = "查询订单的修改留痕记录（分页）")
