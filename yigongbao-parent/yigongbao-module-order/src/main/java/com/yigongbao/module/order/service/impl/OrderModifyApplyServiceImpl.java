@@ -107,6 +107,12 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
+        // 检查订单所有权：只有订单创建者可以提交修改申请
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (!currentUserId.equals(order.getOperatorId())) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_BELONG_TO_USER);
+        }
+
         // 检查是否存在待审核申请，避免重复提交
         List<OrderModificationApplyEntity> pendingApplies = orderModificationApplyMapper.selectList(
                 new LambdaQueryWrapper<OrderModificationApplyEntity>()

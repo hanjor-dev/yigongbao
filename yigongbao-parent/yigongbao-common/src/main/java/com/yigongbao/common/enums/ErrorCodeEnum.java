@@ -282,6 +282,7 @@ public enum ErrorCodeEnum {
     ORDER_MODIFY_DESIGNER_NOT_ALLOWED(737, "设计师不允许提交修改申请", 3),
     ORDER_MODIFY_AUDIT_NO_PERMISSION(738, "无权限审核修改申请", 3),
     ORDER_MODIFY_TIME_WINDOW_EXCEEDED(739, "订单修改时间已超限，请提交申请", 3),
+    ORDER_NOT_BELONG_TO_USER(740, "只能对自己创建的订单提交修改申请", 3),
 
     // ==================== 产品规格相关 754-756 ====================
     PRODUCT_HAS_SPECS(754, "产品下存在规格，无法删除", 4),
@@ -335,6 +336,7 @@ public enum ErrorCodeEnum {
     CHARGING_TEMPLATE_NAME_EXISTS(788, "收费模板名称已存在", 4),
     CHARGING_TEMPLATE_REBUILD_PROJECT_NOT_FOUND(789, "重建项目不存在或已停用", 4),
     CHARGING_TEMPLATE_DUPLICATE_PROJECT(790, "同一模板中存在重复的重建项目", 4),
+    CHARGING_TEMPLATE_REQUIRED(791, "业务类型账户必须绑定收费模板", 4),
 
     // ==================== 生产模块错误码 (800-824) ====================
     PRODUCTION_RECORD_NOT_FOUND(800, "生产流转卡不存在", 3),
