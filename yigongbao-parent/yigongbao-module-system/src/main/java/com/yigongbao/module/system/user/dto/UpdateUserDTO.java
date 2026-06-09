@@ -112,6 +112,11 @@ public class UpdateUserDTO implements Serializable {
     private Integer settlementType;
 
     /**
+     * 收费模板ID（业务类型账户）
+     */
+    private Long chargingTemplateId;
+
+    /**
      * 状态（0=禁用，1=正常）
      */
     @Min(value = 0, message = "状态值不合法，仅支持0（禁用）或1（正常）")

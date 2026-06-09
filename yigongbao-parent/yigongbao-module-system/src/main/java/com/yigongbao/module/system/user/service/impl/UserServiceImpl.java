@@ -91,6 +91,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     private final CodeGeneratorService codeGeneratorService;
     private final StringRedisTemplate stringRedisTemplate;
     private final com.yigongbao.module.basic.processingCenter.mapper.ProcessingCenterMapper processingCenterMapper;
+    private final com.yigongbao.module.basic.chargingTemplate.service.ChargingTemplateService chargingTemplateService;
 
     /**
      * 分页查询用户列表
@@ -150,13 +151,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     : deptService.listByIds(deptIds).stream()
                             .collect(Collectors.toMap(DeptEntity::getId, Function.identity()));
 
+            // 批量查询收费模板信息: 转为 Map 供 O(1) 查找
+            Set<Long> templateIds = records.stream()
+                    .map(UserEntity::getChargingTemplateId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            Map<Long, com.yigongbao.module.basic.chargingTemplate.entity.ChargingTemplateEntity> templateMap =
+                    templateIds.isEmpty() ? Collections.emptyMap()
+                    : chargingTemplateService.listByIds(templateIds).stream()
+                            .collect(Collectors.toMap(com.yigongbao.module.basic.chargingTemplate.entity.ChargingTemplateEntity::getId, Function.identity()));
+
             // 批量查询用户-医院关联（一次 IN 查询替代逐用户查询）
             userHospitalMap = userHospitalService.listHospitalIdsByUserIds(
                     records.stream().map(UserEntity::getId).filter(Objects::nonNull).collect(Collectors.toList()));
 
             // 将批量查询结果填充到实体冗余字段: 避免 VO 转换后再单条查询
             for (UserEntity entity : records) {
-                fillEntityWithNames(entity, roleMap, orgMap, deptMap);
+                fillEntityWithNames(entity, roleMap, orgMap, deptMap, templateMap);
             }
         }
 
@@ -283,9 +294,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
      * @param roleMap 角色 Map（key=roleId）
      * @param orgMap  机构 Map（key=orgId）
      * @param deptMap 部门 Map（key=deptId）
+     * @param templateMap 收费模板 Map（key=templateId）
      */
     private void fillEntityWithNames(UserEntity entity, Map<Long, RoleEntity> roleMap,
-                                    Map<Long, OrgEntity> orgMap, Map<Long, DeptEntity> deptMap) {
+                                    Map<Long, OrgEntity> orgMap, Map<Long, DeptEntity> deptMap,
+                                    Map<Long, com.yigongbao.module.basic.chargingTemplate.entity.ChargingTemplateEntity> templateMap) {
         if (entity == null) {
             return;
         }
@@ -309,6 +322,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             if (roleEntity != null) {
                 entity.setRoleName(roleEntity.getRoleName());
                 entity.setRoleCode(roleEntity.getRoleCode());
+            }
+        }
+        // 填充收费模板名称
+        if (entity.getChargingTemplateId() != null) {
+            com.yigongbao.module.basic.chargingTemplate.entity.ChargingTemplateEntity template = templateMap.get(entity.getChargingTemplateId());
+            if (template != null) {
+                entity.setChargingTemplateName(template.getTemplateName());
             }
         }
     }
@@ -432,6 +452,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             }
             // 校验部门必填规则和部门类型匹配：dataScopeType为dept或self的角色必须选择部门: 且角色accountType必须与部门deptType匹配
             validateDeptRequired(roleEntity, deptEntity);
+            // 业务类型账户必须绑定收费模板
+            if (StatusConstants.ACCOUNT_TYPE_BUSINESS.equals(dto.getAccountType()) && dto.getChargingTemplateId() == null) {
+                log.warn("业务类型账户未绑定收费模板: accountType={}", dto.getAccountType());
+                throw new BusinessException(ErrorCodeEnum.CHARGING_TEMPLATE_REQUIRED);
+            }
             // 角色业务规则校验（hospitals范围 + 设计师specialty）
             validateHospitalScope(roleEntity, dto.getHospitalIds());
             validateSpecialty(roleEntity, dto.getSpecialtyList());
@@ -590,6 +615,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 validateDeptRequired(effectiveRole, effectiveDept);
                 validateHospitalScope(effectiveRole, dto.getHospitalIds());
                 validateSpecialty(effectiveRole, dto.getSpecialtyList());
+            }
+            // 业务类型账户必须绑定收费模板
+            String effectiveAccountType = dto.getAccountType() != null ? dto.getAccountType() : entity.getAccountType();
+            Long effectiveChargingTemplateId = dto.getChargingTemplateId() != null ? dto.getChargingTemplateId() : entity.getChargingTemplateId();
+            if (StatusConstants.ACCOUNT_TYPE_BUSINESS.equals(effectiveAccountType) && effectiveChargingTemplateId == null) {
+                log.warn("业务类型账户未绑定收费模板: accountType={}", effectiveAccountType);
+                throw new BusinessException(ErrorCodeEnum.CHARGING_TEMPLATE_REQUIRED);
             }
             // 生产员角色校验加工中心，并复用查询结果更新冗余字段
             Long effectiveCenterId = dto.getCenterId() != null ? dto.getCenterId() : entity.getCenterId();
@@ -1057,6 +1089,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     .eq(DictEntity::getDictValue, vo.getSettlementType().toString())
                     .one();
             vo.setSettlementTypeName(dictEntity != null ? dictEntity.getDictName() : null);
+        }
+        // 填充收费模板名称
+        if (vo.getChargingTemplateId() != null) {
+            com.yigongbao.module.basic.chargingTemplate.entity.ChargingTemplateEntity template =
+                    chargingTemplateService.getById(vo.getChargingTemplateId());
+            vo.setChargingTemplateName(template != null ? template.getTemplateName() : null);
         }
         return vo;
     }

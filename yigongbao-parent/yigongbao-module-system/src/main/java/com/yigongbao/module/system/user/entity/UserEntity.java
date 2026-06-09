@@ -139,6 +139,17 @@ public class UserEntity extends BaseEntity implements Serializable {
     private Integer settlementType;
 
     /**
+     * 收费模板ID（业务类型账户）
+     */
+    private Long chargingTemplateId;
+
+    /**
+     * 收费模板名称（冗余字段）
+     */
+    @TableField(exist = false)
+    private String chargingTemplateName;
+
+    /**
      * 状态（0=禁用，1=正常）
      */
     private Integer status;
