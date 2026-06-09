@@ -11,6 +11,7 @@ import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.service.OrderExportService;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
+import com.yigongbao.module.order.vo.order.OrderExportFieldVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -225,11 +226,20 @@ public class OrderExportServiceImpl implements OrderExportService {
             case "orderTypeName":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getOrderTypeName()));
                 break;
+            case "needsPhysicalDeliveryName":
+                cell.setCellValue(StrUtil.nullToEmpty(order.getNeedsPhysicalDeliveryName()));
+                break;
             case "hospitalName":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getHospitalName()));
                 break;
             case "areaName":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getAreaName()));
+                break;
+            case "fullAreaName":
+                cell.setCellValue(StrUtil.nullToEmpty(order.getFullAreaName()));
+                break;
+            case "hospitalDeptName":
+                cell.setCellValue(StrUtil.nullToEmpty(order.getHospitalDeptName()));
                 break;
             case "doctorName":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getDoctorName()));
@@ -255,6 +265,9 @@ public class OrderExportServiceImpl implements OrderExportService {
             case "isPostal":
                 cell.setCellValue(order.getIsPostal() != null && order.getIsPostal() == 1 ? "是" : "否");
                 break;
+            case "isClassicCase":
+                cell.setCellValue(order.getIsClassicCase() != null && order.getIsClassicCase() == 1 ? "是" : "否");
+                break;
             case "postalAddress":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getPostalAddress()));
                 break;
@@ -266,10 +279,14 @@ public class OrderExportServiceImpl implements OrderExportService {
                 BigDecimal cost = order.getEstimatedCost();
                 cell.setCellValue(cost != null ? cost.toString() : "");
                 break;
+            case "dataEvaluationOpinion":
+                cell.setCellValue(StrUtil.nullToEmpty(order.getDataEvaluationOpinion()));
+                break;
             case "designerName":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getDesignerName()));
                 break;
             case "phase":
+            case "phaseName":
                 cell.setCellValue(StrUtil.nullToEmpty(orderQueryHelper.getPhaseName(order.getPhase())));
                 break;
             case "status":
@@ -278,6 +295,9 @@ public class OrderExportServiceImpl implements OrderExportService {
                 break;
             case "operatorName":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getOperatorName()));
+                break;
+            case "operatorPhone":
+                cell.setCellValue(StrUtil.nullToEmpty(order.getOperatorPhone()));
                 break;
             case "operatorDeptName":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getOperatorDeptName()));
@@ -335,6 +355,144 @@ public class OrderExportServiceImpl implements OrderExportService {
                 })
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.joining("；"));
+    }
+
+    @Override
+    public void customExportOrders(com.yigongbao.module.order.dto.order.OrderCustomExportDTO dto, HttpServletResponse response) {
+        // 按时间范围查询订单（最多10000条）
+        LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<OrderMainEntity>()
+                .ge(OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
+                .le(OrderMainEntity::getCreateTime, dto.getCreateTimeEnd())
+                .orderByDesc(OrderMainEntity::getCreateTime)
+                .last("LIMIT " + MAX_EXPORT_COUNT);
+
+        List<OrderMainEntity> orderEntities = orderMainMapper.selectList(wrapper);
+        List<OrderListVO> orderList = orderEntities.stream()
+                .map(orderQueryHelper::toOrderListVO)
+                .collect(Collectors.toList());
+
+        // 构建字段标签映射
+        java.util.Map<String, String> fieldLabels = dto.getFieldLabels() != null
+                ? dto.getFieldLabels()
+                : getDefaultFieldLabels();
+
+        // 构建Excel
+        try {
+            buildCustomExcel(dto.getExportFields(), fieldLabels, orderList, response);
+        } catch (IOException e) {
+            log.error("自定义导出订单失败", e);
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR);
+        }
+    }
+
+    private void buildCustomExcel(List<String> exportFields, java.util.Map<String, String> fieldLabels,
+                                   List<OrderListVO> orderList, HttpServletResponse response) throws IOException {
+        try (SXSSFWorkbook workbook = new SXSSFWorkbook(100)) {
+            workbook.setCompressTempFiles(true);
+            SXSSFSheet sheet = workbook.createSheet("订单列表");
+
+            CellStyle headerStyle = createHeaderStyle(workbook);
+
+            // 构建表头
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < exportFields.size(); i++) {
+                String field = exportFields.get(i);
+                String label = fieldLabels.getOrDefault(field, field);
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(label);
+                cell.setCellStyle(headerStyle);
+                sheet.setColumnWidth(i, 20 * 256);
+            }
+
+            // 填充数据
+            int rowNum = 1;
+            for (OrderListVO order : orderList) {
+                Row row = sheet.createRow(rowNum++);
+                for (int i = 0; i < exportFields.size(); i++) {
+                    Cell cell = row.createCell(i);
+                    setCellValue(cell, order, exportFields.get(i));
+                }
+            }
+
+            // 设置响应头
+            String fileName = "订单列表_" + java.time.LocalDate.now().format(DATE_FORMATTER) + ".xlsx";
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setHeader("Content-Disposition",
+                    "attachment;filename=" + URLEncoder.encode(fileName, StandardCharsets.UTF_8));
+
+            workbook.write(response.getOutputStream());
+            workbook.dispose();
+        }
+    }
+
+    private java.util.Map<String, String> getDefaultFieldLabels() {
+        java.util.Map<String, String> labels = new java.util.HashMap<>();
+        labels.put("orderCode", "订单编号");
+        labels.put("orderTypeName", "订单类型");
+        labels.put("needsPhysicalDeliveryName", "是否需要实体交付");
+        labels.put("hospitalName", "医院名称");
+        labels.put("areaName", "地区");
+        labels.put("fullAreaName", "完整地区路径");
+        labels.put("hospitalDeptName", "医院科室");
+        labels.put("doctorName", "医生姓名");
+        labels.put("doctorPhone", "医生电话");
+        labels.put("patientName", "患者姓名");
+        labels.put("patientAge", "患者年龄");
+        labels.put("patientGenderName", "患者性别");
+        labels.put("businessTypeName", "业务类型");
+        labels.put("isUrgent", "是否加急");
+        labels.put("isPostal", "是否邮寄");
+        labels.put("isClassicCase", "是否经典案例");
+        labels.put("postalAddress", "邮寄地址");
+        labels.put("expectedDeliveryDate", "期望交付时间");
+        labels.put("estimatedCost", "预计费用");
+        labels.put("dataEvaluationOpinion", "影像评估意见");
+        labels.put("designerName", "设计师");
+        labels.put("phase", "阶段");
+        labels.put("phaseName", "阶段");
+        labels.put("statusName", "状态");
+        labels.put("operatorName", "业务员");
+        labels.put("operatorPhone", "业务员电话");
+        labels.put("operatorDeptName", "业务员部门");
+        labels.put("orgName", "提单机构");
+        labels.put("createTime", "创建时间");
+        labels.put("rebuildProjectList", "重建项目");
+        return labels;
+    }
+
+    @Override
+    public List<OrderExportFieldVO> getAvailableExportFields() {
+        List<OrderExportFieldVO> fields = new java.util.ArrayList<>();
+        fields.add(new OrderExportFieldVO("orderCode", "订单编号"));
+        fields.add(new OrderExportFieldVO("orderTypeName", "订单类型"));
+        fields.add(new OrderExportFieldVO("needsPhysicalDeliveryName", "是否需要实体交付"));
+        fields.add(new OrderExportFieldVO("hospitalName", "医院名称"));
+        fields.add(new OrderExportFieldVO("areaName", "地区"));
+        fields.add(new OrderExportFieldVO("fullAreaName", "完整地区路径"));
+        fields.add(new OrderExportFieldVO("hospitalDeptName", "医院科室"));
+        fields.add(new OrderExportFieldVO("doctorName", "医生姓名"));
+        fields.add(new OrderExportFieldVO("doctorPhone", "医生电话"));
+        fields.add(new OrderExportFieldVO("patientName", "患者姓名"));
+        fields.add(new OrderExportFieldVO("patientAge", "患者年龄"));
+        fields.add(new OrderExportFieldVO("patientGenderName", "患者性别"));
+        fields.add(new OrderExportFieldVO("businessTypeName", "业务类型"));
+        fields.add(new OrderExportFieldVO("isUrgent", "是否加急"));
+        fields.add(new OrderExportFieldVO("isPostal", "是否邮寄"));
+        fields.add(new OrderExportFieldVO("isClassicCase", "是否经典案例"));
+        fields.add(new OrderExportFieldVO("postalAddress", "邮寄地址"));
+        fields.add(new OrderExportFieldVO("expectedDeliveryDate", "期望交付时间"));
+        fields.add(new OrderExportFieldVO("estimatedCost", "预计费用"));
+        fields.add(new OrderExportFieldVO("dataEvaluationOpinion", "影像评估意见"));
+        fields.add(new OrderExportFieldVO("designerName", "设计师"));
+        fields.add(new OrderExportFieldVO("phaseName", "阶段"));
+        fields.add(new OrderExportFieldVO("statusName", "状态"));
+        fields.add(new OrderExportFieldVO("operatorName", "业务员"));
+        fields.add(new OrderExportFieldVO("operatorPhone", "业务员电话"));
+        fields.add(new OrderExportFieldVO("operatorDeptName", "业务员部门"));
+        fields.add(new OrderExportFieldVO("orgName", "提单机构"));
+        fields.add(new OrderExportFieldVO("createTime", "创建时间"));
+        fields.add(new OrderExportFieldVO("rebuildProjectList", "重建项目"));
+        return fields;
     }
 
 }

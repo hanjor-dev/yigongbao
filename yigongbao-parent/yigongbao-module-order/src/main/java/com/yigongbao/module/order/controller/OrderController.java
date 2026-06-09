@@ -13,6 +13,7 @@ import com.yigongbao.module.order.dto.order.AssignDesignerDTO;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
 import com.yigongbao.module.order.dto.order.DesignerQueryDTO;
+import com.yigongbao.module.order.dto.order.OrderCustomExportDTO;
 import com.yigongbao.module.order.dto.order.OrderExportQueryDTO;
 import com.yigongbao.module.order.dto.order.OrderPageDTO;
 import com.yigongbao.module.order.service.DesignerAssignmentService;
@@ -24,6 +25,7 @@ import com.yigongbao.module.order.vo.draft.OrderDraftDetailVO;
 import com.yigongbao.module.order.vo.draft.OrderDraftVO;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
+import com.yigongbao.module.order.vo.order.OrderExportFieldVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -217,5 +219,18 @@ public class OrderController {
     @PostMapping("/export")
     public void exportOrders(@RequestBody OrderExportQueryDTO dto, HttpServletResponse response) {
         orderExportService.exportOrders(dto, response);
+    }
+
+    @Operation(summary = "自定义字段导出订单（Excel）")
+    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.EXPORT, operation = "自定义导出订单")
+    @PostMapping("/export/custom")
+    public void customExportOrders(@Valid @RequestBody OrderCustomExportDTO dto, HttpServletResponse response) {
+        orderExportService.customExportOrders(dto, response);
+    }
+
+    @Operation(summary = "获取可导出字段列表")
+    @GetMapping("/export/fields")
+    public Result<List<OrderExportFieldVO>> getAvailableExportFields() {
+        return Result.success(orderExportService.getAvailableExportFields());
     }
 }
