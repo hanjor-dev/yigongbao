@@ -841,7 +841,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             currentUserId = StpUtil.getLoginIdAsLong();
         } catch (Exception e) {
             log.error("获取当前登录用户失败", e);
-            throw new BusinessException(ErrorCodeEnum.USER_NOT_LOGIN);
+            throw new BusinessException(ErrorCodeEnum.UNAUTHORIZED);
         }
 
         UserEntity user = userService.getById(currentUserId);

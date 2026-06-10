@@ -2,6 +2,7 @@ package com.yigongbao.module.order.service;
 
 import com.yigongbao.module.order.dto.order.OrderCustomExportDTO;
 import com.yigongbao.module.order.dto.order.OrderExportQueryDTO;
+import com.yigongbao.module.order.dto.workload.DesignerWorkloadExportDTO;
 import com.yigongbao.module.order.vo.order.OrderExportFieldVO;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -40,4 +41,12 @@ public interface OrderExportService {
      * @return 可导出字段列表
      */
     List<OrderExportFieldVO> getAvailableExportFields();
+
+    /**
+     * 导出设计师工作量统计
+     *
+     * @param dto 导出参数
+     * @param response HTTP 响应
+     */
+    void exportDesignerWorkload(DesignerWorkloadExportDTO dto, HttpServletResponse response);
 }

@@ -7,13 +7,20 @@ import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
 import com.yigongbao.module.design.service.DesignWorkorderService;
+import com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO;
 import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
 import com.yigongbao.module.design.vo.DesignWorkorderListVO;
+import com.yigongbao.module.order.dto.workload.DesignerWorkloadExportDTO;
+import com.yigongbao.module.order.service.OrderExportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 设计工单查询 Controller
@@ -28,6 +35,7 @@ import org.springframework.web.bind.annotation.*;
 public class DesignWorkorderController {
 
     private final DesignWorkorderService designWorkorderService;
+    private final OrderExportService orderExportService;
 
     /**
      * 分页查询设计工单列表
@@ -65,7 +73,7 @@ public class DesignWorkorderController {
      */
     @Operation(summary = "查询订单设计师分配历史")
     @GetMapping("/{orderId}/assignment-history")
-    public Result<java.util.List<com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO>> getAssignmentHistory(@PathVariable Long orderId) {
+    public Result<List<DesignerAssignmentHistoryVO>> getAssignmentHistory(@PathVariable Long orderId) {
         return Result.success(designWorkorderService.listAssignmentHistory(orderId));
     }
 
@@ -79,5 +87,16 @@ public class DesignWorkorderController {
     public Result<Void> completeDesign(@PathVariable Long orderId) {
         designWorkorderService.completeDesign(orderId);
         return Result.success();
+    }
+
+    /**
+     * 导出设计师工作量统计
+     */
+    @Operation(summary = "导出设计师工作量统计")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.EXPORT, operation = "导出设计师工作量")
+    @PostMapping("/workload/export")
+    public void exportDesignerWorkload(@Valid @RequestBody DesignerWorkloadExportDTO dto,
+                                       HttpServletResponse response) {
+        orderExportService.exportDesignerWorkload(dto, response);
     }
 }

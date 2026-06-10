@@ -6,13 +6,16 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.module.order.dto.order.OrderCustomExportDTO;
 import com.yigongbao.module.order.dto.order.OrderExportQueryDTO;
+import com.yigongbao.module.order.dto.workload.DesignerWorkloadExportDTO;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.service.OrderExportService;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderExportFieldVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
+import com.yigongbao.module.order.vo.workload.DesignerWorkloadVO;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +27,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
@@ -211,6 +215,66 @@ public class OrderExportServiceImpl implements OrderExportService {
     }
 
     /**
+     * 根据字段名设置单元格值（带重建项目参数）
+     */
+    private boolean setCellValue(Cell cell, OrderListVO order, OrderListVO.RebuildProjectItemVO project, String field) {
+        // 重建项目相关字段
+        if (project != null) {
+            switch (field) {
+                case "projectName":
+                    cell.setCellValue(StrUtil.nullToEmpty(project.getProjectName()));
+                    return true;
+                case "bodyPartName":
+                    cell.setCellValue(StrUtil.nullToEmpty(project.getBodyPartName()));
+                    return true;
+                case "categoryName":
+                    cell.setCellValue(StrUtil.nullToEmpty(project.getCategoryName()));
+                    return true;
+                case "projectDesc":
+                    cell.setCellValue(StrUtil.nullToEmpty(project.getProjectDesc()));
+                    return true;
+                case "formingRequirement":
+                    cell.setCellValue(StrUtil.nullToEmpty(project.getFormingRequirement()));
+                    return true;
+                case "otherRequirement":
+                    cell.setCellValue(StrUtil.nullToEmpty(project.getOtherRequirement()));
+                    return true;
+                case "rebuildProjectList":
+                    cell.setCellValue(formatSingleRebuildProject(project));
+                    return true;
+            }
+        }
+
+        // 订单基础字段（调用原有逻辑）
+        return setCellValue(cell, order, field);
+    }
+
+    /**
+     * 格式化单个重建项目
+     */
+    private String formatSingleRebuildProject(OrderListVO.RebuildProjectItemVO item) {
+        StringBuilder sb = new StringBuilder();
+        if (StrUtil.isNotBlank(item.getProjectName())) {
+            sb.append(item.getProjectName());
+        }
+        if (StrUtil.isNotBlank(item.getBodyPartName())) {
+            if (sb.length() > 0) sb.append("-");
+            sb.append(item.getBodyPartName());
+        }
+        if (StrUtil.isNotBlank(item.getCategoryName())) {
+            if (sb.length() > 0) {
+                sb.append("(").append(item.getCategoryName()).append(")");
+            } else {
+                sb.append(item.getCategoryName());
+            }
+        }
+        if (item.getCount() != null && item.getCount() > 1) {
+            if (sb.length() > 0) sb.append("×").append(item.getCount());
+        }
+        return sb.toString();
+    }
+
+    /**
      * 根据字段名设置单元格值
      */
     /** @return true 表示字段已匹配处理，false 表示未匹配 */
@@ -358,7 +422,7 @@ public class OrderExportServiceImpl implements OrderExportService {
     }
 
     @Override
-    public void customExportOrders(com.yigongbao.module.order.dto.order.OrderCustomExportDTO dto, HttpServletResponse response) {
+    public void customExportOrders(OrderCustomExportDTO dto, HttpServletResponse response) {
         // 按时间范围查询订单（最多10000条）
         LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<OrderMainEntity>()
                 .ge(OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
@@ -370,6 +434,9 @@ public class OrderExportServiceImpl implements OrderExportService {
         List<OrderListVO> orderList = orderEntities.stream()
                 .map(orderQueryHelper::toOrderListVO)
                 .collect(Collectors.toList());
+
+        // 填充重建项目列表
+        orderQueryHelper.fillRebuildProjectList(orderList);
 
         // 构建字段标签映射
         java.util.Map<String, String> fieldLabels = dto.getFieldLabels() != null
@@ -404,13 +471,23 @@ public class OrderExportServiceImpl implements OrderExportService {
                 sheet.setColumnWidth(i, 20 * 256);
             }
 
-            // 填充数据
+            // 填充数据（按重建项目拆分行）
             int rowNum = 1;
             for (OrderListVO order : orderList) {
-                Row row = sheet.createRow(rowNum++);
-                for (int i = 0; i < exportFields.size(); i++) {
-                    Cell cell = row.createCell(i);
-                    setCellValue(cell, order, exportFields.get(i));
+                if (order.getRebuildProjectList() == null || order.getRebuildProjectList().isEmpty()) {
+                    Row row = sheet.createRow(rowNum++);
+                    for (int i = 0; i < exportFields.size(); i++) {
+                        Cell cell = row.createCell(i);
+                        setCellValue(cell, order, null, exportFields.get(i));
+                    }
+                } else {
+                    for (OrderListVO.RebuildProjectItemVO project : order.getRebuildProjectList()) {
+                        Row row = sheet.createRow(rowNum++);
+                        for (int i = 0; i < exportFields.size(); i++) {
+                            Cell cell = row.createCell(i);
+                            setCellValue(cell, order, project, exportFields.get(i));
+                        }
+                    }
                 }
             }
 
@@ -457,6 +534,12 @@ public class OrderExportServiceImpl implements OrderExportService {
         labels.put("orgName", "提单机构");
         labels.put("createTime", "创建时间");
         labels.put("rebuildProjectList", "重建项目");
+        labels.put("projectName", "重建项目名称");
+        labels.put("bodyPartName", "重建部位");
+        labels.put("categoryName", "项目分类");
+        labels.put("projectDesc", "项目说明");
+        labels.put("formingRequirement", "成形需求");
+        labels.put("otherRequirement", "其他要求");
         return labels;
     }
 
@@ -492,7 +575,133 @@ public class OrderExportServiceImpl implements OrderExportService {
         fields.add(new OrderExportFieldVO("orgName", "提单机构"));
         fields.add(new OrderExportFieldVO("createTime", "创建时间"));
         fields.add(new OrderExportFieldVO("rebuildProjectList", "重建项目"));
+        fields.add(new OrderExportFieldVO("projectName", "重建项目名称"));
+        fields.add(new OrderExportFieldVO("bodyPartName", "重建部位"));
+        fields.add(new OrderExportFieldVO("categoryName", "项目分类"));
+        fields.add(new OrderExportFieldVO("projectDesc", "项目说明"));
+        fields.add(new OrderExportFieldVO("formingRequirement", "成形需求"));
+        fields.add(new OrderExportFieldVO("otherRequirement", "其他要求"));
         return fields;
+    }
+
+    @Override
+    public void exportDesignerWorkload(DesignerWorkloadExportDTO dto, HttpServletResponse response) {
+        List<DesignerWorkloadVO> workloadList =
+            orderMainMapper.statisticsDesignerWorkload(dto.getCreateTimeStart(), dto.getCreateTimeEnd());
+
+        if (workloadList == null || workloadList.isEmpty()) {
+            log.warn("设计师工作量统计为空: startTime={}, endTime={}", dto.getCreateTimeStart(), dto.getCreateTimeEnd());
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "统计数据");
+        }
+
+        int totalCaseCount = workloadList.stream().mapToInt(DesignerWorkloadVO::getCaseCount).sum();
+        int totalPoints = workloadList.stream().mapToInt(DesignerWorkloadVO::getTotalPoints).sum();
+
+        if (totalCaseCount == 0) {
+            log.error("设计师工作量统计案例数为0，数据异常");
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "统计数据异常");
+        }
+
+        workloadList.forEach(vo -> {
+            vo.setCaseCountRate(BigDecimal.valueOf(vo.getCaseCount() * 100.0 / totalCaseCount)
+                .setScale(2, RoundingMode.HALF_UP));
+
+            if (totalPoints > 0) {
+                vo.setTotalPointsRate(BigDecimal.valueOf(vo.getTotalPoints() * 100.0 / totalPoints)
+                    .setScale(2, RoundingMode.HALF_UP));
+            } else {
+                vo.setTotalPointsRate(BigDecimal.ZERO);
+            }
+        });
+
+        try {
+            buildWorkloadExcel(workloadList, totalCaseCount, totalPoints, response);
+            log.info("导出设计师工作量统计: 设计师数量={}, 总案例数={}, 总分值={}",
+                workloadList.size(), totalCaseCount, totalPoints);
+        } catch (IOException e) {
+            log.error("导出设计师工作量统计失败", e);
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR);
+        }
+    }
+
+    private void buildWorkloadExcel(List<DesignerWorkloadVO> workloadList,
+                                     int totalCaseCount, int totalPoints,
+                                     HttpServletResponse response) throws IOException {
+        try (SXSSFWorkbook workbook = new SXSSFWorkbook(100)) {
+            workbook.setCompressTempFiles(true);
+            SXSSFSheet sheet = workbook.createSheet("设计师工作量统计");
+
+            CellStyle headerStyle = createHeaderStyle(workbook);
+            CellStyle dataStyle = createDataStyle(workbook);
+
+            Row headerRow = sheet.createRow(0);
+            String[] headers = {"设计师", "案例数", "案例数占比", "分值总数", "分值占比"};
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+                sheet.setColumnWidth(i, 20 * 256);
+            }
+
+            int rowNum = 1;
+            for (DesignerWorkloadVO vo : workloadList) {
+                Row row = sheet.createRow(rowNum++);
+                Cell cell0 = row.createCell(0);
+                cell0.setCellValue(StrUtil.nullToEmpty(vo.getDesignerName()));
+                cell0.setCellStyle(dataStyle);
+
+                Cell cell1 = row.createCell(1);
+                cell1.setCellValue(vo.getCaseCount());
+                cell1.setCellStyle(dataStyle);
+
+                Cell cell2 = row.createCell(2);
+                cell2.setCellValue(vo.getCaseCountRate().toString() + "%");
+                cell2.setCellStyle(dataStyle);
+
+                Cell cell3 = row.createCell(3);
+                cell3.setCellValue(vo.getTotalPoints());
+                cell3.setCellStyle(dataStyle);
+
+                Cell cell4 = row.createCell(4);
+                cell4.setCellValue(vo.getTotalPointsRate().toString() + "%");
+                cell4.setCellStyle(dataStyle);
+            }
+
+            Row totalRow = sheet.createRow(rowNum);
+            Cell totalCell = totalRow.createCell(0);
+            totalCell.setCellValue("合计");
+            totalCell.setCellStyle(headerStyle);
+            Cell totalCaseCell = totalRow.createCell(1);
+            totalCaseCell.setCellValue(totalCaseCount);
+            totalCaseCell.setCellStyle(headerStyle);
+            Cell totalCaseRateCell = totalRow.createCell(2);
+            totalCaseRateCell.setCellValue("100.00%");
+            totalCaseRateCell.setCellStyle(headerStyle);
+            Cell totalPointsCell = totalRow.createCell(3);
+            totalPointsCell.setCellValue(totalPoints);
+            totalPointsCell.setCellStyle(headerStyle);
+            Cell totalPointsRateCell = totalRow.createCell(4);
+            totalPointsRateCell.setCellValue("100.00%");
+            totalPointsRateCell.setCellStyle(headerStyle);
+
+            String fileName = "设计师工作量统计_" + java.time.LocalDate.now().format(DATE_FORMATTER) + ".xlsx";
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setHeader("Content-Disposition",
+                    "attachment;filename=" + URLEncoder.encode(fileName, StandardCharsets.UTF_8));
+
+            workbook.write(response.getOutputStream());
+            workbook.dispose();
+        }
+    }
+
+    /**
+     * 创建数据行样式（居中）
+     */
+    private CellStyle createDataStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        return style;
     }
 
 }
