@@ -37,6 +37,7 @@ public class DeviceStatusListener {
     private final ProductionProcessMapper processMapper;
     private final IProductionRecordService recordService;
     private final OrderMainMapper orderMainMapper;
+    private final com.yigongbao.module.production.product.mapper.ProductionProductMapper productMapper;
 
     /** 监听设备状态变更：IDLE→BUSY 触发打印开始并更新流转卡状态；BUSY→IDLE 触发打印完成并聚合推进 Flow */
     @EventListener
@@ -68,6 +69,7 @@ public class DeviceStatusListener {
                 record.setContentUpdateTime(now);
                 recordMapper.updateById(record);
                 updatePrintProcessStartTime(record.getId(), now);
+                updateProductStatusToInProcess(record.getId());
 
                 log.info("设备状态变更触发打印开始: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
@@ -130,5 +132,16 @@ public class DeviceStatusListener {
                         .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getStatus,
                                 ProcessStatusEnum.COMPLETED.getCode())
                         .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getEndTime, endTime));
+    }
+
+    /** 更新流转卡下所有待生产产品状态为生产中 */
+    private void updateProductStatusToInProcess(Long recordId) {
+        productMapper.update(null,
+                new LambdaUpdateWrapper<com.yigongbao.module.production.product.entity.ProductionProductEntity>()
+                        .eq(com.yigongbao.module.production.product.entity.ProductionProductEntity::getProductionRecordId, recordId)
+                        .eq(com.yigongbao.module.production.product.entity.ProductionProductEntity::getStatus,
+                                com.yigongbao.module.production.enums.ProductStatusEnum.PENDING.getCode())
+                        .set(com.yigongbao.module.production.product.entity.ProductionProductEntity::getStatus,
+                                com.yigongbao.module.production.enums.ProductStatusEnum.IN_PROCESS.getCode()));
     }
 }

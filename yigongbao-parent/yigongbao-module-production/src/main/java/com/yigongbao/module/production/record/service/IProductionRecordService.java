@@ -5,12 +5,10 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
+import com.yigongbao.module.production.record.dto.SaveProductionColumnConfigDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
-import com.yigongbao.module.production.record.vo.CancelPreviewVO;
-import com.yigongbao.module.production.record.vo.DeviceConfigVO;
-import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
-import com.yigongbao.module.production.record.vo.ProductionRecordVO;
+import com.yigongbao.module.production.record.vo.*;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import java.util.List;
 
@@ -77,4 +75,14 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
      * @return 文件信息
      */
     FileVO generateFlowCardExcel(Long recordId);
+
+    /**
+     * 获取当前用户的列配置
+     */
+    ProductionColumnConfigVO getColumnConfig();
+
+    /**
+     * 保存当前用户的列配置
+     */
+    void saveColumnConfig(SaveProductionColumnConfigDTO dto);
 }

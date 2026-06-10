@@ -252,7 +252,12 @@ public enum SystemConfigKeyEnum {
      * 工序参数配置字典（JSON格式）
      * 定义各工序的参数字段（key/label/type/options/unit），前端据此动态渲染参数表单
      */
-    PRODUCTION_PROCESS_PARAMS_CONFIG("production.process.params.config", "工序参数配置字典（JSON）");
+    PRODUCTION_PROCESS_PARAMS_CONFIG("production.process.params.config", "工序参数配置字典（JSON）"),
+
+    /**
+     * 生产流转卡列表默认列配置（JSON格式）
+     */
+    PRODUCTION_COLUMN_CONFIG("production.column.config", "生产流转卡列表默认列配置");
 
     /**
      * 配置键

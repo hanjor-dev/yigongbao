@@ -236,7 +236,7 @@ public class DesignCompletedListener {
                 product.setMaterialName(dp.getMaterialName());
                 product.setColorName(dp.getColorName());
                 product.setFileName(dpFile != null ? dpFile.getPackageFileName() : null);
-                product.setStatus(ProductStatusEnum.IN_PROCESS.getCode());
+                product.setStatus(ProductStatusEnum.PENDING.getCode());
                 productMapper.insert(product);
             }
             totalCount += qty;

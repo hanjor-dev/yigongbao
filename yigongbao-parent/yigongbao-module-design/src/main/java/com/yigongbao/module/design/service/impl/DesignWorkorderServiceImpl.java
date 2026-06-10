@@ -136,9 +136,14 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
                     .or().like(OrderMainEntity::getHospitalName, queryDTO.getOrderCode())
                     .or().like(OrderMainEntity::getPatientName, queryDTO.getOrderCode()));
         }
-        // 状态筛选
+        // 状态筛选：设计完成状态使用 >= 查询（包含后续阶段，排除已取消），其他状态精确匹配
         if (queryDTO.getStatus() != null) {
-            wrapper.eq(OrderMainEntity::getStatus, queryDTO.getStatus());
+            if (FlowStatusEnum.DESIGN_COMPLETED.getValue().equals(queryDTO.getStatus())) {
+                wrapper.ge(OrderMainEntity::getStatus, FlowStatusEnum.DESIGN_COMPLETED.getValue())
+                       .lt(OrderMainEntity::getStatus, FlowStatusEnum.CANCELLED.getValue());
+            } else {
+                wrapper.eq(OrderMainEntity::getStatus, queryDTO.getStatus());
+            }
         }
         wrapper.eq(queryDTO.getIsUrgent() != null, OrderMainEntity::getIsUrgent, queryDTO.getIsUrgent());
         wrapper.eq(queryDTO.getHospitalId() != null, OrderMainEntity::getHospitalId, queryDTO.getHospitalId());

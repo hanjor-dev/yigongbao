@@ -41,12 +41,19 @@ import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
+import com.yigongbao.module.production.record.dto.SaveProductionColumnConfigDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.helper.FlowCardExcelBuilder;
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
+import com.yigongbao.module.system.config.service.ConfigService;
+import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -83,6 +90,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final FlowFacade flowFacade;
     private final FlowCardExcelBuilder flowCardExcelBuilder;
     private final com.yigongbao.module.basic.file.service.FileService fileService;
+    private final ConfigService configService;
+    private final UserService userService;
+    private final ObjectMapper objectMapper;
 
     /** 查询流转卡详情，包含产品列表、当前工序中文名和设计文件信息 */
     @Override
@@ -191,7 +201,14 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (dto.getStatuses() != null && !dto.getStatuses().isEmpty()) {
             wrapper.in(ProductionRecordEntity::getStatus, dto.getStatuses());
         } else if (dto.getStatus() != null) {
-            wrapper.eq(ProductionRecordEntity::getStatus, dto.getStatus());
+            // 质检相关状态使用 >= 查询（包含后续阶段，排除已取消），其他状态精确匹配
+            if (FlowStatusEnum.QC_IN_PROGRESS.getValue().equals(dto.getStatus())
+                    || FlowStatusEnum.PACKING.getValue().equals(dto.getStatus())) {
+                wrapper.ge(ProductionRecordEntity::getStatus, dto.getStatus())
+                       .lt(ProductionRecordEntity::getStatus, FlowStatusEnum.CANCELLED.getValue());
+            } else {
+                wrapper.eq(ProductionRecordEntity::getStatus, dto.getStatus());
+            }
         }
         if (dto.getProcessingCenterId() != null) {
             // 前端或管理员指定加工中心时精确过滤
@@ -785,5 +802,78 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
         UserEntity designer = userMapper.selectById(order.getDesignerId());
         return designer != null ? designer.getAssetNumber() : null;
+    }
+
+    @Override
+    public ProductionColumnConfigVO getColumnConfig() {
+        try {
+            Long currentUserId = StpUtil.getLoginIdAsLong();
+            UserEntity user = userService.getById(currentUserId);
+            if (user != null && StrUtil.isNotBlank(user.getProductionColumnSettings())) {
+                try {
+                    return objectMapper.readValue(user.getProductionColumnSettings(), ProductionColumnConfigVO.class);
+                } catch (JsonProcessingException e) {
+                    log.warn("解析用户生产列配置失败，降级为系统默认，userId={}", currentUserId, e);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("获取当前用户信息失败，使用系统默认配置", e);
+        }
+
+        String configJson = configService.getConfigValue(SystemConfigKeyEnum.PRODUCTION_COLUMN_CONFIG.getKey());
+        if (StrUtil.isBlank(configJson)) {
+            log.warn("系统默认生产列配置为空");
+            return new ProductionColumnConfigVO();
+        }
+        try {
+            return objectMapper.readValue(configJson, ProductionColumnConfigVO.class);
+        } catch (JsonProcessingException e) {
+            log.error("解析系统生产列配置失败", e);
+            return new ProductionColumnConfigVO();
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void saveColumnConfig(SaveProductionColumnConfigDTO dto) {
+        Long currentUserId;
+        try {
+            currentUserId = StpUtil.getLoginIdAsLong();
+        } catch (Exception e) {
+            log.error("获取当前登录用户失败", e);
+            throw new BusinessException(ErrorCodeEnum.USER_NOT_LOGIN);
+        }
+
+        UserEntity user = userService.getById(currentUserId);
+        if (user == null) {
+            log.error("用户不存在: userId={}", currentUserId);
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+        }
+
+        ProductionColumnConfigVO configVO = new ProductionColumnConfigVO();
+        if (dto.getColumns() != null) {
+            List<ProductionColumnConfigVO.ColumnItemVO> columnItems = dto.getColumns().stream()
+                    .map(item -> {
+                        ProductionColumnConfigVO.ColumnItemVO colVO = new ProductionColumnConfigVO.ColumnItemVO();
+                        colVO.setField(item.getField());
+                        colVO.setLabel(item.getLabel());
+                        colVO.setVisible(item.getVisible());
+                        colVO.setSort(item.getSort());
+                        colVO.setWidth(item.getWidth());
+                        colVO.setFixed(item.getFixed());
+                        return colVO;
+                    }).collect(Collectors.toList());
+            configVO.setColumns(columnItems);
+        }
+
+        try {
+            String configJson = objectMapper.writeValueAsString(configVO);
+            user.setProductionColumnSettings(configJson);
+            userService.updateById(user);
+            log.info("保存生产列配置成功: userId={}", currentUserId);
+        } catch (JsonProcessingException e) {
+            log.error("序列化生产列配置失败: userId={}", currentUserId, e);
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR);
+        }
     }
 }

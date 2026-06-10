@@ -14,6 +14,7 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public enum ProductStatusEnum {
+    PENDING("pending", "待生产"),
     IN_PROCESS("in_process", "生产中"),
     FAIL("fail", "质检不合格"),
     PASS("pass", "质检合格"),

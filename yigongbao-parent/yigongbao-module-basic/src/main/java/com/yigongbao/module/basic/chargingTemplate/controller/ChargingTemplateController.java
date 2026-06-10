@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Tag(name = "收费模板管理", description = "收费模板的增删改查接口")
 @RestController
-@RequestMapping("/api/basic/charging-template")
+@RequestMapping("/basic/charging-template")
 @RequiredArgsConstructor
 public class ChargingTemplateController {
 
