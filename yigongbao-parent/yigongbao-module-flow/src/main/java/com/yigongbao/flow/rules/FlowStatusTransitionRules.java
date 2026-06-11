@@ -101,8 +101,7 @@ public class FlowStatusTransitionRules {
         transitions.put(statusKey(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.WAREHOUSED),
                 Set.of(FlowStatusEnum.WAREHOUSE_OUT));
 
-        transitions.put(statusKey(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.WAREHOUSE_OUT),
-                Set.of(FlowStatusEnum.COMPLETED));
+        // WAREHOUSE_OUT 为最终态，暂不流转到 COMPLETED
 
         STATUS_TRANSITIONS = Map.copyOf(transitions);
     }

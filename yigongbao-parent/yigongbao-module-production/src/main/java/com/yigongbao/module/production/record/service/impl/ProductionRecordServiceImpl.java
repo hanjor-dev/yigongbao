@@ -661,9 +661,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         order.setId(orderId);
         order.setPhase(result.getTargetPhase());
         order.setStatus(result.getFinalStatus());
-        if (FlowActionEnum.COMPLETE_WAREHOUSE_OUT.equals(action)) {
-            order.setActualCompleteTime(java.time.LocalDateTime.now());
-        }
         orderMainMapper.updateById(order);
         log.info("Flow状态流转完成: orderId={}, action={}, targetPhase={}, targetStatus={}",
                 orderId, action, result.getTargetPhase(), result.getFinalStatus());

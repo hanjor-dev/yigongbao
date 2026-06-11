@@ -191,11 +191,6 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             return new PhaseAndStatus(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.PENDING_WAREHOUSE_IN);
         }
 
-        // 已出库 → 进入已完成
-        if (targetStatus == FlowStatusEnum.WAREHOUSE_OUT) {
-            return new PhaseAndStatus(FlowPhaseEnum.COMPLETED, FlowStatusEnum.COMPLETED);
-        }
-
         // 客户确认 → 进入已完成
         if (targetStatus == FlowStatusEnum.COMPLETED) {
             return new PhaseAndStatus(FlowPhaseEnum.COMPLETED, FlowStatusEnum.COMPLETED);
