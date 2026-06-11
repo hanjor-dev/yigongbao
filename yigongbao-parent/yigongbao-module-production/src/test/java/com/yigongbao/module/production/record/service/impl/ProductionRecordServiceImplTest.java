@@ -3,8 +3,10 @@ package com.yigongbao.module.production.record.service.impl;
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -24,9 +26,15 @@ import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
+import com.yigongbao.module.production.record.dto.SaveProductionColumnConfigDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
+import com.yigongbao.module.production.record.vo.ProductionColumnConfigVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
+import com.yigongbao.module.system.config.service.ConfigService;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.system.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,6 +66,10 @@ class ProductionRecordServiceImplTest {
     @Mock private ProductionProductMapper productMapper;
     @Mock private ProductionProcessMapper processMapper;
     @Mock private FlowFacade flowFacade;
+    @Mock private UserMapper userMapper;
+    @Mock private ConfigService configService;
+    @Mock private UserService userService;
+    @Mock private ObjectMapper objectMapper;
 
     @InjectMocks
     private ProductionRecordServiceImpl recordService;
@@ -208,6 +220,191 @@ class ProductionRecordServiceImplTest {
         }
 
         verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.COMPLETE_PRINT), any(FlowOperator.class));
+    }
+
+    // ---- getColumnConfig ----
+
+    @Test
+    void getColumnConfig_userHasConfig_returnsUserConfig() throws Exception {
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+        user.setProductionColumnSettings("{\"columns\":[{\"field\":\"recordNo\",\"visible\":true}]}");
+
+        ProductionColumnConfigVO expectedConfig = new ProductionColumnConfigVO();
+        ProductionColumnConfigVO.ColumnItemVO item = new ProductionColumnConfigVO.ColumnItemVO();
+        item.setField("recordNo");
+        item.setVisible(true);
+        expectedConfig.setColumns(List.of(item));
+
+        when(userService.getById(1L)).thenReturn(user);
+        when(objectMapper.readValue(anyString(), eq(ProductionColumnConfigVO.class))).thenReturn(expectedConfig);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            ProductionColumnConfigVO result = recordService.getColumnConfig();
+
+            assertNotNull(result);
+            assertEquals(1, result.getColumns().size());
+            assertEquals("recordNo", result.getColumns().get(0).getField());
+            verify(configService, never()).getConfigValue(any());
+        }
+    }
+
+    @Test
+    void getColumnConfig_userConfigInvalid_fallbackToSystemConfig() throws Exception {
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+        user.setProductionColumnSettings("invalid json");
+
+        ProductionColumnConfigVO systemConfig = new ProductionColumnConfigVO();
+        when(userService.getById(1L)).thenReturn(user);
+        when(objectMapper.readValue("invalid json", ProductionColumnConfigVO.class))
+            .thenThrow(new com.fasterxml.jackson.core.JsonProcessingException("parse error") {});
+        when(configService.getConfigValue(SystemConfigKeyEnum.PRODUCTION_COLUMN_CONFIG.getKey()))
+            .thenReturn("{\"columns\":[]}");
+        when(objectMapper.readValue("{\"columns\":[]}", ProductionColumnConfigVO.class)).thenReturn(systemConfig);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            ProductionColumnConfigVO result = recordService.getColumnConfig();
+
+            assertNotNull(result);
+            verify(configService).getConfigValue(SystemConfigKeyEnum.PRODUCTION_COLUMN_CONFIG.getKey());
+        }
+    }
+
+    @Test
+    void getColumnConfig_noUserConfig_returnsSystemConfig() throws Exception {
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+        user.setProductionColumnSettings(null);
+
+        ProductionColumnConfigVO systemConfig = new ProductionColumnConfigVO();
+        when(userService.getById(1L)).thenReturn(user);
+        when(configService.getConfigValue(SystemConfigKeyEnum.PRODUCTION_COLUMN_CONFIG.getKey()))
+            .thenReturn("{\"columns\":[]}");
+        when(objectMapper.readValue("{\"columns\":[]}", ProductionColumnConfigVO.class)).thenReturn(systemConfig);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            ProductionColumnConfigVO result = recordService.getColumnConfig();
+
+            assertNotNull(result);
+            verify(configService).getConfigValue(SystemConfigKeyEnum.PRODUCTION_COLUMN_CONFIG.getKey());
+        }
+    }
+
+    @Test
+    void getColumnConfig_systemConfigEmpty_returnsEmptyConfig() throws Exception {
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+
+        when(userService.getById(1L)).thenReturn(user);
+        when(configService.getConfigValue(SystemConfigKeyEnum.PRODUCTION_COLUMN_CONFIG.getKey())).thenReturn("");
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            ProductionColumnConfigVO result = recordService.getColumnConfig();
+
+            assertNotNull(result);
+            assertNull(result.getColumns());
+        }
+    }
+
+    // ---- saveColumnConfig ----
+
+    @Test
+    void saveColumnConfig_userNotFound_throwsException() {
+        when(userService.getById(1L)).thenReturn(null);
+
+        SaveProductionColumnConfigDTO dto = new SaveProductionColumnConfigDTO();
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            BusinessException ex = assertThrows(BusinessException.class,
+                () -> recordService.saveColumnConfig(dto));
+            assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), ex.getCode());
+        }
+    }
+
+    @Test
+    void saveColumnConfig_success_savesUserConfig() throws Exception {
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+
+        SaveProductionColumnConfigDTO dto = new SaveProductionColumnConfigDTO();
+        SaveProductionColumnConfigDTO.ColumnItemDTO item = new SaveProductionColumnConfigDTO.ColumnItemDTO();
+        item.setField("recordNo");
+        item.setLabel("流转卡编号");
+        item.setVisible(true);
+        item.setSort(1);
+        dto.setColumns(List.of(item));
+
+        when(userService.getById(1L)).thenReturn(user);
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"columns\":[]}");
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            recordService.saveColumnConfig(dto);
+
+            verify(userService).updateById(argThat(u -> {
+                UserEntity entity = (UserEntity) u;
+                return "{\"columns\":[]}".equals(entity.getProductionColumnSettings());
+            }));
+        }
+    }
+
+    @Test
+    void saveColumnConfig_serializationFails_throwsException() throws Exception {
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+
+        SaveProductionColumnConfigDTO dto = new SaveProductionColumnConfigDTO();
+        when(userService.getById(1L)).thenReturn(user);
+        when(objectMapper.writeValueAsString(any()))
+            .thenThrow(new com.fasterxml.jackson.core.JsonProcessingException("error") {});
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            BusinessException ex = assertThrows(BusinessException.class,
+                () -> recordService.saveColumnConfig(dto));
+            assertEquals(ErrorCodeEnum.SYSTEM_ERROR.getCode(), ex.getCode());
+        }
+    }
+
+    @Test
+    void saveColumnConfig_emptyColumns_success() throws Exception {
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+
+        SaveProductionColumnConfigDTO dto = new SaveProductionColumnConfigDTO();
+        dto.setColumns(Collections.emptyList());
+
+        when(userService.getById(1L)).thenReturn(user);
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"columns\":[]}");
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertDoesNotThrow(() -> recordService.saveColumnConfig(dto));
+            verify(userService).updateById(any());
+        }
+    }
+
+    @Test
+    void saveColumnConfig_nullColumns_success() throws Exception {
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+
+        SaveProductionColumnConfigDTO dto = new SaveProductionColumnConfigDTO();
+        dto.setColumns(null);
+
+        when(userService.getById(1L)).thenReturn(user);
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"columns\":null}");
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertDoesNotThrow(() -> recordService.saveColumnConfig(dto));
+        }
     }
 
     // ---- helpers ----

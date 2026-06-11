@@ -296,7 +296,7 @@ class FlowPhaseTransitionRulesTest {
                     FlowActionEnum.QC_PASS,
                     1, null);
             assertEquals(FlowPhaseEnum.WAREHOUSE, result.phase());
-            assertEquals(FlowStatusEnum.WAREHOUSE_IN, result.initialStatus());
+            assertEquals(FlowStatusEnum.PENDING_WAREHOUSE_IN, result.initialStatus());
         }
 
         @Test

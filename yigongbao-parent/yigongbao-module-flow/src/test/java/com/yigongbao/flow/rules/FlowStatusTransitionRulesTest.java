@@ -507,7 +507,7 @@ class FlowStatusTransitionRulesTest {
         void warehouse_phase_needDelivery_hasStatuses() {
             Set<FlowStatusEnum> statuses = rules.getValidStatusesForPhase(FlowPhaseEnum.WAREHOUSE, 1);
             assertEquals(2, statuses.size());
-            assertTrue(statuses.contains(FlowStatusEnum.WAREHOUSE_IN));
+            assertTrue(statuses.contains(FlowStatusEnum.PENDING_WAREHOUSE_IN));
             assertTrue(statuses.contains(FlowStatusEnum.WAREHOUSED));
         }
 

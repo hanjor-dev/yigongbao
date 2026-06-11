@@ -36,10 +36,11 @@ public interface OrderMainMapper extends BaseMapper<OrderMainEntity> {
         INNER JOIN order_item oi ON om.id = oi.order_id
         INNER JOIN rebuild_project rp ON oi.project_id = rp.id
         LEFT JOIN sys_user u ON om.designer_id = u.id
-        WHERE om.create_time BETWEEN #{createTimeStart} AND #{createTimeEnd}
-          AND om.designer_id IS NOT NULL
+        WHERE om.designer_id IS NOT NULL
           AND om.status >= 2030
           AND om.is_deleted = 0
+          AND (#{createTimeStart} IS NULL OR om.create_time >= #{createTimeStart})
+          AND (#{createTimeEnd} IS NULL OR om.create_time <= #{createTimeEnd})
         GROUP BY om.designer_id, u.real_name
         ORDER BY totalPoints DESC, caseCount DESC
     """)

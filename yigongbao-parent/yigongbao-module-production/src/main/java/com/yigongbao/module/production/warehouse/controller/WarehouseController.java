@@ -1,11 +1,17 @@
 package com.yigongbao.module.production.warehouse.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.module.production.warehouse.dto.ListWarehouseDTO;
+import com.yigongbao.module.production.warehouse.dto.ListWarehouseProductDTO;
 import com.yigongbao.module.production.warehouse.dto.WarehouseInProductDTO;
 import com.yigongbao.module.production.warehouse.dto.WarehouseOutProductDTO;
 import com.yigongbao.module.production.warehouse.service.IWarehouseService;
+import com.yigongbao.module.production.warehouse.vo.WarehouseDetailVO;
+import com.yigongbao.module.production.warehouse.vo.WarehouseProductVO;
+import com.yigongbao.module.production.warehouse.vo.WarehouseRecordVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +31,24 @@ import org.springframework.web.bind.annotation.*;
 public class WarehouseController {
 
     private final IWarehouseService warehouseService;
+
+    @Operation(summary = "仓储列表")
+    @PostMapping("/list")
+    public Result<IPage<WarehouseRecordVO>> listWarehouse(@RequestBody ListWarehouseDTO dto) {
+        return Result.success(warehouseService.listWarehouse(dto));
+    }
+
+    @Operation(summary = "仓储详情")
+    @GetMapping("/detail/{recordId}")
+    public Result<WarehouseDetailVO> getWarehouseDetail(@PathVariable Long recordId) {
+        return Result.success(warehouseService.getWarehouseDetail(recordId));
+    }
+
+    @Operation(summary = "产品明细列表")
+    @PostMapping("/products/list")
+    public Result<IPage<WarehouseProductVO>> listWarehouseProducts(@RequestBody ListWarehouseProductDTO dto) {
+        return Result.success(warehouseService.listWarehouseProducts(dto));
+    }
 
     @Operation(summary = "产品入库")
     @OperationLog(module = "仓储管理", businessType = OperationTypeEnum.UPDATE, operation = "产品入库")

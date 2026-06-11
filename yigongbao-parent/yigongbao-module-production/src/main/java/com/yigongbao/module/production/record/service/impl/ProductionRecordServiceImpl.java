@@ -350,24 +350,22 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .eq(ProductionRecordEntity::getOrderId, orderId)
                 .notIn(ProductionRecordEntity::getStatus,
                         FlowStatusEnum.PRINT_FAILED.getValue(),
+                        FlowStatusEnum.REWORK.getValue(),
                         FlowStatusEnum.CANCELLED.getValue()));
         if (totalActive == 0) {
             return;
         }
-        // 已达到或超过 requiredStatus 的状态集合（状态机单向推进）
         List<Integer> reachedStatuses = getReachedOrBeyondStatuses(requiredStatus);
         long reachedCount = count(new LambdaQueryWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getOrderId, orderId)
                 .in(ProductionRecordEntity::getStatus, reachedStatuses));
         if (totalActive == reachedCount) {
-            // 幂等保护：再次确认 action 仍可执行（防止并发重复触发）
-            List<String> availableActions = flowFacade.getAvailableActions(orderId);
-            if (!availableActions.contains(action.name())) {
-                log.info("聚合条件满足但Flow已推进，跳过: orderId={}, action={}", orderId, action);
-                return;
+            try {
+                triggerFlowAndSync(orderId, action);
+                log.info("聚合条件满足，触发Flow: orderId={}, requiredStatus={}, action={}", orderId, requiredStatus, action);
+            } catch (BusinessException e) {
+                log.info("Flow状态流转被拒绝（可能已被并发触发）: orderId={}, action={}, reason={}", orderId, action, e.getMessage());
             }
-            triggerFlowAndSync(orderId, action);
-            log.info("聚合条件满足，触发Flow: orderId={}, requiredStatus={}, action={}", orderId, requiredStatus, action);
         } else {
             log.info("聚合条件未满足，暂不触发Flow: orderId={}, requiredStatus={}, active={}, reached={}",
                     orderId, requiredStatus, totalActive, reachedCount);
@@ -380,6 +378,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .eq(ProductionRecordEntity::getOrderId, orderId)
                 .notIn(ProductionRecordEntity::getStatus,
                         FlowStatusEnum.PRINT_FAILED.getValue(),
+                        FlowStatusEnum.REWORK.getValue(),
                         FlowStatusEnum.CANCELLED.getValue()));
         if (totalActive == 0) {
             return;
@@ -388,13 +387,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .eq(ProductionRecordEntity::getOrderId, orderId)
                 .eq(ProductionRecordEntity::getStatus, exactStatus));
         if (totalActive == matchCount) {
-            List<String> availableActions = flowFacade.getAvailableActions(orderId);
-            if (!availableActions.contains(action.name())) {
-                log.info("聚合条件满足但Flow已推进，跳过: orderId={}, action={}", orderId, action);
-                return;
+            try {
+                triggerFlowAndSync(orderId, action);
+                log.info("聚合条件满足（精确匹配），触发Flow: orderId={}, exactStatus={}, action={}", orderId, exactStatus, action);
+            } catch (BusinessException e) {
+                log.info("Flow状态流转被拒绝（可能已被并发触发）: orderId={}, action={}, reason={}", orderId, action, e.getMessage());
             }
-            triggerFlowAndSync(orderId, action);
-            log.info("聚合条件满足（精确匹配），触发Flow: orderId={}, exactStatus={}, action={}", orderId, exactStatus, action);
         } else {
             log.info("聚合条件未满足，暂不触发Flow: orderId={}, exactStatus={}, active={}, matched={}",
                     orderId, exactStatus, totalActive, matchCount);

@@ -1,0 +1,22 @@
+package com.yigongbao.module.production.warehouse.dto;
+
+import lombok.Data;
+import java.time.LocalDateTime;
+
+/**
+ * 产品明细列表查询参数
+ *
+ * @author hanjor
+ * @date 2026-06-11
+ */
+@Data
+public class ListWarehouseProductDTO {
+    private String keyword;
+    private String status;
+    private LocalDateTime warehouseInTimeStart;
+    private LocalDateTime warehouseInTimeEnd;
+    private LocalDateTime warehouseOutTimeStart;
+    private LocalDateTime warehouseOutTimeEnd;
+    private Integer page;
+    private Integer size;
+}

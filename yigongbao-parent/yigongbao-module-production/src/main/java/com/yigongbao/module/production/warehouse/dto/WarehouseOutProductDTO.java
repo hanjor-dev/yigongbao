@@ -1,6 +1,5 @@
 package com.yigongbao.module.production.warehouse.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 /**
@@ -11,11 +10,5 @@ import lombok.Data;
  */
 @Data
 public class WarehouseOutProductDTO {
-    @NotBlank(message = "收货人不能为空")
-    private String recipient;
-
-    @NotBlank(message = "收货电话不能为空")
-    private String recipientPhone;
-
     private String remark;
 }
