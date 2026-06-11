@@ -1778,13 +1778,23 @@ CREATE TABLE production_product (
     qc_remark VARCHAR(500) COMMENT '质检不合格原因',
     qc_time DATETIME COMMENT '质检时间',
     qc_user_id BIGINT COMMENT '质检员ID',
+    warehouse_in_time DATETIME COMMENT '入库时间',
+    warehouse_in_user_id BIGINT COMMENT '入库人ID',
+    warehouse_location VARCHAR(100) COMMENT '库位',
+    warehouse_in_remark VARCHAR(500) COMMENT '入库备注',
+    warehouse_out_time DATETIME COMMENT '出库时间',
+    warehouse_out_user_id BIGINT COMMENT '出库人ID',
+    warehouse_out_remark VARCHAR(500) COMMENT '出库备注',
+    recipient VARCHAR(50) COMMENT '收货人',
+    recipient_phone VARCHAR(20) COMMENT '收货电话',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     create_by BIGINT COMMENT '创建人ID',
     update_by BIGINT COMMENT '更新人ID',
     is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
     KEY idx_production_record_id (production_record_id),
-    KEY idx_status (status)
+    KEY idx_status (status),
+    KEY idx_record_status (production_record_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产产品记录表';
 CREATE UNIQUE INDEX uk_product_no ON production_product ((CASE WHEN is_deleted = 0 THEN product_no ELSE NULL END));
 

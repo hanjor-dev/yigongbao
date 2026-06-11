@@ -86,7 +86,7 @@ public class FlowStatusTransitionRules {
                 Set.of(FlowStatusEnum.QC_PASSED, FlowStatusEnum.QC_FAILED, FlowStatusEnum.PENDING_PRINT));
 
         transitions.put(statusKey(FlowPhaseEnum.QC, FlowStatusEnum.QC_PASSED),
-                Set.of(FlowStatusEnum.WAREHOUSE_IN));
+                Set.of(FlowStatusEnum.PENDING_WAREHOUSE_IN));
 
         transitions.put(statusKey(FlowPhaseEnum.QC, FlowStatusEnum.QC_FAILED),
                 Set.of(FlowStatusEnum.REWORK));
@@ -95,10 +95,13 @@ public class FlowStatusTransitionRules {
                 Set.of(FlowStatusEnum.QC_IN_PROGRESS));
 
         // ==================== 仓储阶段状态转换（6010-6090）====================
-        transitions.put(statusKey(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.WAREHOUSE_IN),
+        transitions.put(statusKey(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.PENDING_WAREHOUSE_IN),
                 Set.of(FlowStatusEnum.WAREHOUSED));
 
         transitions.put(statusKey(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.WAREHOUSED),
+                Set.of(FlowStatusEnum.WAREHOUSE_OUT));
+
+        transitions.put(statusKey(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.WAREHOUSE_OUT),
                 Set.of(FlowStatusEnum.COMPLETED));
 
         STATUS_TRANSITIONS = Map.copyOf(transitions);
@@ -171,10 +174,15 @@ public class FlowStatusTransitionRules {
             };
 
             case WAREHOUSE -> switch (status) {
-                case WAREHOUSE_IN -> needsProduction
+                case PENDING_WAREHOUSE_IN -> needsProduction
+                        ? List.of(FlowActionEnum.TRANSFER_TO_WAREHOUSE)
+                        : List.of();
+                case WAREHOUSED -> needsProduction
                         ? List.of(FlowActionEnum.COMPLETE_WAREHOUSE_IN)
                         : List.of();
-                // WAREHOUSED 为过渡状态，不会出现在 phase=WAREHOUSE 的订单中（自动推进）
+                case WAREHOUSE_OUT -> needsProduction
+                        ? List.of(FlowActionEnum.COMPLETE_WAREHOUSE_OUT)
+                        : List.of();
                 default -> List.of();
             };
 
@@ -255,7 +263,9 @@ public class FlowStatusTransitionRules {
             case REWORK_TO_PRINT -> FlowStatusEnum.PENDING_PRINT.getValue();
 
             // 仓储阶段动作
+            case TRANSFER_TO_WAREHOUSE -> FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue();
             case COMPLETE_WAREHOUSE_IN -> FlowStatusEnum.WAREHOUSED.getValue();
+            case COMPLETE_WAREHOUSE_OUT -> FlowStatusEnum.WAREHOUSE_OUT.getValue();
 
             default -> null;
         };
@@ -344,7 +354,7 @@ public class FlowStatusTransitionRules {
                     : Set.of();
 
             case WAREHOUSE -> needsProduction
-                    ? Set.of(FlowStatusEnum.WAREHOUSE_IN, FlowStatusEnum.WAREHOUSED)
+                    ? Set.of(FlowStatusEnum.PENDING_WAREHOUSE_IN, FlowStatusEnum.WAREHOUSED, FlowStatusEnum.WAREHOUSE_OUT)
                     : Set.of();
 
             case COMPLETED -> Set.of(FlowStatusEnum.COMPLETED);

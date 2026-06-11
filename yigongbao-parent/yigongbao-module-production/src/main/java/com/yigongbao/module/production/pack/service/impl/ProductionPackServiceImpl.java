@@ -8,6 +8,7 @@ import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
+import com.yigongbao.module.production.enums.ProductStatusEnum;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -16,6 +17,8 @@ import com.yigongbao.module.production.pack.dto.FillPackDTO;
 import com.yigongbao.module.production.pack.service.IProductionPackService;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
+import com.yigongbao.module.production.product.entity.ProductionProductEntity;
+import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
@@ -43,6 +46,7 @@ public class ProductionPackServiceImpl implements IProductionPackService {
     private final IProductionRecordService recordService;
     private final UserMapper userMapper;
     private final ProductionProcessMapper processMapper;
+    private final ProductionProductMapper productMapper;
 
     /**
      * 填写包装信息
@@ -132,7 +136,7 @@ public class ProductionPackServiceImpl implements IProductionPackService {
     }
 
     /**
-     * 包装完成，流转到入库
+     * 包装完成，流转到待入库
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -144,24 +148,38 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         if (record.getPackDeviceId() == null) {
             throw new BusinessException(ErrorCodeEnum.PACK_INFO_NOT_FILLED);
         }
-        // 幂等性保护：只有在包装状态下才能流转到入库
+        // 幂等性保护
         if (!FlowStatusEnum.PACKING.getValue().equals(record.getStatus())) {
-            log.warn("流转卡状态不允许流转到入库: recordId={}, currentStatus={}",
+            log.warn("流转卡状态不允许流转: recordId={}, currentStatus={}",
                 recordId, record.getStatus());
-            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_WAREHOUSE_IN);
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_TRANSFER_TO_PACK);
         }
-        record.setStatus(FlowStatusEnum.WAREHOUSE_IN.getValue());
+
+        record.setStatus(FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue());
         recordMapper.updateById(record);
 
-        // 同步更新包装工序记录的完成时间和状态
+        // 批量更新产品状态：PASS → PENDING_WAREHOUSE_IN
+        productMapper.update(null,
+            new LambdaUpdateWrapper<ProductionProductEntity>()
+                .eq(ProductionProductEntity::getProductionRecordId, recordId)
+                .eq(ProductionProductEntity::getStatus, ProductStatusEnum.PASS.getCode())
+                .set(ProductionProductEntity::getStatus, ProductStatusEnum.PENDING_WAREHOUSE_IN.getCode())
+        );
+
+        // 同步更新包装工序完成时间
         processMapper.update(null, new LambdaUpdateWrapper<ProductionProcessEntity>()
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)
                 .eq(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PACK.getCode())
                 .set(ProductionProcessEntity::getEndTime, LocalDateTime.now())
                 .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.COMPLETED.getCode()));
 
-        recordService.triggerFlowIfAllExact(record.getOrderId(),
-                FlowStatusEnum.WAREHOUSE_IN.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_IN);
-        log.info("包装完成，流转到入库: recordId={}, recordNo={}, orderId={}", recordId, record.getRecordNo(), record.getOrderId());
+        log.info("包装完成，流转到待入库: recordId={}, recordNo={}", recordId, record.getRecordNo());
+
+        // 聚合触发
+        recordService.triggerFlowIfAllExact(
+            record.getOrderId(),
+            FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(),
+            FlowActionEnum.TRANSFER_TO_WAREHOUSE
+        );
     }
 }

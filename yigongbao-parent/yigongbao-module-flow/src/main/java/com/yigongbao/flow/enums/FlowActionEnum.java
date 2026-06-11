@@ -115,9 +115,19 @@ public enum FlowActionEnum {
 
     // ==================== 仓储阶段动作 ====================
     /**
+     * 包装完成，流转到待入库
+     */
+    TRANSFER_TO_WAREHOUSE("TRANSFER_TO_WAREHOUSE", "流转到待入库"),
+
+    /**
      * 完成入库
      */
-    COMPLETE_WAREHOUSE_IN("COMPLETE_WAREHOUSE_IN", "完成入库");
+    COMPLETE_WAREHOUSE_IN("COMPLETE_WAREHOUSE_IN", "完成入库"),
+
+    /**
+     * 完成出库
+     */
+    COMPLETE_WAREHOUSE_OUT("COMPLETE_WAREHOUSE_OUT", "完成出库");
 
     /**
      * 动作编码

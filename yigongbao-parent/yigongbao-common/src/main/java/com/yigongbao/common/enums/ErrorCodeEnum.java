@@ -367,7 +367,9 @@ public enum ErrorCodeEnum {
     PRODUCT_STATUS_NOT_ALLOW_MARK_FAIL(821, "产品当前状态不允许标记不合格", 3),
     RECORD_STATUS_NOT_ALLOW_TRANSFER_TO_PACK(822, "流转卡当前状态不允许流转到包装", 3),
     PRODUCT_HAS_NOT_QC(823, "存在未质检的产品，无法流转到包装", 3),
-    PRODUCT_HAS_FAIL(824, "存在质检不合格的产品，无法流转到包装", 3);
+    PRODUCT_HAS_FAIL(824, "存在质检不合格的产品，无法流转到包装", 3),
+    PRODUCT_STATUS_NOT_ALLOW_WAREHOUSE_IN(825, "产品当前状态不允许入库", 3),
+    PRODUCT_STATUS_NOT_ALLOW_WAREHOUSE_OUT(826, "产品当前状态不允许出库", 3);
 
     /**
      * 错误码

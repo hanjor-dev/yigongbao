@@ -54,4 +54,22 @@ public class ProductionProductEntity extends BaseEntity {
     private LocalDateTime qcTime;
     /** 质检员ID */
     private Long qcUserId;
+    /** 入库时间 */
+    private LocalDateTime warehouseInTime;
+    /** 入库人ID */
+    private Long warehouseInUserId;
+    /** 库位 */
+    private String warehouseLocation;
+    /** 入库备注 */
+    private String warehouseInRemark;
+    /** 出库时间 */
+    private LocalDateTime warehouseOutTime;
+    /** 出库人ID */
+    private Long warehouseOutUserId;
+    /** 出库备注 */
+    private String warehouseOutRemark;
+    /** 收货人 */
+    private String recipient;
+    /** 收货电话 */
+    private String recipientPhone;
 }

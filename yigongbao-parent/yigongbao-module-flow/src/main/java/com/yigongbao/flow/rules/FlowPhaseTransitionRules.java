@@ -186,13 +186,13 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             return new PhaseAndStatus(FlowPhaseEnum.QC, FlowStatusEnum.QC_IN_PROGRESS);
         }
 
-        // 质检合格 → 进入仓储阶段，初始状态为 WAREHOUSE_IN
+        // 质检合格 → 进入仓储阶段，初始状态为 PENDING_WAREHOUSE_IN
         if (targetStatus == FlowStatusEnum.QC_PASSED) {
-            return new PhaseAndStatus(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.WAREHOUSE_IN);
+            return new PhaseAndStatus(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.PENDING_WAREHOUSE_IN);
         }
 
-        // 已入库 → 进入已完成
-        if (targetStatus == FlowStatusEnum.WAREHOUSED) {
+        // 已出库 → 进入已完成
+        if (targetStatus == FlowStatusEnum.WAREHOUSE_OUT) {
             return new PhaseAndStatus(FlowPhaseEnum.COMPLETED, FlowStatusEnum.COMPLETED);
         }
 

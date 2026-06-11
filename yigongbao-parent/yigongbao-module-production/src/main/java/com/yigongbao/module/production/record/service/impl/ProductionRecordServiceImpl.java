@@ -410,7 +410,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 FlowStatusEnum.POST_PROCESSING.getValue(),
                 FlowStatusEnum.QC_IN_PROGRESS.getValue(),
                 FlowStatusEnum.PACKING.getValue(),
-                FlowStatusEnum.WAREHOUSE_IN.getValue(),
+                FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(),
+                FlowStatusEnum.WAREHOUSED.getValue(),
+                FlowStatusEnum.WAREHOUSE_OUT.getValue(),
                 FlowStatusEnum.COMPLETED.getValue()
         );
         int idx = ordered.indexOf(requiredStatus);
@@ -659,12 +661,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         order.setId(orderId);
         order.setPhase(result.getTargetPhase());
         order.setStatus(result.getFinalStatus());
-        if (FlowActionEnum.COMPLETE_WAREHOUSE_IN.equals(action)) {
+        if (FlowActionEnum.COMPLETE_WAREHOUSE_OUT.equals(action)) {
             order.setActualCompleteTime(java.time.LocalDateTime.now());
-            update(new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
-                    .eq(ProductionRecordEntity::getOrderId, orderId)
-                    .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.WAREHOUSE_IN.getValue())
-                    .set(ProductionRecordEntity::getStatus, FlowStatusEnum.COMPLETED.getValue()));
         }
         orderMainMapper.updateById(order);
         log.info("Flow状态流转完成: orderId={}, action={}, targetPhase={}, targetStatus={}",
