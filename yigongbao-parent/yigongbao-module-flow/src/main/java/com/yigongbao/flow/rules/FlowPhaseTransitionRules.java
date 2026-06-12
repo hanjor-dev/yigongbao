@@ -197,7 +197,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
         }
 
         // 完成包装 → 进入仓储阶段，初始状态为 PENDING_WAREHOUSE_IN
-        if (targetStatus == FlowStatusEnum.PACKING
+        if (targetStatus == FlowStatusEnum.PENDING_WAREHOUSE_IN
                 && action == FlowActionEnum.COMPLETE_PACKING) {
             return new PhaseAndStatus(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.PENDING_WAREHOUSE_IN);
         }
