@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * 收费模板 Controller
  *
@@ -43,6 +45,19 @@ public class ChargingTemplateController {
             @RequestParam(required = false) String templateName) {
         IPage<ChargingTemplateVO> page = chargingTemplateService.listPage(pageNum, pageSize, templateName);
         return Result.success(page);
+    }
+
+    /**
+     * 查询收费模板列表（不分页，用于下拉选择）
+     *
+     * @param templateName 模板名称
+     * @return 模板列表
+     */
+    @Operation(summary = "查询收费模板列表（用于下拉选择）")
+    @GetMapping("/all")
+    public Result<List<ChargingTemplateVO>> listAll(@RequestParam(required = false) String templateName) {
+        List<ChargingTemplateVO> list = chargingTemplateService.list(templateName);
+        return Result.success(list);
     }
 
     /**

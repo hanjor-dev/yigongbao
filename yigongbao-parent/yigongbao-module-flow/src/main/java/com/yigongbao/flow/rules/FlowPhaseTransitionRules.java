@@ -169,9 +169,14 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             return new PhaseAndStatus(FlowPhaseEnum.PRINT, FlowStatusEnum.PENDING_PRINT);
         }
 
-        // 打印完成 → 医疗器械进入后处理，非医疗器械直接进入质检
-        // orderType: 1=医疗器械，2=非医疗器械；null 时按医疗器械处理
+        // 打印完成 → 不自动推进，停留在打印完成状态，等待生产员主动开始后处理工序
         if (targetStatus == FlowStatusEnum.PRINT_COMPLETED) {
+            return new PhaseAndStatus(null, null);
+        }
+
+        // 开始后处理 → 医疗器械进入后处理阶段，非医疗器械直接进入质检阶段
+        if (targetStatus == FlowStatusEnum.POST_PROCESSING
+                && action == FlowActionEnum.START_POST_PROCESSING) {
             boolean isMedical = !Integer.valueOf(2).equals(orderType);
             if (isMedical) {
                 return new PhaseAndStatus(FlowPhaseEnum.POST_PROCESSING, FlowStatusEnum.POST_PROCESSING);
@@ -186,8 +191,14 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             return new PhaseAndStatus(FlowPhaseEnum.QC, FlowStatusEnum.QC_IN_PROGRESS);
         }
 
-        // 质检合格 → 进入仓储阶段，初始状态为 PENDING_WAREHOUSE_IN
+        // 质检合格 → 不自动推进，停留在包装状态，等待包装完成
         if (targetStatus == FlowStatusEnum.QC_PASSED) {
+            return new PhaseAndStatus(null, null);
+        }
+
+        // 完成包装 → 进入仓储阶段，初始状态为 PENDING_WAREHOUSE_IN
+        if (targetStatus == FlowStatusEnum.PACKING
+                && action == FlowActionEnum.COMPLETE_PACKING) {
             return new PhaseAndStatus(FlowPhaseEnum.WAREHOUSE, FlowStatusEnum.PENDING_WAREHOUSE_IN);
         }
 
@@ -226,8 +237,8 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      */
     public static boolean isPhaseChangeAction(FlowActionEnum action) {
         return switch (action) {
-            case DATA_AUDIT_PASS, DOWNLOAD_DATA_PACKAGE, COMPLETE_PRINT,
-                 COMPLETE_POST_PROCESSING, QC_PASS, REWORK_COMPLETE,
+            case DATA_AUDIT_PASS, DOWNLOAD_DATA_PACKAGE, START_POST_PROCESSING,
+                 COMPLETE_POST_PROCESSING, COMPLETE_PACKING, REWORK_COMPLETE,
                  COMPLETE_WAREHOUSE_IN, REWORK_TO_PRINT -> true;
             default -> false;
         };

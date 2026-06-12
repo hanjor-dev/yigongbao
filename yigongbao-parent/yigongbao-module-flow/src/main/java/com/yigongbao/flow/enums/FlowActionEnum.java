@@ -83,6 +83,11 @@ public enum FlowActionEnum {
 
     // ==================== 后处理动作 ====================
     /**
+     * 开始后处理
+     */
+    START_POST_PROCESSING("START_POST_PROCESSING", "开始后处理"),
+
+    /**
      * 完成后处理
      */
     COMPLETE_POST_PROCESSING("COMPLETE_POST_PROCESSING", "完成后处理"),
@@ -107,6 +112,11 @@ public enum FlowActionEnum {
      * 返工完成（返工结束后重新进入质检）
      */
     REWORK_COMPLETE("REWORK_COMPLETE", "返工完成"),
+
+    /**
+     * 完成包装
+     */
+    COMPLETE_PACKING("COMPLETE_PACKING", "完成包装"),
 
     /**
      * 质检不合格回退到打印

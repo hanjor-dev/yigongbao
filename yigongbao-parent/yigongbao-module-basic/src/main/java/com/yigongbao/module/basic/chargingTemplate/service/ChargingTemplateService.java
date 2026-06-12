@@ -8,6 +8,8 @@ import com.yigongbao.module.basic.chargingTemplate.entity.ChargingTemplateEntity
 import com.yigongbao.module.basic.chargingTemplate.vo.ChargingTemplateDetailVO;
 import com.yigongbao.module.basic.chargingTemplate.vo.ChargingTemplateVO;
 
+import java.util.List;
+
 /**
  * 收费模板 Service
  *
@@ -56,4 +58,12 @@ public interface ChargingTemplateService extends IService<ChargingTemplateEntity
      * @param id 模板ID
      */
     void remove(Long id);
+
+    /**
+     * 查询收费模板列表（不分页，用于下拉选择）
+     *
+     * @param templateName 模板名称（模糊查询）
+     * @return 模板列表
+     */
+    List<ChargingTemplateVO> list(String templateName);
 }

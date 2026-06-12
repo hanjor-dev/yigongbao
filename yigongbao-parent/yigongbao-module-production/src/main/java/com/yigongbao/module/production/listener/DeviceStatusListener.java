@@ -96,17 +96,8 @@ public class DeviceStatusListener {
                         record.getId(), record.getRecordNo(), deviceId);
             });
             Long orderId = records.get(0).getOrderId();
-            // 非医疗器械订单打印完成后 Flow 直接跳 QC，需同步更新流转卡状态
-            boolean isNonMedical = ProductionConstants.ORDER_TYPE_NON_MEDICAL.equals(records.get(0).getOrderType());
             recordService.triggerFlowIfAllExact(orderId,
                     FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-            if (isNonMedical) {
-                recordMapper.update(null,
-                        new LambdaUpdateWrapper<ProductionRecordEntity>()
-                                .eq(ProductionRecordEntity::getOrderId, orderId)
-                                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINT_COMPLETED.getValue())
-                                .set(ProductionRecordEntity::getStatus, FlowStatusEnum.QC_IN_PROGRESS.getValue()));
-            }
         }
     }
 

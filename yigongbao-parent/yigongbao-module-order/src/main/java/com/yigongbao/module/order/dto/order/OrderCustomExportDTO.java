@@ -21,15 +21,13 @@ public class OrderCustomExportDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 创建时间起始（必填）
+     * 创建时间起始（选填，不填则导出所有时间）
      */
-    @NotNull(message = "创建时间起始不能为空")
     private LocalDateTime createTimeStart;
 
     /**
-     * 创建时间结束（必填）
+     * 创建时间结束（选填，不填则导出所有时间）
      */
-    @NotNull(message = "创建时间结束不能为空")
     private LocalDateTime createTimeEnd;
 
     /**

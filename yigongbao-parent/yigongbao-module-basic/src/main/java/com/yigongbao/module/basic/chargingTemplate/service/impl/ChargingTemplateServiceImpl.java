@@ -241,6 +241,29 @@ public class ChargingTemplateServiceImpl extends ServiceImpl<ChargingTemplateMap
         log.info("删除收费模板: id={}, templateName={}", id, template.getTemplateName());
     }
 
+    /**
+     * 查询收费模板列表（不分页，用于下拉选择）
+     *
+     * @param templateName 模板名称（模糊查询）
+     * @return 模板列表
+     */
+    @Override
+    public List<ChargingTemplateVO> list(String templateName) {
+        LambdaQueryWrapper<ChargingTemplateEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.like(StrUtil.isNotBlank(templateName), ChargingTemplateEntity::getTemplateName, templateName)
+                .eq(ChargingTemplateEntity::getStatus, StatusConstants.NORMAL)
+                .orderByDesc(ChargingTemplateEntity::getCreateTime);
+
+        List<ChargingTemplateEntity> entities = list(wrapper);
+
+        return entities.stream().map(entity -> {
+            ChargingTemplateVO vo = new ChargingTemplateVO();
+            BeanUtil.copyProperties(entity, vo);
+            vo.setStatusName(StatusConstants.getStatusName(entity.getStatus()));
+            return vo;
+        }).collect(Collectors.toList());
+    }
+
     private void validateTemplateItems(List<ChargingTemplateItemDTO> items) {
         Set<Long> projectIds = items.stream()
                 .map(ChargingTemplateItemDTO::getRebuildProjectId)

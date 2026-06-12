@@ -151,7 +151,7 @@ public class FlowStatusTransitionRules {
             case PRINT -> switch (status) {
                 case PENDING_PRINT -> needsProduction ? List.of(FlowActionEnum.START_PRINT) : List.of();
                 case PRINTING -> List.of(FlowActionEnum.COMPLETE_PRINT);
-                // PRINT_COMPLETED 为过渡状态，不会出现在 phase=PRINT 的订单中（自动推进）
+                case PRINT_COMPLETED -> needsProduction ? List.of(FlowActionEnum.START_POST_PROCESSING) : List.of();
                 default -> List.of();
             };
 
@@ -168,20 +168,19 @@ public class FlowStatusTransitionRules {
                         : List.of();
                 case QC_FAILED -> List.of(FlowActionEnum.REWORK);
                 case REWORK -> List.of(FlowActionEnum.REWORK_COMPLETE);
-                // QC_PASSED 为过渡状态，不会出现在 phase=QC 的订单中（自动推进）
+                case QC_PASSED -> List.of(FlowActionEnum.COMPLETE_PACKING);
+                case PACKING -> List.of(FlowActionEnum.COMPLETE_PACKING);
                 default -> List.of();
             };
 
             case WAREHOUSE -> switch (status) {
                 case PENDING_WAREHOUSE_IN -> needsProduction
-                        ? List.of(FlowActionEnum.TRANSFER_TO_WAREHOUSE)
-                        : List.of();
-                case WAREHOUSED -> needsProduction
                         ? List.of(FlowActionEnum.COMPLETE_WAREHOUSE_IN)
                         : List.of();
-                case WAREHOUSE_OUT -> needsProduction
+                case WAREHOUSED -> needsProduction
                         ? List.of(FlowActionEnum.COMPLETE_WAREHOUSE_OUT)
                         : List.of();
+                case WAREHOUSE_OUT -> List.of();
                 default -> List.of();
             };
 
@@ -249,17 +248,19 @@ public class FlowStatusTransitionRules {
 
             // 打印阶段动作
             case START_PRINT -> FlowStatusEnum.PRINTING.getValue();
-            case COMPLETE_PRINT -> FlowStatusEnum.PRINT_COMPLETED.getValue(); // 过渡状态，自动推进
+            case COMPLETE_PRINT -> FlowStatusEnum.PRINT_COMPLETED.getValue();
 
             // 后处理动作
-            case COMPLETE_POST_PROCESSING -> FlowStatusEnum.QC_IN_PROGRESS.getValue(); // 自动进入质检
+            case START_POST_PROCESSING -> FlowStatusEnum.POST_PROCESSING.getValue();
+            case COMPLETE_POST_PROCESSING -> FlowStatusEnum.QC_IN_PROGRESS.getValue();
 
             // 质检阶段动作
-            case QC_PASS -> FlowStatusEnum.QC_PASSED.getValue(); // 自动进入入库
+            case QC_PASS -> FlowStatusEnum.QC_PASSED.getValue();
             case QC_FAIL -> FlowStatusEnum.QC_FAILED.getValue();
             case REWORK -> FlowStatusEnum.REWORK.getValue();
             case REWORK_COMPLETE -> FlowStatusEnum.QC_IN_PROGRESS.getValue();
             case REWORK_TO_PRINT -> FlowStatusEnum.PENDING_PRINT.getValue();
+            case COMPLETE_PACKING -> FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue();
 
             // 仓储阶段动作
             case TRANSFER_TO_WAREHOUSE -> FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue();

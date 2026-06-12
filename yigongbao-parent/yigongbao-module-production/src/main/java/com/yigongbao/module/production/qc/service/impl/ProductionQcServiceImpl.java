@@ -47,6 +47,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
     private final ProductionRecordMapper recordMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final IProductionRecordService recordService;
+    private final com.yigongbao.module.order.mapper.OrderMainMapper orderMainMapper;
 
     /**
      * 标记产品质检合格；医疗器械同步生成 UDI 码；回写流转卡合格计数
@@ -150,8 +151,22 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         }
         record.setStatus(FlowStatusEnum.PACKING.getValue());
         recordMapper.updateById(record);
-        recordService.triggerFlowIfAllExact(record.getOrderId(),
-                FlowStatusEnum.PACKING.getValue(), FlowActionEnum.QC_PASS);
+        // 检查所有流转卡是否都进入包装状态，是则同步订单状态
+        long totalActive = recordMapper.selectCount(new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getOrderId, record.getOrderId())
+                .notIn(ProductionRecordEntity::getStatus,
+                        FlowStatusEnum.PRINT_FAILED.getValue(),
+                        FlowStatusEnum.REWORK.getValue(),
+                        FlowStatusEnum.CANCELLED.getValue()));
+        long packingCount = recordMapper.selectCount(new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getOrderId, record.getOrderId())
+                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PACKING.getValue()));
+        if (totalActive == packingCount) {
+            orderMainMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<com.yigongbao.common.entity.OrderMainEntity>()
+                    .eq(com.yigongbao.common.entity.OrderMainEntity::getId, record.getOrderId())
+                    .set(com.yigongbao.common.entity.OrderMainEntity::getStatus, FlowStatusEnum.PACKING.getValue()));
+            log.info("所有流转卡进入包装，同步订单状态: orderId={}", record.getOrderId());
+        }
         log.info("质检完成，流转到包装: recordId={}, recordNo={}, orderId={}",
                 recordId, record.getRecordNo(), record.getOrderId());
     }

@@ -425,8 +425,8 @@ public class OrderExportServiceImpl implements OrderExportService {
     public void customExportOrders(OrderCustomExportDTO dto, HttpServletResponse response) {
         // 按时间范围查询订单（最多10000条）
         LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<OrderMainEntity>()
-                .ge(OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
-                .le(OrderMainEntity::getCreateTime, dto.getCreateTimeEnd())
+                .ge(dto.getCreateTimeStart() != null, OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
+                .le(dto.getCreateTimeEnd() != null, OrderMainEntity::getCreateTime, dto.getCreateTimeEnd())
                 .orderByDesc(OrderMainEntity::getCreateTime)
                 .last("LIMIT " + MAX_EXPORT_COUNT);
 

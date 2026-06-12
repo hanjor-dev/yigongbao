@@ -134,6 +134,9 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             record.setCurrentProcess(dto.getProcessType());
             record.setContentUpdateTime(LocalDateTime.now());
             recordMapper.updateById(record);
+            // 开始后处理工序后，检查是否所有流转卡都进入后处理，是则聚合触发订单状态流转
+            recordService.triggerFlowIfAllExact(record.getOrderId(),
+                    FlowStatusEnum.POST_PROCESSING.getValue(), FlowActionEnum.START_POST_PROCESSING);
         }
         log.info("开始工序: recordId={}, processType={}, deviceId={}", recordId, dto.getProcessType(), dto.getPrimaryDeviceId());
     }

@@ -155,17 +155,6 @@ public class ProductionPackServiceImpl implements IProductionPackService {
             throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_TRANSFER_TO_PACK);
         }
 
-        record.setStatus(FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue());
-        recordMapper.updateById(record);
-
-        // 批量更新产品状态：PASS → PENDING_WAREHOUSE_IN
-        productMapper.update(null,
-            new LambdaUpdateWrapper<ProductionProductEntity>()
-                .eq(ProductionProductEntity::getProductionRecordId, recordId)
-                .eq(ProductionProductEntity::getStatus, ProductStatusEnum.PASS.getCode())
-                .set(ProductionProductEntity::getStatus, ProductStatusEnum.PENDING_WAREHOUSE_IN.getCode())
-        );
-
         // 同步更新包装工序完成时间
         processMapper.update(null, new LambdaUpdateWrapper<ProductionProcessEntity>()
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)
@@ -173,13 +162,13 @@ public class ProductionPackServiceImpl implements IProductionPackService {
                 .set(ProductionProcessEntity::getEndTime, LocalDateTime.now())
                 .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.COMPLETED.getCode()));
 
-        log.info("包装完成，流转到待入库: recordId={}, recordNo={}", recordId, record.getRecordNo());
+        log.info("包装完成，准备流转到待入库: recordId={}, recordNo={}", recordId, record.getRecordNo());
 
-        // 聚合触发
+        // 通过 Flow 触发阶段推进：PACKING(5050) → PENDING_WAREHOUSE_IN(6010)
         recordService.triggerFlowIfAllExact(
             record.getOrderId(),
-            FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(),
-            FlowActionEnum.TRANSFER_TO_WAREHOUSE
+            FlowStatusEnum.PACKING.getValue(),
+            FlowActionEnum.COMPLETE_PACKING
         );
     }
 }

@@ -158,6 +158,7 @@ public class WarehouseServiceImpl implements IWarehouseService {
         log.info("流转卡全部产品已入库: recordId={}, recordNo={}, warehousedCount={}, cancelledCount={}",
             recordId, record.getRecordNo(), warehousedCount, cancelledCount);
 
+        // 触发订单聚合：检查所有流转卡是否都已入库
         recordService.triggerFlowIfAllExact(
             record.getOrderId(),
             FlowStatusEnum.WAREHOUSED.getValue(),
