@@ -17,6 +17,7 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.service.FlowOrderService;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.order.convert.OrderDiffCalculator;
 import com.yigongbao.module.order.dto.apply.ApplyListQueryDTO;
 import com.yigongbao.module.order.dto.apply.AuditApplyDTO;
@@ -227,8 +228,12 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "申请内容格式错误");
             }
 
-            // 执行订单修改（如果失败会抛出异常，事务回滚，申请状态不会更新）
-            orderModifyFullService.modifyOrderFull(apply.getOrderId(), modifyDto);
+            // 执行订单修改（审核场景，跳过权限校验，使用申请人作为修改人）
+            // 查询申请人角色（用于判断修改范围）
+            UserEntity applyUser = userService.getById(apply.getApplyUserId());
+            String applyUserRoleCode = applyUser != null ? applyUser.getRoleCode() : "";
+            orderModifyFullService.modifyOrderFull(apply.getOrderId(), modifyDto, true,
+                apply.getApplyUserId(), apply.getApplyUserName(), applyUserRoleCode);
 
             // 修改成功后，仅在订单阶段时重置审核状态（数据已变更，需要重新审核）
             OrderMainEntity order = orderMainMapper.selectById(apply.getOrderId());
@@ -294,16 +299,14 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     // ==================== 查询方法 ====================
 
     /**
-     * 查询修改申请列表（设计管理员）
+     * 查询修改申请列表
      *
      * @param dto 查询条件
      * @return 分页列表
      */
     @Override
+    @RequirePermission("order:ModifyApply")
     public IPage<ApplyListItemVO> listApplies(ApplyListQueryDTO dto) {
-        // 检查权限：仅设计管理员可查询所有申请
-        checkAuditPermission();
-
         // 构建分页查询条件
         Page<OrderModificationApplyEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
         LambdaQueryWrapper<OrderModificationApplyEntity> wrapper = new LambdaQueryWrapper<OrderModificationApplyEntity>()

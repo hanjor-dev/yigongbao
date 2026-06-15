@@ -190,11 +190,15 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         pageDTO.setPageSize(dto.getPageSize());
         pageDTO.setKeyword(dto.getKeyword());
         if (dto.getStatus() != null) {
+            // 指定状态：精确匹配
             pageDTO.setStatus(dto.getStatus());
+            pageDTO.setIncludeFollowingStatuses(false);
+            log.info("质检列表查询-指定状态: status={}, includeFollowingStatuses=false", dto.getStatus());
         } else {
-            pageDTO.setStatuses(List.of(
-                    FlowStatusEnum.QC_IN_PROGRESS.getValue(),
-                    FlowStatusEnum.PACKING.getValue()));
+            // 未指定状态：查询质检中及所有后续状态
+            pageDTO.setStatus(FlowStatusEnum.QC_IN_PROGRESS.getValue());
+            pageDTO.setIncludeFollowingStatuses(true);
+            log.info("质检列表查询-默认: status={}, includeFollowingStatuses=true", FlowStatusEnum.QC_IN_PROGRESS.getValue());
         }
         return recordService.pageRecords(pageDTO);
     }

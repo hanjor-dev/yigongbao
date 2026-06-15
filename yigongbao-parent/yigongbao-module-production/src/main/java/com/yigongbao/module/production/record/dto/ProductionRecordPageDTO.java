@@ -29,4 +29,6 @@ public class ProductionRecordPageDTO {
     private LocalDateTime orderCreateTimeStart;
     /** 订单创建时间范围-结束 */
     private LocalDateTime orderCreateTimeEnd;
+    /** 是否包含后续状态（true=使用>=范围查询，false=精确匹配，默认false） */
+    private Boolean includeFollowingStatuses = false;
 }

@@ -11,6 +11,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.event.ClassicCaseMarkedEvent;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.order.convert.ClassicCaseConvert;
 import com.yigongbao.module.order.dto.ClassicCaseQueryDTO;
 import com.yigongbao.module.order.dto.MarkClassicCaseDTO;
@@ -28,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -42,6 +44,7 @@ public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
     private final OrderMainService orderMainService;
     private final ApplicationEventPublisher eventPublisher;
     private final com.yigongbao.module.order.helper.OrderQueryHelper orderQueryHelper;
+    private final com.yigongbao.module.system.user.service.UserService userService;
 
     /**
      * 将订单标记为经典案例
@@ -63,10 +66,12 @@ public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
 
-        // 校验订单必须处于"已完成"状态（phase=80）
-        if (!FlowPhaseEnum.COMPLETED.getValue().equals(order.getPhase())) {
-            log.warn("订单未完成，无法标记为经典案例: orderId={}, currentPhase={}",
-                dto.getOrderId(), order.getPhase());
+        // 校验订单必须处于"已完成"阶段（phase=80）或"已出库"状态（status=6030）
+        boolean isCompleted = FlowPhaseEnum.COMPLETED.getValue().equals(order.getPhase());
+        boolean isWarehouseOut = FlowStatusEnum.WAREHOUSE_OUT.getValue().equals(order.getStatus());
+        if (!isCompleted && !isWarehouseOut) {
+            log.warn("订单未完成或未出库，无法标记为经典案例: orderId={}, phase={}, status={}",
+                dto.getOrderId(), order.getPhase(), order.getStatus());
             throw new BusinessException(ErrorCodeEnum.CLASSIC_CASE_ORDER_NOT_COMPLETED);
         }
 
@@ -142,13 +147,36 @@ public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
 
         IPage<OrderMainEntity> entityPage = orderMainMapper.selectPage(page, wrapper);
 
+        // 收集所有标记人ID并批量查询用户信息
+        List<Long> userIds = entityPage.getRecords().stream()
+                .map(OrderMainEntity::getClassicCaseBy)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<Long, String> userNameMap = new java.util.HashMap<>();
+        if (!userIds.isEmpty()) {
+            List<com.yigongbao.module.system.user.entity.UserEntity> users = userService.listByIds(userIds);
+            userNameMap = users.stream()
+                    .collect(Collectors.toMap(
+                            com.yigongbao.module.system.user.entity.UserEntity::getId,
+                            com.yigongbao.module.system.user.entity.UserEntity::getRealName,
+                            (a, b) -> a));
+        }
+
         // 使用 OrderQueryHelper 转换为完整的 OrderListVO，然后转换为 ClassicCaseVO
+        Map<Long, String> finalUserNameMap = userNameMap;
         List<ClassicCaseVO> voList = entityPage.getRecords().stream()
                 .map(entity -> {
                     // 先使用 OrderQueryHelper 获取包含所有翻译字段的 OrderListVO
                     OrderListVO orderListVO = orderQueryHelper.toOrderListVO(entity);
                     // 再转换为 ClassicCaseVO，添加经典案例特有字段（列表查询不包含订单明细和文件）
-                    return ClassicCaseConvert.toClassicCaseVOFromList(orderListVO, entity);
+                    ClassicCaseVO vo = ClassicCaseConvert.toClassicCaseVOFromList(orderListVO, entity);
+                    // 填充标记人姓名
+                    if (entity.getClassicCaseBy() != null) {
+                        vo.setClassicCaseByName(finalUserNameMap.get(entity.getClassicCaseBy()));
+                    }
+                    return vo;
                 })
                 .collect(Collectors.toList());
 

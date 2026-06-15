@@ -329,21 +329,24 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
 
             // 批量插入新关联（仅当非空时）
             if (resourceIds != null && !resourceIds.isEmpty()) {
+                // 去重（前端可能传入重复ID）
+                List<Long> distinctResourceIds = resourceIds.stream().distinct().collect(Collectors.toList());
+
                 // 校验资源是否存在
-                List<ResourceEntity> validResources = baseMapper.selectBatchIds(resourceIds);
-                if (validResources.size() != resourceIds.size()) {
+                List<ResourceEntity> validResources = baseMapper.selectBatchIds(distinctResourceIds);
+                if (validResources.size() != distinctResourceIds.size()) {
                     // 计算不存在的资源ID
                     List<Long> validIds = validResources.stream()
                             .map(ResourceEntity::getId)
                             .collect(Collectors.toList());
-                    List<Long> invalidIds = resourceIds.stream()
+                    List<Long> invalidIds = distinctResourceIds.stream()
                             .filter(id -> !validIds.contains(id))
                             .collect(Collectors.toList());
                     log.warn("部分资源不存在: invalidIds={}", invalidIds);
                     throw new BusinessException(ErrorCodeEnum.RESOURCE_NOT_FOUND);
                 }
 
-                List<RoleResourceEntity> relations = resourceIds.stream()
+                List<RoleResourceEntity> relations = distinctResourceIds.stream()
                         .map(resourceId -> {
                             RoleResourceEntity r = new RoleResourceEntity();
                             r.setRoleId(roleId);

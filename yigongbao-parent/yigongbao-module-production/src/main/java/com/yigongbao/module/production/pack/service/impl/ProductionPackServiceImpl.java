@@ -163,12 +163,23 @@ public class ProductionPackServiceImpl implements IProductionPackService {
                 .set(ProductionProcessEntity::getEndTime, LocalDateTime.now())
                 .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.COMPLETED.getCode()));
 
-        log.info("包装完成，准备流转到待入库: recordId={}, recordNo={}", recordId, record.getRecordNo());
+        // 更新流转卡状态为待入库
+        record.setStatus(FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue());
+        recordMapper.updateById(record);
 
-        // 通过 Flow 触发阶段推进：PACKING(5050) → PENDING_WAREHOUSE_IN(6010)
+        // 更新产品状态为待入库（仅更新合格产品）
+        productMapper.update(null, new LambdaUpdateWrapper<ProductionProductEntity>()
+                .eq(ProductionProductEntity::getProductionRecordId, recordId)
+                .eq(ProductionProductEntity::getStatus, ProductStatusEnum.PASS.getCode())
+                .set(ProductionProductEntity::getStatus, ProductStatusEnum.PENDING_WAREHOUSE_IN.getCode()));
+
+        log.info("包装完成，流转卡状态已更新: recordId={}, recordNo={}, status={}",
+            recordId, record.getRecordNo(), FlowStatusEnum.PENDING_WAREHOUSE_IN.getName());
+
+        // 通过 Flow 触发订单级别阶段推进：PACKING(5050) → PENDING_WAREHOUSE_IN(6010)
         recordService.triggerFlowIfAllExact(
             record.getOrderId(),
-            FlowStatusEnum.PACKING.getValue(),
+            FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(),
             FlowActionEnum.COMPLETE_PACKING
         );
     }

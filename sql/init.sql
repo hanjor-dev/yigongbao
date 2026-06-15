@@ -348,7 +348,7 @@ VALUES ('design.column.config', '设计工单列表默认列配置', '{"module":
 
 -- 生产流转卡列表默认列配置
 INSERT INTO sys_config (config_key, config_name, config_value, config_type, config_group, config_desc, is_system, is_public, sort, status)
-VALUES ('production.column.config', '生产流转卡列表默认列配置', '{"module":"production","columns":[{"field":"isUrgent","label":"加急","visible":true,"sort":1,"width":70,"fixed":null},{"field":"recordNo","label":"流转卡编号","visible":true,"sort":2,"width":150,"fixed":null},{"field":"designPackageCode","label":"数据包编号","visible":true,"sort":3,"width":150,"fixed":null},{"field":"productionBatchNo","label":"生产批号","visible":true,"sort":4,"width":150,"fixed":null},{"field":"orderCode","label":"订单流水号","visible":true,"sort":5,"width":160,"fixed":null},{"field":"currentProcess","label":"当前工序","visible":true,"sort":6,"width":120,"fixed":null},{"field":"statusName","label":"状态","visible":true,"sort":7,"width":120,"fixed":null},{"field":"orderTypeName","label":"订单类型","visible":true,"sort":8,"width":110,"fixed":null},{"field":"totalProductCount","label":"产品数量","visible":true,"sort":9,"width":90,"fixed":null},{"field":"hospitalName","label":"医院名称","visible":true,"sort":10,"width":180,"fixed":null},{"field":"hospitalDeptName","label":"科室名称","visible":true,"sort":11,"width":100,"fixed":null},{"field":"doctorName","label":"医生姓名","visible":true,"sort":12,"width":100,"fixed":null},{"field":"patientName","label":"患者姓名","visible":true,"sort":13,"width":100,"fixed":null},{"field":"isPostal","label":"是否邮寄","visible":true,"sort":14,"width":80,"fixed":null},{"field":"expectedDeliveryDate","label":"期望交付时间","visible":true,"sort":15,"width":160,"fixed":null},{"field":"orgName","label":"机构名称","visible":true,"sort":16,"width":150,"fixed":null},{"field":"createTime","label":"创建时间","visible":true,"sort":17,"width":160,"fixed":null},{"field":"action","label":"操作","visible":true,"sort":18,"width":150,"fixed":"right"}]}', 'json', 'system', '生产流转卡列表默认显示的列（JSON格式）', 1, 0, 14, 1);
+VALUES ('production.column.config', '生产流转卡列表默认列配置', '{"module":"production","columns":[{"field":"isUrgent","label":"加急","visible":true,"sort":1,"width":70,"fixed":null},{"field":"recordNo","label":"流转卡编号","visible":true,"sort":2,"width":150,"fixed":null},{"field":"designPackageCode","label":"数据包编号","visible":true,"sort":3,"width":150,"fixed":null},{"field":"productionBatchNo","label":"生产批号","visible":true,"sort":4,"width":150,"fixed":null},{"field":"orderCode","label":"订单流水号","visible":true,"sort":5,"width":160,"fixed":null},{"field":"currentProcessName","label":"当前工序","visible":true,"sort":6,"width":120,"fixed":null},{"field":"statusName","label":"状态","visible":true,"sort":7,"width":120,"fixed":null},{"field":"orderTypeName","label":"订单类型","visible":true,"sort":8,"width":110,"fixed":null},{"field":"totalProductCount","label":"产品数量","visible":true,"sort":9,"width":90,"fixed":null},{"field":"hospitalName","label":"医院名称","visible":true,"sort":10,"width":180,"fixed":null},{"field":"hospitalDeptName","label":"科室名称","visible":true,"sort":11,"width":100,"fixed":null},{"field":"doctorName","label":"医生姓名","visible":true,"sort":12,"width":100,"fixed":null},{"field":"patientName","label":"患者姓名","visible":true,"sort":13,"width":100,"fixed":null},{"field":"isPostal","label":"是否邮寄","visible":true,"sort":14,"width":80,"fixed":null},{"field":"expectedDeliveryDate","label":"期望交付时间","visible":true,"sort":15,"width":160,"fixed":null},{"field":"orgName","label":"机构名称","visible":true,"sort":16,"width":150,"fixed":null},{"field":"createTime","label":"创建时间","visible":true,"sort":17,"width":160,"fixed":null},{"field":"action","label":"操作","visible":true,"sort":18,"width":150,"fixed":"right"}]}', 'json', 'system', '生产流转卡列表默认显示的列（JSON格式）', 1, 0, 14, 1);
 
 -- ------------------------------------------------------------
 -- 文件配置（group=file）
@@ -555,6 +555,8 @@ VALUES
 (1120, 101, '标记为经典案例',    'order:MarkCase',          3, 20, 1),
 -- 设计师分配
 (1121, 101, '分配设计师',        'design:AssignDesigner',   3, 21, 1),
+-- 修改申请
+(1122, 101, '修改申请列表',      'order:ModifyApply',       3, 22, 1),
 
 -- ------------------------------------------------------------
 -- 我的工单按钮（parent_id=102）共13个
@@ -578,6 +580,7 @@ VALUES
 (1212, 102, '审核驳回',          'design:Reject',           3, 12, 1),
 -- 导出功能
 (1213, 102, '批量导出',          'design:BatchExport',      3, 13, 1),
+(1214, 102, '工作量导出',        'design:WorkExport',       3, 14, 1),
 
 -- ------------------------------------------------------------
 -- 生产管理按钮（parent_id=103）共12个
@@ -685,10 +688,10 @@ INSERT INTO sys_role_resource (role_id, resource_id) VALUES
 (1, 1050), (1, 1051), (1, 1052), (1, 1053),
 -- 订单管理按钮（21个）
 (1, 1101), (1, 1102), (1, 1103), (1, 1104), (1, 1105), (1, 1106), (1, 1107), (1, 1108), (1, 1109), (1, 1110),
-(1, 1111), (1, 1112), (1, 1113), (1, 1114), (1, 1115), (1, 1116), (1, 1117), (1, 1118), (1, 1119), (1, 1120), (1, 1121),
+(1, 1111), (1, 1112), (1, 1113), (1, 1114), (1, 1115), (1, 1116), (1, 1117), (1, 1118), (1, 1119), (1, 1120), (1, 1121),(1, 1122),
 -- 我的工单按钮（13个）
 (1, 1201), (1, 1202), (1, 1203), (1, 1204), (1, 1205), (1, 1206), (1, 1207), (1, 1208), (1, 1209), (1, 1210),
-(1, 1211), (1, 1212), (1, 1213),
+(1, 1211), (1, 1212), (1, 1213),(1, 1214),
 -- 生产管理按钮（12个）
 (1, 1301), (1, 1302), (1, 1303), (1, 1304), (1, 1305), (1, 1306), (1, 1307), (1, 1308), (1, 1309), (1, 1310),
 (1, 1311), (1, 1312),

@@ -201,12 +201,13 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (dto.getStatuses() != null && !dto.getStatuses().isEmpty()) {
             wrapper.in(ProductionRecordEntity::getStatus, dto.getStatuses());
         } else if (dto.getStatus() != null) {
-            // 质检相关状态使用 >= 查询（包含后续阶段，排除已取消），其他状态精确匹配
-            if (FlowStatusEnum.QC_IN_PROGRESS.getValue().equals(dto.getStatus())
-                    || FlowStatusEnum.PACKING.getValue().equals(dto.getStatus())) {
+            // 根据 includeFollowingStatuses 决定查询方式
+            if (Boolean.TRUE.equals(dto.getIncludeFollowingStatuses())) {
+                // 质检接口：使用 >= 范围查询（包含后续阶段，排除已取消）
                 wrapper.ge(ProductionRecordEntity::getStatus, dto.getStatus())
                        .lt(ProductionRecordEntity::getStatus, FlowStatusEnum.CANCELLED.getValue());
             } else {
+                // 生产流转卡列表：精确匹配
                 wrapper.eq(ProductionRecordEntity::getStatus, dto.getStatus());
             }
         }

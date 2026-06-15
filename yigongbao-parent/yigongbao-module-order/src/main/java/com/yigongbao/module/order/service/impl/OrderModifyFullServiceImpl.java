@@ -71,42 +71,62 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void modifyOrderFull(Long orderId, OrderModifyFullDTO dto) {
+        modifyOrderFull(orderId, dto, false);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void modifyOrderFull(Long orderId, OrderModifyFullDTO dto, boolean skipPermissionCheck) {
+        Long userId = StpUtil.getLoginIdAsLong();
+        UserEntity currentUser = userService.getById(userId);
+        String userName = currentUser != null ? currentUser.getRealName() : null;
+        String roleCode = currentUser != null ? currentUser.getRoleCode() : "";
+        modifyOrderFull(orderId, dto, skipPermissionCheck, userId, userName, roleCode);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void modifyOrderFull(Long orderId, OrderModifyFullDTO dto, boolean skipPermissionCheck, Long modifierId, String modifierName, String modifierRoleCode) {
         // 1. 查询当前订单
         OrderMainEntity order = orderMainMapper.selectById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "订单不存在");
         }
 
-        // 2. 获取当前用户角色
-        Long userId = StpUtil.getLoginIdAsLong();
-        UserEntity currentUser = userService.getById(userId);
-        String roleCode = currentUser != null ? currentUser.getRoleCode() : "";
+        // 2. 获取当前用户角色（用于权限校验）
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        UserEntity currentUser = userService.getById(currentUserId);
+        String currentRoleCode = currentUser != null ? currentUser.getRoleCode() : "";
 
-        boolean isAdmin = ADMIN_ROLES.contains(roleCode);
-        boolean isDesigner = DESIGNER_ROLES.contains(roleCode);
+        boolean isAdmin = ADMIN_ROLES.contains(currentRoleCode);
+        boolean isDesigner = DESIGNER_ROLES.contains(currentRoleCode);
         int phase = order.getPhase();
         boolean isDesignPhase = phase == FlowPhaseEnum.DESIGN.getValue();
         boolean isOrderPhase = phase == FlowPhaseEnum.ORDER.getValue();
 
-        // 3. 权限校验
-        if (!isAdmin) {
-            if (isDesigner) {
-                // 设计师管理员：仅设计阶段可改重建项目
-                if (!isDesignPhase) {
-                    throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED, "设计师仅可在设计阶段修改重建项目");
-                }
-            } else {
-                // 普通业务员：仅订单阶段（未提交）可改
-                if (!isOrderPhase) {
-                    throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED, "订单提交后不允许修改");
+        // 3. 权限校验（审核场景跳过）
+        if (!skipPermissionCheck) {
+            if (!isAdmin) {
+                if (isDesigner) {
+                    // 设计师：只能在设计阶段修改（且只能改items，由onlyItems控制）
+                    if (!isDesignPhase) {
+                        throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED, "设计师仅可在设计阶段修改订单");
+                    }
+                } else {
+                    // 普通业务员：仅订单阶段（未提交）可改
+                    if (!isOrderPhase) {
+                        throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED, "订单提交后不允许修改");
+                    }
                 }
             }
         }
 
-        // 4. 按对象 diff（设计师只 diff items）
+        // 4. 按对象 diff（基于修改人角色判断修改范围）
         List<ObjectChange> changes = new ArrayList<>();
 
-        boolean onlyItems = isDesigner && !isAdmin;
+        boolean modifierIsDesigner = DESIGNER_ROLES.contains(modifierRoleCode);
+        boolean modifierIsAdmin = ADMIN_ROLES.contains(modifierRoleCode);
+        boolean onlyItems = modifierIsDesigner && !modifierIsAdmin;
 
         if (!onlyItems) {
             changes.add(diffOrderInfo(order, dto));
@@ -146,7 +166,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             }
         }
 
-        // 7. 记录日志
+        // 7. 记录日志（使用传入的修改人信息）
         for (ObjectChange change : actualChanges) {
             OrderModificationLogEntity logEntity = new OrderModificationLogEntity();
             logEntity.setOrderId(orderId);
@@ -155,8 +175,8 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             logEntity.setFieldLabel(change.getObjectLabel());
             logEntity.setOldValue(change.getOldValue());
             logEntity.setNewValue(change.getNewValue());
-            logEntity.setModifierId(userId);
-            logEntity.setModifierName(currentUser != null ? currentUser.getRealName() : null);
+            logEntity.setModifierId(modifierId);
+            logEntity.setModifierName(modifierName);
             orderModificationLogMapper.insert(logEntity);
         }
 
