@@ -11,6 +11,8 @@ import com.yigongbao.module.system.doctor.service.DoctorService;
 import com.yigongbao.module.system.doctor.vo.DoctorVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
+import com.yigongbao.module.system.dict.service.DictService;
+import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.order.dto.diff.*;
 import com.yigongbao.module.order.dto.draft.OrderItemDraftItemDTO;
 import com.yigongbao.module.order.dto.modify.OrderModifyFullDTO;
@@ -40,6 +42,7 @@ public class OrderDiffCalculator {
     private final OrgService orgService;
     private final HospitalDeptService hospitalDeptService;
     private final DoctorService doctorService;
+    private final DictService dictService;
 
     /**
      * 计算订单修改差异
@@ -85,8 +88,13 @@ public class OrderDiffCalculator {
                 current.getPatientAge(), dto.getPatientAge());
 
         // 患者性别
-        addDiffIfChanged(diffs, "patientGender", "患者性别",
-                current.getPatientGender(), dto.getPatientGender());
+        if (!Objects.equals(current.getPatientGender(), dto.getPatientGender())) {
+            String oldDisplay = getGenderDisplay(current.getPatientGender());
+            String newDisplay = getGenderDisplay(dto.getPatientGender());
+            diffs.add(new FieldDiff("patientGender", "患者性别",
+                    current.getPatientGender(), dto.getPatientGender(),
+                    oldDisplay, newDisplay));
+        }
 
         // 医院
         if (!Objects.equals(current.getHospitalId(), dto.getHospitalId())) {
@@ -276,5 +284,16 @@ public class OrderDiffCalculator {
                     String.valueOf(oldValue), String.valueOf(newValue),
                     oldDisplay, newDisplay));
         }
+    }
+
+    /**
+     * 获取性别的中文显示名称
+     */
+    private String getGenderDisplay(String genderCode) {
+        if (genderCode == null) {
+            return null;
+        }
+        DictVO dict = dictService.getByDictCode(genderCode);
+        return dict != null ? dict.getDictName() : genderCode;
     }
 }
