@@ -106,7 +106,8 @@ public class ProductionPackServiceImpl implements IProductionPackService {
                 .set(ProductionProcessEntity::getOperatorId, userId)
                 .set(ProductionProcessEntity::getOperatorName, user != null ? user.getRealName() : null)
                 .set(ProductionProcessEntity::getStartTime, LocalDateTime.now())
-                .set(ProductionProcessEntity::getProcessParams, dto.getProcessParams());
+                .set(ProductionProcessEntity::getProcessParams, dto.getProcessParams())
+                .set(ProductionProcessEntity::getStatus, ProcessStatusEnum.IN_PROGRESS.getCode());
 
         // 辅助设备（可选）
         if (dto.getSecondaryDeviceId() != null) {

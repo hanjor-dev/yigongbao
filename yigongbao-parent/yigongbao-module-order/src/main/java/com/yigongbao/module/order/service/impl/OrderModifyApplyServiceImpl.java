@@ -14,6 +14,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.service.FlowOrderService;
 import com.yigongbao.module.order.convert.OrderDiffCalculator;
@@ -231,7 +232,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
 
             // 修改成功后，仅在订单阶段时重置审核状态（数据已变更，需要重新审核）
             OrderMainEntity order = orderMainMapper.selectById(apply.getOrderId());
-            if (order != null && order.getPhase() == 10) {
+            if (order != null && FlowPhaseEnum.ORDER.getValue().equals(order.getPhase())) {
                 LambdaUpdateWrapper<OrderMainEntity> updateWrapper = new LambdaUpdateWrapper<>();
                 updateWrapper.eq(OrderMainEntity::getId, apply.getOrderId())
                         .set(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PENDING)

@@ -121,9 +121,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         // 构建查询条件
         LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
 
-        // 固定过滤：仅查询设计阶段订单（phase=20）
-        wrapper.eq(OrderMainEntity::getPhase, 20);
-
         // 注入数据权限过滤（按 designer_id）
         designQueryHelper.buildDataScopeCondition(wrapper, currentUser, scopeType);
 
