@@ -25,22 +25,19 @@ COPY yigongbao-parent/ ./
 # 构建项目
 RUN mvn clean package -DskipTests -B
 
-# 多阶段构建：第二阶段 - 运行时镜像
-FROM amazoncorretto:21-alpine
+# 多阶段构建：第二阶段 - 运行时镜像（生产环境）
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-# 安装 curl（用于健康检查）
-RUN apk add --no-cache curl
-
 # 创建非 root 用户
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN groupadd -r appuser && useradd -r -g appuser -u 1001 appuser
 
 # 从构建阶段复制 JAR 文件
 COPY --from=builder /build/yigongbao-boot/target/yigongbao-boot-*.jar /app/app.jar
 
-# 创建文件存储目录
-RUN mkdir -p /app/files && chown -R appuser:appgroup /app
+# 创建文件存储目录并设置权限
+RUN mkdir -p /app/files && chown -R appuser:appuser /app
 
 # 切换到非 root 用户
 USER appuser
@@ -48,8 +45,12 @@ USER appuser
 # 暴露端口（HTTP API）
 EXPOSE 8082
 
-# JVM 参数优化
-ENV JAVA_OPTS="-Xms512m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+# JVM 参数优化（生产环境）
+ENV JAVA_OPTS="-Xms512m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/files -Djava.security.egd=file:/dev/./urandom"
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8082/actuator/health || exit 1
 
 # 启动应用
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
