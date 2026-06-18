@@ -1904,6 +1904,7 @@ CREATE TABLE order_modification_apply (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单修改申请表';
 
 -- 消息通知表
+DROP TABLE IF EXISTS notification_message;
 CREATE TABLE notification_message
 (
     id             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',

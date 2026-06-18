@@ -58,24 +58,51 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
 
     /**
      * 解析角色+数据权限范围对应的用户ID列表
-     * 根据 sys_role.data_scope_type 分支，查询满足 context 过滤条件的用户
+     *
+     * 【通知范围与数据权限无关】
+     * - context 为空时：查询该角色的全部用户
+     * - context 提供范围时：根据角色权限类型匹配对应的查询方法
      */
     @Override
     public List<Long> resolveUserIds(String roleCode, NotificationContext context) {
         String scopeType = userQueryMapper.findDataScopeTypeByRoleCode(roleCode);
         DataScopeTypeEnum scope = DataScopeTypeEnum.getByCodeOrDefault(scopeType);
+
+        // 无范围限制：查询该角色全部用户
+        if (isEmptyContext(context)) {
+            return userQueryMapper.findUserIdsByRoleAll(roleCode);
+        }
+
         return switch (scope) {
-            // ALL：查询该角色下全部用户，不限机构
-            case ALL -> userQueryMapper.findUserIdsByRoleAll(roleCode);
-            // ORG/DEPT：查询该角色在指定机构内的用户
-            case ORG, DEPT -> {
+            case ALL -> {
+                // ALL权限：优先使用context提供的范围，无范围时查询全部
+                if (context.getOrgId() != null) {
+                    yield userQueryMapper.findUserIdsByRoleAndOrg(roleCode, context.getOrgId());
+                } else if (context.getCenterId() != null) {
+                    yield userQueryMapper.findUserIdsByRoleAndCenter(roleCode, context.getCenterId());
+                } else if (context.getDeptId() != null) {
+                    yield userQueryMapper.findUserIdsByRoleAndDept(roleCode, context.getDeptId());
+                } else {
+                    yield userQueryMapper.findUserIdsByRoleAll(roleCode);
+                }
+            }
+            case ORG -> {
                 if (context.getOrgId() == null) {
-                    log.warn("ORG/DEPT scope 缺少 orgId: roleCode={}", roleCode);
+                    log.warn("ORG scope 缺少 orgId: roleCode={}", roleCode);
                     yield Collections.emptyList();
                 }
                 yield userQueryMapper.findUserIdsByRoleAndOrg(roleCode, context.getOrgId());
             }
-            // CENTER：查询该角色在指定加工中心内的用户
+            case DEPT -> {
+                if (context.getDeptId() != null) {
+                    yield userQueryMapper.findUserIdsByRoleAndDept(roleCode, context.getDeptId());
+                } else if (context.getOrgId() != null) {
+                    yield userQueryMapper.findUserIdsByRoleAndOrg(roleCode, context.getOrgId());
+                } else {
+                    log.warn("DEPT scope 缺少 deptId/orgId: roleCode={}", roleCode);
+                    yield Collections.emptyList();
+                }
+            }
             case CENTER -> {
                 if (context.getCenterId() == null) {
                     log.warn("CENTER scope 缺少 centerId: roleCode={}", roleCode);
@@ -83,7 +110,6 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
                 }
                 yield userQueryMapper.findUserIdsByRoleAndCenter(roleCode, context.getCenterId());
             }
-            // HOSPITALS：查询该角色关联指定医院的用户（通过 sys_user_hospital 关联表）
             case HOSPITALS -> {
                 if (context.getHospitalId() == null) {
                     log.warn("HOSPITALS scope 缺少 hospitalId: roleCode={}", roleCode);
@@ -91,12 +117,21 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
                 }
                 yield userQueryMapper.findUserIdsByRoleAndHospital(roleCode, context.getHospitalId());
             }
-            // SELF：不适用角色推送，应改用 send(userId, dto)
             default -> {
                 log.warn("SELF scope 不适用角色推送，请改用 send(userId, dto): roleCode={}", roleCode);
                 yield Collections.emptyList();
             }
         };
+    }
+
+    /**
+     * 判断 context 是否为空（无范围限制）
+     */
+    private boolean isEmptyContext(NotificationContext context) {
+        return context.getOrgId() == null
+            && context.getHospitalId() == null
+            && context.getDeptId() == null
+            && context.getCenterId() == null;
     }
 
     /**
@@ -109,10 +144,10 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
 
     /**
      * 最终收束点：批量持久化消息记录，再推送 WebSocket
-     * 事务范围仅包含 saveBatch，推送在事务提交后执行，推送失败不回滚消息写入
+     * 推送失败不影响消息持久化
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void send(List<Long> userIds, NotificationDTO dto) {
         if (CollectionUtils.isEmpty(userIds)) {
             return;
@@ -127,16 +162,15 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
                 .collect(Collectors.toList());
         saveBatch(entities);
 
-        // 注册事务提交后回调，延迟推送到事务提交后执行
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                pushService.pushToUsers(userIds, entities);
-                log.info("通知发送完成: title={}, category={}, type={}, bizType={}, bizId={}, receiverCount={}, receiverIds={}",
-                        dto.getTitle(), dto.getCategory(), dto.getMessageType(),
-                        dto.getBizType(), dto.getBizId(), userIds.size(), userIds);
-            }
-        });
+        // 事务提交后推送（异步执行，失败不影响消息保存）
+        try {
+            pushService.pushToUsers(userIds, entities);
+            log.info("通知发送完成: title={}, category={}, type={}, bizType={}, bizId={}, receiverCount={}, receiverIds={}",
+                    dto.getTitle(), dto.getCategory(), dto.getMessageType(),
+                    dto.getBizType(), dto.getBizId(), userIds.size(), userIds);
+        } catch (Exception e) {
+            log.error("WebSocket推送失败（消息已保存）: title={}, receiverCount={}", dto.getTitle(), userIds.size(), e);
+        }
     }
 
     /**
@@ -240,6 +274,7 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
         entity.setReceiverId(userId);
         entity.setMessageType(dto.getMessageType() != null ? dto.getMessageType().getCode() : null);
         entity.setCategory(dto.getCategory() != null ? dto.getCategory().getCode() : null);
+        entity.setBizType(dto.getBizType());
         entity.setIsRead(0);
         entity.setIsConfirmed(0);
         return entity;

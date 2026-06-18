@@ -254,10 +254,12 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             // 订单修改成功后才更新申请状态
             apply.setStatus(ApplyStatusEnum.APPROVED.getCode());
         } else if (ApplyStatusEnum.REJECTED.getCode().equals(dto.getResult())) {
-            // 审核驳回：记录驳回原因
+            // 审核驳回：记录驳回原因，通知订单业务人员
             apply.setStatus(ApplyStatusEnum.REJECTED.getCode());
             apply.setAuditRemark(dto.getRemark());
-            eventPublisher.publishEvent(new OrderModifyApplyRejectedEvent(this, applyId, apply.getApplyUserId(), dto.getRemark()));
+            OrderMainEntity order = orderMainMapper.selectById(apply.getOrderId());
+            Long operatorId = order != null ? order.getOperatorId() : null;
+            eventPublisher.publishEvent(new OrderModifyApplyRejectedEvent(this, applyId, operatorId, dto.getRemark()));
         } else {
             throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "审核结果无效");
         }

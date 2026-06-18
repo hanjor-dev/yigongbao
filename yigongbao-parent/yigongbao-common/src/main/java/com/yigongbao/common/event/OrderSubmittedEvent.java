@@ -9,14 +9,16 @@ public class OrderSubmittedEvent extends ApplicationEvent {
     private final String businessType;
     private final Long hospitalId;
     private final Long orgId;
+    private final Long deptId;
     private final Long createBy;
 
-    public OrderSubmittedEvent(Object source, Long orderId, String businessType, Long hospitalId, Long orgId, Long createBy) {
+    public OrderSubmittedEvent(Object source, Long orderId, String businessType, Long hospitalId, Long orgId, Long deptId, Long createBy) {
         super(source);
         this.orderId = orderId;
         this.businessType = businessType;
         this.hospitalId = hospitalId;
         this.orgId = orgId;
+        this.deptId = deptId;
         this.createBy = createBy;
     }
 }

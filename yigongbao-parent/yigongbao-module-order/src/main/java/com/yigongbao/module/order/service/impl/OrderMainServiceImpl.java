@@ -598,7 +598,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         entity.setPhase(result.getTargetPhase());
         entity.setStatus(result.getFinalStatus());
         updateById(entity);
-        eventPublisher.publishEvent(new OrderSubmittedEvent(this, entity.getId(), entity.getBusinessType(), entity.getHospitalId(), entity.getOrgId(), entity.getCreateBy()));
+        eventPublisher.publishEvent(new OrderSubmittedEvent(this, entity.getId(), entity.getBusinessType(), entity.getHospitalId(), entity.getOrgId(), entity.getOperatorDeptId(), entity.getCreateBy()));
         log.info("提交订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
     }
 
@@ -1281,6 +1281,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         // Step 6：记录状态历史（CREATE 动作仅记录历史，不改变 phase/status）
         flowFacade.executeFlow(orderId, FlowActionEnum.CREATE,
                 new FlowOperator(currentUserId, currentUser.getRealName(), "直提创建"));
+
+        // Step 7：发布订单提交事件（触发消息通知）
+        eventPublisher.publishEvent(new OrderSubmittedEvent(this, orderId, order.getBusinessType(),
+                order.getHospitalId(), order.getOrgId(), order.getOperatorDeptId(), currentUserId));
 
         log.info("创建订单: orderId={}, orderCode={}, userId={}, itemCount={}",
                 orderId, orderCode, currentUserId, dto.getItems() != null ? dto.getItems().size() : 0);

@@ -24,6 +24,9 @@ public interface UserQueryMapper {
     @Select("SELECT id FROM sys_user WHERE role_code = #{roleCode} AND org_id = #{orgId} AND is_deleted = 0")
     List<Long> findUserIdsByRoleAndOrg(@Param("roleCode") String roleCode, @Param("orgId") Long orgId);
 
+    @Select("SELECT id FROM sys_user WHERE role_code = #{roleCode} AND dept_id = #{deptId} AND is_deleted = 0")
+    List<Long> findUserIdsByRoleAndDept(@Param("roleCode") String roleCode, @Param("deptId") Long deptId);
+
     @Select("SELECT id FROM sys_user WHERE role_code = #{roleCode} AND center_id = #{centerId} AND is_deleted = 0")
     List<Long> findUserIdsByRoleAndCenter(@Param("roleCode") String roleCode, @Param("centerId") Long centerId);
 
