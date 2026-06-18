@@ -8,22 +8,17 @@ package com.yigongbao.module.notification.constant;
  */
 public class NotificationJumpUrlConstants {
 
-    /**
-     * 订单详情页（需拼接 orderId）
-     * 示例：/order/detail/123
-     */
-    public static final String ORDER_DETAIL = "/order/detail/";
+    /** 订单列表页，前端自动拼 ?detailId=orderId */
+    public static final String ORDER_DETAIL = "/business/order";
 
-    /**
-     * 设计工单列表页
-     */
-    public static final String DESIGN_LIST = "/design/list";
+    /** 设计工单页，bizId = orderId */
+    public static final String DESIGN_LIST = "/business/design";
 
-    /**
-     * 生产流转卡详情页（需拼接 recordId）
-     * 示例：/production/record/456
-     */
-    public static final String PRODUCTION_RECORD = "/production/record/";
+    /** 订单修改申请页，bizId = applyId */
+    public static final String MODIFY_APPLY = "/business/modifyApply";
+
+    /** 生产流转卡页，bizId = recordId */
+    public static final String PRODUCTION_RECORD = "/business/manufacture";
 
     private NotificationJumpUrlConstants() {
     }

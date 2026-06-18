@@ -76,7 +76,7 @@ public class NotificationEventListener {
                     .category(MessageCategoryEnum.APPROVAL)
                     .bizType(BizTypeEnum.ORDER.getCode())
                     .bizId(event.getOrderId())
-                    .jumpUrl(NotificationJumpUrlConstants.ORDER_DETAIL + event.getOrderId())
+                    .jumpUrl(NotificationJumpUrlConstants.ORDER_DETAIL)
                     .build();
             if (DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(event.getBusinessType())) {
                 log.info("试用订单，通知区域管理员: orderId={}, deptId={}", event.getOrderId(), event.getDeptId());
@@ -110,7 +110,7 @@ public class NotificationEventListener {
                     .category(MessageCategoryEnum.APPROVAL)
                     .bizType(BizTypeEnum.ORDER.getCode())
                     .bizId(event.getOrderId())
-                    .jumpUrl(NotificationJumpUrlConstants.ORDER_DETAIL + event.getOrderId())
+                    .jumpUrl(NotificationJumpUrlConstants.ORDER_DETAIL)
                     .build();
             notificationService.send(RoleCodeEnum.DESIGNER_MANAGER.getCode(), NotificationContext.all(), dto);
             log.info("已通知全部设计管理员区域审核通过: orderId={}", event.getOrderId());
@@ -137,7 +137,7 @@ public class NotificationEventListener {
                     .category(MessageCategoryEnum.ORDER)
                     .bizType(BizTypeEnum.ORDER.getCode())
                     .bizId(event.getOrderId())
-                    .jumpUrl(NotificationJumpUrlConstants.ORDER_DETAIL + event.getOrderId())
+                    .jumpUrl(NotificationJumpUrlConstants.ORDER_DETAIL)
                     .build();
             notificationService.send(event.getCreateBy(), dto);
             log.info("已通知订单创建人审核驳回: orderId={}, createBy={}", event.getOrderId(), event.getCreateBy());
@@ -205,7 +205,7 @@ public class NotificationEventListener {
                     .category(MessageCategoryEnum.APPROVAL)
                     .bizType(BizTypeEnum.MODIFY_APPLY.getCode())
                     .bizId(event.getApplyId())
-                    .jumpUrl(NotificationJumpUrlConstants.ORDER_DETAIL + event.getOrderId())
+                    .jumpUrl(NotificationJumpUrlConstants.MODIFY_APPLY)
                     .build();
             notificationService.send(RoleCodeEnum.DESIGNER_MANAGER.getCode(), NotificationContext.all(), dto);
             log.info("已通知全部设计管理员修改申请: orderId={}", event.getOrderId());
@@ -230,6 +230,7 @@ public class NotificationEventListener {
                     .category(MessageCategoryEnum.ORDER)
                     .bizType(BizTypeEnum.MODIFY_APPLY.getCode())
                     .bizId(event.getApplyId())
+                    .jumpUrl(NotificationJumpUrlConstants.MODIFY_APPLY)
                     .build();
             notificationService.send(event.getOperatorId(), dto);
             log.info("已通知订单业务人员修改申请驳回: applyId={}, operatorId={}", event.getApplyId(), event.getOperatorId());
@@ -272,7 +273,7 @@ public class NotificationEventListener {
                         .bizType(BizTypeEnum.PRODUCTION_CARD.getCode())
                         .bizId(record.getId())
                         .bizData(JSONUtil.toJsonStr(Map.of("recordNo", record.getRecordNo(), "orderId", record.getOrderId())))
-                        .jumpUrl(NotificationJumpUrlConstants.PRODUCTION_RECORD + record.getId())
+                        .jumpUrl(NotificationJumpUrlConstants.PRODUCTION_RECORD)
                         .build();
                 notificationService.send(allRecipients, dto);
             }
