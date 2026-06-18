@@ -10,6 +10,7 @@ import com.yigongbao.module.notification.dto.MessageQueryDTO;
 import com.yigongbao.module.notification.dto.NotificationContext;
 import com.yigongbao.module.notification.dto.NotificationDTO;
 import com.yigongbao.module.notification.entity.NotificationMessageEntity;
+import com.yigongbao.module.notification.enums.BizStatusEnum;
 import com.yigongbao.module.notification.mapper.NotificationMessageMapper;
 import com.yigongbao.module.notification.mapper.UserQueryMapper;
 import com.yigongbao.module.notification.service.INotificationService;
@@ -43,6 +44,7 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
 
     private final UserQueryMapper userQueryMapper;
     private final NotificationPushService pushService;
+    private final NotificationMessageMapper notificationMessageMapper;
 
     /**
      * 按角色+数据权限范围发送通知
@@ -147,7 +149,7 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
      * 推送失败不影响消息持久化
      */
     @Override
-    @Transactional(rollbackFor = Exception.class, propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    @Transactional(rollbackFor = Exception.class, propagation = org.springframework.transaction.annotation.Propagation.REQUIRED)
     public void send(List<Long> userIds, NotificationDTO dto) {
         if (CollectionUtils.isEmpty(userIds)) {
             return;
@@ -264,6 +266,25 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
         log.info("消息已删除: messageId={}, receiverId={}", id, receiverId);
     }
 
+    @Override
+    @org.springframework.scheduling.annotation.Async
+    public void pushPendingNotifications(Long userId) {
+        List<NotificationMessageEntity> pending = list(new LambdaQueryWrapper<NotificationMessageEntity>()
+                .eq(NotificationMessageEntity::getReceiverId, userId)
+                .eq(NotificationMessageEntity::getMessageType, "POPUP")
+                .eq(NotificationMessageEntity::getIsConfirmed, 0)
+                .eq(NotificationMessageEntity::getIsDeleted, 0));
+        if (!pending.isEmpty()) {
+            pending.forEach(msg -> pushService.pushToUser(userId, msg));
+            log.info("补推离线通知: userId={}, count={}", userId, pending.size());
+        }
+    }
+
+    @Override
+    public void updateRemark(String bizType, Long bizId, String category, String remark) {
+        notificationMessageMapper.updateRemark(bizType, bizId, category, remark);
+    }
+
     /**
      * 构建消息实体
      * 枚举字段（messageType/category）需单独转换为 code，其余字段通过 copyProperties 批量复制
@@ -277,6 +298,7 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
         entity.setBizType(dto.getBizType());
         entity.setIsRead(0);
         entity.setIsConfirmed(0);
+        entity.setBizStatus(BizStatusEnum.PENDING.getCode());
         return entity;
     }
 

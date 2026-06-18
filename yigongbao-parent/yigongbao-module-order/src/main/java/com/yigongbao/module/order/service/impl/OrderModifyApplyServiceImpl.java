@@ -180,7 +180,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
 
         orderModificationApplyMapper.insert(apply);
 
-        eventPublisher.publishEvent(new OrderModifyApplySubmittedEvent(this, apply.getId(), orderId, order.getOrgId(), userId));
+        eventPublisher.publishEvent(new OrderModifyApplySubmittedEvent(this, apply.getId(), orderId,
+                order.getOrderCode(), userName, order.getOrgId(), userId));
         log.info("提交修改申请: applyId={}, orderId={}, userId={}", apply.getId(), orderId, userId);
 
         return apply.getId();
@@ -259,7 +260,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             apply.setAuditRemark(dto.getRemark());
             OrderMainEntity order = orderMainMapper.selectById(apply.getOrderId());
             Long operatorId = order != null ? order.getOperatorId() : null;
-            eventPublisher.publishEvent(new OrderModifyApplyRejectedEvent(this, applyId, operatorId, dto.getRemark()));
+            String orderCode = order != null ? order.getOrderCode() : null;
+            eventPublisher.publishEvent(new OrderModifyApplyRejectedEvent(this, applyId, orderCode, operatorId, dto.getRemark()));
         } else {
             throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "审核结果无效");
         }
@@ -272,6 +274,12 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         apply.setAuditTime(LocalDateTime.now());
 
         orderModificationApplyMapper.updateById(apply);
+
+        // 更新原推送通知的备注（审核完成状态提示）
+        String remark = ApplyStatusEnum.APPROVED.getCode().equals(dto.getResult())
+                ? "该申请已被" + userName + "审核通过"
+                : "该申请已被" + userName + "审核驳回";
+        eventPublisher.publishEvent(new com.yigongbao.common.event.NotificationRemarkUpdateEvent(this, "MODIFY_APPLY", applyId, "APPROVAL", remark));
 
         log.info("审核修改申请: applyId={}, result={}, auditUserId={}", applyId, dto.getResult(), userId);
     }

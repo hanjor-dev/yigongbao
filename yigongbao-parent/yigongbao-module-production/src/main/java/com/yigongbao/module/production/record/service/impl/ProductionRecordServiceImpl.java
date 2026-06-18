@@ -376,7 +376,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         // 发布流转卡认领事件
         if (record != null) {
-            eventPublisher.publishEvent(new ProductionCardClaimedEvent(this, record.getId(), userId));
+            eventPublisher.publishEvent(new ProductionCardClaimedEvent(this, record.getId(), userId, realName));
         }
 
         // 聚合逻辑：检查是否所有流转卡都已下载，如果是则通过状态机推进订单状态

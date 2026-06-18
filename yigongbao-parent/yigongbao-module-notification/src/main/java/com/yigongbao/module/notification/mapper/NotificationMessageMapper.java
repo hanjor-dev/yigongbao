@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.yigongbao.module.notification.entity.NotificationMessageEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 import java.util.Map;
@@ -24,4 +25,11 @@ public interface NotificationMessageMapper extends BaseMapper<NotificationMessag
     void markAllRead(@Param("receiverId") Long receiverId, @Param("category") String category);
 
     void batchMarkClaimed(@Param("recordId") Long recordId, @Param("claimedByUserId") Long claimedByUserId);
+
+    @Update("UPDATE notification_message SET content = JSON_SET(content, '$.remark', #{remark}), " +
+            "biz_status = 'PROCESSED' " +
+            "WHERE biz_type = #{bizType} AND biz_id = #{bizId} AND category = #{category} AND biz_status = 'PENDING' AND is_deleted = 0")
+    void updateRemark(@Param("bizType") String bizType, @Param("bizId") Long bizId,
+                      @Param("category") String category, @Param("remark") String remark);
 }
+

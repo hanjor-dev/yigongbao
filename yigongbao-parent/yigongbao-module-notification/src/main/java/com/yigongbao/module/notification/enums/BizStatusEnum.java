@@ -13,6 +13,8 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum BizStatusEnum {
 
+    PENDING("PENDING", "待处理"),
+    PROCESSED("PROCESSED", "已处理"),
     CLAIMED("CLAIMED", "已被他人接收");
 
     private final String code;

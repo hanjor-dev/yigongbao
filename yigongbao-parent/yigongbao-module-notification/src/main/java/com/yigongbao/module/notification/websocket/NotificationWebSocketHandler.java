@@ -28,6 +28,12 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
     private static final String PONG      = "{\"type\":\"PONG\"}";
 
     private final WebSocketSessionManager sessionManager;
+    private final com.yigongbao.module.notification.service.INotificationService notificationService;
+
+    @Override
+    public void afterConnectionEstablished(WebSocketSession session) {
+        log.info("WebSocket 连接建立: sessionId={}, remoteAddress={}", session.getId(), session.getRemoteAddress());
+    }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
@@ -36,6 +42,7 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
 
         if (AUTH.equals(type)) {
             String token = json.getStr("token");
+            Long userId = null;
             try {
                 Object loginId = StpUtil.getLoginIdByToken(token);
                 if (loginId == null) {
@@ -43,7 +50,7 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
                     session.close();
                     return;
                 }
-                Long userId = Long.parseLong(loginId.toString());
+                userId = Long.parseLong(loginId.toString());
                 sessionManager.add(userId, session);
                 session.getAttributes().put("userId", userId);
                 session.sendMessage(new TextMessage(AUTH_OK));
@@ -52,6 +59,13 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
                 log.warn("WebSocket 认证失败: {}", e.getMessage());
                 session.sendMessage(new TextMessage(AUTH_FAIL));
                 session.close();
+                return;
+            }
+            // 补推离线期间的待处理通知，独立捕获异常，不影响认证结果
+            try {
+                notificationService.pushPendingNotifications(userId);
+            } catch (Exception e) {
+                log.warn("补推离线通知失败: userId={}, error={}", userId, e.getMessage());
             }
         } else if (PING.equals(type)) {
             session.sendMessage(new TextMessage(PONG));
@@ -63,7 +77,9 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
         Long userId = (Long) session.getAttributes().get("userId");
         if (userId != null) {
             sessionManager.remove(userId);
-            log.info("WebSocket 断开连接: userId={}", userId);
+            log.info("WebSocket 断开连接: userId={}, sessionId={}, status={}", userId, session.getId(), status);
+        } else {
+            log.info("WebSocket 未认证连接断开: sessionId={}, status={}", session.getId(), status);
         }
     }
 

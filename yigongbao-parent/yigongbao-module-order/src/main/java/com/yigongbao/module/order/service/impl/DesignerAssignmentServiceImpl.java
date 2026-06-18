@@ -141,7 +141,8 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         saveAutoAssignmentLog(order, designer);
         // 7. 更新订单 designerId / designerName
         updateOrderDesigner(order, designer);
-        eventPublisher.publishEvent(new DesignerAssignedEvent(this, orderId, designer.getId(), oldDesignerId));
+        eventPublisher.publishEvent(new DesignerAssignedEvent(this, orderId, order.getOrderCode(),
+                order.getPatientName(), order.getHospitalName(), designer.getId(), oldDesignerId));
         log.info("自动分配设计师: orderId={}, designerId={}, specialty={}", orderId, designer.getId(), specialty);
         return designer.getId();
     }
@@ -196,7 +197,8 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         // 5. 更新订单
         Long oldDesignerId = order.getDesignerId();
         updateOrderDesigner(order, designer);
-        eventPublisher.publishEvent(new DesignerAssignedEvent(this, orderId, designerId, oldDesignerId));
+        eventPublisher.publishEvent(new DesignerAssignedEvent(this, orderId, order.getOrderCode(),
+                order.getPatientName(), order.getHospitalName(), designerId, oldDesignerId));
         log.info("手动分配成功，orderId={}, designerId={}", orderId, designerId);
     }
 

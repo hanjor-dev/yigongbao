@@ -102,10 +102,26 @@ public interface INotificationService {
     void confirm(Long id, Long receiverId);
 
     /**
+     * 补推离线期间未确认的 POPUP 通知（用户重新连接 WebSocket 时调用）
+     *
+     * @param userId 用户ID
+     */
+    void pushPendingNotifications(Long userId);
+
+    /**
      * 删除消息（逻辑删除）
      *
      * @param id         消息ID
      * @param receiverId 当前登录用户ID（防止越权）
      */
     void deleteMessage(Long id, Long receiverId);
+
+    /**
+     * 更新指定业务消息的备注（已审核/已接收等状态提示）
+     *
+     * @param bizType 业务类型
+     * @param bizId   业务ID
+     * @param remark  备注内容
+     */
+    void updateRemark(String bizType, Long bizId, String category, String remark);
 }

@@ -14,6 +14,7 @@ import lombok.Getter;
 public enum BizTypeEnum {
 
     ORDER("ORDER", "订单"),
+    MODIFY_APPLY("MODIFY_APPLY", "修改申请"),
     PRODUCTION_CARD("PRODUCTION_CARD", "生产卡");
 
     private final String code;

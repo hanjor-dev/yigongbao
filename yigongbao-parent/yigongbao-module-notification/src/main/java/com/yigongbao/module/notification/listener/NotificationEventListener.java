@@ -7,6 +7,7 @@ import com.yigongbao.common.event.*;
 import com.yigongbao.module.notification.constant.NotificationJumpUrlConstants;
 import com.yigongbao.module.notification.dto.NotificationContext;
 import com.yigongbao.module.notification.dto.NotificationDTO;
+import com.yigongbao.module.notification.dto.NotificationField;
 import com.yigongbao.module.notification.enums.BizTypeEnum;
 import com.yigongbao.module.notification.enums.MessageCategoryEnum;
 import com.yigongbao.module.notification.enums.MessageTypeEnum;
@@ -21,13 +22,12 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.util.CollectionUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /**
  * 消息通知事件监听器
- * 监听全部业务事件，统一在此处构建消息内容并调用 NotificationService 推送
- * 所有监听方法在事务提交后异步执行，通知失败不影响核心业务
  *
  * @author hanjor
  * @date 2026-06-18
@@ -41,6 +41,20 @@ public class NotificationEventListener {
     private final NotificationMessageMapper notificationMessageMapper;
     private final IProductionRecordService productionRecordService;
 
+    // ==================== 消息内容构建工具 ====================
+
+    /** 构建卡片消息内容 JSON，包含字段列表和空备注 */
+    private static String content(NotificationField... fields) {
+        return JSONUtil.toJsonStr(Map.of("fields", List.of(fields), "remark", ""));
+    }
+
+    /** 构建消息卡片字段：标识、中文名、值 */
+    private static NotificationField f(String key, String label, String value) {
+        return new NotificationField(key, label, value != null ? value : "");
+    }
+
+    // ==================== 订单相关通知 ====================
+
     /**
      * 订单提交事件
      * 试用订单 → 通知订单所属部门的区域管理员
@@ -53,19 +67,22 @@ public class NotificationEventListener {
                     event.getOrderId(), event.getBusinessType(), event.getDeptId());
             NotificationDTO dto = NotificationDTO.builder()
                     .title("有新的订单待审核")
+                    .content(content(
+                            f("orderCode", "订单号", event.getOrderCode()),
+                            f("patientName", "患者", event.getPatientName()),
+                            f("hospitalName", "医院", event.getHospitalName()),
+                            f("operatorName", "业务员", event.getOperatorName())))
                     .messageType(MessageTypeEnum.POPUP)
                     .category(MessageCategoryEnum.APPROVAL)
                     .bizType(BizTypeEnum.ORDER.getCode())
                     .bizId(event.getOrderId())
                     .jumpUrl(NotificationJumpUrlConstants.ORDER_DETAIL + event.getOrderId())
                     .build();
-            // 试用订单：通知订单所属部门的区域管理员
             if (DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(event.getBusinessType())) {
                 log.info("试用订单，通知区域管理员: orderId={}, deptId={}", event.getOrderId(), event.getDeptId());
                 notificationService.send(RoleCodeEnum.REGIONAL_MANAGER.getCode(),
                         NotificationContext.ofDept(event.getDeptId()), dto);
             } else {
-                // 普通订单：通知全部设计管理员
                 log.info("普通订单，通知全部设计管理员: orderId={}", event.getOrderId());
                 notificationService.send(RoleCodeEnum.DESIGNER_MANAGER.getCode(),
                         NotificationContext.all(), dto);
@@ -85,14 +102,17 @@ public class NotificationEventListener {
             log.info("收到区域审核通过事件: orderId={}", event.getOrderId());
             NotificationDTO dto = NotificationDTO.builder()
                     .title("试用订单区域审核已通过，请分配设计师")
+                    .content(content(
+                            f("orderCode", "订单号", event.getOrderCode()),
+                            f("patientName", "患者", event.getPatientName()),
+                            f("hospitalName", "医院", event.getHospitalName())))
                     .messageType(MessageTypeEnum.POPUP)
                     .category(MessageCategoryEnum.APPROVAL)
                     .bizType(BizTypeEnum.ORDER.getCode())
                     .bizId(event.getOrderId())
                     .jumpUrl(NotificationJumpUrlConstants.ORDER_DETAIL + event.getOrderId())
                     .build();
-            notificationService.send(RoleCodeEnum.DESIGNER_MANAGER.getCode(),
-                    NotificationContext.all(), dto);
+            notificationService.send(RoleCodeEnum.DESIGNER_MANAGER.getCode(), NotificationContext.all(), dto);
             log.info("已通知全部设计管理员区域审核通过: orderId={}", event.getOrderId());
         } catch (Exception e) {
             log.error("区域审核通过通知发送失败: orderId={}", event.getOrderId(), e);
@@ -100,8 +120,7 @@ public class NotificationEventListener {
     }
 
     /**
-     * 审核驳回事件
-     * 定向通知订单创建人
+     * 审核驳回事件，定向通知订单创建人
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onAuditRejected(AuditRejectedEvent event) {
@@ -109,7 +128,11 @@ public class NotificationEventListener {
             log.info("收到审核驳回事件: orderId={}, createBy={}", event.getOrderId(), event.getCreateBy());
             NotificationDTO dto = NotificationDTO.builder()
                     .title("您的订单审核未通过")
-                    .content("驳回原因：" + event.getRejectReason())
+                    .content(content(
+                            f("orderCode", "订单号", event.getOrderCode()),
+                            f("patientName", "患者", event.getPatientName()),
+                            f("hospitalName", "医院", event.getHospitalName()),
+                            f("rejectReason", "驳回原因", event.getRejectReason())))
                     .messageType(MessageTypeEnum.POPUP)
                     .category(MessageCategoryEnum.ORDER)
                     .bizType(BizTypeEnum.ORDER.getCode())
@@ -124,8 +147,7 @@ public class NotificationEventListener {
     }
 
     /**
-     * 设计师分配事件
-     * 通知新设计师（POPUP）；重新分配时同时通知旧设计师（MESSAGE）
+     * 设计师分配事件，通知新设计师；重新分配时同时通知旧设计师
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDesignerAssigned(DesignerAssignedEvent event) {
@@ -136,8 +158,13 @@ public class NotificationEventListener {
             }
             log.info("收到设计师分配事件: orderId={}, newDesignerId={}, oldDesignerId={}",
                     event.getOrderId(), event.getNewDesignerId(), event.getOldDesignerId());
+            String orderContent = content(
+                    f("orderCode", "订单号", event.getOrderCode()),
+                    f("patientName", "患者", event.getPatientName()),
+                    f("hospitalName", "医院", event.getHospitalName()));
             notificationService.send(event.getNewDesignerId(), NotificationDTO.builder()
                     .title("您有新的设计任务")
+                    .content(orderContent)
                     .messageType(MessageTypeEnum.POPUP)
                     .category(MessageCategoryEnum.DESIGN)
                     .bizType(BizTypeEnum.ORDER.getCode())
@@ -145,10 +172,10 @@ public class NotificationEventListener {
                     .jumpUrl(NotificationJumpUrlConstants.DESIGN_LIST)
                     .build());
             log.info("已通知新设计师: orderId={}, newDesignerId={}", event.getOrderId(), event.getNewDesignerId());
-            // 重新分配时通知原设计师任务已被撤销
             if (event.getOldDesignerId() != null) {
                 notificationService.send(event.getOldDesignerId(), NotificationDTO.builder()
                         .title("您的设计任务已被重新分配")
+                        .content(orderContent)
                         .messageType(MessageTypeEnum.POPUP)
                         .category(MessageCategoryEnum.DESIGN)
                         .bizType(BizTypeEnum.ORDER.getCode())
@@ -163,24 +190,24 @@ public class NotificationEventListener {
     }
 
     /**
-     * 订单修改申请提交事件
-     * 通知全部设计管理员审核
+     * 订单修改申请提交事件，通知全部设计管理员
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onModifyApplySubmitted(OrderModifyApplySubmittedEvent event) {
         try {
-            log.info("收到订单修改申请提交事件: orderId={}, applyUserId=",
-                    event.getOrderId(), event.getApplyUserId());
+            log.info("收到订单修改申请提交事件: orderId={}, applyUserId={}", event.getOrderId(), event.getApplyUserId());
             NotificationDTO dto = NotificationDTO.builder()
                     .title("有新的订单修改申请待审核")
+                    .content(content(
+                            f("orderCode", "订单号", event.getOrderCode()),
+                            f("applyUserName", "申请人", event.getApplyUserName())))
                     .messageType(MessageTypeEnum.POPUP)
                     .category(MessageCategoryEnum.APPROVAL)
-                    .bizType(BizTypeEnum.ORDER.getCode())
-                    .bizId(event.getOrderId())
+                    .bizType(BizTypeEnum.MODIFY_APPLY.getCode())
+                    .bizId(event.getApplyId())
                     .jumpUrl(NotificationJumpUrlConstants.ORDER_DETAIL + event.getOrderId())
                     .build();
-            notificationService.send(RoleCodeEnum.DESIGNER_MANAGER.getCode(),
-                    NotificationContext.all(), dto);
+            notificationService.send(RoleCodeEnum.DESIGNER_MANAGER.getCode(), NotificationContext.all(), dto);
             log.info("已通知全部设计管理员修改申请: orderId={}", event.getOrderId());
         } catch (Exception e) {
             log.error("订单修改申请通知发送失败: orderId={}", event.getOrderId(), e);
@@ -188,8 +215,7 @@ public class NotificationEventListener {
     }
 
     /**
-     * 订单修改申请驳回事件
-     * 定向通知订单业务人员
+     * 订单修改申请驳回事件，定向通知订单业务人员
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onModifyApplyRejected(OrderModifyApplyRejectedEvent event) {
@@ -197,10 +223,12 @@ public class NotificationEventListener {
             log.info("收到订单修改申请驳回事件: applyId={}, operatorId={}", event.getApplyId(), event.getOperatorId());
             NotificationDTO dto = NotificationDTO.builder()
                     .title("您的订单修改申请已被驳回")
-                    .content("驳回原因：" + event.getRejectReason())
+                    .content(content(
+                            f("orderCode", "订单号", event.getOrderCode()),
+                            f("rejectReason", "驳回原因", event.getRejectReason())))
                     .messageType(MessageTypeEnum.POPUP)
                     .category(MessageCategoryEnum.ORDER)
-                    .bizType(BizTypeEnum.ORDER.getCode())
+                    .bizType(BizTypeEnum.MODIFY_APPLY.getCode())
                     .bizId(event.getApplyId())
                     .build();
             notificationService.send(event.getOperatorId(), dto);
@@ -210,9 +238,10 @@ public class NotificationEventListener {
         }
     }
 
+    // ==================== 生产相关通知 ====================
+
     /**
-     * 生产流转卡批量创建事件
-     * 通知全部生产员和生产管理员（不限加工中心）
+     * 生产流转卡批量创建事件，通知全部生产员和生产管理员
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProductionCardsCreated(ProductionCardsCreatedEvent event) {
@@ -223,31 +252,29 @@ public class NotificationEventListener {
                 log.warn("流转卡记录不存在，跳过通知: recordIds={}", event.getRecordIds());
                 return;
             }
-
-            // 查询全部生产员和生产管理员（一次查询，所有流转卡共享）
             List<Long> workerIds = notificationService.resolveUserIds(
-                RoleCodeEnum.PRODUCTION_WORKER.getCode(), NotificationContext.all());
+                    RoleCodeEnum.PRODUCTION_WORKER.getCode(), NotificationContext.all());
             List<Long> managerIds = notificationService.resolveUserIds(
-                RoleCodeEnum.PRODUCTION_MANAGER.getCode(), NotificationContext.all());
+                    RoleCodeEnum.PRODUCTION_MANAGER.getCode(), NotificationContext.all());
+            List<Long> allRecipients = new ArrayList<>(workerIds);
+            allRecipients.addAll(managerIds);
             log.info("生产用户列表: workerIds={}, managerIds={}", workerIds, managerIds);
-
-            // 为每张流转卡发送通知
             for (ProductionRecordEntity record : records) {
-                String bizData = JSONUtil.toJsonStr(Map.of(
-                        "recordNo", record.getRecordNo(),
-                        "orderId", record.getOrderId()
-                ));
                 NotificationDTO dto = NotificationDTO.builder()
                         .title("有新的生产流转卡待接收")
+                        .content(content(
+                                f("recordNo", "流转卡编号", record.getRecordNo()),
+                                f("orderCode", "订单号", record.getOrderCode()),
+                                f("patientName", "患者", record.getPatientName()),
+                                f("hospitalName", "医院", record.getHospitalName())))
                         .messageType(MessageTypeEnum.POPUP)
                         .category(MessageCategoryEnum.PRODUCTION)
                         .bizType(BizTypeEnum.PRODUCTION_CARD.getCode())
                         .bizId(record.getId())
-                        .bizData(bizData)
+                        .bizData(JSONUtil.toJsonStr(Map.of("recordNo", record.getRecordNo(), "orderId", record.getOrderId())))
                         .jumpUrl(NotificationJumpUrlConstants.PRODUCTION_RECORD + record.getId())
                         .build();
-                notificationService.send(workerIds, dto);
-                notificationService.send(managerIds, dto);
+                notificationService.send(allRecipients, dto);
             }
             log.info("生产流转卡通知已发送: recordCount={}, workerCount={}, managerCount={}",
                     records.size(), workerIds.size(), managerIds.size());
@@ -258,17 +285,32 @@ public class NotificationEventListener {
 
     /**
      * 生产流转卡被接收事件
-     * 不推送新消息，仅将其他生产员的待接收通知标记为 CLAIMED + 已确认
+     * 标记其他生产员的通知为 CLAIMED，并更新备注提示已被接收
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProductionCardClaimed(ProductionCardClaimedEvent event) {
         try {
             log.info("收到流转卡接收事件: recordId={}, claimedByUserId={}", event.getRecordId(), event.getClaimedByUserId());
-            // 批量更新其他生产员的通知状态为 CLAIMED，使其无需强制弹窗确认
             notificationMessageMapper.batchMarkClaimed(event.getRecordId(), event.getClaimedByUserId());
-            log.info("流转卡通知已标记 CLAIMED: recordId={}, claimedByUserId={}", event.getRecordId(), event.getClaimedByUserId());
+            String name = event.getClaimedByUserName() != null ? event.getClaimedByUserName() : "他人";
+            notificationService.updateRemark(BizTypeEnum.PRODUCTION_CARD.getCode(), event.getRecordId(),
+                    MessageCategoryEnum.PRODUCTION.getCode(), "该流转卡已被" + name + "接收");
+            log.info("流转卡通知已标记 CLAIMED 并更新备注: recordId={}", event.getRecordId());
         } catch (Exception e) {
             log.error("流转卡接收通知更新失败: recordId={}", event.getRecordId(), e);
+        }
+    }
+
+    /**
+     * 通知备注更新事件（订单审核通过/驳回后，更新原推送通知的备注）
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onNotificationRemarkUpdate(NotificationRemarkUpdateEvent event) {
+        try {
+            notificationService.updateRemark(event.getBizType(), event.getBizId(), event.getCategory(), event.getRemark());
+            log.info("通知备注已更新: bizType={}, bizId={}, remark={}", event.getBizType(), event.getBizId(), event.getRemark());
+        } catch (Exception e) {
+            log.error("通知备注更新失败: bizType={}, bizId={}", event.getBizType(), event.getBizId(), e);
         }
     }
 }

@@ -11,6 +11,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.constant.AuditStatusConstants;
 import com.yigongbao.common.event.AuditRejectedEvent;
+import com.yigongbao.common.event.NotificationRemarkUpdateEvent;
 import com.yigongbao.common.event.OrderCancelledEvent;
 import com.yigongbao.common.event.OrderSubmittedEvent;
 import com.yigongbao.common.event.RegionalAuditPassedEvent;
@@ -598,7 +599,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         entity.setPhase(result.getTargetPhase());
         entity.setStatus(result.getFinalStatus());
         updateById(entity);
-        eventPublisher.publishEvent(new OrderSubmittedEvent(this, entity.getId(), entity.getBusinessType(), entity.getHospitalId(), entity.getOrgId(), entity.getOperatorDeptId(), entity.getCreateBy()));
+        eventPublisher.publishEvent(new OrderSubmittedEvent(this, entity.getId(), entity.getOrderCode(),
+                entity.getBusinessType(), entity.getPatientName(), entity.getHospitalName(), entity.getOperatorName(),
+                entity.getHospitalId(), entity.getOrgId(), entity.getOperatorDeptId(), entity.getCreateBy()));
         log.info("提交订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
     }
 
@@ -692,7 +695,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 if (!update(uw)) {
                     throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
                 }
-                eventPublisher.publishEvent(new RegionalAuditPassedEvent(this, id, entity.getOrgId()));
+                eventPublisher.publishEvent(new RegionalAuditPassedEvent(this, id, entity.getOrderCode(),
+                        entity.getPatientName(), entity.getHospitalName(), entity.getOrgId()));
                 log.info("试用订单区域审核通过: orderId={}, regionalAuditBy={}", id, currentUserId);
             } else if (RoleCodeConstants.DESIGN_ADMIN.equals(roleCode)) {
                 // 设计管理员审核：更新设计审核状态并推进流程
@@ -725,6 +729,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 }
 
                 designerAssignmentService.triggerAssignmentAfterAudit(id);
+                eventPublisher.publishEvent(new NotificationRemarkUpdateEvent(
+                        this, "ORDER", id, "APPROVAL", "该订单已被" + operatorName + "审核通过"));
                 log.info("试用订单设计审核通过: orderId={}, {} -> {}, designAuditBy={}",
                     id, entity.getStatus(), result.getFinalStatus(), currentUserId);
             } else {
@@ -762,6 +768,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             }
 
             designerAssignmentService.triggerAssignmentAfterAudit(id);
+            eventPublisher.publishEvent(new NotificationRemarkUpdateEvent(
+                    this, "ORDER", id, "APPROVAL", "该订单已被" + operatorName + "审核通过"));
             log.info("订单审核通过: orderId={}, {} -> {}, designAuditBy={}",
                 id, entity.getStatus(), result.getFinalStatus(), currentUserId);
         }
@@ -832,7 +840,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 if (!update(uw)) {
                     throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
                 }
-                eventPublisher.publishEvent(new AuditRejectedEvent(this, id, entity.getCreateBy(), dto.getRemark()));
+                eventPublisher.publishEvent(new AuditRejectedEvent(this, id, entity.getOrderCode(),
+                        entity.getPatientName(), entity.getHospitalName(), entity.getCreateBy(), dto.getRemark()));
                 log.warn("试用订单区域审核驳回: orderId={}, {} -> {}, regionalAuditBy={}, reason={}",
                     id, entity.getStatus(), result.getFinalStatus(), currentUserId, dto.getRemark());
             } else if (RoleCodeConstants.DESIGN_ADMIN.equals(roleCode)) {
@@ -858,7 +867,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                         .set(OrderMainEntity::getDesignAuditRemark, dto.getRemark())
                         .set(OrderMainEntity::getAuditRemark, dto.getRemark())
                         .set(OrderMainEntity::getCurrentHandlerId, currentUserId));
-                eventPublisher.publishEvent(new AuditRejectedEvent(this, id, entity.getCreateBy(), dto.getRemark()));
+                eventPublisher.publishEvent(new AuditRejectedEvent(this, id, entity.getOrderCode(),
+                        entity.getPatientName(), entity.getHospitalName(), entity.getCreateBy(), dto.getRemark()));
+                eventPublisher.publishEvent(new NotificationRemarkUpdateEvent(
+                        this, "ORDER", id, "APPROVAL", "该订单已被" + operatorName + "审核驳回"));
                 log.warn("试用订单设计审核驳回: orderId={}, {} -> {}, designAuditBy={}, reason={}",
                     id, entity.getStatus(), result.getFinalStatus(), currentUserId, dto.getRemark());
             } else {
@@ -887,7 +899,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     .set(OrderMainEntity::getDesignAuditRemark, dto.getRemark())
                     .set(OrderMainEntity::getAuditRemark, dto.getRemark())
                     .set(OrderMainEntity::getCurrentHandlerId, currentUserId));
-            eventPublisher.publishEvent(new AuditRejectedEvent(this, id, entity.getCreateBy(), dto.getRemark()));
+            eventPublisher.publishEvent(new AuditRejectedEvent(this, id, entity.getOrderCode(),
+                        entity.getPatientName(), entity.getHospitalName(), entity.getCreateBy(), dto.getRemark()));
+            eventPublisher.publishEvent(new NotificationRemarkUpdateEvent(
+                    this, "ORDER", id, "APPROVAL", "该订单已被" + operatorName + "审核驳回"));
             log.warn("订单审核驳回: orderId={}, {} -> {}, designAuditBy={}, reason={}",
                 id, entity.getStatus(), result.getFinalStatus(), currentUserId, dto.getRemark());
         }
@@ -1283,7 +1298,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 new FlowOperator(currentUserId, currentUser.getRealName(), "直提创建"));
 
         // Step 7：发布订单提交事件（触发消息通知）
-        eventPublisher.publishEvent(new OrderSubmittedEvent(this, orderId, order.getBusinessType(),
+        eventPublisher.publishEvent(new OrderSubmittedEvent(this, orderId, order.getOrderCode(),
+                order.getBusinessType(), order.getPatientName(), order.getHospitalName(), order.getOperatorName(),
                 order.getHospitalId(), order.getOrgId(), order.getOperatorDeptId(), currentUserId));
 
         log.info("创建订单: orderId={}, orderCode={}, userId={}, itemCount={}",
