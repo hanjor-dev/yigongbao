@@ -1,9 +1,8 @@
 package com.yigongbao.module.notification.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.Data;
-
-import javax.validation.constraints.Max;
-import javax.validation.constraints.Min;
 
 /**
  * 消息查询 DTO
