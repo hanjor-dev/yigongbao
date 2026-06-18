@@ -272,6 +272,7 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
         List<NotificationMessageEntity> pending = list(new LambdaQueryWrapper<NotificationMessageEntity>()
                 .eq(NotificationMessageEntity::getReceiverId, userId)
                 .eq(NotificationMessageEntity::getMessageType, "POPUP")
+                .eq(NotificationMessageEntity::getBizStatus, BizStatusEnum.PENDING.getCode())
                 .eq(NotificationMessageEntity::getIsConfirmed, 0)
                 .eq(NotificationMessageEntity::getIsDeleted, 0));
         if (!pending.isEmpty()) {

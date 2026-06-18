@@ -60,6 +60,7 @@ public class NotificationPushService {
             data.put("messageType", message.getMessageType());
             data.put("category", message.getCategory());
             data.put("title", message.getTitle());
+            data.put("content", message.getContent());
             data.put("bizStatus", message.getBizStatus());
             data.put("createTime", message.getCreateTime() != null ? message.getCreateTime().toString() : null);
 
