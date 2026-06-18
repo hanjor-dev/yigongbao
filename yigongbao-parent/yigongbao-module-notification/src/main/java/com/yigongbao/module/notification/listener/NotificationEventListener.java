@@ -235,32 +235,37 @@ public class NotificationEventListener {
             }
 
             for (Map.Entry<Long, List<ProductionRecordEntity>> entry : byCenterId.entrySet()) {
-                Long centerId = entry.getKey();
-                NotificationContext ctx = NotificationContext.ofCenter(centerId);
-                // 同一 centerId 下，WORKER 和 MANAGER 的用户列表各查一次，在该 center 所有流转卡间复用
-                List<Long> workerIds = notificationService.resolveUserIds(RoleCodeEnum.PRODUCTION_WORKER.getCode(), ctx);
-                List<Long> managerIds = notificationService.resolveUserIds(RoleCodeEnum.PRODUCTION_MANAGER.getCode(), ctx);
-                log.info("加工中心用户列表解析: centerId={}, workerIds={}, managerIds={}", centerId, workerIds, managerIds);
+                try {
+                    Long centerId = entry.getKey();
+                    NotificationContext ctx = NotificationContext.ofCenter(centerId);
+                    // 同一 centerId 下，WORKER 和 MANAGER 的用户列表各查一次，在该 center 所有流转卡间复用
+                    List<Long> workerIds = notificationService.resolveUserIds(RoleCodeEnum.PRODUCTION_WORKER.getCode(), ctx);
+                    List<Long> managerIds = notificationService.resolveUserIds(RoleCodeEnum.PRODUCTION_MANAGER.getCode(), ctx);
+                    log.info("加工中心用户列表解析: centerId={}, workerIds={}, managerIds={}", centerId, workerIds, managerIds);
 
-                for (ProductionRecordEntity record : entry.getValue()) {
-                    String bizData = JSONUtil.toJsonStr(Map.of(
-                            "recordNo", record.getRecordNo(),
-                            "orderId", record.getOrderId()
-                    ));
-                    NotificationDTO dto = NotificationDTO.builder()
-                            .title("有新的生产流转卡待接收")
-                            .messageType(MessageTypeEnum.POPUP)
-                            .category(MessageCategoryEnum.PRODUCTION)
-                            .bizType(BizTypeEnum.PRODUCTION_CARD.getCode())
-                            .bizId(record.getId())
-                            .bizData(bizData)
-                            .jumpUrl("/production/record/" + record.getId())
-                            .build();
-                    notificationService.send(workerIds, dto);
-                    notificationService.send(managerIds, dto);
+                    for (ProductionRecordEntity record : entry.getValue()) {
+                        String bizData = JSONUtil.toJsonStr(Map.of(
+                                "recordNo", record.getRecordNo(),
+                                "orderId", record.getOrderId()
+                        ));
+                        NotificationDTO dto = NotificationDTO.builder()
+                                .title("有新的生产流转卡待接收")
+                                .messageType(MessageTypeEnum.POPUP)
+                                .category(MessageCategoryEnum.PRODUCTION)
+                                .bizType(BizTypeEnum.PRODUCTION_CARD.getCode())
+                                .bizId(record.getId())
+                                .bizData(bizData)
+                                .jumpUrl("/production/record/" + record.getId())
+                                .build();
+                        notificationService.send(workerIds, dto);
+                        notificationService.send(managerIds, dto);
+                    }
+                    log.info("生产流转卡通知已发送: centerId={}, recordCount={}, workerCount={}, managerCount={}",
+                            centerId, entry.getValue().size(), workerIds.size(), managerIds.size());
+                } catch (Exception e) {
+                    log.error("加工中心流转卡通知发送失败: centerId={}, recordCount={}",
+                        entry.getKey(), entry.getValue().size(), e);
                 }
-                log.info("生产流转卡通知已发送: centerId={}, recordCount={}, workerCount={}, managerCount={}",
-                        centerId, entry.getValue().size(), workerIds.size(), managerIds.size());
             }
         } catch (Exception e) {
             log.error("生产流转卡通知发送失败: recordIds={}", event.getRecordIds(), e);
