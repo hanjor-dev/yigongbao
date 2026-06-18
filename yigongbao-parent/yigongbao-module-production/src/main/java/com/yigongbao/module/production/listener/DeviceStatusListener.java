@@ -39,7 +39,7 @@ public class DeviceStatusListener {
     private final OrderMainMapper orderMainMapper;
     private final com.yigongbao.module.production.product.mapper.ProductionProductMapper productMapper;
 
-    /** 监听设备状态变更：IDLE→BUSY 触发打印开始并更新流转卡状态；BUSY→IDLE 触发打印完成并聚合推进 Flow */
+    /** 监听设备状态变更：0→非0 触发打印开始并更新流转卡状态；非0→0 触发打印完成并聚合推进 Flow */
     @EventListener
     @Transactional(rollbackFor = Exception.class)
     public void onDeviceStateChange(DeviceStateChangeEvent event) {
@@ -60,7 +60,7 @@ public class DeviceStatusListener {
 
         // 空闲 → 占用：打印开始，更新流转卡状态并触发 Flow
         if (ProductionConstants.DEVICE_STATE_IDLE.equals(oldState)
-                && ProductionConstants.DEVICE_STATE_BUSY.equals(newState)) {
+                && !ProductionConstants.DEVICE_STATE_IDLE.equals(newState)) {
             LocalDateTime now = LocalDateTime.now();
             records.forEach(record -> {
                 record.setStatus(FlowStatusEnum.PRINTING.getValue());
@@ -79,7 +79,7 @@ public class DeviceStatusListener {
                     FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
         }
         // 占用 → 空闲：打印完成，更新状态并聚合触发 Flow
-        else if (ProductionConstants.DEVICE_STATE_BUSY.equals(oldState)
+        else if (!ProductionConstants.DEVICE_STATE_IDLE.equals(oldState)
                 && ProductionConstants.DEVICE_STATE_IDLE.equals(newState)) {
             LocalDateTime now = LocalDateTime.now();
             records.forEach(record -> {

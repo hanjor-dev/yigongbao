@@ -47,6 +47,7 @@ import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.helper.FlowCardExcelBuilder;
+import com.yigongbao.common.event.ProductionCardClaimedEvent;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -54,8 +55,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.service.UserService;
+import com.yigongbao.module.system.user.service.UserHospitalService;
+import com.yigongbao.common.enums.DataScopeTypeEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -92,7 +96,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final com.yigongbao.module.basic.file.service.FileService fileService;
     private final ConfigService configService;
     private final UserService userService;
+    private final UserHospitalService userHospitalService;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 查询流转卡详情，包含产品列表、当前工序中文名和设计文件信息 */
     @Override
@@ -190,10 +196,11 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         return record.getQrCodeUrl();
     }
 
-    /** 分页查询流转卡列表；生产员自动限定到自己绑定的加工中心，支持关键字和时间范围过滤，批量关联查询避免 N+1 */
+    /** 分页查询流转卡列表；支持关键字和时间范围过滤，批量关联查询避免 N+1 */
     @Override
     public IPage<ProductionRecordVO> pageRecords(ProductionRecordPageDTO dto) {
-        UserEntity currentUser = userMapper.selectById(StpUtil.getLoginIdAsLong());
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        UserEntity currentUser = userMapper.selectById(currentUserId);
 
         Page<ProductionRecordEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
         LambdaQueryWrapper<ProductionRecordEntity> wrapper = new LambdaQueryWrapper<ProductionRecordEntity>()
@@ -211,20 +218,14 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 wrapper.eq(ProductionRecordEntity::getStatus, dto.getStatus());
             }
         }
+        // 数据权限过滤
         if (dto.getProcessingCenterId() != null) {
             // 前端或管理员指定加工中心时精确过滤
             wrapper.eq(ProductionRecordEntity::getProcessingCenterId, dto.getProcessingCenterId());
-        } else if (RoleCodeEnum.PRODUCTION_WORKER.getCode().equals(currentUser.getRoleCode())) {
-            // 生产员：已分配加工中心的数据只看自己的，未分配（设计审核通过状态）的数据所有人可见
-            Long centerId = currentUser.getCenterId();
-            if (centerId != null) {
-                wrapper.and(w -> w
-                        .eq(ProductionRecordEntity::getProcessingCenterId, centerId)
-                        .or().isNull(ProductionRecordEntity::getProcessingCenterId));
-            } else {
-                // 生产员未绑定加工中心，只能看未分配的数据
-                wrapper.isNull(ProductionRecordEntity::getProcessingCenterId);
-            }
+        } else {
+            // 使用统一数据权限机制
+            DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+            buildDataScopeCondition(wrapper, currentUser, scopeType);
         }
         if (dto.getKeyword() != null && !dto.getKeyword().isBlank()) {
             String kw = dto.getKeyword();
@@ -317,24 +318,66 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
+        // 查询本条流转卡（用于发布事件和后续状态更新）
+        ProductionRecordEntity record = getOne(new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
+                .last("LIMIT 1"));
+
         // 更新本条流转卡状态：DESIGN_COMPLETED → PENDING_PRINT（幂等）
         baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
                 .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_COMPLETED.getValue())
                 .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue()));
 
-        // 回写订单操作人信息（当前生产员）
+        // 回写订单操作人和加工中心信息（当前生产员）
         Long userId = StpUtil.getLoginIdAsLong();
         UserEntity currentUser = userMapper.selectById(userId);
         String realName = currentUser != null ? currentUser.getRealName() : null;
-        OrderMainEntity orderUpdate = new OrderMainEntity();
-        orderUpdate.setId(order.getId());
-        orderUpdate.setCurrentHandlerId(userId);
-        orderUpdate.setCurrentHandlerName(realName);
-        orderUpdate.setProducerId(userId);
-        orderMainMapper.updateById(orderUpdate);
 
-        log.info("下载设计数据包，流转卡推进到待打印: orderId={}, designPackageId={}", order.getId(), designPackageId);
+        // 订单归属加工中心：首次下载时确定（使用条件更新保证幂等）
+        if (currentUser != null && currentUser.getCenterId() != null) {
+            com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<OrderMainEntity> updateWrapper =
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+            updateWrapper.eq(OrderMainEntity::getId, order.getId())
+                .isNull(OrderMainEntity::getCenterId)  // 仅在未分配时更新
+                .set(OrderMainEntity::getCenterId, currentUser.getCenterId())
+                .set(OrderMainEntity::getCenterName, currentUser.getCenterName())
+                .set(OrderMainEntity::getCurrentHandlerId, userId)
+                .set(OrderMainEntity::getCurrentHandlerName, realName)
+                .set(OrderMainEntity::getProducerId, userId);
+
+            int updated = orderMainMapper.update(null, updateWrapper);
+            if (updated > 0) {
+                log.info("订单归属加工中心: orderId={}, centerId={}, centerName={}, producerId={}",
+                    order.getId(), currentUser.getCenterId(), currentUser.getCenterName(), userId);
+            } else {
+                // 已被其他事务分配，仅更新操作人信息
+                OrderMainEntity orderUpdate = new OrderMainEntity();
+                orderUpdate.setId(order.getId());
+                orderUpdate.setCurrentHandlerId(userId);
+                orderUpdate.setCurrentHandlerName(realName);
+                orderUpdate.setProducerId(userId);
+                orderMainMapper.updateById(orderUpdate);
+                log.info("订单已归属其他加工中心，仅更新操作人: orderId={}, producerId={}", order.getId(), userId);
+            }
+        } else {
+            // 用户未绑定加工中心，仅更新操作人信息
+            OrderMainEntity orderUpdate = new OrderMainEntity();
+            orderUpdate.setId(order.getId());
+            orderUpdate.setCurrentHandlerId(userId);
+            orderUpdate.setCurrentHandlerName(realName);
+            orderUpdate.setProducerId(userId);
+            orderMainMapper.updateById(orderUpdate);
+            log.warn("生产员未绑定加工中心，跳过订单加工中心分配: orderId={}, userId={}", order.getId(), userId);
+        }
+
+        log.info("下载设计数据包，流转卡推进到待打印: orderId={}, designPackageId={}, producerId=",
+            order.getId(), designPackageId, userId);
+
+        // 发布流转卡认领事件
+        if (record != null) {
+            eventPublisher.publishEvent(new ProductionCardClaimedEvent(this, record.getId(), userId));
+        }
 
         // 聚合逻辑：检查是否所有流转卡都已下载，如果是则通过状态机推进订单状态
         if (order.getStatus().equals(FlowStatusEnum.DESIGN_COMPLETED.getValue())) {
@@ -597,19 +640,13 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .ifPresent(e -> vo.setCurrentProcessName(e.getDesc()));
     }
 
-    /**
-     * 解析设备状态：0=空闲，1=占用（包括离线、繁忙、不可用）
-     *
-     * 打印设备（PRINTER_SLA）：state=0表示空闲，state=1表示繁忙
-     * 其他设备：state=0表示可用，state=1表示不可用
-     */
-    /** 返回设备可用状态：0=空闲可用，1=占用不可用 */
+    /** 返回设备可用状态：0=空闲可用，1=占用不可用（state=0空闲，非0占用） */
     private int resolveDeviceStatus(DeviceEntity device) {
         if (device.getConnectionStatus() == null || device.getConnectionStatus() == 0) {
-            return 1;
+            return 1;  // 离线视为占用
         }
-        // state=0 空闲，state=1 占用
-        return Integer.valueOf(1).equals(device.getState()) ? 1 : 0;
+        // state=0 空闲，非0 占用
+        return (device.getState() != null && device.getState() == 0) ? 0 : 1;
     }
 
     @Override
@@ -868,6 +905,52 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         } catch (JsonProcessingException e) {
             log.error("序列化生产列配置失败: userId={}", currentUserId, e);
             throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR);
+        }
+    }
+
+    /**
+     * 根据数据范围类型向查询条件注入数据权限过滤
+     * CENTER：未分配流转卡全员可见（用于接单），已分配的按订单 center_id 过滤
+     * ALL：不做限制
+     */
+    private void buildDataScopeCondition(LambdaQueryWrapper<ProductionRecordEntity> wrapper,
+                                         UserEntity currentUser,
+                                         DataScopeTypeEnum scopeType) {
+        if (currentUser == null) {
+            log.warn("当前用户信息为空，数据权限过滤返回空列表");
+            wrapper.apply("1 = 0");
+            return;
+        }
+
+        switch (scopeType) {
+            case CENTER:
+                Long centerId = currentUser.getCenterId();
+                if (centerId != null) {
+                    // 先查出本加工中心的订单ID列表
+                    List<Long> centerOrderIds = orderMainMapper.selectList(
+                        new LambdaQueryWrapper<OrderMainEntity>()
+                            .eq(OrderMainEntity::getCenterId, centerId)
+                            .select(OrderMainEntity::getId))
+                        .stream().map(OrderMainEntity::getId).collect(Collectors.toList());
+
+                    // 未分配的全员可见 OR 订单属于本加工中心
+                    wrapper.and(w -> {
+                        w.isNull(ProductionRecordEntity::getProcessingCenterId);
+                        if (!centerOrderIds.isEmpty()) {
+                            w.or().in(ProductionRecordEntity::getOrderId, centerOrderIds);
+                        }
+                    });
+                } else {
+                    // 未绑定加工中心，只能看未分配的
+                    wrapper.isNull(ProductionRecordEntity::getProcessingCenterId);
+                }
+                break;
+            case ALL:
+                break;
+            default:
+                log.warn("生产模块不支持的数据权限类型，降级为 CENTER: scopeType={}", scopeType);
+                buildDataScopeCondition(wrapper, currentUser, DataScopeTypeEnum.CENTER);
+                break;
         }
     }
 }

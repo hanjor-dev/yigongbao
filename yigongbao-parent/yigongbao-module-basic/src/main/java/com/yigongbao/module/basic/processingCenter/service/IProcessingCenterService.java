@@ -16,4 +16,5 @@ public interface IProcessingCenterService extends IService<ProcessingCenterEntit
     void updateProcessingCenter(UpdateProcessingCenterDTO dto);
     void deleteProcessingCenter(Long id);
     List<ProcessingCenterVO> listAllEnabled();
+    void updateConnectionStatus(Long centerId, Integer status);
 }

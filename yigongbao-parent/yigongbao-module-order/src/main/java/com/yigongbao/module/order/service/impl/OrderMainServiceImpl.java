@@ -10,6 +10,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.constant.AuditStatusConstants;
+import com.yigongbao.common.event.AuditRejectedEvent;
+import com.yigongbao.common.event.OrderCancelledEvent;
+import com.yigongbao.common.event.OrderSubmittedEvent;
+import com.yigongbao.common.event.RegionalAuditPassedEvent;
 import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.RoleCodeConstants;
@@ -63,6 +67,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -121,6 +126,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderDataValidator orderDataValidator;
     private final OrderModifyApplyService orderModifyApplyService;
     private final com.yigongbao.module.order.convert.OrderConvert orderConvert;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 打破循环依赖：DesignerAssignmentServiceImpl 反向依赖 OrderMainService */
     @Lazy
@@ -592,6 +598,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         entity.setPhase(result.getTargetPhase());
         entity.setStatus(result.getFinalStatus());
         updateById(entity);
+        eventPublisher.publishEvent(new OrderSubmittedEvent(this, entity.getId(), entity.getBusinessType(), entity.getHospitalId(), entity.getOrgId(), entity.getCreateBy()));
         log.info("提交订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
     }
 
@@ -685,6 +692,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 if (!update(uw)) {
                     throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
                 }
+                eventPublisher.publishEvent(new RegionalAuditPassedEvent(this, id, entity.getOrgId()));
                 log.info("试用订单区域审核通过: orderId={}, regionalAuditBy={}", id, currentUserId);
             } else if (RoleCodeConstants.DESIGN_ADMIN.equals(roleCode)) {
                 // 设计管理员审核：更新设计审核状态并推进流程
@@ -824,6 +832,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 if (!update(uw)) {
                     throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
                 }
+                eventPublisher.publishEvent(new AuditRejectedEvent(this, id, entity.getCreateBy(), dto.getRemark()));
                 log.warn("试用订单区域审核驳回: orderId={}, {} -> {}, regionalAuditBy={}, reason={}",
                     id, entity.getStatus(), result.getFinalStatus(), currentUserId, dto.getRemark());
             } else if (RoleCodeConstants.DESIGN_ADMIN.equals(roleCode)) {
@@ -849,6 +858,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                         .set(OrderMainEntity::getDesignAuditRemark, dto.getRemark())
                         .set(OrderMainEntity::getAuditRemark, dto.getRemark())
                         .set(OrderMainEntity::getCurrentHandlerId, currentUserId));
+                eventPublisher.publishEvent(new AuditRejectedEvent(this, id, entity.getCreateBy(), dto.getRemark()));
                 log.warn("试用订单设计审核驳回: orderId={}, {} -> {}, designAuditBy={}, reason={}",
                     id, entity.getStatus(), result.getFinalStatus(), currentUserId, dto.getRemark());
             } else {
@@ -877,6 +887,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     .set(OrderMainEntity::getDesignAuditRemark, dto.getRemark())
                     .set(OrderMainEntity::getAuditRemark, dto.getRemark())
                     .set(OrderMainEntity::getCurrentHandlerId, currentUserId));
+            eventPublisher.publishEvent(new AuditRejectedEvent(this, id, entity.getCreateBy(), dto.getRemark()));
             log.warn("订单审核驳回: orderId={}, {} -> {}, designAuditBy={}, reason={}",
                 id, entity.getStatus(), result.getFinalStatus(), currentUserId, dto.getRemark());
         }
@@ -1006,6 +1017,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         entity.setPhase(result.getTargetPhase());
         entity.setStatus(result.getFinalStatus());
         updateById(entity);
+        eventPublisher.publishEvent(new OrderCancelledEvent(this, id));
         log.info("取消订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
     }
 

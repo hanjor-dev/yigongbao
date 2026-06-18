@@ -114,6 +114,14 @@ public interface UserService extends IService<UserEntity> {
     List<Long> listUserIdsByOrgId(Long orgId);
 
     /**
+     * 根据加工中心ID查询用户ID列表，用于数据权限过滤（CENTER 类型）
+     *
+     * @param centerId 加工中心ID
+     * @return 该加工中心下所有正常状态用户的ID列表，centerId 为 null 时返回空列表
+     */
+    List<Long> listUserIdsByCenterId(Long centerId);
+
+    /**
      * 预览用户名（自动生成模式，预占5分钟）
      *
      * @param orgId 机构ID

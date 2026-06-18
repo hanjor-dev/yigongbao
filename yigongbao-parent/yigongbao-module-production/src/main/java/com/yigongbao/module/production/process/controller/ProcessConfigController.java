@@ -108,7 +108,7 @@ public class ProcessConfigController {
                             vo.setId(d.getId());
                             vo.setDeviceNo(d.getDeviceId());
                             vo.setDeviceName(d.getDeviceName());
-                            int s = (d.getConnectionStatus() == null || d.getConnectionStatus() == 0 || Integer.valueOf(1).equals(d.getState())) ? 1 : 0;
+                            int s = (d.getConnectionStatus() == null || d.getConnectionStatus() == 0 || (d.getState() != null && d.getState() != 0)) ? 1 : 0;
                             vo.setStatus(s);
                             vo.setStatusName(s == 0 ? "空闲" : "占用");
                             return vo;

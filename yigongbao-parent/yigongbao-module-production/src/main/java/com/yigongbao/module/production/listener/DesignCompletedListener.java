@@ -3,6 +3,7 @@ package com.yigongbao.module.production.listener;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.event.DesignCompletedEvent;
+import com.yigongbao.common.event.ProductionCardsCreatedEvent;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
@@ -24,6 +25,7 @@ import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +53,7 @@ public class DesignCompletedListener {
     private final ProductionProductMapper productMapper;
     private final ProductionProcessMapper processMapper;
     private final CodeGeneratorService codeGeneratorService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 监听设计完成事件，为订单下每个数据包创建流转卡、产品记录和工序记录
@@ -83,7 +86,7 @@ public class DesignCompletedListener {
         }
 
         // 为每个数据包创建流转卡
-        int createdCount = 0;
+        List<Long> createdRecordIds = new ArrayList<>();
         for (DesignPackageEntity pkg : packages) {
             try {
                 // 幂等性检查：跳过已创建流转卡的数据包
@@ -107,7 +110,7 @@ public class DesignCompletedListener {
                 record.setQrCodeUrl(qrContent);
                 recordMapper.updateById(record);
 
-                createdCount++;
+                createdRecordIds.add(record.getId());
             } catch (Exception e) {
                 log.error("创建生产流转卡失败: orderId={}, packageId={}, packageCode={}",
                     orderId, pkg.getId(), pkg.getPackageCode(), e);
@@ -116,7 +119,11 @@ public class DesignCompletedListener {
         }
 
         log.info("设计完成自动创建流转卡完成: orderId={}, packageCount={}, recordCount={}",
-            orderId, packages.size(), createdCount);
+            orderId, packages.size(), createdRecordIds.size());
+
+        if (!createdRecordIds.isEmpty()) {
+            eventPublisher.publishEvent(new ProductionCardsCreatedEvent(this, createdRecordIds));
+        }
     }
 
     /**

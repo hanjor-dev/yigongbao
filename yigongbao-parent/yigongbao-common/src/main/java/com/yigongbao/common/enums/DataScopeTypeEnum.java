@@ -44,7 +44,13 @@ public enum DataScopeTypeEnum {
      * 全部数据
      * 用户可以查看和操作全部数据，不受任何范围限制
      */
-    ALL("all", "全部");
+    ALL("all", "全部"),
+
+    /**
+     * 加工中心数据范围
+     * 用户可以查看和操作某个加工中心的全部数据
+     */
+    CENTER("center", "本加工中心（生产专用）");
 
     /**
      * 枚举编码，对应数据库 data_scope_type 字段值

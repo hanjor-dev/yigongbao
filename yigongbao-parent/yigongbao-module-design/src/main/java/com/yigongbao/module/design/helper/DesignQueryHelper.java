@@ -112,6 +112,20 @@ public class DesignQueryHelper {
         return userService.getById(userId);
     }
 
+    /**
+     * 获取当前登录用户的加工中心ID
+     *
+     * @return 当前用户所属加工中心ID
+     */
+    public Long getCurrentUserCenterId() {
+        Long userId = getCurrentUserId();
+        if (userId == null) {
+            return null;
+        }
+        UserEntity user = userService.getById(userId);
+        return user != null ? user.getCenterId() : null;
+    }
+
     // ==================== 数据权限 ====================
 
     /**
@@ -199,6 +213,11 @@ public class DesignQueryHelper {
             case HOSPITALS:
                 // 设计师不按医院分配，静默降级为 SELF
                 log.info("HOSPITALS 数据范围降级为 SELF（设计工单不按医院分配），userId={}", currentUserId);
+                wrapper.eq(OrderMainEntity::getDesignerId, currentUserId);
+                break;
+            case CENTER:
+                // 设计阶段订单无 center_id，降级为 SELF
+                log.info("CENTER 数据范围降级为 SELF（设计阶段订单无加工中心），userId={}", currentUserId);
                 wrapper.eq(OrderMainEntity::getDesignerId, currentUserId);
                 break;
             case ALL:

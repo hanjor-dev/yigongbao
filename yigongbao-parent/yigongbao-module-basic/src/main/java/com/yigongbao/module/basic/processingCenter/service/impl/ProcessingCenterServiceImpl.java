@@ -246,4 +246,14 @@ public class ProcessingCenterServiceImpl extends ServiceImpl<ProcessingCenterMap
             }
         }
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateConnectionStatus(Long centerId, Integer status) {
+        update(new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProcessingCenterEntity>()
+            .eq(ProcessingCenterEntity::getId, centerId)
+            .set(ProcessingCenterEntity::getConnectionStatus, status)
+            .set(status == 1, ProcessingCenterEntity::getLastHeartbeat, java.time.LocalDateTime.now()));
+        log.info("更新加工中心连接状态: centerId={}, status={}", centerId, status == 1 ? "在线" : "离线");
+    }
 }

@@ -1089,6 +1089,8 @@ CREATE TABLE order_main (
     designer_id     BIGINT          COMMENT '设计师ID',
     designer_name   VARCHAR(100)    COMMENT '设计师姓名（冗余）',
     producer_id     BIGINT          COMMENT '生产员ID',
+    center_id       BIGINT          COMMENT '加工中心ID',
+    center_name     VARCHAR(100)    COMMENT '加工中心名称（冗余）',
 
     -- ==================== 审核信息 ====================
     audit_remark    TEXT            COMMENT '审核备注（驳回原因等）',
@@ -1129,7 +1131,8 @@ CREATE TABLE order_main (
     KEY idx_order_main_phase_status (phase, status),
     KEY idx_order_main_create_time (create_time),
     KEY idx_order_regional_audit (business_type, regional_audit_status, status, operator_dept_id),
-    KEY idx_order_design_audit (design_audit_status, status)
+    KEY idx_order_design_audit (design_audit_status, status),
+    KEY idx_order_center_id (center_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单主表';
 CREATE UNIQUE INDEX uk_order_main_code ON order_main ((CASE WHEN is_deleted = 0 THEN order_code ELSE NULL END));
 ALTER TABLE order_main ADD FULLTEXT INDEX ft_order_search (order_code, org_name, operator_name, hospital_name, patient_name);
@@ -1899,3 +1902,34 @@ CREATE TABLE order_modification_apply (
     KEY idx_oma_expire_time (expire_time),
     KEY idx_oma_apply_time (apply_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单修改申请表';
+
+-- 消息通知表
+CREATE TABLE notification_message
+(
+    id             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    message_type   VARCHAR(20)  NOT NULL COMMENT '展现类型：MESSAGE/POPUP',
+    category       VARCHAR(20)  NOT NULL COMMENT '业务分类：ORDER/APPROVAL/DESIGN/PRODUCTION',
+    title          VARCHAR(200) NOT NULL COMMENT '消息标题',
+    content        TEXT         COMMENT '消息正文',
+    biz_type       VARCHAR(50)  COMMENT '业务数据类型：ORDER/PRODUCTION_CARD',
+    biz_id         BIGINT       COMMENT '业务数据ID',
+    biz_data       JSON         COMMENT '扩展业务数据',
+    biz_status     VARCHAR(20)  COMMENT '业务状态：NULL=正常，CLAIMED=已被他人接收',
+    jump_url       VARCHAR(500) COMMENT '前端路由跳转路径',
+    receiver_id    BIGINT       NOT NULL COMMENT '接收人 sys_user.id',
+    is_read        TINYINT      NOT NULL DEFAULT 0 COMMENT '0=未读 1=已读',
+    read_time      DATETIME     COMMENT '阅读时间',
+    is_confirmed   TINYINT      NOT NULL DEFAULT 0 COMMENT '0=未确认 1=已确认（POPUP专用）',
+    confirmed_time DATETIME     COMMENT '确认时间',
+    create_time    DATETIME     COMMENT '创建时间',
+    create_by      BIGINT       COMMENT '创建人',
+    update_time    DATETIME     COMMENT '更新时间',
+    update_by      BIGINT       COMMENT '更新人',
+    is_deleted     TINYINT      NOT NULL DEFAULT 0 COMMENT '是否删除',
+    PRIMARY KEY (id),
+    KEY idx_nm_receiver_read (receiver_id, is_read, create_time),
+    KEY idx_nm_biz (biz_type, biz_id),
+    KEY idx_nm_category_time (category, create_time)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COMMENT = '消息通知表';

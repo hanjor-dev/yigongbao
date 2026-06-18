@@ -36,6 +36,12 @@ public class ProcessingCenterVO {
     /** 状态（0=禁用，1=启用） */
     private Integer status;
 
+    /** 连接状态（0=离线，1=在线） */
+    private Integer connectionStatus;
+
+    /** 最后心跳时间 */
+    private LocalDateTime lastHeartbeat;
+
     /** 备注 */
     private String remark;
 

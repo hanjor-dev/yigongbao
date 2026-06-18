@@ -23,9 +23,11 @@ import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.yigongbao.common.event.DesignerAssignedEvent;
 
 import java.util.List;
 import java.util.regex.Pattern;
@@ -52,6 +54,7 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
     private final DictService dictService;
     private final RebuildProjectService rebuildProjectService;
     private final com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 手写构造函数，对 OrderMainService 使用 @Lazy 打破循环依赖
@@ -65,7 +68,8 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
             ConfigService configService,
             DictService dictService,
             RebuildProjectService rebuildProjectService,
-            com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper) {
+            com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper,
+            ApplicationEventPublisher eventPublisher) {
         this.orderMainService = orderMainService;
         this.orderItemMapper = orderItemMapper;
         this.userMapper = userMapper;
@@ -73,6 +77,7 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         this.dictService = dictService;
         this.rebuildProjectService = rebuildProjectService;
         this.assignmentLogMapper = assignmentLogMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -131,10 +136,12 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         UserEntity designer = candidates.getFirst();
         // 5. 获取订单实体
         OrderMainEntity order = orderMainService.getById(orderId);
+        Long oldDesignerId = order.getDesignerId();
         // 6. 记录分配历史（自动分配）
         saveAutoAssignmentLog(order, designer);
         // 7. 更新订单 designerId / designerName
         updateOrderDesigner(order, designer);
+        eventPublisher.publishEvent(new DesignerAssignedEvent(this, orderId, designer.getId(), oldDesignerId));
         log.info("自动分配设计师: orderId={}, designerId={}, specialty={}", orderId, designer.getId(), specialty);
         return designer.getId();
     }
@@ -187,7 +194,9 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         // 4. 记录分配历史（支持重新分配）
         saveAssignmentLog(order, designer);
         // 5. 更新订单
+        Long oldDesignerId = order.getDesignerId();
         updateOrderDesigner(order, designer);
+        eventPublisher.publishEvent(new DesignerAssignedEvent(this, orderId, designerId, oldDesignerId));
         log.info("手动分配成功，orderId={}, designerId={}", orderId, designerId);
     }
 

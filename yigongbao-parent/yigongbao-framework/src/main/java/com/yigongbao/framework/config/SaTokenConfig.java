@@ -57,6 +57,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 .addExclude("/files/public/**")
                 .addExclude("/system/config/key/**")
                 .addExclude("/ws/device")
+                .addExclude("/notification/websocket")
                 .addExclude("/basic/processing-center/**")
                 .addExclude("/basic/device/**")
                 .addExclude("/imaging/v1/dcm")
@@ -109,6 +110,8 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 "/system/config/key/**",
                 // 设备 WebSocket（允许任何客户端连接，无需身份认证）
                 "/ws/device",
+                // 通知 WebSocket（握手阶段无 token，认证通过首帧 AUTH 消息完成）
+                "/notification/websocket",
                 // 基础数据加工中心和设备接口（无需登录）
                 "/basic/processing-center/**",
                 "/basic/device/**",

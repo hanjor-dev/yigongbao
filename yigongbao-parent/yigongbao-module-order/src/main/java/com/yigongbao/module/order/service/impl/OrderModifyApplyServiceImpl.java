@@ -45,9 +45,12 @@ import com.yigongbao.module.order.vo.modify.ModificationLogVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserService;
+import com.yigongbao.common.event.OrderModifyApplyRejectedEvent;
+import com.yigongbao.common.event.OrderModifyApplySubmittedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -83,6 +86,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     private final OrderDiffCalculator diffCalculator;
     private final OrderModifyTimeWindowChecker timeWindowChecker;
     private final ConfigService configService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ==================== 申请审核流程方法 ====================
 
@@ -176,6 +180,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
 
         orderModificationApplyMapper.insert(apply);
 
+        eventPublisher.publishEvent(new OrderModifyApplySubmittedEvent(this, apply.getId(), orderId, order.getOrgId(), userId));
         log.info("提交修改申请: applyId={}, orderId={}, userId={}", apply.getId(), orderId, userId);
 
         return apply.getId();
@@ -252,6 +257,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             // 审核驳回：记录驳回原因
             apply.setStatus(ApplyStatusEnum.REJECTED.getCode());
             apply.setAuditRemark(dto.getRemark());
+            eventPublisher.publishEvent(new OrderModifyApplyRejectedEvent(this, applyId, apply.getApplyUserId(), dto.getRemark()));
         } else {
             throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "审核结果无效");
         }

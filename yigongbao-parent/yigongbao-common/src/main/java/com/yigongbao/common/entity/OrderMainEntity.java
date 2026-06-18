@@ -233,6 +233,16 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
      */
     private Long producerId;
 
+    /**
+     * 加工中心ID
+     */
+    private Long centerId;
+
+    /**
+     * 加工中心名称（冗余）
+     */
+    private String centerName;
+
     // ==================== 审核信息 ====================
     /**
      * 审核备注（驳回原因等）

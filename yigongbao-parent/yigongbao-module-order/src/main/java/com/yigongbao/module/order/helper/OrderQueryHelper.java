@@ -137,6 +137,20 @@ public class OrderQueryHelper {
         return user != null ? user.getDeptId() : null;
     }
 
+    /**
+     * 获取当前登录用户的加工中心ID
+     *
+     * @return 当前用户所属加工中心ID
+     */
+    public Long getCurrentUserCenterId() {
+        Long userId = getCurrentUserId();
+        if (userId == null) {
+            return null;
+        }
+        UserEntity user = userService.getById(userId);
+        return user != null ? user.getCenterId() : null;
+    }
+
     // ==================== 数据权限 ====================
 
     /**
@@ -211,6 +225,17 @@ public class OrderQueryHelper {
                         log.warn("DEPT 降级 SELF 但 currentUserId 也为 null，返回空列表");
                         wrapper.apply("1 = 0");
                     }
+                }
+                break;
+            case CENTER:
+                // 看同加工中心的所有订单
+                Long centerId = getCurrentUserCenterId();
+                if (centerId != null) {
+                    wrapper.eq(OrderMainEntity::getCenterId, centerId);
+                } else {
+                    // 用户未分配加工中心，返回空列表
+                    log.warn("CENTER 类型用户未分配加工中心，返回空列表，userId={}", currentUserId);
+                    wrapper.apply("1 = 0");
                 }
                 break;
             case ALL:

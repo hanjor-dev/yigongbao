@@ -1211,6 +1211,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<Long> listUserIdsByCenterId(Long centerId) {
+        if (centerId == null) {
+            return Collections.emptyList();
+        }
+        return list(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getCenterId, centerId)
+                .eq(UserEntity::getStatus, StatusConstants.NORMAL)
+                .eq(UserEntity::getIsDeleted, StatusConstants.NOT_DELETED))
+                .stream()
+                .map(UserEntity::getId)
+                .collect(Collectors.toList());
+    }
+
     /**
      * 预览用户名（自动生成模式: 预占5分钟）
      *

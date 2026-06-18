@@ -1,11 +1,13 @@
 package com.yigongbao.module.production.product.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.production.product.dto.ProductionProductPageDTO;
@@ -15,6 +17,9 @@ import com.yigongbao.module.production.product.service.IProductionProductService
 import com.yigongbao.module.production.product.vo.ProductionProductDetailVO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.system.user.service.UserHospitalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,6 +44,8 @@ public class ProductionProductServiceImpl extends ServiceImpl<ProductionProductM
         implements IProductionProductService {
 
     private final ProductionRecordMapper recordMapper;
+    private final UserMapper userMapper;
+    private final UserHospitalService userHospitalService;
 
     @Override
     public List<ProductionProductEntity> listByRecordId(Long recordId) {
@@ -77,34 +84,29 @@ public class ProductionProductServiceImpl extends ServiceImpl<ProductionProductM
      * <p>
      * keyword 模糊匹配：订单号、数据包编号、流转卡编号、产品名称、患者姓名
      * 先按 keyword 过滤流转卡，再分页查产品，最后批量回填流转卡信息
+     * 【数据权限】：CENTER 类型只能看本加工中心的产品，ALL 类型可看全部
      *
      * @param dto 查询条件
      * @return 分页结果
      */
     @Override
     public IPage<ProductionProductDetailVO> pageProductDetails(ProductionProductPageDTO dto) {
-        // 1. 分页查产品，keyword 同时匹配产品名 OR 流转卡关联字段（订单号、数据包编号、流转卡编号、患者姓名）
+        // 数据权限过滤：先查询有权限的流转卡ID列表
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        UserEntity currentUser = userMapper.selectById(currentUserId);
+        DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+
+        List<Long> allowedRecordIds = getAccessibleRecordIds(currentUser, scopeType, dto.getKeyword());
+        if (allowedRecordIds.isEmpty()) {
+            return new Page<>(dto.getPageNum(), dto.getPageSize());
+        }
+
+        // 分页查产品，限定在有权限的流转卡范围内
         LambdaQueryWrapper<ProductionProductEntity> wrapper = new LambdaQueryWrapper<ProductionProductEntity>()
+                .in(ProductionProductEntity::getProductionRecordId, allowedRecordIds)
                 .orderByDesc(ProductionProductEntity::getId);
         if (StrUtil.isNotBlank(dto.getKeyword())) {
-            String kw = dto.getKeyword();
-            // 先查流转卡匹配的 recordId 集合
-            List<Long> recordIds = recordMapper.selectList(
-                    new LambdaQueryWrapper<ProductionRecordEntity>()
-                            .and(w -> w
-                                    .like(ProductionRecordEntity::getOrderCode, kw)
-                                    .or().like(ProductionRecordEntity::getDesignPackageCode, kw)
-                                    .or().like(ProductionRecordEntity::getRecordNo, kw)
-                                    .or().like(ProductionRecordEntity::getPatientName, kw))
-                            .select(ProductionRecordEntity::getId))
-                    .stream().map(ProductionRecordEntity::getId).collect(Collectors.toList());
-            // 产品名 OR 流转卡匹配（两者均无结果才返回空）
-            wrapper.and(w -> {
-                w.like(ProductionProductEntity::getProductName, kw);
-                if (!recordIds.isEmpty()) {
-                    w.or().in(ProductionProductEntity::getProductionRecordId, recordIds);
-                }
-            });
+            wrapper.like(ProductionProductEntity::getProductName, dto.getKeyword());
         }
 
         Page<ProductionProductEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
@@ -113,7 +115,7 @@ public class ProductionProductServiceImpl extends ServiceImpl<ProductionProductM
             return result.convert(e -> new ProductionProductDetailVO());
         }
 
-        // 3. 批量查流转卡，避免 N+1
+        // 批量查流转卡，避免 N+1
         Set<Long> relatedRecordIds = result.getRecords().stream()
                 .map(ProductionProductEntity::getProductionRecordId).collect(Collectors.toSet());
         Map<Long, ProductionRecordEntity> recordMap = recordMapper.selectList(
@@ -121,7 +123,7 @@ public class ProductionProductServiceImpl extends ServiceImpl<ProductionProductM
                         .in(ProductionRecordEntity::getId, relatedRecordIds))
                 .stream().collect(Collectors.toMap(ProductionRecordEntity::getId, r -> r, (a, b) -> a));
 
-        // 4. 组装 VO
+        // 组装 VO
         return result.convert(p -> {
             ProductionProductDetailVO vo = new ProductionProductDetailVO();
             BeanUtil.copyProperties(p, vo);
@@ -144,5 +146,72 @@ public class ProductionProductServiceImpl extends ServiceImpl<ProductionProductM
             }
             return vo;
         });
+    }
+
+    /**
+     * 获取当前用户有权访问的流转卡ID列表
+     * CENTER：未分配的全员可见（用于接单），已分配的按订单 center_id 过滤
+     */
+    private List<Long> getAccessibleRecordIds(UserEntity currentUser, DataScopeTypeEnum scopeType, String keyword) {
+        LambdaQueryWrapper<ProductionRecordEntity> wrapper = new LambdaQueryWrapper<>();
+
+        // 数据权限过滤
+        switch (scopeType) {
+            case CENTER:
+                Long centerId = currentUser.getCenterId();
+                if (centerId != null) {
+                    // 先查本加工中心的订单ID列表
+                    List<Long> centerOrderIds = recordMapper.selectList(
+                        new LambdaQueryWrapper<ProductionRecordEntity>()
+                            .apply("order_id IN (SELECT id FROM order_main WHERE center_id = {0})", centerId)
+                            .select(ProductionRecordEntity::getOrderId))
+                        .stream().map(ProductionRecordEntity::getOrderId).distinct().collect(Collectors.toList());
+
+                    // 未分配 OR 订单属于本加工中心
+                    wrapper.and(w -> {
+                        w.isNull(ProductionRecordEntity::getProcessingCenterId);
+                        if (!centerOrderIds.isEmpty()) {
+                            w.or().in(ProductionRecordEntity::getOrderId, centerOrderIds);
+                        }
+                    });
+                } else {
+                    wrapper.isNull(ProductionRecordEntity::getProcessingCenterId);
+                }
+                break;
+            case ALL:
+                break;
+            default:
+                log.warn("产品明细查询不支持的数据权限类型，降级为 CENTER: scopeType={}", scopeType);
+                if (currentUser.getCenterId() != null) {
+                    List<Long> centerOrderIds = recordMapper.selectList(
+                        new LambdaQueryWrapper<ProductionRecordEntity>()
+                            .apply("order_id IN (SELECT id FROM order_main WHERE center_id = {0})", currentUser.getCenterId())
+                            .select(ProductionRecordEntity::getOrderId))
+                        .stream().map(ProductionRecordEntity::getOrderId).distinct().collect(Collectors.toList());
+
+                    wrapper.and(w -> {
+                        w.isNull(ProductionRecordEntity::getProcessingCenterId);
+                        if (!centerOrderIds.isEmpty()) {
+                            w.or().in(ProductionRecordEntity::getOrderId, centerOrderIds);
+                        }
+                    });
+                } else {
+                    wrapper.isNull(ProductionRecordEntity::getProcessingCenterId);
+                }
+                break;
+        }
+
+        // keyword 过滤
+        if (StrUtil.isNotBlank(keyword)) {
+            wrapper.and(w -> w
+                    .like(ProductionRecordEntity::getOrderCode, keyword)
+                    .or().like(ProductionRecordEntity::getDesignPackageCode, keyword)
+                    .or().like(ProductionRecordEntity::getRecordNo, keyword)
+                    .or().like(ProductionRecordEntity::getPatientName, keyword));
+        }
+
+        List<ProductionRecordEntity> records = recordMapper.selectList(wrapper.select(ProductionRecordEntity::getId));
+        return records.isEmpty() ? Collections.emptyList() :
+               records.stream().map(ProductionRecordEntity::getId).collect(Collectors.toList());
     }
 }

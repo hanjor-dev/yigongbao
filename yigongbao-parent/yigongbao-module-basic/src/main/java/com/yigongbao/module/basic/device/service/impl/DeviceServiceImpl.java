@@ -135,7 +135,7 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
      * 手动更新设备状态
      *
      * @param id 设备ID
-     * @param state 新状态（0=空闲，1=占用）
+     * @param state 新状态（0=空闲，非0=占用）
      * @throws BusinessException 数据不存在时抛出
      */
     @Override
@@ -384,8 +384,8 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         if (entity == null) {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
-        // 占用中的设备不允许删除
-        if (Integer.valueOf(1).equals(entity.getState())) {
+        // 占用中的设备不允许删除（state非0表示占用）
+        if (entity.getState() != null && entity.getState() != 0) {
             throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "设备当前处于占用状态，不允许删除");
         }
 
