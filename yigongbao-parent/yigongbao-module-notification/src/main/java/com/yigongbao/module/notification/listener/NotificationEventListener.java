@@ -40,6 +40,7 @@ public class NotificationEventListener {
     private final INotificationService notificationService;
     private final NotificationMessageMapper notificationMessageMapper;
     private final IProductionRecordService productionRecordService;
+    private final com.yigongbao.module.system.user.service.UserService userService;
 
     // ==================== 消息内容构建工具 ====================
 
@@ -70,7 +71,7 @@ public class NotificationEventListener {
                     .content(content(
                             f("orderCode", "订单号", event.getOrderCode()),
                             f("patientName", "患者", event.getPatientName()),
-                            f("hospitalName", "医院", event.getHospitalName()),
+                            f("orgName", "机构", event.getOrgName()),
                             f("operatorName", "业务员", event.getOperatorName())))
                     .messageType(MessageTypeEnum.POPUP)
                     .category(MessageCategoryEnum.APPROVAL)
@@ -100,12 +101,20 @@ public class NotificationEventListener {
     public void onRegionalAuditPassed(RegionalAuditPassedEvent event) {
         try {
             log.info("收到区域审核通过事件: orderId={}", event.getOrderId());
+            String auditorName = "";
+            if (event.getRegionalAuditBy() != null) {
+                var user = userService.getById(event.getRegionalAuditBy());
+                if (user != null) {
+                    auditorName = user.getRealName();
+                }
+            }
             NotificationDTO dto = NotificationDTO.builder()
-                    .title("试用订单区域审核已通过，请分配设计师")
+                    .title("试用订单区域审核已通过，请您及时处理")
                     .content(content(
                             f("orderCode", "订单号", event.getOrderCode()),
                             f("patientName", "患者", event.getPatientName()),
-                            f("hospitalName", "医院", event.getHospitalName())))
+                            f("orgName", "机构", event.getOrgName()),
+                            f("regionalAuditor", "区域审核员", auditorName)))
                     .messageType(MessageTypeEnum.POPUP)
                     .category(MessageCategoryEnum.APPROVAL)
                     .bizType(BizTypeEnum.ORDER.getCode())

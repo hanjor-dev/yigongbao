@@ -600,7 +600,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         entity.setStatus(result.getFinalStatus());
         updateById(entity);
         eventPublisher.publishEvent(new OrderSubmittedEvent(this, entity.getId(), entity.getOrderCode(),
-                entity.getBusinessType(), entity.getPatientName(), entity.getHospitalName(), entity.getOperatorName(),
+                entity.getBusinessType(), entity.getPatientName(), entity.getOrgName(), entity.getOperatorName(),
                 entity.getHospitalId(), entity.getOrgId(), entity.getOperatorDeptId(), entity.getCreateBy()));
         log.info("提交订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
     }
@@ -696,7 +696,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
                 }
                 eventPublisher.publishEvent(new RegionalAuditPassedEvent(this, id, entity.getOrderCode(),
-                        entity.getPatientName(), entity.getHospitalName(), entity.getOrgId()));
+                        entity.getPatientName(), entity.getOrgName(), currentUserId, entity.getOrgId()));
                 log.info("试用订单区域审核通过: orderId={}, regionalAuditBy={}", id, currentUserId);
             } else if (RoleCodeConstants.DESIGN_ADMIN.equals(roleCode)) {
                 // 设计管理员审核：更新设计审核状态并推进流程
@@ -1299,7 +1299,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
         // Step 7：发布订单提交事件（触发消息通知）
         eventPublisher.publishEvent(new OrderSubmittedEvent(this, orderId, order.getOrderCode(),
-                order.getBusinessType(), order.getPatientName(), order.getHospitalName(), order.getOperatorName(),
+                order.getBusinessType(), order.getPatientName(), order.getOrgName(), order.getOperatorName(),
                 order.getHospitalId(), order.getOrgId(), order.getOperatorDeptId(), currentUserId));
 
         log.info("创建订单: orderId={}, orderCode={}, userId={}, itemCount={}",

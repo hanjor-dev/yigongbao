@@ -8,16 +8,18 @@ public class RegionalAuditPassedEvent extends ApplicationEvent {
     private final Long orderId;
     private final String orderCode;
     private final String patientName;
-    private final String hospitalName;
+    private final String orgName;
+    private final Long regionalAuditBy;
     private final Long orgId;
 
     public RegionalAuditPassedEvent(Object source, Long orderId, String orderCode,
-                                    String patientName, String hospitalName, Long orgId) {
+                                    String patientName, String orgName, Long regionalAuditBy, Long orgId) {
         super(source);
         this.orderId = orderId;
         this.orderCode = orderCode;
         this.patientName = patientName;
-        this.hospitalName = hospitalName;
+        this.orgName = orgName;
+        this.regionalAuditBy = regionalAuditBy;
         this.orgId = orgId;
     }
 }
