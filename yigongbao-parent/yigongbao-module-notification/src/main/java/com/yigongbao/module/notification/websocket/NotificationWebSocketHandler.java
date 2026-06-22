@@ -21,11 +21,8 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 @RequiredArgsConstructor
 public class NotificationWebSocketHandler extends TextWebSocketHandler {
 
-    private static final String AUTH      = "AUTH";
-    private static final String PING      = "PING";
-    private static final String AUTH_OK   = "{\"type\":\"AUTH_OK\"}";
-    private static final String AUTH_FAIL = "{\"type\":\"AUTH_FAIL\"}";
-    private static final String PONG      = "{\"type\":\"PONG\"}";
+    private static final String AUTH = "AUTH";
+    private static final String PING = "PING";
 
     private final WebSocketSessionManager sessionManager;
     private final com.yigongbao.module.notification.service.INotificationService notificationService;
@@ -46,30 +43,43 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
             try {
                 Object loginId = StpUtil.getLoginIdByToken(token);
                 if (loginId == null) {
-                    session.sendMessage(new TextMessage(AUTH_FAIL));
-                    session.close();
+                    sendAuthFailed(session, "Token无效或已过期");
                     return;
                 }
                 userId = Long.parseLong(loginId.toString());
                 sessionManager.add(userId, session);
                 session.getAttributes().put("userId", userId);
-                session.sendMessage(new TextMessage(AUTH_OK));
+                sendAuthSuccess(session, userId);
                 log.info("WebSocket 认证成功: userId={}", userId);
             } catch (Exception e) {
                 log.warn("WebSocket 认证失败: {}", e.getMessage());
-                session.sendMessage(new TextMessage(AUTH_FAIL));
-                session.close();
+                sendAuthFailed(session, "Token无效或已过期");
                 return;
             }
-            // 补推离线期间的待处理通知，独立捕获异常，不影响认证结果
             try {
                 notificationService.pushPendingNotifications(userId);
             } catch (Exception e) {
                 log.warn("补推离线通知失败: userId={}, error={}", userId, e.getMessage());
             }
         } else if (PING.equals(type)) {
-            session.sendMessage(new TextMessage(PONG));
+            session.sendMessage(new TextMessage("{\"type\":\"PONG\"}"));
         }
+    }
+
+    private void sendAuthSuccess(WebSocketSession session, Long userId) throws Exception {
+        JSONObject response = new JSONObject();
+        response.set("type", "AUTH_SUCCESS");
+        response.set("userId", userId);
+        session.sendMessage(new TextMessage(response.toString()));
+    }
+
+    private void sendAuthFailed(WebSocketSession session, String message) throws Exception {
+        JSONObject response = new JSONObject();
+        response.set("type", "AUTH_FAILED");
+        response.set("message", message);
+        response.set("code", 401);
+        session.sendMessage(new TextMessage(response.toString()));
+        session.close(CloseStatus.POLICY_VIOLATION);
     }
 
     @Override
