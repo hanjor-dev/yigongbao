@@ -47,10 +47,24 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
                     return;
                 }
                 userId = Long.parseLong(loginId.toString());
+
+                // 注册新会话前，先踢出旧会话
+                WebSocketSession oldSession = sessionManager.get(userId);
+                if (oldSession != null && oldSession.isOpen() && !oldSession.getId().equals(session.getId())) {
+                    try {
+                        String kickoutMsg = "{\"type\":\"SESSION_KICKOUT\",\"title\":\"账号在另一处登录\",\"content\":\"您的账号在另一台设备登录，请重新登录\"}";
+                        oldSession.sendMessage(new TextMessage(kickoutMsg));
+                        oldSession.close(CloseStatus.POLICY_VIOLATION);
+                        log.info("踢出旧会话: userId={}, oldSessionId={}", userId, oldSession.getId());
+                    } catch (Exception e) {
+                        log.warn("踢出旧会话失败: userId={}", userId, e);
+                    }
+                }
+
                 sessionManager.add(userId, session);
                 session.getAttributes().put("userId", userId);
                 sendAuthSuccess(session, userId);
-                log.info("WebSocket 认证成功: userId={}", userId);
+                log.info("WebSocket 认证成功: userId={}, sessionId={}", userId, session.getId());
             } catch (Exception e) {
                 log.warn("WebSocket 认证失败: {}", e.getMessage());
                 sendAuthFailed(session, "Token无效或已过期");
@@ -86,8 +100,14 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         Long userId = (Long) session.getAttributes().get("userId");
         if (userId != null) {
-            sessionManager.remove(userId);
-            log.info("WebSocket 断开连接: userId={}, sessionId={}, status={}", userId, session.getId(), status);
+            // 只有当前会话是该用户的活动会话时才移除（避免误删新会话）
+            WebSocketSession currentSession = sessionManager.get(userId);
+            if (currentSession != null && currentSession.getId().equals(session.getId())) {
+                sessionManager.remove(userId);
+                log.info("WebSocket 断开连接并移除会话: userId={}, sessionId={}, status={}", userId, session.getId(), status);
+            } else {
+                log.info("WebSocket 断开连接（旧会话）: userId={}, sessionId={}, status={}", userId, session.getId(), status);
+            }
         } else {
             log.info("WebSocket 未认证连接断开: sessionId={}, status={}", session.getId(), status);
         }
