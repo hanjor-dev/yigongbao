@@ -41,6 +41,7 @@ import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
+import com.yigongbao.module.production.record.dto.ProductLedgerExportDTO;
 import com.yigongbao.module.production.record.dto.SaveProductionColumnConfigDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
@@ -93,6 +94,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final ProductionProcessMapper processMapper;
     private final FlowFacade flowFacade;
     private final FlowCardExcelBuilder flowCardExcelBuilder;
+    private final com.yigongbao.module.production.helper.ProductLedgerExcelBuilder productLedgerExcelBuilder;
     private final com.yigongbao.module.basic.file.service.FileService fileService;
     private final ConfigService configService;
     private final UserService userService;
@@ -323,16 +325,18 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
                 .last("LIMIT 1"));
 
-        // 更新本条流转卡状态：DESIGN_COMPLETED → PENDING_PRINT（幂等）
-        baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
-                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_COMPLETED.getValue())
-                .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue()));
-
         // 回写订单操作人和加工中心信息（当前生产员）
         Long userId = StpUtil.getLoginIdAsLong();
         UserEntity currentUser = userMapper.selectById(userId);
         String realName = currentUser != null ? currentUser.getRealName() : null;
+
+        // 更新本条流转卡状态和生产员信息：DESIGN_COMPLETED → PENDING_PRINT（幂等）
+        baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
+                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_COMPLETED.getValue())
+                .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue())
+                .set(ProductionRecordEntity::getProducerId, userId)
+                .set(ProductionRecordEntity::getProducerName, realName));
 
         // 订单归属加工中心：首次下载时确定（使用条件更新保证幂等）
         if (currentUser != null && currentUser.getCenterId() != null) {
@@ -951,6 +955,97 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 log.warn("生产模块不支持的数据权限类型，降级为 CENTER: scopeType={}", scopeType);
                 buildDataScopeCondition(wrapper, currentUser, DataScopeTypeEnum.CENTER);
                 break;
+        }
+    }
+
+    /**
+     * 导出生产产品台账Excel
+     * <p>
+     * 核心流程：
+     * 1. 应用数据权限过滤（医院/加工中心/全部）
+     * 2. 参数校验（至少一个查询条件）
+     * 3. 查询总数（判断是否为空、是否超1万条）
+     * 4. 查询数据（最多1万条）
+     * 5. 生成Excel（超1万条时顶部红色警告）
+     * </p>
+     */
+    @Override
+    public byte[] exportProductLedger(ProductLedgerExportDTO dto) {
+        // 应用数据权限：根据用户角色自动注入 hospitalIds 或 centerIds
+        applyDataScopeForExport(dto);
+
+        // 时间范围合理性校验
+        if (dto.getStartTime() != null && dto.getEndTime() != null
+            && dto.getStartTime().isAfter(dto.getEndTime())) {
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR.getCode(), "开始时间不能晚于结束时间");
+        }
+
+        // 查询总数
+        Long totalCount = productMapper.countProductLedgerData(dto);
+        if (totalCount == 0) {
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), "未查询到符合条件的数据");
+        }
+
+        // 查询数据（最多1万条）
+        List<Map<String, Object>> dataList = productMapper.listProductLedgerData(dto);
+
+        log.info("导出生产产品台账: 总数={}, 实际导出={}, dto={}", totalCount, dataList.size(), dto);
+
+        // 生成Excel
+        try {
+            return productLedgerExcelBuilder.build(dataList, totalCount);
+        } catch (Exception e) {
+            log.error("导出生产产品台账失败: dto={}", dto, e);
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR.getCode(), "Excel生成失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 应用数据权限过滤（仅用于导出功能）
+     * <p>
+     * 权限策略：
+     * - 医院角色：只能导出本医院订单的生产数据，通过 dto.hospitalIds 过滤
+     * - 加工中心角色：只能导出分配给自己中心的数据，通过 dto.centerIds 过滤
+     * - 全部权限：可导出全部数据，不添加过滤条件
+     * - 其他角色：拒绝导出
+     * </p>
+     *
+     * @param dto 查询条件DTO，方法内会自动填充 hospitalIds 或 centerIds
+     * @throws BusinessException 无权限或未绑定医院/加工中心时抛出
+     */
+    private void applyDataScopeForExport(ProductLedgerExportDTO dto) {
+        Long userId = StpUtil.getLoginIdAsLong();
+        DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(userId);
+
+        switch (scopeType) {
+            case HOSPITALS:
+                // 医院权限：获取用户绑定的所有医院ID
+                List<Long> hospitalIds = userHospitalService.getHospitalIdsByUserId(userId);
+                if (hospitalIds.isEmpty()) {
+                    throw new BusinessException(ErrorCodeEnum.PARAM_ERROR.getCode(), "您未绑定任何医院，无权导出数据");
+                }
+                dto.setHospitalIds(hospitalIds);
+                log.info("医院数据权限: userId={}, hospitalIds={}", userId, hospitalIds);
+                break;
+
+            case CENTER:
+                // 加工中心权限：获取用户绑定的加工中心ID
+                UserEntity currentUser = userMapper.selectById(userId);
+                if (currentUser == null || currentUser.getCenterId() == null) {
+                    throw new BusinessException(ErrorCodeEnum.PARAM_ERROR.getCode(), "您未绑定加工中心，无权导出数据");
+                }
+                dto.setCenterIds(List.of(currentUser.getCenterId()));
+                log.info("加工中心数据权限: userId={}, centerId={}", userId, currentUser.getCenterId());
+                break;
+
+            case ALL:
+                // 全部权限：不添加过滤条件
+                log.info("全部数据权限: userId={}", userId);
+                break;
+
+            default:
+                log.warn("不支持的数据权限类型: userId={}, scopeType={}", userId, scopeType);
+                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR.getCode(), "您没有导出权限");
         }
     }
 }

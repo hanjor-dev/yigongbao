@@ -39,6 +39,10 @@ public class ProductionRecordEntity extends BaseEntity {
     private Long processingCenterId;
     /** 加工中心名称 */
     private String processingCenterName;
+    /** 生产员ID */
+    private Long producerId;
+    /** 生产员姓名 */
+    private String producerName;
     /** 打印机ID（assignDevice 时写入） */
     private Long printDeviceId;
     /** 打印机编号 */

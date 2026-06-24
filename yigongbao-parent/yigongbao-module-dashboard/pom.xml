@@ -37,6 +37,12 @@
             <artifactId>yigongbao-module-design</artifactId>
         </dependency>
 
+        <!-- 生产模块（生产员/生产管理员数据源） -->
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-production</artifactId>
+        </dependency>
+
         <!-- 系统模块（用户角色） -->
         <dependency>
             <groupId>com.yigongbao</groupId>
