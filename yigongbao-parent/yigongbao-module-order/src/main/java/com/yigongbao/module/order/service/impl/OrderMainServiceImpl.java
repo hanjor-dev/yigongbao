@@ -1070,9 +1070,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         // 通过 FlowFacade 执行完成动作
         TransitionResult result = flowFacade.executeFlow(
                 orderId, FlowActionEnum.COMPLETE, new FlowOperator(currentUserId, operatorName, "手动完成"));
-        // 更新订单的阶段和状态
+        // 更新订单的阶段、状态和完成时间
         entity.setPhase(result.getTargetPhase());
         entity.setStatus(result.getFinalStatus());
+        entity.setActualCompleteTime(LocalDateTime.now());
         updateById(entity);
         log.info("手动完成订单: orderId={}, {} -> {}, operator={}",
             orderId, FlowStatusEnum.DESIGN_COMPLETED.getValue(), result.getFinalStatus(), currentUserId);

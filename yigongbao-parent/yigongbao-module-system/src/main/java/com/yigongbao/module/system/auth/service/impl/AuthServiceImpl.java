@@ -190,8 +190,6 @@ public class AuthServiceImpl implements AuthService {
      * 构建登录成功响应并执行 Sa-Token 登录
      */
     private LoginVO buildLoginSuccess(UserEntity user, String principal, String loginType, String ip, String userAgent) {
-        // TODO: WebSocket推送被踢出通知（需在StpUtil.login前获取旧token，登录后推送给旧会话）
-
         StpUtil.login(user.getId());
         StpUtil.getSession().set("username", user.getUsername());
         StpUtil.getSession().set("realName", user.getRealName());

@@ -867,6 +867,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         update.setId(orderId);
         update.setPhase(result.getTargetPhase());
         update.setStatus(result.getFinalStatus());
+        update.setDesignSubmitTime(LocalDateTime.now());
         update.setCurrentHandlerId(currentUserId);
         update.setCurrentHandlerName(currentUserName);
         orderMainService.updateById(update);
