@@ -1,142 +1,251 @@
 package com.yigongbao.module.dashboard.service.strategy;
 
-import com.yigongbao.module.dashboard.dto.DashboardQueryDTO;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.yigongbao.flow.enums.FlowPhaseEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.dashboard.dto.DashboardQueryDTO;
-import com.yigongbao.common.entity.OrderMainEntity;
-import com.yigongbao.module.dashboard.enums.TimeRangeEnum;
 import com.yigongbao.module.dashboard.util.TimeRangeUtil;
 import com.yigongbao.module.dashboard.vo.*;
+import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
+import com.yigongbao.module.production.product.entity.ProductionProductEntity;
+import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.*;
 
+/**
+ * 财务数据概览策略
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class FinanceDashboardStrategy implements DashboardStrategy {
+
     private final OrderMainMapper orderMapper;
+    private final ProductionProductMapper productMapper;
 
     @Override
     public DashboardVO buildDashboard(Long userId, DashboardQueryDTO query) {
         log.info("构建财务数据概览: userId={}, query={}", userId, query);
-        TimeRangeEnum timeRange = query.getTimeRangeEnum();
+        DashboardVO vo = new DashboardVO();
         try {
-            LocalDateTime[] range = TimeRangeUtil.getStartAndEndTime(timeRange, query.getStartDate(), query.getEndDate());
-            DashboardVO vo = new DashboardVO();
+            LocalDateTime[] range = TimeRangeUtil.getStartAndEndTime(query.getTimeRangeEnum(), query.getStartDate(), query.getEndDate());
             vo.setCards(buildCards(range));
-            vo.setCharts(buildCharts(range, timeRange));
-            vo.setTodos(List.of(
-                TodoVO.builder().id(1).title("逾期账款").count(0).link("/receivable?status=overdue").urgent(true).build(),
-                TodoVO.builder().id(2).title("待开发票").count(0).link("/invoice?status=pending").build()
-            ));
-            return vo;
+            vo.setCharts(buildCharts(range, query));
+            vo.setTodos(new ArrayList<>());
         } catch (Exception e) {
-            log.error("构建财务数据概览失败: userId={}, query={}", userId, query, e);
+            log.error("构建数据概览失败: userId={}, query={}", userId, query, e);
             return buildEmptyDashboard();
         }
+        return vo;
     }
 
     private List<CardVO> buildCards(LocalDateTime[] range) {
-        QueryWrapper<OrderMainEntity> wrapper = new QueryWrapper<>();
-        wrapper.select("IFNULL(SUM(estimated_cost), 0) as total")
-               .eq("status", 80).between("create_time", range[0], range[1]);
-        List<Map<String, Object>> results = orderMapper.selectMaps(wrapper);
-        double revenue = 0.0;
-        if (results != null && !results.isEmpty()) {
-            Map<String, Object> result = results.get(0);
-            if (result != null && result.containsKey("total")) {
-                revenue = ((Number) result.getOrDefault("total", 0)).doubleValue() / 10000;
-            }
-        }
+        List<CardVO> cards = new ArrayList<>();
 
-        return List.of(
-            CardVO.builder().key("totalRevenue").title("总营收").value(String.format("%.2f", revenue)).unit("万元").build(),
-            CardVO.builder().key("receivableAmount").title("应收账款").value("0.0").unit("万元").build(),
-            CardVO.builder().key("receivedAmount").title("已收账款").value("0.0").unit("万元").build(),
-            CardVO.builder().key("overdueAmount").title("逾期账款").value("0.0").unit("万元").build()
-        );
+        Long totalOrders = orderMapper.selectCount(new LambdaQueryWrapper<OrderMainEntity>()
+                .ne(OrderMainEntity::getStatus, FlowStatusEnum.CANCELLED.getValue())
+                .between(OrderMainEntity::getCreateTime, range[0], range[1]));
+        cards.add(CardVO.builder().key("totalOrders").title("订单总数").value(totalOrders).unit("单").build());
+
+        Long ongoingOrders = orderMapper.selectCount(new LambdaQueryWrapper<OrderMainEntity>()
+                .notIn(OrderMainEntity::getStatus,
+                        FlowStatusEnum.WAREHOUSE_OUT.getValue(),
+                        FlowStatusEnum.COMPLETED.getValue(),
+                        FlowStatusEnum.CANCELLED.getValue())
+                .between(OrderMainEntity::getCreateTime, range[0], range[1]));
+        cards.add(CardVO.builder().key("ongoingOrders").title("进行中订单").value(ongoingOrders).unit("单").build());
+
+        Long completedOrders = orderMapper.selectCount(new LambdaQueryWrapper<OrderMainEntity>()
+                .in(OrderMainEntity::getStatus,
+                        FlowStatusEnum.WAREHOUSE_OUT.getValue(),
+                        FlowStatusEnum.COMPLETED.getValue())
+                .between(OrderMainEntity::getActualCompleteTime, range[0], range[1]));
+        cards.add(CardVO.builder().key("completedOrders").title("已完成订单").value(completedOrders).unit("单").build());
+
+        QueryWrapper<OrderMainEntity> cycleWrapper = new QueryWrapper<>();
+        cycleWrapper.select("IFNULL(AVG(TIMESTAMPDIFF(HOUR, create_time, update_time)), 0) as avg_hours")
+                .in("status", FlowStatusEnum.COMPLETED.getValue(), FlowStatusEnum.WAREHOUSE_OUT.getValue())
+                .between("create_time", range[0], range[1]);
+        List<Map<String, Object>> cycleResults = orderMapper.selectMaps(cycleWrapper);
+        Integer avgHours = 0;
+        if (!cycleResults.isEmpty() && cycleResults.get(0) != null && cycleResults.get(0).get("avg_hours") != null) {
+            avgHours = ((Number) cycleResults.get(0).get("avg_hours")).intValue();
+        }
+        cards.add(CardVO.builder().key("avgOrderCycle").title("平均订单周期").value(String.valueOf(avgHours)).unit("小时").build());
+
+        return cards;
     }
 
-    private List<ChartVO> buildCharts(LocalDateTime[] range, TimeRangeEnum timeRange) {
+    private List<ChartVO> buildCharts(LocalDateTime[] range, DashboardQueryDTO query) {
         List<ChartVO> charts = new ArrayList<>();
-        charts.add(buildRevenueTrendChart(range, timeRange));
-        charts.add(buildPaymentStatusChart());
-        charts.add(buildDeptRevenueChart(range));
+        charts.add(buildOrderTrendChart(range, query));
+        charts.add(buildOrderPhaseDistributionChart(range));
+        charts.add(buildTopDeptOrdersChart(range));
+        charts.add(buildTopOrgOrdersChart(range));
         return charts;
     }
 
-    private ChartVO buildRevenueTrendChart(LocalDateTime[] range, TimeRangeEnum timeRange) {
-        List<String> xAxis = TimeRangeUtil.getXAxisLabels(timeRange);
-        List<Integer> data = new ArrayList<>();
-        for (int i = 0; i < xAxis.size(); i++) data.add(0);
+    private ChartVO buildOrderTrendChart(LocalDateTime[] range, DashboardQueryDTO query) {
+        List<String> xAxis = TimeRangeUtil.getXAxisLabels(query.getTimeRangeEnum(), query.getStartDate(), query.getEndDate());
+        List<Integer> newOrderData = new ArrayList<>(Collections.nCopies(xAxis.size(), 0));
+        List<Integer> completedOrderData = new ArrayList<>(Collections.nCopies(xAxis.size(), 0));
 
-        QueryWrapper<OrderMainEntity> wrapper = new QueryWrapper<>();
-        wrapper.eq("status", 80);
-        switch (timeRange) {
-            case TODAY:
-                wrapper.select("HOUR(create_time) as hour, IFNULL(SUM(estimated_cost), 0) / 10000 as revenue")
-                       .apply("DATE(create_time) = CURDATE()").groupBy("HOUR(create_time)");
-                break;
-            case WEEK:
-                wrapper.select("DAYOFWEEK(create_time) as weekday, IFNULL(SUM(estimated_cost), 0) / 10000 as revenue")
-                       .apply("YEARWEEK(create_time) = YEARWEEK(NOW())").groupBy("DAYOFWEEK(create_time)");
-                break;
-            default:
-                wrapper.select("DATE(create_time) as date, IFNULL(SUM(estimated_cost), 0) / 10000 as revenue")
-                       .between("create_time", range[0], range[1]).groupBy("DATE(create_time)");
-        }
+        QueryWrapper<OrderMainEntity> newWrapper = new QueryWrapper<>();
+        newWrapper.between("create_time", range[0], range[1]);
+        addGroupByClause(newWrapper, query, range, "create_time");
+        fillChartData(orderMapper.selectMaps(newWrapper), newOrderData, query, range);
 
-        List<Map<String, Object>> results = orderMapper.selectMaps(wrapper);
-        for (Map<String, Object> row : results) {
-            int revenue = ((Number) row.get("revenue")).intValue();
-            if (timeRange == TimeRangeEnum.TODAY) {
-                int hour = ((Number) row.get("hour")).intValue();
-                int index = hour / 2;
-                if (index < data.size()) data.set(index, data.get(index) + revenue);
-            } else if (timeRange == TimeRangeEnum.WEEK) {
-                int weekday = ((Number) row.get("weekday")).intValue() - 1;
-                if (weekday >= 0 && weekday < data.size()) data.set(weekday, revenue);
-            }
-        }
+        QueryWrapper<OrderMainEntity> completedWrapper = new QueryWrapper<>();
+        completedWrapper.in("status", FlowStatusEnum.WAREHOUSE_OUT.getValue(), FlowStatusEnum.COMPLETED.getValue())
+                .between("actual_complete_time", range[0], range[1]);
+        addGroupByClause(completedWrapper, query, range, "actual_complete_time");
+        fillChartData(orderMapper.selectMaps(completedWrapper), completedOrderData, query, range);
 
-        return ChartVO.builder().key("revenueTrend").title("营收趋势").type("line")
-            .data(LineChartDataVO.builder().xAxis(xAxis)
-                .series(List.of(LineChartDataVO.SeriesVO.builder().name("营收(万元)").data(data).build())).build()).build();
+        return ChartVO.builder().key("orderTrend").title("订单趋势").type("line")
+                .data(LineChartDataVO.builder().xAxis(xAxis).series(List.of(
+                        LineChartDataVO.SeriesVO.builder().name("新增订单").data(newOrderData).build(),
+                        LineChartDataVO.SeriesVO.builder().name("完成订单").data(completedOrderData).build()
+                )).build()).build();
     }
 
-    private ChartVO buildPaymentStatusChart() {
-        return ChartVO.builder().key("paymentStatus").title("回款状态").type("pie")
-            .data(PieChartDataVO.builder().items(List.of(
-                PieChartDataVO.ItemVO.builder().name("暂无数据").value(0).build()
-            )).build()).build();
+    private ChartVO buildOrderPhaseDistributionChart(LocalDateTime[] range) {
+        QueryWrapper<OrderMainEntity> wrapper = new QueryWrapper<>();
+        wrapper.select("phase, COUNT(*) as count")
+                .between("create_time", range[0], range[1])
+                .groupBy("phase");
+        List<Map<String, Object>> results = orderMapper.selectMaps(wrapper);
+
+        Map<Integer, Integer> phaseCountMap = new HashMap<>();
+        for (Map<String, Object> row : results) {
+            Integer phase = ((Number) row.get("phase")).intValue();
+            int count = ((Number) row.get("count")).intValue();
+            phaseCountMap.put(phase, count);
+        }
+
+        List<String> xAxis = new ArrayList<>();
+        List<Integer> data = new ArrayList<>();
+        for (FlowPhaseEnum phaseEnum : FlowPhaseEnum.values()) {
+            xAxis.add(phaseEnum.getName());
+            data.add(phaseCountMap.getOrDefault(phaseEnum.getValue(), 0));
+        }
+
+        return ChartVO.builder().key("orderPhaseDistribution").title("订单流程分布").type("bar")
+                .data(BarChartDataVO.builder().xAxis(xAxis).series(List.of(
+                        BarChartDataVO.SeriesVO.builder().name("订单数").data(data).build()
+                )).build()).build();
     }
 
-    private ChartVO buildDeptRevenueChart(LocalDateTime[] range) {
+    private ChartVO buildTopDeptOrdersChart(LocalDateTime[] range) {
         QueryWrapper<OrderMainEntity> wrapper = new QueryWrapper<>();
-        wrapper.select("operator_dept_name, IFNULL(SUM(estimated_cost), 0) / 10000 as revenue")
-               .eq("status", 80).between("create_time", range[0], range[1])
-               .isNotNull("operator_dept_name")
-               .groupBy("operator_dept_name").orderByDesc("revenue").last("LIMIT 10");
-
+        wrapper.select("operator_dept_name, COUNT(*) as count")
+                .isNotNull("operator_dept_name")
+                .between("create_time", range[0], range[1])
+                .groupBy("operator_dept_name")
+                .orderByDesc("count")
+                .last("LIMIT 3");
         List<Map<String, Object>> results = orderMapper.selectMaps(wrapper);
-        List<String> names = new ArrayList<>();
+
+        List<String> xAxis = new ArrayList<>();
         List<Integer> data = new ArrayList<>();
         for (Map<String, Object> row : results) {
-            names.add((String) row.get("operator_dept_name"));
-            data.add(((Number) row.get("revenue")).intValue());
+            xAxis.add((String) row.get("operator_dept_name"));
+            data.add(((Number) row.get("count")).intValue());
         }
-        if (names.isEmpty()) {
-            names.add("暂无数据");
+        if (xAxis.isEmpty()) {
+            xAxis.add("暂无数据");
             data.add(0);
         }
 
-        return ChartVO.builder().key("deptRevenue").title("各部门业绩").type("bar")
-            .data(LineChartDataVO.builder().xAxis(names)
-                .series(List.of(LineChartDataVO.SeriesVO.builder().name("营收(万元)").data(data).build())).build()).build();
+        return ChartVO.builder().key("topDeptOrders").title("业务部门Top3订单量").type("bar")
+                .data(BarChartDataVO.builder().xAxis(xAxis).series(List.of(
+                        BarChartDataVO.SeriesVO.builder().name("订单数").data(data).build()
+                )).build()).build();
+    }
+
+    private ChartVO buildTopOrgOrdersChart(LocalDateTime[] range) {
+        QueryWrapper<OrderMainEntity> wrapper = new QueryWrapper<>();
+        wrapper.select("org_name, COUNT(*) as count")
+                .isNotNull("org_name")
+                .between("create_time", range[0], range[1])
+                .groupBy("org_name")
+                .orderByDesc("count")
+                .last("LIMIT 5");
+        List<Map<String, Object>> results = orderMapper.selectMaps(wrapper);
+
+        List<String> xAxis = new ArrayList<>();
+        List<Integer> data = new ArrayList<>();
+        for (Map<String, Object> row : results) {
+            xAxis.add((String) row.get("org_name"));
+            data.add(((Number) row.get("count")).intValue());
+        }
+        if (xAxis.isEmpty()) {
+            xAxis.add("暂无数据");
+            data.add(0);
+        }
+
+        return ChartVO.builder().key("topOrgOrders").title("活跃机构Top5订单量").type("bar")
+                .data(BarChartDataVO.builder().xAxis(xAxis).series(List.of(
+                        BarChartDataVO.SeriesVO.builder().name("订单数").data(data).build()
+                )).build()).build();
+    }
+
+    private void addGroupByClause(QueryWrapper<OrderMainEntity> wrapper, DashboardQueryDTO query, LocalDateTime[] range, String timeField) {
+        switch (query.getTimeRangeEnum()) {
+            case TODAY: wrapper.select("HOUR(" + timeField + ") as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
+            case WEEK: wrapper.select("DAYOFWEEK(" + timeField + ") as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
+            case MONTH: wrapper.select("DAY(" + timeField + ") as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
+            case QUARTER:
+            case YEAR: wrapper.select("MONTH(" + timeField + ") as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
+            case CUSTOM:
+                long days = java.time.temporal.ChronoUnit.DAYS.between(range[0].toLocalDate(), range[1].toLocalDate()) + 1;
+                if (days <= 1) {
+                    wrapper.select("HOUR(" + timeField + ") as time_unit, COUNT(*) as count").groupBy("time_unit");
+                } else if (days <= 7) {
+                    wrapper.select("DATEDIFF(" + timeField + ", '" + range[0].toLocalDate() + "') as time_unit, COUNT(*) as count").groupBy("time_unit");
+                } else if (days <= 31) {
+                    wrapper.select("DAY(" + timeField + ") as time_unit, COUNT(*) as count").groupBy("time_unit");
+                } else {
+                    wrapper.select("MONTH(" + timeField + ") as time_unit, COUNT(*) as count").groupBy("time_unit");
+                }
+                break;
+        }
+    }
+
+    private void fillChartData(List<Map<String, Object>> results, List<Integer> data, DashboardQueryDTO query, LocalDateTime[] range) {
+        for (Map<String, Object> row : results) {
+            Number timeUnitNum = (Number) row.get("time_unit");
+            if (timeUnitNum == null) continue;
+            int timeUnit = timeUnitNum.intValue();
+            int count = ((Number) row.get("count")).intValue();
+            int index = -1;
+            switch (query.getTimeRangeEnum()) {
+                case TODAY: index = timeUnit / 2; break;
+                case WEEK: index = timeUnit - 1; break;
+                case MONTH: index = (timeUnit - 1) / 5; break;
+                case QUARTER:
+                case YEAR: index = timeUnit - range[0].getMonthValue(); break;
+                case CUSTOM:
+                    long days = java.time.temporal.ChronoUnit.DAYS.between(range[0].toLocalDate(), range[1].toLocalDate()) + 1;
+                    if (days <= 1) {
+                        index = timeUnit / 2;
+                    } else if (days <= 7) {
+                        index = timeUnit;
+                    } else if (days <= 31) {
+                        index = (timeUnit - 1) / 5;
+                    } else {
+                        index = timeUnit - range[0].getMonthValue();
+                    }
+                    break;
+            }
+            if (index >= 0 && index < data.size()) {
+                data.set(index, data.get(index) + count);
+            }
+        }
     }
 
     private DashboardVO buildEmptyDashboard() {

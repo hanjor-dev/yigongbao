@@ -21,6 +21,7 @@
         <module>yigongbao-module-imaging</module>
         <module>yigongbao-module-production</module>
         <module>yigongbao-module-notification</module>
+        <module>yigongbao-module-dashboard</module>
         <module>yigongbao-boot</module>
     </modules>
 
@@ -105,6 +106,11 @@
             <dependency>
                 <groupId>com.yigongbao</groupId>
                 <artifactId>yigongbao-module-notification</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-module-dashboard</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

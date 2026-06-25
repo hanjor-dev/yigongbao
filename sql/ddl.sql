@@ -1722,6 +1722,8 @@ CREATE TABLE production_record (
     processing_center_name VARCHAR(100) COMMENT '加工中心名称（冗余）',
     producer_id BIGINT COMMENT '生产员ID',
     producer_name VARCHAR(50) COMMENT '生产员姓名',
+    qc_id BIGINT COMMENT '质检员ID',
+    qc_name VARCHAR(50) COMMENT '质检员姓名',
     print_device_id BIGINT COMMENT '分配的打印机ID',
     print_device_code VARCHAR(50) COMMENT '打印机编号',
     print_device_name VARCHAR(100) COMMENT '打印机名称（冗余）',

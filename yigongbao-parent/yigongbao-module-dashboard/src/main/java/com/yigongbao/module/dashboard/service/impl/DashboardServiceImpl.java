@@ -33,7 +33,7 @@ public class DashboardServiceImpl implements IDashboardService {
     private final DesignerManagerDashboardStrategy designerManagerStrategy;
     private final ProductionManagerDashboardStrategy productionManagerStrategy;
     private final ProductionWorkerDashboardStrategy productionWorkerStrategy;
-    private final QcDashboardStrategy qcStrategy;
+    private final QcWorkerDashboardStrategy qcWorkerStrategy;
     private final QcManagerDashboardStrategy qcManagerStrategy;
     private final WarehouseManagerDashboardStrategy warehouseManagerStrategy;
     private final FinanceDashboardStrategy financeStrategy;
@@ -50,7 +50,7 @@ public class DashboardServiceImpl implements IDashboardService {
         strategyMap.put(RoleCodeEnum.DESIGNER_MANAGER.getCode(), designerManagerStrategy);
         strategyMap.put(RoleCodeEnum.PRODUCTION_MANAGER.getCode(), productionManagerStrategy);
         strategyMap.put(RoleCodeEnum.PRODUCTION_WORKER.getCode(), productionWorkerStrategy);
-        strategyMap.put(RoleCodeEnum.QC.getCode(), qcStrategy);
+        strategyMap.put(RoleCodeEnum.QC.getCode(), qcWorkerStrategy);
         strategyMap.put(RoleCodeEnum.QC_MANAGER.getCode(), qcManagerStrategy);
         strategyMap.put(RoleCodeEnum.WAREHOUSE_MANAGER.getCode(), warehouseManagerStrategy);
         strategyMap.put(RoleCodeEnum.FINANCE.getCode(), financeStrategy);

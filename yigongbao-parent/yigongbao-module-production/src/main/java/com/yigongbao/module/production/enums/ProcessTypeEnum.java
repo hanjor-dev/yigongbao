@@ -25,4 +25,17 @@ public enum ProcessTypeEnum {
     private final String code;
     private final String desc;
     private final Integer order;
+
+    /**
+     * 根据code获取枚举
+     */
+    public static ProcessTypeEnum getByCode(String code) {
+        if (code == null) return null;
+        for (ProcessTypeEnum type : values()) {
+            if (type.code.equals(code)) {
+                return type;
+            }
+        }
+        return null;
+    }
 }

@@ -14,9 +14,10 @@ import lombok.Getter;
 public enum MessageCategoryEnum {
 
     ORDER("ORDER", "订单"),
-    APPROVAL("APPROVAL", "审批"),
+    APPROVAL("APPROVAL", "审核"),
     DESIGN("DESIGN", "设计"),
-    PRODUCTION("PRODUCTION", "生产");
+    PRODUCTION("PRODUCTION", "生产"),
+    SYSTEM("SYSTEM", "系统通知");
 
     private final String code;
     private final String desc;

@@ -62,6 +62,7 @@ public class ProductionRecordVO {
     private String patientGender;
     private String postalAddress;
     private String designerName;
+    private Long producerId;
     private String producerName;
     private BigDecimal estimatedCost;
     private LocalDateTime actualCompleteTime;

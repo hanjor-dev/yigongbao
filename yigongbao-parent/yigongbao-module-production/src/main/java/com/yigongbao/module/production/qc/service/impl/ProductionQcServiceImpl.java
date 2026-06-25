@@ -48,6 +48,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
     private final CodeGeneratorService codeGeneratorService;
     private final IProductionRecordService recordService;
     private final com.yigongbao.module.order.mapper.OrderMainMapper orderMainMapper;
+    private final com.yigongbao.module.system.user.mapper.UserMapper userMapper;
 
     /**
      * 标记产品质检合格；医疗器械同步生成 UDI 码；回写流转卡合格计数
@@ -149,8 +150,17 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         if (failCount > 0) {
             throw new BusinessException(ErrorCodeEnum.PRODUCT_HAS_FAIL);
         }
+
+        // 记录质检员信息
+        Long userId = StpUtil.getLoginIdAsLong();
+        com.yigongbao.module.system.user.entity.UserEntity currentUser = userMapper.selectById(userId);
+        String realName = currentUser != null ? currentUser.getRealName() : null;
+
+        record.setQcId(userId);
+        record.setQcName(realName);
         record.setStatus(FlowStatusEnum.PACKING.getValue());
         recordMapper.updateById(record);
+
         // 检查所有流转卡是否都进入包装状态，是则同步订单状态
         long totalActive = recordMapper.selectCount(new LambdaQueryWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getOrderId, record.getOrderId())
@@ -167,8 +177,8 @@ public class ProductionQcServiceImpl implements IProductionQcService {
                     .set(com.yigongbao.common.entity.OrderMainEntity::getStatus, FlowStatusEnum.PACKING.getValue()));
             log.info("所有流转卡进入包装，同步订单状态: orderId={}", record.getOrderId());
         }
-        log.info("质检完成，流转到包装: recordId={}, recordNo={}, orderId={}",
-                recordId, record.getRecordNo(), record.getOrderId());
+        log.info("质检完成，流转到包装: recordId={}, recordNo={}, qcId={}, qcName={}, orderId={}",
+                recordId, record.getRecordNo(), userId, realName, record.getOrderId());
     }
 
     /** 查询流转卡下所有产品列表，按 ID 升序排列 */

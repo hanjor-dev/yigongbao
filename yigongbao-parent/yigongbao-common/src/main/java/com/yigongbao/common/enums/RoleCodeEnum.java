@@ -22,7 +22,8 @@ public enum RoleCodeEnum {
     DESIGNER_MANAGER("designer-manager", "设计管理员"),
     PRODUCTION_WORKER("production-worker", "生产员"),
     PRODUCTION_MANAGER("production-manager", "生产管理员"),
-    QC_INSPECTOR("qc-inspector", "质管"),
+    QC_WORKER("qc", "质检员"),
+    QC_MANAGER("qc-manager", "质检管理员"),
     WAREHOUSE_MANAGER("warehouse-manager", "库管"),
     FINANCE("finance", "财务");
 

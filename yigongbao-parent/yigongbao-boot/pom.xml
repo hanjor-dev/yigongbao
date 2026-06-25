@@ -49,6 +49,10 @@
             <groupId>com.yigongbao</groupId>
             <artifactId>yigongbao-module-notification</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-dashboard</artifactId>
+        </dependency>
 
         <!-- spring boot -->
         <dependency>

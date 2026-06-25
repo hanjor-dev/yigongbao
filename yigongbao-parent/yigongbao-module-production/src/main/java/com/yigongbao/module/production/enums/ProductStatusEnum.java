@@ -28,4 +28,17 @@ public enum ProductStatusEnum {
     @JsonValue
     private final String code;
     private final String desc;
+
+    /**
+     * 根据code获取枚举
+     */
+    public static ProductStatusEnum getByCode(String code) {
+        if (code == null) return null;
+        for (ProductStatusEnum status : values()) {
+            if (status.code.equals(code)) {
+                return status;
+            }
+        }
+        return null;
+    }
 }

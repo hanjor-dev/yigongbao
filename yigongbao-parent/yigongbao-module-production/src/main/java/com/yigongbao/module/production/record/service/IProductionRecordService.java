@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
+import com.yigongbao.module.production.record.dto.ProductLedgerExportDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.SaveProductionColumnConfigDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
@@ -85,4 +86,21 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
      * 保存当前用户的列配置
      */
     void saveColumnConfig(SaveProductionColumnConfigDTO dto);
+
+    /**
+     * 导出生产产品台账Excel
+     * <p>
+     * 功能说明：
+     * 1. 数据粒度：产品级别（非订单级别、非流转卡级别）
+     * 2. 导出字段：41个字段，涵盖产品信息、订单信息、流转卡信息、工序人员、质检仓储
+     * 3. 数据权限：根据当前用户角色自动过滤（医院/加工中心/全部）
+     * 4. 导出限制：最多1万条，超出时Excel顶部显示红色警告
+     * 5. 参数校验：至少指定一个查询条件，防止无条件全表导出
+     * </p>
+     *
+     * @param dto 查询条件（recordNo/orderCode/productNo/startTime/endTime）
+     * @return Excel文件字节数组
+     * @throws BusinessException 无查询条件、无权限、查询结果为空、Excel生成失败时抛出
+     */
+    byte[] exportProductLedger(ProductLedgerExportDTO dto);
 }

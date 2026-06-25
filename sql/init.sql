@@ -516,6 +516,7 @@ INSERT INTO yigongbao.sys_resource (id, parent_id, resource_name, resource_code,
 INSERT INTO yigongbao.sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, redirect, sort, visible, status, remark, create_time, update_time, create_by, update_by, is_deleted) VALUES (1310, 103, '包装', 'manufacture:packaging', 3, null, null, null, null, 10, 1, 1, null, '2026-06-15 10:39:52', '2026-06-15 10:39:52', null, null, 0);
 INSERT INTO yigongbao.sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, redirect, sort, visible, status, remark, create_time, update_time, create_by, update_by, is_deleted) VALUES (1311, 103, '保存包装信息', 'manufacture:SaveInfo', 3, null, null, null, null, 11, 1, 1, null, '2026-06-15 10:39:52', '2026-06-15 10:39:52', null, null, 0);
 INSERT INTO yigongbao.sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, redirect, sort, visible, status, remark, create_time, update_time, create_by, update_by, is_deleted) VALUES (1312, 103, '流转入库', 'manufacture:Warehousing', 3, null, null, null, null, 12, 1, 1, null, '2026-06-15 10:39:52', '2026-06-15 10:39:52', null, null, 0);
+INSERT INTO yigongbao.sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, redirect, sort, visible, status, remark, create_time, update_time, create_by, update_by, is_deleted) VALUES (1313, 103, '导出生产产品台账', 'manufacture:Export', 3, null, null, null, null, 13, 1, 1, null, '2026-06-15 10:39:52', '2026-06-15 10:39:52', null, null, 0);
 INSERT INTO yigongbao.sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, redirect, sort, visible, status, remark, create_time, update_time, create_by, update_by, is_deleted) VALUES (1401, 104, '开始质检', 'quality:Start', 3, null, null, null, null, 1, 1, 1, null, '2026-06-15 10:39:52', '2026-06-15 10:39:52', null, null, 0);
 INSERT INTO yigongbao.sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, redirect, sort, visible, status, remark, create_time, update_time, create_by, update_by, is_deleted) VALUES (1402, 104, '重新质检', 'quality:Again', 3, null, null, null, null, 2, 1, 1, null, '2026-06-15 10:39:52', '2026-06-15 10:39:52', null, null, 0);
 INSERT INTO yigongbao.sys_resource (id, parent_id, resource_name, resource_code, resource_type, icon, path, component, redirect, sort, visible, status, remark, create_time, update_time, create_by, update_by, is_deleted) VALUES (1403, 104, '流转包装', 'quality:ToPackaging', 3, null, null, null, null, 3, 1, 1, null, '2026-06-15 10:39:52', '2026-06-15 10:39:52', null, null, 0);
@@ -694,6 +695,7 @@ INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (118, 
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (119, 1, 1310);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (120, 1, 1311);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (121, 1, 1312);
+INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (1213, 1, 1313);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (122, 1, 1401);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (123, 1, 1402);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (124, 1, 1403);
@@ -849,6 +851,7 @@ INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (706, 
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (707, 7, 1310);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (708, 7, 1311);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (709, 7, 1312);
+INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (1214, 7, 1313);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (690, 7, 1504);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (712, 8, 1);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (719, 8, 2);
@@ -874,6 +877,7 @@ INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (878, 
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (879, 10, 1105);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (880, 10, 1106);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (881, 10, 1119);
+INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (1215, 10, 1313);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (875, 10, 1504);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (732, 11, 1);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (734, 11, 2);
@@ -983,12 +987,14 @@ INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (782, 
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (783, 11, 1310);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (784, 11, 1311);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (785, 11, 1312);
+INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (1216, 11, 1313);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (787, 11, 1401);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (788, 11, 1402);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (789, 11, 1403);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (791, 11, 1501);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (798, 11, 1502);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (733, 11, 1504);
+INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (1217, 12, 1);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (731, 12, 2);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (730, 12, 6);
 INSERT INTO yigongbao.sys_role_resource (id, role_id, resource_id) VALUES (720, 12, 101);

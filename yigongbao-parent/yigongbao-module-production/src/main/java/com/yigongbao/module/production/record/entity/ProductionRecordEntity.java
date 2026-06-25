@@ -43,6 +43,10 @@ public class ProductionRecordEntity extends BaseEntity {
     private Long producerId;
     /** 生产员姓名 */
     private String producerName;
+    /** 质检员ID */
+    private Long qcId;
+    /** 质检员姓名 */
+    private String qcName;
     /** 打印机ID（assignDevice 时写入） */
     private Long printDeviceId;
     /** 打印机编号 */
