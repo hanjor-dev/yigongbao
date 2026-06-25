@@ -530,7 +530,7 @@ INSERT INTO yigongbao.sys_resource (id, parent_id, resource_name, resource_code,
 INSERT INTO sys_org (id, org_name, org_code, org_type, username_prefix, contact, phone, status)
 VALUES
 (1, '嘉一高科（企业）', 'ORG-0001', '1.1', 'jygk', '管理员', '13800000000', 1),
-(2, '其他医院', 'ORG-H-0008', '1.3', NULL, NULL, NULL, 1);
+(2, '其他医院', 'ORG-H-9999', '1.3', NULL, NULL, NULL, 1);
 
 
 -- ============================================================
