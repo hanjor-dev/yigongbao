@@ -78,6 +78,9 @@ public class DesignWorkorderListVO {
     /** 开始设计时间 */
     private LocalDateTime designStartTime;
 
+    /** 设计提交时间 */
+    private LocalDateTime designSubmitTime;
+
     /** 期望交付日期 */
     private LocalDateTime expectedDeliveryDate;
 

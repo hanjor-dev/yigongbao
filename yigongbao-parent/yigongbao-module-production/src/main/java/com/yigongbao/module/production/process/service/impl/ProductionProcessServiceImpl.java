@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -14,6 +15,7 @@ import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProcessTypeEnum;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
@@ -53,6 +55,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
     private final IProductionRecordService recordService;
     private final DeviceMapper deviceMapper;
     private final UserMapper userMapper;
+    private final OrderMainMapper orderMainMapper;
 
     /** 查询流转卡的工序列表，按工序顺序升序排列 */
     @Override
@@ -196,12 +199,15 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             if (productCount == 0) {
                 throw new BusinessException(ErrorCodeEnum.RECORD_NO_PRODUCT_FOR_QC);
             }
+            LocalDateTime now = LocalDateTime.now();
             recordMapper.update(null,
                     new LambdaUpdateWrapper<ProductionRecordEntity>()
                             .eq(ProductionRecordEntity::getId, recordId)
                             .set(ProductionRecordEntity::getStatus, FlowStatusEnum.QC_IN_PROGRESS.getValue())
                             .set(ProductionRecordEntity::getCurrentProcess, null)
-                            .set(ProductionRecordEntity::getContentUpdateTime, LocalDateTime.now()));
+                            .set(ProductionRecordEntity::getPostProcessingEndTime, now)
+                            .set(ProductionRecordEntity::getContentUpdateTime, now));
+            updateOrderProductionEndTimeIfAllFinished(record.getOrderId());
             recordService.triggerFlowIfAllExact(record.getOrderId(),
                     FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
         }
@@ -218,5 +224,26 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             case "pack" -> DeviceTypeEnum.SEALING_MACHINE.getCode();
             default -> null;
         };
+    }
+
+    /** 检查订单下所有流转卡是否都完成后处理，如果是则更新订单生产结束时间 */
+    private void updateOrderProductionEndTimeIfAllFinished(Long orderId) {
+        long totalRecords = recordMapper.selectCount(
+            new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getOrderId, orderId));
+        long finishedRecords = recordMapper.selectCount(
+            new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getOrderId, orderId)
+                .isNotNull(ProductionRecordEntity::getPostProcessingEndTime));
+        if (totalRecords == finishedRecords && finishedRecords > 0) {
+            int updated = orderMainMapper.update(null,
+                new LambdaUpdateWrapper<OrderMainEntity>()
+                    .eq(OrderMainEntity::getId, orderId)
+                    .isNull(OrderMainEntity::getProductionEndTime)
+                    .set(OrderMainEntity::getProductionEndTime, LocalDateTime.now()));
+            if (updated > 0) {
+                log.info("订单所有流转卡后处理完成，更新生产结束时间: orderId={}, totalRecords={}", orderId, totalRecords);
+            }
+        }
     }
 }

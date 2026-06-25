@@ -47,20 +47,17 @@ public class DeviceStatusListener {
         Integer oldState = event.getOldState();
         Integer newState = event.getNewState();
 
-        List<ProductionRecordEntity> records = recordMapper.selectList(
-                new LambdaQueryWrapper<ProductionRecordEntity>()
-                        .eq(ProductionRecordEntity::getPrintDeviceId, deviceId)
-                        .in(ProductionRecordEntity::getStatus,
-                                FlowStatusEnum.PENDING_PRINT.getValue(),
-                                FlowStatusEnum.PRINTING.getValue()));
-        if (records.isEmpty()) {
-            log.debug("设备状态变更，未找到关联的生产流转卡: deviceId={}", deviceId);
-            return;
-        }
-
-        // 空闲 → 占用：打印开始，更新流转卡状态并触发 Flow
+        // 空闲 → 占用：打印开始，只查询待打印的流转卡
         if (ProductionConstants.DEVICE_STATE_IDLE.equals(oldState)
                 && !ProductionConstants.DEVICE_STATE_IDLE.equals(newState)) {
+            List<ProductionRecordEntity> records = recordMapper.selectList(
+                    new LambdaQueryWrapper<ProductionRecordEntity>()
+                            .eq(ProductionRecordEntity::getPrintDeviceId, deviceId)
+                            .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue()));
+            if (records.isEmpty()) {
+                log.debug("设备开始占用，未找到待打印的流转卡: deviceId={}", deviceId);
+                return;
+            }
             LocalDateTime now = LocalDateTime.now();
             records.forEach(record -> {
                 record.setStatus(FlowStatusEnum.PRINTING.getValue());
@@ -75,12 +72,21 @@ public class DeviceStatusListener {
                         record.getId(), record.getRecordNo(), deviceId);
             });
             Long orderId = records.get(0).getOrderId();
+            updateOrderProductionStartTime(orderId, now);
             recordService.triggerFlowIfAllExact(orderId,
                     FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
         }
-        // 占用 → 空闲：打印完成，更新状态并聚合触发 Flow
+        // 占用 → 空闲：打印完成，只查询打印中的流转卡
         else if (!ProductionConstants.DEVICE_STATE_IDLE.equals(oldState)
                 && ProductionConstants.DEVICE_STATE_IDLE.equals(newState)) {
+            List<ProductionRecordEntity> records = recordMapper.selectList(
+                    new LambdaQueryWrapper<ProductionRecordEntity>()
+                            .eq(ProductionRecordEntity::getPrintDeviceId, deviceId)
+                            .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINTING.getValue()));
+            if (records.isEmpty()) {
+                log.debug("设备变为空闲，未找到打印中的流转卡: deviceId={}", deviceId);
+                return;
+            }
             LocalDateTime now = LocalDateTime.now();
             records.forEach(record -> {
                 recordMapper.update(null,
@@ -134,5 +140,17 @@ public class DeviceStatusListener {
                                 com.yigongbao.module.production.enums.ProductStatusEnum.PENDING.getCode())
                         .set(com.yigongbao.module.production.product.entity.ProductionProductEntity::getStatus,
                                 com.yigongbao.module.production.enums.ProductStatusEnum.IN_PROCESS.getCode()));
+    }
+
+    /** 更新订单生产开始时间（仅当为空时更新） */
+    private void updateOrderProductionStartTime(Long orderId, LocalDateTime startTime) {
+        int updated = orderMainMapper.update(null,
+                new LambdaUpdateWrapper<OrderMainEntity>()
+                        .eq(OrderMainEntity::getId, orderId)
+                        .isNull(OrderMainEntity::getProductionStartTime)
+                        .set(OrderMainEntity::getProductionStartTime, startTime));
+        if (updated > 0) {
+            log.info("更新订单生产开始时间: orderId={}, productionStartTime={}", orderId, startTime);
+        }
     }
 }

@@ -504,6 +504,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         vo.setDesignerId(entity.getDesignerId());
         vo.setDesignerName(entity.getDesignerName());
         vo.setDesignStartTime(entity.getDesignStartTime());
+        vo.setDesignSubmitTime(entity.getDesignSubmitTime());
         vo.setExpectedDeliveryDate(entity.getExpectedDeliveryDate());
         vo.setCreateTime(entity.getCreateTime());
         return vo;

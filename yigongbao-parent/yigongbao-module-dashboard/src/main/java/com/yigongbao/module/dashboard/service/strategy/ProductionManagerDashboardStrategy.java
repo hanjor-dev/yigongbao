@@ -78,7 +78,8 @@ public class ProductionManagerDashboardStrategy implements DashboardStrategy {
         LambdaQueryWrapper<ProductionRecordEntity> completedWrapper = new LambdaQueryWrapper<>();
         completedWrapper.eq(ProductionRecordEntity::getProcessingCenterId, centerId)
                 .in(ProductionRecordEntity::getStatus, 6030, 8010)
-                .between(ProductionRecordEntity::getCreateTime, range[0], range[1]);
+                .isNotNull(ProductionRecordEntity::getPostProcessingEndTime)
+                .between(ProductionRecordEntity::getPostProcessingEndTime, range[0], range[1]);
         Long completed = productionRecordMapper.selectCount(completedWrapper);
         cards.add(CardVO.builder().key("completed").title("已完成").value(completed).unit("单").build());
         return cards;
@@ -107,8 +108,9 @@ public class ProductionManagerDashboardStrategy implements DashboardStrategy {
 
         QueryWrapper<ProductionRecordEntity> completedWrapper = new QueryWrapper<>();
         completedWrapper.eq("processing_center_id", centerId).in("status", 6030, 8010)
-                .between("create_time", range[0], range[1]);
-        addGroupByClause(completedWrapper, query, range);
+                .isNotNull("post_processing_end_time")
+                .between("post_processing_end_time", range[0], range[1]);
+        addGroupByClauseForCompletedTime(completedWrapper, query, range);
         fillChartData(productionRecordMapper.selectMaps(completedWrapper), completedData, query, range);
 
         QueryWrapper<ProductionRecordEntity> otherStageWrapper = new QueryWrapper<>();
@@ -173,6 +175,30 @@ public class ProductionManagerDashboardStrategy implements DashboardStrategy {
                     wrapper.select("DAY(create_time) as time_unit, COUNT(*) as count").groupBy("time_unit");
                 } else {
                     wrapper.select("MONTH(create_time) as time_unit, COUNT(*) as count").groupBy("time_unit");
+                }
+                break;
+        }
+    }
+
+    /** 为已完成数据添加分组子句（基于后处理结束时间） */
+    private void addGroupByClauseForCompletedTime(QueryWrapper<ProductionRecordEntity> wrapper, DashboardQueryDTO query, LocalDateTime[] range) {
+        switch (query.getTimeRangeEnum()) {
+            case TODAY: wrapper.select("HOUR(post_processing_end_time) as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
+            case WEEK: wrapper.select("DAYOFWEEK(post_processing_end_time) as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
+            case MONTH: wrapper.select("DAY(post_processing_end_time) as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
+            case QUARTER:
+            case YEAR: wrapper.select("MONTH(post_processing_end_time) as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
+            case CUSTOM:
+                long days = java.time.temporal.ChronoUnit.DAYS.between(
+                    range[0].toLocalDate(), range[1].toLocalDate()) + 1;
+                if (days <= 1) {
+                    wrapper.select("HOUR(post_processing_end_time) as time_unit, COUNT(*) as count").groupBy("time_unit");
+                } else if (days <= 7) {
+                    wrapper.select("DATEDIFF(post_processing_end_time, '" + range[0].toLocalDate() + "') as time_unit, COUNT(*) as count").groupBy("time_unit");
+                } else if (days <= 31) {
+                    wrapper.select("DAY(post_processing_end_time) as time_unit, COUNT(*) as count").groupBy("time_unit");
+                } else {
+                    wrapper.select("MONTH(post_processing_end_time) as time_unit, COUNT(*) as count").groupBy("time_unit");
                 }
                 break;
         }

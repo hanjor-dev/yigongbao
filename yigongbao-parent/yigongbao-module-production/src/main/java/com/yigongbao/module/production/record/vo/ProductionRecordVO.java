@@ -40,6 +40,7 @@ public class ProductionRecordVO {
     private String qrCodeUrl;
     private LocalDateTime printStartTime;
     private LocalDateTime printFinishTime;
+    private LocalDateTime postProcessingEndTime;
     private LocalDateTime createTime;
     // 订单冗余字段（来自 production_record 表）
     private String hospitalName;

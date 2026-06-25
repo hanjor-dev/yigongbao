@@ -251,6 +251,9 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
                 toUpdate.add(device);
 
                 if (!oldState.equals(deviceStatus.getState())) {
+                    log.info("设备状态变更: deviceId={}, {} -> {}",
+                        device.getDeviceId(), oldState, deviceStatus.getState());
+
                     DeviceStateLogEntity stateLog = new DeviceStateLogEntity();
                     stateLog.setDeviceId(device.getDeviceId());
                     stateLog.setOldState(oldState);
@@ -259,6 +262,8 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
                     stateLog.setChangeType("auto");
                     stateLogs.add(stateLog);
                     eventPublisher.publishEvent(new DeviceStateChangeEvent(this, device.getId(), oldState, deviceStatus.getState()));
+                } else {
+                    log.info("设备状态未变化: deviceId={}, state={}", device.getDeviceId(), oldState);
                 }
             }
         }

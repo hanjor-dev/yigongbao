@@ -192,6 +192,16 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
     private LocalDateTime userConfirmTime;
 
     /**
+     * 生产开始时间（任意流转卡开始打印时）
+     */
+    private LocalDateTime productionStartTime;
+
+    /**
+     * 生产结束时间（所有流转卡后处理结束时）
+     */
+    private LocalDateTime productionEndTime;
+
+    /**
      * 实际完成时间
      */
     private LocalDateTime actualCompleteTime;

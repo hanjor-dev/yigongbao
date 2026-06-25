@@ -89,6 +89,8 @@ public class ProductionRecordEntity extends BaseEntity {
     private LocalDateTime printStartTime;
     /** 打印完成时间（由设备 WebSocket 状态推送写入） */
     private LocalDateTime printFinishTime;
+    /** 后处理结束时间 */
+    private LocalDateTime postProcessingEndTime;
     // ===== 订单基础信息冗余字段（创建时从 order_main 复制，避免跨模块查询）=====
     private String hospitalName;
     private String hospitalDeptName;

@@ -349,6 +349,10 @@ public class OrderQueryHelper {
         vo.setStatus(entity.getStatus());
         vo.setStatusName(getStatusName(entity.getStatus()));
         // 时间戳
+        vo.setDesignStartTime(entity.getDesignStartTime());
+        vo.setDesignSubmitTime(entity.getDesignSubmitTime());
+        vo.setProductionStartTime(entity.getProductionStartTime());
+        vo.setProductionEndTime(entity.getProductionEndTime());
         vo.setCreateTime(entity.getCreateTime());
         return vo;
     }

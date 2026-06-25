@@ -259,6 +259,26 @@ public class OrderListVO implements Serializable {
     // ==================== 时间 ====================
 
     /**
+     * 设计开始时间
+     */
+    private LocalDateTime designStartTime;
+
+    /**
+     * 设计提交时间
+     */
+    private LocalDateTime designSubmitTime;
+
+    /**
+     * 生产开始时间
+     */
+    private LocalDateTime productionStartTime;
+
+    /**
+     * 生产结束时间
+     */
+    private LocalDateTime productionEndTime;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;
