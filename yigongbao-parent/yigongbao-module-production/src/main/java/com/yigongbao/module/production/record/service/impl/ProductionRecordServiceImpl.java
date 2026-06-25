@@ -170,9 +170,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             com.yigongbao.module.basic.file.vo.FileVO fileVO = generateFlowCardExcel(record.getId());
             vo.setFlowCardFile(fileVO);
         } else {
+            // 获取订单信息，添加患者姓名前缀
+            OrderMainEntity order = orderMainMapper.selectById(record.getOrderId());
+            String patientName = (order != null && order.getPatientName() != null) ? order.getPatientName() : "";
             com.yigongbao.module.basic.file.vo.FileVO fileVO = new com.yigongbao.module.basic.file.vo.FileVO();
             fileVO.setFileUrl(record.getFlowCardFileUrl());
-            fileVO.setFileName("流转卡_" + record.getRecordNo() + ".xlsx");
+            fileVO.setFileName(patientName + "流转卡.xlsx");
             vo.setFlowCardFile(fileVO);
         }
     }
@@ -701,6 +704,11 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         order.setId(orderId);
         order.setPhase(result.getTargetPhase());
         order.setStatus(result.getFinalStatus());
+        // 订单完成或出库时，设置实际完成时间
+        if (FlowStatusEnum.WAREHOUSE_OUT.getValue().equals(result.getFinalStatus())
+                || FlowStatusEnum.COMPLETED.getValue().equals(result.getFinalStatus())) {
+            order.setActualCompleteTime(java.time.LocalDateTime.now());
+        }
         orderMainMapper.updateById(order);
         log.info("Flow状态流转完成: orderId={}, action={}, targetPhase={}, targetStatus={}",
                 orderId, action, result.getTargetPhase(), result.getFinalStatus());
@@ -721,9 +729,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (needRegenerate) {
             return generateFlowCardExcel(recordId);
         } else {
+            // 获取订单信息，添加患者姓名前缀
+            OrderMainEntity order = orderMainMapper.selectById(record.getOrderId());
+            String patientName = (order != null && order.getPatientName() != null) ? order.getPatientName() : "";
             com.yigongbao.module.basic.file.vo.FileVO fileVO = new com.yigongbao.module.basic.file.vo.FileVO();
             fileVO.setFileUrl(record.getFlowCardFileUrl());
-            fileVO.setFileName("流转卡_" + record.getRecordNo() + ".xlsx");
+            fileVO.setFileName(patientName + "流转卡.xlsx");
             return fileVO;
         }
     }
@@ -798,7 +809,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         try {
             byte[] excelBytes = flowCardExcelBuilder.build(context);
-            String filename = "流转卡_" + record.getRecordNo() + ".xlsx";
+            // 获取订单信息，添加患者姓名前缀
+            OrderMainEntity order = orderMainMapper.selectById(record.getOrderId());
+            String patientName = (order != null && order.getPatientName() != null) ? order.getPatientName() : "";
+            String filename = patientName + "流转卡.xlsx";
             com.yigongbao.module.basic.file.vo.FileVO fileVO = fileService.uploadBytes(
                 excelBytes, filename, com.yigongbao.common.enums.FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
 

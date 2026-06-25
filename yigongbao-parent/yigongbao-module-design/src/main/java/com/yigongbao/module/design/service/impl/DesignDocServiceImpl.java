@@ -582,8 +582,8 @@ public class DesignDocServiceImpl implements DesignDocService {
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
 
-        // 上传 OSS
-        String filename = "指令单-" + pkg.getPackageCode() + ".xlsx";
+        // 上传 OSS（文件名前加患者姓名）
+        String filename = order.getPatientName() + "指令单.xlsx";
         FileVO fileVO = fileService.uploadBytes(bytes, filename, FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
 
         // 确定指令单编号（覆盖时复用已有编号，新建时生成新编号）
@@ -672,8 +672,8 @@ public class DesignDocServiceImpl implements DesignDocService {
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
 
-        // 上传 OSS
-        String filename = "图纸-" + pkg.getPackageCode() + ".xlsx";
+        // 上传 OSS（文件名前加患者姓名）
+        String filename = order.getPatientName() + "图纸.xlsx";
         FileVO fileVO = fileService.uploadBytes(bytes, filename, FileBizTypeEnum.DRAWING_FILE.getDictCode());
 
         // 持久化

@@ -7,6 +7,7 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
+import com.yigongbao.module.production.record.dto.ProductLedgerExportDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
@@ -105,5 +106,20 @@ public class ProductionRecordController {
     public Result<FileVO> generateFlowCardExcel(@PathVariable Long id) {
         FileVO fileVO = recordService.getOrGenerateFlowCardExcel(id);
         return Result.success(fileVO);
+    }
+
+    @Operation(summary = "导出生产产品台账Excel")
+    @OperationLog(module = "生产管理", businessType = OperationTypeEnum.EXPORT, operation = "导出生产产品台账")
+    @PostMapping("/product-ledger/export")
+    public void exportProductLedger(@Valid @RequestBody ProductLedgerExportDTO dto, HttpServletResponse response) throws IOException {
+        byte[] excelBytes = recordService.exportProductLedger(dto);
+
+        // 注：生产产品台账是批量导出，不添加患者姓名
+        String fileName = "生产产品台账_" + java.time.LocalDate.now() + ".xlsx";
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition", "attachment; filename=" + URLEncoder.encode(fileName, StandardCharsets.UTF_8));
+
+        response.getOutputStream().write(excelBytes);
+        response.getOutputStream().flush();
     }
 }
