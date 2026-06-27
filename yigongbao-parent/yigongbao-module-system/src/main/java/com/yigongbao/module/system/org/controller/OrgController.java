@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import com.yigongbao.module.system.org.vo.OrgHospitalChangeCheckVO;
 import com.yigongbao.module.system.org.vo.OrgOperationCheckVO;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -179,5 +180,19 @@ public class OrgController {
     @Operation(summary = "预检查禁用机构影响")
     public Result<OrgOperationCheckVO> checkDisable(@PathVariable Long id) {
         return Result.success(orgService.checkDisable(id));
+    }
+
+    /**
+     * 导出机构列表为 Excel
+     */
+    @GetMapping("/export")
+    @Operation(summary = "导出机构列表")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.EXPORT,
+            operation = "导出机构列表"
+    )
+    public void export(HttpServletResponse response) {
+        orgService.exportOrgs(response);
     }
 }

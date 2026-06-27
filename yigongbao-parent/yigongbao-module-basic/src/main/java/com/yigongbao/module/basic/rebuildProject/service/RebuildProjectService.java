@@ -2,11 +2,13 @@ package com.yigongbao.module.basic.rebuildProject.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.basic.rebuildProject.dto.CreateRebuildProjectDTO;
+import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectTreeDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.UpdateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.entity.RebuildProjectEntity;
 import com.yigongbao.module.basic.rebuildProject.vo.BodyPartProjectTreeVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectVO;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.List;
 
@@ -95,4 +97,11 @@ public interface RebuildProjectService extends IService<RebuildProjectEntity> {
      * @return 专业方向字典编码（如 "7.1"），项目不存在或未设置时返回 null
      */
     String getSpecialtyByProjectId(Long projectId);
+
+    /**
+     * 导出项目列表为 Excel
+     *
+     * @param response HTTP 响应
+     */
+    void exportProjects(HttpServletResponse response);
 }

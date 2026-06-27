@@ -303,56 +303,15 @@ class AuthServiceImplTest {
     // ==================== login - PHONE ====================
 
     @Test
-    @DisplayName("login(PHONE): 手机验证码正确时登录成功（不校验 captchaToken）")
-    void login_byPhone_whenSuccess_shouldReturnToken() {
-        LoginDTO dto = new LoginDTO();
-        dto.setLoginType(LoginTypeEnum.PHONE);
-        dto.setPrincipal("13800000001");
-        dto.setCredential("123456");
-        // PHONE 类型不设置 captchaToken
-
-        doNothing().when(captchaService).verifyCaptcha(anyString(), eq("13800000001"), anyString(), anyString());
-        when(userMapper.selectByPhone("13800000001")).thenReturn(testUser);
-        stpUtilMockedStatic.when(StpUtil::getTokenValue).thenReturn("mock-token");
-        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-
-        LoginVO result = authService.login(dto);
-
-        assertNotNull(result.getToken());
-        verify(captchaService).verifyCaptcha(anyString(), eq("13800000001"), anyString(), anyString());
-    }
-
-    @Test
-    @DisplayName("login(PHONE): 手机号未注册时抛出 USER_NOT_FOUND")
-    void login_byPhone_whenUserNotFound_shouldThrow() {
-        LoginDTO dto = new LoginDTO();
-        dto.setLoginType(LoginTypeEnum.PHONE);
-        dto.setPrincipal("13900000000");
-        dto.setCredential("123456");
-
-        doNothing().when(captchaService).verifyCaptcha(anyString(), anyString(), anyString(), anyString());
-        when(userMapper.selectByPhone("13900000000")).thenReturn(null);
-        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-
-        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(dto));
-        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), ex.getCode());
-    }
-
-    @Test
-    @DisplayName("login(PHONE): 手机号对应用户已禁用时抛出 USER_DISABLED")
-    void login_byPhone_whenUserDisabled_shouldThrow() {
-        testUser.setStatus(StatusConstants.DISABLED);
+    @DisplayName("login(PHONE): 手机验证码登录已禁用，抛出 LOGIN_TYPE_NOT_SUPPORTED")
+    void login_byPhone_shouldThrowNotSupported() {
         LoginDTO dto = new LoginDTO();
         dto.setLoginType(LoginTypeEnum.PHONE);
         dto.setPrincipal("13800000001");
         dto.setCredential("123456");
 
-        doNothing().when(captchaService).verifyCaptcha(anyString(), anyString(), anyString(), anyString());
-        when(userMapper.selectByPhone("13800000001")).thenReturn(testUser);
-        when(loginLogMapper.insert(any(LoginLogEntity.class))).thenReturn(1);
-
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(dto));
-        assertEquals(ErrorCodeEnum.USER_DISABLED.getCode(), ex.getCode());
+        assertEquals(ErrorCodeEnum.LOGIN_TYPE_NOT_SUPPORTED.getCode(), ex.getCode());
     }
 
     // ==================== login - PASSWORD by email ====================
@@ -537,80 +496,50 @@ class AuthServiceImplTest {
     }
 
     @Test
-    @DisplayName("sendForgotPasswordCaptcha: target 未注册时静默成功（防枚举）")
-    void sendForgotPasswordCaptcha_whenTargetNotExists_shouldSilentlySucceed() {
+    @DisplayName("sendForgotPasswordCaptcha: 手机号找回密码已禁用，抛出 PHONE_RESET_PASSWORD_NOT_SUPPORTED")
+    void sendForgotPasswordCaptcha_byPhone_shouldThrowNotSupported() {
         SendCaptchaDTO dto = new SendCaptchaDTO();
         dto.setCaptchaType(CaptchaTypeEnum.PHONE);
         dto.setTarget("13999999999");
 
-        when(userMapper.selectByPhone("13999999999")).thenReturn(null);
-
-        authService.sendForgotPasswordCaptcha(dto);
-
-        verify(captchaService, never()).sendCaptcha(anyString(), anyString(), anyString());
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.sendForgotPasswordCaptcha(dto));
+        assertEquals(ErrorCodeEnum.PHONE_RESET_PASSWORD_NOT_SUPPORTED.getCode(), ex.getCode());
     }
 
     @Test
-    @DisplayName("sendForgotPasswordCaptcha: target 已注册时调用 CaptchaService（FORGOT 场景）")
-    void sendForgotPasswordCaptcha_whenTargetExists_shouldSendCaptcha() {
+    @DisplayName("sendForgotPasswordCaptcha: 邮箱找回密码正常工作")
+    void sendForgotPasswordCaptcha_byEmail_shouldWork() {
         SendCaptchaDTO dto = new SendCaptchaDTO();
-        dto.setCaptchaType(CaptchaTypeEnum.PHONE);
-        dto.setTarget("13800000001");
+        dto.setCaptchaType(CaptchaTypeEnum.EMAIL);
+        dto.setTarget("admin@example.com");
 
-        when(userMapper.selectByPhone("13800000001")).thenReturn(testUser);
+        when(userMapper.selectByEmail("admin@example.com")).thenReturn(testUser);
         doNothing().when(captchaService).sendCaptcha(anyString(), anyString(), anyString());
 
         authService.sendForgotPasswordCaptcha(dto);
 
-        verify(captchaService).sendCaptcha("PHONE", "13800000001", "forgot");
+        verify(captchaService).sendCaptcha("EMAIL", "admin@example.com", "forgot");
     }
 
     // ==================== 重置密码 ====================
 
     @Test
-    @DisplayName("resetPassword: 验证码正确且用户存在时重置成功并解除锁定")
-    void resetPassword_whenValid_shouldUpdatePasswordAndUnlock() {
+    @DisplayName("resetPassword: 手机号重置密码已禁用，抛出 PHONE_RESET_PASSWORD_NOT_SUPPORTED")
+    void resetPassword_byPhone_shouldThrowNotSupported() {
         ForgotPasswordResetDTO dto = new ForgotPasswordResetDTO();
         dto.setCaptchaType(CaptchaTypeEnum.PHONE);
         dto.setTarget("13800000001");
         dto.setCaptcha("123456");
         dto.setNewPassword("newPass123");
 
-        testUser.setLoginFailCount(5);
-        testUser.setLockTime(LocalDateTime.now());
-
         doNothing().when(captchaService).verifyCaptcha(anyString(), anyString(), anyString(), anyString());
-        when(userMapper.selectByPhone("13800000001")).thenReturn(testUser);
-        when(passwordEncoder.encode("newPass123")).thenReturn("encoded");
-        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
-
-        assertDoesNotThrow(() -> authService.resetPassword(dto));
-
-        verify(userMapper).updateById(argThat((UserEntity u) ->
-                "encoded".equals(u.getPassword()) &&
-                u.getLoginFailCount() == 0 &&
-                u.getLockTime() == null
-        ));
-    }
-
-    @Test
-    @DisplayName("resetPassword: 用户不存在时抛出 USER_NOT_FOUND")
-    void resetPassword_whenUserNotFound_shouldThrow() {
-        ForgotPasswordResetDTO dto = new ForgotPasswordResetDTO();
-        dto.setCaptchaType(CaptchaTypeEnum.PHONE);
-        dto.setTarget("13999999999");
-        dto.setCaptcha("123456");
-        dto.setNewPassword("newPass123");
-
-        doNothing().when(captchaService).verifyCaptcha(anyString(), anyString(), anyString(), anyString());
-        when(userMapper.selectByPhone("13999999999")).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.resetPassword(dto));
-        assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), ex.getCode());
+        assertEquals(ErrorCodeEnum.PHONE_RESET_PASSWORD_NOT_SUPPORTED.getCode(), ex.getCode());
     }
 
     @Test
-    @DisplayName("resetPassword(EMAIL): 邮箱场景重置密码成功")
+    @DisplayName("resetPassword(EMAIL): 邮箱场景重置密码成功并解除锁定")
     void resetPassword_byEmail_whenValid_shouldSuccess() {
         ForgotPasswordResetDTO dto = new ForgotPasswordResetDTO();
         dto.setCaptchaType(CaptchaTypeEnum.EMAIL);
@@ -618,12 +547,19 @@ class AuthServiceImplTest {
         dto.setCaptcha("654321");
         dto.setNewPassword("newPass456");
 
+        testUser.setLoginFailCount(5);
+        testUser.setLockTime(LocalDateTime.now());
+
         doNothing().when(captchaService).verifyCaptcha(anyString(), anyString(), anyString(), anyString());
         when(userMapper.selectByEmail("admin@example.com")).thenReturn(testUser);
         when(passwordEncoder.encode("newPass456")).thenReturn("encoded2");
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
         assertDoesNotThrow(() -> authService.resetPassword(dto));
-        verify(userMapper).updateById(argThat((UserEntity u) -> "encoded2".equals(u.getPassword())));
+        verify(userMapper).updateById(argThat((UserEntity u) ->
+                "encoded2".equals(u.getPassword()) &&
+                u.getLoginFailCount() == 0 &&
+                u.getLockTime() == null
+        ));
     }
 }

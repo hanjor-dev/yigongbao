@@ -15,6 +15,7 @@ import com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO;
 import com.yigongbao.module.system.user.dto.UserPageDTO;
 import com.yigongbao.module.system.user.service.UserService;
 import com.yigongbao.module.system.user.vo.UserVO;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -178,5 +179,19 @@ public class UserController {
     @Operation(summary = "预览用户名（自动生成模式，预占5分钟）")
     public Result<String> previewUsername(@RequestParam Long orgId) {
         return Result.success(userService.previewUsername(orgId));
+    }
+
+    /**
+     * 导出用户列表为 Excel
+     */
+    @GetMapping("/export")
+    @Operation(summary = "导出用户列表")
+    @OperationLog(
+            module = "系统管理",
+            businessType = OperationTypeEnum.EXPORT,
+            operation = "导出用户列表"
+    )
+    public void export(HttpServletResponse response) {
+        userService.exportUsers(response);
     }
 }

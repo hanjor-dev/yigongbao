@@ -26,6 +26,9 @@ public final class DictCodeConstants {
     /** 医疗机构 dict_code = "1.3" */
     public static final String ORG_TYPE_HOSPITAL = "1.3";
 
+    /** 服务商 dict_code = "1.4" */
+    public static final String ORG_TYPE_SERVICE_PROVIDER = "1.4";
+
     /** 代理产品线 dict_code = "5" */
     public static final String AGENT_PRODUCT_LINE = "5";
 

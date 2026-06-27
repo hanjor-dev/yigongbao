@@ -16,6 +16,7 @@ import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -147,5 +148,19 @@ public class RebuildProjectController {
             @RequestParam @NotNull @Min(0) @Max(1) Integer status) {
         rebuildProjectService.updateStatus(id, status);
         return Result.success();
+    }
+
+    /**
+     * 导出项目列表为 Excel
+     */
+    @GetMapping("/export")
+    @Operation(summary = "导出项目列表")
+    @OperationLog(
+            module = "基础管理",
+            businessType = OperationTypeEnum.EXPORT,
+            operation = "导出重建项目列表"
+    )
+    public void export(HttpServletResponse response) {
+        rebuildProjectService.exportProjects(response);
     }
 }

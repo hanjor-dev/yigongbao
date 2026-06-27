@@ -495,14 +495,19 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
      */
     private void validateOrgTypeMatchDeptType(List<Long> orgIds, String deptType, Long excludeDeptId) {
         if (StatusConstants.DEPT_TYPE_ENTERPRISE.equals(deptType)) {
-            // 企业部门只能关联一个生产企业
+            // 企业部门只能关联一个企业机构
             if (orgIds.size() > 1) {
                 throw new BusinessException(ErrorCodeEnum.DEPT_INTERNAL_ORG_LIMIT);
             }
             List<OrgEntity> orgs = orgService.listByIds(orgIds);
-            boolean mismatch = orgs.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_PRODUCER.equals(o.getOrgType()));
+            // 允许生产企业（1.1）或服务商（1.4）
+            boolean mismatch = orgs.stream().anyMatch(o ->
+                !DictCodeConstants.ORG_TYPE_PRODUCER.equals(o.getOrgType())
+                && !DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(o.getOrgType()));
             if (mismatch) {
-                throw new BusinessException(ErrorCodeEnum.ORG_DEPT_TYPE_MISMATCH);
+                log.warn("企业部门关联的机构类型错误: orgTypes={}",
+                    orgs.stream().map(OrgEntity::getOrgType).collect(Collectors.joining(",")));
+                throw new BusinessException(ErrorCodeEnum.DEPT_ENTERPRISE_ORG_TYPE_ERROR);
             }
         } else {
             // 业务部门：校验机构类型均为经销商

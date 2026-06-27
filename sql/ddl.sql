@@ -208,8 +208,8 @@ CREATE TABLE sys_user (
     KEY idx_user_charging_template_id (charging_template_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 CREATE UNIQUE INDEX uk_username ON sys_user ((CASE WHEN is_deleted = 0 THEN username ELSE NULL END));
-CREATE UNIQUE INDEX uk_phone ON sys_user ((CASE WHEN is_deleted = 0 THEN phone ELSE NULL END));
 CREATE INDEX idx_sys_user_center_id ON sys_user(center_id);
+CREATE INDEX idx_user_phone ON sys_user(phone);
 
 -- email 唯一（逻辑删除兼容）
 CREATE UNIQUE INDEX uk_email

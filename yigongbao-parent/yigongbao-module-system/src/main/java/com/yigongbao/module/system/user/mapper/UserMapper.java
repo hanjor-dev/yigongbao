@@ -54,13 +54,13 @@ public interface UserMapper extends BaseMapper<UserEntity> {
     UserEntity selectByUsername(String username);
 
     /**
-     * 根据手机号查询用户
+     * 根据手机号查询用户（手机号不再唯一，返回列表）
      *
      * @param phone 手机号
-     * @return 用户实体
+     * @return 用户列表
      */
-    @Select("SELECT * FROM sys_user WHERE phone = #{phone} AND is_deleted = 0 LIMIT 1")
-    UserEntity selectByPhone(String phone);
+    @Select("SELECT * FROM sys_user WHERE phone = #{phone} AND is_deleted = 0")
+    List<UserEntity> selectListByPhone(String phone);
 
     /**
      * 根据邮箱查询用户

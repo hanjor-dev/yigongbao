@@ -293,22 +293,6 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("createUser: 手机号已存在时抛出异常")
-    void createUser_whenPhoneExists_shouldThrowException() {
-        // 准备：用户名不存在，手机号存在
-        when(userMapper.selectCount(any(LambdaQueryWrapper.class)))
-                .thenReturn(0L)  // 用户名检查
-                .thenReturn(1L); // 手机号检查
-
-        // 执行 & 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> userService.createUser(createDTO)
-        );
-        assertEquals(ErrorCodeEnum.USER_PHONE_EXISTS.getCode(), exception.getCode());
-    }
-
-    @Test
     @DisplayName("createUser: 邮箱已存在时抛出异常")
     void createUser_whenEmailExists_shouldThrowException() {
         // 准备：用户名不存在，手机号不存在，邮箱存在
@@ -506,25 +490,6 @@ class UserServiceImplTest {
         assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
     }
 
-    @Test
-    @DisplayName("updateUser: 手机号与其他用户重复时抛出异常")
-    void updateUser_whenPhoneDuplicated_shouldThrowException() {
-        // 准备：更新后的手机号与其他用户重复
-        UpdateUserDTO dtoWithPhone = new UpdateUserDTO();
-        dtoWithPhone.setPhone("13800000002");
-
-        when(userMapper.selectById(1L)).thenReturn(testEntity);
-        // 手机号检查：存在重复（排除自己后还有1条）
-        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
-
-        // 执行 & 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> userService.updateUser(1L, dtoWithPhone)
-        );
-        assertEquals(ErrorCodeEnum.USER_PHONE_EXISTS.getCode(), exception.getCode());
-    }
-
     // ==================== removeUser 测试 ====================
 
     @Test
@@ -708,22 +673,6 @@ class UserServiceImplTest {
                 () -> userService.updateUserBySelf(999L, updateSelfDTO)
         );
         assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
-    }
-
-    @Test
-    @DisplayName("updateUserBySelf: 手机号与其他用户重复时抛出异常")
-    void updateUserBySelf_whenPhoneDuplicated_shouldThrowException() {
-        // 准备：更新后的手机号与其他用户重复
-        when(userMapper.selectById(1L)).thenReturn(testEntity);
-        // 手机号检查：存在重复（排除自己后还有1条）
-        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
-
-        // 执行 & 断言
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> userService.updateUserBySelf(1L, updateSelfDTO)
-        );
-        assertEquals(ErrorCodeEnum.USER_PHONE_EXISTS.getCode(), exception.getCode());
     }
 
     // ==================== createUser 医院范围权限测试 ====================

@@ -43,8 +43,11 @@ import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.service.UserService;
 import com.yigongbao.module.system.user.vo.UserVO;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -55,6 +58,10 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -363,11 +370,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 log.warn("用户名已存在: username={}", maskUsername(dto.getUsername()));
                 throw new BusinessException(ErrorCodeEnum.USER_EXISTS);
             }
-            // 校验手机号全局唯一
-            if (isPhoneExists(dto.getPhone())) {
-                log.warn("手机号已存在: phone={}", maskPhone(dto.getPhone()));
-                throw new BusinessException(ErrorCodeEnum.USER_PHONE_EXISTS);
-            }
             // 邮箱为选填字段: 非空时才做唯一性校验
             if (StrUtil.isNotBlank(dto.getEmail()) && isEmailExists(dto.getEmail())) {
                 log.warn("邮箱已存在: email={}", dto.getEmail());
@@ -400,19 +402,48 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             if (deptEntity != null) {
                 String deptType = deptEntity.getDeptType();
                 if (StatusConstants.DEPT_TYPE_ENTERPRISE.equals(deptType)) {
-                    // 企业部门（deptType=6.1）：强制覆盖 orgId 为生产企业: 防止前端伪造归属；同时要求工号非空
-                    String manufacturerOrgIdStr = configService.getConfigValue(SystemConfigKeyEnum.MANUFACTURER_ORG_ID.getKey());
-                    if (StrUtil.isBlank(manufacturerOrgIdStr)) {
-                        log.error("系统配置缺失：{}: 无法创建内部用户", SystemConfigKeyEnum.MANUFACTURER_ORG_ID.getKey());
-                        throw new BusinessException(ErrorCodeEnum.SYSTEM_CONFIG_MISSING);
+                    // 企业部门（deptType=6.1）：从部门关联动态获取企业机构
+                    List<Long> deptOrgIds = deptOrgMapper.selectList(
+                        new LambdaQueryWrapper<DeptOrgEntity>()
+                            .eq(DeptOrgEntity::getDeptId, dto.getDeptId()))
+                        .stream()
+                        .map(DeptOrgEntity::getOrgId)
+                        .collect(Collectors.toList());
+
+                    // 校验：企业部门必须关联唯一企业机构
+                    if (deptOrgIds.isEmpty()) {
+                        log.warn("企业部门未关联企业机构: deptId={}, deptName={}",
+                            dto.getDeptId(), deptEntity.getDeptName());
+                        throw new BusinessException(ErrorCodeEnum.DEPT_ENTERPRISE_ORG_NOT_BOUND);
                     }
-                    Long manufacturerOrgId = Long.valueOf(manufacturerOrgIdStr);
-                    // 强制将 orgId 设为生产企业: 忽略前端传入值
-                    dto.setOrgId(manufacturerOrgId);
-                    orgEntity = orgService.getById(manufacturerOrgId);
+                    if (deptOrgIds.size() != 1) {
+                        log.error("企业部门关联多个机构，数据异常: deptId={}, orgCount={}",
+                            dto.getDeptId(), deptOrgIds.size());
+                        throw new BusinessException(ErrorCodeEnum.DEPT_ENTERPRISE_ORG_NOT_BOUND);
+                    }
+
+                    Long enterpriseOrgId = deptOrgIds.get(0);
+                    orgEntity = orgService.getById(enterpriseOrgId);
+
+                    // 校验机构类型：必须是生产企业（1.1）或服务商（1.4）
+                    if (!DictCodeConstants.ORG_TYPE_PRODUCER.equals(orgEntity.getOrgType())
+                        && !DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(orgEntity.getOrgType())) {
+                        log.warn("企业部门关联的机构类型错误: deptId={}, orgId={}, orgType={}",
+                            dto.getDeptId(), enterpriseOrgId, orgEntity.getOrgType());
+                        throw new BusinessException(ErrorCodeEnum.DEPT_ENTERPRISE_ORG_TYPE_ERROR);
+                    }
+
+                    // 强制使用部门关联的企业机构（忽略前端传入的 orgId）
+                    dto.setOrgId(enterpriseOrgId);
+
+                    // 企业账户必须填写工号
                     if (StrUtil.isBlank(dto.getEmployeeNo())) {
                         throw new BusinessException(ErrorCodeEnum.EMPLOYEE_NO_REQUIRED);
                     }
+
+                    log.info("企业部门用户机构绑定: username={}, deptId={}, orgId={}, orgType={}, employeeNo={}",
+                        dto.getUsername(), dto.getDeptId(), enterpriseOrgId,
+                        orgEntity.getOrgType(), dto.getEmployeeNo());
                 } else if (StatusConstants.DEPT_TYPE_BUSINESS.equals(deptType)) {
                     // 业务部门（deptType=6.2）：orgId 必填: 且该机构必须已关联到此部门
                     if (dto.getOrgId() == null) {
@@ -452,11 +483,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             }
             // 校验部门必填规则和部门类型匹配：dataScopeType为dept或self的角色必须选择部门: 且角色accountType必须与部门deptType匹配
             validateDeptRequired(roleEntity, deptEntity);
-            // 业务类型账户必须绑定收费模板
-            if (StatusConstants.ACCOUNT_TYPE_BUSINESS.equals(dto.getAccountType()) && dto.getChargingTemplateId() == null) {
-                log.warn("业务类型账户未绑定收费模板: accountType={}", dto.getAccountType());
-                throw new BusinessException(ErrorCodeEnum.CHARGING_TEMPLATE_REQUIRED);
-            }
             // 角色业务规则校验（hospitals范围 + 设计师specialty）
             validateHospitalScope(roleEntity, dto.getHospitalIds());
             validateSpecialty(roleEntity, dto.getSpecialtyList());
@@ -523,7 +549,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
             log.info("创建用户成功: id={}, username={}", entity.getId(), maskUsername(entity.getUsername()));
         } catch (DuplicateKeyException e) {
-            log.warn("用户名或手机号冲突（并发）: username={}", maskUsername(dto.getUsername()), e);
+            log.warn("用户名冲突（并发）: username={}", maskUsername(dto.getUsername()), e);
             throw new BusinessException(ErrorCodeEnum.USER_EXISTS);
         } catch (Exception e) {
             log.error("创建用户异常: orgId={}", dto.getOrgId(), e);
@@ -550,13 +576,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             if (entity == null) {
                 log.warn("用户不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
-            }
-            // 校验手机号是否与其他用户重复
-            if (StrUtil.isNotBlank(dto.getPhone()) && !dto.getPhone().equals(entity.getPhone())) {
-                if (isPhoneExistsExcludingId(dto.getPhone(), id)) {
-                    log.warn("手机号已存在: phone={}", maskPhone(dto.getPhone()));
-                    throw new BusinessException(ErrorCodeEnum.USER_PHONE_EXISTS);
-                }
             }
             // 校验邮箱是否与其他用户重复
             if (StrUtil.isNotBlank(dto.getEmail()) && !dto.getEmail().equals(entity.getEmail())) {
@@ -616,13 +635,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 validateHospitalScope(effectiveRole, dto.getHospitalIds());
                 validateSpecialty(effectiveRole, dto.getSpecialtyList());
             }
-            // 业务类型账户必须绑定收费模板
-            String effectiveAccountType = dto.getAccountType() != null ? dto.getAccountType() : entity.getAccountType();
-            Long effectiveChargingTemplateId = dto.getChargingTemplateId() != null ? dto.getChargingTemplateId() : entity.getChargingTemplateId();
-            if (StatusConstants.ACCOUNT_TYPE_BUSINESS.equals(effectiveAccountType) && effectiveChargingTemplateId == null) {
-                log.warn("业务类型账户未绑定收费模板: accountType={}", effectiveAccountType);
-                throw new BusinessException(ErrorCodeEnum.CHARGING_TEMPLATE_REQUIRED);
-            }
             // 生产员角色校验加工中心，并复用查询结果更新冗余字段
             Long effectiveCenterId = dto.getCenterId() != null ? dto.getCenterId() : entity.getCenterId();
             if (effectiveRole != null && RoleCodeEnum.PRODUCTION_WORKER.getCode().equals(effectiveRole.getRoleCode())) {
@@ -670,9 +682,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             }
             updateById(entity);
             log.info("更新用户成功: id={}", id);
-        } catch (DuplicateKeyException e) {
-            log.warn("手机号冲突（并发）: id={}", id, e);
-            throw new BusinessException(ErrorCodeEnum.USER_PHONE_EXISTS);
         } catch (Exception e) {
             log.error("更新用户异常: id={}", id, e);
             throw e;
@@ -791,13 +800,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         if (entity == null) {
             log.warn("用户不存在: id={}", id);
             throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
-        }
-        // 校验手机号是否与其他用户重复
-        if (dto.getPhone() != null && !dto.getPhone().equals(entity.getPhone())) {
-            if (isPhoneExistsExcludingId(dto.getPhone(), id)) {
-                log.warn("手机号已存在: phone={}", maskPhone(dto.getPhone()));
-                throw new BusinessException(ErrorCodeEnum.USER_PHONE_EXISTS);
-            }
         }
         // 只更新手机号和头像
         if (dto.getPhone() != null) {
@@ -1108,23 +1110,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     }
 
     /**
-     * 校验手机号是否存在
-     */
-    private boolean isPhoneExists(String phone) {
-        return count(new LambdaQueryWrapper<UserEntity>()
-                .eq(UserEntity::getPhone, phone)) > 0;
-    }
-
-    /**
-     * 校验手机号是否存在（排除指定ID）
-     */
-    private boolean isPhoneExistsExcludingId(String phone, Long excludeId) {
-        return count(new LambdaQueryWrapper<UserEntity>()
-                .eq(UserEntity::getPhone, phone)
-                .ne(UserEntity::getId, excludeId)) > 0;
-    }
-
-    /**
      * 校验邮箱是否存在
      */
     private boolean isEmailExists(String email) {
@@ -1262,5 +1247,48 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         String prefix = raw.substring(0, dashIdx);
         long seq = Long.parseLong(raw.substring(dashIdx + 1));
         return prefix + String.format("%03d", seq);
+    }
+
+    @Override
+    public void exportUsers(HttpServletResponse response) {
+        LambdaQueryWrapper<UserEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.orderByDesc(UserEntity::getCreateTime).last("LIMIT 10000");
+
+        List<UserEntity> list = list(wrapper);
+        List<UserVO> voList = list.stream().map(this::toVOWithNames).collect(Collectors.toList());
+
+        try (SXSSFWorkbook workbook = new SXSSFWorkbook(100)) {
+            var sheet = workbook.createSheet("用户列表");
+            String[] headers = {"用户名", "姓名", "手机号", "角色", "所属机构", "所属部门", "状态", "创建时间"};
+
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                headerRow.createCell(i).setCellValue(headers[i]);
+                sheet.setColumnWidth(i, 4000);
+            }
+
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            for (int i = 0; i < voList.size(); i++) {
+                UserVO vo = voList.get(i);
+                Row row = sheet.createRow(i + 1);
+                row.createCell(0).setCellValue(vo.getUsername());
+                row.createCell(1).setCellValue(vo.getRealName());
+                row.createCell(2).setCellValue(vo.getPhone());
+                row.createCell(3).setCellValue(vo.getRoleName());
+                row.createCell(4).setCellValue(vo.getOrgName());
+                row.createCell(5).setCellValue(vo.getDeptName());
+                row.createCell(6).setCellValue(vo.getStatusName());
+                row.createCell(7).setCellValue(vo.getCreateTime() != null ? vo.getCreateTime().format(formatter) : "");
+            }
+
+            String filename = URLEncoder.encode("账户导出.xlsx", StandardCharsets.UTF_8);
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setHeader("Content-Disposition", "attachment; filename=" + filename);
+            workbook.write(response.getOutputStream());
+            log.info("导出用户列表: 总数={}", voList.size());
+        } catch (IOException e) {
+            log.error("导出用户列表失败", e);
+            throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
+        }
     }
 }

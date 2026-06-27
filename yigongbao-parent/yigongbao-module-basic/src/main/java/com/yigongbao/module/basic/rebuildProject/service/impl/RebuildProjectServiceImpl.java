@@ -12,6 +12,7 @@ import com.yigongbao.module.basic.bodyPart.service.BodyPartService;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.rebuildProject.convert.RebuildProjectConvert;
 import com.yigongbao.module.basic.rebuildProject.dto.CreateRebuildProjectDTO;
+import com.yigongbao.module.basic.rebuildProject.dto.RebuildProjectTreeDTO;
 import com.yigongbao.module.basic.rebuildProject.dto.UpdateRebuildProjectDTO;
 import com.yigongbao.module.basic.rebuildProject.entity.RebuildProjectEntity;
 import com.yigongbao.module.basic.rebuildProject.mapper.RebuildProjectMapper;
@@ -20,12 +21,18 @@ import com.yigongbao.module.basic.rebuildProject.vo.BodyPartProjectTreeVO;
 import com.yigongbao.module.basic.rebuildProject.vo.ProjectOptionItemVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
 import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectVO;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.hutool.core.util.StrUtil;
 
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -272,6 +279,7 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
             entity.setUrgentPrice(dto.getUrgentPrice());
             entity.setEstimatedHours(dto.getEstimatedHours());
             entity.setDescription(dto.getDescription());
+            entity.setPoints(dto.getPoints());
             entity.setFormingRequirements(dto.getFormingRequirements());
             entity.setSort(Objects.requireNonNullElse(dto.getSort(), 0));
             entity.setStatus(Objects.requireNonNullElse(dto.getStatus(), entity.getStatus()));
@@ -513,5 +521,52 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
             case DictCodeConstants.PROJECT_CATEGORY_OTHER   -> "其他";
             default -> null;
         };
+    }
+
+    @Override
+    public void exportProjects(HttpServletResponse response) {
+        List<RebuildProjectVO> tree = listTree(null, null);
+        List<RebuildProjectVO> flatList = tree.stream()
+                .flatMap(parent -> {
+                    List<RebuildProjectVO> list = new ArrayList<>();
+                    list.add(parent);
+                    if (parent.getChildren() != null) {
+                        list.addAll(parent.getChildren());
+                    }
+                    return list.stream();
+                })
+                .collect(Collectors.toList());
+
+        try (SXSSFWorkbook workbook = new SXSSFWorkbook(100)) {
+            var sheet = workbook.createSheet("重建项目列表");
+            String[] headers = {"项目名称", "项目编码", "所属部位", "项目分类", "层级", "积分权重", "状态"};
+
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                headerRow.createCell(i).setCellValue(headers[i]);
+                sheet.setColumnWidth(i, 4000);
+            }
+
+            for (int i = 0; i < flatList.size(); i++) {
+                RebuildProjectVO vo = flatList.get(i);
+                Row row = sheet.createRow(i + 1);
+                row.createCell(0).setCellValue(vo.getName());
+                row.createCell(1).setCellValue(vo.getCode());
+                row.createCell(2).setCellValue(vo.getBodyPartName());
+                row.createCell(3).setCellValue(vo.getCategoryName());
+                row.createCell(4).setCellValue(vo.getLevel() == 1 ? "重建项目" : "子重建项目");
+                row.createCell(5).setCellValue(vo.getPoints());
+                row.createCell(6).setCellValue(vo.getStatusName());
+            }
+
+            String filename = URLEncoder.encode("重建项目.xlsx", StandardCharsets.UTF_8);
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setHeader("Content-Disposition", "attachment; filename=" + filename);
+            workbook.write(response.getOutputStream());
+            log.info("导出重建项目列表: 总数={}", flatList.size());
+        } catch (IOException e) {
+            log.error("导出重建项目列表失败", e);
+            throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
+        }
     }
 }

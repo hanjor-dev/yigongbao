@@ -9,6 +9,7 @@ import com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO;
 import com.yigongbao.module.system.user.dto.UserPageDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.vo.UserVO;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.List;
 
@@ -128,4 +129,11 @@ public interface UserService extends IService<UserEntity> {
      * @return 预占的用户名，手动模式返回 null
      */
     String previewUsername(Long orgId);
+
+    /**
+     * 导出用户列表为 Excel
+     *
+     * @param response HTTP 响应
+     */
+    void exportUsers(HttpServletResponse response);
 }

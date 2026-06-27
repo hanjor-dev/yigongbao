@@ -10,6 +10,7 @@ import com.yigongbao.module.system.org.vo.OrgVO;
 
 import com.yigongbao.module.system.org.vo.OrgHospitalChangeCheckVO;
 import com.yigongbao.module.system.org.vo.OrgOperationCheckVO;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.List;
 
@@ -98,4 +99,11 @@ public interface OrgService extends IService<OrgEntity> {
      * @return 检查结果
      */
     OrgOperationCheckVO checkDisable(Long id);
+
+    /**
+     * 导出机构列表为 Excel
+     *
+     * @param response HTTP 响应
+     */
+    void exportOrgs(HttpServletResponse response);
 }

@@ -128,39 +128,11 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 手机验证码登录
+     * 手机验证码登录（已禁用：手机号不再唯一，无法区分用户身份）
      */
     private LoginVO resolveByPhone(LoginDTO dto, String ip, String userAgent) {
-        // 1. 校验验证码
-        captchaService.verifyCaptcha(
-                com.yigongbao.module.system.auth.enums.CaptchaTypeEnum.PHONE.getValue(),
-                dto.getPrincipal(), CaptchaSceneEnum.LOGIN.getScene(), dto.getCredential()
-        );
-
-        // 2. 查询用户
-        UserEntity user = userMapper.selectByPhone(dto.getPrincipal());
-        if (user == null) {
-            log.warn("手机号对应用户不存在: phone={}", dto.getPrincipal());
-            saveLoginLog(null, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户不存在");
-            throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
-        }
-
-        // 3. 校验用户状态
-        if (Integer.valueOf(StatusConstants.DISABLED).equals(user.getStatus())) {
-            log.warn("用户已禁用: phone={}", dto.getPrincipal());
-            saveLoginLog(user.getId(), dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "用户已禁用");
-            throw new BusinessException(ErrorCodeEnum.USER_DISABLED);
-        }
-        // 校验用户所属机构状态
-        validateOrgStatus(user, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent);
-        if (isAccountLocked(user)) {
-            int remainingMinutes = calculateRemainingLockMinutes(user);
-            log.warn("账户已锁定: phone={}, 剩余{}分钟", dto.getPrincipal(), remainingMinutes);
-            saveLoginLog(user.getId(), dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent, 0, "账户已锁定");
-            throw new BusinessException(ErrorCodeEnum.ACCOUNT_LOCKED, remainingMinutes);
-        }
-
-        return buildLoginSuccess(user, dto.getPrincipal(), dto.getLoginType().getValue(), ip, userAgent);
+        log.warn("手机验证码登录已禁用: phone={}", dto.getPrincipal());
+        throw new BusinessException(ErrorCodeEnum.LOGIN_TYPE_NOT_SUPPORTED);
     }
 
     /**
@@ -287,20 +259,20 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 发送忘记密码验证码
+     * 发送忘记密码验证码（仅支持邮箱）
      * 防反枚举攻击：无论 target 是否注册，接口始终返回成功
      */
     @Override
     public void sendForgotPasswordCaptcha(SendCaptchaDTO dto) {
-        // 检查 target 是否存在（防止滥用，但不对外暴露结果）
-        UserEntity user = null;
+        // 手机号找回密码已禁用
         if (com.yigongbao.module.system.auth.enums.CaptchaTypeEnum.PHONE == dto.getCaptchaType()) {
-            user = userMapper.selectByPhone(dto.getTarget());
-        } else if (com.yigongbao.module.system.auth.enums.CaptchaTypeEnum.EMAIL == dto.getCaptchaType()) {
-            user = userMapper.selectByEmail(dto.getTarget());
+            log.warn("手机号找回密码已禁用: phone={}", dto.getTarget());
+            throw new BusinessException(ErrorCodeEnum.PHONE_RESET_PASSWORD_NOT_SUPPORTED);
         }
+
+        // 检查邮箱是否存在
+        UserEntity user = userMapper.selectByEmail(dto.getTarget());
         if (user == null) {
-            // 静默成功，防止枚举用户
             log.info("忘记密码验证码: target未注册，静默成功, target={}", dto.getTarget());
             return;
         }
@@ -308,7 +280,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 忘记密码：校验验证码并重置密码
+     * 忘记密码：校验验证码并重置密码（仅支持邮箱）
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -317,21 +289,21 @@ public class AuthServiceImpl implements AuthService {
         captchaService.verifyCaptcha(dto.getCaptchaType().getValue(), dto.getTarget(),
                 CaptchaSceneEnum.FORGOT.getScene(), dto.getCaptcha());
 
-        // 2. 查询用户
-        UserEntity user = null;
+        // 2. 仅支持邮箱重置密码
         if (com.yigongbao.module.system.auth.enums.CaptchaTypeEnum.PHONE == dto.getCaptchaType()) {
-            user = userMapper.selectByPhone(dto.getTarget());
-        } else if (com.yigongbao.module.system.auth.enums.CaptchaTypeEnum.EMAIL == dto.getCaptchaType()) {
-            user = userMapper.selectByEmail(dto.getTarget());
+            log.warn("手机号重置密码已禁用: phone={}", dto.getTarget());
+            throw new BusinessException(ErrorCodeEnum.PHONE_RESET_PASSWORD_NOT_SUPPORTED);
         }
+
+        // 3. 查询用户
+        UserEntity user = userMapper.selectByEmail(dto.getTarget());
         if (user == null) {
             log.warn("忘记密码重置失败: 用户不存在: target={}", dto.getTarget());
             throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
         }
 
-        // 3. 更新密码
+        // 4. 更新密码
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
-        // 解锁账户
         user.setLoginFailCount(0);
         user.setLockTime(null);
         userMapper.updateById(user);

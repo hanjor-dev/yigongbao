@@ -49,6 +49,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.hutool.core.util.StrUtil;
 
+import jakarta.servlet.http.HttpServletResponse;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -197,8 +205,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             log.warn("机构类型不存在: orgType={}", dto.getOrgType());
             throw new BusinessException(ErrorCodeEnum.ORG_TYPE_NOT_FOUND);
         }
-        // 经销商机构类型时账号前缀必填
-        if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType()) && StrUtil.isBlank(dto.getUsernamePrefix())) {
+        // 经销商/服务商机构类型时账号前缀必填
+        if ((DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType())
+            || DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(dto.getOrgType()))
+            && StrUtil.isBlank(dto.getUsernamePrefix())) {
             throw new BusinessException(ErrorCodeEnum.ORG_USERNAME_PREFIX_REQUIRED);
         }
         // 经销商机构类型时资质类型必填
@@ -802,5 +812,61 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             result.setMessage("本次变更将移除 " + removedHospitals.size() + " 家医院，导致 " + affectedUsers.size() + " 个业务员失去对应医院的访问权限，请确认是否继续？");
         }
         return result;
+    }
+
+    @Override
+    public void exportOrgs(HttpServletResponse response) {
+        LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.orderByDesc(OrgEntity::getCreateTime).last("LIMIT 10000");
+
+        List<OrgEntity> list = list(wrapper);
+        List<OrgVO> voList = list.stream().map(entity -> {
+            OrgVO vo = OrgConvert.toVO(entity);
+            if (vo.getOrgType() != null) {
+                DictVO dict = dictService.getByDictCode(vo.getOrgType());
+                vo.setOrgTypeName(dict != null ? dict.getDictName() : "");
+            }
+            if (vo.getAreaId() != null) {
+                AreaEntity area = areaService.getById(vo.getAreaId());
+                vo.setAreaName(area != null ? area.getName() : "");
+            }
+            vo.setStatusName(StatusConstants.getStatusName(vo.getStatus()));
+            return vo;
+        }).collect(Collectors.toList());
+
+        try (SXSSFWorkbook workbook = new SXSSFWorkbook(100)) {
+            var sheet = workbook.createSheet("机构列表");
+            String[] headers = {"机构名称", "机构编码", "机构类型", "地区", "联系人", "联系电话", "邮箱", "状态", "创建时间"};
+
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                headerRow.createCell(i).setCellValue(headers[i]);
+                sheet.setColumnWidth(i, 4000);
+            }
+
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            for (int i = 0; i < voList.size(); i++) {
+                OrgVO vo = voList.get(i);
+                Row row = sheet.createRow(i + 1);
+                row.createCell(0).setCellValue(vo.getOrgName());
+                row.createCell(1).setCellValue(vo.getOrgCode());
+                row.createCell(2).setCellValue(vo.getOrgTypeName());
+                row.createCell(3).setCellValue(vo.getAreaName());
+                row.createCell(4).setCellValue(vo.getContact());
+                row.createCell(5).setCellValue(vo.getPhone());
+                row.createCell(6).setCellValue(vo.getEmail());
+                row.createCell(7).setCellValue(vo.getStatusName());
+                row.createCell(8).setCellValue(vo.getCreateTime() != null ? vo.getCreateTime().format(formatter) : "");
+            }
+
+            String filename = URLEncoder.encode("机构列表.xlsx", StandardCharsets.UTF_8);
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setHeader("Content-Disposition", "attachment; filename=" + filename);
+            workbook.write(response.getOutputStream());
+            log.info("导出机构列表: 总数={}", voList.size());
+        } catch (IOException e) {
+            log.error("导出机构列表失败", e);
+            throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
+        }
     }
 }

@@ -17,6 +17,7 @@ public enum RoleCodeEnum {
     ADMIN("admin", "超级管理员"),
     COMPANY_ADMIN("company-admin", "公司管理员"),
     SALESMAN("salesman", "业务员"),
+    SALESMAN_SELF("salesman-self", "业务员（自营）"),
     REGIONAL_MANAGER("regional-manager", "区域管理员"),
     DESIGNER("designer", "设计师"),
     DESIGNER_MANAGER("designer-manager", "设计管理员"),

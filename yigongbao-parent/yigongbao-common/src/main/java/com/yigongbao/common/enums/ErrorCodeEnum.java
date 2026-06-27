@@ -36,7 +36,8 @@ public enum ErrorCodeEnum {
     USER_NOT_FOUND(601, "用户不存在", 3),
     USER_DISABLED(602, "用户已被禁用", 3),
     USER_EXISTS(603, "用户名已存在", 3),
-    USER_PHONE_EXISTS(604, "手机号已存在", 3),
+    @Deprecated
+    USER_PHONE_EXISTS(604, "手机号已存在（已废弃：手机号不再唯一）", 3),
 
     // ==================== 认证相关 605-612 ====================
     PASSWORD_ERROR(605, "密码错误", 1),
@@ -47,6 +48,8 @@ public enum ErrorCodeEnum {
     LOGIN_MAX_FAILURES(610, "登录失败次数过多，账户已被锁定", 1),
     TOKEN_INVALID(611, "Token无效或已过期", 1),
     PERMISSION_DENIED(612, "没有权限执行该操作", 1),
+    LOGIN_TYPE_NOT_SUPPORTED(613, "该登录方式暂不支持", 1),
+    PHONE_RESET_PASSWORD_NOT_SUPPORTED(614, "暂不支持手机号找回密码，请使用邮箱找回", 1),
 
     // ==================== 机构相关 613-620 ====================
     ORG_NOT_FOUND(613, "机构不存在", 4),
@@ -71,6 +74,8 @@ public enum ErrorCodeEnum {
     DEPT_DISABLED(633, "部门已停用", 5),
     DEPT_ORG_ALREADY_BOUND(634, "以下经销商已被其他部门关联: %s", 5),
     DEPT_INTERNAL_ORG_LIMIT(635, "内部部门只能关联一个生产企业机构", 5),
+    DEPT_ENTERPRISE_ORG_NOT_BOUND(636, "企业部门未关联企业机构", 5),
+    DEPT_ENTERPRISE_ORG_TYPE_ERROR(637, "企业部门关联的机构类型错误（必须是生产企业或服务商）", 5),
 
     // ==================== 角色相关 622-628 ====================
     USER_ROLE_NOT_FOUND(622, "角色不存在", 5),
