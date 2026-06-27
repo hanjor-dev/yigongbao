@@ -576,6 +576,14 @@ public class OrderDataValidator {
                 throw new BusinessException(ErrorCodeEnum.ORDER_BUSINESS_TYPE_RESTRICTED);
             }
         }
+        // 业务员（自营）不能选择"测试"（11.2）类型
+        if (com.yigongbao.common.enums.RoleCodeEnum.SALESMAN_SELF.getCode().equals(user.getRoleCode())) {
+            if (com.yigongbao.common.constant.DictCodeConstants.ORDER_BUSINESS_TYPE_TEST.equals(businessType)) {
+                log.warn("业务员（自营）不允许选择测试业务类型: userId={}, roleCode={}, businessType={}",
+                        userId, user.getRoleCode(), businessType);
+                throw new BusinessException(ErrorCodeEnum.ORDER_BUSINESS_TYPE_RESTRICTED);
+            }
+        }
         // 试用订单（11.3）必须上传审批文件
         if (com.yigongbao.common.constant.DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(businessType)) {
             if (approvalFileIds == null || approvalFileIds.isEmpty()) {
