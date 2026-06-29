@@ -76,6 +76,7 @@ public enum ErrorCodeEnum {
     DEPT_INTERNAL_ORG_LIMIT(635, "内部部门只能关联一个生产企业机构", 5),
     DEPT_ENTERPRISE_ORG_NOT_BOUND(636, "企业部门未关联企业机构", 5),
     DEPT_ENTERPRISE_ORG_TYPE_ERROR(637, "企业部门关联的机构类型错误（必须是生产企业或服务商）", 5),
+    DEPT_ORG_TYPE_MIXED(638, "部门关联机构类型不能混合，只允许全部为经销商或全部为服务商", 5),
 
     // ==================== 角色相关 622-628 ====================
     USER_ROLE_NOT_FOUND(622, "角色不存在", 5),

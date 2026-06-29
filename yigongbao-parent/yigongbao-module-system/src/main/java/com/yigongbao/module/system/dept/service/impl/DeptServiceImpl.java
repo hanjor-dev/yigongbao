@@ -509,14 +509,26 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                     orgs.stream().map(OrgEntity::getOrgType).collect(Collectors.joining(",")));
                 throw new BusinessException(ErrorCodeEnum.DEPT_ENTERPRISE_ORG_TYPE_ERROR);
             }
-        } else {
-            // 业务部门：校验机构类型均为经销商
+        } else if (StatusConstants.DEPT_TYPE_BUSINESS.equals(deptType)) {
+            // 业务部门：关联机构不允许混合经销商和服务商类型
             List<OrgEntity> orgs = orgService.listByIds(orgIds);
-            boolean mismatch = orgs.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_DEALER.equals(o.getOrgType()));
+            Set<String> orgTypes = orgs.stream()
+                .map(OrgEntity::getOrgType)
+                .filter(type -> DictCodeConstants.ORG_TYPE_DEALER.equals(type)
+                    || DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(type))
+                .collect(Collectors.toSet());
+            if (orgTypes.size() > 1) {
+                log.warn("业务部门关联机构类型混合: orgTypes={}", String.join(",", orgTypes));
+                throw new BusinessException(ErrorCodeEnum.DEPT_ORG_TYPE_MIXED);
+            }
+            // 校验机构类型均为经销商或服务商
+            boolean mismatch = orgs.stream().anyMatch(o ->
+                !DictCodeConstants.ORG_TYPE_DEALER.equals(o.getOrgType())
+                && !DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(o.getOrgType()));
             if (mismatch) {
                 throw new BusinessException(ErrorCodeEnum.ORG_DEPT_TYPE_MISMATCH);
             }
-            // 校验每个经销商未被其他外部部门关联（一个经销商只属于一个部门）
+            // 校验每个经销商/服务商未被其他业务部门关联（一个机构只属于一个部门）
             List<Long> boundOrgIds = new ArrayList<>();
             for (Long orgId : orgIds) {
                 LambdaQueryWrapper<DeptOrgEntity> wrapper = new LambdaQueryWrapper<DeptOrgEntity>()
