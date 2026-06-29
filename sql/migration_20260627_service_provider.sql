@@ -5,8 +5,9 @@
 -- ============================================================
 
 -- 1. 新增服务商机构类型字典项
-INSERT INTO sys_dict (dict_code, dict_name, parent_code, sort_order, status, remark, create_time, update_time, is_deleted)
-VALUES ('1.4', '服务商', '1', 4, 1, '企业自营业务机构', NOW(), NOW(), 0);
+SET @org_type_parent_id = (SELECT id FROM sys_dict WHERE dict_code = '1' AND is_deleted = 0 LIMIT 1);
+INSERT INTO sys_dict (dict_code, dict_name, parent_id, sort, status, remark, create_time, update_time, is_deleted)
+VALUES ('1.4', '服务商', @org_type_parent_id, 4, 1, '企业自营业务机构', NOW(), NOW(), 0);
 
 -- 2. 新增业务员（自营）角色
 INSERT INTO sys_role (role_name, role_code, account_type, data_scope_type, status, remark, create_time, update_time, is_deleted)
@@ -16,10 +17,14 @@ VALUES ('业务员（自营）', 'salesman-self', '6.1', 'HOSPITALS', 1, '企业
 SET @salesman_role_id = (SELECT id FROM sys_role WHERE role_code = 'salesman' AND is_deleted = 0);
 SET @salesman_self_role_id = (SELECT id FROM sys_role WHERE role_code = 'salesman-self' AND is_deleted = 0);
 
-INSERT INTO sys_role_resource (role_id, resource_id, create_time, update_time, is_deleted)
-SELECT @salesman_self_role_id, resource_id, NOW(), NOW(), 0
-FROM sys_role_resource
-WHERE role_id = @salesman_role_id AND is_deleted = 0;
+-- 使用临时表避免同表查询插入问题
+CREATE TEMPORARY TABLE temp_resources AS
+SELECT resource_id FROM sys_role_resource WHERE role_id = @salesman_role_id;
+
+INSERT INTO sys_role_resource (role_id, resource_id)
+SELECT @salesman_self_role_id, resource_id FROM temp_resources;
+
+DROP TEMPORARY TABLE temp_resources;
 
 -- 4. 数据迁移：为现有企业部门补充与生产企业的关联记录
 SET @manufacturer_org_id = (
@@ -30,19 +35,17 @@ SET @manufacturer_org_id = (
 );
 SET @manufacturer_org_id = IFNULL(@manufacturer_org_id, 1);
 
-INSERT INTO sys_dept_org (dept_id, org_id, create_time, update_time, is_deleted)
+INSERT INTO sys_dept_org (dept_id, org_id, create_time)
 SELECT
     d.id,
     @manufacturer_org_id,
-    NOW(),
-    NOW(),
-    0
+    NOW()
 FROM sys_dept d
 WHERE d.dept_type = '6.1'
   AND d.is_deleted = 0
   AND NOT EXISTS (
       SELECT 1 FROM sys_dept_org do
-      WHERE do.dept_id = d.id AND do.is_deleted = 0
+      WHERE do.dept_id = d.id
   );
 
 -- 5. 验证：查询企业部门关联情况
@@ -53,7 +56,7 @@ SELECT
     o.org_name,
     o.org_type
 FROM sys_dept d
-LEFT JOIN sys_dept_org do ON d.id = do.dept_id AND do.is_deleted = 0
+LEFT JOIN sys_dept_org do ON d.id = do.dept_id
 LEFT JOIN sys_org o ON do.org_id = o.id AND o.is_deleted = 0
 WHERE d.dept_type = '6.1'
   AND d.is_deleted = 0

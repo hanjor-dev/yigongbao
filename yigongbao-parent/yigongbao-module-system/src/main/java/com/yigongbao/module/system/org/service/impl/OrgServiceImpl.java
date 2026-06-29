@@ -158,8 +158,9 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
         }
         OrgVO vo = toVOWithDictNames(entity);
-        // 填充经销商关联的医疗机构
-        if (DictCodeConstants.ORG_TYPE_DEALER.equals(entity.getOrgType())) {
+        // 填充经销商或服务商关联的医疗机构
+        if (DictCodeConstants.ORG_TYPE_DEALER.equals(entity.getOrgType())
+                || DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(entity.getOrgType())) {
             List<Long> hospitalOrgIds = orgHospitalMapper.selectList(
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrgHospitalEntity>()
                             .eq(OrgHospitalEntity::getDistributorOrgId, id))
@@ -245,8 +246,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
         if (StrUtil.isNotBlank(dto.getQualificationFile())) {
             fileService.linkFile(dto.getQualificationFile(), FileBizTypeEnum.ORG_CERT.getDictCode(), entity.getId());
         }
-        // 经销商类型：保存关联医疗机构
-        if (DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType()) && dto.getHospitalOrgIds() != null && !dto.getHospitalOrgIds().isEmpty()) {
+        // 经销商类型或服务商类型：保存关联医疗机构
+        if ((DictCodeConstants.ORG_TYPE_DEALER.equals(dto.getOrgType())
+                || DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(dto.getOrgType()))
+                && dto.getHospitalOrgIds() != null && !dto.getHospitalOrgIds().isEmpty()) {
             // 校验 hospitalOrgIds 中的机构必须是医疗机构类型
             List<OrgEntity> hospitals = listByIds(dto.getHospitalOrgIds());
             boolean hasInvalid = hospitals.stream().anyMatch(o -> !DictCodeConstants.ORG_TYPE_HOSPITAL.equals(o.getOrgType()));
@@ -321,9 +324,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
                     .eq(UserEntity::getOrgId, id)
                     .set(UserEntity::getOrgName, dto.getOrgName()));
         }
-        // 经销商类型且前端传入了 hospitalOrgIds 时，全量替换关联关系（先校验后删插）
+        // 经销商类型或服务商类型且前端传入了 hospitalOrgIds 时，全量替换关联关系（先校验后删插）
         String orgType = entity.getOrgType();
-        if (DictCodeConstants.ORG_TYPE_DEALER.equals(orgType) && dto.getHospitalOrgIds() != null) {
+        if ((DictCodeConstants.ORG_TYPE_DEALER.equals(orgType)
+                || DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(orgType))
+                && dto.getHospitalOrgIds() != null) {
             // 先校验新列表合法性，再执行写操作
             if (!dto.getHospitalOrgIds().isEmpty()) {
                 List<OrgEntity> hospitals = listByIds(dto.getHospitalOrgIds());
@@ -338,7 +343,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements
             if (!dto.getHospitalOrgIds().isEmpty()) {
                 saveOrgHospitalRelations(id, dto.getHospitalOrgIds());
             }
-            // 同步清理该经销商下业务员中已失效的医院权限
+            // 同步清理该机构下用户中已失效的医院权限
             java.util.Set<Long> newSet = new java.util.HashSet<>(dto.getHospitalOrgIds());
             List<UserEntity> users = userMapper.selectList(
                     new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getOrgId, id));

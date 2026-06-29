@@ -27,6 +27,7 @@ public class DashboardServiceImpl implements IDashboardService {
 
     private final UserService userService;
     private final SalesmanDashboardStrategy salesmanStrategy;
+    private final SalesmanSelfDashboardStrategy salesmanSelfStrategy;
     private final DesignerDashboardStrategy designerStrategy;
     private final SuperAdminDashboardStrategy superAdminStrategy;
     private final RegionalManagerDashboardStrategy regionalManagerStrategy;
@@ -45,6 +46,7 @@ public class DashboardServiceImpl implements IDashboardService {
     public void init() {
         strategyMap.put(RoleCodeEnum.ADMIN.getCode(), superAdminStrategy);
         strategyMap.put(RoleCodeEnum.SALESMAN.getCode(), salesmanStrategy);
+        strategyMap.put(RoleCodeEnum.SALESMAN_SELF.getCode(), salesmanSelfStrategy);
         strategyMap.put(RoleCodeEnum.DESIGNER.getCode(), designerStrategy);
         strategyMap.put(RoleCodeEnum.REGIONAL_MANAGER.getCode(), regionalManagerStrategy);
         strategyMap.put(RoleCodeEnum.DESIGNER_MANAGER.getCode(), designerManagerStrategy);
