@@ -271,7 +271,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
     /**
      * 获取当前用户创建订单时可操作的医院列表
      * <p>
-     * 先通过用户所属经销商机构（sys_org_hospital）确定候选医院范围，
+     * 先通过用户所属机构（经销商或服务商）在 sys_org_hospital 中关联的医院确定候选范围，
      * 再按数据权限类型筛选：HOSPITALS 权限取与已分配列表的交集，ALL/ORG 直接返回全部。
      * </p>
      *
@@ -283,20 +283,20 @@ public class UserHospitalServiceImpl implements UserHospitalService {
         UserEntity user = userMapper.selectById(userId);
         if (user == null) throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
 
-        // 1. 查用户所属经销商机构下关联的所有医院
-        Long distributorOrgId = user.getOrgId();
-        if (distributorOrgId == null) {
+        // 1. 查用户所属机构（经销商或服务商）关联的所有医院
+        Long orgId = user.getOrgId();
+        if (orgId == null) {
             log.warn("用户未分配机构: userId={}", userId);
             return new ArrayList<>();
         }
 
-        List<Long> dealerHospitalIds = orgHospitalMapper.selectList(
+        List<Long> orgHospitalIds = orgHospitalMapper.selectList(
                         new LambdaQueryWrapper<OrgHospitalEntity>()
-                                .eq(OrgHospitalEntity::getDistributorOrgId, distributorOrgId))
+                                .eq(OrgHospitalEntity::getDistributorOrgId, orgId))
                 .stream().map(OrgHospitalEntity::getHospitalOrgId).collect(Collectors.toList());
 
-        if (dealerHospitalIds.isEmpty()) {
-            log.info("经销商机构无关联医院，distributorOrgId={}", distributorOrgId);
+        if (orgHospitalIds.isEmpty()) {
+            log.info("机构无关联医院，orgId={}", orgId);
             return new ArrayList<>();
         }
 
@@ -304,12 +304,12 @@ public class UserHospitalServiceImpl implements UserHospitalService {
         DataScopeTypeEnum scopeType = getDataScopeType(userId);
         List<Long> resultIds;
         if (scopeType == DataScopeTypeEnum.HOSPITALS) {
-            // HOSPITALS 权限：取经销商医院与用户已分配医院的交集
+            // HOSPITALS 权限：取机构关联医院与用户已分配医院的交集
             Set<Long> assignedIdSet = new HashSet<>(getHospitalIdsByUserId(userId));
-            resultIds = dealerHospitalIds.stream().filter(assignedIdSet::contains).collect(Collectors.toList());
+            resultIds = orgHospitalIds.stream().filter(assignedIdSet::contains).collect(Collectors.toList());
         } else {
-            // ALL / ORG 权限：返回经销商下全部关联医院
-            resultIds = dealerHospitalIds;
+            // ALL / ORG 权限：返回机构下全部关联医院
+            resultIds = orgHospitalIds;
         }
 
         if (resultIds.isEmpty()) {

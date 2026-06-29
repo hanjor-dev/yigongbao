@@ -486,8 +486,8 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
 
     /**
      * 校验机构类型与部门类型的匹配关系，并附加以下约束：
-     * - 企业部门（deptType=6.1）：orgIds 只能传一个，且必须是生产企业
-     * - 业务部门（deptType=6.2）：每个经销商只能属于一个业务部门（排除 excludeDeptId 自身）
+     * - 企业部门（deptType=6.1）：允许生产企业（最多1个）或服务商（可多个），不允许混合
+     * - 业务部门（deptType=6.2）：每个经销商/服务商只能属于一个业务部门（排除 excludeDeptId 自身）
      *
      * @param orgIds        待关联的机构ID列表
      * @param deptType      部门类型（字典编码：6.1=企业部门，6.2=业务部门）
@@ -495,12 +495,19 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
      */
     private void validateOrgTypeMatchDeptType(List<Long> orgIds, String deptType, Long excludeDeptId) {
         if (StatusConstants.DEPT_TYPE_ENTERPRISE.equals(deptType)) {
-            // 企业部门只能关联一个企业机构
-            if (orgIds.size() > 1) {
-                throw new BusinessException(ErrorCodeEnum.DEPT_INTERNAL_ORG_LIMIT);
-            }
             List<OrgEntity> orgs = orgService.listByIds(orgIds);
-            // 允许生产企业（1.1）或服务商（1.4）
+            // 收集机构类型
+            Set<String> orgTypes = orgs.stream()
+                .map(OrgEntity::getOrgType)
+                .filter(type -> DictCodeConstants.ORG_TYPE_PRODUCER.equals(type)
+                    || DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(type))
+                .collect(Collectors.toSet());
+            // 不允许混合生产企业和服务商
+            if (orgTypes.size() > 1) {
+                log.warn("企业部门不允许混合生产企业和服务商: orgTypes={}", String.join(",", orgTypes));
+                throw new BusinessException(ErrorCodeEnum.DEPT_ORG_TYPE_MIXED);
+            }
+            // 校验机构类型必须是生产企业或服务商
             boolean mismatch = orgs.stream().anyMatch(o ->
                 !DictCodeConstants.ORG_TYPE_PRODUCER.equals(o.getOrgType())
                 && !DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(o.getOrgType()));
@@ -508,6 +515,13 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> impleme
                 log.warn("企业部门关联的机构类型错误: orgTypes={}",
                     orgs.stream().map(OrgEntity::getOrgType).collect(Collectors.joining(",")));
                 throw new BusinessException(ErrorCodeEnum.DEPT_ENTERPRISE_ORG_TYPE_ERROR);
+            }
+            // 如果包含生产企业，只能关联1个
+            long producerCount = orgs.stream()
+                .filter(o -> DictCodeConstants.ORG_TYPE_PRODUCER.equals(o.getOrgType()))
+                .count();
+            if (producerCount > 1) {
+                throw new BusinessException(ErrorCodeEnum.DEPT_INTERNAL_ORG_LIMIT);
             }
         } else if (StatusConstants.DEPT_TYPE_BUSINESS.equals(deptType)) {
             // 业务部门：关联机构不允许混合经销商和服务商类型

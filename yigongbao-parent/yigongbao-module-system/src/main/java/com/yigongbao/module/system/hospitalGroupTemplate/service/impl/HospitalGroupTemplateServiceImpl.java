@@ -320,11 +320,11 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
      * 查询模板医院明细列表，并填充机构详细信息、已分配状态和可用性标识
      * <p>
      * assigned 字段：表示该医院已被全系统任意用户分配<br>
-     * isAvailable 字段：表示该医院对指定经销商机构是否可用（在经销商关联医院列表中）
+     * isAvailable 字段：表示该医院对指定机构是否可用（在机构关联医院列表中）
      * </p>
      *
      * @param templateId 模板ID
-     * @param orgId      经销商机构ID（可选，传入时标记医院可用性；不传时 isAvailable 默认为 true）
+     * @param orgId      机构ID（经销商或服务商，可选；传入时仅返回该机构关联的医院；不传时返回全部）
      * @return 明细VO列表，每条记录包含机构信息、assigned 和 isAvailable 标志
      */
     private List<HospitalGroupTemplateDetailVO> getDetails(Long templateId, Long orgId) {
@@ -345,7 +345,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
         // 查询全系统任意用户已分配的医院ID集合（管理员视角）
         Set<Long> assignedHospitalIds = userHospitalService.getAssignedHospitalIds(hospitalIds);
 
-        // 查询指定经销商关联的医院ID集合（用于标记可用性）
+        // 查询指定机构关联的医院ID集合
         Set<Long> availableHospitalIds = new java.util.HashSet<>();
         if (orgId != null) {
             availableHospitalIds = orgHospitalMapper.selectList(
@@ -363,7 +363,7 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
             detailVO.setCreateTime(d.getCreateTime());
             // 标记该医院是否已被系统中任意用户分配
             detailVO.setAssigned(assignedHospitalIds.contains(d.getHospitalId()));
-            // 标记该医院对指定经销商是否可用
+            // 标记该医院对指定机构是否可用
             detailVO.setIsAvailable(orgId == null || finalAvailableHospitalIds.contains(d.getHospitalId()));
             OrgEntity org = orgMap.get(d.getHospitalId());
             if (org != null) {
@@ -377,9 +377,16 @@ public class HospitalGroupTemplateServiceImpl extends ServiceImpl<HospitalGroupT
             return detailVO;
         })
         .filter(vo -> {
-            // 过滤掉已禁用的医院（保留关联数据，但查询时不返回）
             OrgEntity org = orgMap.get(vo.getHospitalId());
-            return org != null && org.getStatus() != null && org.getStatus().equals(StatusConstants.NORMAL);
+            // 过滤掉已禁用的医院
+            if (org == null || !org.getStatus().equals(StatusConstants.NORMAL)) {
+                return false;
+            }
+            // 当指定了机构时，只返回该机构关联的医院
+            if (orgId != null && !finalAvailableHospitalIds.contains(vo.getHospitalId())) {
+                return false;
+            }
+            return true;
         })
         .collect(Collectors.toList());
     }

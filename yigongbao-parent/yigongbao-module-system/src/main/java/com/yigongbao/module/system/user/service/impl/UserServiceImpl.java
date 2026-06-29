@@ -410,19 +410,26 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                         .map(DeptOrgEntity::getOrgId)
                         .collect(Collectors.toList());
 
-                    // 校验：企业部门必须关联唯一企业机构
+                    // 校验：企业部门必须关联至少1个机构
                     if (deptOrgIds.isEmpty()) {
                         log.warn("企业部门未关联企业机构: deptId={}, deptName={}",
                             dto.getDeptId(), deptEntity.getDeptName());
                         throw new BusinessException(ErrorCodeEnum.DEPT_ENTERPRISE_ORG_NOT_BOUND);
                     }
-                    if (deptOrgIds.size() != 1) {
-                        log.error("企业部门关联多个机构，数据异常: deptId={}, orgCount={}",
-                            dto.getDeptId(), deptOrgIds.size());
-                        throw new BusinessException(ErrorCodeEnum.DEPT_ENTERPRISE_ORG_NOT_BOUND);
-                    }
 
-                    Long enterpriseOrgId = deptOrgIds.get(0);
+                    Long enterpriseOrgId;
+                    // 如果部门关联多个机构（服务商场景），需前端传入 orgId 指定
+                    if (deptOrgIds.size() > 1) {
+                        if (dto.getOrgId() == null || !deptOrgIds.contains(dto.getOrgId())) {
+                            log.warn("企业部门关联多个机构，需指定具体机构: deptId={}, orgCount={}, providedOrgId={}",
+                                dto.getDeptId(), deptOrgIds.size(), dto.getOrgId());
+                            throw new BusinessException(ErrorCodeEnum.ORG_NOT_BELONG_TO_DEPT);
+                        }
+                        enterpriseOrgId = dto.getOrgId();
+                    } else {
+                        // 部门只关联1个机构（生产企业场景），自动使用
+                        enterpriseOrgId = deptOrgIds.get(0);
+                    }
                     orgEntity = orgService.getById(enterpriseOrgId);
 
                     // 校验机构类型：必须是生产企业（1.1）或服务商（1.4）
@@ -1232,21 +1239,42 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
     /**
      * 按机构前缀生成用户名: 格式为 {prefix}{seq3位补零}（如 ceshi001）
+     * <p>
+     * 服务商机构若无独立前缀，使用生产企业统一前缀
+     * </p>
      *
      * @param orgId 机构ID
      * @return 生成的用户名
      */
     private String generateUsername(Long orgId) {
         OrgEntity org = orgService.getById(orgId);
-        if (org == null || StrUtil.isBlank(org.getUsernamePrefix())) {
+        if (org == null) {
+            throw new BusinessException(ErrorCodeEnum.ORG_NOT_FOUND);
+        }
+
+        String prefix = org.getUsernamePrefix();
+        // 服务商机构无独立前缀时，使用生产企业的前缀
+        if (StrUtil.isBlank(prefix) && DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(org.getOrgType())) {
+            String manufacturerOrgIdStr = configService.getConfigValue(
+                SystemConfigKeyEnum.MANUFACTURER_ORG_ID.getKey());
+            if (StrUtil.isNotBlank(manufacturerOrgIdStr)) {
+                OrgEntity manufacturer = orgService.getById(Long.parseLong(manufacturerOrgIdStr));
+                if (manufacturer != null) {
+                    prefix = manufacturer.getUsernamePrefix();
+                }
+            }
+        }
+
+        if (StrUtil.isBlank(prefix)) {
             throw new BusinessException(ErrorCodeEnum.ORG_USERNAME_PREFIX_MISSING);
         }
+
         // generateWithSeqSuffix 返回格式为 "prefix-N": 解析后格式化为 "prefixNNN"
-        String raw = codeGeneratorService.generateWithSeqSuffix(CodeRuleConstants.USER_NO, org.getUsernamePrefix());
+        String raw = codeGeneratorService.generateWithSeqSuffix(CodeRuleConstants.USER_NO, prefix);
         int dashIdx = raw.lastIndexOf('-');
-        String prefix = raw.substring(0, dashIdx);
+        String prefixPart = raw.substring(0, dashIdx);
         long seq = Long.parseLong(raw.substring(dashIdx + 1));
-        return prefix + String.format("%03d", seq);
+        return prefixPart + String.format("%03d", seq);
     }
 
     @Override
