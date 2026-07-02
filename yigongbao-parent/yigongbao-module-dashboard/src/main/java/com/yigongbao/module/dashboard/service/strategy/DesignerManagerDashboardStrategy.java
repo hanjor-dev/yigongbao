@@ -104,7 +104,7 @@ public class DesignerManagerDashboardStrategy implements DashboardStrategy {
 
     private ChartVO buildDesignerWorkloadChart(List<Long> designerIds) {
         QueryWrapper<OrderMainEntity> wrapper = new QueryWrapper<>();
-        wrapper.select("designer_id, designer_name, " +
+        wrapper.select("designer_id, MAX(designer_name) as designer_name, " +
                 "SUM(CASE WHEN status = 2010 THEN 1 ELSE 0 END) as pending, " +
                 "SUM(CASE WHEN status = 2020 THEN 1 ELSE 0 END) as designing, " +
                 "SUM(CASE WHEN status >= 2030 AND status != 9010 THEN 1 ELSE 0 END) as completed")
