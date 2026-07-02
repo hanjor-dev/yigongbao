@@ -19,6 +19,7 @@ import org.apache.commons.compress.utils.SeekableInMemoryByteChannel;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -91,11 +92,24 @@ public final class ArchiveParserUtil {
 
     /**
      * 解析 ZIP 格式（同时读取文件内容，用于后续独立上传 OSS）
+     * 优先 UTF-8 解码文件名；若失败（Windows 打包的 ZIP 常用 GBK），自动 fallback 到 GBK 重试。
      */
     private static List<ArchiveFileInfo> parseZip(InputStream inputStream,
                                                    Set<String> allowedExtensions) throws IOException {
+        byte[] zipBytes = inputStream.readAllBytes();
+        try {
+            return parseZipWithCharset(zipBytes, Charset.forName("UTF-8"), allowedExtensions);
+        } catch (IllegalArgumentException e) {
+            // UTF-8 解码文件名失败，fallback 到 GBK（Windows 默认压缩编码）
+            log.warn("ZIP 文件名 UTF-8 解码失败，尝试 GBK 编码重新解析");
+            return parseZipWithCharset(zipBytes, Charset.forName("GBK"), allowedExtensions);
+        }
+    }
+
+    private static List<ArchiveFileInfo> parseZipWithCharset(byte[] zipBytes, Charset charset,
+                                                              Set<String> allowedExtensions) throws IOException {
         List<ArchiveFileInfo> result = new ArrayList<>();
-        try (ZipInputStream zis = new ZipInputStream(inputStream)) {
+        try (ZipInputStream zis = new ZipInputStream(new java.io.ByteArrayInputStream(zipBytes), charset)) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 // 跳过目录

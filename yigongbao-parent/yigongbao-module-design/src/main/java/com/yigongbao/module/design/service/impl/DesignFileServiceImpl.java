@@ -38,7 +38,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -99,84 +101,107 @@ public class DesignFileServiceImpl implements DesignFileService {
         String maxSizeMbStr = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_PACKAGE_MAX_SIZE_MB.getKey());
         fileService.assertFileSizeAllowed(file.getSize(), maxSizeMbStr, 500, "打印文件包");
 
-        // 4. 先读取文件流到内存，避免 MultipartFile InputStream 被上传步骤消费后无法重新读取
-        byte[] fileBytes;
+        // 4. 写临时文件（流式，不占堆内存，避免大文件 OOM）
+        File tempFile = null;
         try {
-            fileBytes = file.getBytes();
-        } catch (IOException e) {
-            log.error("读取上传文件流失败", e);
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_PARSE_FAILED, e.getMessage());
+            // 创建临时文件
+            try {
+                tempFile = java.nio.file.Files.createTempFile("design_pkg_", fileExt).toFile();
+            } catch (IOException e) {
+                log.error("创建临时文件失败", e);
+                throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR);
+            }
+
+            // 将上传文件写入临时文件
+            try (InputStream in = file.getInputStream();
+                 java.io.FileOutputStream out = new java.io.FileOutputStream(tempFile)) {
+                in.transferTo(out);
+            } catch (IOException e) {
+                log.error("写入临时文件失败", e);
+                throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_PARSE_FAILED, e.getMessage());
+            }
+
+            // 5. 解析压缩包内文件列表（第一次读取临时文件）
+            Set<String> allowedExtensions = getAllowedExtensions();
+            List<ArchiveFileInfo> archiveFiles;
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(tempFile)) {
+                archiveFiles = ArchiveParserUtil.parse(fis, fileName, allowedExtensions);
+            } catch (BusinessException e) {
+                throw e;
+            } catch (Exception e) {
+                log.error("解析压缩包失败", e);
+                throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_PARSE_FAILED, e.getMessage());
+            }
+
+            // 6. 校验是否有有效文件
+            if (CollUtil.isEmpty(archiveFiles)) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_EMPTY);
+            }
+
+            // 7. 上传压缩包文件（第二次读取临时文件，流式上传）
+            FileVO fileVO;
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(tempFile)) {
+                fileVO = fileService.uploadStream(fis, tempFile.length(), fileName,
+                        FileBizTypeEnum.PRINT_PACKAGE.getDictCode());
+            } catch (IOException e) {
+                log.error("读取临时文件失败", e);
+                throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_PARSE_FAILED, e.getMessage());
+            }
+
+            // 8. 生成数据包编号
+            String packageCode = codeGeneratorService.generateWithSeqSuffix(
+                    CodeRuleConstants.DATA_PACKAGE_NO, order.getOrderCode());
+
+            // 9. 计算序号
+            Integer packageSeq = getNextPackageSeq(orderId);
+
+            // 10. 保存数据包记录
+            DesignPackageEntity packageEntity = new DesignPackageEntity();
+            packageEntity.setOrderId(orderId);
+            packageEntity.setOrderCode(order.getOrderCode());
+            packageEntity.setPackageCode(packageCode);
+            packageEntity.setPackageSeq(packageSeq);
+            packageEntity.setFileId(fileVO.getId());
+            packageEntity.setFileName(fileName);
+            packageEntity.setFileUrl(fileVO.getFileUrl());
+            packageEntity.setFileSize(fileVO.getFileSize());
+            packageEntity.setFileCount(archiveFiles.size());
+            packageEntity.setUploadTime(LocalDateTime.now());
+            packageService.save(packageEntity);
+
+            // 11. 逐文件上传内部文件到 OSS，并保存包内文件记录
+            List<DesignPackageFileEntity> fileEntities = new ArrayList<>();
+            int sortOrder = 1;
+            for (ArchiveFileInfo archiveFile : archiveFiles) {
+                // 将包内文件独立上传到 OSS，获取独立访问 URL
+                FileVO innerFileVO = fileService.uploadBytes(
+                        archiveFile.getFileContent(),
+                        archiveFile.getFileName(),
+                        FileBizTypeEnum.PACKAGE_FILE.getDictCode());
+
+                DesignPackageFileEntity fileEntity = new DesignPackageFileEntity();
+                fileEntity.setPackageId(packageEntity.getId());
+                fileEntity.setFileName(archiveFile.getFileName());
+                fileEntity.setFileExt(archiveFile.getExtension().replace(".", ""));
+                fileEntity.setFilePath(archiveFile.getFilePath());
+                fileEntity.setFileSize(archiveFile.getFileSize());
+                fileEntity.setSortOrder(sortOrder++);
+                fileEntity.setFileId(innerFileVO.getId());
+                fileEntity.setFileUrl(innerFileVO.getFileUrl());
+                fileEntities.add(fileEntity);
+            }
+            // 批量插入
+            packageFileService.saveBatch(fileEntities);
+
+            // 12. 构建返回结果
+            log.info("上传数据包: orderId={}, packageCode={}, fileCount={}", orderId, packageCode, archiveFiles.size());
+            return buildPackageVO(packageEntity, fileEntities);
+        } finally {
+            // 清理临时文件
+            if (tempFile != null && tempFile.exists()) {
+                cn.hutool.core.io.FileUtil.del(tempFile);
+            }
         }
-
-        // 5. 解析压缩包内文件列表（使用缓存的 byte[]，避免流被消费后为空）
-        Set<String> allowedExtensions = getAllowedExtensions();
-        List<ArchiveFileInfo> archiveFiles;
-        try {
-            archiveFiles = ArchiveParserUtil.parse(new java.io.ByteArrayInputStream(fileBytes),
-                    fileName, allowedExtensions);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("读取压缩包流失败", e);
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_PARSE_FAILED, e.getMessage());
-        }
-
-        // 6. 校验是否有有效文件
-        if (CollUtil.isEmpty(archiveFiles)) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_EMPTY);
-        }
-
-        // 7. 上传压缩包文件（使用缓存的 byte[]）
-        FileVO fileVO = fileService.uploadBytes(fileBytes, fileName, FileBizTypeEnum.PRINT_PACKAGE.getDictCode());
-
-        // 8. 生成数据包编号
-        String packageCode = codeGeneratorService.generateWithSeqSuffix(
-                CodeRuleConstants.DATA_PACKAGE_NO, order.getOrderCode());
-
-        // 9. 计算序号
-        Integer packageSeq = getNextPackageSeq(orderId);
-
-        // 10. 保存数据包记录
-        DesignPackageEntity packageEntity = new DesignPackageEntity();
-        packageEntity.setOrderId(orderId);
-        packageEntity.setOrderCode(order.getOrderCode());
-        packageEntity.setPackageCode(packageCode);
-        packageEntity.setPackageSeq(packageSeq);
-        packageEntity.setFileId(fileVO.getId());
-        packageEntity.setFileName(fileName);
-        packageEntity.setFileUrl(fileVO.getFileUrl());
-        packageEntity.setFileSize(fileVO.getFileSize());
-        packageEntity.setFileCount(archiveFiles.size());
-        packageEntity.setUploadTime(LocalDateTime.now());
-        packageService.save(packageEntity);
-
-        // 11. 逐文件上传内部文件到 OSS，并保存包内文件记录
-        List<DesignPackageFileEntity> fileEntities = new ArrayList<>();
-        int sortOrder = 1;
-        for (ArchiveFileInfo archiveFile : archiveFiles) {
-            // 将包内文件独立上传到 OSS，获取独立访问 URL
-            FileVO innerFileVO = fileService.uploadBytes(
-                    archiveFile.getFileContent(),
-                    archiveFile.getFileName(),
-                    FileBizTypeEnum.PACKAGE_FILE.getDictCode());
-
-            DesignPackageFileEntity fileEntity = new DesignPackageFileEntity();
-            fileEntity.setPackageId(packageEntity.getId());
-            fileEntity.setFileName(archiveFile.getFileName());
-            fileEntity.setFileExt(archiveFile.getExtension().replace(".", ""));
-            fileEntity.setFilePath(archiveFile.getFilePath());
-            fileEntity.setFileSize(archiveFile.getFileSize());
-            fileEntity.setSortOrder(sortOrder++);
-            fileEntity.setFileId(innerFileVO.getId());
-            fileEntity.setFileUrl(innerFileVO.getFileUrl());
-            fileEntities.add(fileEntity);
-        }
-        // 批量插入
-        packageFileService.saveBatch(fileEntities);
-
-        // 12. 构建返回结果
-        log.info("上传数据包: orderId={}, packageCode={}, fileCount={}", orderId, packageCode, archiveFiles.size());
-        return buildPackageVO(packageEntity, fileEntities);
     }
 
     @Override

@@ -88,6 +88,12 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    public FileVO uploadStream(InputStream inputStream, long size, String filename, String bizType) {
+        return doUpload(new com.yigongbao.module.basic.file.util.InputStreamMultipartFile(
+                inputStream, size, filename), bizType, null);
+    }
+
+    @Override
     public FileVO uploadAndLink(MultipartFile file, String bizType, Long bizId) {
         return doUpload(file, bizType, bizId);
     }

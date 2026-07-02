@@ -68,6 +68,7 @@ services:
     environment:
       TZ: Asia/Shanghai
       SPRING_PROFILES_ACTIVE: prod
+      JAVA_OPTS: "-Xmx2g -Xms2g -XX:MaxDirectMemorySize=512m"
       DB_HOST: mysql
       DB_PORT: 3306
       DB_NAME: ${DB_NAME}
@@ -111,6 +112,12 @@ services:
     networks:
       - yigongbao-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+        reservations:
+          memory: 2g
 
 # 数据卷
 volumes:

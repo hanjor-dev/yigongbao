@@ -8,6 +8,7 @@ import com.yigongbao.framework.util.IpLocationUtil;
 import com.yigongbao.framework.annotation.OperationLog;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.multipart.MultipartFile;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -182,9 +183,11 @@ public class OperationLogAspect {
             String[] paramNames = signature.getParameterNames();
             Map<String, Object> paramMap = new java.util.HashMap<>();
             for (int i = 0; i < args.length; i++) {
-                // 跳过 HttpServletRequest 和 HttpServletResponse
+                // 跳过 HttpServletRequest、HttpServletResponse 和文件上传对象（避免读取文件内容撑爆 Direct Buffer）
                 if (args[i] instanceof HttpServletRequest
-                        || args[i] instanceof jakarta.servlet.http.HttpServletResponse) {
+                        || args[i] instanceof jakarta.servlet.http.HttpServletResponse
+                        || args[i] instanceof MultipartFile
+                        || args[i] instanceof MultipartFile[]) {
                     continue;
                 }
                 String name = paramNames != null && i < paramNames.length

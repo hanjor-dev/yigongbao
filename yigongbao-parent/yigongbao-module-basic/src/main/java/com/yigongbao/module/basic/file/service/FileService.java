@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Set;
 
@@ -36,6 +37,18 @@ public interface FileService {
      * @return 文件信息
      */
     FileVO uploadBytes(byte[] bytes, String filename, String bizType);
+
+    /**
+     * 上传 InputStream 流式内容（不关联业务）
+     * 用于避免大文件读取到内存，支持从 FileInputStream 等流式上传
+     *
+     * @param inputStream 文件输入流
+     * @param size        文件大小（字节）
+     * @param filename    文件名（含扩展名，用于类型校验）
+     * @param bizType     业务类型（字典 dict_code）
+     * @return 文件信息
+     */
+    FileVO uploadStream(InputStream inputStream, long size, String filename, String bizType);
 
     /**
      * 上传并关联业务
