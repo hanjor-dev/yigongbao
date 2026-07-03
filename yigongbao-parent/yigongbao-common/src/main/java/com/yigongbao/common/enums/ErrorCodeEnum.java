@@ -305,7 +305,10 @@ public enum ErrorCodeEnum {
     DESIGN_PACKAGE_HAS_PRODUCTS(759, "数据包已关联打印产品，无法删除", 3),
     DESIGN_PACKAGE_HAS_DOCS(760, "数据包已生成指令单或图纸，无法删除", 3),
     DESIGN_MODEL_NOT_FOUND(761, "可视化模型不存在", 3),
+    DESIGN_MODEL_ALREADY_EXISTS(777, "模型文件已关联，无法重复关联", 3),
     DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED(762, "不支持的压缩包格式", 3),
+    DESIGN_PACKAGE_NAME_INVALID(778, "请检查打印文件数据包名称", 3),
+    DESIGN_PACKAGE_CODE_EXISTS(779, "数据包编号已存在，请使用不同的编号", 3),
 
     // ==================== 设计文档生成（763-769）====================
     DESIGN_ARCHIVE_PARSE_FAILED(763, "压缩包解析失败：%s", 3),

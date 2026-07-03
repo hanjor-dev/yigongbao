@@ -203,9 +203,9 @@ public class DrawingExcelBuilder {
                 setCell(sheet, FOOTER_ROW, ORDER_CODE_COL, strOrEmpty(ctx.getOrderCode()));
                 setCell(sheet, PAGE_TEXT_ROW, PAGE_TEXT_COL,
                         "第" + toChinese(page + 1) + "页/共" + toChinese(totalPages) + "页");
-                setCell(sheet, DESIGN_NAME_ROW, DESIGN_NAME_COL, strOrEmpty(ctx.getDesignerName()));
+                // 设计师名留空，由设计师手动签名
                 setCell(sheet, DESIGN_DATE_ROW, DESIGN_DATE_COL, strOrEmpty(ctx.getGenerateDate()));
-                setCell(sheet, REVIEW_DATE_ROW, REVIEW_DATE_COL, strOrEmpty(ctx.getGenerateDate()));
+                // 审核日期留空，由审核人手动填写
 
                 // 更新文本框中的页码水印（如果存在）
                 updatePageWatermark((XSSFSheet) sheet, page + 1, totalPages);

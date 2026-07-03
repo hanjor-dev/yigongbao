@@ -101,7 +101,29 @@ public class DesignFileServiceImpl implements DesignFileService {
         String maxSizeMbStr = configService.getConfigValue(SystemConfigKeyEnum.DESIGN_PACKAGE_MAX_SIZE_MB.getKey());
         fileService.assertFileSizeAllowed(file.getSize(), maxSizeMbStr, 500, "打印文件包");
 
-        // 4. 写临时文件（流式，不占堆内存，避免大文件 OOM）
+        // 4. 校验文件名格式并提取数据包编号
+        // 规则：文件名（去扩展名）必须为 {订单编号}-{数字}，如 202607030001-1
+        String baseName = fileName.substring(0, fileName.lastIndexOf('.'));
+        String expectedPrefix = order.getOrderCode() + "-";
+        String seqPart = baseName.startsWith(expectedPrefix)
+                ? baseName.substring(expectedPrefix.length()) : "";
+        if (seqPart.isEmpty() || !seqPart.matches("\\d{1,9}")) {
+            log.warn("数据包文件名格式不符合规则: fileName={}, orderCode={}", fileName, order.getOrderCode());
+            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NAME_INVALID);
+        }
+        String packageCode = baseName;
+        int packageSeq = Integer.parseInt(seqPart);
+
+        // 5. 校验数据包编号唯一性
+        boolean codeExists = packageService.lambdaQuery()
+                .eq(DesignPackageEntity::getPackageCode, packageCode)
+                .exists();
+        if (codeExists) {
+            log.warn("数据包编号已存在: packageCode={}", packageCode);
+            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_CODE_EXISTS);
+        }
+
+        // 6. 写临时文件（流式，不占堆内存，避免大文件 OOM）
         File tempFile = null;
         try {
             // 创建临时文件
@@ -121,7 +143,7 @@ public class DesignFileServiceImpl implements DesignFileService {
                 throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_PARSE_FAILED, e.getMessage());
             }
 
-            // 5. 解析压缩包内文件列表（第一次读取临时文件）
+            // 7. 解析压缩包内文件列表（第一次读取临时文件）
             Set<String> allowedExtensions = getAllowedExtensions();
             List<ArchiveFileInfo> archiveFiles;
             try (java.io.FileInputStream fis = new java.io.FileInputStream(tempFile)) {
@@ -133,12 +155,12 @@ public class DesignFileServiceImpl implements DesignFileService {
                 throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_PARSE_FAILED, e.getMessage());
             }
 
-            // 6. 校验是否有有效文件
+            // 8. 校验是否有有效文件
             if (CollUtil.isEmpty(archiveFiles)) {
                 throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_EMPTY);
             }
 
-            // 7. 上传压缩包文件（第二次读取临时文件，流式上传）
+            // 9. 上传压缩包文件（第二次读取临时文件，流式上传）
             FileVO fileVO;
             try (java.io.FileInputStream fis = new java.io.FileInputStream(tempFile)) {
                 fileVO = fileService.uploadStream(fis, tempFile.length(), fileName,
@@ -147,13 +169,6 @@ public class DesignFileServiceImpl implements DesignFileService {
                 log.error("读取临时文件失败", e);
                 throw new BusinessException(ErrorCodeEnum.DESIGN_ARCHIVE_PARSE_FAILED, e.getMessage());
             }
-
-            // 8. 生成数据包编号
-            String packageCode = codeGeneratorService.generateWithSeqSuffix(
-                    CodeRuleConstants.DATA_PACKAGE_NO, order.getOrderCode());
-
-            // 9. 计算序号
-            Integer packageSeq = getNextPackageSeq(orderId);
 
             // 10. 保存数据包记录
             DesignPackageEntity packageEntity = new DesignPackageEntity();
@@ -382,23 +397,51 @@ public class DesignFileServiceImpl implements DesignFileService {
             throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
         }
 
-        // 3. 批量关联文件到业务，并保存模型记录
+        // 3. 去重检查：查询订单已关联的模型文件
+        List<DesignModelEntity> existingModels = modelService.list(
+                new LambdaQueryWrapper<DesignModelEntity>()
+                        .eq(DesignModelEntity::getOrderId, orderId));
+        Set<String> existingFileIds = existingModels.stream()
+                .map(DesignModelEntity::getFileId)
+                .collect(Collectors.toSet());
+
+        // 过滤掉已关联的文件
+        List<String> newFileIds = fileIds.stream()
+                .filter(fileId -> !existingFileIds.contains(fileId))
+                .collect(Collectors.toList());
+
+        if (newFileIds.isEmpty()) {
+            log.warn("所有文件已关联, orderId={}, fileIds={}", orderId, fileIds);
+            throw new BusinessException(ErrorCodeEnum.DESIGN_MODEL_ALREADY_EXISTS);
+        }
+
+        if (newFileIds.size() < fileIds.size()) {
+            List<String> duplicateIds = fileIds.stream()
+                    .filter(existingFileIds::contains)
+                    .collect(Collectors.toList());
+            log.warn("部分文件已关联将被忽略, orderId={}, duplicateIds={}", orderId, duplicateIds);
+        }
+
+        // 4. 批量关联文件到业务，并保存模型记录
         Map<String, FileVO> fileMap = fileVOs.stream()
                 .collect(Collectors.toMap(FileVO::getId, f -> f));
 
-        List<DesignModelVO> results = new ArrayList<>();
-        for (String fileId : fileIds) {
-            // 关联文件到业务
-            fileService.linkFile(fileId, FileBizTypeEnum.VISUAL_MODEL.getDictCode(), orderId);
+        newFileIds.forEach(fileId ->
+                fileService.linkFile(fileId, FileBizTypeEnum.VISUAL_MODEL.getDictCode(), orderId));
 
-            // 保存模型记录
-            DesignModelEntity modelEntity = new DesignModelEntity();
-            modelEntity.setOrderId(orderId);
-            modelEntity.setFileId(fileId);
-            modelService.save(modelEntity);
+        List<DesignModelEntity> modelEntities = newFileIds.stream()
+                .map(fileId -> {
+                    DesignModelEntity entity = new DesignModelEntity();
+                    entity.setOrderId(orderId);
+                    entity.setFileId(fileId);
+                    return entity;
+                })
+                .collect(Collectors.toList());
+        modelService.saveBatch(modelEntities);
 
-            results.add(buildModelVO(modelEntity, fileMap.get(fileId)));
-        }
+        List<DesignModelVO> results = modelEntities.stream()
+                .map(entity -> buildModelVO(entity, fileMap.get(entity.getFileId())))
+                .collect(Collectors.toList());
 
         log.info("批量关联可视化模型: orderId={}, count={}", orderId, results.size());
         return results;
@@ -424,7 +467,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         // 4. 删除存储的文件
         fileService.deleteById(modelEntity.getFileId());
 
-        log.info("删除可视化模型: modelId=, orderId=", modelId, orderId);
+        log.info("删除可视化模型: modelId={}, orderId={}", modelId, orderId);
     }
 
     @Override

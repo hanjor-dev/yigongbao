@@ -13,8 +13,9 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
-import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.enums.OrderTypeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
+import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
@@ -841,17 +842,13 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         }
 
         // 根据是否需要实体交付执行不同校验
-        log.info("开始完成设计校验: orderId={}, needsPhysicalDelivery={}, currentStatus={}",
-            orderId, order.getNeedsPhysicalDelivery(), order.getStatus());
+        log.info("开始完成设计校验: orderId={}, orderType={}, needsPhysicalDelivery={}, currentStatus={}",
+            orderId, order.getOrderType(), order.getNeedsPhysicalDelivery(), order.getStatus());
 
         if (Integer.valueOf(StatusConstants.YES).equals(order.getNeedsPhysicalDelivery())) {
             // 校验实体交付所需的完整数据
             log.info("执行实体交付校验: orderId={}", orderId);
-            validatePhysicalDelivery(orderId);
-        } else {
-            // 校验非实体交付所需的最小数据
-            log.info("执行非实体交付校验: orderId={}", orderId);
-            validateNonPhysicalDelivery(orderId);
+            validatePhysicalDelivery(order, orderId);
         }
 
         // 获取当前操作用户ID
@@ -884,13 +881,19 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     /**
      * 校验实体交付订单：数据包 → 打印信息 → 指令单 → 图纸 → 图纸确认 → 指令单确认
      */
-    private void validatePhysicalDelivery(Long orderId) {
+    private void validatePhysicalDelivery(OrderMainEntity order, Long orderId) {
         // 查询所有未删除数据包
         List<DesignPackageEntity> packages = designPackageMapper.selectList(
                 new LambdaQueryWrapper<DesignPackageEntity>()
                         .eq(DesignPackageEntity::getOrderId, orderId)
                         .eq(DesignPackageEntity::getIsDeleted, StatusConstants.NOT_DELETED));
         if (packages.isEmpty()) {
+            // 非医疗器械订单允许不上传打印文件数据包
+            if (OrderTypeEnum.NON_MEDICAL_DEVICE.getValue().equals(order.getOrderType())) {
+                log.info("非医疗器械订单无打印文件数据包，跳过完成设计校验: orderId={}", orderId);
+                return;
+            }
+            // 医疗器械订单必须上传打印文件
             throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请先上传打印文件数据包");
         }
 
@@ -950,19 +953,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         });
         if (!allInstructionConfirmed) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请确认指令单");
-        }
-    }
-
-    /**
-     * 校验非实体交付订单：只检查 STL 重建模型
-     */
-    private void validateNonPhysicalDelivery(Long orderId) {
-        long modelCount = designModelMapper.selectCount(
-                new LambdaQueryWrapper<DesignModelEntity>()
-                        .eq(DesignModelEntity::getOrderId, orderId)
-                        .eq(DesignModelEntity::getIsDeleted, StatusConstants.NOT_DELETED));
-        if (modelCount == 0) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请上传重建模型");
         }
     }
 }

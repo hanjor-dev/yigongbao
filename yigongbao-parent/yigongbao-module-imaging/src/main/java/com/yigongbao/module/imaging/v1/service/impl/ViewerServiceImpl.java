@@ -9,8 +9,10 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
+import com.yigongbao.module.design.entity.DesignModelEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignPackageFileEntity;
+import com.yigongbao.module.design.service.DesignModelService;
 import com.yigongbao.module.design.service.DesignPackageFileService;
 import com.yigongbao.module.design.service.DesignPackageService;
 import com.yigongbao.module.design.service.DesignScreenshotService;
@@ -56,6 +58,7 @@ public class ViewerServiceImpl implements ViewerService {
     private final PartColorMapper partColorMapper;
     private final FileService fileService;
     private final DesignScreenshotService screenshotService;
+    private final DesignModelService designModelService;
 
     @Override
     public ViewerConfigVO getViewerConfig(Long orderId, String token) {
@@ -168,19 +171,26 @@ public class ViewerServiceImpl implements ViewerService {
 
     @Override
     public List<StlFileVO> getStlFileList(Long orderId) {
-        List<DesignPackageEntity> packages = designPackageService.list(
-                new LambdaQueryWrapper<DesignPackageEntity>()
-                        .eq(DesignPackageEntity::getOrderId, orderId));
-        if (CollUtil.isEmpty(packages)) {
+        List<DesignModelEntity> models = designModelService.list(
+                new LambdaQueryWrapper<DesignModelEntity>()
+                        .eq(DesignModelEntity::getOrderId, orderId)
+                        .orderByAsc(DesignModelEntity::getId));
+        if (CollUtil.isEmpty(models)) {
             return new ArrayList<>();
         }
-        List<Long> packageIds = packages.stream().map(DesignPackageEntity::getId).collect(Collectors.toList());
-        return designPackageFileService.list(
-                new LambdaQueryWrapper<DesignPackageFileEntity>()
-                        .in(DesignPackageFileEntity::getPackageId, packageIds)
-                        .orderByAsc(DesignPackageFileEntity::getSortOrder))
-                .stream()
-                .filter(f -> StrUtil.isNotBlank(f.getFileUrl()))
+        List<String> fileIds = models.stream()
+                .map(DesignModelEntity::getFileId)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toList());
+        if (CollUtil.isEmpty(fileIds)) {
+            return new ArrayList<>();
+        }
+        Map<String, FileVO> fileMap = fileService.listByIds(fileIds).stream()
+                .collect(Collectors.toMap(FileVO::getId, f -> f));
+        return models.stream()
+                .filter(m -> StrUtil.isNotBlank(m.getFileId()))
+                .map(m -> fileMap.get(m.getFileId()))
+                .filter(f -> f != null && StrUtil.isNotBlank(f.getFileUrl()))
                 .map(f -> {
                     StlFileVO vo = new StlFileVO();
                     vo.setStlName(f.getFileName());

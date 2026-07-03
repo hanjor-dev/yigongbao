@@ -259,9 +259,8 @@ public class InstructionExcelBuilder {
 
             // row30（原 row29）：指令人/日期 | 复核/日期（无边框）
             int row30 = 29 + offset;
-            setCellNoBorder(wb, sheet, row30, 1, strOrEmpty(ctx.getDesignerName()));     // B30：指令人
+            // 指令人和复核日期留空，由相关人员手动签名填写
             setCellNoBorder(wb, sheet, row30, 2, strOrEmpty(ctx.getGenerateDate()));     // C30：指令日期
-            setCellNoBorder(wb, sheet, row30, 8, strOrEmpty(ctx.getGenerateDate()));     // I30：复核日期
 
             // 8. 写出为 byte[]
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
