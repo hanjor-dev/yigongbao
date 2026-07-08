@@ -219,7 +219,18 @@ AFTER design_package_code;
 - 允许NULL：是（历史数据为NULL）
 - 注释：产品大类(17.1=模型类, 17.2=导板类)
 
-**索引建议**：如果后续需要频繁按产品大类查询流转卡，可添加索引：
+**索引建议**：
+
+1. **联合唯一索引（强烈建议）**：从数据库层面保证幂等性
+```sql
+ALTER TABLE production_record 
+ADD UNIQUE INDEX uk_package_category (design_package_id, product_category);
+```
+- 保证同一数据包的同一产品大类只能创建一张流转卡
+- 数据库层面的幂等性保护，即使程序逻辑有bug也不会重复创建
+- 支持NULL值：历史数据的product_category为NULL不受影响
+
+2. **产品大类查询索引（可选）**：如果需要频繁按产品大类查询流转卡
 ```sql
 ALTER TABLE production_record ADD INDEX idx_product_category (product_category);
 ```
@@ -259,29 +270,99 @@ private String productCategory;
 
 ### 7.2 幂等性保护
 
-**检查逻辑**：在处理每个数据包时，检查是否已存在流转卡
+**检查逻辑**：在处理每个产品大类时，检查"数据包+产品大类"组合是否已存在流转卡
 
 ```java
-// 幂等性检查：跳过已创建流转卡的数据包
-ProductionRecordEntity existingRecord = recordMapper.selectOne(
-    new LambdaQueryWrapper<ProductionRecordEntity>()
-        .eq(ProductionRecordEntity::getDesignPackageId, pkg.getId())
-        .last("LIMIT 1"));
-        
-if (existingRecord != null) {
-    log.info("数据包已存在流转卡，跳过创建: packageId={}, packageCode=, recordNo={}",
-        pkg.getId(), pkg.getPackageCode(), existingRecord.getRecordNo());
-    continue;
+// 为每个产品大类创建流转卡
+for (Map.Entry<String, List<DesignProductEntity>> entry : groupedByCategory.entrySet()) {
+    String category = entry.getKey();
+    List<DesignProductEntity> categoryProducts = entry.getValue();
+    
+    // 幂等性检查：检查该数据包+产品大类的流转卡是否已存在
+    ProductionRecordEntity existingRecord = recordMapper.selectOne(
+        new LambdaQueryWrapper<ProductionRecordEntity>()
+            .eq(ProductionRecordEntity::getDesignPackageId, pkg.getId())
+            .eq(ProductionRecordEntity::getProductCategory, category)
+            .last("LIMIT 1"));
+            
+    if (existingRecord != null) {
+        log.info("数据包的该产品大类流转卡已存在，跳过创建: packageId=, category={}, recordNo={}",
+            pkg.getId(), category, existingRecord.getRecordNo());
+        continue;  // 跳过该产品大类，继续处理其他产品大类
+    }
+    
+    // 创建该产品大类的流转卡...
 }
 ```
 
-**说明**：如果数据包已存在任何流转卡（无论是旧的还是新的），都跳过该数据包的处理，避免重复创建。
+**说明**：
+- 幂等性检查在**产品大类循环内部**进行，而不是数据包层级
+- 检查条件：`design_package_id = ? AND product_category = ?`
+- 如果该数据包的某个产品大类（如模型类）已存在流转卡，只跳过该产品大类，继续处理其他产品大类（如导板类）
+- 这样可以支持部分创建场景：系统崩溃后重试时，已创建的产品大类流转卡不会重复创建，未创建的产品大类流转卡会继续创建
+
+**关键场景**：
+1. 系统处理包含模型+导板的数据包
+2. 成功创建模型类流转卡（category=17.1）
+3. 系统崩溃或事务部分回滚
+4. 事件重放时，幂等性检查发现模型类流转卡已存在，跳过模型类
+5. 继续创建导板类流转卡（category=17.2），确保数据完整性
 
 ### 7.3 事务处理
 
-整个监听器方法使用 `@Transactional` 注解，确保：
-- 同一数据包的多张流转卡要么全部创建成功，要么全部回滚
-- 流转卡、产品记录、工序记录的创建保持原子性
+**事务边界**：`onDesignCompleted()` 方法使用 `@Transactional(rollbackFor = Exception.class)` 注解
+
+**事务范围**：
+- 整个监听器方法在一个事务中执行
+- 处理一个订单下的所有数据包
+- 每个数据包的所有产品大类流转卡的创建在同一事务中
+
+**失败处理策略**：**强一致性 - 整个数据包全部成功或全部回滚**
+
+```java
+// 为每个产品大类创建流转卡
+for (Map.Entry<String, List<DesignProductEntity>> entry : groupedByCategory.entrySet()) {
+    String category = entry.getKey();
+    List<DesignProductEntity> categoryProducts = entry.getValue();
+    
+    // 幂等性检查...
+    
+    try {
+        // 创建流转卡
+        ProductionRecordEntity record = createProductionRecord(order, pkg, category);
+        int productCount = createProductRecords(record, categoryProducts);
+        createProcessRecords(record.getId(), order.getOrderType());
+        // 更新流转卡...
+        
+    } catch (Exception e) {
+        log.error("创建生产流转卡失败: orderId={}, packageId={}, category=",
+            orderId, packageId, category, e);
+        throw e;  // 重新抛出异常，触发整个事务回滚
+    }
+}
+```
+
+**事务行为**：
+1. 如果某个数据包的任何一个产品大类流转卡创建失败，**整个数据包的所有流转卡都会回滚**
+2. 事务回滚后，事件会重新投递（Spring Events的默认行为）
+3. 重试时，幂等性保护确保已成功创建的流转卡不会重复创建
+4. 最终结果：同一数据包的所有产品大类流转卡要么全部存在，要么全部不存在
+
+**为什么选择强一致性**：
+- 同一患者案例的所有产品应该同时进入生产流程
+- 避免部分产品有流转卡、部分没有的不一致状态
+- 生产调度和追溯更清晰
+
+**跨数据包的独立性**：
+- 不同数据包的流转卡创建是独立的
+- 某个数据包失败不影响其他数据包
+- 由外层的数据包遍历逻辑保证（每个数据包有独立的try-catch）
+
+**原子性保证**：
+- 流转卡记录（ProductionRecord）
+- 产品记录（ProductionProduct）
+- 工序记录（ProductionProcess）
+- 三者的创建在同一事务中，保持原子性
 
 ---
 
@@ -299,9 +380,10 @@ if (existingRecord != null) {
 | 单一模型 | 数据包只有3个模型产品 | 生成1张流转卡（模型卡3个产品） |
 | 单一导板 | 数据包只有1个导板产品 | 生成1张流转卡（导板卡1个产品） |
 | 空数据包 | 数据包无设计产品 | 不生成流转卡 |
-| 混合大类 | 包含模型、导板和其他大类 | 只为模型和导板生成流转卡，其他忽略 |
+| 混合大类 | 包含2个模型(17.1)+1个导板(17.2)+1个其他大类(17.3) | 生成2张流转卡（模型1张、导板1张），忽略17.3 |
 | 无效产品ID | 产品ID在Product表中不存在 | 过滤该产品，正常处理其他产品 |
-| 幂等性 | 数据包已存在流转卡 | 跳过该数据包，不创建新卡 |
+| 幂等性-全部已创建 | 数据包的所有产品大类流转卡都已存在 | 跳过所有产品大类，不创建新卡 |
+| 幂等性-部分已创建 | 数据包包含模型+导板，模型类流转卡已存在 | 跳过模型类，只创建导板类流转卡 |
 
 ### 8.2 测试验证点
 
