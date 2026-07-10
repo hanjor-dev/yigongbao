@@ -1328,6 +1328,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
         List<UserEntity> users = baseMapper.selectList(
                 new LambdaQueryWrapper<UserEntity>()
+                        .select(UserEntity::getId)
                         .eq(UserEntity::getRoleCode, roleCode)
                         .eq(UserEntity::getStatus, StatusConstants.NORMAL)
         );
@@ -1343,7 +1344,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             return null;
         }
 
-        UserEntity user = baseMapper.selectById(userId);
+        UserEntity user = baseMapper.selectOne(
+                new LambdaQueryWrapper<UserEntity>()
+                        .select(UserEntity::getRealName)
+                        .eq(UserEntity::getId, userId)
+        );
         return user != null ? user.getRealName() : null;
     }
 
@@ -1351,7 +1356,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     public String getCurrentUserRoleCode() {
         try {
             Long userId = StpUtil.getLoginIdAsLong();
-            UserEntity user = baseMapper.selectById(userId);
+            UserEntity user = baseMapper.selectOne(
+                    new LambdaQueryWrapper<UserEntity>()
+                            .select(UserEntity::getRoleCode)
+                            .eq(UserEntity::getId, userId)
+            );
             return user != null ? user.getRoleCode() : null;
         } catch (Exception e) {
             log.warn("获取当前用户角色失败，用户未登录或会话已过期");
