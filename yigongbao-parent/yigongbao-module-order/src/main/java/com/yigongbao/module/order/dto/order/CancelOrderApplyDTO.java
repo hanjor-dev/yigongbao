@@ -5,6 +5,12 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import org.hibernate.validator.constraints.Length;
 
+/**
+ * 提交取消申请DTO
+ *
+ * @author hanjor
+ * @since 2026-07-10
+ */
 @Data
 @Schema(description = "提交取消申请DTO")
 public class CancelOrderApplyDTO {

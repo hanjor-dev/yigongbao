@@ -4,6 +4,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import java.time.LocalDateTime;
 
+/**
+ * 取消申请详情VO
+ *
+ * @author hanjor
+ * @since 2026-07-10
+ */
 @Data
 @Schema(description = "取消申请详情VO")
 public class CancelApplyVO {
