@@ -27,12 +27,14 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -173,5 +175,152 @@ class DesignCompletedListenerTest {
 
         // Assert: 应该创建2张流转卡（模型1张，导板1张）
         verify(recordMapper, times(2)).insert(any(ProductionRecordEntity.class));
+    }
+
+    @Test
+    void testOnDesignCompleted_SingleCategory() {
+        // Arrange: 只有模型类产品
+        Long orderId = 1L;
+        Long packageId = 1L;
+
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(orderId);
+        order.setOrderCode("ORD001");
+        order.setOrderType(1);
+
+        DesignPackageEntity pkg = new DesignPackageEntity();
+        pkg.setId(packageId);
+        pkg.setPackageCode("PKG001");
+
+        when(orderMainMapper.selectById(orderId)).thenReturn(order);
+        when(designPackageMapper.selectList(any())).thenReturn(Arrays.asList(pkg));
+
+        // 模拟3个模型类产品
+        DesignProductEntity product1 = new DesignProductEntity();
+        product1.setId(1L);
+        product1.setProductId(101L);
+        product1.setQuantity(1);
+
+        DesignProductEntity product2 = new DesignProductEntity();
+        product2.setId(2L);
+        product2.setProductId(101L);
+        product2.setQuantity(1);
+
+        DesignProductEntity product3 = new DesignProductEntity();
+        product3.setId(3L);
+        product3.setProductId(101L);
+        product3.setQuantity(1);
+
+        when(designProductMapper.selectList(any())).thenReturn(
+            Arrays.asList(product1, product2, product3));
+
+        // 模拟产品大类查询 - 只有模型类
+        ProductEntity productModel = new ProductEntity();
+        productModel.setId(101L);
+        productModel.setCategory("17.1");
+
+        when(baseProductMapper.selectBatchIds(any())).thenReturn(Arrays.asList(productModel));
+        when(recordMapper.selectOne(any())).thenReturn(null);
+        when(codeGeneratorService.generate(anyString())).thenReturn("MOCK_CODE");
+
+        // Act
+        listener.onDesignCompleted(new DesignCompletedEvent(this, orderId));
+
+        // Assert: 应该只创建1张流转卡（模型类）
+        verify(recordMapper, times(1)).insert(any(ProductionRecordEntity.class));
+    }
+
+    @Test
+    void testOnDesignCompleted_EmptyPackage() {
+        // Arrange: 数据包无设计产品
+        Long orderId = 1L;
+        Long packageId = 1L;
+
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(orderId);
+        order.setOrderCode("ORD001");
+        order.setOrderType(1);
+
+        DesignPackageEntity pkg = new DesignPackageEntity();
+        pkg.setId(packageId);
+        pkg.setPackageCode("PKG001");
+
+        when(orderMainMapper.selectById(orderId)).thenReturn(order);
+        when(designPackageMapper.selectList(any())).thenReturn(Arrays.asList(pkg));
+
+        // 模拟空的设计产品列表
+        when(designProductMapper.selectList(any())).thenReturn(Collections.emptyList());
+
+        // Act
+        listener.onDesignCompleted(new DesignCompletedEvent(this, orderId));
+
+        // Assert: 应该不创建流转卡
+        verify(recordMapper, never()).insert(any(ProductionRecordEntity.class));
+    }
+
+    @Test
+    void testOnDesignCompleted_IdempotencyCheck() {
+        // Arrange: 模型类流转卡已存在，只应创建导板类流转卡
+        Long orderId = 1L;
+        Long packageId = 1L;
+
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(orderId);
+        order.setOrderCode("ORD001");
+        order.setOrderType(1);
+
+        DesignPackageEntity pkg = new DesignPackageEntity();
+        pkg.setId(packageId);
+        pkg.setPackageCode("PKG001");
+
+        when(orderMainMapper.selectById(orderId)).thenReturn(order);
+        when(designPackageMapper.selectList(any())).thenReturn(Arrays.asList(pkg));
+
+        // 模拟2个模型 + 1个导板
+        DesignProductEntity modelProduct1 = new DesignProductEntity();
+        modelProduct1.setId(1L);
+        modelProduct1.setProductId(101L);
+        modelProduct1.setQuantity(1);
+
+        DesignProductEntity modelProduct2 = new DesignProductEntity();
+        modelProduct2.setId(2L);
+        modelProduct2.setProductId(101L);
+        modelProduct2.setQuantity(1);
+
+        DesignProductEntity guideProduct = new DesignProductEntity();
+        guideProduct.setId(3L);
+        guideProduct.setProductId(102L);
+        guideProduct.setQuantity(1);
+
+        when(designProductMapper.selectList(any())).thenReturn(
+            Arrays.asList(modelProduct1, modelProduct2, guideProduct));
+
+        // 模拟产品大类查询
+        ProductEntity productModel = new ProductEntity();
+        productModel.setId(101L);
+        productModel.setCategory("17.1");
+
+        ProductEntity productGuide = new ProductEntity();
+        productGuide.setId(102L);
+        productGuide.setCategory("17.2");
+
+        when(baseProductMapper.selectBatchIds(any())).thenReturn(
+            Arrays.asList(productModel, productGuide));
+
+        // 模拟模型类流转卡已存在
+        ProductionRecordEntity existingModelRecord = new ProductionRecordEntity();
+        existingModelRecord.setId(100L);
+        existingModelRecord.setRecordNo("REC001");
+        existingModelRecord.setProductCategory("17.1");
+
+        // 第一次查询返回已存在的模型类流转卡，第二次查询返回null（导板类不存在）
+        when(recordMapper.selectOne(any())).thenReturn(existingModelRecord, null);
+        when(codeGeneratorService.generate(anyString())).thenReturn("MOCK_CODE");
+
+        // Act
+        listener.onDesignCompleted(new DesignCompletedEvent(this, orderId));
+
+        // Assert: 应该只创建1张流转卡（跳过模型类，只创建导板类）
+        verify(recordMapper, times(1)).insert(any(ProductionRecordEntity.class));
     }
 }
