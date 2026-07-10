@@ -217,6 +217,11 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
      */
     private Integer status;
 
+    /**
+     * 是否有待审核的取消申请：0-无，1-有
+     */
+    private Integer hasPendingCancelApply;
+
     // ==================== 当前处理人 ====================
     /**
      * 当前处理人ID
