@@ -33,7 +33,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 设计完成事件监听器
@@ -282,5 +286,52 @@ public class DesignCompletedListener {
             process.setStatus(ProcessStatusEnum.PENDING.getCode());
             processMapper.insert(process);
         }
+    }
+
+    /**
+     * 按产品大类分组设计产品
+     *
+     * @param packageId 数据包ID
+     * @return 按产品大类分组的设计产品Map，key为产品大类编码（17.1/17.2）
+     */
+    private Map<String, List<DesignProductEntity>> groupByProductCategory(Long packageId) {
+        // 1. 查询数据包下的所有设计产品
+        List<DesignProductEntity> designProducts = designProductMapper.selectList(
+            new LambdaQueryWrapper<DesignProductEntity>()
+                .eq(DesignProductEntity::getPackageId, packageId));
+
+        if (designProducts.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        // 2. 批量查询产品大类信息
+        Set<Long> productIds = designProducts.stream()
+            .map(DesignProductEntity::getProductId)
+            .collect(Collectors.toSet());
+        List<ProductEntity> products = baseProductMapper.selectBatchIds(productIds);
+
+        // 3. 构建 productId -> category 的映射（过滤category为null的产品）
+        Map<Long, String> productCategoryMap = products.stream()
+            .filter(p -> p.getCategory() != null)
+            .collect(Collectors.toMap(ProductEntity::getId, ProductEntity::getCategory));
+
+        // 4. 按产品大类分组（只保留模型类和导板类）
+        Map<String, List<DesignProductEntity>> groupedByCategory = designProducts.stream()
+            .filter(dp -> {
+                String category = productCategoryMap.get(dp.getProductId());
+                return "17.1".equals(category) || "17.2".equals(category);
+            })
+            .collect(Collectors.groupingBy(dp ->
+                productCategoryMap.get(dp.getProductId())));
+
+        // 5. 记录被忽略的产品
+        long ignoredCount = designProducts.size() -
+            groupedByCategory.values().stream().mapToLong(List::size).sum();
+        if (ignoredCount > 0) {
+            log.warn("数据包包含非模型/导板类产品，已忽略: packageId={}, ignoredCount={}",
+                packageId, ignoredCount);
+        }
+
+        return groupedByCategory;
     }
 }
