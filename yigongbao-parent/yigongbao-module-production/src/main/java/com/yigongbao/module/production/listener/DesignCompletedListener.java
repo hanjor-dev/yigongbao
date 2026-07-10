@@ -6,6 +6,8 @@ import com.yigongbao.common.event.DesignCompletedEvent;
 import com.yigongbao.common.event.ProductionCardsCreatedEvent;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
+import com.yigongbao.module.basic.product.entity.ProductEntity;
+import com.yigongbao.module.basic.product.mapper.ProductMapper;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.mapper.DesignPackageMapper;
 import com.yigongbao.module.design.mapper.DesignProductFileMapper;
@@ -52,6 +54,7 @@ public class DesignCompletedListener {
     private final ProductionRecordMapper recordMapper;
     private final ProductionProductMapper productMapper;
     private final ProductionProcessMapper processMapper;
+    private final ProductMapper baseProductMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final ApplicationEventPublisher eventPublisher;
 
