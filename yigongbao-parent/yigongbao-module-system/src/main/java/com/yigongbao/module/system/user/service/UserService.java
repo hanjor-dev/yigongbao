@@ -136,4 +136,27 @@ public interface UserService extends IService<UserEntity> {
      * @param response HTTP 响应
      */
     void exportUsers(HttpServletResponse response);
+
+    /**
+     * 根据角色编码获取用户ID列表
+     *
+     * @param roleCode 角色编码
+     * @return 该角色下所有正常状态用户的ID列表
+     */
+    List<Long> getUserIdsByRoleCode(String roleCode);
+
+    /**
+     * 获取用户真实姓名
+     *
+     * @param userId 用户ID
+     * @return 用户真实姓名，用户不存在返回 null
+     */
+    String getUserRealName(Long userId);
+
+    /**
+     * 获取当前登录用户的角色编码
+     *
+     * @return 角色编码，未登录或无角色返回 null
+     */
+    String getCurrentUserRoleCode();
 }

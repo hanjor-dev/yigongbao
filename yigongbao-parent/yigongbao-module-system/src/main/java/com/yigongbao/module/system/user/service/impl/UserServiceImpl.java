@@ -1319,4 +1319,43 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
     }
+
+    @Override
+    public List<Long> getUserIdsByRoleCode(String roleCode) {
+        if (StrUtil.isBlank(roleCode)) {
+            return Collections.emptyList();
+        }
+
+        List<UserEntity> users = baseMapper.selectList(
+                new LambdaQueryWrapper<UserEntity>()
+                        .eq(UserEntity::getRoleCode, roleCode)
+                        .eq(UserEntity::getStatus, StatusConstants.NORMAL)
+        );
+
+        return users.stream()
+                .map(UserEntity::getId)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public String getUserRealName(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+
+        UserEntity user = baseMapper.selectById(userId);
+        return user != null ? user.getRealName() : null;
+    }
+
+    @Override
+    public String getCurrentUserRoleCode() {
+        try {
+            Long userId = StpUtil.getLoginIdAsLong();
+            UserEntity user = baseMapper.selectById(userId);
+            return user != null ? user.getRoleCode() : null;
+        } catch (Exception e) {
+            log.warn("获取当前用户角色失败，用户未登录或会话已过期");
+            return null;
+        }
+    }
 }
