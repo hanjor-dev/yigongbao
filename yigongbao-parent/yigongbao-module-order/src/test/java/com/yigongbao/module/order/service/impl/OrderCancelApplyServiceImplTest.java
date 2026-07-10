@@ -20,6 +20,7 @@ import com.yigongbao.module.order.convert.OrderCancelApplyConvert;
 import com.yigongbao.module.order.dto.order.AuditCancelApplyDTO;
 import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
 import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
+import com.yigongbao.module.order.enums.ApplyStatusEnum;
 import com.yigongbao.module.order.mapper.OrderCancelApplyMapper;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -263,7 +264,7 @@ class OrderCancelApplyServiceImplTest {
         dto.setApproved(true);
         dto.setReason(AUDIT_REASON);
 
-        OrderCancelApplyEntity apply = buildCancelApplyEntity(APPLY_ID, ORDER_ID, 1);
+        OrderCancelApplyEntity apply = buildCancelApplyEntity(APPLY_ID, ORDER_ID, ApplyStatusEnum.PENDING.getCode());
         OrderMainEntity order = buildOrderEntity(ORDER_ID, 20, 2010, StatusConstants.YES);
         UserEntity auditor = new UserEntity();
         auditor.setId(CURRENT_USER_ID);
@@ -308,7 +309,7 @@ class OrderCancelApplyServiceImplTest {
         dto.setApproved(false);
         dto.setReason("不符合取消条件");
 
-        OrderCancelApplyEntity apply = buildCancelApplyEntity(APPLY_ID, ORDER_ID, 1);
+        OrderCancelApplyEntity apply = buildCancelApplyEntity(APPLY_ID, ORDER_ID, ApplyStatusEnum.PENDING.getCode());
         OrderMainEntity order = buildOrderEntity(ORDER_ID, 20, 2010, StatusConstants.YES);
 
         try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {

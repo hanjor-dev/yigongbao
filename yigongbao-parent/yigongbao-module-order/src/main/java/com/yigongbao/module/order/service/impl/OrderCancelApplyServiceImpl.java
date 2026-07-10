@@ -20,6 +20,7 @@ import com.yigongbao.module.order.dto.order.AuditCancelApplyDTO;
 import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
 import com.yigongbao.module.order.dto.order.OrderPageDTO;
 import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
+import com.yigongbao.module.order.enums.ApplyStatusEnum;
 import com.yigongbao.common.event.CancelApplyApprovedEvent;
 import com.yigongbao.common.event.CancelApplyRejectedEvent;
 import com.yigongbao.common.event.CancelApplySubmittedEvent;
@@ -57,21 +58,6 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
     private final OrderCancelApplyConvert cancelApplyConvert;
     private final ApplicationEventPublisher eventPublisher;
     private final UserService userService;
-
-    /**
-     * 审核状态：待审核
-     */
-    private static final int AUDIT_STATUS_PENDING = 1;
-
-    /**
-     * 审核状态：已通过
-     */
-    private static final int AUDIT_STATUS_PASSED = 2;
-
-    /**
-     * 审核状态：已驳回
-     */
-    private static final int AUDIT_STATUS_REJECTED = 3;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -117,7 +103,7 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
         apply.setOrderId(orderId);
         apply.setApplyBy(currentUserId);
         apply.setApplyReason(dto.getReason());
-        apply.setAuditStatus(AUDIT_STATUS_PENDING);
+        apply.setAuditStatus(ApplyStatusEnum.PENDING.getCode());
         save(apply);
 
         // 6. 更新订单待审核标记
@@ -155,7 +141,7 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
         }
 
         // 3. 验证申请状态为待审核
-        if (apply.getAuditStatus() != AUDIT_STATUS_PENDING) {
+        if (!ApplyStatusEnum.PENDING.getCode().equals(apply.getAuditStatus())) {
             log.warn("审核取消申请失败，申请已审核: applyId={}, auditStatus={}",
                     applyId, apply.getAuditStatus());
             throw new BusinessException(ErrorCodeEnum.CANCEL_APPLY_ALREADY_AUDITED);
@@ -186,7 +172,7 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
                         .set(OrderMainEntity::getHasPendingCancelApply, StatusConstants.NO));
 
                 // 更新申请记录
-                apply.setAuditStatus(AUDIT_STATUS_PASSED);
+                apply.setAuditStatus(ApplyStatusEnum.APPROVED.getCode());
                 apply.setAuditBy(currentUserId);
                 apply.setAuditReason(dto.getReason());
                 apply.setAuditTime(LocalDateTime.now());
@@ -206,7 +192,7 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
 
         } else {
             // 审核驳回：更新申请记录并清除订单标记
-            apply.setAuditStatus(AUDIT_STATUS_REJECTED);
+            apply.setAuditStatus(ApplyStatusEnum.REJECTED.getCode());
             apply.setAuditBy(currentUserId);
             apply.setAuditReason(dto.getReason());
             apply.setAuditTime(LocalDateTime.now());
@@ -241,7 +227,7 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
         Page<OrderCancelApplyEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
 
         LambdaQueryWrapper<OrderCancelApplyEntity> qw = new LambdaQueryWrapper<>();
-        qw.eq(OrderCancelApplyEntity::getAuditStatus, AUDIT_STATUS_PENDING)
+        qw.eq(OrderCancelApplyEntity::getAuditStatus, ApplyStatusEnum.PENDING.getCode())
                 .orderByDesc(OrderCancelApplyEntity::getCreateTime);
 
         page = page(page, qw);
