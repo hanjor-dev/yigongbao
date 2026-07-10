@@ -325,11 +325,6 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
      * @return 角色编码
      */
     private String getCurrentUserRoleCode() {
-        try {
-            return (String) StpUtil.getSession().get("roleCode");
-        } catch (Exception e) {
-            log.warn("获取当前用户角色编码失败", e);
-            return null;
-        }
+        return userService.getCurrentUserRoleCode();
     }
 }
