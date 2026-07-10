@@ -793,27 +793,46 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     public void cancelOrder(Long id) {
         Long currentUserId = getCurrentUserId();
         // 校验订单存在
-        OrderMainEntity entity = getById(id);
-        if (entity == null) {
+        OrderMainEntity order = getById(id);
+        if (order == null) {
             log.warn("订单不存在: orderId={}", id);
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
         // 校验订单未取消
-        if (entity.getStatus().equals(FlowStatusEnum.CANCELLED.getValue())) {
+        if (order.getStatus().equals(FlowStatusEnum.CANCELLED.getValue())) {
             log.warn("订单已取消，不能重复取消: orderId={}", id);
             throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_CANCELLED);
         }
+
+        // 检查阶段：订单阶段允许直接取消，设计阶段需提交申请
+        if (order.getPhase() < 20) {
+            // 订单阶段：直接取消
+            directCancelOrder(id, order, currentUserId);
+        } else {
+            // 设计阶段：需提交取消申请
+            throw new BusinessException(ErrorCodeEnum.ORDER_NEED_CANCEL_APPLY);
+        }
+    }
+
+    /**
+     * 直接取消订单（仅订单阶段）
+     *
+     * @param id 订单ID
+     * @param order 订单实体
+     * @param currentUserId 当前用户ID
+     */
+    private void directCancelOrder(Long id, OrderMainEntity order, Long currentUserId) {
         // 获取当前用户姓名
         String operatorName = getUserRealName(currentUserId);
         // 通过 FlowFacade 执行取消动作
         TransitionResult result = flowFacade.executeFlow(
                 id, FlowActionEnum.CANCEL, new FlowOperator(currentUserId, operatorName, null));
         // 更新订单的阶段和状态
-        entity.setPhase(result.getTargetPhase());
-        entity.setStatus(result.getFinalStatus());
-        updateById(entity);
+        order.setPhase(result.getTargetPhase());
+        order.setStatus(result.getFinalStatus());
+        updateById(order);
         eventPublisher.publishEvent(new OrderCancelledEvent(this, id));
-        log.info("取消订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
+        log.info("直接取消订单: orderId={}", id);
     }
 
     /**
