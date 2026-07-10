@@ -32,7 +32,13 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import com.yigongbao.common.event.DesignCompletedEvent;
+import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 
 /**
  * 设计完成监听器单元测试
@@ -105,5 +111,67 @@ class DesignCompletedListenerTest {
         assertTrue(grouped.containsKey("17.2"));
         assertEquals(2, grouped.get("17.1").size());
         assertEquals(1, grouped.get("17.2").size());
+    }
+
+    @Test
+    void testOnDesignCompleted_SplitByCategory() {
+        // Arrange
+        Long orderId = 1L;
+        Long packageId = 1L;
+
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(orderId);
+        order.setOrderCode("ORD001");
+        order.setOrderType(1);
+
+        DesignPackageEntity pkg = new DesignPackageEntity();
+        pkg.setId(packageId);
+        pkg.setPackageCode("PKG001");
+
+        when(orderMainMapper.selectById(orderId)).thenReturn(order);
+        when(designPackageMapper.selectList(any())).thenReturn(Arrays.asList(pkg));
+
+        // 模拟2个模型 + 1个导板
+        DesignProductEntity modelProduct1 = new DesignProductEntity();
+        modelProduct1.setId(1L);
+        modelProduct1.setProductId(101L);
+        modelProduct1.setQuantity(1);
+
+        DesignProductEntity modelProduct2 = new DesignProductEntity();
+        modelProduct2.setId(2L);
+        modelProduct2.setProductId(101L);
+        modelProduct2.setQuantity(1);
+
+        DesignProductEntity guideProduct = new DesignProductEntity();
+        guideProduct.setId(3L);
+        guideProduct.setProductId(102L);
+        guideProduct.setQuantity(1);
+
+        when(designProductMapper.selectList(any())).thenReturn(
+            Arrays.asList(modelProduct1, modelProduct2, guideProduct));
+
+        // 模拟产品大类查询
+        ProductEntity productModel = new ProductEntity();
+        productModel.setId(101L);
+        productModel.setCategory("17.1");
+
+        ProductEntity productGuide = new ProductEntity();
+        productGuide.setId(102L);
+        productGuide.setCategory("17.2");
+
+        when(baseProductMapper.selectBatchIds(any())).thenReturn(
+            Arrays.asList(productModel, productGuide));
+
+        // Mock幂等性检查返回null（不存在）
+        when(recordMapper.selectOne(any())).thenReturn(null);
+
+        // Mock编码生成器
+        when(codeGeneratorService.generate(anyString())).thenReturn("MOCK_CODE");
+
+        // Act
+        listener.onDesignCompleted(new DesignCompletedEvent(this, orderId));
+
+        // Assert: 应该创建2张流转卡（模型1张，导板1张）
+        verify(recordMapper, times(2)).insert(any(ProductionRecordEntity.class));
     }
 }

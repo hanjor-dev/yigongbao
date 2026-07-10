@@ -92,38 +92,60 @@ public class DesignCompletedListener {
             return;
         }
 
-        // 为每个数据包创建流转卡
+        // 为每个数据包按产品大类创建流转卡
         List<Long> createdRecordIds = new ArrayList<>();
         for (DesignPackageEntity pkg : packages) {
             try {
-                // 幂等性检查：跳过已创建流转卡的数据包
-                ProductionRecordEntity existingRecord = recordMapper.selectOne(
-                        new LambdaQueryWrapper<ProductionRecordEntity>()
-                                .eq(ProductionRecordEntity::getDesignPackageId, pkg.getId())
-                                .last("LIMIT 1"));
-                if (existingRecord != null) {
-                    log.info("数据包已存在流转卡，跳过创建: packageId=, packageCode={}, recordNo={}",
-                        pkg.getId(), pkg.getPackageCode(), existingRecord.getRecordNo());
+                // 按产品大类分组
+                Map<String, List<DesignProductEntity>> groupedByCategory =
+                    groupByProductCategory(pkg.getId());
+
+                if (groupedByCategory.isEmpty()) {
+                    log.warn("数据包无有效产品，跳过流转卡创建: packageId={}, packageCode={}",
+                        pkg.getId(), pkg.getPackageCode());
                     continue;
                 }
 
-                // 查询数据包下的所有设计产品
-                List<DesignProductEntity> designProducts = designProductMapper.selectList(
-                        new LambdaQueryWrapper<DesignProductEntity>()
-                                .eq(DesignProductEntity::getPackageId, pkg.getId()));
+                // 为每个产品大类创建流转卡
+                for (Map.Entry<String, List<DesignProductEntity>> entry : groupedByCategory.entrySet()) {
+                    String category = entry.getKey();
+                    List<DesignProductEntity> categoryProducts = entry.getValue();
 
-                // 暂时使用null作为category参数，后续实现按产品大类拆分时再传入具体值
-                ProductionRecordEntity record = createProductionRecord(order, pkg, null, designProducts);
-                int productCount = createProductRecords(record, designProducts);
-                createProcessRecords(record.getId(), order.getOrderType());
+                    // 幂等性检查：检查该数据包+产品大类的流转卡是否已存在
+                    ProductionRecordEntity existingRecord = recordMapper.selectOne(
+                        new LambdaQueryWrapper<ProductionRecordEntity>()
+                            .eq(ProductionRecordEntity::getDesignPackageId, pkg.getId())
+                            .eq(ProductionRecordEntity::getProductCategory, category)
+                            .last("LIMIT 1"));
 
-                // 更新流转卡产品总数和二维码
-                record.setTotalProductCount(productCount);
-                String qrContent = String.format("RECORD:%s|BATCH:%s", record.getRecordNo(), record.getProductionBatchNo());
-                record.setQrCodeUrl(qrContent);
-                recordMapper.updateById(record);
+                    if (existingRecord != null) {
+                        log.info("数据包的该产品大类流转卡已存在，跳过创建: packageId={}, category={}, recordNo={}",
+                            pkg.getId(), category, existingRecord.getRecordNo());
+                        continue;
+                    }
 
-                createdRecordIds.add(record.getId());
+                    // 创建流转卡
+                    ProductionRecordEntity record = createProductionRecord(order, pkg, category, categoryProducts);
+
+                    // 创建产品记录
+                    int productCount = createProductRecords(record, categoryProducts);
+
+                    // 创建工序记录
+                    createProcessRecords(record.getId(), order.getOrderType());
+
+                    // 更新流转卡产品总数和二维码
+                    record.setTotalProductCount(productCount);
+                    String qrContent = String.format("RECORD:%s|BATCH:%s",
+                        record.getRecordNo(), record.getProductionBatchNo());
+                    record.setQrCodeUrl(qrContent);
+                    recordMapper.updateById(record);
+
+                    createdRecordIds.add(record.getId());
+
+                    log.info("创建生产流转卡: recordNo={}, packageId={}, category={}, productCount={}",
+                        record.getRecordNo(), pkg.getId(), category, productCount);
+                }
+
             } catch (Exception e) {
                 log.error("创建生产流转卡失败: orderId={}, packageId={}, packageCode={}",
                     orderId, pkg.getId(), pkg.getPackageCode(), e);
