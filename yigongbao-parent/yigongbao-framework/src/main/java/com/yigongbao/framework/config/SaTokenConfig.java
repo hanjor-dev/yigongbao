@@ -60,7 +60,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 .addExclude("/notification/websocket")
                 .addExclude("/basic/processing-center/**")
                 .addExclude("/basic/device/**")
-                .addExclude("/imaging/v1/dcm")
+                .addExclude("/imaging/v1/**")
                 .addExclude("/imaging/v1/stl")
                 .addExclude("/imaging/v1/mark");
                 // 注意：不设置 setAuth()，Filter 只做路径过滤，认证由 Interceptor 负责
@@ -116,7 +116,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 "/basic/processing-center/**",
                 "/basic/device/**",
                 // 影像查看器适配接口（二维码传播，无需登录）
-                "/imaging/v1/dcm",
+                "/imaging/v1/**",
                 "/imaging/v1/stl",
                 "/imaging/v1/mark"
         );

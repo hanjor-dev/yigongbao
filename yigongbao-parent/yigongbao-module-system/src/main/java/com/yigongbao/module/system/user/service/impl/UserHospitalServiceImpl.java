@@ -287,7 +287,9 @@ public class UserHospitalServiceImpl implements UserHospitalService {
         Long orgId = user.getOrgId();
         if (orgId == null) {
             log.warn("用户未分配机构: userId={}", userId);
-            return new ArrayList<>();
+            List<OrgVO> emptyResult = new ArrayList<>();
+            appendUnknownHospital(emptyResult);
+            return emptyResult;
         }
 
         List<Long> orgHospitalIds = orgHospitalMapper.selectList(
@@ -297,7 +299,9 @@ public class UserHospitalServiceImpl implements UserHospitalService {
 
         if (orgHospitalIds.isEmpty()) {
             log.info("机构无关联医院，orgId={}", orgId);
-            return new ArrayList<>();
+            List<OrgVO> emptyResult = new ArrayList<>();
+            appendUnknownHospital(emptyResult);
+            return emptyResult;
         }
 
         // 2. 按数据权限类型筛选
