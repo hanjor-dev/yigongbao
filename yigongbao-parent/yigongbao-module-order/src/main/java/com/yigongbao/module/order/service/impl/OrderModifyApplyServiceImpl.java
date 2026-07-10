@@ -36,6 +36,7 @@ import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderModificationApplyMapper;
 import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
+import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
 import com.yigongbao.module.order.service.OrderModifyFullService;
 import com.yigongbao.module.order.utils.OrderModifyTimeWindowChecker;
@@ -87,6 +88,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     private final OrderModifyTimeWindowChecker timeWindowChecker;
     private final ConfigService configService;
     private final ApplicationEventPublisher eventPublisher;
+    private final OrderCancelApplyService cancelApplyService;
 
     // ==================== 申请审核流程方法 ====================
 
@@ -113,6 +115,12 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         OrderMainEntity order = orderMainMapper.selectById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+
+        // 检查是否存在待审核的取消申请
+        if (cancelApplyService.hasPendingCancelApply(orderId)) {
+            log.warn("订单存在待审核的取消申请，不允许提交修改申请: orderId={}", orderId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
         }
 
         // 检查订单所有权：只有订单创建者可以提交修改申请

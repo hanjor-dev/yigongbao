@@ -51,6 +51,7 @@ import com.yigongbao.module.design.vo.SubmitCheckVO;
 import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.mapper.OrderFileMapper;
+import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.service.OrderItemService;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
@@ -104,6 +105,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     private final OrderFileMapper orderFileMapper;
     private final com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private final com.yigongbao.module.order.service.OrderCancelApplyService cancelApplyService;
 
     /**
      * 分页查询设计工单列表
@@ -344,6 +346,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+
+        // 检查是否存在待审核的取消申请
+        if (cancelApplyService.hasPendingCancelApply(orderId)) {
+            log.warn("订单存在待审核的取消申请，不允许开始设计: orderId={}", orderId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
         }
 
         // 2. 校验订单状态（必须是待设计）
@@ -833,6 +841,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         // 校验订单是否存在
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+
+        // 检查是否存在待审核的取消申请
+        if (cancelApplyService.hasPendingCancelApply(orderId)) {
+            log.warn("订单存在待审核的取消申请，不允许完成设计: orderId={}", orderId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
         }
 
         // 校验订单状态必须为设计中

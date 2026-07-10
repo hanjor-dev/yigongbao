@@ -48,6 +48,7 @@ import com.yigongbao.module.order.entity.OrderModificationLogEntity;
 import com.yigongbao.module.order.enums.OrderDraftStatusEnum;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.service.DesignerAssignmentService;
+import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
 import com.yigongbao.module.order.mapper.OrderDraftMapper;
 import com.yigongbao.module.order.mapper.OrderFileMapper;
@@ -125,6 +126,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final ObjectMapper objectMapper;
     private final OrderDataValidator orderDataValidator;
     private final OrderModifyApplyService orderModifyApplyService;
+    private final OrderCancelApplyService cancelApplyService;
     private final com.yigongbao.module.order.convert.OrderConvert orderConvert;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -649,6 +651,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_PENDING);
         }
 
+        if (cancelApplyService.hasPendingCancelApply(id)) {
+            log.warn("订单存在待审核的取消申请，不允许数据审核: orderId={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
+        }
+
         String roleCode = getCurrentUserRoleCode();
 
         // 所有订单统一：只有设计管理员可以审核（试用订单不再需要区域管理员审核）
@@ -716,6 +723,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (orderModifyApplyService.hasPendingApply(id)) {
             log.warn("订单存在待审核的修改申请，不允许数据审核: orderId={}", id);
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_PENDING);
+        }
+
+        if (cancelApplyService.hasPendingCancelApply(id)) {
+            log.warn("订单存在待审核的取消申请，不允许数据审核: orderId={}", id);
+            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
         }
 
         String roleCode = getCurrentUserRoleCode();
