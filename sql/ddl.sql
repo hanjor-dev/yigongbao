@@ -1119,6 +1119,9 @@ CREATE TABLE order_main (
     -- ==================== 乐观锁 ====================
     version         INT             DEFAULT 0 COMMENT '版本号（乐观锁）',
 
+    -- ==================== 取消申请状态 ====================
+    has_pending_cancel_apply TINYINT DEFAULT 0 COMMENT '是否有待审核的取消申请（0=否，1=是）',
+
     -- ==================== 公共字段（BaseEntity） ====================
     create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -1134,7 +1137,8 @@ CREATE TABLE order_main (
     KEY idx_order_main_create_time (create_time),
     KEY idx_order_regional_audit (business_type, regional_audit_status, status, operator_dept_id),
     KEY idx_order_design_audit (design_audit_status, status),
-    KEY idx_order_center_id (center_id)
+    KEY idx_order_center_id (center_id),
+    KEY idx_order_main_has_pending_cancel_apply (has_pending_cancel_apply)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单主表';
 CREATE UNIQUE INDEX uk_order_main_code ON order_main ((CASE WHEN is_deleted = 0 THEN order_code ELSE NULL END));
 ALTER TABLE order_main ADD FULLTEXT INDEX ft_order_search (order_code, org_name, operator_name, hospital_name, patient_name);
@@ -1945,3 +1949,29 @@ CREATE TABLE notification_message
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COMMENT = '消息通知表';
+
+
+-- ============================================================
+-- 订单取消申请表（order_cancel_apply）
+-- 存储订单取消申请记录，支持审核流程
+-- ============================================================
+DROP TABLE IF EXISTS order_cancel_apply;
+CREATE TABLE order_cancel_apply (
+    id                  BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    order_id            BIGINT NOT NULL COMMENT '订单ID',
+    apply_by            BIGINT NOT NULL COMMENT '申请人ID',
+    apply_reason        VARCHAR(500) COMMENT '取消原因（选填）',
+    audit_status        TINYINT NOT NULL DEFAULT 1 COMMENT '审核状态：1=待审核，2=已通过，3=已驳回',
+    audit_by            BIGINT COMMENT '审核人ID',
+    audit_reason        VARCHAR(500) COMMENT '审核驳回原因（选填）',
+    audit_time          DATETIME COMMENT '审核时间',
+    create_time         DATETIME NOT NULL COMMENT '创建时间',
+    update_time         DATETIME NOT NULL COMMENT '更新时间',
+    create_by           BIGINT COMMENT '创建人ID',
+    update_by           BIGINT COMMENT '更新人ID',
+    is_deleted          TINYINT DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
+
+    KEY idx_order_cancel_apply_order_id (order_id),
+    KEY idx_order_cancel_apply_audit_status (audit_status),
+    KEY idx_order_cancel_apply_apply_by (apply_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单取消申请表';
