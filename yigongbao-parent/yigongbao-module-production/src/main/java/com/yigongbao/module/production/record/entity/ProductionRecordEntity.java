@@ -29,6 +29,8 @@ public class ProductionRecordEntity extends BaseEntity {
     private Long designPackageId;
     /** 设计数据包编号（冗余） */
     private String designPackageCode;
+    /** 产品大类（17.1=模型类，17.2=导板类） */
+    private String productCategory;
     /** 生产批号 */
     private String productionBatchNo;
     /** 版本号 */
