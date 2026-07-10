@@ -1965,8 +1965,8 @@ CREATE TABLE order_cancel_apply (
     audit_by            BIGINT COMMENT '审核人ID',
     audit_reason        VARCHAR(500) COMMENT '审核驳回原因（选填）',
     audit_time          DATETIME COMMENT '审核时间',
-    create_time         DATETIME NOT NULL COMMENT '创建时间',
-    update_time         DATETIME NOT NULL COMMENT '更新时间',
+    create_time         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     create_by           BIGINT COMMENT '创建人ID',
     update_by           BIGINT COMMENT '更新人ID',
     is_deleted          TINYINT DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
@@ -1974,4 +1974,4 @@ CREATE TABLE order_cancel_apply (
     KEY idx_order_cancel_apply_order_id (order_id),
     KEY idx_order_cancel_apply_audit_status (audit_status),
     KEY idx_order_cancel_apply_apply_by (apply_by)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单取消申请表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单取消申请表';
