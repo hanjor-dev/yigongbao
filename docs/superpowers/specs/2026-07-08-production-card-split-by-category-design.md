@@ -69,7 +69,21 @@
 4. `extractMaterialFromDesignProducts()` - 增加产品大类过滤
 
 **新增依赖**：
-- 注入 `ProductMapper`（基础产品表的Mapper），用于查询产品大类信息
+- 在 `DesignCompletedListener` 类中注入 `ProductMapper`（基础产品表的Mapper），用于查询产品大类信息
+  
+```java
+@RequiredArgsConstructor
+public class DesignCompletedListener {
+    // 现有依赖
+    private final OrderMainMapper orderMainMapper;
+    private final DesignPackageMapper designPackageMapper;
+    private final DesignProductMapper designProductMapper;
+    // ... 其他Mapper
+    
+    // 新增依赖
+    private final ProductMapper productMapper;  // 用于查询产品大类
+}
+```
 
 ### 4.2 数据流变化
 
@@ -244,6 +258,23 @@ ALTER TABLE production_record ADD INDEX idx_product_category (product_category);
  */
 private String productCategory;
 ```
+
+**ProductionRecordVO** 新增字段：
+```java
+/**
+ * 产品大类（17.1=模型类，17.2=导板类）
+ */
+private String productCategory;
+
+/**
+ * 产品大类名称（冗余，用于前端显示）
+ */
+private String productCategoryName;
+```
+
+**Convert类修改**（如果项目中存在ProductionRecordConvert类）：
+- 需要在Entity转VO的映射中增加productCategory字段
+- productCategoryName需要从字典服务查询或在Service层赋值
 
 ### 6.3 数据关系变化
 
@@ -475,9 +506,37 @@ void testDesignCompletedEventIntegration() {
    - 可选：编写数据迁移脚本，为历史流转卡补充 `product_category` 字段
 
 2. **前端适配**：
-   - 流转卡列表页面可能需要显示产品大类信息
-   - 筛选条件可能需要增加产品大类筛选
-   - 详情页面需要明确显示产品大类
+   
+   **列表页面展示**（推荐方案B）：
+   
+   方案A：按数据包聚合显示
+   - 同一数据包的多张流转卡聚合为一行
+   - 显示"模型×1、导板×1"标识
+   - 点击展开查看具体流转卡详情
+   - 优点：页面简洁，关联关系清晰
+   - 缺点：需要额外的聚合查询逻辑，交互复杂
+   
+   方案B：平铺显示（推荐）
+   - 每张流转卡单独一行，正常展示
+   - 列表中增加"产品大类"列，显示"模型类"或"导板类"
+   - 可通过数据包编号关联识别同一案例的多张卡
+   - 优点：逻辑简单，查询性能好，便于按产品大类筛选和排序
+   - 缺点：同一案例的流转卡分散显示
+   
+   **详情页面**：
+   - 在流转卡详情中显示"产品大类"字段（模型类/导板类）
+   - 如果同一数据包有多张流转卡，在详情页底部显示"关联流转卡"列表
+   - 关联流转卡列表显示：流转卡编号、产品大类、产品数量、当前状态
+   
+   **筛选功能**（可选实施）：
+   - 在ProductionRecordPageDTO增加productCategory筛选字段
+   - 前端增加产品大类下拉筛选框（全部/模型类/导板类）
+   - 支持与其他筛选条件组合使用
+   
+   **API接口调整**：
+   - ProductionRecordVO已增加productCategory和productCategoryName字段
+   - 分页查询接口向后兼容，新增字段不影响旧版本前端
+   - 如需按产品大类筛选，后端Service层增加对应查询条件
 
 3. **API兼容性**：
    - ProductionRecordVO 增加 `productCategory` 字段
