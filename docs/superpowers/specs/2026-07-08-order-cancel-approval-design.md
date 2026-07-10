@@ -418,6 +418,7 @@ public void auditCancelApply(Long applyId, AuditCancelApplyDTO dto) {
             log.warn("订单已取消，无法审核通过: orderId={}", apply.getOrderId());
             throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_CANCELLED);
         }
+        
         // 审核通过：取消订单
         Long currentUserId = getCurrentUserId();
         String operatorName = getUserRealName(currentUserId);
@@ -426,7 +427,7 @@ public void auditCancelApply(Long applyId, AuditCancelApplyDTO dto) {
             apply.getOrderId(), FlowActionEnum.CANCEL, 
             new FlowOperator(currentUserId, operatorName, null));
         
-        OrderMainEntity order = orderMainService.getById(apply.getOrderId());
+        // 使用前面查询的 order 对象，避免重复查询
         order.setPhase(result.getTargetPhase());
         order.setStatus(result.getFinalStatus());
         order.setHasPendingCancelApply(StatusConstants.NO);
@@ -510,19 +511,28 @@ private void directCancelOrder(Long id, OrderMainEntity order, Long currentUserI
 
 在以下方法的开头添加检查逻辑：
 
-**OrderMainService**：
-- `auditPass()` - 数据审核通过
-- `auditReject()` - 数据审核驳回
+**OrderMainService**（订单模块）：
+- `auditPass(Long orderId, AuditOrderDTO dto)` - 数据审核通过
+- `auditReject(Long orderId, AuditOrderDTO dto)` - 数据审核驳回
 
-**OrderModifyApplyService**：
-- `submitApply()` - 提交订单修改申请
+**OrderModifyApplyService**（订单修改模块）：
+- `submitApply(OrderModifyApplyDTO dto)` - 提交订单修改申请
 
 **DesignService**（设计模块）：
-- `startDesign()` - 开始设计
-- `completeDesign()` - 完成设计
+- `startDesign(Long orderId)` - 开始设计
+- `completeDesign(Long orderId)` - 完成设计
+- `submitDesignPackage(Long orderId, DesignPackageDTO dto)` - 提交设计数据包
 
 **生产相关Service**：
-- 开始打印、完成打印、质检等操作
+- **PrintService**（打印模块）：
+  - `startPrint(Long orderId)` - 开始打印
+  - `completePrint(Long orderId)` - 完成打印
+- **QcService**（质检模块）：
+  - `startQc(Long orderId)` - 开始质检
+  - `completeQc(Long orderId, QcResultDTO dto)` - 完成质检
+- **DeliveryService**（发货模块）：
+  - `startDelivery(Long orderId)` - 开始发货
+  - `completeDelivery(Long orderId)` - 完成发货
 
 ### 7.2 检查代码示例
 
@@ -553,6 +563,13 @@ public class CancelApplySubmittedEvent extends ApplicationEvent {
 
 **触发时机**：用户提交取消申请时  
 **通知对象**：所有设计管理员
+
+**字段说明**：
+- 基础字段已满足消息通知需求
+- 可选扩展字段（用于更丰富的消息展示）：
+  - `patientName` - 患者姓名
+  - `hospitalName` - 医院名称
+  - 示例："患者张三的订单 H20260708001 有新的取消申请"
 
 ### 8.2 CancelApplyApprovedEvent
 
@@ -652,6 +669,13 @@ ORDER_PHASE_NOT_ALLOW_APPLY(625, "订单阶段不允许提交取消申请"),
 
 ### 11.2 实施顺序
 
+**前置准备**：
+0. 确认依赖接口是否存在，不存在则先创建：
+   - `UserService.getUserIdsByRoleCode(String roleCode)` - 根据角色编码获取用户列表
+   - `MessageService.sendToUser(...)` - 发送站内消息给单个用户
+   - `MessageService.sendToUsers(...)` - 发送站内消息给多个用户
+
+**实施步骤**：
 1. 数据库变更（DDL）
 2. 创建 Entity/DTO/VO
 3. 实现 OrderCancelApplyService
@@ -735,7 +759,10 @@ ORDER_PHASE_NOT_ALLOW_APPLY(625, "订单阶段不允许提交取消申请"),
 **新逻辑**：
 ```javascript
 // 伪代码
-if (order.phase < 20) {
+if (order.status === 'CANCELLED') {
+    // 订单已取消：不显示任何取消相关按钮
+    // 或显示"已取消"状态标签
+} else if (order.phase < 20) {
     // 订单阶段：显示"取消订单"按钮，直接调用取消接口
     showButton("取消订单", () => cancelOrder(orderId));
 } else if (order.hasPendingCancelApply) {
@@ -746,6 +773,8 @@ if (order.phase < 20) {
     showButton("申请取消", () => navigateToCancelApply(orderId));
 }
 ```
+
+**说明**：优先判断订单是否已取消，避免在已取消订单上显示取消按钮
 
 ### 14.3 新增页面
 
