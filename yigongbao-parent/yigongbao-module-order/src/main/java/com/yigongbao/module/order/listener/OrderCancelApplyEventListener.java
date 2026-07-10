@@ -44,6 +44,11 @@ public class OrderCancelApplyEventListener {
     @EventListener
     @Async
     public void handleCancelApplySubmitted(CancelApplySubmittedEvent event) {
+        if (event == null || event.getApplyId() == null || event.getOrderId() == null) {
+            log.warn("事件数据不完整，跳过处理: event={}", event);
+            return;
+        }
+
         Long applyId = event.getApplyId();
         Long orderId = event.getOrderId();
         Long applyBy = event.getApplyBy();
@@ -59,7 +64,7 @@ public class OrderCancelApplyEventListener {
             // 获取申请信息
             OrderCancelApplyEntity apply = cancelApplyService.getById(applyId);
             if (apply == null) {
-                log.warn("处理取消申请提交事件失败，申请不存在: applyId=", applyId);
+                log.warn("处理取消申请提交事件失败，申请不存在: applyId={}", applyId);
                 return;
             }
 
@@ -78,8 +83,9 @@ public class OrderCancelApplyEventListener {
 
             // 构建消息内容
             String title = "新的订单取消申请";
+            String reason = apply.getApplyReason() != null ? apply.getApplyReason() : "未填写";
             String content = String.format("订单 %s 有新的取消申请，申请人：%s，申请原因：%s",
-                    order.getOrderCode(), applicantName, apply.getApplyReason());
+                    order.getOrderCode(), applicantName, reason);
 
             // 发送消息给所有设计管理员
             messageService.sendToUsers(adminIds, title, content, "/order/cancel-apply/audit", applyId);
@@ -101,6 +107,11 @@ public class OrderCancelApplyEventListener {
     @EventListener
     @Async
     public void handleCancelApplyApproved(CancelApplyApprovedEvent event) {
+        if (event == null || event.getApplyId() == null || event.getOrderId() == null) {
+            log.warn("事件数据不完整，跳过处理: event={}", event);
+            return;
+        }
+
         Long applyId = event.getApplyId();
         Long orderId = event.getOrderId();
         Long auditBy = event.getAuditBy();
@@ -145,6 +156,11 @@ public class OrderCancelApplyEventListener {
     @EventListener
     @Async
     public void handleCancelApplyRejected(CancelApplyRejectedEvent event) {
+        if (event == null || event.getApplyId() == null || event.getOrderId() == null) {
+            log.warn("事件数据不完整，跳过处理: event={}", event);
+            return;
+        }
+
         Long applyId = event.getApplyId();
         Long orderId = event.getOrderId();
         Long auditBy = event.getAuditBy();
@@ -173,8 +189,9 @@ public class OrderCancelApplyEventListener {
 
             // 构建消息内容
             String title = "订单取消申请已驳回";
+            String rejectReason = apply.getAuditReason() != null ? apply.getAuditReason() : "未填写";
             String content = String.format("您的订单 %s 取消申请已被驳回，审核人：%s，驳回原因：%s",
-                    order.getOrderCode(), auditorName, apply.getAuditReason());
+                    order.getOrderCode(), auditorName, rejectReason);
 
             // 发送消息给申请人
             messageService.sendToUser(applyBy, title, content, "/order/detail/{orderId}", orderId);
