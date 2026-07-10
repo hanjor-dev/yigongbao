@@ -294,6 +294,13 @@ public enum ErrorCodeEnum {
     ORDER_MODIFY_TIME_WINDOW_EXCEEDED(739, "订单修改时间已超限，请提交申请", 3),
     ORDER_NOT_BELONG_TO_USER(740, "只能对自己创建的订单提交修改申请", 3),
 
+    // ==================== 订单取消申请相关（741-745）====================
+    ORDER_CANCEL_APPLY_PENDING(741, "订单存在待审核的取消申请", 3),
+    ORDER_NEED_CANCEL_APPLY(742, "该订单需要提交取消申请", 3),
+    CANCEL_APPLY_NOT_FOUND(743, "取消申请不存在", 3),
+    CANCEL_APPLY_ALREADY_AUDITED(744, "取消申请已审核", 3),
+    ORDER_PHASE_NOT_ALLOW_APPLY(745, "订单阶段不允许提交取消申请", 3),
+
     // ==================== 产品规格相关 754-756 ====================
     PRODUCT_HAS_SPECS(754, "产品下存在规格，无法删除", 4),
     PRODUCT_SPEC_NOT_FOUND(755, "产品规格不存在", 4),
