@@ -107,8 +107,14 @@ public class DesignCompletedListener {
                     continue;
                 }
 
-                ProductionRecordEntity record = createProductionRecord(order, pkg);
-                int productCount = createProductRecords(record, pkg);
+                // 查询数据包下的所有设计产品
+                List<DesignProductEntity> designProducts = designProductMapper.selectList(
+                        new LambdaQueryWrapper<DesignProductEntity>()
+                                .eq(DesignProductEntity::getPackageId, pkg.getId()));
+
+                // 暂时使用null作为category参数，后续实现按产品大类拆分时再传入具体值
+                ProductionRecordEntity record = createProductionRecord(order, pkg, null, designProducts);
+                int productCount = createProductRecords(record, designProducts);
                 createProcessRecords(record.getId(), order.getOrderType());
 
                 // 更新流转卡产品总数和二维码
@@ -138,9 +144,12 @@ public class DesignCompletedListener {
      *
      * @param order 订单信息
      * @param pkg 数据包信息
+     * @param category 产品大类编码
+     * @param designProducts 设计产品列表
      * @return 流转卡实体
      */
-    private ProductionRecordEntity createProductionRecord(OrderMainEntity order, DesignPackageEntity pkg) {
+    private ProductionRecordEntity createProductionRecord(OrderMainEntity order, DesignPackageEntity pkg,
+                                                          String category, List<DesignProductEntity> designProducts) {
         // 生成流转卡编号和生产批号
         String recordNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_RECORD_NO);
         String batchNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_BATCH_NO);
@@ -163,8 +172,11 @@ public class DesignCompletedListener {
         record.setExpectedDeliveryDate(order.getExpectedDeliveryDate());
 
         // 从设计产品中提取材质信息
-        String material = extractMaterialFromDesignProducts(pkg.getId());
+        String material = extractMaterialFromDesignProducts(designProducts);
         record.setMaterial(material);
+
+        // 设置产品大类
+        record.setProductCategory(category);
 
         // 设置初始状态为设计完成
         record.setStatus(FlowStatusEnum.DESIGN_COMPLETED.getValue());
@@ -175,16 +187,10 @@ public class DesignCompletedListener {
     /**
      * 从设计产品中提取材质信息（拼接颜色+材质，多种组合则用顿号分隔）
      *
-     * @param packageId 数据包ID
+     * @param designProducts 设计产品列表
      * @return 材质描述
      */
-    private String extractMaterialFromDesignProducts(Long packageId) {
-        // 查询数据包下的所有设计产品
-        List<DesignProductEntity> designProducts = designProductMapper.selectList(
-                new LambdaQueryWrapper<DesignProductEntity>()
-                        .eq(DesignProductEntity::getPackageId, packageId)
-                        .select(DesignProductEntity::getMaterialName, DesignProductEntity::getColorName));
-
+    private String extractMaterialFromDesignProducts(List<DesignProductEntity> designProducts) {
         if (designProducts.isEmpty()) {
             return null;
         }
@@ -215,15 +221,10 @@ public class DesignCompletedListener {
      * 按设计产品列表创建生产产品记录，按 quantity 字段展开数量，返回总产品数
      *
      * @param record 流转卡实体
-     * @param pkg 数据包实体
+     * @param designProducts 设计产品列表
      * @return 总产品数
      */
-    private int createProductRecords(ProductionRecordEntity record, DesignPackageEntity pkg) {
-        // 查询数据包下的所有设计产品
-        List<DesignProductEntity> designProducts = designProductMapper.selectList(
-                new LambdaQueryWrapper<DesignProductEntity>()
-                        .eq(DesignProductEntity::getPackageId, pkg.getId()));
-
+    private int createProductRecords(ProductionRecordEntity record, List<DesignProductEntity> designProducts) {
         if (designProducts.isEmpty()) {
             return 0;
         }
