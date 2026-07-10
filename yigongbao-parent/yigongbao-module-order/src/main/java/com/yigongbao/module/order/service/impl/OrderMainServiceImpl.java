@@ -133,6 +133,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     @Autowired
     private DesignerAssignmentService designerAssignmentService;
 
+    /** 设计阶段阈值：订单阶段(phase=10)与设计阶段(phase=20)的分界点 */
+    private static final int DESIGN_PHASE_THRESHOLD = 20;
+
     // ==================== 私有方法 ====================
 
     /**
@@ -805,11 +808,12 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
 
         // 检查阶段：订单阶段允许直接取消，设计阶段需提交申请
-        if (order.getPhase() < 20) {
+        if (order.getPhase() < DESIGN_PHASE_THRESHOLD) {
             // 订单阶段：直接取消
             directCancelOrder(id, order, currentUserId);
         } else {
             // 设计阶段：需提交取消申请
+            log.warn("订单处于设计阶段，需提交取消申请: orderId={}, phase={}", id, order.getPhase());
             throw new BusinessException(ErrorCodeEnum.ORDER_NEED_CANCEL_APPLY);
         }
     }
@@ -832,7 +836,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         order.setStatus(result.getFinalStatus());
         updateById(order);
         eventPublisher.publishEvent(new OrderCancelledEvent(this, id));
-        log.info("直接取消订单: orderId={}", id);
+        log.info("直接取消订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
     }
 
     /**
