@@ -203,6 +203,10 @@ public class DesignCompletedListener {
         // 设置初始状态为设计完成
         record.setStatus(FlowStatusEnum.DESIGN_COMPLETED.getValue());
         recordMapper.insert(record);
+
+        log.info("创建生产流转卡记录: packageId={}, category={}, recordNo={}",
+            pkg.getId(), category, recordNo);
+
         return record;
     }
 
@@ -218,7 +222,7 @@ public class DesignCompletedListener {
         }
 
         // 拼接颜色+材质，去重后用顿号分隔
-        java.util.Set<String> materialDescriptions = designProducts.stream()
+        Set<String> materialDescriptions = designProducts.stream()
                 .map(dp -> {
                     String color = dp.getColorName();
                     String material = dp.getMaterialName();
@@ -231,7 +235,7 @@ public class DesignCompletedListener {
                     return material;
                 })
                 .filter(desc -> desc != null)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
 
         if (materialDescriptions.isEmpty()) {
             return null;
