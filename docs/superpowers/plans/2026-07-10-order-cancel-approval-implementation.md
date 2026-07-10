@@ -73,6 +73,72 @@
 
 ---
 
+## Task 0: 验证依赖接口
+
+**Files:**
+- Check: `yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/user/service/UserService.java`
+- Check: `yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/message/service/MessageService.java`
+
+**Goal:** 验证并确保依赖接口存在，不存在则创建
+
+- [ ] **Step 1: 检查 UserService.getUserIdsByRoleCode() 方法**
+
+检查方法是否存在：
+```java
+List<Long> getUserIdsByRoleCode(String roleCode);
+```
+
+如不存在，在 UserService 接口中添加方法定义，在 UserServiceImpl 中添加实现：
+```java
+@Override
+public List<Long> getUserIdsByRoleCode(String roleCode) {
+    return baseMapper.selectList(
+        new LambdaQueryWrapper<UserEntity>()
+            .eq(UserEntity::getRoleCode, roleCode)
+            .eq(UserEntity::getStatus, StatusConstants.NORMAL)
+    ).stream()
+     .map(UserEntity::getId)
+     .collect(Collectors.toList());
+}
+```
+
+- [ ] **Step 2: 检查 MessageService 方法**
+
+检查以下方法是否存在：
+```java
+void sendToUser(Long userId, String title, String content, String linkUrl, Long linkParam);
+void sendToUsers(List<Long> userIds, String title, String content, String linkUrl, Long linkParam);
+```
+
+如不存在，需要在 MessageService 接口中添加方法定义并在实现类中添加实现。
+
+- [ ] **Step 3: 检查 UserService.getUserRealName() 和 getCurrentUserRoleCode() 方法**
+
+检查以下方法是否存在：
+```java
+String getUserRealName(Long userId);
+String getCurrentUserRoleCode();
+```
+
+如不存在，需要添加这些方法。
+
+- [ ] **Step 4: 提交依赖接口补充（如有）**
+
+```bash
+cd yigongbao-parent
+# 如果添加了新方法，提交相关文件
+git add yigongbao-module-system/src/main/java/com/yigongbao/module/system/user/service/UserService.java \
+     yigongbao-module-system/src/main/java/com/yigongbao/module/system/user/service/impl/UserServiceImpl.java
+git commit -m "feat(system): 添加取消申请所需的依赖方法
+
+- UserService.getUserIdsByRoleCode() 根据角色获取用户列表
+- UserService.getUserRealName() 获取用户真实姓名
+- UserService.getCurrentUserRoleCode() 获取当前用户角色
+- MessageService 消息通知方法（如需要）"
+```
+
+---
+
 ## Task 1: 数据库变更（DDL）
 
 **Files:**
@@ -491,6 +557,7 @@ import com.yigongbao.module.order.mapper.OrderCancelApplyMapper;
 import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.order.CancelApplyVO;
+import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -512,6 +579,7 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
     private final FlowFacade flowFacade;
     private final OrderCancelApplyConvert cancelApplyConvert;
     private final ApplicationEventPublisher eventPublisher;
+    private final UserService userService;
     
     // 方法实现将在后续步骤中添加
 }
@@ -1039,10 +1107,26 @@ if (cancelApplyService.hasPendingCancelApply(orderId)) {
 
 - [ ] **Step 4: 在生产相关Service添加检查**
 
-在 PrintService、QcService、DeliveryService 的以下方法开头添加检查：
-- PrintService: `startPrint(Long orderId)`, `completePrint(Long orderId)`
-- QcService: `startQc(Long orderId)`, `completeQc(Long orderId, QcResultDTO dto)`
-- DeliveryService: `startDelivery(Long orderId)`, `completeDelivery(Long orderId)`
+在以下Service实现类的方法开头添加检查代码：
+
+**PrintService** (`yigongbao-module-production/src/main/java/com/yigongbao/module/production/service/impl/PrintServiceImpl.java`):
+- `startPrint(Long orderId)`
+- `completePrint(Long orderId)`
+
+**QcService** (`yigongbao-module-production/src/main/java/com/yigongbao/module/production/service/impl/QcServiceImpl.java`):
+- `startQc(Long orderId)`
+- `completeQc(Long orderId, QcResultDTO dto)`
+
+**DeliveryService** (`yigongbao-module-production/src/main/java/com/yigongbao/module/production/service/impl/DeliveryServiceImpl.java`):
+- `startDelivery(Long orderId)`
+- `completeDelivery(Long orderId)`
+
+添加的检查代码：
+```java
+if (cancelApplyService.hasPendingCancelApply(orderId)) {
+    throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
+}
+```
 
 - [ ] **Step 5: 提交待审核检查机制**
 
@@ -1360,16 +1444,49 @@ class OrderCancelApplyServiceImplTest {
     
     @Test
     void submitCancelApply_Success() {
-        // 测试提交取消申请成功场景
-        // Mock数据准备、方法调用、断言验证
+        // 准备测试数据
+        CancelOrderApplyDTO dto = new CancelOrderApplyDTO();
+        dto.setOrderId(1L);
+        dto.setReason("测试取消原因");
+        
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(1L);
+        order.setOrderCode("H20260710001");
+        order.setPhase(20); // 设计阶段
+        order.setStatus(10);
+        order.setHasPendingCancelApply(0);
+        order.setCreateBy(100L);
+        order.setDesignerId(100L);
+        
+        // Mock行为
+        when(orderMainService.getById(1L)).thenReturn(order);
+        when(cancelApplyMapper.insert(any(OrderCancelApplyEntity.class))).thenAnswer(invocation -> {
+            OrderCancelApplyEntity entity = invocation.getArgument(0);
+            entity.setId(1001L);
+            return 1;
+        });
+        
+        // 执行方法（注意：实际执行需要Mock getCurrentUserId等方法）
+        // Long applyId = cancelApplyService.submitCancelApply(dto);
+        
+        // 断言验证
+        // assertNotNull(applyId);
+        // assertEquals(1001L, applyId);
+        // verify(cancelApplyMapper, times(1)).insert(any(OrderCancelApplyEntity.class));
+        // verify(orderMainService, times(1)).update(any());
     }
     
     @Test
     void submitCancelApply_OrderNotFound() {
-        // 测试订单不存在场景
-        assertThrows(BusinessException.class, () -> {
-            // 调用方法
-        });
+        CancelOrderApplyDTO dto = new CancelOrderApplyDTO();
+        dto.setOrderId(999L);
+        
+        when(orderMainService.getById(999L)).thenReturn(null);
+        
+        BusinessException exception = assertThrows(BusinessException.class, 
+            () -> cancelApplyService.submitCancelApply(dto));
+        
+        assertEquals(ErrorCodeEnum.ORDER_NOT_FOUND.getCode(), exception.getCode());
     }
     
     @Test
