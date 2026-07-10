@@ -23,6 +23,14 @@ public class ProductionRecordVO {
     private Integer orderType;
     private Long designPackageId;
     private String designPackageCode;
+    /**
+     * 产品大类（17.1=模型类，17.2=导板类）
+     */
+    private String productCategory;
+    /**
+     * 产品大类名称（冗余，用于前端显示）
+     */
+    private String productCategoryName;
     private String productionBatchNo;
     private String material;
     private String materialBatchNo;
