@@ -10,6 +10,8 @@ import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.system.message.service.MessageService;
 import com.yigongbao.module.system.user.service.UserService;
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
