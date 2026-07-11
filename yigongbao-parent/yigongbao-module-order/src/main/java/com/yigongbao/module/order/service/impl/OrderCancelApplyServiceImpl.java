@@ -12,6 +12,7 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
@@ -72,7 +73,7 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
-        if (order.getStatus() == 9010) {
+        if (FlowStatusEnum.CANCELLED.getValue().equals(order.getStatus())) {
             log.warn("提交取消申请失败，订单已取消: orderId={}", orderId);
             throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_CANCELLED);
         }
