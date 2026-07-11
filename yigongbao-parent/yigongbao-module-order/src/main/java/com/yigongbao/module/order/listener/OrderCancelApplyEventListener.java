@@ -76,14 +76,14 @@ public class OrderCancelApplyEventListener {
 
             // 获取所有设计管理员
             List<Long> adminIds = userService.getUserIdsByRoleCode(RoleCodeConstants.DESIGN_ADMIN);
-            if (adminIds == null || adminIds.isEmpty()) {
+            if (CollUtil.isEmpty(adminIds)) {
                 log.warn("处理取消申请提交事件失败，无设计管理员: applyId={}, orderId={}", applyId, orderId);
                 return;
             }
 
             // 构建消息内容
             String title = "新的订单取消申请";
-            String reason = apply.getApplyReason() != null ? apply.getApplyReason() : "未填写";
+            String reason = StrUtil.blankToDefault(apply.getApplyReason(), "未填写");
             String content = String.format("订单 %s 有新的取消申请，申请人：%s，申请原因：%s",
                     order.getOrderCode(), applicantName, reason);
 
@@ -189,7 +189,7 @@ public class OrderCancelApplyEventListener {
 
             // 构建消息内容
             String title = "订单取消申请已驳回";
-            String rejectReason = apply.getAuditReason() != null ? apply.getAuditReason() : "未填写";
+            String rejectReason = StrUtil.blankToDefault(apply.getAuditReason(), "未填写");
             String content = String.format("您的订单 %s 取消申请已被驳回，审核人：%s，驳回原因：%s",
                     order.getOrderCode(), auditorName, rejectReason);
 
