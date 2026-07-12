@@ -3,8 +3,6 @@ package com.yigongbao.module.production.listener;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
-import com.yigongbao.module.basic.product.entity.ProductEntity;
-import com.yigongbao.module.basic.product.mapper.ProductMapper;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignProductFileEntity;
@@ -59,7 +57,6 @@ class DesignCompletedListenerTest {
     @Mock private ProductionRecordMapper recordMapper;
     @Mock private ProductionProductMapper productMapper;
     @Mock private ProductionProcessMapper processMapper;
-    @Mock private ProductMapper baseProductMapper;
     @Mock private CodeGeneratorService codeGeneratorService;
     @Mock private ApplicationEventPublisher eventPublisher;
 
@@ -67,11 +64,11 @@ class DesignCompletedListenerTest {
     private DesignCompletedListener listener;
 
     @Test
-    void testGroupDesignProductsByCategory() throws Exception {
+    void testGroupDesignProductsByProductId() throws Exception {
         // Arrange: 准备测试数据
         Long packageId = 1L;
 
-        // 模拟3个设计产品：2个模型类 + 1个导板类
+        // 模拟3个设计产品：2个产品101 + 1个产品102
         DesignProductEntity product1 = new DesignProductEntity();
         product1.setId(1L);
         product1.setProductId(101L);
@@ -89,34 +86,23 @@ class DesignCompletedListenerTest {
 
         when(designProductMapper.selectList(any())).thenReturn(Arrays.asList(product1, product2, product3));
 
-        // 模拟产品大类查询
-        ProductEntity modelProduct = new ProductEntity();
-        modelProduct.setId(101L);
-        modelProduct.setCategory("17.1");
-
-        ProductEntity guideProduct = new ProductEntity();
-        guideProduct.setId(102L);
-        guideProduct.setCategory("17.2");
-
-        when(baseProductMapper.selectBatchIds(any())).thenReturn(Arrays.asList(modelProduct, guideProduct));
-
         // Act: 使用反射调用私有方法
-        Method method = DesignCompletedListener.class.getDeclaredMethod("groupByProductCategory", Long.class);
+        Method method = DesignCompletedListener.class.getDeclaredMethod("groupByProductId", Long.class);
         method.setAccessible(true);
         @SuppressWarnings("unchecked")
-        Map<String, List<DesignProductEntity>> grouped = (Map<String, List<DesignProductEntity>>) method.invoke(listener, packageId);
+        Map<Long, List<DesignProductEntity>> grouped = (Map<Long, List<DesignProductEntity>>) method.invoke(listener, packageId);
 
         // Assert: 验证分组结果
         assertNotNull(grouped);
         assertEquals(2, grouped.size());
-        assertTrue(grouped.containsKey("17.1"));
-        assertTrue(grouped.containsKey("17.2"));
-        assertEquals(2, grouped.get("17.1").size());
-        assertEquals(1, grouped.get("17.2").size());
+        assertTrue(grouped.containsKey(101L));
+        assertTrue(grouped.containsKey(102L));
+        assertEquals(2, grouped.get(101L).size());
+        assertEquals(1, grouped.get(102L).size());
     }
 
     @Test
-    void testOnDesignCompleted_SplitByCategory() {
+    void testOnDesignCompleted_SplitByProductId() {
         // Arrange
         Long orderId = 1L;
         Long packageId = 1L;
@@ -133,36 +119,27 @@ class DesignCompletedListenerTest {
         when(orderMainMapper.selectById(orderId)).thenReturn(order);
         when(designPackageMapper.selectList(any())).thenReturn(Arrays.asList(pkg));
 
-        // 模拟2个模型 + 1个导板
-        DesignProductEntity modelProduct1 = new DesignProductEntity();
-        modelProduct1.setId(1L);
-        modelProduct1.setProductId(101L);
-        modelProduct1.setQuantity(1);
+        // 模拟2个产品101 + 1个产品102
+        DesignProductEntity product1 = new DesignProductEntity();
+        product1.setId(1L);
+        product1.setProductId(101L);
+        product1.setProductName("产品A");
+        product1.setQuantity(1);
 
-        DesignProductEntity modelProduct2 = new DesignProductEntity();
-        modelProduct2.setId(2L);
-        modelProduct2.setProductId(101L);
-        modelProduct2.setQuantity(1);
+        DesignProductEntity product2 = new DesignProductEntity();
+        product2.setId(2L);
+        product2.setProductId(101L);
+        product2.setProductName("产品A");
+        product2.setQuantity(1);
 
-        DesignProductEntity guideProduct = new DesignProductEntity();
-        guideProduct.setId(3L);
-        guideProduct.setProductId(102L);
-        guideProduct.setQuantity(1);
+        DesignProductEntity product3 = new DesignProductEntity();
+        product3.setId(3L);
+        product3.setProductId(102L);
+        product3.setProductName("产品B");
+        product3.setQuantity(1);
 
         when(designProductMapper.selectList(any())).thenReturn(
-            Arrays.asList(modelProduct1, modelProduct2, guideProduct));
-
-        // 模拟产品大类查询
-        ProductEntity productModel = new ProductEntity();
-        productModel.setId(101L);
-        productModel.setCategory("17.1");
-
-        ProductEntity productGuide = new ProductEntity();
-        productGuide.setId(102L);
-        productGuide.setCategory("17.2");
-
-        when(baseProductMapper.selectBatchIds(any())).thenReturn(
-            Arrays.asList(productModel, productGuide));
+            Arrays.asList(product1, product2, product3));
 
         // Mock幂等性检查返回null（不存在）
         when(recordMapper.selectOne(any())).thenReturn(null);
@@ -173,13 +150,13 @@ class DesignCompletedListenerTest {
         // Act
         listener.onDesignCompleted(new DesignCompletedEvent(this, orderId));
 
-        // Assert: 应该创建2张流转卡（模型1张，导板1张）
+        // Assert: 应该创建2张流转卡（产品101一张，产品102一张）
         verify(recordMapper, times(2)).insert(any(ProductionRecordEntity.class));
     }
 
     @Test
-    void testOnDesignCompleted_SingleCategory() {
-        // Arrange: 只有模型类产品
+    void testOnDesignCompleted_SingleProductId() {
+        // Arrange: 只有一种产品
         Long orderId = 1L;
         Long packageId = 1L;
 
@@ -195,38 +172,35 @@ class DesignCompletedListenerTest {
         when(orderMainMapper.selectById(orderId)).thenReturn(order);
         when(designPackageMapper.selectList(any())).thenReturn(Arrays.asList(pkg));
 
-        // 模拟3个模型类产品
+        // 模拟3个相同产品101的设计产品
         DesignProductEntity product1 = new DesignProductEntity();
         product1.setId(1L);
         product1.setProductId(101L);
+        product1.setProductName("产品A");
         product1.setQuantity(1);
 
         DesignProductEntity product2 = new DesignProductEntity();
         product2.setId(2L);
         product2.setProductId(101L);
+        product2.setProductName("产品A");
         product2.setQuantity(1);
 
         DesignProductEntity product3 = new DesignProductEntity();
         product3.setId(3L);
         product3.setProductId(101L);
+        product3.setProductName("产品A");
         product3.setQuantity(1);
 
         when(designProductMapper.selectList(any())).thenReturn(
             Arrays.asList(product1, product2, product3));
 
-        // 模拟产品大类查询 - 只有模型类
-        ProductEntity productModel = new ProductEntity();
-        productModel.setId(101L);
-        productModel.setCategory("17.1");
-
-        when(baseProductMapper.selectBatchIds(any())).thenReturn(Arrays.asList(productModel));
         when(recordMapper.selectOne(any())).thenReturn(null);
         when(codeGeneratorService.generate(anyString())).thenReturn("MOCK_CODE");
 
         // Act
         listener.onDesignCompleted(new DesignCompletedEvent(this, orderId));
 
-        // Assert: 应该只创建1张流转卡（模型类）
+        // Assert: 应该只创建1张流转卡（产品101）
         verify(recordMapper, times(1)).insert(any(ProductionRecordEntity.class));
     }
 
@@ -260,7 +234,7 @@ class DesignCompletedListenerTest {
 
     @Test
     void testOnDesignCompleted_IdempotencyCheck() {
-        // Arrange: 模型类流转卡已存在，只应创建导板类流转卡
+        // Arrange: 产品101流转卡已存在，只应创建产品102流转卡
         Long orderId = 1L;
         Long packageId = 1L;
 
@@ -276,51 +250,43 @@ class DesignCompletedListenerTest {
         when(orderMainMapper.selectById(orderId)).thenReturn(order);
         when(designPackageMapper.selectList(any())).thenReturn(Arrays.asList(pkg));
 
-        // 模拟2个模型 + 1个导板
-        DesignProductEntity modelProduct1 = new DesignProductEntity();
-        modelProduct1.setId(1L);
-        modelProduct1.setProductId(101L);
-        modelProduct1.setQuantity(1);
+        // 模拟2个产品101 + 1个产品102
+        DesignProductEntity product1 = new DesignProductEntity();
+        product1.setId(1L);
+        product1.setProductId(101L);
+        product1.setProductName("产品A");
+        product1.setQuantity(1);
 
-        DesignProductEntity modelProduct2 = new DesignProductEntity();
-        modelProduct2.setId(2L);
-        modelProduct2.setProductId(101L);
-        modelProduct2.setQuantity(1);
+        DesignProductEntity product2 = new DesignProductEntity();
+        product2.setId(2L);
+        product2.setProductId(101L);
+        product2.setProductName("产品A");
+        product2.setQuantity(1);
 
-        DesignProductEntity guideProduct = new DesignProductEntity();
-        guideProduct.setId(3L);
-        guideProduct.setProductId(102L);
-        guideProduct.setQuantity(1);
+        DesignProductEntity product3 = new DesignProductEntity();
+        product3.setId(3L);
+        product3.setProductId(102L);
+        product3.setProductName("产品B");
+        product3.setQuantity(1);
 
         when(designProductMapper.selectList(any())).thenReturn(
-            Arrays.asList(modelProduct1, modelProduct2, guideProduct));
+            Arrays.asList(product1, product2, product3));
 
-        // 模拟产品大类查询
-        ProductEntity productModel = new ProductEntity();
-        productModel.setId(101L);
-        productModel.setCategory("17.1");
+        // 模拟产品101流转卡已存在
+        ProductionRecordEntity existingRecord = new ProductionRecordEntity();
+        existingRecord.setId(100L);
+        existingRecord.setRecordNo("REC001");
+        existingRecord.setProductId(101L);
+        existingRecord.setProductName("产品A");
 
-        ProductEntity productGuide = new ProductEntity();
-        productGuide.setId(102L);
-        productGuide.setCategory("17.2");
-
-        when(baseProductMapper.selectBatchIds(any())).thenReturn(
-            Arrays.asList(productModel, productGuide));
-
-        // 模拟模型类流转卡已存在
-        ProductionRecordEntity existingModelRecord = new ProductionRecordEntity();
-        existingModelRecord.setId(100L);
-        existingModelRecord.setRecordNo("REC001");
-        existingModelRecord.setProductCategory("17.1");
-
-        // 第一次查询返回已存在的模型类流转卡，第二次查询返回null（导板类不存在）
-        when(recordMapper.selectOne(any())).thenReturn(existingModelRecord, null);
+        // 第一次查询返回已存在的产品101流转卡，第二次查询返回null（产品102不存在）
+        when(recordMapper.selectOne(any())).thenReturn(existingRecord, null);
         when(codeGeneratorService.generate(anyString())).thenReturn("MOCK_CODE");
 
         // Act
         listener.onDesignCompleted(new DesignCompletedEvent(this, orderId));
 
-        // Assert: 应该只创建1张流转卡（跳过模型类，只创建导板类）
+        // Assert: 应该只创建1张流转卡（跳过产品101，只创建产品102）
         verify(recordMapper, times(1)).insert(any(ProductionRecordEntity.class));
     }
 }

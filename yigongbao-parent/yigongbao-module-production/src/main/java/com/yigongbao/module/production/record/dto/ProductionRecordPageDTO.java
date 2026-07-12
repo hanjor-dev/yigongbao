@@ -31,6 +31,6 @@ public class ProductionRecordPageDTO {
     private LocalDateTime orderCreateTimeEnd;
     /** 是否包含后续状态（true=使用>=范围查询，false=精确匹配，默认false） */
     private Boolean includeFollowingStatuses = false;
-    /** 产品大类筛选（17.1=模型类，17.2=导板类） */
-    private String productCategory;
+    /** 产品ID筛选 */
+    private Long productId;
 }
