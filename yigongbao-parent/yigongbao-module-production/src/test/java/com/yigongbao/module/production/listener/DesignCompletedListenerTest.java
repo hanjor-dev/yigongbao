@@ -279,8 +279,8 @@ class DesignCompletedListenerTest {
         existingRecord.setProductId(101L);
         existingRecord.setProductName("产品A");
 
-        // 第一次查询返回已存在的产品101流转卡，第二次查询返回null（产品102不存在）
-        when(recordMapper.selectOne(any())).thenReturn(existingRecord, null);
+        // 批量查询返回已存在的产品101流转卡（新实现使用selectList批量查询）
+        when(recordMapper.selectList(any())).thenReturn(Arrays.asList(existingRecord));
         when(codeGeneratorService.generate(anyString())).thenReturn("MOCK_CODE");
 
         // Act

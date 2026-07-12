@@ -1,13 +1,12 @@
 package com.yigongbao.module.production.listener;
 
+import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.event.DesignCompletedEvent;
 import com.yigongbao.common.event.ProductionCardsCreatedEvent;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
-import com.yigongbao.module.basic.product.entity.ProductEntity;
-import com.yigongbao.module.basic.product.mapper.ProductMapper;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.mapper.DesignPackageMapper;
 import com.yigongbao.module.design.mapper.DesignProductFileMapper;
@@ -58,7 +57,6 @@ public class DesignCompletedListener {
     private final ProductionRecordMapper recordMapper;
     private final ProductionProductMapper productMapper;
     private final ProductionProcessMapper processMapper;
-    private final ProductMapper baseProductMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -92,11 +90,9 @@ public class DesignCompletedListener {
             return;
         }
 
-        // 为每个数据包按产品ID创建流转卡
         List<Long> createdRecordIds = new ArrayList<>();
         for (DesignPackageEntity pkg : packages) {
             try {
-                // 按产品ID分组
                 Map<Long, List<DesignProductEntity>> groupedByProduct =
                     groupByProductId(pkg.getId());
 
@@ -106,29 +102,30 @@ public class DesignCompletedListener {
                     continue;
                 }
 
-                // 为每个产品创建流转卡
+                // 批量查询该数据包下已存在的流转卡（幂等性检查优化）
+                List<ProductionRecordEntity> existingRecords = recordMapper.selectList(
+                    new LambdaQueryWrapper<ProductionRecordEntity>()
+                        .eq(ProductionRecordEntity::getDesignPackageId, pkg.getId()));
+                Set<Long> existingProductIds = existingRecords.stream()
+                    .map(ProductionRecordEntity::getProductId)
+                    .collect(Collectors.toSet());
+
                 for (Map.Entry<Long, List<DesignProductEntity>> entry : groupedByProduct.entrySet()) {
                     Long productId = entry.getKey();
                     List<DesignProductEntity> productDesigns = entry.getValue();
 
-                    // 获取产品名称（从第一个设计产品中获取）
+                    // groupingBy保证列表非空，安全获取第一个元素的产品名称
                     String productName = productDesigns.get(0).getProductName();
 
-                    // 幂等性检查：检查该数据包+产品ID的流转卡是否已存在
-                    ProductionRecordEntity existingRecord = recordMapper.selectOne(
-                        new LambdaQueryWrapper<ProductionRecordEntity>()
-                            .eq(ProductionRecordEntity::getDesignPackageId, pkg.getId())
-                            .eq(ProductionRecordEntity::getProductId, productId)
-                            .last("LIMIT 1"));
-
-                    if (existingRecord != null) {
-                        log.info("数据包的该产品流转卡已存在，跳过创建: packageId={}, productId={}, productName={}, recordNo={}",
-                            pkg.getId(), productId, productName, existingRecord.getRecordNo());
+                    // 幂等性检查：该产品流转卡已存在则跳过
+                    if (existingProductIds.contains(productId)) {
+                        log.info("数据包的该产品流转卡已存在，跳过创建: packageId={}, productId={}, productName={}",
+                            pkg.getId(), productId, productName);
                         continue;
                     }
 
                     // 创建流转卡
-                    ProductionRecordEntity record = createProductionRecord(order, pkg, productId, productName, productDesigns);
+                    ProductionRecordEntity record = createProductionRecord(order, pkg, productId, productDesigns);
 
                     // 创建产品记录
                     int productCount = createProductRecords(record, productDesigns);
@@ -170,12 +167,11 @@ public class DesignCompletedListener {
      * @param order 订单信息
      * @param pkg 数据包信息
      * @param productId 产品ID
-     * @param productName 产品名称
      * @param designProducts 设计产品列表
      * @return 流转卡实体
      */
     private ProductionRecordEntity createProductionRecord(OrderMainEntity order, DesignPackageEntity pkg,
-                                                          Long productId, String productName, List<DesignProductEntity> designProducts) {
+                                                          Long productId, List<DesignProductEntity> designProducts) {
         // 生成流转卡编号和生产批号
         String recordNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_RECORD_NO);
         String batchNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_BATCH_NO);
@@ -201,7 +197,8 @@ public class DesignCompletedListener {
         String material = extractMaterialFromDesignProducts(designProducts);
         record.setMaterial(material);
 
-        // 设置产品信息
+        // 设置产品信息（产品名称从设计产品列表中获取）
+        String productName = designProducts.get(0).getProductName();
         record.setProductId(productId);
         record.setProductName(productName);
 
@@ -260,14 +257,27 @@ public class DesignCompletedListener {
             return 0;
         }
 
+        // 批量查询所有设计产品的关联文件（优化N+1查询）
+        List<Long> designProductIds = designProducts.stream()
+            .map(DesignProductEntity::getId)
+            .collect(Collectors.toList());
+
+        List<DesignProductFileEntity> allFiles = designProductFileMapper.selectList(
+            new LambdaQueryWrapper<DesignProductFileEntity>()
+                .in(DesignProductFileEntity::getDesignProductId, designProductIds)
+                .orderByAsc(DesignProductFileEntity::getSortOrder));
+
+        // 构建映射：designProductId -> 第一个文件
+        Map<Long, DesignProductFileEntity> fileMap = allFiles.stream()
+            .collect(Collectors.toMap(
+                DesignProductFileEntity::getDesignProductId,
+                file -> file,
+                (existing, replacement) -> existing)); // 保留第一个文件
+
         int totalCount = 0;
         for (DesignProductEntity dp : designProducts) {
-            // 取该产品关联的第一个文件作为打印文件
-            DesignProductFileEntity dpFile = designProductFileMapper.selectOne(
-                    new LambdaQueryWrapper<DesignProductFileEntity>()
-                            .eq(DesignProductFileEntity::getDesignProductId, dp.getId())
-                            .orderByAsc(DesignProductFileEntity::getSortOrder)
-                            .last("LIMIT 1"));
+            // 从映射中获取文件
+            DesignProductFileEntity dpFile = fileMap.get(dp.getId());
 
             // 按数量展开创建产品记录
             int qty = dp.getQuantity() != null && dp.getQuantity() > 0 ? dp.getQuantity() : 1;
@@ -332,7 +342,7 @@ public class DesignCompletedListener {
             new LambdaQueryWrapper<DesignProductEntity>()
                 .eq(DesignProductEntity::getPackageId, packageId));
 
-        if (designProducts.isEmpty()) {
+        if (CollUtil.isEmpty(designProducts)) {
             return Collections.emptyMap();
         }
 
