@@ -50,6 +50,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
     private final IProductionRecordService recordService;
     private final com.yigongbao.module.order.mapper.OrderMainMapper orderMainMapper;
     private final com.yigongbao.module.system.user.mapper.UserMapper userMapper;
+    private final com.yigongbao.module.production.product.service.IProductionProductService productService;
 
     /**
      * 标记产品质检合格，回写流转卡合格计数
@@ -246,13 +247,17 @@ public class ProductionQcServiceImpl implements IProductionQcService {
 
         // 4. 批量更新产品
         LocalDateTime now = LocalDateTime.now();
-        for (BatchUpdateUdiDTO.ProductUdiItem item : dto.getProducts()) {
-            ProductionProductEntity product = new ProductionProductEntity();
-            product.setId(item.getProductId());
-            product.setUdiCode(item.getUdiCode());
-            product.setUdiGenerateTime(now);
-            productMapper.updateById(product);
-        }
+        List<ProductionProductEntity> products = dto.getProducts().stream()
+            .map(item -> {
+                ProductionProductEntity product = new ProductionProductEntity();
+                product.setId(item.getProductId());
+                product.setUdiCode(item.getUdiCode());
+                product.setUdiGenerateTime(now);
+                return product;
+            })
+            .collect(Collectors.toList());
+
+        productService.updateBatchById(products);
 
         // 记录详细日志
         String details = dto.getProducts().stream()
