@@ -73,7 +73,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
 
     /** 开始工序：记录设备、操作员、开始时间；非打印工序同步更新流转卡状态为后处理中 */
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void startProcess(Long recordId, StartProcessDTO dto) {
         ProductionRecordEntity record = recordMapper.selectById(recordId);
         if (record == null) {
@@ -153,7 +153,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
      * 完成工序：标记工序为已完成，后处理工序自动推进到下一工序
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void finishProcess(Long recordId, String processType) {
         ProductionProcessEntity process = getOne(new LambdaQueryWrapper<ProductionProcessEntity>()
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)

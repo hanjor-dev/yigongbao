@@ -80,7 +80,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             String udiCode = codeGeneratorService.generate(ProductionConstants.UDI_CODE);
             product.setUdiCode(udiCode);
             product.setUdiGenerateTime(LocalDateTime.now());
-            log.info("生成UDI码: productId={}, productNo=, udiCode={}", productId, product.getProductNo(), udiCode);
+            log.info("生成UDI码: productId={}, productNo={}, udiCode={}", productId, product.getProductNo(), udiCode);
         }
         productMapper.updateById(product);
 

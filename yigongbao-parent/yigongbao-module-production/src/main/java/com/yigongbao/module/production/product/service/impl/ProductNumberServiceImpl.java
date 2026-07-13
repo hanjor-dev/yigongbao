@@ -136,7 +136,7 @@ public class ProductNumberServiceImpl extends ServiceImpl<ProductionProductMappe
                 products.isEmpty() ? "unknown" : products.get(0).getProductNo());
         }
 
-        log.info("生成正式产品编号: recordId={}, deviceId={}, usageCount={}, productCount=, numbers={}",
+        log.info("生成正式产品编号: recordId={}, deviceId={}, usageCount={}, productCount={}, numbers={}",
                 recordId, deviceId, usageCount, products.size(),
                 products.stream().map(ProductionProductEntity::getProductNo).collect(Collectors.joining(",")));
     }

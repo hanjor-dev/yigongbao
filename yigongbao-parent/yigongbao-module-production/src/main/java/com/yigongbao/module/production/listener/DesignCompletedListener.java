@@ -289,7 +289,8 @@ public class DesignCompletedListener {
                 ProductionProductEntity product = new ProductionProductEntity();
                 product.setProductionRecordId(record.getId());
                 product.setPrintFileId(dpFile != null ? dpFile.getPackageFileId() : null);
-                product.setProductNo(codeGeneratorService.generate(ProductionConstants.PRODUCT_NO));
+                // 产品编号将在分配设备时生成正式编号（包含批号、设备、上机次数等信息）
+                product.setProductNo(null);
                 product.setProductName(dp.getProductName());
                 product.setSpecName(dp.getSpecName());
                 product.setCertNo(dp.getCertNo());

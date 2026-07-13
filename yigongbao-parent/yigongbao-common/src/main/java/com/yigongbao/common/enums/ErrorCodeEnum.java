@@ -308,6 +308,7 @@ public enum ErrorCodeEnum {
     DEVICE_ID_INVALID_FORMAT(829, "设备编号格式无效，必须为1-999的整数", 3),
     DEVICE_ID_OUT_OF_RANGE(830, "设备编号超出范围（1-999）", 3),
     ASSIGN_DEVICE_FAILED(831, "分配设备失败", 3),
+    PRODUCTION_RECORD_ALREADY_CLAIMED(832, "流转卡已被其他用户认领", 3),
 
     // ==================== 产品规格相关 754-756 ====================
     PRODUCT_HAS_SPECS(754, "产品下存在规格，无法删除", 4),

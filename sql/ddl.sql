@@ -1791,6 +1791,7 @@ CREATE TABLE production_record (
     KEY idx_processing_center_id (processing_center_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产流转卡表';
 CREATE UNIQUE INDEX uk_record_no ON production_record ((CASE WHEN is_deleted = 0 THEN record_no ELSE NULL END));
+CREATE UNIQUE INDEX uk_production_batch_no ON production_record ((CASE WHEN is_deleted = 0 THEN production_batch_no ELSE NULL END));
 
 
 -- 生产产品记录表

@@ -317,7 +317,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public String downloadDataPackage(Long designPackageId) {
         DesignPackageEntity designPackage = designPackageMapper.selectById(designPackageId);
         if (designPackage == null) {
@@ -327,10 +327,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
-        // 查询本条流转卡（用于发布事件和后续状态更新）
-        ProductionRecordEntity record = getOne(new LambdaQueryWrapper<ProductionRecordEntity>()
+        // 查询本条流转卡（用于发布事件和后续状态更新）- 使用悲观锁防止并发认领
+        ProductionRecordEntity record = baseMapper.selectOne(new LambdaQueryWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
-                .last("LIMIT 1"));
+                .last("FOR UPDATE"));
 
         // 回写订单操作人和加工中心信息（当前生产员）
         Long userId = StpUtil.getLoginIdAsLong();
@@ -338,12 +338,18 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         String realName = currentUser != null ? currentUser.getRealName() : null;
 
         // 更新本条流转卡状态和生产员信息：DESIGN_COMPLETED → PENDING_PRINT（幂等）
-        baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+        int updated = baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
                 .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_COMPLETED.getValue())
                 .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue())
                 .set(ProductionRecordEntity::getProducerId, userId)
                 .set(ProductionRecordEntity::getProducerName, realName));
+
+        // 检查更新结果，如果影响行数为0，说明流转卡已被其他用户认领
+        if (updated == 0) {
+            log.warn("流转卡已被其他用户认领: designPackageId={}, userId={}", designPackageId, userId);
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_ALREADY_CLAIMED);
+        }
 
         // 订单归属加工中心：首次下载时确定（使用条件更新保证幂等）
         if (currentUser != null && currentUser.getCenterId() != null) {
@@ -357,8 +363,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .set(OrderMainEntity::getCurrentHandlerName, realName)
                 .set(OrderMainEntity::getProducerId, userId);
 
-            int updated = orderMainMapper.update(null, updateWrapper);
-            if (updated > 0) {
+            int orderUpdated = orderMainMapper.update(null, updateWrapper);
+            if (orderUpdated > 0) {
                 log.info("订单归属加工中心: orderId={}, centerId={}, centerName={}, producerId={}",
                     order.getId(), currentUser.getCenterId(), currentUser.getCenterName(), userId);
             } else {
@@ -419,7 +425,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 triggerFlowAndSync(orderId, action);
                 log.info("聚合条件满足，触发Flow: orderId={}, requiredStatus={}, action={}", orderId, requiredStatus, action);
             } catch (BusinessException e) {
-                log.info("Flow状态流转被拒绝（可能已被并发触发）: orderId={}, action={}, reason={}", orderId, action, e.getMessage());
+                log.info("Flow状态流转被拒绝（可能已被并发触发）: orderId={}, action={}, reason={}", orderId, action, e.getMessage(), e);
             }
         } else {
             log.info("聚合条件未满足，暂不触发Flow: orderId={}, requiredStatus={}, active={}, reached={}",
@@ -446,7 +452,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 triggerFlowAndSync(orderId, action);
                 log.info("聚合条件满足（精确匹配），触发Flow: orderId={}, exactStatus={}, action={}", orderId, exactStatus, action);
             } catch (BusinessException e) {
-                log.info("Flow状态流转被拒绝（可能已被并发触发）: orderId={}, action={}, reason={}", orderId, action, e.getMessage());
+                log.info("Flow状态流转被拒绝（可能已被并发触发）: orderId={}, action={}, reason={}", orderId, action, e.getMessage(), e);
             }
         } else {
             log.info("聚合条件未满足，暂不触发Flow: orderId={}, exactStatus={}, active={}, matched={}",
@@ -487,18 +493,20 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
     /** 提交生产批号和原材料批号，写入流转卡 */
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void submitBatchNo(Long recordId, SubmitBatchNoDTO dto) {
         ProductionRecordEntity record = getById(recordId);
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
-        // 批号唯一性校验
+        // 批号唯一性校验（使用悲观锁防止并发提交相同批号）
         if (cn.hutool.core.util.StrUtil.isNotBlank(dto.getProductionBatchNo())) {
-            long existCount = count(new LambdaQueryWrapper<ProductionRecordEntity>()
+            ProductionRecordEntity existRecord = baseMapper.selectOne(new LambdaQueryWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getProductionBatchNo, dto.getProductionBatchNo())
-                .ne(ProductionRecordEntity::getId, recordId));
-            if (existCount > 0) {
+                .ne(ProductionRecordEntity::getId, recordId)
+                .select(ProductionRecordEntity::getId)
+                .last("FOR UPDATE LIMIT 1"));
+            if (existRecord != null) {
                 throw new BusinessException(ErrorCodeEnum.PRODUCTION_BATCH_NO_EXISTS);
             }
         }
@@ -587,7 +595,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
     /** 为流转卡分配打印机；校验流转卡状态为待打印、设备在线且空闲，同步更新打印工序记录 */
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void assignDevice(Long recordId, AssignDeviceDTO dto) {
         ProductionRecordEntity record = getById(recordId);
         if (record == null) {
@@ -605,6 +613,22 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (resolveDeviceStatus(device) != 0) {
             throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
         }
+
+        // 检查是否有其他流转卡正在使用该设备（悲观锁防止并发分配）
+        ProductionRecordEntity conflictRecord = baseMapper.selectOne(new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getPrintDeviceId, device.getId())
+                .in(ProductionRecordEntity::getStatus, List.of(
+                        FlowStatusEnum.PENDING_PRINT.getValue(),
+                        FlowStatusEnum.PRINTING.getValue()))
+                .ne(ProductionRecordEntity::getId, recordId)
+                .select(ProductionRecordEntity::getId)
+                .last("FOR UPDATE LIMIT 1"));
+        if (conflictRecord != null) {
+            log.warn("设备已被其他流转卡占用: deviceId={}, conflictRecordId={}, currentRecordId={}",
+                device.getId(), conflictRecord.getId(), recordId);
+            throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
+        }
+
         record.setPrintDeviceId(device.getId());
         record.setPrintDeviceCode(device.getDeviceId());
         record.setPrintDeviceName(device.getDeviceName());
