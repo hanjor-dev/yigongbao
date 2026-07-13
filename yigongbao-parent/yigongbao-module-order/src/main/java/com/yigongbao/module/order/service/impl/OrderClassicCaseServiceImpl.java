@@ -66,12 +66,20 @@ public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
 
-        // 校验订单必须处于"已完成"阶段（phase=80）或"已出库"状态（status=6030）
+        // 校验订单状态是否允许标记为经典案例
+        // 1. 需要实物交付的订单：必须处于"已完成"（phase=80）或"已出库"（status=6030）
+        // 2. 不需要实物交付的订单：设计完成（status=2030）即可标记
         boolean isCompleted = FlowPhaseEnum.COMPLETED.getValue().equals(order.getPhase());
         boolean isWarehouseOut = FlowStatusEnum.WAREHOUSE_OUT.getValue().equals(order.getStatus());
-        if (!isCompleted && !isWarehouseOut) {
-            log.warn("订单未完成或未出库，无法标记为经典案例: orderId={}, phase={}, status={}",
-                dto.getOrderId(), order.getPhase(), order.getStatus());
+        boolean isDesignCompleted = FlowStatusEnum.DESIGN_COMPLETED.getValue().equals(order.getStatus());
+        boolean needsPhysicalDelivery = StatusConstants.YES == order.getNeedsPhysicalDelivery();
+
+        boolean canMark = isCompleted || isWarehouseOut ||
+                         (isDesignCompleted && !needsPhysicalDelivery);
+
+        if (!canMark) {
+            log.warn("订单状态不允许标记为经典案例: orderId={}, phase={}, status={}, needsPhysicalDelivery={}",
+                dto.getOrderId(), order.getPhase(), order.getStatus(), order.getNeedsPhysicalDelivery());
             throw new BusinessException(ErrorCodeEnum.CLASSIC_CASE_ORDER_NOT_COMPLETED);
         }
 
