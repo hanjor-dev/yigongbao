@@ -75,7 +75,7 @@ udi_generate_time DATETIME COMMENT 'UDI生成时间'
 | 维度 | 确认内容 |
 |------|---------|
 | **录入场景** | 流转卡详情页面的产品明细列表中编辑 |
-| **状态条件** | 打印中(PRINTING)及之后的所有状态均可编辑 |
+| **状态条件** | 打印中(PRINTING)及之后的所有状态均可编辑：PRINTING、PRINT_COMPLETED、POST_PROCESSING、QC_IN_PROGRESS、PACKING、PENDING_WAREHOUSE_IN、WAREHOUSED、WAREHOUSE_OUT、COMPLETED |
 | **录入字段** | 仅`udi_code`字段（`udi_di`和`udi_pi`暂不使用） |
 | **格式要求** | 完全自由输入，不做格式限制 |
 | **可修改性** | 允许多次修改 |
@@ -217,15 +217,20 @@ public void batchUpdateUdi(BatchUpdateUdiDTO dto) {
         throw new BusinessException(ErrorCodeEnum.NON_MEDICAL_NOT_ALLOW_UDI);
     }
 
-    // 3. 批量校验UDI唯一性
-    for (BatchUpdateUdiDTO.ProductUdiItem item : dto.getProducts()) {
-        long duplicateCount = productMapper.selectCount(
-            new LambdaQueryWrapper<ProductionProductEntity>()
-                .eq(ProductionProductEntity::getUdiCode, item.getUdiCode())
-                .ne(ProductionProductEntity::getId, item.getProductId()));
-        if (duplicateCount > 0) {
-            throw new BusinessException(ErrorCodeEnum.UDI_CODE_EXISTS);
-        }
+    // 3. 批量校验UDI唯一性（性能优化：批量查询）
+    List<String> udiCodes = dto.getProducts().stream()
+        .map(BatchUpdateUdiDTO.ProductUdiItem::getUdiCode)
+        .collect(Collectors.toList());
+    List<Long> productIds = dto.getProducts().stream()
+        .map(BatchUpdateUdiDTO.ProductUdiItem::getProductId)
+        .collect(Collectors.toList());
+    
+    long duplicateCount = productMapper.selectCount(
+        new LambdaQueryWrapper<ProductionProductEntity>()
+            .in(ProductionProductEntity::getUdiCode, udiCodes)
+            .notIn(ProductionProductEntity::getId, productIds));
+    if (duplicateCount > 0) {
+        throw new BusinessException(ErrorCodeEnum.UDI_CODE_EXISTS);
     }
 
     // 4. 批量更新产品
@@ -238,7 +243,12 @@ public void batchUpdateUdi(BatchUpdateUdiDTO dto) {
         productMapper.updateById(product);
     }
 
-    log.info("批量更新产品UDI码: recordId={}, productCount={}", dto.getRecordId(), dto.getProducts().size());
+    // 记录详细日志
+    String details = dto.getProducts().stream()
+        .map(item -> "productId=" + item.getProductId() + ",udi=" + item.getUdiCode())
+        .collect(Collectors.joining("; "));
+    log.info("批量更新产品UDI码: recordId={}, productCount={}, details=[{}]", 
+        dto.getRecordId(), dto.getProducts().size(), details);
 }
 ```
 
@@ -445,7 +455,35 @@ NON_MEDICAL_NOT_ALLOW_UDI(835, "非医疗器械产品不允许录入UDI", 3),
 
 ---
 
-## 十、后续优化建议
+## 十、数据库优化建议
+
+### 10.1 UDI唯一索引方案
+
+根据项目编码规范（java-coding-standards.md第7.4节），`production_product`表使用逻辑删除且需要UDI唯一性约束，应使用**函数索引**而非普通唯一索引。
+
+**原因**：
+- 普通唯一索引：`UNIQUE KEY uk_udi_code (udi_code)` 会导致已删除记录仍占用索引槽位
+- 多次删除/重建相同UDI的产品会报`Duplicate entry`异常
+
+**推荐方案**（MySQL 8.0+）：
+
+```sql
+-- 在production_product表上创建函数唯一索引
+CREATE UNIQUE INDEX uk_udi_code
+    ON production_product ((CASE WHEN is_deleted = 0 THEN udi_code ELSE NULL END));
+```
+
+**语义说明**：
+- `is_deleted=0`（未删除）：返回udi_code值，唯一约束生效
+- `is_deleted=1`（已删除）：返回NULL，多个NULL不冲突，允许重复删除/重建
+
+**注意**：
+- H2测试环境不支持函数索引，`schema.sql`中可省略
+- 此方案仅在MySQL生产环境实施
+
+---
+
+## 十一、后续优化建议
 
 1. **UDI码格式校验**：如果后续需要支持特定格式，可增加正则校验
 2. **批量导入**：如果产品数量很多，可考虑提供Excel批量导入UDI功能
