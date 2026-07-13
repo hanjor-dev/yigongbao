@@ -309,6 +309,9 @@ public enum ErrorCodeEnum {
     DEVICE_ID_OUT_OF_RANGE(830, "设备编号超出范围（1-999）", 3),
     ASSIGN_DEVICE_FAILED(831, "分配设备失败", 3),
     PRODUCTION_RECORD_ALREADY_CLAIMED(832, "流转卡已被其他用户认领", 3),
+    UDI_CODE_EXISTS(833, "UDI码已存在", 3),
+    RECORD_STATUS_NOT_ALLOW_UPDATE_UDI(834, "流转卡状态不允许更新UDI", 3),
+    NON_MEDICAL_NOT_ALLOW_UDI(835, "非医疗器械产品不允许录入UDI", 3),
 
     // ==================== 产品规格相关 754-756 ====================
     PRODUCT_HAS_SPECS(754, "产品下存在规格，无法删除", 4),
