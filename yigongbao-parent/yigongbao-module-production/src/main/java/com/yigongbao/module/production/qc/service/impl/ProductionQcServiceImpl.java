@@ -31,7 +31,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -237,6 +239,12 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         List<Long> productIds = dto.getProducts().stream()
             .map(BatchUpdateUdiDTO.ProductUdiItem::getProductId)
             .collect(Collectors.toList());
+
+        // 检查请求内部是否有重复UDI
+        Set<String> uniqueUdis = new HashSet<>(udiCodes);
+        if (uniqueUdis.size() < udiCodes.size()) {
+            throw new BusinessException(ErrorCodeEnum.UDI_CODE_EXISTS);
+        }
 
         long duplicateCount = productMapper.selectCount(
             new LambdaQueryWrapper<ProductionProductEntity>()

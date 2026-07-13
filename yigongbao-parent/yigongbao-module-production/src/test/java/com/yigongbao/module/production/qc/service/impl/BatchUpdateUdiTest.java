@@ -252,6 +252,33 @@ class BatchUpdateUdiTest {
         assertTrue(exception.getMessage().contains("UDI码不能为空"));
     }
 
+    /**
+     * 场景8: 唯一性校验 - 请求内部重复UDI抛出异常
+     * Given: 请求中存在多个产品使用相同的UDI码
+     * When: 调用batchUpdateUdi
+     * Then: 抛出UDI_CODE_EXISTS异常
+     */
+    @Test
+    void batchUpdateUdi_duplicateUdiInRequest_throwsException() {
+        // Given
+        ProductionRecordEntity record = createRecord(1L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        record.setStatus(FlowStatusEnum.PRINTING.getValue());
+        when(recordMapper.selectById(1L)).thenReturn(record);
+
+        BatchUpdateUdiDTO dto = createBatchUpdateUdiDTO(1L, Arrays.asList(
+            createProductUdiItem(101L, "UDI-DUPLICATE"),
+            createProductUdiItem(102L, "UDI-DUPLICATE")  // 重复UDI
+        ));
+
+        // When & Then
+        BusinessException exception = assertThrows(BusinessException.class,
+            () -> qcService.batchUpdateUdi(dto));
+        assertEquals(ErrorCodeEnum.UDI_CODE_EXISTS.getCode(), exception.getCode());
+
+        // 验证未调用更新操作
+        verify(productService, never()).updateBatchById(anyList());
+    }
+
     // ========== 辅助方法 ==========
 
     /**
