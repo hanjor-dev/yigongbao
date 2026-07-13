@@ -5,11 +5,13 @@ import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
+import com.yigongbao.module.production.qc.dto.BatchUpdateUdiDTO;
 import com.yigongbao.module.production.qc.dto.ProductionQcPageDTO;
 import com.yigongbao.module.production.qc.service.IProductionQcService;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -62,6 +64,14 @@ public class ProductionQcController {
     @PostMapping("/{recordId}/transfer-to-pack")
     public Result<Void> transferToPacking(@PathVariable Long recordId) {
         qcService.transferToPacking(recordId);
+        return Result.success();
+    }
+
+    @Operation(summary = "批量更新产品UDI码")
+    @OperationLog(module = "质检管理", businessType = OperationTypeEnum.UPDATE, operation = "批量更新产品UDI码")
+    @PostMapping("/batch-update-udi")
+    public Result<Void> batchUpdateUdi(@RequestBody @Valid BatchUpdateUdiDTO dto) {
+        qcService.batchUpdateUdi(dto);
         return Result.success();
     }
 }
