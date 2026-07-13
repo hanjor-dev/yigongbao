@@ -80,18 +80,7 @@ class OrderDiffCalculatorTest {
         List<FieldDiff> diffs = invokeCalculateBasicInfoDiff(current, dto);
 
         // Assert
-        assertNotNull(diffs);
-        assertTrue(diffs.stream().anyMatch(d -> "needsPhysicalDelivery".equals(d.getFieldName())));
-
-        FieldDiff diff = diffs.stream()
-                .filter(d -> "needsPhysicalDelivery".equals(d.getFieldName()))
-                .findFirst()
-                .orElse(null);
-
-        assertNotNull(diff);
-        assertEquals("是否需要实物交付", diff.getFieldLabel());
-        assertEquals("否", diff.getOldDisplay());
-        assertEquals("是", diff.getNewDisplay());
+        assertFieldDiff(diffs, "needsPhysicalDelivery", "是否需要实物交付", "否", "是");
     }
 
     /**
@@ -111,18 +100,7 @@ class OrderDiffCalculatorTest {
         List<FieldDiff> diffs = invokeCalculateBasicInfoDiff(current, dto);
 
         // Assert
-        assertNotNull(diffs);
-        assertTrue(diffs.stream().anyMatch(d -> "orderType".equals(d.getFieldName())));
-
-        FieldDiff diff = diffs.stream()
-                .filter(d -> "orderType".equals(d.getFieldName()))
-                .findFirst()
-                .orElse(null);
-
-        assertNotNull(diff);
-        assertEquals("订单类型", diff.getFieldLabel());
-        assertEquals("医疗器械", diff.getOldDisplay());
-        assertEquals("非医疗器械", diff.getNewDisplay());
+        assertFieldDiff(diffs, "orderType", "订单类型", "医疗器械", "非医疗器械");
     }
 
     /**
@@ -142,18 +120,69 @@ class OrderDiffCalculatorTest {
         List<FieldDiff> diffs = invokeCalculateBasicInfoDiff(current, dto);
 
         // Assert
+        assertFieldDiff(diffs, "businessType", "业务类型", "业务", "测试");
+    }
+
+    /**
+     * 测试无变更场景：字段值相同时不应生成差异记录
+     */
+    @Test
+    void testNoDiff_WhenFieldValuesAreSame() {
+        // Arrange
+        OrderDraftEntity current = createBaseOrderDraft();
+        current.setNeedsPhysicalDelivery(StatusConstants.YES);
+        current.setOrderType(1);
+        current.setBusinessType("11.1");
+
+        OrderModifyFullDTO dto = createBaseModifyDTO();
+        dto.setNeedsPhysicalDelivery(StatusConstants.YES); // 相同值
+        dto.setOrderType(1); // 相同值
+        dto.setBusinessType("11.1"); // 相同值
+
+        // Act
+        List<FieldDiff> diffs = invokeCalculateBasicInfoDiff(current, dto);
+
+        // Assert
         assertNotNull(diffs);
-        assertTrue(diffs.stream().anyMatch(d -> "businessType".equals(d.getFieldName())));
+        assertFalse(diffs.stream().anyMatch(d -> "needsPhysicalDelivery".equals(d.getFieldName())),
+                "相同值不应生成 needsPhysicalDelivery 差异");
+        assertFalse(diffs.stream().anyMatch(d -> "orderType".equals(d.getFieldName())),
+                "相同值不应生成 orderType 差异");
+        assertFalse(diffs.stream().anyMatch(d -> "businessType".equals(d.getFieldName())),
+                "相同值不应生成 businessType 差异");
+    }
 
-        FieldDiff diff = diffs.stream()
-                .filter(d -> "businessType".equals(d.getFieldName()))
-                .findFirst()
-                .orElse(null);
+    /**
+     * 测试多字段同时变更场景
+     */
+    @Test
+    void testMultipleFieldsChanged_Simultaneously() {
+        // Arrange
+        OrderDraftEntity current = createBaseOrderDraft();
+        current.setNeedsPhysicalDelivery(StatusConstants.NO);
+        current.setOrderType(1);
+        current.setBusinessType("11.1");
 
-        assertNotNull(diff);
-        assertEquals("业务类型", diff.getFieldLabel());
-        assertEquals("业务", diff.getOldDisplay());
-        assertEquals("测试", diff.getNewDisplay());
+        OrderModifyFullDTO dto = createBaseModifyDTO();
+        dto.setNeedsPhysicalDelivery(StatusConstants.YES);
+        dto.setOrderType(2);
+        dto.setBusinessType("11.2");
+
+        // Act
+        List<FieldDiff> diffs = invokeCalculateBasicInfoDiff(current, dto);
+
+        // Assert
+        assertNotNull(diffs);
+        long changedCount = diffs.stream()
+                .filter(d -> "needsPhysicalDelivery".equals(d.getFieldName())
+                        || "orderType".equals(d.getFieldName())
+                        || "businessType".equals(d.getFieldName()))
+                .count();
+        assertEquals(3, changedCount, "应生成3个字段的差异记录");
+
+        assertFieldDiff(diffs, "needsPhysicalDelivery", "是否需要实物交付", "否", "是");
+        assertFieldDiff(diffs, "orderType", "订单类型", "医疗器械", "非医疗器械");
+        assertFieldDiff(diffs, "businessType", "业务类型", "业务", "测试");
     }
 
     /**
@@ -161,21 +190,11 @@ class OrderDiffCalculatorTest {
      */
     private OrderDraftEntity createBaseOrderDraft() {
         OrderDraftEntity entity = new OrderDraftEntity();
-        entity.setPatientName("测试患者");
-        entity.setPatientAge(30);
-        entity.setPatientGender("1");
-        entity.setHospitalId(1L);
+        populateCommonTestFields(entity);
+        // OrderDraftEntity 特有字段
         entity.setHospitalName("测试医院");
-        entity.setHospitalDeptId(1L);
         entity.setHospitalDeptName("测试科室");
-        entity.setDoctorId(1L);
         entity.setDoctorName("测试医生");
-        entity.setIsUrgent(StatusConstants.NO);
-        entity.setIsPostal(StatusConstants.NO);
-        entity.setPostalAddress("测试地址");
-        entity.setNeedsPhysicalDelivery(StatusConstants.YES);
-        entity.setOrderType(1);
-        entity.setBusinessType("11.1");
         return entity;
     }
 
@@ -184,19 +203,43 @@ class OrderDiffCalculatorTest {
      */
     private OrderModifyFullDTO createBaseModifyDTO() {
         OrderModifyFullDTO dto = new OrderModifyFullDTO();
-        dto.setPatientName("测试患者");
-        dto.setPatientAge(30);
-        dto.setPatientGender("1");
-        dto.setHospitalId(1L);
-        dto.setHospitalDeptId(1L);
-        dto.setDoctorId(1L);
-        dto.setIsUrgent(StatusConstants.NO);
-        dto.setIsPostal(StatusConstants.NO);
-        dto.setPostalAddress("测试地址");
-        dto.setNeedsPhysicalDelivery(StatusConstants.YES);
-        dto.setOrderType(1);
-        dto.setBusinessType("11.1");
+        populateCommonTestFields(dto);
         return dto;
+    }
+
+    /**
+     * 填充测试对象的公共字段（避免代码重复）
+     */
+    private void populateCommonTestFields(Object target) {
+        if (target instanceof OrderDraftEntity) {
+            OrderDraftEntity entity = (OrderDraftEntity) target;
+            entity.setPatientName("测试患者");
+            entity.setPatientAge(30);
+            entity.setPatientGender("1");
+            entity.setHospitalId(1L);
+            entity.setHospitalDeptId(1L);
+            entity.setDoctorId(1L);
+            entity.setIsUrgent(StatusConstants.NO);
+            entity.setIsPostal(StatusConstants.NO);
+            entity.setPostalAddress("测试地址");
+            entity.setNeedsPhysicalDelivery(StatusConstants.YES);
+            entity.setOrderType(1);
+            entity.setBusinessType("11.1");
+        } else if (target instanceof OrderModifyFullDTO) {
+            OrderModifyFullDTO dto = (OrderModifyFullDTO) target;
+            dto.setPatientName("测试患者");
+            dto.setPatientAge(30);
+            dto.setPatientGender("1");
+            dto.setHospitalId(1L);
+            dto.setHospitalDeptId(1L);
+            dto.setDoctorId(1L);
+            dto.setIsUrgent(StatusConstants.NO);
+            dto.setIsPostal(StatusConstants.NO);
+            dto.setPostalAddress("测试地址");
+            dto.setNeedsPhysicalDelivery(StatusConstants.YES);
+            dto.setOrderType(1);
+            dto.setBusinessType("11.1");
+        }
     }
 
     /**
@@ -211,5 +254,29 @@ class OrderDiffCalculatorTest {
         } catch (Exception e) {
             throw new RuntimeException("反射调用失败", e);
         }
+    }
+
+    /**
+     * 断言字段差异存在且值正确
+     *
+     * @param diffs 差异列表
+     * @param fieldName 字段名
+     * @param expectedLabel 字段标签
+     * @param expectedOldDisplay 旧值显示
+     * @param expectedNewDisplay 新值显示
+     */
+    private void assertFieldDiff(List<FieldDiff> diffs, String fieldName, String expectedLabel,
+                                  String expectedOldDisplay, String expectedNewDisplay) {
+        assertNotNull(diffs);
+
+        FieldDiff diff = diffs.stream()
+                .filter(d -> fieldName.equals(d.getFieldName()))
+                .findFirst()
+                .orElse(null);
+
+        assertNotNull(diff, "未找到字段差异: " + fieldName);
+        assertEquals(expectedLabel, diff.getFieldLabel());
+        assertEquals(expectedOldDisplay, diff.getOldDisplay());
+        assertEquals(expectedNewDisplay, diff.getNewDisplay());
     }
 }
