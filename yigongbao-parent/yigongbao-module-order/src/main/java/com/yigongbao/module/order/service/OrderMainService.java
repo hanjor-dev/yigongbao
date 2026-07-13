@@ -109,15 +109,17 @@ public interface OrderMainService extends IService<OrderMainEntity> {
      * 重新提交订单（驳回后重新提交）
      *
      * @param id 订单ID
+     * @param version 订单版本号（乐观锁）
      */
-    void resubmit(Long id);
+    void resubmit(Long id, Integer version);
 
     /**
      * 取消订单（全阶段可用）
      *
      * @param id 订单ID
+     * @param version 订单版本号（乐观锁）
      */
-    void cancelOrder(Long id);
+    void cancelOrder(Long id, Integer version);
 
     /**
      * 查询可执行的动作
@@ -168,7 +170,8 @@ public interface OrderMainService extends IService<OrderMainEntity> {
      * 前置条件：订单状态为设计完成(2030)，needsPhysicalDelivery=0
      *
      * @param orderId 订单ID
+     * @param version 订单版本号（乐观锁）
      * @throws BusinessException 订单不存在、状态错误或需要实体交付
      */
-    void manualCompleteOrder(Long orderId);
+    void manualCompleteOrder(Long orderId, Integer version);
 }

@@ -31,6 +31,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -174,7 +176,10 @@ public class DesignCompletedListener {
                                                           Long productId, List<DesignProductEntity> designProducts) {
         // 生成流转卡编号和生产批号
         String recordNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_RECORD_NO);
-        String batchNo = codeGeneratorService.generate(ProductionConstants.PRODUCTION_BATCH_NO);
+        String batchNo = generateBatchNo();
+
+        // 获取产品名称
+        String productName = designProducts.get(0).getProductName();
 
         // 构建流转卡实体
         ProductionRecordEntity record = new ProductionRecordEntity();
@@ -197,8 +202,7 @@ public class DesignCompletedListener {
         String material = extractMaterialFromDesignProducts(designProducts);
         record.setMaterial(material);
 
-        // 设置产品信息（产品名称从设计产品列表中获取）
-        String productName = designProducts.get(0).getProductName();
+        // 设置产品信息
         record.setProductId(productId);
         record.setProductName(productName);
 
@@ -352,5 +356,16 @@ public class DesignCompletedListener {
             .collect(Collectors.groupingBy(DesignProductEntity::getProductId));
 
         return groupedByProduct;
+    }
+
+    /**
+     * 生成生产批号：日期（YYMMDD格式）
+     *
+     * @return 生产批号，格式如 260630
+     */
+    private String generateBatchNo() {
+        LocalDate now = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMdd");
+        return now.format(formatter);
     }
 }

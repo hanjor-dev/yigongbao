@@ -742,8 +742,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 id, FlowActionEnum.DATA_AUDIT_REJECT, new FlowOperator(currentUserId, operatorName, dto.getRemark()),
                 dto.getVersion());
 
-        update(new LambdaUpdateWrapper<OrderMainEntity>()
+        boolean updated = update(new LambdaUpdateWrapper<OrderMainEntity>()
                 .eq(OrderMainEntity::getId, id)
+                .eq(OrderMainEntity::getVersion, dto.getVersion())
                 .eq(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
                 .eq(OrderMainEntity::getStatus, FlowStatusEnum.PENDING_DATA_AUDIT.getValue())
                 .set(OrderMainEntity::getPhase, result.getTargetPhase())
@@ -754,6 +755,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 .set(OrderMainEntity::getDesignAuditRemark, dto.getRemark())
                 .set(OrderMainEntity::getAuditRemark, dto.getRemark())
                 .set(OrderMainEntity::getCurrentHandlerId, currentUserId));
+
+        if (!updated) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+        }
         eventPublisher.publishEvent(new AuditRejectedEvent(this, id, entity.getOrderCode(),
                     entity.getPatientName(), entity.getHospitalName(), entity.getCreateBy(), dto.getRemark()));
         eventPublisher.publishEvent(new NotificationRemarkUpdateEvent(
@@ -767,7 +772,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void resubmit(Long id) {
+    public void resubmit(Long id, Integer version) {
         Long currentUserId = getCurrentUserId();
         OrderMainEntity entity = getById(id);
         if (entity == null) {
@@ -783,11 +788,13 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
         // 调用流程引擎流转状态：DATA_AUDIT_REJECTED → PENDING_DATA_AUDIT
         TransitionResult result = flowFacade.executeFlow(
-                id, FlowActionEnum.RESUBMIT, new FlowOperator(currentUserId, operatorName, "重新提交"));
+                id, FlowActionEnum.RESUBMIT, new FlowOperator(currentUserId, operatorName, "重新提交"),
+                version);
 
         // 所有订单统一：只重置设计审核字段（试用订单不再需要区域管理员审核）
         boolean updated = update(new LambdaUpdateWrapper<OrderMainEntity>()
                 .eq(OrderMainEntity::getId, id)
+                .eq(OrderMainEntity::getVersion, version)
                 .eq(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.REJECTED)
                 .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
                 .set(OrderMainEntity::getDesignAuditTime, null)
@@ -805,7 +812,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void cancelOrder(Long id) {
+    public void cancelOrder(Long id, Integer version) {
         Long currentUserId = getCurrentUserId();
         // 校验订单存在
         OrderMainEntity order = getById(id);
@@ -822,7 +829,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         // 检查阶段：订单阶段允许直接取消，设计阶段需提交申请
         if (order.getPhase() < DESIGN_PHASE_THRESHOLD) {
             // 订单阶段：直接取消
-            directCancelOrder(id, order, currentUserId);
+            directCancelOrder(id, order, currentUserId, version);
         } else {
             // 设计阶段：需提交取消申请
             log.warn("订单处于设计阶段，需提交取消申请: orderId={}, phase={}", id, order.getPhase());
@@ -836,16 +843,25 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      * @param id 订单ID
      * @param order 订单实体
      * @param currentUserId 当前用户ID
+     * @param version 订单版本号（乐观锁）
      */
-    private void directCancelOrder(Long id, OrderMainEntity order, Long currentUserId) {
+    private void directCancelOrder(Long id, OrderMainEntity order, Long currentUserId, Integer version) {
         // 获取当前用户姓名
         String operatorName = getUserRealName(currentUserId);
         // 通过 FlowFacade 执行取消动作
         TransitionResult result = flowFacade.executeFlow(
-                id, FlowActionEnum.CANCEL, new FlowOperator(currentUserId, operatorName, null));
-        // 更新订单的阶段和状态
-        order.setPhase(result.getTargetPhase());
-        order.setStatus(result.getFinalStatus());
+                id, FlowActionEnum.CANCEL, new FlowOperator(currentUserId, operatorName, null),
+                version);
+        // 使用乐观锁更新订单的阶段和状态
+        boolean updated = update(new LambdaUpdateWrapper<OrderMainEntity>()
+                .eq(OrderMainEntity::getId, id)
+                .eq(OrderMainEntity::getVersion, version)
+                .set(OrderMainEntity::getPhase, result.getTargetPhase())
+                .set(OrderMainEntity::getStatus, result.getFinalStatus()));
+
+        if (!updated) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+        }
         updateById(order);
         eventPublisher.publishEvent(new OrderCancelledEvent(this, id));
         log.info("直接取消订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
@@ -856,11 +872,12 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      * 允许将设计完成的非实体交付订单直接标记为完成
      *
      * @param orderId 订单ID
+     * @param version 订单版本号（乐观锁）
      * @throws BusinessException 订单不存在、状态错误或需要实体交付
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void manualCompleteOrder(Long orderId) {
+    public void manualCompleteOrder(Long orderId, Integer version) {
         Long currentUserId = getCurrentUserId();
         // 校验订单存在
         OrderMainEntity entity = getById(orderId);
@@ -884,12 +901,20 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         String operatorName = getUserRealName(currentUserId);
         // 通过 FlowFacade 执行完成动作
         TransitionResult result = flowFacade.executeFlow(
-                orderId, FlowActionEnum.COMPLETE, new FlowOperator(currentUserId, operatorName, "手动完成"));
-        // 更新订单的阶段、状态和完成时间
-        entity.setPhase(result.getTargetPhase());
-        entity.setStatus(result.getFinalStatus());
-        entity.setActualCompleteTime(LocalDateTime.now());
-        updateById(entity);
+                orderId, FlowActionEnum.COMPLETE, new FlowOperator(currentUserId, operatorName, "手动完成"),
+                version);
+        // 使用乐观锁更新订单的阶段、状态和完成时间
+        boolean updated = update(new LambdaUpdateWrapper<OrderMainEntity>()
+                .eq(OrderMainEntity::getId, orderId)
+                .eq(OrderMainEntity::getVersion, version)
+                .eq(OrderMainEntity::getStatus, FlowStatusEnum.DESIGN_COMPLETED.getValue())
+                .set(OrderMainEntity::getPhase, result.getTargetPhase())
+                .set(OrderMainEntity::getStatus, result.getFinalStatus())
+                .set(OrderMainEntity::getActualCompleteTime, LocalDateTime.now()));
+
+        if (!updated) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+        }
         log.info("手动完成订单: orderId={}, {} -> {}, operator={}",
             orderId, FlowStatusEnum.DESIGN_COMPLETED.getValue(), result.getFinalStatus(), currentUserId);
     }

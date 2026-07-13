@@ -1706,6 +1706,25 @@ CREATE TABLE device_state_log (
     KEY idx_change_time (change_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备状态变更日志';
 
+
+-- ============================================================
+-- 设备每日上机次数统计表
+-- ============================================================
+DROP TABLE IF EXISTS device_daily_usage_counter;
+CREATE TABLE device_daily_usage_counter (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    device_id       BIGINT NOT NULL COMMENT '设备ID（关联device表）',
+    usage_date      DATE NOT NULL COMMENT '使用日期',
+    usage_count     INT NOT NULL DEFAULT 0 COMMENT '当日上机次数',
+    version         INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本号',
+
+    create_time     DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+
+    UNIQUE KEY uk_device_date (device_id, usage_date),
+    KEY idx_usage_date (usage_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备每日上机次数统计表';
+
 -- 生产流转卡表
 DROP TABLE IF EXISTS production_record;
 CREATE TABLE production_record (

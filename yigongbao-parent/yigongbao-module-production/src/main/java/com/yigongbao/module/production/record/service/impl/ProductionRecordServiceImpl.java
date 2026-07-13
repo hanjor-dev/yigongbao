@@ -49,6 +49,8 @@ import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.helper.FlowCardExcelBuilder;
 import com.yigongbao.common.event.ProductionCardClaimedEvent;
+import com.yigongbao.module.production.device.service.IDeviceUsageCounterService;
+import com.yigongbao.module.production.product.service.IProductNumberService;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -101,6 +103,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final UserHospitalService userHospitalService;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final IDeviceUsageCounterService deviceUsageCounterService;
+    private final IProductNumberService productNumberService;
 
     /** 查询流转卡详情，包含产品列表、当前工序中文名和设计文件信息 */
     @Override
@@ -622,7 +626,13 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .set(ProductionProcessEntity::getOperatorId, userId)
                 .set(ProductionProcessEntity::getOperatorName, realName)
                 .set(dto.getPrintParams() != null, ProductionProcessEntity::getProcessParams, dto.getPrintParams()));
-        log.info("分配打印机: recordId={}, deviceId={}, deviceNo={}", recordId, device.getId(), device.getDeviceId());
+
+        // 累加设备当日上机次数并生成正式产品编号
+        Integer usageCount = deviceUsageCounterService.incrementAndGet(device.getId());
+        productNumberService.generateFormalNumbers(recordId, device.getId(), usageCount);
+
+        log.info("分配打印设备并生成产品编号: recordId={}, deviceId={}, deviceNo={}, usageCount={}",
+            recordId, device.getId(), device.getDeviceId(), usageCount);
     }
 
     /** 将产品 Entity 转为 VO，并填充状态中文名 */

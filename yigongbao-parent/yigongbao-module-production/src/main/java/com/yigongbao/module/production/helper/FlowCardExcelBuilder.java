@@ -84,8 +84,7 @@ public class FlowCardExcelBuilder {
     }
 
     private void fillHeader(Sheet sheet, BuildContext context) {
-        setCellValue(sheet, 1, 0, "编号：" + StrUtil.blankToDefault(context.getRecordNo(), "-") +
-            "   版本号：" + StrUtil.blankToDefault(context.getVersionNo(), "A/0"));
+        setCellValue(sheet, 1, 0, "编号：QR-SC-002   版本号：" + StrUtil.blankToDefault(context.getVersionNo(), "A/0"));
         setCellValue(sheet, 2, 2, context.getDesignPackageCode());
         setCellValue(sheet, 2, 5, context.getTotalProductCount() != null ?
             String.valueOf(context.getTotalProductCount()) : "-");

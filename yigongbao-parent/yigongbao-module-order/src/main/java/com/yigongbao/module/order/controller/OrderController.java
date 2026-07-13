@@ -141,24 +141,24 @@ public class OrderController {
     @Operation(summary = "重新提交订单")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "重新提交订单")
     @PostMapping("/{id}/resubmit")
-    public Result<Void> resubmit(@PathVariable Long id) {
-        orderMainService.resubmit(id);
+    public Result<Void> resubmit(@PathVariable Long id, @Valid @RequestBody com.yigongbao.module.order.dto.order.ResubmitOrderDTO dto) {
+        orderMainService.resubmit(id, dto.getVersion());
         return Result.success();
     }
 
     @Operation(summary = "取消订单")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.CANCEL, operation = "取消订单")
     @PostMapping("/{id}/cancel")
-    public Result<Void> cancelOrder(@PathVariable Long id) {
-        orderMainService.cancelOrder(id);
+    public Result<Void> cancelOrder(@PathVariable Long id, @Valid @RequestBody com.yigongbao.module.order.dto.order.CancelOrderDTO dto) {
+        orderMainService.cancelOrder(id, dto.getVersion());
         return Result.success();
     }
 
     @Operation(summary = "手动完成订单")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "手动完成订单")
     @PostMapping("/{id}/manual-complete")
-    public Result<Void> manualCompleteOrder(@PathVariable Long id) {
-        orderMainService.manualCompleteOrder(id);
+    public Result<Void> manualCompleteOrder(@PathVariable Long id, @Valid @RequestBody com.yigongbao.module.order.dto.order.ManualCompleteOrderDTO dto) {
+        orderMainService.manualCompleteOrder(id, dto.getVersion());
         return Result.success();
     }
 
