@@ -149,6 +149,36 @@ public class OrderDiffCalculator {
         addDiffIfChanged(diffs, "expectedDeliveryDate", "期望交付时间",
                 current.getExpectedDeliveryDate(), dto.getExpectedDeliveryDate());
 
+        // 是否需要实物交付
+        if (!Objects.equals(current.getNeedsPhysicalDelivery(), dto.getNeedsPhysicalDelivery())) {
+            String oldDisplay = current.getNeedsPhysicalDelivery() == StatusConstants.YES ? "是" : "否";
+            String newDisplay = dto.getNeedsPhysicalDelivery() == StatusConstants.YES ? "是" : "否";
+            diffs.add(new FieldDiff("needsPhysicalDelivery", "是否需要实物交付",
+                    String.valueOf(current.getNeedsPhysicalDelivery()),
+                    String.valueOf(dto.getNeedsPhysicalDelivery()),
+                    oldDisplay, newDisplay));
+        }
+
+        // 订单类型（医疗器械/非医疗器械）
+        if (!Objects.equals(current.getOrderType(), dto.getOrderType())) {
+            String oldDisplay = getOrderTypeDisplay(current.getOrderType());
+            String newDisplay = getOrderTypeDisplay(dto.getOrderType());
+            diffs.add(new FieldDiff("orderType", "订单类型",
+                    String.valueOf(current.getOrderType()),
+                    String.valueOf(dto.getOrderType()),
+                    oldDisplay, newDisplay));
+        }
+
+        // 业务类型
+        if (!Objects.equals(current.getBusinessType(), dto.getBusinessType())) {
+            String oldDisplay = getBusinessTypeDisplay(current.getBusinessType());
+            String newDisplay = getBusinessTypeDisplay(dto.getBusinessType());
+            diffs.add(new FieldDiff("businessType", "业务类型",
+                    current.getBusinessType(),
+                    dto.getBusinessType(),
+                    oldDisplay, newDisplay));
+        }
+
         return diffs;
     }
 
@@ -295,5 +325,27 @@ public class OrderDiffCalculator {
         }
         DictVO dict = dictService.getByDictCode(genderCode);
         return dict != null ? dict.getDictName() : genderCode;
+    }
+
+    /**
+     * 获取订单类型显示名称
+     */
+    private String getOrderTypeDisplay(Integer orderType) {
+        if (orderType == null) {
+            return null;
+        }
+        DictVO dict = dictService.getByDictCode(String.valueOf(orderType));
+        return dict != null ? dict.getDictName() : String.valueOf(orderType);
+    }
+
+    /**
+     * 获取业务类型显示名称
+     */
+    private String getBusinessTypeDisplay(String businessType) {
+        if (businessType == null) {
+            return null;
+        }
+        DictVO dict = dictService.getByDictCode(businessType);
+        return dict != null ? dict.getDictName() : businessType;
     }
 }

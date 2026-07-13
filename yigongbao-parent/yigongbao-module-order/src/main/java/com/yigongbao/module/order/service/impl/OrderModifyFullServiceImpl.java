@@ -152,6 +152,25 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             return;
         }
 
+        // 5.5. 二次验证账户级别限制（防止审核期间账户权限变更）
+        for (ObjectChange change : actualChanges) {
+            if (OrderModifyObjectType.ORDER_INFO.equals(change.getObjectType())) {
+                // 验证 orderType 修改权限
+                if (!Objects.equals(order.getOrderType(), dto.getOrderType())) {
+                    orderDataValidator.validateOrderType(modifierId, dto.getOrderType());
+                    log.info("订单类型修改二次验证通过: orderId={}, modifierId={}, {} -> {}",
+                            orderId, modifierId, order.getOrderType(), dto.getOrderType());
+                }
+                // 验证 businessType 修改权限
+                if (!Objects.equals(order.getBusinessType(), dto.getBusinessType())) {
+                    orderDataValidator.validateBusinessTypeRestrictions(modifierId, dto.getBusinessType(), null);
+                    log.info("业务类型修改二次验证通过: orderId={}, modifierId={}, {} -> {}",
+                            orderId, modifierId, order.getBusinessType(), dto.getBusinessType());
+                }
+                break; // ORDER_INFO 只会有一个，找到后退出
+            }
+        }
+
         // 6. 应用变更
         for (ObjectChange change : actualChanges) {
             String objectType = change.getObjectType();

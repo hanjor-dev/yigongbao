@@ -89,6 +89,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     private final ConfigService configService;
     private final ApplicationEventPublisher eventPublisher;
     private final OrderCancelApplyService cancelApplyService;
+    private final com.yigongbao.module.order.validator.OrderDataValidator orderDataValidator;
 
     // ==================== 申请审核流程方法 ====================
 
@@ -148,6 +149,20 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 new LambdaQueryWrapper<OrderFileEntity>()
                         .eq(OrderFileEntity::getOrderId, orderId)
         );
+
+        // 验证账户级别限制（orderType 和 businessType）
+        if (dto.getOrderType() != null && !dto.getOrderType().equals(order.getOrderType())) {
+            orderDataValidator.validateOrderType(currentUserId, dto.getOrderType());
+            log.info("订单类型修改申请通过账户限制验证: userId={}, orderId={}, {} -> {}",
+                    currentUserId, orderId, order.getOrderType(), dto.getOrderType());
+        }
+        if (StrUtil.isNotBlank(dto.getBusinessType()) && !dto.getBusinessType().equals(order.getBusinessType())) {
+            // 修改申请场景：审批文件传 null，如果改为试用订单且缺少审批文件会在审核时处理
+            orderDataValidator.validateBusinessTypeRestrictions(
+                    currentUserId, dto.getBusinessType(), null);
+            log.info("业务类型修改申请通过账户限制验证: userId={}, orderId={}, {} -> {}",
+                    currentUserId, orderId, order.getBusinessType(), dto.getBusinessType());
+        }
 
         // 计算新旧数据差异(用于审核预览)
         OrderDraftEntity draftOrder = new OrderDraftEntity();
