@@ -65,7 +65,7 @@ class ProductionQcServiceImplTest {
     }
 
     @Test
-    void markProductPass_nonMedical_noUdiGenerated() {
+    void markProductPass_noUdiGenerated() {
         when(productMapper.selectById(1L)).thenReturn(product(1L, 10L));
         when(recordMapper.selectById(10L)).thenReturn(record(10L, ProductionConstants.ORDER_TYPE_NON_MEDICAL));
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
@@ -78,19 +78,6 @@ class ProductionQcServiceImplTest {
                         && QcResultEnum.PASS.getCode().equals(((ProductionProductEntity) p).getQcResult())));
     }
 
-    @Test
-    void markProductPass_medical_generatesUdi() {
-        when(productMapper.selectById(1L)).thenReturn(product(1L, 10L));
-        when(recordMapper.selectById(10L)).thenReturn(record(10L, ProductionConstants.ORDER_TYPE_MEDICAL));
-        when(codeGeneratorService.generate(ProductionConstants.UDI_CODE)).thenReturn("UDI-001");
-        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
-            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
-            qcService.markProductPass(1L);
-        }
-        verify(codeGeneratorService).generate(ProductionConstants.UDI_CODE);
-        verify(productMapper).updateById((ProductionProductEntity) argThat(p ->
-                "UDI-001".equals(((ProductionProductEntity) p).getUdiCode())));
-    }
 
     @Test
     void markProductPass_failStatus_allowed() {

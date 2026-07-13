@@ -51,7 +51,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
     private final com.yigongbao.module.system.user.mapper.UserMapper userMapper;
 
     /**
-     * 标记产品质检合格；医疗器械同步生成 UDI 码；回写流转卡合格计数
+     * 标记产品质检合格，回写流转卡合格计数
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -76,12 +76,6 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         product.setQcResult(QcResultEnum.PASS.getCode());
         product.setQcTime(LocalDateTime.now());
         product.setQcUserId(StpUtil.getLoginIdAsLong());
-        if (ProductionConstants.ORDER_TYPE_MEDICAL.equals(record.getOrderType())) {
-            String udiCode = codeGeneratorService.generate(ProductionConstants.UDI_CODE);
-            product.setUdiCode(udiCode);
-            product.setUdiGenerateTime(LocalDateTime.now());
-            log.info("生成UDI码: productId={}, productNo={}, udiCode={}", productId, product.getProductNo(), udiCode);
-        }
         productMapper.updateById(product);
 
         // 如果之前是不合格状态，需要同时减少不合格计数
