@@ -31,9 +31,9 @@ import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.order.CancelApplyVO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,7 +50,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMapper, OrderCancelApplyEntity>
         implements OrderCancelApplyService {
 
@@ -59,6 +58,22 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
     private final OrderCancelApplyConvert cancelApplyConvert;
     private final ApplicationEventPublisher eventPublisher;
     private final UserService userService;
+
+    /**
+     * 构造器注入，使用@Lazy打破循环依赖
+     */
+    public OrderCancelApplyServiceImpl(
+            @Lazy OrderMainService orderMainService,
+            FlowFacade flowFacade,
+            OrderCancelApplyConvert cancelApplyConvert,
+            ApplicationEventPublisher eventPublisher,
+            UserService userService) {
+        this.orderMainService = orderMainService;
+        this.flowFacade = flowFacade;
+        this.cancelApplyConvert = cancelApplyConvert;
+        this.eventPublisher = eventPublisher;
+        this.userService = userService;
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
