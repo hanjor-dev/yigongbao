@@ -91,7 +91,7 @@ public interface UserMapper extends BaseMapper<UserEntity> {
         SELECT u.*,
                (SELECT COUNT(*) FROM order_main om
                 WHERE om.designer_id = u.id
-                  AND om.status BETWEEN 21 AND 29
+                  AND om.status BETWEEN 2010 AND 2090
                   AND om.is_deleted = 0) AS current_load
         FROM sys_user u
         WHERE u.role_code = 'designer'
@@ -115,7 +115,7 @@ public interface UserMapper extends BaseMapper<UserEntity> {
         SELECT u.*,
                (SELECT COUNT(*) FROM order_main om
                 WHERE om.designer_id = u.id
-                  AND om.status BETWEEN 21 AND 29
+                  AND om.status BETWEEN 2010 AND 2090
                   AND om.is_deleted = 0) AS current_load
         FROM sys_user u
         WHERE u.role_code = 'designer'
