@@ -308,6 +308,8 @@ public enum ErrorCodeEnum {
     DEVICE_ID_INVALID_FORMAT(829, "设备编号格式无效，必须为1-999的整数", 3),
     DEVICE_ID_OUT_OF_RANGE(830, "设备编号超出范围（1-999）", 3),
     ASSIGN_DEVICE_FAILED(831, "分配设备失败", 3),
+
+    // ==================== UDI相关 832-835 ====================
     PRODUCTION_RECORD_ALREADY_CLAIMED(832, "流转卡已被其他用户认领", 3),
     UDI_CODE_EXISTS(833, "UDI码已存在", 3),
     RECORD_STATUS_NOT_ALLOW_UPDATE_UDI(834, "流转卡状态不允许更新UDI", 3),
@@ -397,7 +399,7 @@ public enum ErrorCodeEnum {
     PRODUCT_HAS_NOT_QC(823, "存在未质检的产品，无法流转到包装", 3),
     PRODUCT_HAS_FAIL(824, "存在质检不合格的产品，无法流转到包装", 3),
     PRODUCT_STATUS_NOT_ALLOW_WAREHOUSE_IN(825, "产品当前状态不允许入库", 3),
-    PRODUCT_STATUS_NOT_ALLOW_WAREHOUSE_OUT(826, "产品当前状态不允许出库", 3);
+    PRODUCT_STATUS_NOT_ALLOW_WAREHOUSE_OUT(836, "产品当前状态不允许出库", 3);
 
     /**
      * 错误码
