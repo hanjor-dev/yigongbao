@@ -28,6 +28,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -230,30 +231,25 @@ class BatchUpdateUdiTest {
      * 场景7: 空值校验 - UDI为空抛出异常
      * Given: UDI码为空字符串
      * When: 调用batchUpdateUdi
-     * Then: 验证注解会在Controller层拦截（此测试验证Service层不会处理空值）
-     * 注: 实际空值校验由@NotBlank注解在Controller层完成
+     * Then: Service层抛出PARAM_INVALID异常
      */
     @Test
-    void batchUpdateUdi_emptyUdi_serviceLayerProcessesAsIs() {
+    void batchUpdateUdi_emptyUdi_throwsException() {
         // Given
         ProductionRecordEntity record = createRecord(1L, ProductionConstants.ORDER_TYPE_MEDICAL);
         record.setStatus(FlowStatusEnum.PRINTING.getValue());
         when(recordMapper.selectById(1L)).thenReturn(record);
-        when(productMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
 
-        // 注: 在实际场景中，空字符串会被@NotBlank拦截，但Service层不做校验
         BatchUpdateUdiDTO dto = createBatchUpdateUdiDTO(1L, Arrays.asList(
             createProductUdiItem(101L, "") // 空字符串
         ));
 
-        // When
-        qcService.batchUpdateUdi(dto);
+        // When & Then
+        BusinessException exception = assertThrows(BusinessException.class,
+            () -> qcService.batchUpdateUdi(dto));
 
-        // Then: Service层正常处理，实际空值应由Controller层@Valid注解拦截
-        verify(productService).updateBatchById(productListCaptor.capture());
-        List<ProductionProductEntity> captured = (List<ProductionProductEntity>) productListCaptor.getValue();
-        assertEquals(1, captured.size());
-        assertEquals("", captured.get(0).getUdiCode());
+        assertEquals(ErrorCodeEnum.INVALID_PARAMETER.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("UDI码不能为空"));
     }
 
     // ========== 辅助方法 ==========

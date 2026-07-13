@@ -2,6 +2,7 @@ package com.yigongbao.module.production.qc.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -243,6 +244,13 @@ public class ProductionQcServiceImpl implements IProductionQcService {
                 .notIn(ProductionProductEntity::getId, productIds));
         if (duplicateCount > 0) {
             throw new BusinessException(ErrorCodeEnum.UDI_CODE_EXISTS);
+        }
+
+        // 空值校验
+        for (BatchUpdateUdiDTO.ProductUdiItem item : dto.getProducts()) {
+            if (StrUtil.isBlank(item.getUdiCode())) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "UDI码不能为空");
+            }
         }
 
         // 4. 批量更新产品
