@@ -1766,6 +1766,7 @@ CREATE TABLE production_record (
     pack_device_no VARCHAR(50) COMMENT '包装设备编号',
     pack_seal_temperature DECIMAL(5,2) COMMENT '热封温度（℃）',
     pack_seal_time INT COMMENT '热封时间（秒）',
+    pack_material VARCHAR(100) COMMENT '包装材质（如：纸封袋、PE符合食品包装袋）',
     pack_sterilization_method VARCHAR(100) COMMENT '灭菌方式',
     pack_sterilization_batch_no VARCHAR(50) COMMENT '灭菌批号',
     pack_operator_id BIGINT COMMENT '包装操作人ID',

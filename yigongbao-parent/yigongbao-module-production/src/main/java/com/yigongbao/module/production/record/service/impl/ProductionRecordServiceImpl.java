@@ -813,6 +813,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         context.setPrintStartTime(record.getPrintStartTime());
         context.setPrintFinishTime(record.getPrintFinishTime());
         context.setDesignerAssetNo(designerAssetNo);
+        context.setPackMaterial(record.getPackMaterial());
 
         List<FlowCardExcelBuilder.ProcessInfo> processInfos = processes.stream()
             .map(p -> {

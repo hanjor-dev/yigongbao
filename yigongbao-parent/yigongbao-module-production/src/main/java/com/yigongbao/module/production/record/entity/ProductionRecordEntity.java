@@ -77,6 +77,8 @@ public class ProductionRecordEntity extends BaseEntity {
     private BigDecimal packSealTemperature;
     /** 热封时间（秒） */
     private Integer packSealTime;
+    /** 包装材质（如：纸封袋、PE符合食品包装袋） */
+    private String packMaterial;
     /** 灭菌方式 */
     private String packSterilizationMethod;
     /** 灭菌批号 */
