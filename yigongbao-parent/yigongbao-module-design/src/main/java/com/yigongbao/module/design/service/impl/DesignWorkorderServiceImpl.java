@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -341,7 +342,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void startDesign(Long orderId) {
+    public void startDesign(Long orderId, Integer version) {
         // 1. 校验订单存在
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
@@ -375,17 +376,21 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         // 5. 通过 FlowFacade 执行状态流转（PENDING_DESIGN → DESIGN_IN_PROGRESS）
         try {
             TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.START_DESIGN,
-                    FlowOperator.of(currentUserId, currentUserName));
+                    FlowOperator.of(currentUserId, currentUserName), version);
 
-            // 6. 将流转结果和设计开始时间写回订单表
-            OrderMainEntity update = new OrderMainEntity();
-            update.setId(orderId);
-            update.setPhase(result.getTargetPhase());
-            update.setStatus(result.getFinalStatus());
-            update.setDesignStartTime(LocalDateTime.now());
-            update.setCurrentHandlerId(currentUserId);
-            update.setCurrentHandlerName(currentUserName);
-            orderMainService.updateById(update);
+            // 6. 使用乐观锁更新订单状态和设计开始时间
+            boolean updated = orderMainService.update(new LambdaUpdateWrapper<OrderMainEntity>()
+                    .eq(OrderMainEntity::getId, orderId)
+                    .eq(OrderMainEntity::getVersion, version)
+                    .set(OrderMainEntity::getPhase, result.getTargetPhase())
+                    .set(OrderMainEntity::getStatus, result.getFinalStatus())
+                    .set(OrderMainEntity::getDesignStartTime, LocalDateTime.now())
+                    .set(OrderMainEntity::getCurrentHandlerId, currentUserId)
+                    .set(OrderMainEntity::getCurrentHandlerName, currentUserName));
+
+            if (!updated) {
+                throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+            }
 
             log.info("设计师开始设计: orderId={}, {} -> {}, designerId={}",
                 orderId, FlowStatusEnum.PENDING_DESIGN.getName(), FlowStatusEnum.DESIGN_IN_PROGRESS.getName(), currentUserId);
@@ -835,7 +840,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void completeDesign(Long orderId) {
+    public void completeDesign(Long orderId, Integer version) {
         // 根据ID查询订单实体
         OrderMainEntity order = orderMainService.getById(orderId);
         // 校验订单是否存在
@@ -872,17 +877,21 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
 
         // 执行状态流转：设计中 → 设计完成
         TransitionResult result = flowFacade.executeFlow(orderId, FlowActionEnum.COMPLETE_DESIGN,
-                FlowOperator.of(currentUserId, currentUserName));
+                FlowOperator.of(currentUserId, currentUserName), version);
 
-        // 回写订单表：更新阶段和状态
-        OrderMainEntity update = new OrderMainEntity();
-        update.setId(orderId);
-        update.setPhase(result.getTargetPhase());
-        update.setStatus(result.getFinalStatus());
-        update.setDesignSubmitTime(LocalDateTime.now());
-        update.setCurrentHandlerId(currentUserId);
-        update.setCurrentHandlerName(currentUserName);
-        orderMainService.updateById(update);
+        // 使用乐观锁更新订单状态和设计提交时间
+        boolean updated = orderMainService.update(new LambdaUpdateWrapper<OrderMainEntity>()
+                .eq(OrderMainEntity::getId, orderId)
+                .eq(OrderMainEntity::getVersion, version)
+                .set(OrderMainEntity::getPhase, result.getTargetPhase())
+                .set(OrderMainEntity::getStatus, result.getFinalStatus())
+                .set(OrderMainEntity::getDesignSubmitTime, LocalDateTime.now())
+                .set(OrderMainEntity::getCurrentHandlerId, currentUserId)
+                .set(OrderMainEntity::getCurrentHandlerName, currentUserName));
+
+        if (!updated) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+        }
 
         // 发布设计完成事件，触发生产流转卡创建
         eventPublisher.publishEvent(new com.yigongbao.common.event.DesignCompletedEvent(this, orderId));

@@ -62,8 +62,8 @@ public class DesignWorkorderController {
     @Operation(summary = "设计师开始设计")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "开始设计")
     @PostMapping("/{orderId}/start-design")
-    public Result<Void> startDesign(@PathVariable Long orderId) {
-        designWorkorderService.startDesign(orderId);
+    public Result<Void> startDesign(@PathVariable Long orderId, @Valid @RequestBody com.yigongbao.module.design.dto.StartDesignDTO dto) {
+        designWorkorderService.startDesign(orderId, dto.getVersion());
         return Result.success();
     }
 
@@ -84,8 +84,8 @@ public class DesignWorkorderController {
     @Operation(summary = "完成设计")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "完成设计")
     @PostMapping("/{orderId}/complete-design")
-    public Result<Void> completeDesign(@PathVariable Long orderId) {
-        designWorkorderService.completeDesign(orderId);
+    public Result<Void> completeDesign(@PathVariable Long orderId, @Valid @RequestBody com.yigongbao.module.design.dto.CompleteDesignDTO dto) {
+        designWorkorderService.completeDesign(orderId, dto.getVersion());
         return Result.success();
     }
 

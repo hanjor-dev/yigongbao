@@ -56,8 +56,9 @@ public interface DesignWorkorderService {
      * </p>
      *
      * @param orderId 订单ID
+     * @param version 订单版本号（乐观锁）
      */
-    void startDesign(Long orderId);
+    void startDesign(Long orderId, Integer version);
 
     /**
      * 查询订单设计师分配历史
@@ -74,7 +75,8 @@ public interface DesignWorkorderService {
      * - 不需要实体交付：只校验 STL 重建模型
      *
      * @param orderId 订单ID
+     * @param version 订单版本号（乐观锁）
      * @throws BusinessException 订单不存在或状态错误或校验失败
      */
-    void completeDesign(Long orderId);
+    void completeDesign(Long orderId, Integer version);
 }
