@@ -16,6 +16,7 @@ import com.yigongbao.module.production.enums.QcResultEnum;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
+import com.yigongbao.module.production.qc.dto.BatchUpdateUdiDTO;
 import com.yigongbao.module.production.qc.dto.ProductionQcPageDTO;
 import com.yigongbao.module.production.qc.service.IProductionQcService;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
@@ -205,5 +206,59 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             log.info("质检列表查询-默认: status={}, includeFollowingStatuses=true", FlowStatusEnum.QC_IN_PROGRESS.getValue());
         }
         return recordService.pageRecords(pageDTO);
+    }
+
+    /**
+     * 批量更新产品UDI码
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void batchUpdateUdi(BatchUpdateUdiDTO dto) {
+        // 1. 校验流转卡状态
+        ProductionRecordEntity record = recordMapper.selectById(dto.getRecordId());
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        if (record.getStatus() < FlowStatusEnum.PRINTING.getValue()) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_UPDATE_UDI);
+        }
+
+        // 2. 校验订单类型（仅医疗器械）
+        if (!ProductionConstants.ORDER_TYPE_MEDICAL.equals(record.getOrderType())) {
+            throw new BusinessException(ErrorCodeEnum.NON_MEDICAL_NOT_ALLOW_UDI);
+        }
+
+        // 3. 批量校验UDI唯一性（性能优化：批量查询）
+        List<String> udiCodes = dto.getProducts().stream()
+            .map(BatchUpdateUdiDTO.ProductUdiItem::getUdiCode)
+            .collect(Collectors.toList());
+        List<Long> productIds = dto.getProducts().stream()
+            .map(BatchUpdateUdiDTO.ProductUdiItem::getProductId)
+            .collect(Collectors.toList());
+
+        long duplicateCount = productMapper.selectCount(
+            new LambdaQueryWrapper<ProductionProductEntity>()
+                .in(ProductionProductEntity::getUdiCode, udiCodes)
+                .notIn(ProductionProductEntity::getId, productIds));
+        if (duplicateCount > 0) {
+            throw new BusinessException(ErrorCodeEnum.UDI_CODE_EXISTS);
+        }
+
+        // 4. 批量更新产品
+        LocalDateTime now = LocalDateTime.now();
+        for (BatchUpdateUdiDTO.ProductUdiItem item : dto.getProducts()) {
+            ProductionProductEntity product = new ProductionProductEntity();
+            product.setId(item.getProductId());
+            product.setUdiCode(item.getUdiCode());
+            product.setUdiGenerateTime(now);
+            productMapper.updateById(product);
+        }
+
+        // 记录详细日志
+        String details = dto.getProducts().stream()
+            .map(item -> "productId=" + item.getProductId() + ",udi=" + item.getUdiCode())
+            .collect(Collectors.joining("; "));
+        log.info("批量更新产品UDI码: recordId={}, productCount={}, details=[{}]",
+            dto.getRecordId(), dto.getProducts().size(), details);
     }
 }
