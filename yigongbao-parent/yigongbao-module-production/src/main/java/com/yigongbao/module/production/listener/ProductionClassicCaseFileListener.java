@@ -56,7 +56,8 @@ public class ProductionClassicCaseFileListener {
                             continue;
                         }
 
-                        String newPath = newBasePath + oldFileInfo.getFilename();
+                        // 修复：只设置目录路径，不包含文件名
+                        String newPath = newBasePath;
                         FileInfo newFileInfo = fileStorageService.move(oldFileInfo)
                                 .setPath(newPath)
                                 .move();
@@ -64,6 +65,9 @@ public class ProductionClassicCaseFileListener {
                         record.setFlowCardFileUrl(newFileInfo.getUrl());
                         productionRecordMapper.updateById(record);
                         successCount++;
+
+                        log.info("流转卡文件迁移成功: recordId={}, oldUrl={}, newUrl={}",
+                            record.getId(), oldUrl, newFileInfo.getUrl());
 
                     } catch (Exception e) {
                         log.error("迁移流转卡文件失败: recordId={}, orderId={}", record.getId(), event.getOrderId(), e);

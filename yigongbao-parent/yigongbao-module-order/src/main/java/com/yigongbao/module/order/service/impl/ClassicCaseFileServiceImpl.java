@@ -95,21 +95,22 @@ public class ClassicCaseFileServiceImpl implements IClassicCaseFileService {
                         continue;
                     }
 
-                    // 构建目标文件路径（保留原文件名）
-                    String newPath = newBasePath + oldFileInfo.getFilename();
+                    // 修复：只设置目录路径，不包含文件名
+                    String newPath = newBasePath;
 
                     // 调用 x-file-storage 的 move() 方法迁移文件
                     FileInfo newFileInfo = fileStorageService.move(oldFileInfo)
                             .setPath(newPath)
                             .move();
 
-                    // 更新文件记录表中的路径信息
-                    FileDetail detail = fileRecorderService.toFileDetail(newFileInfo);
-                    fileDetailMapper.updateById(detail);
+                    // 修复：move()操作会创建新的file_id，需要更新order_file表的关联
+                    String oldFileId = fileId;
+                    String newFileId = newFileInfo.getId();
+                    updateOrderFileId(orderId, oldFileId, newFileId);
                     successCount++;
 
-                    log.debug("文件迁移成功: fileId={}, oldPath={}, newPath={}",
-                        fileId, oldFileInfo.getPath(), newPath);
+                    log.info("文件迁移成功: orderId={}, oldFileId={}, newFileId={}, newUrl={}",
+                        orderId, oldFileId, newFileId, newFileInfo.getUrl());
 
                 } catch (Exception e) {
                     log.error("迁移文件失败: fileId={}, orderId={}, errorMsg={}", fileId, orderId, e.getMessage(), e);
@@ -124,6 +125,29 @@ public class ClassicCaseFileServiceImpl implements IClassicCaseFileService {
 
         log.info("经典案例文件迁移完成: orderId={}, orderCode={}, totalCount={}",
             orderId, orderCode, fileIds.size());
+    }
+
+    /**
+     * 更新order_file表的file_id
+     * move()操作会创建新的file_id，需要更新业务表的关联
+     *
+     * @param orderId 订单ID
+     * @param oldFileId 旧文件ID
+     * @param newFileId 新文件ID
+     */
+    private void updateOrderFileId(Long orderId, String oldFileId, String newFileId) {
+        List<OrderFileEntity> orderFiles = orderFileMapper.selectList(
+                new LambdaQueryWrapper<OrderFileEntity>()
+                        .eq(OrderFileEntity::getOrderId, orderId)
+                        .eq(OrderFileEntity::getFileId, oldFileId));
+        for (OrderFileEntity orderFile : orderFiles) {
+            orderFile.setFileId(newFileId);
+            orderFileMapper.updateById(orderFile);
+        }
+        if (!orderFiles.isEmpty()) {
+            log.info("更新order_file的file_id: orderId={}, oldFileId={}, newFileId={}, count={}",
+                orderId, oldFileId, newFileId, orderFiles.size());
+        }
     }
 }
 

@@ -56,9 +56,9 @@ public class ProductionRecordController {
 
     @Operation(summary = "下载设计数据包")
     @OperationLog(module = "生产管理", businessType = OperationTypeEnum.DOWNLOAD, operation = "下载设计数据包")
-    @PostMapping("/{designPackageId}/download-package")
-    public Result<String> downloadDataPackage(@PathVariable Long designPackageId) {
-        return Result.success(recordService.downloadDataPackage(designPackageId));
+    @PostMapping("/{id}/download-package")
+    public Result<String> downloadDataPackage(@PathVariable Long id) {
+        return Result.success(recordService.downloadDataPackage(id));
     }
 
     @Operation(summary = "自动生成生产批号（预览，不写库）")

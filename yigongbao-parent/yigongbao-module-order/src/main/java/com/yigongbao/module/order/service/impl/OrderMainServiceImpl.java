@@ -772,7 +772,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void resubmit(Long id, Integer version) {
+    public void     resubmit(Long id, Integer version) {
         Long currentUserId = getCurrentUserId();
         OrderMainEntity entity = getById(id);
         if (entity == null) {
@@ -889,7 +889,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (!Objects.equals(entity.getNeedsPhysicalDelivery(), StatusConstants.NO)) {
             log.warn("订单需要实体交付，不允许手动完成: orderId={}, needsPhysicalDelivery={}",
                 orderId, entity.getNeedsPhysicalDelivery());
-            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "只允许不需要实体交付的订单手动完成");
+            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_TRANSITION_ERROR);
         }
         // 校验状态必须为设计完成
         if (!Objects.equals(entity.getStatus(), FlowStatusEnum.DESIGN_COMPLETED.getValue())) {

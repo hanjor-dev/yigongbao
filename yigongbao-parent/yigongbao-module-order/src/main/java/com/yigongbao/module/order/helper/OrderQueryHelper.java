@@ -354,6 +354,8 @@ public class OrderQueryHelper {
         vo.setProductionStartTime(entity.getProductionStartTime());
         vo.setProductionEndTime(entity.getProductionEndTime());
         vo.setCreateTime(entity.getCreateTime());
+        // 版本号（乐观锁）
+        vo.setVersion(entity.getVersion());
         return vo;
     }
 

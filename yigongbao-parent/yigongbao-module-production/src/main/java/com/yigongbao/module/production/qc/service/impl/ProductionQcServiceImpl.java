@@ -261,19 +261,15 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             }
         }
 
-        // 4. 批量更新产品
+        // 4. 批量更新产品UDI码（使用lambdaUpdate确保字段正确更新）
         LocalDateTime now = LocalDateTime.now();
-        List<ProductionProductEntity> products = dto.getProducts().stream()
-            .map(item -> {
-                ProductionProductEntity product = new ProductionProductEntity();
-                product.setId(item.getProductId());
-                product.setUdiCode(item.getUdiCode());
-                product.setUdiGenerateTime(now);
-                return product;
-            })
-            .collect(Collectors.toList());
-
-        productService.updateBatchById(products);
+        for (BatchUpdateUdiDTO.ProductUdiItem item : dto.getProducts()) {
+            productService.lambdaUpdate()
+                .set(ProductionProductEntity::getUdiCode, item.getUdiCode())
+                .set(ProductionProductEntity::getUdiGenerateTime, now)
+                .eq(ProductionProductEntity::getId, item.getProductId())
+                .update();
+        }
 
         // 记录详细日志
         String details = dto.getProducts().stream()

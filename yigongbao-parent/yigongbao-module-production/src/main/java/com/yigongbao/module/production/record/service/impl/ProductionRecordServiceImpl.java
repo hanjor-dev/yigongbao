@@ -318,7 +318,17 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
     @Override
     @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
-    public String downloadDataPackage(Long designPackageId) {
+    public String downloadDataPackage(Long recordId) {
+        // 查询本条流转卡（用于发布事件和后续状态更新）- 使用悲观锁防止并发认领
+        ProductionRecordEntity record = baseMapper.selectOne(new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getId, recordId)
+                .last("FOR UPDATE"));
+
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+
+        Long designPackageId = record.getDesignPackageId();
         DesignPackageEntity designPackage = designPackageMapper.selectById(designPackageId);
         if (designPackage == null) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
@@ -327,10 +337,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
-        // 查询本条流转卡（用于发布事件和后续状态更新）- 使用悲观锁防止并发认领
-        ProductionRecordEntity record = baseMapper.selectOne(new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
-                .last("FOR UPDATE"));
 
         // 回写订单操作人和加工中心信息（当前生产员）
         Long userId = StpUtil.getLoginIdAsLong();
@@ -339,7 +345,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         // 更新本条流转卡状态和生产员信息：DESIGN_COMPLETED → PENDING_PRINT（幂等）
         int updated = baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getDesignPackageId, designPackageId)
+                .eq(ProductionRecordEntity::getId, recordId)
                 .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_COMPLETED.getValue())
                 .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue())
                 .set(ProductionRecordEntity::getProducerId, userId)
@@ -347,7 +353,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         // 检查更新结果，如果影响行数为0，说明流转卡已被其他用户认领
         if (updated == 0) {
-            log.warn("流转卡已被其他用户认领: designPackageId={}, userId={}", designPackageId, userId);
+            log.warn("流转卡已被其他用户认领: recordId={}, userId={}", recordId, userId);
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_ALREADY_CLAIMED);
         }
 
@@ -388,8 +394,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             log.warn("生产员未绑定加工中心，跳过订单加工中心分配: orderId={}, userId={}", order.getId(), userId);
         }
 
-        log.info("下载设计数据包，流转卡推进到待打印: orderId={}, designPackageId={}, producerId=",
-            order.getId(), designPackageId, userId);
+        log.info("下载设计数据包，流转卡推进到待打印: recordId={}, orderId={}, designPackageId={}, producerId={}",
+            recordId, order.getId(), designPackageId, userId);
 
         // 发布流转卡认领事件
         if (record != null) {
@@ -498,17 +504,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         ProductionRecordEntity record = getById(recordId);
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
-        }
-        // 批号唯一性校验（使用悲观锁防止并发提交相同批号）
-        if (cn.hutool.core.util.StrUtil.isNotBlank(dto.getProductionBatchNo())) {
-            ProductionRecordEntity existRecord = baseMapper.selectOne(new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getProductionBatchNo, dto.getProductionBatchNo())
-                .ne(ProductionRecordEntity::getId, recordId)
-                .select(ProductionRecordEntity::getId)
-                .last("FOR UPDATE LIMIT 1"));
-            if (existRecord != null) {
-                throw new BusinessException(ErrorCodeEnum.PRODUCTION_BATCH_NO_EXISTS);
-            }
         }
         record.setProductionBatchNo(dto.getProductionBatchNo());
         record.setMaterialBatchNo(dto.getMaterialBatchNo());
@@ -622,7 +617,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                         FlowStatusEnum.PRINTING.getValue()))
                 .ne(ProductionRecordEntity::getId, recordId)
                 .select(ProductionRecordEntity::getId)
-                .last("FOR UPDATE LIMIT 1"));
+                .last("LIMIT 1 FOR UPDATE"));
         if (conflictRecord != null) {
             log.warn("设备已被其他流转卡占用: deviceId={}, conflictRecordId={}, currentRecordId={}",
                 device.getId(), conflictRecord.getId(), recordId);

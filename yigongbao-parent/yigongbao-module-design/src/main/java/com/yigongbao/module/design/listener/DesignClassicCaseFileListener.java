@@ -62,14 +62,23 @@ public class DesignClassicCaseFileListener {
                             continue;
                         }
 
-                        String newPath = newBasePath + oldFileInfo.getFilename();
+                        // 修复：只设置目录路径，不包含文件名
+                        String newPath = newBasePath;
                         FileInfo newFileInfo = fileStorageService.move(oldFileInfo)
                                 .setPath(newPath)
                                 .move();
 
-                        FileDetail detail = fileRecorderService.toFileDetail(newFileInfo);
-                        fileDetailMapper.updateById(detail);
-                        updateDesignPackageFileUrls(fileId, newFileInfo.getUrl());
+                        // 修复：move()操作会创建新的file_id，需要更新业务表的关联
+                        String oldFileId = fileId;
+                        String newFileId = newFileInfo.getId();
+
+                        // 更新design_model表的file_id
+                        updateDesignModelFileId(oldFileId, newFileId);
+                        // 更新design_package_file表的file_url
+                        updateDesignPackageFileUrls(oldFileId, newFileInfo.getUrl());
+
+                        log.info("文件迁移成功: oldFileId={}, newFileId={}, newUrl={}",
+                            oldFileId, newFileId, newFileInfo.getUrl());
                         successCount++;
 
                     } catch (Exception e) {
@@ -134,6 +143,26 @@ public class DesignClassicCaseFileListener {
         for (DesignPackageFileEntity file : files) {
             file.setFileUrl(newUrl);
             designPackageFileMapper.updateById(file);
+        }
+    }
+
+    /**
+     * 更新design_model表的file_id
+     * move()操作会创建新的file_id，需要更新业务表的关联
+     *
+     * @param oldFileId 旧文件ID
+     * @param newFileId 新文件ID
+     */
+    private void updateDesignModelFileId(String oldFileId, String newFileId) {
+        List<DesignModelEntity> models = designModelMapper.selectList(
+                new LambdaQueryWrapper<DesignModelEntity>().eq(DesignModelEntity::getFileId, oldFileId));
+        for (DesignModelEntity model : models) {
+            model.setFileId(newFileId);
+            designModelMapper.updateById(model);
+        }
+        if (!models.isEmpty()) {
+            log.info("更新design_model的file_id: oldFileId={}, newFileId={}, count={}",
+                oldFileId, newFileId, models.size());
         }
     }
 }

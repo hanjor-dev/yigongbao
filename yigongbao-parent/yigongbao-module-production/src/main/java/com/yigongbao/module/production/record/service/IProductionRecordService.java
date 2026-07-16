@@ -29,7 +29,7 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
 
     IPage<ProductionRecordVO> pageRecords(ProductionRecordPageDTO dto);
 
-    String downloadDataPackage(Long designPackageId);
+    String downloadDataPackage(Long recordId);
 
     String generateBatchNo(Long recordId);
 
