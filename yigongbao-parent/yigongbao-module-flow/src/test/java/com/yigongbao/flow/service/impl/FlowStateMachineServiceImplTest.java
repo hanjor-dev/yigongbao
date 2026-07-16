@@ -216,8 +216,8 @@ class FlowStateMachineServiceImplTest {
     class CompletePrintTests {
 
         @Test
-        @DisplayName("COMPLETE_PRINT: phase=30,status=3020 → phase=40,status=4010")
-        void completePrint_shouldAdvanceToPostProcessing() {
+        @DisplayName("COMPLETE_PRINT: phase=30,status=3020 → phase=30,status=3030")
+        void completePrint_shouldStayInPrintPhase() {
             // PRINTING(3020) 在 PRINT 阶段允许 COMPLETE_PRINT
             testOrder.setPhase(30);
             testOrder.setStatus(3020);
@@ -228,11 +228,10 @@ class FlowStateMachineServiceImplTest {
             TransitionResult result = flowStateMachineService.executeTransition(
                     1L, FlowActionEnum.COMPLETE_PRINT, testOperator);
 
-            assertTrue(result.isPhaseChanged());
-            assertEquals(40, result.getTargetPhase());
-            assertEquals(3030, result.getTargetStatus()); // PRINT_COMPLETED（过渡）
-            assertEquals(4010, result.getInitialStatus()); // POST_PROCESSING
-            assertEquals(4010, result.getFinalStatus());
+            assertFalse(result.isPhaseChanged());
+            assertEquals(30, result.getTargetPhase());
+            assertEquals(3030, result.getTargetStatus());
+            assertEquals(3030, result.getFinalStatus());
         }
     }
 
@@ -243,8 +242,8 @@ class FlowStateMachineServiceImplTest {
     class QcPassTests {
 
         @Test
-        @DisplayName("QC_PASS: phase=50,status=5010 → phase=60,status=6010")
-        void qcPass_shouldAdvanceToWarehouse() {
+        @DisplayName("QC_PASS: phase=50,status=5010 → phase=50,status=5050")
+        void qcPass_shouldEnterPacking() {
             // QC_IN_PROGRESS(5010) 在 QC 阶段允许 QC_PASS
             testOrder.setPhase(50);
             testOrder.setStatus(5010);
@@ -255,11 +254,10 @@ class FlowStateMachineServiceImplTest {
             TransitionResult result = flowStateMachineService.executeTransition(
                     1L, FlowActionEnum.QC_PASS, testOperator);
 
-            assertTrue(result.isPhaseChanged());
-            assertEquals(60, result.getTargetPhase());
-            assertEquals(5020, result.getTargetStatus()); // QC_PASSED（过渡）
-            assertEquals(6010, result.getInitialStatus()); // WAREHOUSE_IN
-            assertEquals(6010, result.getFinalStatus());
+            assertFalse(result.isPhaseChanged());
+            assertEquals(50, result.getTargetPhase());
+            assertEquals(5050, result.getTargetStatus()); // PACKING
+            assertEquals(5050, result.getFinalStatus());
         }
     }
 
@@ -270,8 +268,8 @@ class FlowStateMachineServiceImplTest {
     class CompleteWarehouseInTests {
 
         @Test
-        @DisplayName("COMPLETE_WAREHOUSE_IN: phase=60,status=6010 → phase=80,status=8010")
-        void completeWarehouseIn_shouldAdvanceToCompleted() {
+        @DisplayName("COMPLETE_WAREHOUSE_IN: phase=60,status=6010 → phase=60,status=6020")
+        void completeWarehouseIn_shouldStayInWarehousePhase() {
             // WAREHOUSE_IN(6010) 在 WAREHOUSE 阶段允许 COMPLETE_WAREHOUSE_IN
             testOrder.setPhase(60);
             testOrder.setStatus(6010);
@@ -282,11 +280,10 @@ class FlowStateMachineServiceImplTest {
             TransitionResult result = flowStateMachineService.executeTransition(
                     1L, FlowActionEnum.COMPLETE_WAREHOUSE_IN, testOperator);
 
-            assertTrue(result.isPhaseChanged());
-            assertEquals(80, result.getTargetPhase());
-            assertEquals(6020, result.getTargetStatus()); // WAREHOUSED（过渡）
-            assertEquals(8010, result.getInitialStatus()); // COMPLETED
-            assertEquals(8010, result.getFinalStatus());
+            assertFalse(result.isPhaseChanged());
+            assertEquals(60, result.getTargetPhase());
+            assertEquals(6020, result.getTargetStatus());
+            assertEquals(6020, result.getFinalStatus());
         }
     }
 

@@ -94,8 +94,9 @@ class WarehouseServiceImplTest {
 
         verify(recordMapper).updateById(argThat((ProductionRecordEntity obj) ->
             FlowStatusEnum.WAREHOUSED.getValue().equals(((ProductionRecordEntity) obj).getStatus())));
-        verify(recordService).triggerFlowIfAllExact(
+        verify(recordService).triggerFlowIfAllReach(
             100L, FlowStatusEnum.WAREHOUSED.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_IN);
+        verify(recordService).reconcileOrderProductionStatus(100L);
     }
 
     @Test
@@ -185,8 +186,9 @@ class WarehouseServiceImplTest {
 
         verify(recordMapper).updateById(argThat((ProductionRecordEntity obj) ->
             FlowStatusEnum.WAREHOUSE_OUT.getValue().equals(((ProductionRecordEntity) obj).getStatus())));
-        verify(recordService).triggerFlowIfAllExact(
+        verify(recordService).triggerFlowIfAllReach(
             100L, FlowStatusEnum.WAREHOUSE_OUT.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_OUT);
+        verify(recordService).reconcileOrderProductionStatus(100L);
     }
 
     @Test

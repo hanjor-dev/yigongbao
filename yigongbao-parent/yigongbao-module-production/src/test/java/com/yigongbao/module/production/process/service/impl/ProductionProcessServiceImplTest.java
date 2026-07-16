@@ -70,7 +70,7 @@ class ProductionProcessServiceImplTest {
     @Test
     void startProcess_processNotFound_throwsException() {
         when(recordMapper.selectById(1L)).thenReturn(rec(1L, 10L));
-        when(processMapper.selectOne(any())).thenReturn(null);
+        when(processMapper.selectOne(any(), anyBoolean())).thenReturn(null);
         assertEquals(ErrorCodeEnum.PRODUCTION_PROCESS_NOT_FOUND.getCode(),
                 assertThrows(BusinessException.class,
                         () -> processService.startProcess(1L, startDto("wash", 2L))).getCode());
@@ -81,16 +81,18 @@ class ProductionProcessServiceImplTest {
         when(recordMapper.selectById(1L)).thenReturn(rec(1L, 10L));
         ProductionProcessEntity p = proc(1L, 1L, "wash");
         p.setStatus(ProcessStatusEnum.IN_PROGRESS.getCode());
-        when(processMapper.selectOne(any())).thenReturn(p);
+        when(processMapper.selectOne(any(), anyBoolean())).thenReturn(p);
         assertThrows(BusinessException.class, () -> processService.startProcess(1L, startDto("wash", 2L)));
     }
 
     @Test
     void startProcess_postProcess_updatesRecordStatus() {
-        when(recordMapper.selectById(1L)).thenReturn(rec(1L, 10L));
+        ProductionRecordEntity rec = rec(1L, 10L);
+        rec.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
+        when(recordMapper.selectById(1L)).thenReturn(rec);
         ProductionProcessEntity p = proc(1L, 1L, "wash");
         p.setStatus(ProcessStatusEnum.PENDING.getCode());
-        when(processMapper.selectOne(any())).thenReturn(p);
+        when(processMapper.selectOne(any(), anyBoolean())).thenReturn(p);
         when(deviceMapper.selectById(2L)).thenReturn(null);
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
@@ -106,8 +108,8 @@ class ProductionProcessServiceImplTest {
 
     @Test
     void finishProcess_processNotFound_throwsException() {
-        when(processMapper.selectOne(any())).thenReturn(null);
-        assertEquals(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND.getCode(),
+        when(processMapper.selectOne(any(), anyBoolean())).thenReturn(null);
+        assertEquals(ErrorCodeEnum.PRODUCTION_PROCESS_NOT_FOUND.getCode(),
                 assertThrows(BusinessException.class,
                         () -> processService.finishProcess(1L, "wash")).getCode());
     }
@@ -116,7 +118,7 @@ class ProductionProcessServiceImplTest {
     void finishProcess_notInProgress_throwsException() {
         ProductionProcessEntity p = proc(1L, 1L, "wash");
         p.setStatus(ProcessStatusEnum.PENDING.getCode());
-        when(processMapper.selectOne(any())).thenReturn(p);
+        when(processMapper.selectOne(any(), anyBoolean())).thenReturn(p);
         assertThrows(BusinessException.class, () -> processService.finishProcess(1L, "wash"));
     }
 
@@ -125,7 +127,7 @@ class ProductionProcessServiceImplTest {
         ProductionProcessEntity p = proc(1L, 1L, "wash");
         p.setStatus(ProcessStatusEnum.IN_PROGRESS.getCode());
         p.setStartTime(LocalDateTime.now());
-        when(processMapper.selectOne(any())).thenReturn(p);
+        when(processMapper.selectOne(any(), anyBoolean())).thenReturn(p);
         when(recordMapper.selectById(1L)).thenReturn(rec(1L, 10L));
         processService.finishProcess(1L, "wash");
         verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
@@ -137,14 +139,15 @@ class ProductionProcessServiceImplTest {
         ProductionProcessEntity p = proc(1L, 1L, "clean_dry");
         p.setStatus(ProcessStatusEnum.IN_PROGRESS.getCode());
         p.setStartTime(LocalDateTime.now());
-        when(processMapper.selectOne(any())).thenReturn(p);
+        when(processMapper.selectOne(any(), anyBoolean())).thenReturn(p);
         ProductionRecordEntity rec = rec(1L, 10L);
         when(recordMapper.selectById(1L)).thenReturn(rec);
+        when(productMapper.selectCount(any())).thenReturn(1L);
         processService.finishProcess(1L, "clean_dry");
-        verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
-                FlowStatusEnum.QC_IN_PROGRESS.getValue().equals(((ProductionRecordEntity) r).getStatus())));
+        verify(recordMapper).update(isNull(), any());
         verify(recordService).triggerFlowIfAllReach(10L,
                 FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
+        verify(recordService).reconcileOrderProductionStatus(10L);
     }
 
     // ---- helpers ----

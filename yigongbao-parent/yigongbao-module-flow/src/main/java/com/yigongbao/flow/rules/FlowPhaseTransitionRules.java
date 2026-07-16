@@ -132,7 +132,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      * - DATA_AUDIT_PASSED(1030) → 进入 DESIGN(20)，status 变为 PENDING_DESIGN(2010)
      * - DESIGN_COMPLETED(2030) → 需要实体交付时进入 PRINT(30)，不需要时保持在 DESIGN(20)
      * - PRINT_COMPLETED(3030) → 进入 POST_PROCESSING(40)
-     * - QC_PASSED(5020) → 进入 WAREHOUSE(60)
+     * - PACKING(5050) → 保持质检阶段，等待包装完成
      * - WAREHOUSED(6020) → 进入 COMPLETED(80)
      * - COMPLETED(8010) → 进入 COMPLETED(80)
      *
@@ -192,7 +192,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
         }
 
         // 质检合格 → 不自动推进，停留在包装状态，等待包装完成
-        if (targetStatus == FlowStatusEnum.QC_PASSED) {
+        if (targetStatus == FlowStatusEnum.PACKING) {
             return new PhaseAndStatus(null, null);
         }
 

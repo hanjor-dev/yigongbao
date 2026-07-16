@@ -142,8 +142,9 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             recordMapper.updateById(record);
 
             if (isFirstPostProcess) {
-                recordService.triggerFlowIfAllExact(record.getOrderId(),
+                recordService.triggerFlowIfAllReach(record.getOrderId(),
                         FlowStatusEnum.POST_PROCESSING.getValue(), FlowActionEnum.START_POST_PROCESSING);
+                recordService.reconcileOrderProductionStatus(record.getOrderId());
             }
         }
         log.info("开始工序: recordId={}, processType={}, deviceId={}", recordId, dto.getProcessType(), dto.getPrimaryDeviceId());
@@ -208,8 +209,9 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                             .set(ProductionRecordEntity::getPostProcessingEndTime, now)
                             .set(ProductionRecordEntity::getContentUpdateTime, now));
             updateOrderProductionEndTimeIfAllFinished(record.getOrderId());
-            recordService.triggerFlowIfAllExact(record.getOrderId(),
+            recordService.triggerFlowIfAllReach(record.getOrderId(),
                     FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
+            recordService.reconcileOrderProductionStatus(record.getOrderId());
         }
         log.info("完成工序: recordId={}, processType={}", recordId, processType);
     }

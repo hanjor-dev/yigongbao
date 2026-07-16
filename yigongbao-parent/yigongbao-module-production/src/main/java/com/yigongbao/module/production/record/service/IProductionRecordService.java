@@ -58,6 +58,12 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
     void triggerFlowAndSync(Long orderId, FlowActionEnum action);
 
     /**
+     * 根据订单下有效流转卡的最小主线进度，补偿推进订单状态。
+     * 仅通过 Flow 状态机推进父订单，不直接改写 order_main 状态。
+     */
+    void reconcileOrderProductionStatus(Long orderId);
+
+    /**
      * 获取流转卡取消预查询信息
      */
     CancelPreviewVO getCancelPreview(Long recordId);

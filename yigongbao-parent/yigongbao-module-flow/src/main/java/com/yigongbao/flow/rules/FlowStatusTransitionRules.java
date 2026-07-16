@@ -83,7 +83,7 @@ public class FlowStatusTransitionRules {
 
         // ==================== 质检阶段状态转换（5010-5090）====================
         transitions.put(statusKey(FlowPhaseEnum.QC, FlowStatusEnum.QC_IN_PROGRESS),
-                Set.of(FlowStatusEnum.QC_PASSED, FlowStatusEnum.QC_FAILED, FlowStatusEnum.PENDING_PRINT));
+                Set.of(FlowStatusEnum.PACKING, FlowStatusEnum.QC_FAILED, FlowStatusEnum.PENDING_PRINT));
 
         transitions.put(statusKey(FlowPhaseEnum.QC, FlowStatusEnum.QC_PASSED),
                 Set.of(FlowStatusEnum.PENDING_WAREHOUSE_IN));
@@ -255,7 +255,7 @@ public class FlowStatusTransitionRules {
             case COMPLETE_POST_PROCESSING -> FlowStatusEnum.QC_IN_PROGRESS.getValue();
 
             // 质检阶段动作
-            case QC_PASS -> FlowStatusEnum.QC_PASSED.getValue();
+            case QC_PASS -> FlowStatusEnum.PACKING.getValue();
             case QC_FAIL -> FlowStatusEnum.QC_FAILED.getValue();
             case REWORK -> FlowStatusEnum.REWORK.getValue();
             case REWORK_COMPLETE -> FlowStatusEnum.QC_IN_PROGRESS.getValue();
@@ -350,7 +350,8 @@ public class FlowStatusTransitionRules {
                     : Set.of();
 
             case QC -> needsProduction
-                    ? Set.of(FlowStatusEnum.QC_IN_PROGRESS, FlowStatusEnum.QC_FAILED, FlowStatusEnum.REWORK)
+                    ? Set.of(FlowStatusEnum.QC_IN_PROGRESS, FlowStatusEnum.QC_FAILED,
+                            FlowStatusEnum.REWORK, FlowStatusEnum.PACKING)
                     : Set.of();
 
             case WAREHOUSE -> needsProduction

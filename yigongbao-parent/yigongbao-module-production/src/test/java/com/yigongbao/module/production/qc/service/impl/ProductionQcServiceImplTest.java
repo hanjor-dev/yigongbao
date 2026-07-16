@@ -17,6 +17,7 @@ import com.yigongbao.module.production.qc.dto.ProductionQcPageDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
+import com.yigongbao.module.system.user.mapper.UserMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -40,6 +41,7 @@ class ProductionQcServiceImplTest {
     @Mock private ProductionRecordMapper recordMapper;
     @Mock private CodeGeneratorService codeGeneratorService;
     @Mock private IProductionRecordService recordService;
+    @Mock private UserMapper userMapper;
 
     @InjectMocks
     private ProductionQcServiceImpl qcService;
@@ -131,7 +133,7 @@ class ProductionQcServiceImplTest {
     void transferToPacking_notAllPass_throwsException() {
         when(recordMapper.selectById(1L)).thenReturn(record(1L, ProductionConstants.ORDER_TYPE_MEDICAL));
         when(productMapper.selectCount(any())).thenReturn(2L);
-        assertEquals(ErrorCodeEnum.PRODUCT_NOT_ALL_PASS.getCode(),
+        assertEquals(ErrorCodeEnum.PRODUCT_HAS_NOT_QC.getCode(),
                 assertThrows(BusinessException.class, () -> qcService.transferToPacking(1L)).getCode());
     }
 
@@ -141,11 +143,15 @@ class ProductionQcServiceImplTest {
         rec.setOrderId(10L);
         when(recordMapper.selectById(1L)).thenReturn(rec);
         when(productMapper.selectCount(any())).thenReturn(0L);
-        qcService.transferToPacking(1L);
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            qcService.transferToPacking(1L);
+        }
         verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
                 FlowStatusEnum.PACKING.getValue().equals(((ProductionRecordEntity) r).getStatus())));
         verify(recordService).triggerFlowIfAllReach(10L,
                 FlowStatusEnum.PACKING.getValue(), FlowActionEnum.QC_PASS);
+        verify(recordService).reconcileOrderProductionStatus(10L);
     }
 
     // ---- listProductsByRecordId ----
@@ -167,9 +173,11 @@ class ProductionQcServiceImplTest {
         ProductionQcPageDTO dto = new ProductionQcPageDTO();
         dto.setPageNum(1);
         dto.setPageSize(10);
-        when(recordMapper.selectPage(any(), any())).thenReturn(new Page<>());
+        when(recordService.pageRecords(any())).thenReturn(new Page<>());
         qcService.listQcRecords(dto);
-        verify(recordMapper).selectPage(any(), any());
+        verify(recordService).pageRecords(argThat(pageDTO ->
+                FlowStatusEnum.QC_IN_PROGRESS.getValue().equals(pageDTO.getStatus())
+                        && Boolean.TRUE.equals(pageDTO.getIncludeFollowingStatuses())));
     }
 
     // ---- helpers ----
@@ -189,6 +197,7 @@ class ProductionQcServiceImplTest {
         r.setOrderId(id * 10);
         r.setOrderType(orderType);
         r.setRecordNo("REC-00" + id);
+        r.setStatus(FlowStatusEnum.QC_IN_PROGRESS.getValue());
         return r;
     }
 }

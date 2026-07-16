@@ -86,10 +86,10 @@ class FlowStatusTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("phase=DESIGN, status=DESIGN_COMPLETED(2030) → 返回空列表")
-        void design_phase_designCompleted_shouldReturn_empty() {
+        @DisplayName("phase=DESIGN, status=DESIGN_COMPLETED(2030) → 返回 [DOWNLOAD_DATA_PACKAGE]")
+        void design_phase_designCompleted_shouldReturn_downloadDataPackage() {
             List<FlowActionEnum> actions = rules.getAvailableActions(2030, 20, 1);
-            assertEquals(List.of(FlowActionEnum.CANCEL), actions);
+            assertEquals(List.of(FlowActionEnum.DOWNLOAD_DATA_PACKAGE, FlowActionEnum.CANCEL), actions);
         }
 
         // ==================== PRINT 阶段测试 ====================
@@ -289,9 +289,9 @@ class FlowStatusTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("QC_PASS → QC_PASSED(5020)")
+        @DisplayName("QC_PASS → PACKING(5050)")
         void qcPass_shouldReturn_qcPassed() {
-            assertEquals(5020, rules.getTargetStatus(5010, FlowActionEnum.QC_PASS));
+            assertEquals(5050, rules.getTargetStatus(5010, FlowActionEnum.QC_PASS));
         }
 
         @Test
@@ -489,10 +489,11 @@ class FlowStatusTransitionRulesTest {
         @DisplayName("QC 阶段 needsPhysicalDelivery=1 → 有质检相关状态")
         void qc_phase_needDelivery_hasStatuses() {
             Set<FlowStatusEnum> statuses = rules.getValidStatusesForPhase(FlowPhaseEnum.QC, 1);
-            assertEquals(3, statuses.size());
+            assertEquals(4, statuses.size());
             assertTrue(statuses.contains(FlowStatusEnum.QC_IN_PROGRESS));
             assertTrue(statuses.contains(FlowStatusEnum.QC_FAILED));
             assertTrue(statuses.contains(FlowStatusEnum.REWORK));
+            assertTrue(statuses.contains(FlowStatusEnum.PACKING));
         }
 
         @Test
@@ -506,9 +507,10 @@ class FlowStatusTransitionRulesTest {
         @DisplayName("WAREHOUSE 阶段 needsPhysicalDelivery=1 → 有仓储状态")
         void warehouse_phase_needDelivery_hasStatuses() {
             Set<FlowStatusEnum> statuses = rules.getValidStatusesForPhase(FlowPhaseEnum.WAREHOUSE, 1);
-            assertEquals(2, statuses.size());
+            assertEquals(3, statuses.size());
             assertTrue(statuses.contains(FlowStatusEnum.PENDING_WAREHOUSE_IN));
             assertTrue(statuses.contains(FlowStatusEnum.WAREHOUSED));
+            assertTrue(statuses.contains(FlowStatusEnum.WAREHOUSE_OUT));
         }
 
         @Test

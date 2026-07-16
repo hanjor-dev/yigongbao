@@ -73,8 +73,9 @@ public class DeviceStatusListener {
             });
             Long orderId = records.get(0).getOrderId();
             updateOrderProductionStartTime(orderId, now);
-            recordService.triggerFlowIfAllExact(orderId,
+            recordService.triggerFlowIfAllReach(orderId,
                     FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
+            recordService.reconcileOrderProductionStatus(orderId);
         }
         // 占用 → 空闲：打印完成，只查询打印中的流转卡
         else if (!ProductionConstants.DEVICE_STATE_IDLE.equals(oldState)
@@ -102,8 +103,9 @@ public class DeviceStatusListener {
                         record.getId(), record.getRecordNo(), deviceId);
             });
             Long orderId = records.get(0).getOrderId();
-            recordService.triggerFlowIfAllExact(orderId,
+            recordService.triggerFlowIfAllReach(orderId,
                     FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
+            recordService.reconcileOrderProductionStatus(orderId);
         }
     }
 

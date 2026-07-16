@@ -240,15 +240,15 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("DESIGN_COMPLETED(2030) + needsPhysicalDelivery=1 → PRINT + PENDING_PRINT(3010)")
-        void designCompleted_needDelivery_shouldAdvanceToPrint() {
+        @DisplayName("DESIGN_COMPLETED(2030) + needsPhysicalDelivery=1 → 不自动推进")
+        void designCompleted_needDelivery_shouldStayInDesignPhase() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.DESIGN,
                     FlowStatusEnum.DESIGN_COMPLETED,
                     FlowActionEnum.COMPLETE_DESIGN,
                     1, null);
-            assertEquals(FlowPhaseEnum.PRINT, result.phase());
-            assertEquals(FlowStatusEnum.PENDING_PRINT, result.initialStatus());
+            assertNull(result.phase());
+            assertNull(result.initialStatus());
         }
 
         @Test
@@ -264,51 +264,51 @@ class FlowPhaseTransitionRulesTest {
         }
 
         @Test
-        @DisplayName("PRINT_COMPLETED(3030) 医疗器械 → POST_PROCESSING + POST_PROCESSING(4010)")
-        void printCompleted_medical_shouldAdvanceToPostProcessing() {
+        @DisplayName("PRINT_COMPLETED(3030) 医疗器械 → 不自动推进")
+        void printCompleted_medical_shouldStayInPrintPhase() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.PRINT,
                     FlowStatusEnum.PRINT_COMPLETED,
                     FlowActionEnum.COMPLETE_PRINT,
                     1, 1);
-            assertEquals(FlowPhaseEnum.POST_PROCESSING, result.phase());
-            assertEquals(FlowStatusEnum.POST_PROCESSING, result.initialStatus());
+            assertNull(result.phase());
+            assertNull(result.initialStatus());
         }
 
         @Test
-        @DisplayName("PRINT_COMPLETED(3030) 非医疗器械 → QC + QC_IN_PROGRESS(5010)")
-        void printCompleted_nonMedical_shouldAdvanceToQc() {
+        @DisplayName("PRINT_COMPLETED(3030) 非医疗器械 → 不自动推进")
+        void printCompleted_nonMedical_shouldStayInPrintPhase() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.PRINT,
                     FlowStatusEnum.PRINT_COMPLETED,
                     FlowActionEnum.COMPLETE_PRINT,
                     1, 2);
-            assertEquals(FlowPhaseEnum.QC, result.phase());
-            assertEquals(FlowStatusEnum.QC_IN_PROGRESS, result.initialStatus());
+            assertNull(result.phase());
+            assertNull(result.initialStatus());
         }
 
         @Test
-        @DisplayName("QC_PASSED(5020) → WAREHOUSE + WAREHOUSE_IN(6010)")
-        void qcPassed_shouldAdvanceToWarehouse() {
+        @DisplayName("PACKING(5050) → 不推进阶段")
+        void packing_shouldStayInQcPhase() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.QC,
-                    FlowStatusEnum.QC_PASSED,
+                    FlowStatusEnum.PACKING,
                     FlowActionEnum.QC_PASS,
                     1, null);
-            assertEquals(FlowPhaseEnum.WAREHOUSE, result.phase());
-            assertEquals(FlowStatusEnum.PENDING_WAREHOUSE_IN, result.initialStatus());
+            assertNull(result.phase());
+            assertNull(result.initialStatus());
         }
 
         @Test
-        @DisplayName("WAREHOUSED(6020) → COMPLETED + COMPLETED(8010)")
-        void warehoused_shouldAdvanceToCompleted() {
+        @DisplayName("WAREHOUSED(6020) → 不自动推进")
+        void warehoused_shouldStayInWarehousePhase() {
             PhaseAndStatus result = FlowPhaseTransitionRules.decideNextPhaseAndStatus(
                     FlowPhaseEnum.WAREHOUSE,
                     FlowStatusEnum.WAREHOUSED,
                     FlowActionEnum.COMPLETE_WAREHOUSE_IN,
                     1, null);
-            assertEquals(FlowPhaseEnum.COMPLETED, result.phase());
-            assertEquals(FlowStatusEnum.COMPLETED, result.initialStatus());
+            assertNull(result.phase());
+            assertNull(result.initialStatus());
         }
 
         @Test
@@ -364,10 +364,10 @@ class FlowPhaseTransitionRulesTest {
         @DisplayName("会触发阶段推进的动作 → true")
         void phaseChangeActions_shouldReturn_true() {
             assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.DATA_AUDIT_PASS));
-            assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.COMPLETE_DESIGN));
-            assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.COMPLETE_PRINT));
+            assertFalse(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.COMPLETE_DESIGN));
+            assertFalse(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.COMPLETE_PRINT));
             assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.COMPLETE_POST_PROCESSING));
-            assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.QC_PASS));
+            assertFalse(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.QC_PASS));
             assertTrue(FlowPhaseTransitionRules.isPhaseChangeAction(FlowActionEnum.COMPLETE_WAREHOUSE_IN));
         }
 

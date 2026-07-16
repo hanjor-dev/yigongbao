@@ -159,11 +159,12 @@ public class WarehouseServiceImpl implements IWarehouseService {
             recordId, record.getRecordNo(), warehousedCount, cancelledCount);
 
         // 触发订单聚合：检查所有流转卡是否都已入库
-        recordService.triggerFlowIfAllExact(
+        recordService.triggerFlowIfAllReach(
             record.getOrderId(),
             FlowStatusEnum.WAREHOUSED.getValue(),
             FlowActionEnum.COMPLETE_WAREHOUSE_IN
         );
+        recordService.reconcileOrderProductionStatus(record.getOrderId());
     }
 
     @Override
@@ -230,10 +231,11 @@ public class WarehouseServiceImpl implements IWarehouseService {
         log.info("流转卡全部产品已出库: recordId={}, recordNo={}, warehouseOutCount={}, cancelledCount={}",
             recordId, record.getRecordNo(), warehouseOutCount, cancelledCount);
 
-        recordService.triggerFlowIfAllExact(
+        recordService.triggerFlowIfAllReach(
             record.getOrderId(),
             FlowStatusEnum.WAREHOUSE_OUT.getValue(),
             FlowActionEnum.COMPLETE_WAREHOUSE_OUT
         );
+        recordService.reconcileOrderProductionStatus(record.getOrderId());
     }
 }

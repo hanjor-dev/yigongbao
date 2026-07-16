@@ -160,22 +160,9 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         record.setStatus(FlowStatusEnum.PACKING.getValue());
         recordMapper.updateById(record);
 
-        // 检查所有流转卡是否都进入包装状态，是则同步订单状态
-        long totalActive = recordMapper.selectCount(new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getOrderId, record.getOrderId())
-                .notIn(ProductionRecordEntity::getStatus,
-                        FlowStatusEnum.PRINT_FAILED.getValue(),
-                        FlowStatusEnum.REWORK.getValue(),
-                        FlowStatusEnum.CANCELLED.getValue()));
-        long packingCount = recordMapper.selectCount(new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getOrderId, record.getOrderId())
-                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PACKING.getValue()));
-        if (totalActive == packingCount) {
-            orderMainMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<com.yigongbao.common.entity.OrderMainEntity>()
-                    .eq(com.yigongbao.common.entity.OrderMainEntity::getId, record.getOrderId())
-                    .set(com.yigongbao.common.entity.OrderMainEntity::getStatus, FlowStatusEnum.PACKING.getValue()));
-            log.info("所有流转卡进入包装，同步订单状态: orderId={}", record.getOrderId());
-        }
+        recordService.triggerFlowIfAllReach(record.getOrderId(),
+                FlowStatusEnum.PACKING.getValue(), FlowActionEnum.QC_PASS);
+        recordService.reconcileOrderProductionStatus(record.getOrderId());
         log.info("质检完成，流转到包装: recordId={}, recordNo={}, qcId={}, qcName={}, orderId={}",
                 recordId, record.getRecordNo(), userId, realName, record.getOrderId());
     }

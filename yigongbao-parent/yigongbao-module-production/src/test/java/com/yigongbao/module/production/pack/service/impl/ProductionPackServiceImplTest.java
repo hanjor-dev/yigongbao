@@ -2,6 +2,7 @@ package com.yigongbao.module.production.pack.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
@@ -10,6 +11,8 @@ import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.production.pack.dto.FillPackDTO;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
+import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
+import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
@@ -18,6 +21,7 @@ import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -51,6 +55,9 @@ class ProductionPackServiceImplTest {
         mockUser = new UserEntity();
         mockUser.setId(1L);
         mockUser.setRealName("张三");
+        initTableInfo(ProductionProcessEntity.class);
+        initTableInfo(ProductionProductEntity.class);
+        initTableInfo(ProductionRecordEntity.class);
         // 预先打桩，避免 LambdaUpdateWrapper 触发 MyBatis Plus lambda 缓存解析
         when(processMapper.update(any(), any())).thenReturn(1);
         when(productMapper.update(any(), any())).thenReturn(1);
@@ -230,8 +237,17 @@ class ProductionPackServiceImplTest {
 
         verify(recordMapper).updateById(argThat((ProductionRecordEntity rec) ->
             FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue().equals(((ProductionRecordEntity) rec).getStatus())));
-        verify(recordService).triggerFlowIfAllExact(10L,
-            FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(), FlowActionEnum.TRANSFER_TO_WAREHOUSE);
+        verify(recordService).triggerFlowIfAllReach(10L,
+            FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(), FlowActionEnum.COMPLETE_PACKING);
+        verify(recordService).reconcileOrderProductionStatus(10L);
+    }
+
+    private void initTableInfo(Class<?> entityClass) {
+        if (TableInfoHelper.getTableInfo(entityClass) == null) {
+            MapperBuilderAssistant assistant = new MapperBuilderAssistant(
+                    new org.apache.ibatis.session.Configuration(), "");
+            TableInfoHelper.initTableInfo(assistant, entityClass);
+        }
     }
 
     private ProductionRecordEntity record(Long id) {

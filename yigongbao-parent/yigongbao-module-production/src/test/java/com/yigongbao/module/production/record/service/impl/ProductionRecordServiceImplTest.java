@@ -2,6 +2,7 @@ package com.yigongbao.module.production.record.service.impl;
 
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.entity.OrderMainEntity;
@@ -35,6 +36,7 @@ import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserService;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,10 +46,12 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -70,6 +74,7 @@ class ProductionRecordServiceImplTest {
     @Mock private ConfigService configService;
     @Mock private UserService userService;
     @Mock private ObjectMapper objectMapper;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ProductionRecordServiceImpl recordService;
@@ -79,6 +84,17 @@ class ProductionRecordServiceImplTest {
         Field f = ServiceImpl.class.getDeclaredField("baseMapper");
         f.setAccessible(true);
         f.set(recordService, recordMapper);
+
+        if (TableInfoHelper.getTableInfo(ProductionRecordEntity.class) == null) {
+            MapperBuilderAssistant assistant = new MapperBuilderAssistant(
+                    new org.apache.ibatis.session.Configuration(), "");
+            TableInfoHelper.initTableInfo(assistant, ProductionRecordEntity.class);
+        }
+        if (TableInfoHelper.getTableInfo(OrderMainEntity.class) == null) {
+            MapperBuilderAssistant assistant = new MapperBuilderAssistant(
+                    new org.apache.ibatis.session.Configuration(), "");
+            TableInfoHelper.initTableInfo(assistant, OrderMainEntity.class);
+        }
     }
 
     // ---- getRecordDetail ----
@@ -95,6 +111,9 @@ class ProductionRecordServiceImplTest {
         ProductionRecordEntity record = new ProductionRecordEntity();
         record.setId(1L);
         record.setRecordNo("REC-001");
+        record.setFlowCardFileUrl("/flow-card.xlsx");
+        record.setFlowCardGenerateTime(java.time.LocalDateTime.now());
+        record.setContentUpdateTime(record.getFlowCardGenerateTime());
         ProductionProductEntity product = new ProductionProductEntity();
         product.setId(10L);
         when(recordMapper.selectById(1L)).thenReturn(record);
@@ -122,6 +141,9 @@ class ProductionRecordServiceImplTest {
         ProductionRecordEntity record = new ProductionRecordEntity();
         record.setId(5L);
         record.setRecordNo("REC-005");
+        record.setFlowCardFileUrl("/flow-card.xlsx");
+        record.setFlowCardGenerateTime(java.time.LocalDateTime.now());
+        record.setContentUpdateTime(record.getFlowCardGenerateTime());
         when(recordMapper.selectOne(any())).thenReturn(record);
         when(recordMapper.selectOne(any(), anyBoolean())).thenReturn(record);
         when(recordMapper.selectById(5L)).thenReturn(record);
@@ -152,6 +174,7 @@ class ProductionRecordServiceImplTest {
 
     @Test
     void downloadDataPackage_designPackageNotFound_throwsException() {
+        when(recordMapper.selectOne(any())).thenReturn(record(1L, 10L, FlowStatusEnum.DESIGN_COMPLETED.getValue()));
         when(designPackageMapper.selectById(1L)).thenReturn(null);
         assertEquals(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND.getCode(),
                 assertThrows(BusinessException.class, () -> recordService.downloadDataPackage(1L)).getCode());
@@ -159,6 +182,9 @@ class ProductionRecordServiceImplTest {
 
     @Test
     void downloadDataPackage_orderNotFound_throwsException() {
+        ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.DESIGN_COMPLETED.getValue());
+        record.setDesignPackageId(1L);
+        when(recordMapper.selectOne(any())).thenReturn(record);
         when(designPackageMapper.selectById(1L)).thenReturn(pkg(1L, 10L));
         when(orderMainMapper.selectById(10L)).thenReturn(null);
         assertEquals(ErrorCodeEnum.ORDER_NOT_FOUND.getCode(),
@@ -167,29 +193,45 @@ class ProductionRecordServiceImplTest {
 
     @Test
     void downloadDataPackage_startPrintNotAvailable_idempotentSkip() {
+        ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.PENDING_PRINT.getValue());
+        record.setDesignPackageId(1L);
+        when(recordMapper.selectOne(any())).thenReturn(record);
+        when(recordMapper.update(any(), any())).thenReturn(1);
         when(designPackageMapper.selectById(1L)).thenReturn(pkg(1L, 10L));
-        when(orderMainMapper.selectById(10L)).thenReturn(order(10L, ProductionConstants.ORDER_TYPE_MEDICAL));
+        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        order.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
+        when(orderMainMapper.selectById(10L)).thenReturn(order);
         when(flowFacade.getAvailableActions(10L)).thenReturn(List.of("OTHER_ACTION"));
-
-        recordService.downloadDataPackage(1L);
-
-        verify(flowFacade, never()).executeFlow(any(), any(), any());
-    }
-
-    @Test
-    void downloadDataPackage_startPrintAvailable_triggersFlow() {
-        when(designPackageMapper.selectById(1L)).thenReturn(pkg(1L, 10L));
-        when(orderMainMapper.selectById(10L)).thenReturn(order(10L, ProductionConstants.ORDER_TYPE_MEDICAL));
-        when(flowFacade.getAvailableActions(10L)).thenReturn(List.of(FlowActionEnum.START_PRINT.name()));
-        TransitionResult result = buildResult();
-        when(flowFacade.executeFlow(eq(10L), eq(FlowActionEnum.START_PRINT), any(FlowOperator.class))).thenReturn(result);
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             mockStp(stp);
             recordService.downloadDataPackage(1L);
         }
 
-        verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.START_PRINT), any(FlowOperator.class));
+        verify(flowFacade, never()).executeFlow(any(), any(), any());
+    }
+
+    @Test
+    void downloadDataPackage_startPrintAvailable_triggersFlow() {
+        ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.PENDING_PRINT.getValue());
+        record.setDesignPackageId(1L);
+        when(recordMapper.selectOne(any())).thenReturn(record);
+        when(recordMapper.update(any(), any())).thenReturn(1);
+        when(designPackageMapper.selectById(1L)).thenReturn(pkg(1L, 10L));
+        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        order.setStatus(FlowStatusEnum.DESIGN_COMPLETED.getValue());
+        when(orderMainMapper.selectById(10L)).thenReturn(order);
+        when(flowFacade.getAvailableActions(10L)).thenReturn(List.of(FlowActionEnum.START_PRINT.name()));
+        TransitionResult result = buildResult();
+        when(recordMapper.selectCount(any())).thenReturn(1L).thenReturn(1L);
+        when(flowFacade.executeFlow(eq(10L), eq(FlowActionEnum.DOWNLOAD_DATA_PACKAGE), any(FlowOperator.class))).thenReturn(result);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+            recordService.downloadDataPackage(1L);
+        }
+
+        verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.DOWNLOAD_DATA_PACKAGE), any(FlowOperator.class));
     }
 
     // ---- triggerFlowIfAllReach ----
@@ -217,6 +259,76 @@ class ProductionRecordServiceImplTest {
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             mockStp(stp);
             recordService.triggerFlowIfAllReach(10L, FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
+        }
+
+        verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.COMPLETE_PRINT), any(FlowOperator.class));
+    }
+
+    // ---- reconcileOrderProductionStatus ----
+
+    @Test
+    void reconcileOrderProductionStatus_orderBehindPrintCompleted_replaysStartAndCompletePrint() {
+        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        order.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
+        when(orderMainMapper.selectById(10L)).thenReturn(order);
+        when(recordMapper.selectList(any())).thenReturn(List.of(
+                record(1L, 10L, FlowStatusEnum.QC_IN_PROGRESS.getValue()),
+                record(2L, 10L, FlowStatusEnum.QC_IN_PROGRESS.getValue()),
+                record(3L, 10L, FlowStatusEnum.QC_IN_PROGRESS.getValue()),
+                record(4L, 10L, FlowStatusEnum.PRINT_COMPLETED.getValue())
+        ));
+        when(flowFacade.executeFlow(eq(10L), any(FlowActionEnum.class), any(FlowOperator.class)))
+                .thenAnswer(invocation -> resultForAction(invocation.getArgument(1)));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+            recordService.reconcileOrderProductionStatus(10L);
+        }
+
+        verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.START_PRINT), any(FlowOperator.class));
+        verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.COMPLETE_PRINT), any(FlowOperator.class));
+    }
+
+    @Test
+    void reconcileOrderProductionStatus_orderBehindPrinting_replaysStartPrintOnly() {
+        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        order.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
+        when(orderMainMapper.selectById(10L)).thenReturn(order);
+        when(recordMapper.selectList(any())).thenReturn(List.of(
+                record(1L, 10L, FlowStatusEnum.QC_IN_PROGRESS.getValue()),
+                record(2L, 10L, FlowStatusEnum.QC_IN_PROGRESS.getValue()),
+                record(3L, 10L, FlowStatusEnum.QC_IN_PROGRESS.getValue()),
+                record(4L, 10L, FlowStatusEnum.PRINTING.getValue())
+        ));
+        when(flowFacade.executeFlow(eq(10L), any(FlowActionEnum.class), any(FlowOperator.class)))
+                .thenAnswer(invocation -> resultForAction(invocation.getArgument(1)));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+            recordService.reconcileOrderProductionStatus(10L);
+        }
+
+        verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.START_PRINT), any(FlowOperator.class));
+        verify(flowFacade, never()).executeFlow(eq(10L), eq(FlowActionEnum.COMPLETE_PRINT), any(FlowOperator.class));
+    }
+
+    @Test
+    void reconcileOrderProductionStatus_ignoresInactiveRecordsWhenCalculatingMinimumStatus() {
+        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        order.setStatus(FlowStatusEnum.PRINTING.getValue());
+        when(orderMainMapper.selectById(10L)).thenReturn(order);
+        when(recordMapper.selectList(any())).thenReturn(List.of(
+                record(1L, 10L, FlowStatusEnum.CANCELLED.getValue()),
+                record(2L, 10L, FlowStatusEnum.PRINT_FAILED.getValue()),
+                record(3L, 10L, FlowStatusEnum.REWORK.getValue()),
+                record(4L, 10L, FlowStatusEnum.PRINT_COMPLETED.getValue())
+        ));
+        when(flowFacade.executeFlow(eq(10L), any(FlowActionEnum.class), any(FlowOperator.class)))
+                .thenAnswer(invocation -> resultForAction(invocation.getArgument(1)));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+            recordService.reconcileOrderProductionStatus(10L);
         }
 
         verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.COMPLETE_PRINT), any(FlowOperator.class));
@@ -425,6 +537,14 @@ class ProductionRecordServiceImplTest {
         return o;
     }
 
+    private ProductionRecordEntity record(Long id, Long orderId, Integer status) {
+        ProductionRecordEntity r = new ProductionRecordEntity();
+        r.setId(id);
+        r.setOrderId(orderId);
+        r.setStatus(status);
+        return r;
+    }
+
     private DeviceEntity device(Long id) {
         DeviceEntity d = new DeviceEntity();
         d.setId(id);
@@ -439,6 +559,22 @@ class ProductionRecordServiceImplTest {
         TransitionResult r = mock(TransitionResult.class);
         when(r.getTargetPhase()).thenReturn(1);
         when(r.getFinalStatus()).thenReturn(2);
+        return r;
+    }
+
+    private TransitionResult resultForAction(FlowActionEnum action) {
+        Map<FlowActionEnum, Integer> finalStatuses = Map.of(
+                FlowActionEnum.START_PRINT, FlowStatusEnum.PRINTING.getValue(),
+                FlowActionEnum.COMPLETE_PRINT, FlowStatusEnum.PRINT_COMPLETED.getValue(),
+                FlowActionEnum.START_POST_PROCESSING, FlowStatusEnum.POST_PROCESSING.getValue(),
+                FlowActionEnum.COMPLETE_POST_PROCESSING, FlowStatusEnum.QC_IN_PROGRESS.getValue(),
+                FlowActionEnum.COMPLETE_PACKING, FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(),
+                FlowActionEnum.COMPLETE_WAREHOUSE_IN, FlowStatusEnum.WAREHOUSED.getValue(),
+                FlowActionEnum.COMPLETE_WAREHOUSE_OUT, FlowStatusEnum.WAREHOUSE_OUT.getValue()
+        );
+        TransitionResult r = mock(TransitionResult.class);
+        when(r.getTargetPhase()).thenReturn(1);
+        when(r.getFinalStatus()).thenReturn(finalStatuses.get(action));
         return r;
     }
 

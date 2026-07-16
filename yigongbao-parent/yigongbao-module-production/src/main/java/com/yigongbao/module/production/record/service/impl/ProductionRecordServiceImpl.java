@@ -106,6 +106,30 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final IDeviceUsageCounterService deviceUsageCounterService;
     private final IProductNumberService productNumberService;
 
+    private static final List<Integer> NORMAL_PRODUCTION_STATUSES = List.of(
+            FlowStatusEnum.PENDING_PRINT.getValue(),
+            FlowStatusEnum.PRINTING.getValue(),
+            FlowStatusEnum.PRINT_COMPLETED.getValue(),
+            FlowStatusEnum.POST_PROCESSING.getValue(),
+            FlowStatusEnum.QC_IN_PROGRESS.getValue(),
+            FlowStatusEnum.PACKING.getValue(),
+            FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(),
+            FlowStatusEnum.WAREHOUSED.getValue(),
+            FlowStatusEnum.WAREHOUSE_OUT.getValue(),
+            FlowStatusEnum.COMPLETED.getValue()
+    );
+
+    private static final Map<Integer, FlowActionEnum> ACTION_TO_REACH_STATUS = Map.of(
+            FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT,
+            FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT,
+            FlowStatusEnum.POST_PROCESSING.getValue(), FlowActionEnum.START_POST_PROCESSING,
+            FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING,
+            FlowStatusEnum.PACKING.getValue(), FlowActionEnum.QC_PASS,
+            FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(), FlowActionEnum.COMPLETE_PACKING,
+            FlowStatusEnum.WAREHOUSED.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_IN,
+            FlowStatusEnum.WAREHOUSE_OUT.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_OUT
+    );
+
     /** 查询流转卡详情，包含产品列表、当前工序中文名和设计文件信息 */
     @Override
     public ProductionRecordVO getRecordDetail(Long id) {
@@ -466,25 +490,67 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
     }
 
+    @Override
+    public void reconcileOrderProductionStatus(Long orderId) {
+        if (orderId == null) {
+            return;
+        }
+        OrderMainEntity order = orderMainMapper.selectById(orderId);
+        if (order == null || order.getStatus() == null) {
+            return;
+        }
+
+        List<ProductionRecordEntity> records = list(new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getOrderId, orderId));
+        Integer targetStatus = records.stream()
+                .map(ProductionRecordEntity::getStatus)
+                .filter(this::isActiveNormalProductionStatus)
+                .min(Comparator.comparingInt(NORMAL_PRODUCTION_STATUSES::indexOf))
+                .orElse(null);
+        if (targetStatus == null) {
+            log.info("订单无有效生产流转卡，跳过状态补偿: orderId={}", orderId);
+            return;
+        }
+
+        int currentIndex = NORMAL_PRODUCTION_STATUSES.indexOf(order.getStatus());
+        int targetIndex = NORMAL_PRODUCTION_STATUSES.indexOf(targetStatus);
+        if (currentIndex < 0 || targetIndex < 0 || currentIndex >= targetIndex) {
+            return;
+        }
+
+        for (int i = currentIndex + 1; i <= targetIndex; i++) {
+            Integer nextStatus = NORMAL_PRODUCTION_STATUSES.get(i);
+            FlowActionEnum action = ACTION_TO_REACH_STATUS.get(nextStatus);
+            if (action == null) {
+                log.warn("订单状态补偿缺少Flow动作，停止补偿: orderId={}, currentStatus={}, targetStatus={}, nextStatus={}",
+                        orderId, order.getStatus(), targetStatus, nextStatus);
+                return;
+            }
+            triggerFlowAndSync(orderId, action);
+            log.info("订单状态补偿触发Flow: orderId={}, action={}, nextStatus={}, aggregateTargetStatus={}",
+                    orderId, action, nextStatus, targetStatus);
+        }
+    }
+
     /** 返回已达到或超过指定状态的所有状态码（状态机单向推进） */
     private List<Integer> getReachedOrBeyondStatuses(Integer requiredStatus) {
-        List<Integer> ordered = List.of(
-                FlowStatusEnum.PENDING_PRINT.getValue(),
-                FlowStatusEnum.PRINTING.getValue(),
-                FlowStatusEnum.PRINT_COMPLETED.getValue(),
-                FlowStatusEnum.POST_PROCESSING.getValue(),
-                FlowStatusEnum.QC_IN_PROGRESS.getValue(),
-                FlowStatusEnum.PACKING.getValue(),
-                FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(),
-                FlowStatusEnum.WAREHOUSED.getValue(),
-                FlowStatusEnum.WAREHOUSE_OUT.getValue(),
-                FlowStatusEnum.COMPLETED.getValue()
-        );
-        int idx = ordered.indexOf(requiredStatus);
+        int idx = NORMAL_PRODUCTION_STATUSES.indexOf(requiredStatus);
         if (idx < 0) {
             return List.of(requiredStatus);
         }
-        return ordered.subList(idx, ordered.size());
+        return NORMAL_PRODUCTION_STATUSES.subList(idx, NORMAL_PRODUCTION_STATUSES.size());
+    }
+
+    private boolean isActiveNormalProductionStatus(Integer status) {
+        if (status == null) {
+            return false;
+        }
+        if (FlowStatusEnum.PRINT_FAILED.getValue().equals(status)
+                || FlowStatusEnum.REWORK.getValue().equals(status)
+                || FlowStatusEnum.CANCELLED.getValue().equals(status)) {
+            return false;
+        }
+        return NORMAL_PRODUCTION_STATUSES.contains(status);
     }
 
     @Override
