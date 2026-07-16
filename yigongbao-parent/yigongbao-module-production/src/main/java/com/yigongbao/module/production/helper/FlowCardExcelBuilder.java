@@ -145,9 +145,11 @@ public class FlowCardExcelBuilder {
             Row row = sheet.getRow(rowIndex);
             if (row == null) {
                 row = sheet.createRow(rowIndex);
-                if (templateRow != null && i > 0) {
-                    copyRowStyle(templateRow, row);
-                }
+            }
+
+            // 对于第二行及以后，无论行是否已存在，都复制模板行样式以确保样式一致
+            if (templateRow != null && i > 0) {
+                copyRowStyle(templateRow, row);
             }
 
             setCellValue(sheet, rowIndex, 0, product.getProductNo());
