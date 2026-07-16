@@ -13,6 +13,8 @@ import com.yigongbao.module.design.mapper.DesignProductFileMapper;
 import com.yigongbao.module.design.mapper.DesignProductMapper;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignProductFileEntity;
+import com.yigongbao.module.basic.product.mapper.ProductMapper;
+import com.yigongbao.module.basic.product.entity.ProductEntity;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.constants.ProductionConstants;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
@@ -56,6 +58,7 @@ public class DesignCompletedListener {
     private final DesignPackageMapper designPackageMapper;
     private final DesignProductMapper designProductMapper;
     private final DesignProductFileMapper designProductFileMapper;
+    private final ProductMapper basicProductMapper;
     private final ProductionRecordMapper recordMapper;
     private final ProductionProductMapper productMapper;
     private final ProductionProcessMapper processMapper;
@@ -181,6 +184,17 @@ public class DesignCompletedListener {
         // 获取产品名称
         String productName = designProducts.get(0).getProductName();
 
+        // 查询产品主数据获取类别信息
+        ProductEntity productMaster = basicProductMapper.selectById(productId);
+        String productCategory = null;
+        String productCategoryName = null;
+        if (productMaster != null) {
+            productCategory = productMaster.getCategory();
+            productCategoryName = productMaster.getCategoryName();
+        } else {
+            log.warn("产品主数据不存在，产品类别信息将为空: productId={}, productName={}", productId, productName);
+        }
+
         // 构建流转卡实体
         ProductionRecordEntity record = new ProductionRecordEntity();
         record.setRecordNo(recordNo);
@@ -205,6 +219,8 @@ public class DesignCompletedListener {
         // 设置产品信息
         record.setProductId(productId);
         record.setProductName(productName);
+        record.setProductCategory(productCategory);
+        record.setProductCategoryName(productCategoryName);
 
         // 设置初始状态为设计完成
         record.setStatus(FlowStatusEnum.DESIGN_COMPLETED.getValue());

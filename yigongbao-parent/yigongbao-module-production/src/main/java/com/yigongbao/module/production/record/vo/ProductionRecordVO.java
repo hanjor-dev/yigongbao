@@ -31,6 +31,14 @@ public class ProductionRecordVO {
      * 产品名称（冗余）
      */
     private String productName;
+    /**
+     * 产品大类代码（如17.1）
+     */
+    private String productCategory;
+    /**
+     * 产品大类名称（如"模型"、"导板"）
+     */
+    private String productCategoryName;
     private String productionBatchNo;
     private String material;
     private String materialBatchNo;

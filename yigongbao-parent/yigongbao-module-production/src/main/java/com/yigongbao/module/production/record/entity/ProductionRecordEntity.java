@@ -33,6 +33,10 @@ public class ProductionRecordEntity extends BaseEntity {
     private Long productId;
     /** 产品名称（冗余） */
     private String productName;
+    /** 产品大类代码（如17.1，冗余自product.category） */
+    private String productCategory;
+    /** 产品大类名称（如"模型"、"导板"，冗余自product.category_name） */
+    private String productCategoryName;
     /** 生产批号 */
     private String productionBatchNo;
     /** 版本号 */

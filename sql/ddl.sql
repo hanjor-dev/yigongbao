@@ -1720,6 +1720,9 @@ CREATE TABLE device_daily_usage_counter (
 
     create_time     DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by       BIGINT COMMENT '创建人ID',
+    update_by       BIGINT COMMENT '更新人ID',
+    is_deleted      TINYINT DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
 
     UNIQUE KEY uk_device_date (device_id, usage_date),
     KEY idx_usage_date (usage_date)
@@ -1737,6 +1740,8 @@ CREATE TABLE production_record (
     design_package_code VARCHAR(50) NOT NULL COMMENT '设计数据包编号',
     product_id BIGINT COMMENT '产品ID',
     product_name VARCHAR(100) COMMENT '产品名称（冗余）',
+    product_category VARCHAR(50) COMMENT '产品大类代码（如17.1，冗余自product.category）',
+    product_category_name VARCHAR(100) COMMENT '产品大类名称（如"模型"、"导板"，冗余自product.category_name）',
     production_batch_no VARCHAR(50) NOT NULL COMMENT '生产批号',
     version_no VARCHAR(20) COMMENT '版本号',
     material VARCHAR(100) COMMENT '材质',
@@ -1792,7 +1797,6 @@ CREATE TABLE production_record (
     KEY idx_processing_center_id (processing_center_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产流转卡表';
 CREATE UNIQUE INDEX uk_record_no ON production_record ((CASE WHEN is_deleted = 0 THEN record_no ELSE NULL END));
-CREATE UNIQUE INDEX uk_production_batch_no ON production_record ((CASE WHEN is_deleted = 0 THEN production_batch_no ELSE NULL END));
 
 
 -- 生产产品记录表
@@ -1801,7 +1805,7 @@ CREATE TABLE production_product (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
     production_record_id BIGINT NOT NULL COMMENT '流转卡ID',
     print_file_id BIGINT NOT NULL COMMENT '打印文件ID',
-    product_no VARCHAR(50) NOT NULL COMMENT '产品编号',
+    product_no VARCHAR(50) COMMENT '产品编号（分配设备时生成）',
     product_name VARCHAR(200) COMMENT '产品名称',
     spec_name VARCHAR(200) COMMENT '型号规格名称',
     cert_no VARCHAR(200) COMMENT '注册证号',
