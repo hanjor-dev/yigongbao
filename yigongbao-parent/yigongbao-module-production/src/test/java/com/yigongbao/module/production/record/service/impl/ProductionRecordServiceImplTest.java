@@ -41,6 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -267,6 +268,31 @@ class ProductionRecordServiceImplTest {
     // ---- reconcileOrderProductionStatus ----
 
     @Test
+    void reconcileOrderProductionStatus_orderStillDesignCompleted_replaysDownloadAndPrintActions() {
+        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        order.setStatus(FlowStatusEnum.DESIGN_COMPLETED.getValue());
+        when(orderMainMapper.selectById(10L)).thenReturn(order);
+        when(recordMapper.selectList(any())).thenReturn(List.of(
+                record(1L, 10L, FlowStatusEnum.QC_IN_PROGRESS.getValue()),
+                record(2L, 10L, FlowStatusEnum.QC_IN_PROGRESS.getValue()),
+                record(3L, 10L, FlowStatusEnum.QC_IN_PROGRESS.getValue()),
+                record(4L, 10L, FlowStatusEnum.PRINT_COMPLETED.getValue())
+        ));
+        when(flowFacade.executeFlow(eq(10L), any(FlowActionEnum.class), any(FlowOperator.class)))
+                .thenAnswer(invocation -> resultForAction(invocation.getArgument(1)));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+            recordService.reconcileOrderProductionStatus(10L);
+        }
+
+        InOrder inOrder = inOrder(flowFacade);
+        inOrder.verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.DOWNLOAD_DATA_PACKAGE), any(FlowOperator.class));
+        inOrder.verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.START_PRINT), any(FlowOperator.class));
+        inOrder.verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.COMPLETE_PRINT), any(FlowOperator.class));
+    }
+
+    @Test
     void reconcileOrderProductionStatus_orderBehindPrintCompleted_replaysStartAndCompletePrint() {
         OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
         order.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
@@ -287,6 +313,29 @@ class ProductionRecordServiceImplTest {
 
         verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.START_PRINT), any(FlowOperator.class));
         verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.COMPLETE_PRINT), any(FlowOperator.class));
+    }
+
+    @Test
+    void reconcileOrderProductionStatus_stopsWhenIntermediateFlowTransitionFails() {
+        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        order.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
+        when(orderMainMapper.selectById(10L)).thenReturn(order);
+        when(recordMapper.selectList(any())).thenReturn(List.of(
+                record(1L, 10L, FlowStatusEnum.QC_IN_PROGRESS.getValue()),
+                record(2L, 10L, FlowStatusEnum.QC_IN_PROGRESS.getValue()),
+                record(3L, 10L, FlowStatusEnum.QC_IN_PROGRESS.getValue()),
+                record(4L, 10L, FlowStatusEnum.PRINT_COMPLETED.getValue())
+        ));
+        when(flowFacade.executeFlow(eq(10L), eq(FlowActionEnum.START_PRINT), any(FlowOperator.class)))
+                .thenThrow(new BusinessException(ErrorCodeEnum.ORDER_STATUS_TRANSITION_ERROR));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+            recordService.reconcileOrderProductionStatus(10L);
+        }
+
+        verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.START_PRINT), any(FlowOperator.class));
+        verify(flowFacade, never()).executeFlow(eq(10L), eq(FlowActionEnum.COMPLETE_PRINT), any(FlowOperator.class));
     }
 
     @Test
@@ -564,10 +613,12 @@ class ProductionRecordServiceImplTest {
 
     private TransitionResult resultForAction(FlowActionEnum action) {
         Map<FlowActionEnum, Integer> finalStatuses = Map.of(
+                FlowActionEnum.DOWNLOAD_DATA_PACKAGE, FlowStatusEnum.PENDING_PRINT.getValue(),
                 FlowActionEnum.START_PRINT, FlowStatusEnum.PRINTING.getValue(),
                 FlowActionEnum.COMPLETE_PRINT, FlowStatusEnum.PRINT_COMPLETED.getValue(),
                 FlowActionEnum.START_POST_PROCESSING, FlowStatusEnum.POST_PROCESSING.getValue(),
                 FlowActionEnum.COMPLETE_POST_PROCESSING, FlowStatusEnum.QC_IN_PROGRESS.getValue(),
+                FlowActionEnum.QC_PASS, FlowStatusEnum.PACKING.getValue(),
                 FlowActionEnum.COMPLETE_PACKING, FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(),
                 FlowActionEnum.COMPLETE_WAREHOUSE_IN, FlowStatusEnum.WAREHOUSED.getValue(),
                 FlowActionEnum.COMPLETE_WAREHOUSE_OUT, FlowStatusEnum.WAREHOUSE_OUT.getValue()

@@ -107,6 +107,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final IProductNumberService productNumberService;
 
     private static final List<Integer> NORMAL_PRODUCTION_STATUSES = List.of(
+            FlowStatusEnum.DESIGN_COMPLETED.getValue(),
             FlowStatusEnum.PENDING_PRINT.getValue(),
             FlowStatusEnum.PRINTING.getValue(),
             FlowStatusEnum.PRINT_COMPLETED.getValue(),
@@ -120,6 +121,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     );
 
     private static final Map<Integer, FlowActionEnum> ACTION_TO_REACH_STATUS = Map.of(
+            FlowStatusEnum.PENDING_PRINT.getValue(), FlowActionEnum.DOWNLOAD_DATA_PACKAGE,
             FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT,
             FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT,
             FlowStatusEnum.POST_PROCESSING.getValue(), FlowActionEnum.START_POST_PROCESSING,
@@ -526,8 +528,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                         orderId, order.getStatus(), targetStatus, nextStatus);
                 return;
             }
-            triggerFlowAndSync(orderId, action);
-            log.info("订单状态补偿触发Flow: orderId={}, action={}, nextStatus={}, aggregateTargetStatus={}",
+            if (!triggerFlowAndSyncSafely(orderId, action)) {
+                log.info("订单状态补偿中止: orderId={}, action={}, nextStatus={}, aggregateTargetStatus={}",
+                        orderId, action, nextStatus, targetStatus);
+                return;
+            }
+            log.info("订单状态补偿触发Flow成功: orderId={}, action={}, nextStatus={}, aggregateTargetStatus={}",
                     orderId, action, nextStatus, targetStatus);
         }
     }
@@ -780,6 +786,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     @Override
     @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public void triggerFlowAndSync(Long orderId, FlowActionEnum action) {
+        triggerFlowAndSyncSafely(orderId, action);
+    }
+
+    private boolean triggerFlowAndSyncSafely(Long orderId, FlowActionEnum action) {
         FlowOperator operator;
         try {
             Long operatorId = StpUtil.getLoginIdAsLong();
@@ -793,7 +803,11 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             result = flowFacade.executeFlow(orderId, action, operator);
         } catch (com.yigongbao.common.exception.BusinessException e) {
             log.info("Flow状态流转被拒绝（可能已被并发触发）: orderId={}, action={}, reason={}", orderId, action, e.getMessage());
-            return;
+            return false;
+        }
+        if (result == null) {
+            log.warn("Flow状态流转返回空结果，跳过订单状态回写: orderId={}, action={}", orderId, action);
+            return false;
         }
         OrderMainEntity order = new OrderMainEntity();
         order.setId(orderId);
@@ -807,6 +821,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         orderMainMapper.updateById(order);
         log.info("Flow状态流转完成: orderId={}, action={}, targetPhase={}, targetStatus={}",
                 orderId, action, result.getTargetPhase(), result.getFinalStatus());
+        return true;
     }
 
     @Override
