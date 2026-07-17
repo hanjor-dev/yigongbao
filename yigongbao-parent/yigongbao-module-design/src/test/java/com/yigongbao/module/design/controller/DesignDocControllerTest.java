@@ -1,6 +1,7 @@
 package com.yigongbao.module.design.controller;
 
 import com.yigongbao.module.design.service.DesignDocService;
+import com.yigongbao.module.design.service.DesignQrImageService;
 import com.yigongbao.module.design.service.DesignScreenshotService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +26,26 @@ class DesignDocControllerTest {
     @SpringBootApplication static class TestApplication {}
     @Autowired private MockMvc mockMvc;
     @MockBean private DesignDocService docService;
+    @MockBean private DesignQrImageService qrImageService;
     @MockBean private DesignScreenshotService screenshotService;
+
+    @Test
+    void qrImageQuery_delegatesOrderId() throws Exception {
+        mockMvc.perform(get("/design/workorder/{orderId}/qr-image", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+        verify(qrImageService).getCurrent(1L);
+    }
+
+    @Test
+    void qrImageUpload_delegatesMultipart() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "qr.png", "image/png", new byte[]{1});
+
+        mockMvc.perform(multipart("/design/workorder/{orderId}/qr-image", 1L).file(file))
+                .andExpect(status().isOk());
+
+        verify(qrImageService).upload(eq(1L), any());
+    }
 
     @Test
     void previewUrl_delegatesOrderAndPackageIds() throws Exception {

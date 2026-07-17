@@ -148,6 +148,73 @@ class DrawingExcelBuilderTest {
     }
 
     @Test
+    void build_withNonSquareQr_shouldPreserveAspectRatioInsideQrRange() throws Exception {
+        DrawingExcelBuilder builder = new DrawingExcelBuilder();
+        DrawingExcelBuilder.BuildContext ctx = new DrawingExcelBuilder.BuildContext();
+        ctx.setOrderCode("ORD-001");
+        ctx.setPackageCode("PKG-001");
+        ctx.setRows(buildRows(1));
+        ctx.setQrBytes(createPng(300, 900));
+
+        byte[] result = builder.build(ctx);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(result))) {
+            XSSFSheet sheet = wb.getSheetAt(0);
+            XSSFPicture picture = sheet.getDrawingPatriarch().getShapes().stream()
+                    .filter(XSSFPicture.class::isInstance)
+                    .map(XSSFPicture.class::cast)
+                    .findFirst()
+                    .orElseThrow();
+            XSSFClientAnchor anchor = picture.getPreferredSize();
+
+            double left = xPositionInEmu(sheet, anchor.getCol1(), anchor.getDx1());
+            double right = xPositionInEmu(sheet, anchor.getCol2(), anchor.getDx2());
+            double top = yPositionInEmu(sheet, anchor.getRow1(), anchor.getDy1());
+            double bottom = yPositionInEmu(sheet, anchor.getRow2(), anchor.getDy2());
+
+            assertEquals(300d / 900d, (right - left) / (bottom - top), 0.03d);
+            assertTrue(left >= xPositionInEmu(sheet, 12, 0));
+            assertTrue(right <= xPositionInEmu(sheet, 16, 0));
+            assertTrue(top >= yPositionInEmu(sheet, 0, 0));
+            assertTrue(bottom <= yPositionInEmu(sheet, 10, 0));
+        }
+    }
+
+    @Test
+    void build_withUnreadableQr_shouldStillInsertPictureUsingFallbackRange() throws Exception {
+        DrawingExcelBuilder builder = new DrawingExcelBuilder();
+        DrawingExcelBuilder.BuildContext ctx = new DrawingExcelBuilder.BuildContext();
+        ctx.setOrderCode("ORD-001");
+        ctx.setPackageCode("PKG-001");
+        ctx.setRows(buildRows(1));
+        ctx.setQrBytes(new byte[]{0x01, 0x02, 0x03, 0x04});
+
+        byte[] result = builder.build(ctx);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(result))) {
+            assertTrue(wb.getSheetAt(0).getDrawingPatriarch().getShapes().stream()
+                    .anyMatch(XSSFPicture.class::isInstance));
+        }
+    }
+
+    @Test
+    void build_withEmptyQr_shouldInsertMinimalFallbackPicture() throws Exception {
+        DrawingExcelBuilder builder = new DrawingExcelBuilder();
+        DrawingExcelBuilder.BuildContext ctx = new DrawingExcelBuilder.BuildContext();
+        ctx.setOrderCode("ORD-001");
+        ctx.setPackageCode("PKG-001");
+        ctx.setRows(buildRows(1));
+        ctx.setQrBytes(new byte[0]);
+
+        byte[] result = builder.build(ctx);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(result))) {
+            assertTrue(wb.getSheetAt(0).getDrawingPatriarch().getShapes().stream()
+                    .anyMatch(XSSFPicture.class::isInstance));
+        }
+    }
+
+    @Test
     void build_withUnreadableScreenshot_shouldStillInsertPicture() throws Exception {
         DrawingExcelBuilder builder = new DrawingExcelBuilder();
 
