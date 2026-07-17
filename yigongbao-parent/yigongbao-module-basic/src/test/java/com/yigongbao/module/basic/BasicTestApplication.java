@@ -1,5 +1,6 @@
 package com.yigongbao.module.basic;
 
+import org.dromara.x.file.storage.spring.EnableFileStorage;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -15,6 +16,7 @@ import org.springframework.context.annotation.FilterType;
  */
 @SpringBootApplication(scanBasePackages = "com.yigongbao")
 @MapperScan("com.yigongbao.module.basic.**.mapper")
+@EnableFileStorage
 public class BasicTestApplication {
 
     public static void main(String[] args) {

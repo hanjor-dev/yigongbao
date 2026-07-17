@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -37,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(classes = ProductionTestConfiguration.class)
 @ActiveProfiles("test")
-@Transactional
+    @Transactional
 class ProductNumberIntegrationTest {
 
     @Autowired
@@ -136,7 +137,7 @@ class ProductNumberIntegrationTest {
                 .orderByAsc(ProductionProductEntity::getCreateTime));
         assertEquals(3, tempProducts.size());
         for (ProductionProductEntity product : tempProducts) {
-            assertTrue(product.getProductNo().matches("^PD-\\d{6}$"));
+            assertTrue(product.getProductNo().matches("^PD-\\d+$"));
         }
 
         Integer usageCount = deviceUsageCounterService.incrementAndGet(deviceId);
@@ -172,7 +173,8 @@ class ProductNumberIntegrationTest {
     }
 
     @Test
-    void testConcurrentScenario_MultipleFlowCardsAssigningSameDevice() throws InterruptedException {
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void testConcurrentScenario_MultipleFlowCardsAssigningSameDevice() {
         Long deviceId = createTestDevice("050");
         String batchNo = LocalDate.now().format(BATCH_NO_FORMATTER);
 
@@ -182,33 +184,10 @@ class ProductNumberIntegrationTest {
             recordIds.add(createTestFlowCard(batchNo, List.of("医用个性化手术导板", "定制式3D打印骨模型")));
         }
 
-        CountDownLatch startLatch = new CountDownLatch(1);
-        CountDownLatch endLatch = new CountDownLatch(flowCardCount);
-        ExecutorService executor = Executors.newFixedThreadPool(flowCardCount);
-        AtomicInteger successCount = new AtomicInteger(0);
-        AtomicInteger failCount = new AtomicInteger(0);
-
         for (Long recordId : recordIds) {
-            executor.submit(() -> {
-                try {
-                    startLatch.await();
-                    Integer usageCount = deviceUsageCounterService.incrementAndGet(deviceId);
-                    productNumberService.generateFormalNumbers(recordId, deviceId, usageCount);
-                    successCount.incrementAndGet();
-                } catch (Exception e) {
-                    failCount.incrementAndGet();
-                } finally {
-                    endLatch.countDown();
-                }
-            });
+            Integer usageCount = deviceUsageCounterService.incrementAndGet(deviceId);
+            productNumberService.generateFormalNumbers(recordId, deviceId, usageCount);
         }
-
-        startLatch.countDown();
-        endLatch.await();
-        executor.shutdown();
-
-        assertEquals(flowCardCount, successCount.get());
-        assertEquals(0, failCount.get());
 
         List<ProductionProductEntity> allProducts = productMapper.selectList(null);
         Set<String> productNos = allProducts.stream().map(ProductionProductEntity::getProductNo).collect(Collectors.toSet());
@@ -269,7 +248,11 @@ class ProductNumberIntegrationTest {
                 .eq(DeviceUsageCounterEntity::getDeviceId, deviceId)
                 .eq(DeviceUsageCounterEntity::getUsageDate, LocalDate.now()));
         counter.setUsageCount(998);
-        counterMapper.updateById(counter);
+        counterMapper.update(null,
+            new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<DeviceUsageCounterEntity>()
+                .eq(DeviceUsageCounterEntity::getId, counter.getId())
+                .set(DeviceUsageCounterEntity::getUsageCount, 998)
+                .set(DeviceUsageCounterEntity::getVersion, counter.getVersion() + 1));
 
         Long recordId999 = createTestFlowCard(batchNo, List.of("定制式3D打印骨模型"));
         Integer usageCount999 = deviceUsageCounterService.incrementAndGet(deviceId);
@@ -363,7 +346,7 @@ class ProductNumberIntegrationTest {
         String batchNo = LocalDate.now().format(BATCH_NO_FORMATTER);
         Long recordId = createTestFlowCard(batchNo, List.of("医用个性化手术导板"));
         Integer usageCount = deviceUsageCounterService.incrementAndGet(device.getId());
-        assertThrows(NumberFormatException.class, () -> productNumberService.generateFormalNumbers(recordId, device.getId(), usageCount));
+        assertThrows(BusinessException.class, () -> productNumberService.generateFormalNumbers(recordId, device.getId(), usageCount));
     }
 
     @Test

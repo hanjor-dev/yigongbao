@@ -860,6 +860,14 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR);
         }
 
+        // 完成设计只能由当前分配的设计师提交，和开始设计保持一致。
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (!currentUserId.equals(order.getDesignerId())) {
+            log.warn("非分配设计师，无权完成设计: orderId={}, designerId={}, currentUserId={}",
+                    orderId, order.getDesignerId(), currentUserId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_DESIGNER_MISMATCH);
+        }
+
         // 根据是否需要实体交付执行不同校验
         log.info("开始完成设计校验: orderId={}, orderType={}, needsPhysicalDelivery={}, currentStatus={}",
             orderId, order.getOrderType(), order.getNeedsPhysicalDelivery(), order.getStatus());
@@ -871,7 +879,6 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         }
 
         // 获取当前操作用户ID
-        Long currentUserId = StpUtil.getLoginIdAsLong();
         UserEntity currentUser = userService.getById(currentUserId);
         String currentUserName = currentUser != null ? currentUser.getRealName() : null;
 

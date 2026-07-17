@@ -25,6 +25,7 @@ import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignProductFileEntity;
 import com.yigongbao.module.design.mapper.DesignDrawingMapper;
 import com.yigongbao.module.design.mapper.DesignInstructionMapper;
+import com.yigongbao.module.design.helper.DesignQueryHelper;
 import com.yigongbao.module.design.service.DesignPackageFileService;
 import com.yigongbao.module.design.service.DesignPackageService;
 import com.yigongbao.module.design.service.DesignProductFileService;
@@ -80,6 +81,7 @@ class DesignPrintInfoServiceImplTest {
     @Mock private DictService dictService;
     @Mock private DesignInstructionMapper instructionMapper;
     @Mock private DesignDrawingMapper drawingMapper;
+    @Mock private DesignQueryHelper designQueryHelper;
 
     @InjectMocks
     private DesignPrintInfoServiceImpl printInfoService;
@@ -115,6 +117,21 @@ class DesignPrintInfoServiceImplTest {
         designInProgressOrder.setId(ORDER_ID);
         designInProgressOrder.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
         designInProgressOrder.setDesignerId(DESIGNER_ID);
+        doAnswer(invocation -> {
+            OrderMainEntity current = orderMainService.getById(invocation.getArgument(0));
+            if (current == null) throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+            if (!FlowStatusEnum.DESIGN_IN_PROGRESS.getValue().equals(current.getStatus())) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+            }
+            return current;
+        }).when(designQueryHelper).checkDesignPhase(anyLong());
+        doAnswer(invocation -> {
+            OrderMainEntity current = invocation.getArgument(0);
+            if (!DESIGNER_ID.equals(StpUtil.getLoginIdAsLong())) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_OPERATOR_NOT_ALLOWED);
+            }
+            return null;
+        }).when(designQueryHelper).checkIsAssignedDesigner(any());
 
         // 数据包
         testPackage = new DesignPackageEntity();
@@ -227,6 +244,7 @@ class DesignPrintInfoServiceImplTest {
         @Test
         @DisplayName("查询打印信息列表成功，附带关联文件")
         void listPrintInfo_shouldReturnWithFiles() {
+            when(orderMainService.getById(ORDER_ID)).thenReturn(designInProgressOrder);
             when(packageService.getById(PACKAGE_ID)).thenReturn(testPackage);
 
             DesignProductEntity entity = new DesignProductEntity();
@@ -401,7 +419,7 @@ class DesignPrintInfoServiceImplTest {
 
                 BusinessException ex = assertThrows(BusinessException.class,
                         () -> printInfoService.savePrintInfo(ORDER_ID, PACKAGE_ID, dto));
-                assertEquals(741, ex.getCode());
+                assertEquals(ErrorCodeEnum.DESIGN_OPERATOR_NOT_ALLOWED.getCode(), ex.getCode());
             }
         }
     }

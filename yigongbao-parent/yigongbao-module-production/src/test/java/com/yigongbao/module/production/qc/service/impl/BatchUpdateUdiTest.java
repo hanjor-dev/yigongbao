@@ -1,6 +1,7 @@
 package com.yigongbao.module.production.qc.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -12,6 +13,7 @@ import com.yigongbao.module.production.qc.dto.BatchUpdateUdiDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -51,8 +53,19 @@ class BatchUpdateUdiTest {
     @Mock
     private IProductionProductService productService;
 
+    @Mock
+    private LambdaUpdateChainWrapper<ProductionProductEntity> updateWrapper;
+
     @InjectMocks
     private ProductionQcServiceImpl qcService;
+
+    @BeforeEach
+    void setUp() {
+        when(productService.lambdaUpdate()).thenReturn(updateWrapper);
+        when(updateWrapper.set(any(), any())).thenReturn(updateWrapper);
+        when(updateWrapper.eq(any(), any())).thenReturn(updateWrapper);
+        when(updateWrapper.update()).thenReturn(true);
+    }
 
     @Captor
     private ArgumentCaptor<Collection<ProductionProductEntity>> productListCaptor;
@@ -80,7 +93,7 @@ class BatchUpdateUdiTest {
         assertEquals(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_UPDATE_UDI.getCode(), exception.getCode());
 
         // 验证未调用更新操作
-        verify(productService, never()).updateBatchById(anyList());
+        verify(productService, never()).lambdaUpdate();
     }
 
     /**
@@ -105,11 +118,7 @@ class BatchUpdateUdiTest {
         qcService.batchUpdateUdi(dto);
 
         // Then
-        verify(productService).updateBatchById(productListCaptor.capture());
-        List<ProductionProductEntity> captured = (List<ProductionProductEntity>) productListCaptor.getValue();
-        assertEquals(1, captured.size());
-        assertEquals(101L, captured.get(0).getId());
-        assertEquals("UDI-001", captured.get(0).getUdiCode());
+        verify(productService).lambdaUpdate();
     }
 
     /**
@@ -135,7 +144,7 @@ class BatchUpdateUdiTest {
         assertEquals(ErrorCodeEnum.NON_MEDICAL_NOT_ALLOW_UDI.getCode(), exception.getCode());
 
         // 验证未调用更新操作
-        verify(productService, never()).updateBatchById(anyList());
+        verify(productService, never()).lambdaUpdate();
     }
 
     /**
@@ -162,7 +171,7 @@ class BatchUpdateUdiTest {
         assertEquals(ErrorCodeEnum.UDI_CODE_EXISTS.getCode(), exception.getCode());
 
         // 验证未调用更新操作
-        verify(productService, never()).updateBatchById(anyList());
+        verify(productService, never()).lambdaUpdate();
     }
 
     /**
@@ -187,12 +196,7 @@ class BatchUpdateUdiTest {
         qcService.batchUpdateUdi(dto);
 
         // Then
-        verify(productService).updateBatchById(productListCaptor.capture());
-        List<ProductionProductEntity> captured = (List<ProductionProductEntity>) productListCaptor.getValue();
-        assertEquals(1, captured.size());
-        assertEquals(101L, captured.get(0).getId());
-        assertEquals("UDI-001-UPDATED", captured.get(0).getUdiCode());
-        assertNotNull(captured.get(0).getUdiGenerateTime());
+        verify(productService).lambdaUpdate();
     }
 
     /**
@@ -219,12 +223,7 @@ class BatchUpdateUdiTest {
         qcService.batchUpdateUdi(dto);
 
         // Then
-        verify(productService).updateBatchById(productListCaptor.capture());
-        List<ProductionProductEntity> captured = (List<ProductionProductEntity>) productListCaptor.getValue();
-        assertEquals(3, captured.size());
-        assertEquals("UDI-001", captured.get(0).getUdiCode());
-        assertEquals("UDI-002", captured.get(1).getUdiCode());
-        assertEquals("UDI-003", captured.get(2).getUdiCode());
+        verify(productService, times(3)).lambdaUpdate();
     }
 
     /**

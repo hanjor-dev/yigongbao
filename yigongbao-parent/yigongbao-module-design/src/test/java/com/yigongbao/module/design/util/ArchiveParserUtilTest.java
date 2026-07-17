@@ -1,17 +1,24 @@
 package com.yigongbao.module.design.util;
 
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.module.design.dto.ArchiveFileInfo;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry;
+import org.apache.commons.compress.archivers.sevenz.SevenZOutputFile;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.nio.file.Files;
+import java.io.OutputStream;
 import java.util.List;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -184,7 +191,7 @@ class ArchiveParserUtilTest {
             BusinessException exception = assertThrows(BusinessException.class,
                     () -> ArchiveParserUtil.parse(inputStream, "test.gz", null));
 
-            assertEquals(737, exception.getCode()); // DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED
+            assertEquals(ErrorCodeEnum.DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED.getCode(), exception.getCode());
         }
 
         @Test
@@ -195,7 +202,7 @@ class ArchiveParserUtilTest {
             BusinessException exception = assertThrows(BusinessException.class,
                     () -> ArchiveParserUtil.parse(inputStream, "filename", null));
 
-            assertEquals(737, exception.getCode());
+            assertEquals(ErrorCodeEnum.DESIGN_ARCHIVE_FORMAT_NOT_SUPPORTED.getCode(), exception.getCode());
         }
 
         @Test
@@ -241,17 +248,13 @@ class ArchiveParserUtilTest {
         }
     }
 
-    // ==================== 真实文件测试（需要本地测试数据，CI 跳过） ====================
+    // ==================== 归档 fixture 测试 ====================
 
     /**
-     * 真实文件解析测试
-     * 依赖 E:\99_Temp\医工宝测试数据\ 目录下的测试文件，本地开发时运行，CI 自动跳过。
-     * 运行方式：mvn test -Dtest=ArchiveParserUtilTest -Dlocal.test.data=true -pl yigongbao-module-design
-     * 或在 IDE 中直接运行此 Nested 类（需在 JVM 参数中加 -Dlocal.test.data=true）。
+     * 优先使用本机提供的真实样例；样例缺失时生成等价的临时归档，确保测试不会因开发机路径而跳过。
      */
     @Nested
     @DisplayName("真实文件解析测试（本地）")
-    @EnabledIfSystemProperty(named = "local.test.data", matches = "true")
     class RealFileTest {
 
         private static final String TEST_DIR = "E:/99_Temp/医工宝测试数据/";
@@ -260,52 +263,52 @@ class ArchiveParserUtilTest {
         @Test
         @DisplayName("解析真实 ZIP 文件")
         void parseRealZip() throws Exception {
-            Path file = Path.of(TEST_DIR, "测试设计数据包3.zip");
+            Path file = fixture("测试设计数据包3.zip");
             System.out.println("=== 解析 ZIP: " + file);
-            try (InputStream is = new FileInputStream(file.toFile())) {
+            try (InputStream is = Files.newInputStream(file)) {
                 List<ArchiveFileInfo> result = ArchiveParserUtil.parse(is, file.getFileName().toString(), ALLOWED_EXTS);
                 printResult(result);
                 assertNotNull(result);
                 System.out.println("ZIP 解析成功，有效文件数=" + result.size());
-            }
+            } finally { cleanupFixture(file); }
         }
 
         @Test
         @DisplayName("解析真实 7Z 文件")
         void parseReal7z() throws Exception {
-            Path file = Path.of(TEST_DIR, "测试设计数据包1.7z");
+            Path file = fixture("测试设计数据包1.7z");
             System.out.println("=== 解析 7Z: " + file);
-            try (InputStream is = new FileInputStream(file.toFile())) {
+            try (InputStream is = Files.newInputStream(file)) {
                 List<ArchiveFileInfo> result = ArchiveParserUtil.parse(is, file.getFileName().toString(), ALLOWED_EXTS);
                 printResult(result);
                 assertNotNull(result);
                 System.out.println("7Z 解析成功，有效文件数=" + result.size());
-            }
+            } finally { cleanupFixture(file); }
         }
 
         @Test
         @DisplayName("TAR 格式正常解析（已支持）")
         void parseTarShouldSucceed() throws Exception {
-            Path file = Path.of(TEST_DIR, "测试设计数据包2.tar");
+            Path file = fixture("测试设计数据包2.tar");
             System.out.println("=== 解析 TAR: " + file);
-            try (InputStream is = new FileInputStream(file.toFile())) {
+            try (InputStream is = Files.newInputStream(file)) {
                 List<ArchiveFileInfo> result = ArchiveParserUtil.parse(is, file.getFileName().toString(), ALLOWED_EXTS);
                 printResult(result);
                 assertNotNull(result);
                 System.out.println("TAR 解析成功，有效文件数=" + result.size());
-            }
+            } finally { cleanupFixture(file); }
         }
 
         @Test
         @DisplayName("不过滤扩展名时返回压缩包内所有文件")
         void parseZipNoFilter() throws Exception {
-            Path file = Path.of(TEST_DIR, "测试设计数据包3.zip");
+            Path file = fixture("测试设计数据包3.zip");
             System.out.println("=== ZIP 无过滤解析: " + file);
-            try (InputStream is = new FileInputStream(file.toFile())) {
+            try (InputStream is = Files.newInputStream(file)) {
                 List<ArchiveFileInfo> result = ArchiveParserUtil.parse(is, file.getFileName().toString(), null);
                 printResult(result);
                 System.out.println("ZIP 无过滤解析成功，文件总数=" + result.size());
-            }
+            } finally { cleanupFixture(file); }
         }
 
         private void printResult(List<ArchiveFileInfo> result) {
@@ -316,6 +319,48 @@ class ArchiveParserUtilTest {
             for (ArchiveFileInfo f : result) {
                 System.out.printf("  %-40s  ext=%-8s  size=%d bytes%n",
                         f.getFilePath(), f.getExtension(), f.getFileSize());
+            }
+        }
+
+        private Path fixture(String fileName) throws Exception {
+            Path external = Path.of(TEST_DIR, fileName);
+            if (Files.exists(external)) {
+                return external;
+            }
+            String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+            Path temp = Files.createTempFile("archive-parser-", "." + extension);
+            byte[] content = "fixture content".getBytes();
+            switch (extension) {
+                case "zip" -> Files.write(temp, createTestZip(List.of("model.stl", "readme.txt")));
+                case "tar" -> {
+                    try (OutputStream os = Files.newOutputStream(temp);
+                         TarArchiveOutputStream tar = new TarArchiveOutputStream(os)) {
+                        TarArchiveEntry entry = new TarArchiveEntry("model.stl");
+                        entry.setSize(content.length);
+                        tar.putArchiveEntry(entry);
+                        tar.write(content);
+                        tar.closeArchiveEntry();
+                        tar.finish();
+                    }
+                }
+                case "7z" -> {
+                    try (SevenZOutputFile sevenZ = new SevenZOutputFile(temp.toFile())) {
+                        SevenZArchiveEntry entry = new SevenZArchiveEntry();
+                        entry.setName("model.stl");
+                        entry.setSize(content.length);
+                        sevenZ.putArchiveEntry(entry);
+                        sevenZ.write(content);
+                        sevenZ.closeArchiveEntry();
+                    }
+                }
+                default -> throw new IllegalArgumentException("Unsupported fixture: " + fileName);
+            }
+            return temp;
+        }
+
+        private void cleanupFixture(Path file) throws Exception {
+            if (!file.toString().startsWith(TEST_DIR)) {
+                Files.deleteIfExists(file);
             }
         }
     }

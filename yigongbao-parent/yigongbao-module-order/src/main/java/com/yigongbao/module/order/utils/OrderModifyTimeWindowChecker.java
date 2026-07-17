@@ -31,6 +31,11 @@ public class OrderModifyTimeWindowChecker {
         if (orderCreateTime == null) {
             return false;
         }
+        // ChronoUnit.MINUTES truncates sub-minute negative durations toward zero;
+        // compare the timestamps first so future-dated orders never enter the window.
+        if (orderCreateTime.isAfter(LocalDateTime.now())) {
+            return false;
+        }
         Integer timeWindow = configService.getConfigValueAsInt(
                 SystemConfigKeyEnum.ORDER_MODIFY_WINDOW_MINUTES.getKey(), 10
         );

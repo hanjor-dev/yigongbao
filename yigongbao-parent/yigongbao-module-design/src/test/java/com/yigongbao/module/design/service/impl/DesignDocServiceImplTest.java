@@ -16,7 +16,9 @@ import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignProductFileEntity;
 import com.yigongbao.module.design.helper.DrawingExcelBuilder;
 import com.yigongbao.module.design.helper.InstructionExcelBuilder;
+import com.yigongbao.module.design.helper.DesignQueryHelper;
 import com.yigongbao.module.design.mapper.DesignProductMapper;
+import com.yigongbao.module.design.mapper.DesignPackageFileScreenshotMapper;
 import com.yigongbao.module.design.service.DesignDrawingService;
 import com.yigongbao.module.design.service.DesignInstructionService;
 import com.yigongbao.module.design.service.DesignPackageService;
@@ -25,6 +27,7 @@ import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.vo.DocItemVO;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.system.config.service.ConfigService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -76,6 +79,9 @@ class DesignDocServiceImplTest {
     @Mock private FileService fileService;
     @Mock private DesignProductFileService productFileService;
     @Mock private DesignScreenshotService screenshotService;
+    @Mock private DesignQueryHelper designQueryHelper;
+    @Mock private DesignPackageFileScreenshotMapper screenshotMapper;
+    @Mock private ConfigService configService;
 
     @InjectMocks
     private DesignDocServiceImpl docService;
@@ -90,6 +96,9 @@ class DesignDocServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        doNothing().when(designQueryHelper).checkIsAssignedDesigner(any());
+        when(screenshotMapper.getLatestUpdateTime(anyLong())).thenReturn(null);
+        when(configService.getConfigValue(anyString())).thenReturn("http://viewer.test");
         order = new OrderMainEntity();
         order.setId(ORDER_ID);
         order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
@@ -105,6 +114,30 @@ class DesignDocServiceImplTest {
         mockFileVO = new FileVO();
         mockFileVO.setId("file-001");
         mockFileVO.setFileUrl("http://storage/test.xlsx");
+    }
+
+    @Test
+    void listDrawingVersions_validatesContextAndMapsVersionEntities() {
+        DesignDrawingEntity drawing = new DesignDrawingEntity();
+        drawing.setId(5L);
+        drawing.setPackageId(PACKAGE_ID);
+        drawing.setVersion("A/1");
+        drawing.setVersionSeq(1);
+        drawing.setTemplateFileId("drawing-1");
+        drawing.setTemplateFileUrl("http://storage/drawing.xlsx");
+        drawing.setIsConfirmed(1);
+        when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+        when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+        when(drawingService.listVersions(PACKAGE_ID)).thenReturn(List.of(drawing));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+            var versions = docService.listDrawingVersions(ORDER_ID, PACKAGE_ID);
+
+            assertEquals(1, versions.size());
+            assertEquals("A/1", versions.get(0).getVersion());
+            assertEquals("drawing-1", versions.get(0).getTemplateFileId());
+        }
     }
 
     // ==================== getInstructionPreviewUrl（在线模式） ====================
@@ -234,6 +267,7 @@ class DesignDocServiceImplTest {
                 latest.setVersion("A/1");
                 latest.setGenerateTime(generateTime);
                 latest.setRevisedFileId("revised-001"); // 已封版
+                latest.setSourceType(com.yigongbao.common.constant.StatusConstants.SOURCE_TYPE_MANUAL);
 
                 when(orderMainService.getById(ORDER_ID)).thenReturn(order);
                 when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
@@ -445,16 +479,17 @@ class DesignDocServiceImplTest {
                 entity.setId(1L);
                 entity.setPackageId(PACKAGE_ID);
                 entity.setIsConfirmed(0);
-                when(instructionService.getById(1L)).thenReturn(entity);
+                entity.setVersionSeq(1);
+                when(instructionService.getLatestVersion(PACKAGE_ID)).thenReturn(entity);
                 when(fileService.uploadFile(any(), any())).thenReturn(mockFileVO);
-                when(instructionService.updateById(any())).thenReturn(true);
+                when(instructionService.save(any())).thenReturn(true);
 
                 docService.uploadRevisedInstruction(ORDER_ID, PACKAGE_ID, 1L, mock(MultipartFile.class));
 
-                verify(instructionService).updateById(argThat(e ->
+                verify(instructionService).save(argThat(e ->
                         Integer.valueOf(1).equals(e.getIsConfirmed())
-                                && e.getRevisedFileId() != null
-                                && e.getConfirmTime() != null));
+                                && "A/2".equals(e.getVersion())
+                                && e.getTemplateFileId() != null));
             }
         }
 
@@ -466,7 +501,7 @@ class DesignDocServiceImplTest {
 
                 when(orderMainService.getById(ORDER_ID)).thenReturn(order);
                 when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
-                when(instructionService.getById(999L)).thenReturn(null);
+                when(instructionService.getLatestVersion(PACKAGE_ID)).thenReturn(null);
 
                 BusinessException ex = assertThrows(BusinessException.class,
                         () -> docService.uploadRevisedInstruction(ORDER_ID, PACKAGE_ID, 999L,
@@ -495,16 +530,17 @@ class DesignDocServiceImplTest {
                 entity.setId(1L);
                 entity.setPackageId(PACKAGE_ID);
                 entity.setIsConfirmed(0);
-                when(drawingService.getById(1L)).thenReturn(entity);
+                entity.setVersionSeq(1);
+                when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(entity);
                 when(fileService.uploadFile(any(), any())).thenReturn(mockFileVO);
-                when(drawingService.updateById(any())).thenReturn(true);
+                when(drawingService.save(any())).thenReturn(true);
 
                 docService.uploadRevisedDrawing(ORDER_ID, PACKAGE_ID, 1L, mock(MultipartFile.class));
 
-                verify(drawingService).updateById(argThat(e ->
+                verify(drawingService).save(argThat(e ->
                         Integer.valueOf(1).equals(e.getIsConfirmed())
-                                && e.getRevisedFileId() != null
-                                && e.getConfirmTime() != null));
+                                && "A/2".equals(e.getVersion())
+                                && e.getTemplateFileId() != null));
             }
         }
 
@@ -516,7 +552,7 @@ class DesignDocServiceImplTest {
 
                 when(orderMainService.getById(ORDER_ID)).thenReturn(order);
                 when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
-                when(drawingService.getById(999L)).thenReturn(null);
+                when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(null);
 
                 BusinessException ex = assertThrows(BusinessException.class,
                         () -> docService.uploadRevisedDrawing(ORDER_ID, PACKAGE_ID, 999L,

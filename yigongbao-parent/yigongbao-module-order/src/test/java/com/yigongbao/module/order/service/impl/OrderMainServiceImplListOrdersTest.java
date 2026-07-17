@@ -66,6 +66,7 @@ class OrderMainServiceImplListOrdersTest {
     @Mock private com.yigongbao.module.system.dict.service.DictService dictService;
     @Mock private com.yigongbao.module.order.validator.OrderDataValidator orderDataValidator;
     @Mock private com.yigongbao.module.order.service.OrderModifyApplyService orderModifyApplyService;
+    @Mock private com.yigongbao.module.order.convert.OrderConvert orderConvert;
     @Mock private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @InjectMocks
@@ -75,6 +76,7 @@ class OrderMainServiceImplListOrdersTest {
     void setUp() {
         // ServiceImpl 使用 baseMapper 字段执行 page()，需通过反射注入 mock
         ReflectionTestUtils.setField(orderMainService, "baseMapper", orderMainMapper);
+        doNothing().when(orderConvert).fillAuditInfo(any(OrderMainEntity.class), any(OrderListVO.class));
     }
 
     // ==================== 辅助方法 ====================
