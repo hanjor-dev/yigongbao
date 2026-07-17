@@ -362,6 +362,10 @@ class DesignDocServiceImplTest {
                 assertEquals(0, result.getIsConfirmed());
                 verify(drawingService).save(argThat(e -> Integer.valueOf(0).equals(e.getIsConfirmed())
                         && "qr-file-001".equals(e.getQrFileId())));
+                verify(drawingBuilder).build(argThat(ctx ->
+                        "FRONTEND_FILE".equals(ctx.getQrSource())
+                                && ctx.getQrBytes() != null
+                                && ctx.getQrBytes().length > 0));
                 verify(fileService).downloadToBytes("qr-file-001");
             }
         }
@@ -389,7 +393,9 @@ class DesignDocServiceImplTest {
 
                 assertEquals("file-001", result.getFileId());
                 verify(drawingBuilder).build(argThat(ctx ->
-                        ctx.getQrBytes() != null && ctx.getQrBytes().length > 0));
+                        "BACKEND_FALLBACK".equals(ctx.getQrSource())
+                                && ctx.getQrBytes() != null
+                                && ctx.getQrBytes().length > 0));
                 verify(drawingService).save(argThat(e -> e.getQrFileId() == null));
                 verify(fileService, never()).downloadToBytes(anyString());
             }

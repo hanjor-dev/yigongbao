@@ -45,24 +45,38 @@ public class DesignQrImageServiceImpl implements DesignQrImageService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public DesignQrImageVO upload(Long orderId, MultipartFile file) {
+        log.info("收到图纸二维码上传请求，orderId={}, fileName={}, contentType={}, size={}",
+                orderId, file == null ? null : file.getOriginalFilename(),
+                file == null ? null : file.getContentType(), file == null ? 0 : file.getSize());
         OrderMainEntity order = designQueryHelper.checkDesignPhase(orderId);
-        designQueryHelper.checkIsAssignedDesigner(order);
+        // 不需要校验当前订单所属设计师
+        //designQueryHelper.checkIsAssignedDesigner(order);
 
         byte[] bytes = readAndValidate(file);
         String hash = md5Hex(bytes);
+        log.info("图纸二维码文件校验通过，orderId={}, fileName={}, bytes={}, md5={}",
+                orderId, file.getOriginalFilename(), bytes.length, hash);
 
         synchronized (ORDER_LOCKS.computeIfAbsent(orderId, ignored -> new Object())) {
             FileVO current = currentFile(orderId);
             if (current != null && hash.equalsIgnoreCase(current.getFileHash())) {
+                log.info("图纸二维码内容未变化，复用已关联文件，orderId={}, fileId={}, md5={}",
+                        orderId, current.getId(), hash);
                 return toVO(current);
             }
 
             FileVO uploaded = fileService.uploadFile(file, QR_BIZ_TYPE);
+            log.info("图纸二维码文件上传存储完成，orderId={}, fileId={}, bytes={}, md5={}, bizType={}",
+                    orderId, uploaded.getId(), bytes.length, hash, QR_BIZ_TYPE);
             try {
                 fileService.unlinkByBiz(QR_BIZ_TYPE, orderId);
                 fileService.linkFile(uploaded.getId(), QR_BIZ_TYPE, orderId);
+                log.info("图纸二维码文件关联完成，orderId={}, fileId={}, objectType={}, objectId={}",
+                        orderId, uploaded.getId(), QR_BIZ_TYPE, orderId);
                 return toVO(uploaded);
             } catch (RuntimeException ex) {
+                log.error("图纸二维码文件关联失败，orderId={}, fileId={}, bizType={}",
+                        orderId, uploaded.getId(), QR_BIZ_TYPE, ex);
                 restorePreviousAssociation(current, orderId);
                 deleteUnlinkedFile(uploaded.getId());
                 throw ex;
@@ -74,6 +88,10 @@ public class DesignQrImageServiceImpl implements DesignQrImageService {
     public DesignQrImageVO getCurrent(Long orderId) {
         designQueryHelper.checkOrderReadable(orderId);
         FileVO current = currentFile(orderId);
+        log.info("查询订单当前图纸二维码完成，orderId={}, fileId={}, fileName={}, bytes={}",
+                orderId, current == null ? null : current.getId(),
+                current == null ? null : current.getFileName(),
+                current == null ? null : current.getFileSize());
         return current == null ? null : toVO(current);
     }
 

@@ -81,6 +81,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DesignDocServiceImpl implements DesignDocService {
 
+    private static final String QR_SOURCE_FRONTEND_FILE = "FRONTEND_FILE";
+    private static final String QR_SOURCE_BACKEND_FALLBACK = "BACKEND_FALLBACK";
+
     private final OrderMainService orderMainService;
     private final DesignPackageService packageService;
     private final DesignProductService productService;
@@ -521,9 +524,16 @@ public class DesignDocServiceImpl implements DesignDocService {
                 && currentQrFile != null
                 && !Objects.equals(currentQrFile.getId(), latest.getQrFileId());
 
+        log.info("图纸生成决策，orderId={}, packageId={}, latestDrawingId={}, sourceType={}, "
+                        + "currentQrFileId={}, latestQrFileId={}, dataChanged={}, qrChanged={}",
+                orderId, packageId, latest.getId(), latest.getSourceType(),
+                currentQrFile == null ? null : currentQrFile.getId(), latest.getQrFileId(),
+                dataChanged, qrChanged);
+
         if (!dataChanged && !qrChanged) {
             // 场景4：打印信息未变，直接复用
-            log.info("打印信息未变化，复用已有图纸，packageId={}, version={}", packageId, latest.getVersion());
+            log.info("打印信息和二维码均未触发重新生成，复用已有图纸，packageId={}, version={}, qrFileId={}",
+                    packageId, latest.getVersion(), latest.getQrFileId());
             return latest;
         }
 
@@ -541,7 +551,11 @@ public class DesignDocServiceImpl implements DesignDocService {
 
     private FileVO currentQrFile(Long orderId) {
         List<FileVO> files = fileService.listByBiz(FileBizTypeEnum.DRAWING_QR_IMAGE.getDictCode(), orderId);
-        return files == null || files.isEmpty() ? null : files.get(0);
+        FileVO current = files == null || files.isEmpty() ? null : files.get(0);
+        log.info("查询订单当前图纸二维码，orderId={}, bizType={}, fileCount={}, currentQrFileId={}",
+                orderId, FileBizTypeEnum.DRAWING_QR_IMAGE.getDictCode(),
+                files == null ? 0 : files.size(), current == null ? null : current.getId());
+        return current;
     }
 
     /**
@@ -701,6 +715,9 @@ public class DesignDocServiceImpl implements DesignDocService {
 
         // 生成图纸 Excel
         DrawingExcelBuilder.BuildContext ctx = buildDrawingContext(order, pkg, drawingRows, now, qrFile);
+        log.info("图纸二维码快照准备完成，orderId={}, packageId={}, version={}, qrSource={}, qrFileId={}, qrBytes={}",
+                order.getId(), packageId, version, ctx.getQrSource(), ctx.getQrFileId(),
+                ctx.getQrBytes() == null ? 0 : ctx.getQrBytes().length);
         byte[] bytes;
         try {
             bytes = drawingBuilder.build(ctx);
@@ -733,7 +750,8 @@ public class DesignDocServiceImpl implements DesignDocService {
             }
             // 删除旧模板文件，避免 OSS 泄漏；删除失败不影响已保存的新版本。
             deleteOldTemplateFile(oldTemplateFileId);
-            log.info("图纸覆盖完成，packageId={}, version={}", packageId, version);
+            log.info("图纸覆盖完成，packageId={}, version={}, qrSource={}, qrFileId={}",
+                    packageId, version, ctx.getQrSource(), ctx.getQrFileId());
             return toOverride;
         } else {
             try {
@@ -751,7 +769,8 @@ public class DesignDocServiceImpl implements DesignDocService {
                 // 新版本初始为未确认状态
                 entity.setIsConfirmed(StatusConstants.NOT_CONFIRMED);
                 drawingService.save(entity);
-                log.info("图纸新建完成，packageId={}, version={}", packageId, version);
+                log.info("图纸新建完成，packageId={}, version={}, qrSource={}, qrFileId={}",
+                        packageId, version, ctx.getQrSource(), ctx.getQrFileId());
                 return entity;
             } catch (RuntimeException ex) {
                 deleteGeneratedFile(fileVO.getId());
@@ -947,19 +966,31 @@ public class DesignDocServiceImpl implements DesignDocService {
                 if (bytes != null && bytes.length > 0) {
                     ctx.setQrBytes(bytes);
                     ctx.setQrFileId(qrFile.getId());
+                    ctx.setQrSource(QR_SOURCE_FRONTEND_FILE);
+                    log.info("图纸二维码读取成功，source={}, orderId={}, qrFileId={}, fileName={}, fileHash={}, bytes={}",
+                            QR_SOURCE_FRONTEND_FILE, orderId, qrFile.getId(), qrFile.getFileName(),
+                            qrFile.getFileHash(), bytes.length);
                     return;
                 }
-                log.warn("前端二维码文件为空，改用后端兜底二维码，orderId={}, qrFileId={}",
-                        orderId, qrFile.getId());
+                log.warn("前端二维码文件为空，改用后端兜底二维码，orderId={}, qrFileId={}, fileName={}",
+                        orderId, qrFile.getId(), qrFile.getFileName());
             } catch (IOException e) {
-                log.warn("读取前端二维码失败，改用后端兜底二维码，orderId={}, qrFileId={}",
-                        orderId, qrFile.getId(), e);
+                log.warn("读取前端二维码失败，改用后端兜底二维码，orderId={}, qrFileId={}, fileName={}",
+                        orderId, qrFile.getId(), qrFile.getFileName(), e);
             }
+        } else {
+            log.info("订单未找到前端二维码文件，使用后端兜底二维码，orderId={}, reason=FRONTEND_FILE_NOT_FOUND",
+                    orderId);
         }
 
         try {
-            ctx.setQrBytes(generateFallbackQrCode(buildViewerQrContent(orderId), 500, 500));
+            byte[] fallbackBytes = generateFallbackQrCode(buildViewerQrContent(orderId), 500, 500);
+            ctx.setQrBytes(fallbackBytes);
             ctx.setQrFileId(null);
+            ctx.setQrSource(QR_SOURCE_BACKEND_FALLBACK);
+            log.info("图纸二维码使用后端兜底生成，source={}, orderId={}, qrFileId=null, bytes={}, "
+                            + "contentType=IMAGING_VIEWER_URL",
+                    QR_SOURCE_BACKEND_FALLBACK, orderId, fallbackBytes.length);
         } catch (Exception e) {
             log.error("生成后端兜底二维码失败，orderId={}", orderId, e);
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
@@ -979,7 +1010,10 @@ public class DesignDocServiceImpl implements DesignDocService {
                 "\"token\":{\"Authorization\":\"\"}}",
                 orderId, orderId);
         String kv = Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
-        return baseUrl + "?kv=" + kv;
+        String content = baseUrl + "?kv=" + kv;
+        log.info("后端二维码内容构建完成，orderId={}, viewerBaseUrlConfigured=true, payloadBytes={}, contentLength={}",
+                orderId, json.getBytes(StandardCharsets.UTF_8).length, content.length());
+        return content;
     }
 
     private byte[] generateFallbackQrCode(String content, int width, int height) throws Exception {

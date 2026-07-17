@@ -68,6 +68,8 @@ public class DrawingExcelBuilder {
         private List<ProductRow> rows;
         /** 前端图片或后端兜底二维码的 PNG 字节（null 时跳过二维码嵌入） */
         private byte[] qrBytes;
+        /** 二维码来源：FRONTEND_FILE 或 BACKEND_FALLBACK。 */
+        private String qrSource;
         /** 服务层用于保存图纸版本快照的前端二维码文件 ID，后端兜底时为空。 */
         private String qrFileId;
     }
@@ -131,8 +133,9 @@ public class DrawingExcelBuilder {
         // 计算总页数：至少1页
         int totalPages = Math.max(1, (int) Math.ceil((double) n / SLOTS_PER_PAGE));
 
-        log.info("开始生成图纸，orderCode={}, rowCount={}, totalPages={}",
-                ctx.getOrderCode(), n, totalPages);
+        log.info("开始生成图纸，orderCode={}, rowCount={}, totalPages={}, qrSource={}, qrFileId={}, qrBytes={}",
+                ctx.getOrderCode(), n, totalPages, ctx.getQrSource(), ctx.getQrFileId(),
+                ctx.getQrBytes() == null ? 0 : ctx.getQrBytes().length);
 
         // 前端图片或后端兜底二维码所有分页复用同一份图片字节
         byte[] qrBytes = ctx.getQrBytes();
@@ -181,7 +184,10 @@ public class DrawingExcelBuilder {
 
                 // 嵌入二维码（右上角，每页相同）
                 if (qrBytes != null) {
-                    insertQrCode((XSSFSheet) sheet, (XSSFWorkbook) wb, qrBytes);
+                    insertQrCode((XSSFSheet) sheet, (XSSFWorkbook) wb, qrBytes, ctx.getQrSource(), page + 1);
+                } else {
+                    log.warn("图纸二维码未嵌入，二维码字节为空，orderCode={}, page={}, qrSource={}",
+                            ctx.getOrderCode(), page + 1, ctx.getQrSource());
                 }
 
                 // 填充 footer
@@ -206,15 +212,22 @@ public class DrawingExcelBuilder {
         }
     }
 
-    private void insertQrCode(XSSFSheet sheet, XSSFWorkbook wb, byte[] qrBytes) {
+    private void insertQrCode(XSSFSheet sheet, XSSFWorkbook wb, byte[] qrBytes,
+                              String qrSource, int page) {
         try {
             createQrPicture(sheet, wb, qrBytes);
+            log.info("图纸二维码插入Excel成功，source={}, page={}, bytes={}, slot=M1:P10",
+                    qrSource, page, qrBytes.length);
         } catch (Exception e) {
-            log.warn("二维码原图嵌入失败，使用最小PNG兜底，error={}", e.getMessage());
+            log.warn("图纸二维码原图插入Excel失败，改用构建器最小PNG兜底，source={}, page={}, bytes={}, error={}",
+                    qrSource, page, qrBytes.length, e.getMessage(), e);
             try {
                 createQrPicture(sheet, wb, FALLBACK_QR_PNG);
+                log.info("图纸二维码构建器兜底图片插入Excel成功，source=BUILDER_EMBED_FALLBACK, page={}, bytes={}, slot=M1:P10",
+                        page, FALLBACK_QR_PNG.length);
             } catch (Exception fallbackException) {
-                log.error("二维码原图和兜底图片均嵌入失败，error={}", fallbackException.getMessage(), fallbackException);
+                log.error("图纸二维码原图和构建器兜底图片均插入Excel失败，source={}, page={}, error={}",
+                        qrSource, page, fallbackException.getMessage(), fallbackException);
             }
         }
     }
