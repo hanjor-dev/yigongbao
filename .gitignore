@@ -79,3 +79,6 @@ docker-compose.override.yml
 DEPLOYMENT_CHECKLIST.md
 
 /frontend
+
+# Git worktrees
+/.worktrees/
