@@ -1,0 +1,2113 @@
+diff --git a/sql/ddl.sql b/sql/ddl.sql
+index 04f012a..9bd6a05 100644
+--- a/sql/ddl.sql
++++ b/sql/ddl.sql
+@@ -1119,6 +1119,9 @@ CREATE TABLE order_main (
+     -- ==================== 乐观锁 ====================
+     version         INT             DEFAULT 0 COMMENT '版本号（乐观锁）',
+ 
++    -- ==================== 取消申请状态 ====================
++    has_pending_cancel_apply TINYINT DEFAULT 0 COMMENT '是否有待审核的取消申请（0=否，1=是）',
++
+     -- ==================== 公共字段（BaseEntity） ====================
+     create_time     DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+     update_time     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+@@ -1134,7 +1137,8 @@ CREATE TABLE order_main (
+     KEY idx_order_main_create_time (create_time),
+     KEY idx_order_regional_audit (business_type, regional_audit_status, status, operator_dept_id),
+     KEY idx_order_design_audit (design_audit_status, status),
+-    KEY idx_order_center_id (center_id)
++    KEY idx_order_center_id (center_id),
++    KEY idx_order_main_has_pending_cancel_apply (has_pending_cancel_apply)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单主表';
+ CREATE UNIQUE INDEX uk_order_main_code ON order_main ((CASE WHEN is_deleted = 0 THEN order_code ELSE NULL END));
+ ALTER TABLE order_main ADD FULLTEXT INDEX ft_order_search (order_code, org_name, operator_name, hospital_name, patient_name);
+@@ -1945,3 +1949,29 @@ CREATE TABLE notification_message
+ ) ENGINE = InnoDB
+   DEFAULT CHARSET = utf8mb4
+   COMMENT = '消息通知表';
++
++
++-- ============================================================
++-- 订单取消申请表（order_cancel_apply）
++-- 存储订单取消申请记录，支持审核流程
++-- ============================================================
++DROP TABLE IF EXISTS order_cancel_apply;
++CREATE TABLE order_cancel_apply (
++    id                  BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
++    order_id            BIGINT NOT NULL COMMENT '订单ID',
++    apply_by            BIGINT NOT NULL COMMENT '申请人ID',
++    apply_reason        VARCHAR(500) COMMENT '取消原因（选填）',
++    audit_status        TINYINT NOT NULL DEFAULT 1 COMMENT '审核状态：1=待审核，2=已通过，3=已驳回',
++    audit_by            BIGINT COMMENT '审核人ID',
++    audit_reason        VARCHAR(500) COMMENT '审核驳回原因（选填）',
++    audit_time          DATETIME COMMENT '审核时间',
++    create_time         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
++    update_time         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
++    create_by           BIGINT COMMENT '创建人ID',
++    update_by           BIGINT COMMENT '更新人ID',
++    is_deleted          TINYINT DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
++
++    KEY idx_order_cancel_apply_order_id (order_id),
++    KEY idx_order_cancel_apply_audit_status (audit_status),
++    KEY idx_order_cancel_apply_apply_by (apply_by)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单取消申请表';
+diff --git a/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/entity/OrderMainEntity.java b/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/entity/OrderMainEntity.java
+index 8866751..c0595df 100644
+--- a/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/entity/OrderMainEntity.java
++++ b/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/entity/OrderMainEntity.java
+@@ -217,6 +217,11 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
+      */
+     private Integer status;
+ 
++    /**
++     * 是否有待审核的取消申请：0-无，1-有
++     */
++    private Integer hasPendingCancelApply;
++
+     // ==================== 当前处理人 ====================
+     /**
+      * 当前处理人ID
+diff --git a/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/enums/ErrorCodeEnum.java b/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/enums/ErrorCodeEnum.java
+index 5b70d7d..153f329 100644
+--- a/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/enums/ErrorCodeEnum.java
++++ b/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/enums/ErrorCodeEnum.java
+@@ -294,6 +294,13 @@ public enum ErrorCodeEnum {
+     ORDER_MODIFY_TIME_WINDOW_EXCEEDED(739, "订单修改时间已超限，请提交申请", 3),
+     ORDER_NOT_BELONG_TO_USER(740, "只能对自己创建的订单提交修改申请", 3),
+ 
++    // ==================== 订单取消申请相关（741-745）====================
++    ORDER_CANCEL_APPLY_PENDING(741, "订单存在待审核的取消申请", 3),
++    ORDER_NEED_CANCEL_APPLY(742, "该订单需要提交取消申请", 3),
++    CANCEL_APPLY_NOT_FOUND(743, "取消申请不存在", 3),
++    CANCEL_APPLY_ALREADY_AUDITED(744, "取消申请已审核", 3),
++    ORDER_PHASE_NOT_ALLOW_APPLY(745, "订单阶段不允许提交取消申请", 3),
++
+     // ==================== 产品规格相关 754-756 ====================
+     PRODUCT_HAS_SPECS(754, "产品下存在规格，无法删除", 4),
+     PRODUCT_SPEC_NOT_FOUND(755, "产品规格不存在", 4),
+diff --git a/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/event/CancelApplyApprovedEvent.java b/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/event/CancelApplyApprovedEvent.java
+new file mode 100644
+index 0000000..a3af361
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/event/CancelApplyApprovedEvent.java
+@@ -0,0 +1,28 @@
++package com.yigongbao.common.event;
++
++import lombok.Getter;
++import org.springframework.context.ApplicationEvent;
++
++/**
++ * 取消申请审核通过事件
++ * 当设计管理员审核通过取消申请时触发，用于通知申请人
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++@Getter
++public class CancelApplyApprovedEvent extends ApplicationEvent {
++
++    private final Long applyId;
++    private final Long orderId;
++    private final Long auditBy;
++    private final Long applyBy;
++
++    public CancelApplyApprovedEvent(Object source, Long applyId, Long orderId, Long auditBy, Long applyBy) {
++        super(source);
++        this.applyId = applyId;
++        this.orderId = orderId;
++        this.auditBy = auditBy;
++        this.applyBy = applyBy;
++    }
++}
+diff --git a/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/event/CancelApplyRejectedEvent.java b/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/event/CancelApplyRejectedEvent.java
+new file mode 100644
+index 0000000..b5252ab
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/event/CancelApplyRejectedEvent.java
+@@ -0,0 +1,28 @@
++package com.yigongbao.common.event;
++
++import lombok.Getter;
++import org.springframework.context.ApplicationEvent;
++
++/**
++ * 取消申请审核驳回事件
++ * 当设计管理员驳回取消申请时触发，用于通知申请人
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++@Getter
++public class CancelApplyRejectedEvent extends ApplicationEvent {
++
++    private final Long applyId;
++    private final Long orderId;
++    private final Long auditBy;
++    private final Long applyBy;
++
++    public CancelApplyRejectedEvent(Object source, Long applyId, Long orderId, Long auditBy, Long applyBy) {
++        super(source);
++        this.applyId = applyId;
++        this.orderId = orderId;
++        this.auditBy = auditBy;
++        this.applyBy = applyBy;
++    }
++}
+diff --git a/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/event/CancelApplySubmittedEvent.java b/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/event/CancelApplySubmittedEvent.java
+new file mode 100644
+index 0000000..77bea27
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-common/src/main/java/com/yigongbao/common/event/CancelApplySubmittedEvent.java
+@@ -0,0 +1,26 @@
++package com.yigongbao.common.event;
++
++import lombok.Getter;
++import org.springframework.context.ApplicationEvent;
++
++/**
++ * 取消申请提交事件
++ * 当用户提交订单取消申请时触发，用于通知相关人员审核
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++@Getter
++public class CancelApplySubmittedEvent extends ApplicationEvent {
++
++    private final Long applyId;
++    private final Long orderId;
++    private final Long applyBy;
++
++    public CancelApplySubmittedEvent(Object source, Long applyId, Long orderId, Long applyBy) {
++        super(source);
++        this.applyId = applyId;
++        this.orderId = orderId;
++        this.applyBy = applyBy;
++    }
++}
+diff --git a/yigongbao-parent/yigongbao-module-design/src/main/java/com/yigongbao/module/design/service/impl/DesignWorkorderServiceImpl.java b/yigongbao-parent/yigongbao-module-design/src/main/java/com/yigongbao/module/design/service/impl/DesignWorkorderServiceImpl.java
+index 48af5b7..d59c47e 100644
+--- a/yigongbao-parent/yigongbao-module-design/src/main/java/com/yigongbao/module/design/service/impl/DesignWorkorderServiceImpl.java
++++ b/yigongbao-parent/yigongbao-module-design/src/main/java/com/yigongbao/module/design/service/impl/DesignWorkorderServiceImpl.java
+@@ -51,6 +51,7 @@ import com.yigongbao.module.design.vo.SubmitCheckVO;
+ import com.yigongbao.module.order.entity.OrderFileEntity;
+ import com.yigongbao.module.order.entity.OrderItemEntity;
+ import com.yigongbao.module.order.mapper.OrderFileMapper;
++import com.yigongbao.module.order.service.OrderCancelApplyService;
+ import com.yigongbao.module.order.service.OrderItemService;
+ import com.yigongbao.module.order.service.OrderMainService;
+ import com.yigongbao.module.order.vo.order.OrderDetailVO;
+@@ -104,6 +105,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
+     private final OrderFileMapper orderFileMapper;
+     private final com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper;
+     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
++    private final com.yigongbao.module.order.service.OrderCancelApplyService cancelApplyService;
+ 
+     /**
+      * 分页查询设计工单列表
+@@ -346,6 +348,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
+             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+         }
+ 
++        // 检查是否存在待审核的取消申请
++        if (cancelApplyService.hasPendingCancelApply(orderId)) {
++            log.warn("订单存在待审核的取消申请，不允许开始设计: orderId={}", orderId);
++            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
++        }
++
+         // 2. 校验订单状态（必须是待设计）
+         if (!FlowStatusEnum.PENDING_DESIGN.getValue().equals(order.getStatus())) {
+             log.warn("订单状态不允许开始设计，orderId={}, status={}", orderId, order.getStatus());
+@@ -835,6 +843,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
+             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+         }
+ 
++        // 检查是否存在待审核的取消申请
++        if (cancelApplyService.hasPendingCancelApply(orderId)) {
++            log.warn("订单存在待审核的取消申请，不允许完成设计: orderId={}", orderId);
++            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
++        }
++
+         // 校验订单状态必须为设计中
+         if (!FlowStatusEnum.DESIGN_IN_PROGRESS.getValue().equals(order.getStatus())) {
+             log.warn("订单状态不允许完成设计: orderId={}, status={}", orderId, order.getStatus());
+diff --git a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/controller/OrderCancelApplyController.java b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/controller/OrderCancelApplyController.java
+new file mode 100644
+index 0000000..fd34349
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/controller/OrderCancelApplyController.java
+@@ -0,0 +1,102 @@
++package com.yigongbao.module.order.controller;
++
++import com.baomidou.mybatisplus.core.metadata.IPage;
++import com.yigongbao.common.result.Result;
++import com.yigongbao.common.enums.OperationTypeEnum;
++import com.yigongbao.framework.annotation.OperationLog;
++import com.yigongbao.framework.annotation.RequireSign;
++import com.yigongbao.module.order.dto.order.AuditCancelApplyDTO;
++import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
++import com.yigongbao.module.order.dto.order.OrderPageDTO;
++import com.yigongbao.module.order.service.OrderCancelApplyService;
++import com.yigongbao.module.order.vo.order.CancelApplyVO;
++import io.swagger.v3.oas.annotations.Operation;
++import io.swagger.v3.oas.annotations.Parameter;
++import io.swagger.v3.oas.annotations.tags.Tag;
++import jakarta.validation.Valid;
++import lombok.RequiredArgsConstructor;
++import org.springframework.web.bind.annotation.*;
++
++import java.util.List;
++
++/**
++ * 订单取消申请管理 Controller
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++@RestController
++@RequestMapping("/order/cancel-apply")
++@RequiredArgsConstructor
++@Tag(name = "订单取消申请管理")
++@RequireSign
++public class OrderCancelApplyController {
++
++    private final OrderCancelApplyService cancelApplyService;
++
++    /**
++     * 提交取消申请
++     */
++    @PostMapping
++    @Operation(summary = "提交取消申请", description = "订单创建人或设计师可提交取消申请，订单需≥设计阶段且无待审核申请")
++    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.CREATE, operation = "提交取消申请")
++    public Result<Long> submitCancelApply(@Valid @RequestBody CancelOrderApplyDTO dto) {
++        Long applyId = cancelApplyService.submitCancelApply(dto);
++        return Result.success(applyId);
++    }
++
++    /**
++     * 审核取消申请
++     */
++    @PostMapping("/{applyId}/audit")
++    @Operation(summary = "审核取消申请", description = "设计管理员审核取消申请，通过则执行取消流程，驳回则清除待审核标记")
++    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.AUDIT, operation = "审核取消申请")
++    public Result<Void> auditCancelApply(
++            @Parameter(description = "申请ID") @PathVariable Long applyId,
++            @Valid @RequestBody AuditCancelApplyDTO dto) {
++        cancelApplyService.auditCancelApply(applyId, dto);
++        return Result.success();
++    }
++
++    /**
++     * 查询取消申请详情
++     */
++    @GetMapping("/{applyId}")
++    @Operation(summary = "查询取消申请详情", description = "根据申请ID查询取消申请的详细信息")
++    public Result<CancelApplyVO> getCancelApplyDetail(
++            @Parameter(description = "申请ID") @PathVariable Long applyId) {
++        CancelApplyVO vo = cancelApplyService.getCancelApplyDetail(applyId);
++        return Result.success(vo);
++    }
++
++    /**
++     * 分页查询待审核的取消申请列表（设计管理员使用）
++     */
++    @PostMapping("/pending/list")
++    @Operation(summary = "查询待审核申请列表", description = "设计管理员查询所有待审核的取消申请")
++    public Result<IPage<CancelApplyVO>> listPendingApplies(@Valid @RequestBody OrderPageDTO dto) {
++        IPage<CancelApplyVO> page = cancelApplyService.listPendingApplies(dto);
++        return Result.success(page);
++    }
++
++    /**
++     * 分页查询当前用户的取消申请列表（我的申请）
++     */
++    @PostMapping("/my-applies")
++    @Operation(summary = "查询我的申请列表", description = "查询当前用户提交的所有取消申请")
++    public Result<IPage<CancelApplyVO>> listMyApplies(@Valid @RequestBody OrderPageDTO dto) {
++        IPage<CancelApplyVO> page = cancelApplyService.listMyApplies(dto);
++        return Result.success(page);
++    }
++
++    /**
++     * 查询订单的取消申请历史记录
++     */
++    @GetMapping("/order/{orderId}/history")
++    @Operation(summary = "查询订单申请历史", description = "查询指定订单的所有取消申请记录（按时间倒序）")
++    public Result<List<CancelApplyVO>> getCancelApplyHistory(
++            @Parameter(description = "订单ID") @PathVariable Long orderId) {
++        List<CancelApplyVO> history = cancelApplyService.getCancelApplyHistory(orderId);
++        return Result.success(history);
++    }
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/convert/OrderCancelApplyConvert.java b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/convert/OrderCancelApplyConvert.java
+new file mode 100644
+index 0000000..2776e9b
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/convert/OrderCancelApplyConvert.java
+@@ -0,0 +1,52 @@
++package com.yigongbao.module.order.convert;
++
++import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
++import com.yigongbao.module.order.vo.order.CancelApplyVO;
++import org.springframework.beans.BeanUtils;
++import org.springframework.stereotype.Component;
++
++/**
++ * 订单取消申请 Convert
++ * 提供 Entity 与 VO 之间的转换方法
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++@Component
++public class OrderCancelApplyConvert {
++
++    /**
++     * 将取消申请实体转换为 VO（基础转换）
++     *
++     * @param entity 取消申请实体
++     * @return VO对象，entity为null时返回null
++     */
++    public CancelApplyVO toVO(OrderCancelApplyEntity entity) {
++        if (entity == null) {
++            return null;
++        }
++        CancelApplyVO vo = new CancelApplyVO();
++        BeanUtils.copyProperties(entity, vo);
++        return vo;
++    }
++
++    /**
++     * 将取消申请实体转换为 VO（包含关联信息）
++     *
++     * @param entity 取消申请实体
++     * @param applyByName 申请人姓名
++     * @param auditByName 审核人姓名
++     * @param orderCode 订单编号
++     * @return VO对象，entity为null时返回null
++     */
++    public CancelApplyVO toVO(OrderCancelApplyEntity entity, String applyByName,
++                              String auditByName, String orderCode) {
++        CancelApplyVO vo = toVO(entity);
++        if (vo != null) {
++            vo.setApplyByName(applyByName);
++            vo.setAuditByName(auditByName);
++            vo.setOrderCode(orderCode);
++        }
++        return vo;
++    }
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/dto/order/AuditCancelApplyDTO.java b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/dto/order/AuditCancelApplyDTO.java
+new file mode 100644
+index 0000000..d585a23
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/dto/order/AuditCancelApplyDTO.java
+@@ -0,0 +1,25 @@
++package com.yigongbao.module.order.dto.order;
++
++import io.swagger.v3.oas.annotations.media.Schema;
++import jakarta.validation.constraints.NotNull;
++import lombok.Data;
++import org.hibernate.validator.constraints.Length;
++
++/**
++ * 审核取消申请DTO
++ *
++ * @author hanjor
++ * @since 2026-07-10
++ */
++@Data
++@Schema(description = "审核取消申请DTO")
++public class AuditCancelApplyDTO {
++
++    @Schema(description = "审核结果：true=通过，false=驳回")
++    @NotNull(message = "审核结果不能为空")
++    private Boolean approved;
++
++    @Schema(description = "审核备注（驳回时选填）")
++    @Length(max = 500, message = "审核备注不能超过500字")
++    private String reason;
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/dto/order/CancelOrderApplyDTO.java b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/dto/order/CancelOrderApplyDTO.java
+new file mode 100644
+index 0000000..ecb8f50
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/dto/order/CancelOrderApplyDTO.java
+@@ -0,0 +1,25 @@
++package com.yigongbao.module.order.dto.order;
++
++import io.swagger.v3.oas.annotations.media.Schema;
++import jakarta.validation.constraints.NotNull;
++import lombok.Data;
++import org.hibernate.validator.constraints.Length;
++
++/**
++ * 提交取消申请DTO
++ *
++ * @author hanjor
++ * @since 2026-07-10
++ */
++@Data
++@Schema(description = "提交取消申请DTO")
++public class CancelOrderApplyDTO {
++
++    @Schema(description = "订单ID")
++    @NotNull(message = "订单ID不能为空")
++    private Long orderId;
++
++    @Schema(description = "取消原因（选填）")
++    @Length(max = 500, message = "取消原因不能超过500字")
++    private String reason;
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/entity/OrderCancelApplyEntity.java b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/entity/OrderCancelApplyEntity.java
+new file mode 100644
+index 0000000..17860d8
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/entity/OrderCancelApplyEntity.java
+@@ -0,0 +1,55 @@
++package com.yigongbao.module.order.entity;
++
++import com.baomidou.mybatisplus.annotation.TableName;
++import com.yigongbao.common.entity.BaseEntity;
++import lombok.Data;
++import lombok.EqualsAndHashCode;
++
++import java.time.LocalDateTime;
++
++/**
++ * 订单取消申请 Entity
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++@Data
++@EqualsAndHashCode(callSuper = true)
++@TableName("order_cancel_apply")
++public class OrderCancelApplyEntity extends BaseEntity {
++
++    /**
++     * 订单ID
++     */
++    private Long orderId;
++
++    /**
++     * 申请人ID
++     */
++    private Long applyBy;
++
++    /**
++     * 申请原因
++     */
++    private String applyReason;
++
++    /**
++     * 审核状态：0-待审核，1-通过，2-驳回
++     */
++    private Integer auditStatus;
++
++    /**
++     * 审核人ID
++     */
++    private Long auditBy;
++
++    /**
++     * 审核原因（驳回原因或审核备注）
++     */
++    private String auditReason;
++
++    /**
++     * 审核时间
++     */
++    private LocalDateTime auditTime;
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/listener/OrderCancelApplyEventListener.java b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/listener/OrderCancelApplyEventListener.java
+new file mode 100644
+index 0000000..c441c5a
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/listener/OrderCancelApplyEventListener.java
+@@ -0,0 +1,206 @@
++package com.yigongbao.module.order.listener;
++
++import com.yigongbao.common.constant.RoleCodeConstants;
++import com.yigongbao.common.entity.OrderMainEntity;
++import com.yigongbao.common.event.CancelApplyApprovedEvent;
++import com.yigongbao.common.event.CancelApplyRejectedEvent;
++import com.yigongbao.common.event.CancelApplySubmittedEvent;
++import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
++import com.yigongbao.module.order.service.OrderCancelApplyService;
++import com.yigongbao.module.order.service.OrderMainService;
++import com.yigongbao.module.system.message.service.MessageService;
++import com.yigongbao.module.system.user.service.UserService;
++import lombok.RequiredArgsConstructor;
++import lombok.extern.slf4j.Slf4j;
++import org.springframework.context.event.EventListener;
++import org.springframework.scheduling.annotation.Async;
++import org.springframework.stereotype.Component;
++
++import java.util.List;
++
++/**
++ * 订单取消申请事件监听器
++ * 监听取消申请的提交、审核通过、审核驳回事件，并发送消息通知相关用户
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++@Slf4j
++@Component
++@RequiredArgsConstructor
++public class OrderCancelApplyEventListener {
++
++    private final MessageService messageService;
++    private final UserService userService;
++    private final OrderMainService orderMainService;
++    private final OrderCancelApplyService cancelApplyService;
++
++    /**
++     * 处理取消申请提交事件
++     * 通知所有设计管理员有新的取消申请需要审核
++     *
++     * @param event 取消申请提交事件
++     */
++    @EventListener
++    @Async
++    public void handleCancelApplySubmitted(CancelApplySubmittedEvent event) {
++        if (event == null || event.getApplyId() == null || event.getOrderId() == null) {
++            log.warn("事件数据不完整，跳过处理: event={}", event);
++            return;
++        }
++
++        Long applyId = event.getApplyId();
++        Long orderId = event.getOrderId();
++        Long applyBy = event.getApplyBy();
++
++        try {
++            // 获取订单信息
++            OrderMainEntity order = orderMainService.getById(orderId);
++            if (order == null) {
++                log.warn("处理取消申请提交事件失败，订单不存在: applyId={}, orderId={}", applyId, orderId);
++                return;
++            }
++
++            // 获取申请信息
++            OrderCancelApplyEntity apply = cancelApplyService.getById(applyId);
++            if (apply == null) {
++                log.warn("处理取消申请提交事件失败，申请不存在: applyId={}", applyId);
++                return;
++            }
++
++            // 获取申请人姓名
++            String applicantName = userService.getUserRealName(applyBy);
++            if (applicantName == null) {
++                applicantName = "未知用户";
++            }
++
++            // 获取所有设计管理员
++            List<Long> adminIds = userService.getUserIdsByRoleCode(RoleCodeConstants.DESIGN_ADMIN);
++            if (adminIds == null || adminIds.isEmpty()) {
++                log.warn("处理取消申请提交事件失败，无设计管理员: applyId={}, orderId={}", applyId, orderId);
++                return;
++            }
++
++            // 构建消息内容
++            String title = "新的订单取消申请";
++            String reason = apply.getApplyReason() != null ? apply.getApplyReason() : "未填写";
++            String content = String.format("订单 %s 有新的取消申请，申请人：%s，申请原因：%s",
++                    order.getOrderCode(), applicantName, reason);
++
++            // 发送消息给所有设计管理员
++            messageService.sendToUsers(adminIds, title, content, "/order/cancel-apply/audit", applyId);
++
++            log.info("取消申请提交事件处理完成: applyId={}, orderId={}, notifyCount={}",
++                    applyId, orderId, adminIds.size());
++
++        } catch (Exception e) {
++            log.error("处理取消申请提交事件异常: applyId={}, orderId={}", applyId, orderId, e);
++        }
++    }
++
++    /**
++     * 处理取消申请审核通过事件
++     * 通知申请人其取消申请已通过，订单已取消
++     *
++     * @param event 取消申请审核通过事件
++     */
++    @EventListener
++    @Async
++    public void handleCancelApplyApproved(CancelApplyApprovedEvent event) {
++        if (event == null || event.getApplyId() == null || event.getOrderId() == null) {
++            log.warn("事件数据不完整，跳过处理: event={}", event);
++            return;
++        }
++
++        Long applyId = event.getApplyId();
++        Long orderId = event.getOrderId();
++        Long auditBy = event.getAuditBy();
++        Long applyBy = event.getApplyBy();
++
++        try {
++            // 获取订单信息
++            OrderMainEntity order = orderMainService.getById(orderId);
++            if (order == null) {
++                log.warn("处理取消申请通过事件失败，订单不存在: applyId={}, orderId={}", applyId, orderId);
++                return;
++            }
++
++            // 获取审核人姓名
++            String auditorName = userService.getUserRealName(auditBy);
++            if (auditorName == null) {
++                auditorName = "未知用户";
++            }
++
++            // 构建消息内容
++            String title = "订单取消申请已通过";
++            String content = String.format("您的订单 %s 取消申请已通过，审核人：%s，订单已取消",
++                    order.getOrderCode(), auditorName);
++
++            // 发送消息给申请人
++            messageService.sendToUser(applyBy, title, content, "/order/detail/{orderId}", orderId);
++
++            log.info("取消申请通过事件处理完成: applyId={}, orderId={}, applyBy={}",
++                    applyId, orderId, applyBy);
++
++        } catch (Exception e) {
++            log.error("处理取消申请通过事件异常: applyId={}, orderId={}", applyId, orderId, e);
++        }
++    }
++
++    /**
++     * 处理取消申请审核驳回事件
++     * 通知申请人其取消申请已被驳回
++     *
++     * @param event 取消申请审核驳回事件
++     */
++    @EventListener
++    @Async
++    public void handleCancelApplyRejected(CancelApplyRejectedEvent event) {
++        if (event == null || event.getApplyId() == null || event.getOrderId() == null) {
++            log.warn("事件数据不完整，跳过处理: event={}", event);
++            return;
++        }
++
++        Long applyId = event.getApplyId();
++        Long orderId = event.getOrderId();
++        Long auditBy = event.getAuditBy();
++        Long applyBy = event.getApplyBy();
++
++        try {
++            // 获取订单信息
++            OrderMainEntity order = orderMainService.getById(orderId);
++            if (order == null) {
++                log.warn("处理取消申请驳回事件失败，订单不存在: applyId={}, orderId={}", applyId, orderId);
++                return;
++            }
++
++            // 获取申请信息
++            OrderCancelApplyEntity apply = cancelApplyService.getById(applyId);
++            if (apply == null) {
++                log.warn("处理取消申请驳回事件失败，申请不存在: applyId={}", applyId);
++                return;
++            }
++
++            // 获取审核人姓名
++            String auditorName = userService.getUserRealName(auditBy);
++            if (auditorName == null) {
++                auditorName = "未知用户";
++            }
++
++            // 构建消息内容
++            String title = "订单取消申请已驳回";
++            String rejectReason = apply.getAuditReason() != null ? apply.getAuditReason() : "未填写";
++            String content = String.format("您的订单 %s 取消申请已被驳回，审核人：%s，驳回原因：%s",
++                    order.getOrderCode(), auditorName, rejectReason);
++
++            // 发送消息给申请人
++            messageService.sendToUser(applyBy, title, content, "/order/detail/{orderId}", orderId);
++
++            log.info("取消申请驳回事件处理完成: applyId={}, orderId={}, applyBy={}",
++                    applyId, orderId, applyBy);
++
++        } catch (Exception e) {
++            log.error("处理取消申请驳回事件异常: applyId={}, orderId={}", applyId, orderId, e);
++        }
++    }
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/mapper/OrderCancelApplyMapper.java b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/mapper/OrderCancelApplyMapper.java
+new file mode 100644
+index 0000000..b83d83b
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/mapper/OrderCancelApplyMapper.java
+@@ -0,0 +1,15 @@
++package com.yigongbao.module.order.mapper;
++
++import com.baomidou.mybatisplus.core.mapper.BaseMapper;
++import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
++import org.apache.ibatis.annotations.Mapper;
++
++/**
++ * 订单取消申请 Mapper
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++@Mapper
++public interface OrderCancelApplyMapper extends BaseMapper<OrderCancelApplyEntity> {
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/OrderCancelApplyService.java b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/OrderCancelApplyService.java
+new file mode 100644
+index 0000000..dc658cb
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/OrderCancelApplyService.java
+@@ -0,0 +1,88 @@
++package com.yigongbao.module.order.service;
++
++import com.baomidou.mybatisplus.core.metadata.IPage;
++import com.baomidou.mybatisplus.extension.service.IService;
++import com.yigongbao.module.order.dto.order.AuditCancelApplyDTO;
++import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
++import com.yigongbao.module.order.dto.order.OrderPageDTO;
++import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
++import com.yigongbao.module.order.vo.order.CancelApplyVO;
++
++import java.util.List;
++
++/**
++ * 订单取消申请 Service
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++public interface OrderCancelApplyService extends IService<OrderCancelApplyEntity> {
++
++    /**
++     * 提交取消申请
++     * <p>
++     * 业务规则：
++     * - 订单存在且未取消
++     * - 订单阶段≥20（设计阶段及之后）
++     * - 无待审核的取消申请
++     * - 仅订单创建人或设计师可提交
++     *
++     * @param dto 取消申请参数
++     * @return 申请ID
++     */
++    Long submitCancelApply(CancelOrderApplyDTO dto);
++
++    /**
++     * 审核取消申请
++     * <p>
++     * 业务规则：
++     * - 仅设计管理员可审核
++     * - 申请状态为待审核
++     * - 审核通过：执行订单取消流程
++     * - 审核驳回：清除订单待审核标记
++     *
++     * @param applyId 申请ID
++     * @param dto 审核参数
++     */
++    void auditCancelApply(Long applyId, AuditCancelApplyDTO dto);
++
++    /**
++     * 查询取消申请详情
++     *
++     * @param applyId 申请ID
++     * @return 申请详情
++     */
++    CancelApplyVO getCancelApplyDetail(Long applyId);
++
++    /**
++     * 分页查询待审核的取消申请列表（设计管理员使用）
++     *
++     * @param dto 分页参数
++     * @return 待审核申请列表
++     */
++    IPage<CancelApplyVO> listPendingApplies(OrderPageDTO dto);
++
++    /**
++     * 检查订单是否有待审核的取消申请
++     *
++     * @param orderId 订单ID
++     * @return true=有待审核申请，false=无
++     */
++    boolean hasPendingCancelApply(Long orderId);
++
++    /**
++     * 分页查询当前用户的取消申请列表（我的申请）
++     *
++     * @param dto 分页参数
++     * @return 我的申请列表
++     */
++    IPage<CancelApplyVO> listMyApplies(OrderPageDTO dto);
++
++    /**
++     * 查询订单的取消申请历史记录
++     *
++     * @param orderId 订单ID
++     * @return 历史记录列表（按时间倒序）
++     */
++    List<CancelApplyVO> getCancelApplyHistory(Long orderId);
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/impl/OrderCancelApplyServiceImpl.java b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/impl/OrderCancelApplyServiceImpl.java
+new file mode 100644
+index 0000000..5d2cc9b
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/impl/OrderCancelApplyServiceImpl.java
+@@ -0,0 +1,316 @@
++package com.yigongbao.module.order.service.impl;
++
++import cn.dev33.satoken.stp.StpUtil;
++import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
++import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
++import com.baomidou.mybatisplus.core.metadata.IPage;
++import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
++import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
++import com.yigongbao.common.constant.RoleCodeConstants;
++import com.yigongbao.common.constant.StatusConstants;
++import com.yigongbao.common.entity.OrderMainEntity;
++import com.yigongbao.common.enums.ErrorCodeEnum;
++import com.yigongbao.common.exception.BusinessException;
++import com.yigongbao.flow.enums.FlowActionEnum;
++import com.yigongbao.flow.facade.FlowFacade;
++import com.yigongbao.flow.operator.FlowOperator;
++import com.yigongbao.flow.result.TransitionResult;
++import com.yigongbao.module.order.convert.OrderCancelApplyConvert;
++import com.yigongbao.module.order.dto.order.AuditCancelApplyDTO;
++import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
++import com.yigongbao.module.order.dto.order.OrderPageDTO;
++import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
++import com.yigongbao.module.order.enums.ApplyStatusEnum;
++import com.yigongbao.common.event.CancelApplyApprovedEvent;
++import com.yigongbao.common.event.CancelApplyRejectedEvent;
++import com.yigongbao.common.event.CancelApplySubmittedEvent;
++import com.yigongbao.module.order.mapper.OrderCancelApplyMapper;
++import com.yigongbao.module.order.service.OrderCancelApplyService;
++import com.yigongbao.module.order.service.OrderMainService;
++import com.yigongbao.module.order.vo.order.CancelApplyVO;
++import com.yigongbao.module.system.user.entity.UserEntity;
++import com.yigongbao.module.system.user.service.UserService;
++import lombok.RequiredArgsConstructor;
++import lombok.extern.slf4j.Slf4j;
++import org.springframework.context.ApplicationEventPublisher;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++
++import java.lang.reflect.Field;
++import java.time.LocalDateTime;
++import java.util.List;
++import java.util.stream.Collectors;
++
++/**
++ * 订单取消申请 Service 实现
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++@Slf4j
++@Service
++@RequiredArgsConstructor
++public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMapper, OrderCancelApplyEntity>
++        implements OrderCancelApplyService {
++
++    private final OrderMainService orderMainService;
++    private final FlowFacade flowFacade;
++    private final OrderCancelApplyConvert cancelApplyConvert;
++    private final ApplicationEventPublisher eventPublisher;
++    private final UserService userService;
++
++    @Override
++    @Transactional(rollbackFor = Exception.class)
++    public Long submitCancelApply(CancelOrderApplyDTO dto) {
++        Long currentUserId = StpUtil.getLoginIdAsLong();
++        Long orderId = dto.getOrderId();
++
++        // 1. 验证订单存在且未取消
++        OrderMainEntity order = orderMainService.getById(orderId);
++        if (order == null) {
++            log.warn("提交取消申请失败，订单不存在: orderId={}", orderId);
++            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
++        }
++
++        if (order.getStatus() == 9010) {
++            log.warn("提交取消申请失败，订单已取消: orderId={}", orderId);
++            throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_CANCELLED);
++        }
++
++        // 2. 验证订单阶段≥20
++        if (order.getPhase() < 20) {
++            log.warn("提交取消申请失败，订单阶段不允许: orderId={}, phase={}", orderId, order.getPhase());
++            throw new BusinessException(ErrorCodeEnum.ORDER_PHASE_NOT_ALLOW_APPLY);
++        }
++
++        // 3. 验证无待审核的取消申请
++        if (StatusConstants.YES == order.getHasPendingCancelApply()) {
++            log.warn("提交取消申请失败，存在待审核申请: orderId={}", orderId);
++            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
++        }
++
++        // 4. 权限校验：仅订单创建人或设计师可提交
++        boolean isCreator = currentUserId.equals(order.getCreateBy());
++        boolean isDesigner = currentUserId.equals(order.getDesignerId());
++        if (!isCreator && !isDesigner) {
++            log.warn("提交取消申请失败，无权限: orderId={}, userId={}, creator={}, designer={}",
++                    orderId, currentUserId, order.getCreateBy(), order.getDesignerId());
++            throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
++        }
++
++        // 5. 创建取消申请记录
++        OrderCancelApplyEntity apply = new OrderCancelApplyEntity();
++        apply.setOrderId(orderId);
++        apply.setApplyBy(currentUserId);
++        apply.setApplyReason(dto.getReason());
++        apply.setAuditStatus(ApplyStatusEnum.PENDING.getCode());
++        save(apply);
++
++        // 6. 更新订单待审核标记
++        orderMainService.update(new LambdaUpdateWrapper<OrderMainEntity>()
++                .eq(OrderMainEntity::getId, orderId)
++                .set(OrderMainEntity::getHasPendingCancelApply, StatusConstants.YES));
++
++        // 7. 发布申请提交事件
++        eventPublisher.publishEvent(new CancelApplySubmittedEvent(this, apply.getId(), orderId, currentUserId));
++
++        log.info("提交取消申请: applyId={}, orderId={}, applyBy={}, reason={}",
++                apply.getId(), orderId, currentUserId, dto.getReason());
++
++        return apply.getId();
++    }
++
++    @Override
++    @Transactional(rollbackFor = Exception.class)
++    public void auditCancelApply(Long applyId, AuditCancelApplyDTO dto) {
++        Long currentUserId = StpUtil.getLoginIdAsLong();
++
++        // 1. 权限校验：仅设计管理员可审核
++        String roleCode = getCurrentUserRoleCode();
++        if (!RoleCodeConstants.DESIGN_ADMIN.equals(roleCode)) {
++            log.warn("审核取消申请失败，无权限: applyId={}, userId={}, roleCode={}",
++                    applyId, currentUserId, roleCode);
++            throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
++        }
++
++        // 2. 验证申请存在
++        OrderCancelApplyEntity apply = getById(applyId);
++        if (apply == null) {
++            log.warn("审核取消申请失败，申请不存在: applyId={}", applyId);
++            throw new BusinessException(ErrorCodeEnum.CANCEL_APPLY_NOT_FOUND);
++        }
++
++        // 3. 验证申请状态为待审核
++        if (!ApplyStatusEnum.PENDING.getCode().equals(apply.getAuditStatus())) {
++            log.warn("审核取消申请失败，申请已审核: applyId={}, auditStatus={}",
++                    applyId, apply.getAuditStatus());
++            throw new BusinessException(ErrorCodeEnum.CANCEL_APPLY_ALREADY_AUDITED);
++        }
++
++        Long orderId = apply.getOrderId();
++        OrderMainEntity order = orderMainService.getById(orderId);
++        if (order == null) {
++            log.error("审核取消申请失败，订单不存在: applyId={}, orderId={}", applyId, orderId);
++            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
++        }
++
++        String auditorName = getUserRealName(currentUserId);
++
++        if (dto.getApproved()) {
++            // 审核通过：执行订单取消流程
++            try {
++                TransitionResult result = flowFacade.executeFlow(
++                        orderId,
++                        FlowActionEnum.CANCEL,
++                        new FlowOperator(currentUserId, auditorName, dto.getReason()));
++
++                // 更新订单状态和标记
++                orderMainService.update(new LambdaUpdateWrapper<OrderMainEntity>()
++                        .eq(OrderMainEntity::getId, orderId)
++                        .set(OrderMainEntity::getPhase, result.getTargetPhase())
++                        .set(OrderMainEntity::getStatus, result.getFinalStatus())
++                        .set(OrderMainEntity::getHasPendingCancelApply, StatusConstants.NO));
++
++                // 更新申请记录
++                apply.setAuditStatus(ApplyStatusEnum.APPROVED.getCode());
++                apply.setAuditBy(currentUserId);
++                apply.setAuditReason(dto.getReason());
++                apply.setAuditTime(LocalDateTime.now());
++                updateById(apply);
++
++                // 发布审核通过事件
++                eventPublisher.publishEvent(new CancelApplyApprovedEvent(
++                        this, applyId, orderId, currentUserId, apply.getApplyBy()));
++
++                log.info("取消申请审核通过: applyId={}, orderId={}, auditBy={}, phase={}, status={}",
++                        applyId, orderId, currentUserId, result.getTargetPhase(), result.getFinalStatus());
++
++            } catch (Exception e) {
++                log.error("取消申请审核通过失败: applyId={}, orderId={}", applyId, orderId, e);
++                throw e;
++            }
++
++        } else {
++            // 审核驳回：更新申请记录并清除订单标记
++            apply.setAuditStatus(ApplyStatusEnum.REJECTED.getCode());
++            apply.setAuditBy(currentUserId);
++            apply.setAuditReason(dto.getReason());
++            apply.setAuditTime(LocalDateTime.now());
++            updateById(apply);
++
++            // 清除订单待审核标记
++            orderMainService.update(new LambdaUpdateWrapper<OrderMainEntity>()
++                    .eq(OrderMainEntity::getId, orderId)
++                    .set(OrderMainEntity::getHasPendingCancelApply, StatusConstants.NO));
++
++            // 发布审核驳回事件
++            eventPublisher.publishEvent(new CancelApplyRejectedEvent(
++                    this, applyId, orderId, currentUserId, apply.getApplyBy()));
++
++            log.info("取消申请审核驳回: applyId={}, orderId={}, auditBy={}, reason={}",
++                    applyId, orderId, currentUserId, dto.getReason());
++        }
++    }
++
++    @Override
++    public CancelApplyVO getCancelApplyDetail(Long applyId) {
++        OrderCancelApplyEntity apply = getById(applyId);
++        if (apply == null) {
++            throw new BusinessException(ErrorCodeEnum.CANCEL_APPLY_NOT_FOUND);
++        }
++
++        return buildCancelApplyVO(apply);
++    }
++
++    @Override
++    public IPage<CancelApplyVO> listPendingApplies(OrderPageDTO dto) {
++        Page<OrderCancelApplyEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
++
++        LambdaQueryWrapper<OrderCancelApplyEntity> qw = new LambdaQueryWrapper<>();
++        qw.eq(OrderCancelApplyEntity::getAuditStatus, ApplyStatusEnum.PENDING.getCode())
++                .orderByDesc(OrderCancelApplyEntity::getCreateTime);
++
++        page = page(page, qw);
++
++        return page.convert(this::buildCancelApplyVO);
++    }
++
++    @Override
++    public boolean hasPendingCancelApply(Long orderId) {
++        OrderMainEntity order = orderMainService.getById(orderId);
++        if (order == null) {
++            return false;
++        }
++        return StatusConstants.YES == order.getHasPendingCancelApply();
++    }
++
++    @Override
++    public IPage<CancelApplyVO> listMyApplies(OrderPageDTO dto) {
++        Long currentUserId = StpUtil.getLoginIdAsLong();
++        Page<OrderCancelApplyEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
++
++        LambdaQueryWrapper<OrderCancelApplyEntity> qw = new LambdaQueryWrapper<>();
++        qw.eq(OrderCancelApplyEntity::getApplyBy, currentUserId)
++                .orderByDesc(OrderCancelApplyEntity::getCreateTime);
++
++        page = page(page, qw);
++
++        return page.convert(this::buildCancelApplyVO);
++    }
++
++    @Override
++    public List<CancelApplyVO> getCancelApplyHistory(Long orderId) {
++        LambdaQueryWrapper<OrderCancelApplyEntity> qw = new LambdaQueryWrapper<>();
++        qw.eq(OrderCancelApplyEntity::getOrderId, orderId)
++                .orderByDesc(OrderCancelApplyEntity::getCreateTime);
++
++        List<OrderCancelApplyEntity> applies = list(qw);
++
++        return applies.stream()
++                .map(this::buildCancelApplyVO)
++                .collect(Collectors.toList());
++    }
++
++    /**
++     * 构建取消申请VO（包含用户名称和订单编号）
++     *
++     * @param entity 取消申请实体
++     * @return 取消申请VO
++     */
++    private CancelApplyVO buildCancelApplyVO(OrderCancelApplyEntity entity) {
++        if (entity == null) {
++            return null;
++        }
++
++        String applyByName = getUserRealName(entity.getApplyBy());
++        String auditByName = entity.getAuditBy() != null ? getUserRealName(entity.getAuditBy()) : null;
++
++        OrderMainEntity order = orderMainService.getById(entity.getOrderId());
++        String orderCode = order != null ? order.getOrderCode() : null;
++
++        return cancelApplyConvert.toVO(entity, applyByName, auditByName, orderCode);
++    }
++
++    /**
++     * 获取用户真实姓名
++     *
++     * @param userId 用户ID
++     * @return 用户真实姓名
++     */
++    private String getUserRealName(Long userId) {
++        if (userId == null) {
++            return null;
++        }
++        UserEntity user = userService.getById(userId);
++        return user != null ? user.getRealName() : null;
++    }
++
++    /**
++     * 获取当前用户角色编码
++     *
++     * @return 角色编码
++     */
++    private String getCurrentUserRoleCode() {
++        return userService.getCurrentUserRoleCode();
++    }
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/impl/OrderMainServiceImpl.java b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/impl/OrderMainServiceImpl.java
+index 15f3892..452aa43 100644
+--- a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/impl/OrderMainServiceImpl.java
++++ b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/impl/OrderMainServiceImpl.java
+@@ -48,6 +48,7 @@ import com.yigongbao.module.order.entity.OrderModificationLogEntity;
+ import com.yigongbao.module.order.enums.OrderDraftStatusEnum;
+ import com.yigongbao.module.order.helper.OrderQueryHelper;
+ import com.yigongbao.module.order.service.DesignerAssignmentService;
++import com.yigongbao.module.order.service.OrderCancelApplyService;
+ import com.yigongbao.module.order.service.OrderModifyApplyService;
+ import com.yigongbao.module.order.mapper.OrderDraftMapper;
+ import com.yigongbao.module.order.mapper.OrderFileMapper;
+@@ -125,6 +126,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
+     private final ObjectMapper objectMapper;
+     private final OrderDataValidator orderDataValidator;
+     private final OrderModifyApplyService orderModifyApplyService;
++    private final OrderCancelApplyService cancelApplyService;
+     private final com.yigongbao.module.order.convert.OrderConvert orderConvert;
+     private final ApplicationEventPublisher eventPublisher;
+ 
+@@ -133,6 +135,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
+     @Autowired
+     private DesignerAssignmentService designerAssignmentService;
+ 
++    /** 设计阶段阈值：订单阶段(phase=10)与设计阶段(phase=20)的分界点 */
++    private static final int DESIGN_PHASE_THRESHOLD = 20;
++
+     // ==================== 私有方法 ====================
+ 
+     /**
+@@ -646,6 +651,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
+             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_PENDING);
+         }
+ 
++        if (cancelApplyService.hasPendingCancelApply(id)) {
++            log.warn("订单存在待审核的取消申请，不允许数据审核: orderId={}", id);
++            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
++        }
++
+         String roleCode = getCurrentUserRoleCode();
+ 
+         // 所有订单统一：只有设计管理员可以审核（试用订单不再需要区域管理员审核）
+@@ -715,6 +725,11 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
+             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_PENDING);
+         }
+ 
++        if (cancelApplyService.hasPendingCancelApply(id)) {
++            log.warn("订单存在待审核的取消申请，不允许数据审核: orderId={}", id);
++            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
++        }
++
+         String roleCode = getCurrentUserRoleCode();
+ 
+         // 所有订单统一：只有设计管理员可以驳回（试用订单不再需要区域管理员审核）
+@@ -793,27 +808,47 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
+     public void cancelOrder(Long id) {
+         Long currentUserId = getCurrentUserId();
+         // 校验订单存在
+-        OrderMainEntity entity = getById(id);
+-        if (entity == null) {
++        OrderMainEntity order = getById(id);
++        if (order == null) {
+             log.warn("订单不存在: orderId={}", id);
+             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+         }
+         // 校验订单未取消
+-        if (entity.getStatus().equals(FlowStatusEnum.CANCELLED.getValue())) {
++        if (order.getStatus().equals(FlowStatusEnum.CANCELLED.getValue())) {
+             log.warn("订单已取消，不能重复取消: orderId={}", id);
+             throw new BusinessException(ErrorCodeEnum.ORDER_ALREADY_CANCELLED);
+         }
++
++        // 检查阶段：订单阶段允许直接取消，设计阶段需提交申请
++        if (order.getPhase() < DESIGN_PHASE_THRESHOLD) {
++            // 订单阶段：直接取消
++            directCancelOrder(id, order, currentUserId);
++        } else {
++            // 设计阶段：需提交取消申请
++            log.warn("订单处于设计阶段，需提交取消申请: orderId={}, phase={}", id, order.getPhase());
++            throw new BusinessException(ErrorCodeEnum.ORDER_NEED_CANCEL_APPLY);
++        }
++    }
++
++    /**
++     * 直接取消订单（仅订单阶段）
++     *
++     * @param id 订单ID
++     * @param order 订单实体
++     * @param currentUserId 当前用户ID
++     */
++    private void directCancelOrder(Long id, OrderMainEntity order, Long currentUserId) {
+         // 获取当前用户姓名
+         String operatorName = getUserRealName(currentUserId);
+         // 通过 FlowFacade 执行取消动作
+         TransitionResult result = flowFacade.executeFlow(
+                 id, FlowActionEnum.CANCEL, new FlowOperator(currentUserId, operatorName, null));
+         // 更新订单的阶段和状态
+-        entity.setPhase(result.getTargetPhase());
+-        entity.setStatus(result.getFinalStatus());
+-        updateById(entity);
++        order.setPhase(result.getTargetPhase());
++        order.setStatus(result.getFinalStatus());
++        updateById(order);
+         eventPublisher.publishEvent(new OrderCancelledEvent(this, id));
+-        log.info("取消订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
++        log.info("直接取消订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
+     }
+ 
+     /**
+diff --git a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/impl/OrderModifyApplyServiceImpl.java b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/impl/OrderModifyApplyServiceImpl.java
+index 848a086..7fcbed4 100644
+--- a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/impl/OrderModifyApplyServiceImpl.java
++++ b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/service/impl/OrderModifyApplyServiceImpl.java
+@@ -36,6 +36,7 @@ import com.yigongbao.module.order.mapper.OrderItemMapper;
+ import com.yigongbao.module.order.mapper.OrderMainMapper;
+ import com.yigongbao.module.order.mapper.OrderModificationApplyMapper;
+ import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
++import com.yigongbao.module.order.service.OrderCancelApplyService;
+ import com.yigongbao.module.order.service.OrderModifyApplyService;
+ import com.yigongbao.module.order.service.OrderModifyFullService;
+ import com.yigongbao.module.order.utils.OrderModifyTimeWindowChecker;
+@@ -87,6 +88,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
+     private final OrderModifyTimeWindowChecker timeWindowChecker;
+     private final ConfigService configService;
+     private final ApplicationEventPublisher eventPublisher;
++    private final OrderCancelApplyService cancelApplyService;
+ 
+     // ==================== 申请审核流程方法 ====================
+ 
+@@ -115,6 +117,12 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
+             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+         }
+ 
++        // 检查是否存在待审核的取消申请
++        if (cancelApplyService.hasPendingCancelApply(orderId)) {
++            log.warn("订单存在待审核的取消申请，不允许提交修改申请: orderId={}", orderId);
++            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
++        }
++
+         // 检查订单所有权：只有订单创建者可以提交修改申请
+         Long currentUserId = StpUtil.getLoginIdAsLong();
+         if (!currentUserId.equals(order.getOperatorId())) {
+diff --git a/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/vo/order/CancelApplyVO.java b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/vo/order/CancelApplyVO.java
+new file mode 100644
+index 0000000..388d9f3
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/main/java/com/yigongbao/module/order/vo/order/CancelApplyVO.java
+@@ -0,0 +1,52 @@
++package com.yigongbao.module.order.vo.order;
++
++import io.swagger.v3.oas.annotations.media.Schema;
++import lombok.Data;
++import java.time.LocalDateTime;
++
++/**
++ * 取消申请详情VO
++ *
++ * @author hanjor
++ * @since 2026-07-10
++ */
++@Data
++@Schema(description = "取消申请详情VO")
++public class CancelApplyVO {
++
++    @Schema(description = "申请ID")
++    private Long id;
++
++    @Schema(description = "订单ID")
++    private Long orderId;
++
++    @Schema(description = "订单编号")
++    private String orderCode;
++
++    @Schema(description = "申请人ID")
++    private Long applyBy;
++
++    @Schema(description = "申请人姓名")
++    private String applyByName;
++
++    @Schema(description = "取消原因")
++    private String applyReason;
++
++    @Schema(description = "审核状态：1=待审核，2=已通过，3=已驳回")
++    private Integer auditStatus;
++
++    @Schema(description = "审核人ID")
++    private Long auditBy;
++
++    @Schema(description = "审核人姓名")
++    private String auditByName;
++
++    @Schema(description = "审核原因")
++    private String auditReason;
++
++    @Schema(description = "审核时间")
++    private LocalDateTime auditTime;
++
++    @Schema(description = "创建时间")
++    private LocalDateTime createTime;
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/test/java/com/yigongbao/module/order/TestConfiguration.java b/yigongbao-parent/yigongbao-module-order/src/test/java/com/yigongbao/module/order/TestConfiguration.java
+new file mode 100644
+index 0000000..cd38c27
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/test/java/com/yigongbao/module/order/TestConfiguration.java
+@@ -0,0 +1,15 @@
++package com.yigongbao.module.order;
++
++import org.springframework.boot.autoconfigure.SpringBootApplication;
++import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
++
++/**
++ * 测试配置类
++ * 排除数据库自动配置，避免测试时初始化数据库
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++@SpringBootApplication(exclude = {DataSourceAutoConfiguration.class})
++public class TestConfiguration {
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/test/java/com/yigongbao/module/order/controller/OrderCancelApplyControllerTest.java b/yigongbao-parent/yigongbao-module-order/src/test/java/com/yigongbao/module/order/controller/OrderCancelApplyControllerTest.java
+new file mode 100644
+index 0000000..4e5ac2e
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/test/java/com/yigongbao/module/order/controller/OrderCancelApplyControllerTest.java
+@@ -0,0 +1,169 @@
++package com.yigongbao.module.order.controller;
++
++import com.fasterxml.jackson.databind.ObjectMapper;
++import com.yigongbao.module.order.dto.order.AuditCancelApplyDTO;
++import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
++import com.yigongbao.module.order.service.OrderCancelApplyService;
++import com.yigongbao.module.order.vo.order.CancelApplyVO;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
++import org.springframework.boot.test.mock.mockito.MockBean;
++import org.springframework.http.MediaType;
++import org.springframework.test.web.servlet.MockMvc;
++
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.ArgumentMatchers.eq;
++import static org.mockito.Mockito.*;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
++
++/**
++ * OrderCancelApplyController Web层测试
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++@WebMvcTest(OrderCancelApplyController.class)
++class OrderCancelApplyControllerTest {
++
++    @Autowired
++    private MockMvc mockMvc;
++
++    @Autowired
++    private ObjectMapper objectMapper;
++
++    @MockBean
++    private OrderCancelApplyService cancelApplyService;
++
++    private static final Long APPLY_ID = 3001L;
++    private static final Long ORDER_ID = 2001L;
++
++    /**
++     * 测试提交取消申请 - 成功
++     */
++    @Test
++    void submitCancelApply_Success() throws Exception {
++        // Arrange
++        CancelOrderApplyDTO dto = new CancelOrderApplyDTO();
++        dto.setOrderId(ORDER_ID);
++        dto.setReason("客户取消订单");
++
++        when(cancelApplyService.submitCancelApply(any(CancelOrderApplyDTO.class)))
++                .thenReturn(APPLY_ID);
++
++        // Act & Assert
++        mockMvc.perform(post("/order/cancel-apply")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(dto)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.code").value(200))
++                .andExpect(jsonPath("$.data").value(APPLY_ID));
++
++        verify(cancelApplyService, times(1)).submitCancelApply(any(CancelOrderApplyDTO.class));
++    }
++
++    /**
++     * 测试提交取消申请 - 参数校验失败（订单ID为空）
++     */
++    @Test
++    void submitCancelApply_ValidationFailed() throws Exception {
++        // Arrange
++        CancelOrderApplyDTO dto = new CancelOrderApplyDTO();
++        // orderId 为空，应该触发校验失败
++
++        // Act & Assert
++        mockMvc.perform(post("/order/cancel-apply")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(dto)))
++                .andExpect(status().isBadRequest());
++
++        verify(cancelApplyService, never()).submitCancelApply(any());
++    }
++
++    /**
++     * 测试审核取消申请 - 审核通过
++     */
++    @Test
++    void auditCancelApply_Approved() throws Exception {
++        // Arrange
++        AuditCancelApplyDTO dto = new AuditCancelApplyDTO();
++        dto.setApproved(true);
++        dto.setReason("审核通过");
++
++        doNothing().when(cancelApplyService).auditCancelApply(eq(APPLY_ID), any(AuditCancelApplyDTO.class));
++
++        // Act & Assert
++        mockMvc.perform(post("/order/cancel-apply/{applyId}/audit", APPLY_ID)
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(dto)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.code").value(200));
++
++        verify(cancelApplyService, times(1)).auditCancelApply(eq(APPLY_ID), any(AuditCancelApplyDTO.class));
++    }
++
++    /**
++     * 测试审核取消申请 - 审核驳回
++     */
++    @Test
++    void auditCancelApply_Rejected() throws Exception {
++        // Arrange
++        AuditCancelApplyDTO dto = new AuditCancelApplyDTO();
++        dto.setApproved(false);
++        dto.setReason("不符合取消条件");
++
++        doNothing().when(cancelApplyService).auditCancelApply(eq(APPLY_ID), any(AuditCancelApplyDTO.class));
++
++        // Act & Assert
++        mockMvc.perform(post("/order/cancel-apply/{applyId}/audit", APPLY_ID)
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(dto)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.code").value(200));
++
++        verify(cancelApplyService, times(1)).auditCancelApply(eq(APPLY_ID), any(AuditCancelApplyDTO.class));
++    }
++
++    /**
++     * 测试审核取消申请 - 参数校验失败（审核结果为空）
++     */
++    @Test
++    void auditCancelApply_ValidationFailed() throws Exception {
++        // Arrange
++        AuditCancelApplyDTO dto = new AuditCancelApplyDTO();
++        // approved 为空，应该触发校验失败
++
++        // Act & Assert
++        mockMvc.perform(post("/order/cancel-apply/{applyId}/audit", APPLY_ID)
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(dto)))
++                .andExpect(status().isBadRequest());
++
++        verify(cancelApplyService, never()).auditCancelApply(any(), any());
++    }
++
++    /**
++     * 测试查询取消申请详情 - 成功
++     */
++    @Test
++    void getCancelApplyDetail_Success() throws Exception {
++        // Arrange
++        CancelApplyVO vo = new CancelApplyVO();
++        vo.setId(APPLY_ID);
++        vo.setOrderId(ORDER_ID);
++        vo.setOrderCode("ORD2026071000001");
++        vo.setApplyReason("客户取消订单");
++
++        when(cancelApplyService.getCancelApplyDetail(APPLY_ID)).thenReturn(vo);
++
++        // Act & Assert
++        mockMvc.perform(get("/order/cancel-apply/{applyId}", APPLY_ID))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.code").value(200))
++                .andExpect(jsonPath("$.data.id").value(APPLY_ID))
++                .andExpect(jsonPath("$.data.orderId").value(ORDER_ID));
++
++        verify(cancelApplyService, times(1)).getCancelApplyDetail(APPLY_ID);
++    }
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/test/java/com/yigongbao/module/order/service/impl/OrderCancelApplyServiceImplTest.java b/yigongbao-parent/yigongbao-module-order/src/test/java/com/yigongbao/module/order/service/impl/OrderCancelApplyServiceImplTest.java
+new file mode 100644
+index 0000000..358dd9b
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-order/src/test/java/com/yigongbao/module/order/service/impl/OrderCancelApplyServiceImplTest.java
+@@ -0,0 +1,347 @@
++package com.yigongbao.module.order.service.impl;
++
++import cn.dev33.satoken.stp.StpUtil;
++import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
++import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
++import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
++import com.yigongbao.common.constant.RoleCodeConstants;
++import com.yigongbao.common.constant.StatusConstants;
++import com.yigongbao.common.entity.OrderMainEntity;
++import com.yigongbao.common.enums.ErrorCodeEnum;
++import com.yigongbao.common.event.CancelApplyApprovedEvent;
++import com.yigongbao.common.event.CancelApplyRejectedEvent;
++import com.yigongbao.common.event.CancelApplySubmittedEvent;
++import com.yigongbao.common.exception.BusinessException;
++import com.yigongbao.flow.enums.FlowActionEnum;
++import com.yigongbao.flow.facade.FlowFacade;
++import com.yigongbao.flow.operator.FlowOperator;
++import com.yigongbao.flow.result.TransitionResult;
++import com.yigongbao.module.order.convert.OrderCancelApplyConvert;
++import com.yigongbao.module.order.dto.order.AuditCancelApplyDTO;
++import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
++import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
++import com.yigongbao.module.order.enums.ApplyStatusEnum;
++import com.yigongbao.module.order.mapper.OrderCancelApplyMapper;
++import com.yigongbao.module.order.service.OrderMainService;
++import com.yigongbao.module.system.user.entity.UserEntity;
++import com.yigongbao.module.system.user.service.UserService;
++import org.apache.ibatis.builder.MapperBuilderAssistant;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.MockedStatic;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.mockito.junit.jupiter.MockitoSettings;
++import org.mockito.quality.Strictness;
++import org.springframework.context.ApplicationEventPublisher;
++
++import java.lang.reflect.Field;
++
++import static org.junit.jupiter.api.Assertions.*;
++import static org.mockito.ArgumentMatchers.*;
++import static org.mockito.Mockito.*;
++
++/**
++ * OrderCancelApplyService 单元测试
++ *
++ * @author Claude Sonnet 4.6
++ * @date 2026-07-10
++ */
++@ExtendWith(MockitoExtension.class)
++@MockitoSettings(strictness = Strictness.LENIENT)
++class OrderCancelApplyServiceImplTest {
++
++    @Mock
++    private OrderCancelApplyMapper cancelApplyMapper;
++
++    @Mock
++    private OrderMainService orderMainService;
++
++    @Mock
++    private FlowFacade flowFacade;
++
++    @Mock
++    private OrderCancelApplyConvert cancelApplyConvert;
++
++    @Mock
++    private ApplicationEventPublisher eventPublisher;
++
++    @Mock
++    private UserService userService;
++
++    @InjectMocks
++    private OrderCancelApplyServiceImpl cancelApplyService;
++
++    private static final Long CURRENT_USER_ID = 1001L;
++    private static final Long ORDER_ID = 2001L;
++    private static final Long APPLY_ID = 3001L;
++    private static final String APPLY_REASON = "客户取消订单";
++    private static final String AUDIT_REASON = "审核通过";
++
++    @BeforeEach
++    void setUp() throws Exception {
++        // 反射注入 baseMapper（继承 ServiceImpl 时必须）
++        Field baseMapperField = ServiceImpl.class.getDeclaredField("baseMapper");
++        baseMapperField.setAccessible(true);
++        baseMapperField.set(cancelApplyService, cancelApplyMapper);
++
++        // 初始化 OrderMainEntity 的表信息（支持 LambdaUpdateWrapper）
++        if (TableInfoHelper.getTableInfo(OrderMainEntity.class) == null) {
++            MapperBuilderAssistant assistant = new MapperBuilderAssistant(
++                    new org.apache.ibatis.session.Configuration(), "");
++            TableInfoHelper.initTableInfo(assistant, OrderMainEntity.class);
++        }
++    }
++
++    /**
++     * 测试提交取消申请 - 成功场景
++     */
++    @Test
++    void submitCancelApply_Success() {
++        // Arrange
++        CancelOrderApplyDTO dto = new CancelOrderApplyDTO();
++        dto.setOrderId(ORDER_ID);
++        dto.setReason(APPLY_REASON);
++
++        OrderMainEntity order = buildOrderEntity(ORDER_ID, 20, 2010, StatusConstants.NO);
++        order.setCreateBy(CURRENT_USER_ID);
++
++        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
++            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
++
++            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
++            when(cancelApplyMapper.insert(any(OrderCancelApplyEntity.class))).thenAnswer(invocation -> {
++                OrderCancelApplyEntity entity = invocation.getArgument(0);
++                entity.setId(APPLY_ID);
++                return 1;
++            });
++            when(orderMainService.update(any(LambdaUpdateWrapper.class))).thenReturn(true);
++
++            // Act
++            Long applyId = cancelApplyService.submitCancelApply(dto);
++
++            // Assert
++            assertNotNull(applyId);
++            assertEquals(APPLY_ID, applyId);
++
++            verify(cancelApplyMapper, times(1)).insert(any(OrderCancelApplyEntity.class));
++            verify(orderMainService, times(1)).update(any(LambdaUpdateWrapper.class));
++            verify(eventPublisher, times(1)).publishEvent(any(CancelApplySubmittedEvent.class));
++        }
++    }
++
++    /**
++     * 测试提交取消申请 - 订单不存在
++     */
++    @Test
++    void submitCancelApply_OrderNotFound() {
++        // Arrange
++        CancelOrderApplyDTO dto = new CancelOrderApplyDTO();
++        dto.setOrderId(ORDER_ID);
++        dto.setReason(APPLY_REASON);
++
++        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
++            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
++            when(orderMainService.getById(ORDER_ID)).thenReturn(null);
++
++            // Act & Assert
++            BusinessException exception = assertThrows(BusinessException.class,
++                    () -> cancelApplyService.submitCancelApply(dto));
++
++            assertEquals(ErrorCodeEnum.ORDER_NOT_FOUND.getCode(), exception.getCode());
++
++            verify(cancelApplyMapper, never()).insert(any(OrderCancelApplyEntity.class));
++            verify(eventPublisher, never()).publishEvent(any());
++        }
++    }
++
++    /**
++     * 测试提交取消申请 - 订单已取消
++     */
++    @Test
++    void submitCancelApply_OrderAlreadyCancelled() {
++        // Arrange
++        CancelOrderApplyDTO dto = new CancelOrderApplyDTO();
++        dto.setOrderId(ORDER_ID);
++        dto.setReason(APPLY_REASON);
++
++        OrderMainEntity order = buildOrderEntity(ORDER_ID, 90, 9010, StatusConstants.NO);
++        order.setCreateBy(CURRENT_USER_ID);
++
++        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
++            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
++            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
++
++            // Act & Assert
++            BusinessException exception = assertThrows(BusinessException.class,
++                    () -> cancelApplyService.submitCancelApply(dto));
++
++            assertEquals(ErrorCodeEnum.ORDER_ALREADY_CANCELLED.getCode(), exception.getCode());
++
++            verify(cancelApplyMapper, never()).insert(any(OrderCancelApplyEntity.class));
++            verify(eventPublisher, never()).publishEvent(any());
++        }
++    }
++
++    /**
++     * 测试提交取消申请 - 已存在待审核申请
++     */
++    @Test
++    void submitCancelApply_HasPendingApply() {
++        // Arrange
++        CancelOrderApplyDTO dto = new CancelOrderApplyDTO();
++        dto.setOrderId(ORDER_ID);
++        dto.setReason(APPLY_REASON);
++
++        OrderMainEntity order = buildOrderEntity(ORDER_ID, 20, 2010, StatusConstants.YES);
++        order.setCreateBy(CURRENT_USER_ID);
++
++        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
++            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
++            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
++
++            // Act & Assert
++            BusinessException exception = assertThrows(BusinessException.class,
++                    () -> cancelApplyService.submitCancelApply(dto));
++
++            assertEquals(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING.getCode(), exception.getCode());
++
++            verify(cancelApplyMapper, never()).insert(any(OrderCancelApplyEntity.class));
++            verify(eventPublisher, never()).publishEvent(any());
++        }
++    }
++
++    /**
++     * 测试提交取消申请 - 订单阶段不允许
++     */
++    @Test
++    void submitCancelApply_PhaseNotAllow() {
++        // Arrange
++        CancelOrderApplyDTO dto = new CancelOrderApplyDTO();
++        dto.setOrderId(ORDER_ID);
++        dto.setReason(APPLY_REASON);
++
++        OrderMainEntity order = buildOrderEntity(ORDER_ID, 10, 1020, StatusConstants.NO);
++        order.setCreateBy(CURRENT_USER_ID);
++
++        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
++            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
++            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
++
++            // Act & Assert
++            BusinessException exception = assertThrows(BusinessException.class,
++                    () -> cancelApplyService.submitCancelApply(dto));
++
++            assertEquals(ErrorCodeEnum.ORDER_PHASE_NOT_ALLOW_APPLY.getCode(), exception.getCode());
++
++            verify(cancelApplyMapper, never()).insert(any(OrderCancelApplyEntity.class));
++            verify(eventPublisher, never()).publishEvent(any());
++        }
++    }
++
++    /**
++     * 构建订单实体
++     */
++    private OrderMainEntity buildOrderEntity(Long orderId, Integer phase, Integer status, Integer hasPendingCancelApply) {
++        OrderMainEntity order = new OrderMainEntity();
++        order.setId(orderId);
++        order.setPhase(phase);
++        order.setStatus(status);
++        order.setHasPendingCancelApply(hasPendingCancelApply);
++        order.setOrderCode("ORD2026071000001");
++        return order;
++    }
++
++    /**
++     * 测试审核取消申请 - 审核通过
++     */
++    @Test
++    void auditCancelApply_Approved() {
++        // Arrange
++        AuditCancelApplyDTO dto = new AuditCancelApplyDTO();
++        dto.setApproved(true);
++        dto.setReason(AUDIT_REASON);
++
++        OrderCancelApplyEntity apply = buildCancelApplyEntity(APPLY_ID, ORDER_ID, ApplyStatusEnum.PENDING.getCode());
++        OrderMainEntity order = buildOrderEntity(ORDER_ID, 20, 2010, StatusConstants.YES);
++        UserEntity auditor = new UserEntity();
++        auditor.setId(CURRENT_USER_ID);
++        auditor.setRealName("审核员");
++
++        TransitionResult transitionResult = new TransitionResult();
++        transitionResult.setTargetPhase(90);
++        transitionResult.setTargetStatus(9010);
++        transitionResult.setInitialStatus(9010);
++        transitionResult.setPhaseChanged(true);
++
++        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
++            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
++
++            when(userService.getCurrentUserRoleCode()).thenReturn(RoleCodeConstants.DESIGN_ADMIN);
++            when(cancelApplyMapper.selectById(APPLY_ID)).thenReturn(apply);
++            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
++            when(userService.getById(CURRENT_USER_ID)).thenReturn(auditor);
++            when(flowFacade.executeFlow(eq(ORDER_ID), eq(FlowActionEnum.CANCEL), any(FlowOperator.class)))
++                    .thenReturn(transitionResult);
++            when(orderMainService.update(any(LambdaUpdateWrapper.class))).thenReturn(true);
++            when(cancelApplyMapper.updateById(any(OrderCancelApplyEntity.class))).thenReturn(1);
++
++            // Act
++            cancelApplyService.auditCancelApply(APPLY_ID, dto);
++
++            // Assert
++            verify(flowFacade, times(1)).executeFlow(eq(ORDER_ID), eq(FlowActionEnum.CANCEL), any(FlowOperator.class));
++            verify(orderMainService, times(1)).update(any(LambdaUpdateWrapper.class));
++            verify(cancelApplyMapper, times(1)).updateById(any(OrderCancelApplyEntity.class));
++            verify(eventPublisher, times(1)).publishEvent(any(CancelApplyApprovedEvent.class));
++        }
++    }
++
++    /**
++     * 测试审核取消申请 - 审核驳回
++     */
++    @Test
++    void auditCancelApply_Rejected() {
++        // Arrange
++        AuditCancelApplyDTO dto = new AuditCancelApplyDTO();
++        dto.setApproved(false);
++        dto.setReason("不符合取消条件");
++
++        OrderCancelApplyEntity apply = buildCancelApplyEntity(APPLY_ID, ORDER_ID, ApplyStatusEnum.PENDING.getCode());
++        OrderMainEntity order = buildOrderEntity(ORDER_ID, 20, 2010, StatusConstants.YES);
++
++        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
++            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
++
++            when(userService.getCurrentUserRoleCode()).thenReturn(RoleCodeConstants.DESIGN_ADMIN);
++            when(cancelApplyMapper.selectById(APPLY_ID)).thenReturn(apply);
++            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
++            when(cancelApplyMapper.updateById(any(OrderCancelApplyEntity.class))).thenReturn(1);
++            when(orderMainService.update(any(LambdaUpdateWrapper.class))).thenReturn(true);
++
++            // Act
++            cancelApplyService.auditCancelApply(APPLY_ID, dto);
++
++            // Assert
++            verify(flowFacade, never()).executeFlow(any(), any(), any());
++            verify(cancelApplyMapper, times(1)).updateById(any(OrderCancelApplyEntity.class));
++            verify(orderMainService, times(1)).update(any(LambdaUpdateWrapper.class));
++            verify(eventPublisher, times(1)).publishEvent(any(CancelApplyRejectedEvent.class));
++        }
++    }
++
++    /**
++     * 构建取消申请实体
++     */
++    private OrderCancelApplyEntity buildCancelApplyEntity(Long applyId, Long orderId, Integer auditStatus) {
++        OrderCancelApplyEntity apply = new OrderCancelApplyEntity();
++        apply.setId(applyId);
++        apply.setOrderId(orderId);
++        apply.setApplyBy(CURRENT_USER_ID);
++        apply.setApplyReason(APPLY_REASON);
++        apply.setAuditStatus(auditStatus);
++        return apply;
++    }
++}
+diff --git a/yigongbao-parent/yigongbao-module-order/src/test/resources/application-test.yml b/yigongbao-parent/yigongbao-module-order/src/test/resources/application-test.yml
+index 5e73f31..ba39fb4 100644
+--- a/yigongbao-parent/yigongbao-module-order/src/test/resources/application-test.yml
++++ b/yigongbao-parent/yigongbao-module-order/src/test/resources/application-test.yml
+@@ -3,7 +3,7 @@ spring:
+     active: test
+   datasource:
+     driver-class-name: org.h2.Driver
+-    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false
++    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false;CHARSET=UTF8
+     username: sa
+     password:
+   servlet:
+@@ -15,6 +15,7 @@ spring:
+     init:
+       mode: always
+       schema-locations: classpath*:schema.sql
++      encoding: UTF-8
+ 
+ mybatis-plus:
+   configuration:
+diff --git a/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/message/service/MessageService.java b/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/message/service/MessageService.java
+new file mode 100644
+index 0000000..995c046
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/message/service/MessageService.java
+@@ -0,0 +1,35 @@
++package com.yigongbao.module.system.message.service;
++
++import java.util.List;
++
++/**
++ * 消息服务接口
++ * 提供简化的消息发送功能，用于业务流程中的通知场景
++ *
++ * @author hanjor
++ * @date 2026-07-10
++ */
++public interface MessageService {
++
++    /**
++     * 发送消息给单个用户
++     *
++     * @param userId   接收人用户ID
++     * @param title    消息标题
++     * @param content  消息内容
++     * @param linkUrl  跳转链接URL（可选）
++     * @param linkParam 链接参数（可选，如订单ID）
++     */
++    void sendToUser(Long userId, String title, String content, String linkUrl, Long linkParam);
++
++    /**
++     * 批量发送消息给多个用户
++     *
++     * @param userIds  接收人用户ID列表
++     * @param title    消息标题
++     * @param content  消息内容
++     * @param linkUrl  跳转链接URL（可选）
++     * @param linkParam 链接参数（可选，如订单ID）
++     */
++    void sendToUsers(List<Long> userIds, String title, String content, String linkUrl, Long linkParam);
++}
+diff --git a/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/message/service/impl/MessageServiceImpl.java b/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/message/service/impl/MessageServiceImpl.java
+new file mode 100644
+index 0000000..94cdc09
+--- /dev/null
++++ b/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/message/service/impl/MessageServiceImpl.java
+@@ -0,0 +1,35 @@
++package com.yigongbao.module.system.message.service.impl;
++
++import com.yigongbao.module.system.message.service.MessageService;
++import lombok.extern.slf4j.Slf4j;
++import org.springframework.stereotype.Service;
++
++import java.util.List;
++
++/**
++ * 消息服务实现类（临时桩实现）
++ *
++ * TODO: 需要集成 yigongbao-module-notification 的 INotificationService
++ * 当前仅记录日志，实际消息发送需要在具体业务模块中通过 INotificationService 实现
++ *
++ * @author hanjor
++ * @date 2026-07-10
++ */
++@Service
++@Slf4j
++public class MessageServiceImpl implements MessageService {
++
++    @Override
++    public void sendToUser(Long userId, String title, String content, String linkUrl, Long linkParam) {
++        log.info("发送消息给用户: userId={}, title={}, content={}, linkUrl={}, linkParam={}",
++                userId, title, content, linkUrl, linkParam);
++        // TODO: 集成 INotificationService 实现实际消息发送
++    }
++
++    @Override
++    public void sendToUsers(List<Long> userIds, String title, String content, String linkUrl, Long linkParam) {
++        log.info("批量发送消息: userIds={}, title={}, content={}, linkUrl={}, linkParam={}",
++                userIds, title, content, linkUrl, linkParam);
++        // TODO: 集成 INotificationService 实现实际消息发送
++    }
++}
+diff --git a/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/user/service/UserService.java b/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/user/service/UserService.java
+index 02792f9..0e7e132 100644
+--- a/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/user/service/UserService.java
++++ b/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/user/service/UserService.java
+@@ -136,4 +136,27 @@ public interface UserService extends IService<UserEntity> {
+      * @param response HTTP 响应
+      */
+     void exportUsers(HttpServletResponse response);
++
++    /**
++     * 根据角色编码获取用户ID列表
++     *
++     * @param roleCode 角色编码
++     * @return 该角色下所有正常状态用户的ID列表
++     */
++    List<Long> getUserIdsByRoleCode(String roleCode);
++
++    /**
++     * 获取用户真实姓名
++     *
++     * @param userId 用户ID
++     * @return 用户真实姓名，用户不存在返回 null
++     */
++    String getUserRealName(Long userId);
++
++    /**
++     * 获取当前登录用户的角色编码
++     *
++     * @return 角色编码，未登录或无角色返回 null
++     */
++    String getCurrentUserRoleCode();
+ }
+diff --git a/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/user/service/impl/UserServiceImpl.java b/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/user/service/impl/UserServiceImpl.java
+index 3a57265..cb55938 100644
+--- a/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/user/service/impl/UserServiceImpl.java
++++ b/yigongbao-parent/yigongbao-module-system/src/main/java/com/yigongbao/module/system/user/service/impl/UserServiceImpl.java
+@@ -1319,4 +1319,52 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
+             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
+         }
+     }
++
++    @Override
++    public List<Long> getUserIdsByRoleCode(String roleCode) {
++        if (StrUtil.isBlank(roleCode)) {
++            return Collections.emptyList();
++        }
++
++        List<UserEntity> users = baseMapper.selectList(
++                new LambdaQueryWrapper<UserEntity>()
++                        .select(UserEntity::getId)
++                        .eq(UserEntity::getRoleCode, roleCode)
++                        .eq(UserEntity::getStatus, StatusConstants.NORMAL)
++        );
++
++        return users.stream()
++                .map(UserEntity::getId)
++                .collect(Collectors.toList());
++    }
++
++    @Override
++    public String getUserRealName(Long userId) {
++        if (userId == null) {
++            return null;
++        }
++
++        UserEntity user = baseMapper.selectOne(
++                new LambdaQueryWrapper<UserEntity>()
++                        .select(UserEntity::getRealName)
++                        .eq(UserEntity::getId, userId)
++        );
++        return user != null ? user.getRealName() : null;
++    }
++
++    @Override
++    public String getCurrentUserRoleCode() {
++        try {
++            Long userId = StpUtil.getLoginIdAsLong();
++            UserEntity user = baseMapper.selectOne(
++                    new LambdaQueryWrapper<UserEntity>()
++                            .select(UserEntity::getRoleCode)
++                            .eq(UserEntity::getId, userId)
++            );
++            return user != null ? user.getRoleCode() : null;
++        } catch (Exception e) {
++            log.warn("获取当前用户角色失败，用户未登录或会话已过期");
++            return null;
++        }
++    }
+ }

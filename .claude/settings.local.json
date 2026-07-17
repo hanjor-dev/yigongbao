@@ -6,7 +6,28 @@
       "Bash(xargs grep:*)",
       "Bash(mvn clean:*)",
       "Bash(mvn compile:*)",
-      "Bash(iconv -f UTF-8 -t UTF-8//IGNORE)"
+      "Bash(iconv -f UTF-8 -t UTF-8//IGNORE)",
+      "Bash(claude *)",
+      "Bash(pip show *)",
+      "Bash(pip install *)",
+      "Bash(mkdir -p ~/claude-telegram-bot)",
+      "Read(//c/Users/hanjor_prod/**)",
+      "Bash(python -m claude_code_telegram --log-level DEBUG)",
+      "Bash(python -m claude_code_telegram)",
+      "Bash(where python *)",
+      "Bash(python -c \"import claude_code_telegram; print\\('模块已找到'\\)\")",
+      "Bash(python -m pip list)",
+      "Bash(python -m claude_code_telegram.__main__)",
+      "Bash(python *)",
+      "Bash(C:/Users/hanjor_prod/AppData/Roaming/Python/Python311/Scripts/claude-telegram-bot.exe *)",
+      "Bash(taskkill /f /im claude-telegram-bot.exe)",
+      "Bash(tasklist)",
+      "Bash(taskkill *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Skill(subagent-driven-development)",
+      "Skill(writing-plans)",
+      "Bash(git commit *)"
     ]
   }
 }
