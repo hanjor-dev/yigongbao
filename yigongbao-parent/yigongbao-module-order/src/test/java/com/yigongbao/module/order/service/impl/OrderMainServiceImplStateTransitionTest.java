@@ -338,7 +338,7 @@ class OrderMainServiceImplStateTransitionTest {
         doReturn(order).when(service).getById(orderId);
         doReturn(true).when(service).update(any(LambdaUpdateWrapper.class));
         ReflectionTestUtils.setField(service, "designerAssignmentService", designerAssignmentService);
-        
+
         when(orderQueryHelper.getCurrentUserId()).thenReturn(userId);
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(userId);
