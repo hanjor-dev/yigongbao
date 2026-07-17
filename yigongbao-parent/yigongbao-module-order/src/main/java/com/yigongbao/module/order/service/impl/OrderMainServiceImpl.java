@@ -286,6 +286,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                         .or().like(OrderMainEntity::getPatientName, dto.getOrderCode()));
             }
             wrapper.eq(Objects.nonNull(dto.getAreaId()), OrderMainEntity::getAreaId, dto.getAreaId())
+                    .like(StrUtil.isNotBlank(dto.getPatientName()), OrderMainEntity::getPatientName, dto.getPatientName())
                     .like(StrUtil.isNotBlank(dto.getDoctorName()), OrderMainEntity::getDoctorName, dto.getDoctorName())
                     .eq(StrUtil.isNotBlank(dto.getBusinessType()), OrderMainEntity::getBusinessType, dto.getBusinessType())
                     .eq(Objects.nonNull(dto.getOperatorId()), OrderMainEntity::getOperatorId, dto.getOperatorId())
@@ -862,7 +863,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (!updated) {
             throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
         }
-        updateById(order);
         eventPublisher.publishEvent(new OrderCancelledEvent(this, id));
         log.info("直接取消订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
     }

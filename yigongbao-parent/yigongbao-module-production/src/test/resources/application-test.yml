@@ -4,6 +4,10 @@ spring:
     url: jdbc:h2:mem:testdb
     username: sa
     password:
+
+app:
+  sign:
+    secret: test-secret
   h2:
     console:
       enabled: true

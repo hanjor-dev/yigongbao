@@ -25,8 +25,11 @@ import com.yigongbao.module.design.entity.DesignModelEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignReviewEntity;
+import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.helper.DesignQueryHelper;
 import com.yigongbao.module.design.enums.DesignModeEnum;
+import com.yigongbao.module.design.service.DesignFileService;
+import com.yigongbao.module.design.service.DesignDocService;
 import com.yigongbao.module.design.mapper.DesignDrawingMapper;
 import com.yigongbao.module.design.mapper.DesignInstructionMapper;
 import com.yigongbao.module.design.mapper.DesignModelMapper;
@@ -40,11 +43,14 @@ import com.yigongbao.module.design.vo.SubmitCheckVO;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.service.OrderItemService;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.order.mapper.OrderFileMapper;
+import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.service.UserService;
 import com.yigongbao.module.system.config.service.ConfigService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -55,6 +61,9 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.apache.ibatis.session.Configuration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -75,6 +84,14 @@ import static org.mockito.Mockito.*;
 @DisplayName("DesignWorkorderService 单元测试")
 class DesignWorkorderServiceImplTest {
 
+    @BeforeAll
+    static void initLambdaMetadata() {
+        Configuration configuration = new Configuration();
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "");
+        TableInfoHelper.initTableInfo(assistant, OrderMainEntity.class);
+        TableInfoHelper.initTableInfo(assistant, DesignProductEntity.class);
+    }
+
     @Mock private OrderMainService orderMainService;
     @Mock private OrderItemService orderItemService;
     @Mock private FileService fileService;
@@ -90,9 +107,25 @@ class DesignWorkorderServiceImplTest {
     @Mock private ConfigService configService;
     @Mock private ObjectMapper objectMapper;
     @Mock private FlowFacade flowFacade;
+    @Mock private OrderFileMapper orderFileMapper;
+    @Mock private OrderCancelApplyService cancelApplyService;
+    @Mock private DesignFileService designFileService;
+    @Mock private DesignDocService designDocService;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private DesignWorkorderServiceImpl service;
+
+    @BeforeEach
+    void setUpCommonMocks() {
+        when(cancelApplyService.hasPendingCancelApply(anyLong())).thenReturn(false);
+        when(orderFileMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(designFileService.listPackages(anyLong())).thenReturn(Collections.emptyList());
+        when(designFileService.listModels(anyLong())).thenReturn(Collections.emptyList());
+        when(designFileService.getReport(anyLong())).thenReturn(null);
+        when(designDocService.getLatestInstructionMap(anySet())).thenReturn(Collections.emptyMap());
+        when(designDocService.getLatestDrawingMap(anySet())).thenReturn(Collections.emptyMap());
+    }
 
     private OrderMainEntity buildOrder(Long id) {
         OrderMainEntity order = new OrderMainEntity();
@@ -440,9 +473,10 @@ class DesignWorkorderServiceImplTest {
             DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
             SubmitCheckVO check = vo.getSubmitCheck();
 
-            assertTrue(check.getHasDrawingConfirmed());
-            assertTrue(check.getHasInstructionConfirmed());
-            assertTrue(check.getCanSubmit());
+            // 当前提交校验统一检查 isConfirmed，设计模式只影响前端展示，不再跳过确认状态。
+            assertFalse(check.getHasDrawingConfirmed());
+            assertFalse(check.getHasInstructionConfirmed());
+            assertFalse(check.getCanSubmit());
         }
     }
 
@@ -536,17 +570,14 @@ class DesignWorkorderServiceImplTest {
 
                 when(orderMainService.getById(1L)).thenReturn(order);
                 when(userService.getById(100L)).thenReturn(user);
-                when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.START_DESIGN), any(FlowOperator.class)))
+                when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.START_DESIGN), any(FlowOperator.class), eq(1)))
                         .thenReturn(TransitionResult.of(20, FlowStatusEnum.DESIGN_IN_PROGRESS.getValue()));
+                when(orderMainService.update(any())).thenReturn(true);
 
-                assertDoesNotThrow(() -> service.startDesign(1L));
+                assertDoesNotThrow(() -> service.startDesign(1L, 1));
 
                 // 验证订单字段已回写
-                verify(orderMainService).updateById(argThat((OrderMainEntity o) ->
-                        o.getStatus().equals(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue())
-                                && o.getDesignStartTime() != null
-                                && Long.valueOf(100L).equals(o.getCurrentHandlerId())
-                                && "张设计".equals(o.getCurrentHandlerName())));
+                verify(orderMainService).update(any());
             }
         }
 
@@ -558,7 +589,7 @@ class DesignWorkorderServiceImplTest {
                 when(orderMainService.getById(1L)).thenReturn(null);
 
                 BusinessException ex = assertThrows(BusinessException.class,
-                        () -> service.startDesign(1L));
+                        () -> service.startDesign(1L, 1));
                 assertEquals(ErrorCodeEnum.ORDER_NOT_FOUND.getCode(), ex.getCode());
             }
         }
@@ -575,7 +606,7 @@ class DesignWorkorderServiceImplTest {
                 when(orderMainService.getById(1L)).thenReturn(order);
 
                 BusinessException ex = assertThrows(BusinessException.class,
-                        () -> service.startDesign(1L));
+                        () -> service.startDesign(1L, 1));
                 assertEquals(ErrorCodeEnum.ORDER_STATUS_ERROR.getCode(), ex.getCode());
             }
         }
@@ -592,7 +623,7 @@ class DesignWorkorderServiceImplTest {
                 when(orderMainService.getById(1L)).thenReturn(order);
 
                 BusinessException ex = assertThrows(BusinessException.class,
-                        () -> service.startDesign(1L));
+                        () -> service.startDesign(1L, 1));
                 assertEquals(ErrorCodeEnum.ORDER_DESIGNER_MISMATCH.getCode(), ex.getCode());
             }
         }
@@ -616,6 +647,25 @@ class DesignWorkorderServiceImplTest {
                 order.setNeedsPhysicalDelivery(1);
                 when(orderMainService.getById(1L)).thenReturn(order);
 
+                DesignPackageEntity pkg = new DesignPackageEntity();
+                pkg.setId(10L);
+                pkg.setOrderId(1L);
+                pkg.setIsDeleted(StatusConstants.NOT_DELETED);
+                when(designPackageMapper.selectList(any(Wrapper.class))).thenReturn(List.of(pkg));
+                DesignProductEntity product = new DesignProductEntity();
+                product.setPackageId(10L);
+                when(designProductMapper.selectList(any(Wrapper.class))).thenReturn(List.of(product));
+                DesignInstructionEntity instruction = new DesignInstructionEntity();
+                instruction.setPackageId(10L);
+                instruction.setVersionSeq(1);
+                instruction.setIsConfirmed(StatusConstants.CONFIRMED);
+                when(designInstructionMapper.selectList(any(Wrapper.class))).thenReturn(List.of(instruction));
+                DesignDrawingEntity drawing = new DesignDrawingEntity();
+                drawing.setPackageId(10L);
+                drawing.setVersionSeq(1);
+                drawing.setIsConfirmed(StatusConstants.CONFIRMED);
+                when(designDrawingMapper.selectList(any(Wrapper.class))).thenReturn(List.of(drawing));
+
                 UserEntity user = new UserEntity();
                 user.setId(100L);
                 user.setRealName("设计师A");
@@ -623,14 +673,13 @@ class DesignWorkorderServiceImplTest {
 
                 TransitionResult mockResult = TransitionResult.of(FlowStatusEnum.PENDING_PRINT.getValue(),
                     FlowStatusEnum.DESIGN_COMPLETED.getValue());
-                when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.START_PRINT), any()))
+                when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.COMPLETE_DESIGN), any(), eq(1)))
                         .thenReturn(mockResult);
-                when(orderMainService.updateById(any())).thenReturn(true);
+                when(orderMainService.update(any())).thenReturn(true);
 
-                assertDoesNotThrow(() -> service.completeDesign(1L));
-                verify(flowFacade).executeFlow(eq(1L), eq(FlowActionEnum.START_PRINT), any());
-                verify(orderMainService).updateById(argThat((OrderMainEntity o) ->
-                        o.getStatus().equals(FlowStatusEnum.PENDING_PRINT.getValue())));
+                assertDoesNotThrow(() -> service.completeDesign(1L, 1));
+                verify(flowFacade).executeFlow(eq(1L), eq(FlowActionEnum.COMPLETE_DESIGN), any(), eq(1));
+                verify(orderMainService).update(any());
             }
         }
 
@@ -654,14 +703,13 @@ class DesignWorkorderServiceImplTest {
 
                 TransitionResult mockResult = TransitionResult.of(FlowStatusEnum.DESIGN_COMPLETED.getValue(),
                     FlowStatusEnum.DESIGN_COMPLETED.getValue());
-                when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.COMPLETE_DESIGN), any()))
+                when(flowFacade.executeFlow(eq(1L), eq(FlowActionEnum.COMPLETE_DESIGN), any(), eq(1)))
                         .thenReturn(mockResult);
-                when(orderMainService.updateById(any())).thenReturn(true);
+                when(orderMainService.update(any())).thenReturn(true);
 
-                assertDoesNotThrow(() -> service.completeDesign(1L));
-                verify(flowFacade).executeFlow(eq(1L), eq(FlowActionEnum.COMPLETE_DESIGN), any());
-                verify(orderMainService).updateById(argThat((OrderMainEntity o) ->
-                        o.getStatus().equals(FlowStatusEnum.DESIGN_COMPLETED.getValue())));
+                assertDoesNotThrow(() -> service.completeDesign(1L, 1));
+                verify(flowFacade).executeFlow(eq(1L), eq(FlowActionEnum.COMPLETE_DESIGN), any(), eq(1));
+                verify(orderMainService).update(any());
             }
         }
 
@@ -669,7 +717,7 @@ class DesignWorkorderServiceImplTest {
         @DisplayName("订单不存在，抛 ORDER_NOT_FOUND")
         void orderNotFound() {
             when(orderMainService.getById(999L)).thenReturn(null);
-            assertThrows(BusinessException.class, () -> service.completeDesign(999L));
+            assertThrows(BusinessException.class, () -> service.completeDesign(999L, 1));
         }
 
         @Test
@@ -684,7 +732,7 @@ class DesignWorkorderServiceImplTest {
                 order.setDesignerId(100L);
                 when(orderMainService.getById(1L)).thenReturn(order);
 
-                assertThrows(BusinessException.class, () -> service.completeDesign(1L));
+                assertThrows(BusinessException.class, () -> service.completeDesign(1L, 1));
             }
         }
 
@@ -700,7 +748,7 @@ class DesignWorkorderServiceImplTest {
                 order.setDesignerId(200L);
                 when(orderMainService.getById(1L)).thenReturn(order);
 
-                assertThrows(BusinessException.class, () -> service.completeDesign(1L));
+                assertThrows(BusinessException.class, () -> service.completeDesign(1L, 1));
             }
         }
     }

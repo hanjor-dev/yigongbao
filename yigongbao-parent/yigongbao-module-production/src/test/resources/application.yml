@@ -1,0 +1,3 @@
+app:
+  sign:
+    secret: test-secret

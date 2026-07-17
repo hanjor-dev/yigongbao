@@ -3,6 +3,7 @@ package com.yigongbao.module.production.listener;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
+import com.yigongbao.module.basic.product.mapper.ProductMapper;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignProductFileEntity;
@@ -58,6 +59,7 @@ class DesignCompletedListenerTest {
     @Mock private ProductionProductMapper productMapper;
     @Mock private ProductionProcessMapper processMapper;
     @Mock private CodeGeneratorService codeGeneratorService;
+    @Mock private ProductMapper basicProductMapper;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks

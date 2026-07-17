@@ -122,6 +122,10 @@ public class ProductNumberServiceImpl extends ServiceImpl<ProductionProductMappe
                     usageCount,
                     sequenceNo
             );
+            if (!checkUniqueness(productNo)) {
+                log.error("产品编号重复: recordId={}, productNo={}", recordId, productNo);
+                throw new BusinessException(ErrorCodeEnum.PRODUCT_NUMBER_DUPLICATE, productNo);
+            }
             product.setProductNo(productNo);
             sequenceNo++;
         }

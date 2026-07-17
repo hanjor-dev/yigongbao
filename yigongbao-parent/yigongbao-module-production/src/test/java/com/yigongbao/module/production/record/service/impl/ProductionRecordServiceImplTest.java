@@ -23,6 +23,7 @@ import com.yigongbao.module.design.mapper.DesignPackageFileMapper;
 import com.yigongbao.module.design.mapper.DesignPackageMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.constants.ProductionConstants;
+import com.yigongbao.module.production.helper.FlowCardExcelBuilder;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
@@ -76,6 +77,8 @@ class ProductionRecordServiceImplTest {
     @Mock private UserService userService;
     @Mock private ObjectMapper objectMapper;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private FlowCardExcelBuilder flowCardExcelBuilder;
+    @Mock private com.yigongbao.module.basic.file.service.FileService fileService;
 
     @InjectMocks
     private ProductionRecordServiceImpl recordService;
@@ -127,6 +130,70 @@ class ProductionRecordServiceImplTest {
         assertEquals(1, vo.getProducts().size());
     }
 
+    @Test
+    void generateFlowCardExcel_recordNotFound_throwsException() {
+        when(recordMapper.selectById(99L)).thenReturn(null);
+        when(productMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(processMapper.selectList(any())).thenReturn(Collections.emptyList());
+
+        assertEquals(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND.getCode(),
+                assertThrows(BusinessException.class, () -> recordService.generateFlowCardExcel(99L)).getCode());
+    }
+
+    @Test
+    void getOrGenerateFlowCardExcel_reusesFreshCachedFileWithPatientPrefix() {
+        ProductionRecordEntity record = record(100L, 200L, FlowStatusEnum.PRINT_COMPLETED.getValue());
+        record.setFlowCardFileUrl("https://files/card.xlsx");
+        record.setFlowCardGenerateTime(java.time.LocalDateTime.now().minusMinutes(5));
+        record.setContentUpdateTime(java.time.LocalDateTime.now().minusMinutes(10));
+        OrderMainEntity order = order(200L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        order.setPatientName("患者甲");
+        when(recordMapper.selectById(100L)).thenReturn(record);
+        when(orderMainMapper.selectById(200L)).thenReturn(order);
+
+        var file = recordService.getOrGenerateFlowCardExcel(100L);
+
+        assertEquals("https://files/card.xlsx", file.getFileUrl());
+        assertEquals("患者甲流转卡.xlsx", file.getFileName());
+        verifyNoInteractions(flowCardExcelBuilder, fileService);
+    }
+
+    @Test
+    void triggerFlowAndSync_nullTransitionDoesNotWriteOrder() {
+        when(flowFacade.executeFlow(eq(10L), eq(FlowActionEnum.COMPLETE_PRINT), any(FlowOperator.class)))
+                .thenReturn(null);
+
+        recordService.triggerFlowAndSync(10L, FlowActionEnum.COMPLETE_PRINT);
+
+        verify(recordMapper, never()).updateById(any(ProductionRecordEntity.class));
+    }
+
+    @Test
+    void triggerFlowAndSync_writesTransitionToOrder() {
+        TransitionResult result = mock(TransitionResult.class);
+        when(result.getTargetPhase()).thenReturn(30);
+        when(result.getFinalStatus()).thenReturn(FlowStatusEnum.PRINT_COMPLETED.getValue());
+        when(flowFacade.executeFlow(eq(10L), eq(FlowActionEnum.COMPLETE_PRINT), any(FlowOperator.class)))
+                .thenReturn(result);
+
+        recordService.triggerFlowAndSync(10L, FlowActionEnum.COMPLETE_PRINT);
+
+        verify(orderMainMapper).updateById(argThat((OrderMainEntity order) ->
+                order.getId().equals(10L)
+                        && order.getPhase().equals(30)
+                        && order.getStatus().equals(FlowStatusEnum.PRINT_COMPLETED.getValue())));
+    }
+
+    @Test
+    void triggerFlowAndSync_ignoresRejectedTransition() {
+        when(flowFacade.executeFlow(eq(10L), eq(FlowActionEnum.COMPLETE_PRINT), any(FlowOperator.class)))
+                .thenThrow(new BusinessException(ErrorCodeEnum.ORDER_STATUS_TRANSITION_ERROR));
+
+        recordService.triggerFlowAndSync(10L, FlowActionEnum.COMPLETE_PRINT);
+
+        verify(orderMainMapper, never()).updateById(any(OrderMainEntity.class));
+    }
+
     // ---- getByRecordNo ----
 
     @Test
@@ -151,6 +218,55 @@ class ProductionRecordServiceImplTest {
         when(productMapper.selectList(any())).thenReturn(Collections.emptyList());
 
         assertEquals("REC-005", recordService.getByRecordNo("REC-005").getRecordNo());
+    }
+
+    @Test
+    void generateBatchNo_existingRecord_returnsPreviewWithoutPersisting() {
+        ProductionRecordEntity record = new ProductionRecordEntity();
+        record.setId(20L);
+        when(recordMapper.selectById(20L)).thenReturn(record);
+        when(codeGeneratorService.generate(ProductionConstants.PRODUCTION_BATCH_NO)).thenReturn("260717");
+
+        assertEquals("260717", recordService.generateBatchNo(20L));
+
+        verify(codeGeneratorService).generate(ProductionConstants.PRODUCTION_BATCH_NO);
+        verify(recordMapper, never()).updateById(org.mockito.ArgumentMatchers.<ProductionRecordEntity>any());
+    }
+
+    @Test
+    void submitBatchNo_updatesProductionAndMaterialBatch() {
+        ProductionRecordEntity record = new ProductionRecordEntity();
+        record.setId(21L);
+        when(recordMapper.selectById(21L)).thenReturn(record);
+        doReturn(1).when(recordMapper).updateById(
+                org.mockito.ArgumentMatchers.<ProductionRecordEntity>any());
+        com.yigongbao.module.production.record.dto.SubmitBatchNoDTO dto =
+                new com.yigongbao.module.production.record.dto.SubmitBatchNoDTO();
+        dto.setProductionBatchNo("260717");
+        dto.setMaterialBatchNo("MAT-01");
+
+        recordService.submitBatchNo(21L, dto);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(ProductionRecordEntity.class);
+        verify(recordMapper).updateById(captor.capture());
+        assertEquals("260717", captor.getValue().getProductionBatchNo());
+        assertEquals("MAT-01", captor.getValue().getMaterialBatchNo());
+    }
+
+    @Test
+    void getDeviceConfig_existingRecord_copiesAssignedDeviceFields() {
+        ProductionRecordEntity record = new ProductionRecordEntity();
+        record.setId(22L);
+        record.setPrintDeviceId(3L);
+        record.setPrintDeviceCode("SLA-003");
+        record.setPrintDeviceName("打印机3");
+        when(recordMapper.selectById(22L)).thenReturn(record);
+
+        var config = recordService.getDeviceConfig(22L);
+
+        assertEquals(3L, config.getPrintDeviceId());
+        assertEquals("SLA-003", config.getPrintDeviceCode());
+        assertEquals("打印机3", config.getPrintDeviceName());
     }
 
     // ---- getQrCodeUrl ----

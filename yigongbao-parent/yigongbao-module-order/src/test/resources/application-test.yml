@@ -1,11 +1,13 @@
 spring:
-  profiles:
-    active: test
   datasource:
     driver-class-name: org.h2.Driver
     url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false;CHARSET=UTF8
     username: sa
     password:
+
+app:
+  sign:
+    secret: test-secret
   servlet:
     multipart:
       enabled: true
@@ -41,10 +43,10 @@ yigongbao:
     order-image-required: true
     order-draft-expire-days: 30
     order-modify-window-minutes: 10
-      # 草稿过期天数
-      draft-expiration-days: 7
-      # 业务类型是否必须上传文件
-      business-type-file-required: "11.1,11.2,11.3,11.4"
+    # 草稿过期天数
+    draft-expiration-days: 7
+    # 业务类型是否必须上传文件
+    business-type-file-required: "11.1,11.2,11.3,11.4"
   # 文件存储业务配置
   file-storage:
     max-file-size: 524288000

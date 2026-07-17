@@ -15,6 +15,7 @@ import com.yigongbao.module.design.service.DesignModelService;
 import com.yigongbao.module.design.service.DesignPackageFileService;
 import com.yigongbao.module.design.service.DesignPackageService;
 import com.yigongbao.module.design.service.DesignProductService;
+import com.yigongbao.module.design.helper.DesignQueryHelper;
 import com.yigongbao.module.design.vo.DesignModelVO;
 import com.yigongbao.module.design.vo.DesignPackageVO;
 import com.yigongbao.module.order.service.OrderMainService;
@@ -79,6 +80,9 @@ class DesignFileServiceImplTest {
     @Mock
     private ConfigService configService;
 
+    @Mock
+    private DesignQueryHelper designQueryHelper;
+
     @InjectMocks
     private DesignFileServiceImpl designFileService;
 
@@ -94,6 +98,21 @@ class DesignFileServiceImplTest {
         designingOrder.setOrderCode("202604150001");
         designingOrder.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
         designingOrder.setDesignerId(designerId);
+        doAnswer(invocation -> {
+            OrderMainEntity current = orderMainService.getById(invocation.getArgument(0));
+            if (current == null) throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+            if (!FlowStatusEnum.DESIGN_IN_PROGRESS.getValue().equals(current.getStatus())) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+            }
+            return current;
+        }).when(designQueryHelper).checkDesignPhase(anyLong());
+        doAnswer(invocation -> {
+            OrderMainEntity current = invocation.getArgument(0);
+            if (!designerId.equals(StpUtil.getLoginIdAsLong())) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_OPERATOR_NOT_ALLOWED);
+            }
+            return null;
+        }).when(designQueryHelper).checkIsAssignedDesigner(any());
     }
 
     @Nested
@@ -177,7 +196,7 @@ class DesignFileServiceImplTest {
                 List<DesignModelVO> results = designFileService.linkModels(orderId, fileIds);
 
                 assertEquals(2, results.size());
-                verify(modelService, times(2)).save(any(DesignModelEntity.class));
+                verify(modelService).saveBatch(anyList());
                 verify(fileService, times(2)).linkFile(anyString(), eq("10.6"), eq(orderId));
             }
         }

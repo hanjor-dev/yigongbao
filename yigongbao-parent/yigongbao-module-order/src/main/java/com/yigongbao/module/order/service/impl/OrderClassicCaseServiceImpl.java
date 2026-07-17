@@ -72,7 +72,7 @@ public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
         boolean isCompleted = FlowPhaseEnum.COMPLETED.getValue().equals(order.getPhase());
         boolean isWarehouseOut = FlowStatusEnum.WAREHOUSE_OUT.getValue().equals(order.getStatus());
         boolean isDesignCompleted = FlowStatusEnum.DESIGN_COMPLETED.getValue().equals(order.getStatus());
-        boolean needsPhysicalDelivery = StatusConstants.YES == order.getNeedsPhysicalDelivery();
+        boolean needsPhysicalDelivery = Integer.valueOf(StatusConstants.YES).equals(order.getNeedsPhysicalDelivery());
 
         boolean canMark = isCompleted || isWarehouseOut ||
                          (isDesignCompleted && !needsPhysicalDelivery);

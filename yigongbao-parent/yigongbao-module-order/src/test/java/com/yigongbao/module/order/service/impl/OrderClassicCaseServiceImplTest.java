@@ -4,15 +4,16 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
+import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.dto.ClassicCaseQueryDTO;
 import com.yigongbao.module.order.dto.MarkClassicCaseDTO;
 import com.yigongbao.module.order.service.IClassicCaseFileService;
+import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.ClassicCaseVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,10 +25,11 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
-import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -42,16 +44,17 @@ class OrderClassicCaseServiceImplTest {
 
     @Mock
     private IClassicCaseFileService classicCaseFileService;
+    @Mock
+    private OrderMainService orderMainService;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private OrderQueryHelper orderQueryHelper;
+    @Mock
+    private com.yigongbao.module.system.user.service.UserService userService;
 
     @InjectMocks
     private OrderClassicCaseServiceImpl classicCaseService;
-
-    @BeforeEach
-    void setUp() throws Exception {
-        Field baseMapperField = ServiceImpl.class.getDeclaredField("baseMapper");
-        baseMapperField.setAccessible(true);
-        baseMapperField.set(classicCaseService, orderMainMapper);
-    }
 
     @Test
     void markAsClassicCase_success() {
@@ -67,6 +70,7 @@ class OrderClassicCaseServiceImplTest {
             order.setOrderCode("ORD001");
             order.setPhase(80);
             order.setIsClassicCase(StatusConstants.NO);
+            order.setNeedsPhysicalDelivery(StatusConstants.NO);
 
             when(orderMainMapper.selectById(1L)).thenReturn(order);
 
@@ -81,7 +85,26 @@ class OrderClassicCaseServiceImplTest {
             assertEquals("优秀案例", updated.getClassicCaseRemark());
             assertNotNull(updated.getClassicCaseTime());
 
-            verify(classicCaseFileService).migrateFilesToClassicCase(1L, "ORD001");
+            verify(eventPublisher).publishEvent(any());
+        }
+    }
+
+    @Test
+    void markAsClassicCase_nullNeedsPhysicalDelivery_shouldUsePhaseCompletion() {
+        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+            MarkClassicCaseDTO dto = new MarkClassicCaseDTO();
+            dto.setOrderId(1L);
+            OrderMainEntity order = new OrderMainEntity();
+            order.setId(1L);
+            order.setOrderCode("ORD001");
+            order.setPhase(80);
+            order.setNeedsPhysicalDelivery(null);
+            order.setIsClassicCase(StatusConstants.NO);
+            when(orderMainMapper.selectById(1L)).thenReturn(order);
+
+            assertDoesNotThrow(() -> classicCaseService.markAsClassicCase(dto));
+            verify(orderMainMapper).updateById(order);
         }
     }
 
@@ -107,6 +130,7 @@ class OrderClassicCaseServiceImplTest {
         OrderMainEntity order = new OrderMainEntity();
         order.setId(1L);
         order.setPhase(60);
+        order.setNeedsPhysicalDelivery(StatusConstants.NO);
 
         when(orderMainMapper.selectById(1L)).thenReturn(order);
 
@@ -125,6 +149,7 @@ class OrderClassicCaseServiceImplTest {
         order.setId(1L);
         order.setPhase(80);
         order.setIsClassicCase(StatusConstants.YES);
+        order.setNeedsPhysicalDelivery(StatusConstants.NO);
 
         when(orderMainMapper.selectById(1L)).thenReturn(order);
 
@@ -149,6 +174,8 @@ class OrderClassicCaseServiceImplTest {
         page.setTotal(1);
 
         when(orderMainMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+        when(orderQueryHelper.toOrderListVO(order1)).thenReturn(new com.yigongbao.module.order.vo.order.OrderListVO());
+        when(userService.listByIds(anyList())).thenReturn(List.of());
 
         IPage<ClassicCaseVO> result = classicCaseService.listClassicCases(dto);
 
@@ -165,6 +192,11 @@ class OrderClassicCaseServiceImplTest {
         order.setIsClassicCase(StatusConstants.YES);
 
         when(orderMainMapper.selectById(1L)).thenReturn(order);
+        com.yigongbao.module.order.vo.order.OrderDetailVO detail =
+                new com.yigongbao.module.order.vo.order.OrderDetailVO();
+        detail.setOrderCode("ORD001");
+        when(orderMainService.buildOrderDetailWithoutPermissionCheck(eq(1L), eq(order)))
+                .thenReturn(detail);
 
         ClassicCaseVO result = classicCaseService.getClassicCaseDetail(1L);
 
@@ -203,5 +235,38 @@ class OrderClassicCaseServiceImplTest {
         when(orderMainMapper.selectById(1L)).thenReturn(order);
 
         assertFalse(classicCaseService.isClassicCase(1L));
+    }
+
+    @Test
+    void cancelClassicCaseMark_clearsProtectedMetadata() {
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(1L);
+        order.setIsClassicCase(StatusConstants.YES);
+        order.setClassicCaseBy(100L);
+        order.setClassicCaseRemark("案例");
+        order.setClassicCaseTime(LocalDateTime.now());
+        when(orderMainMapper.selectById(1L)).thenReturn(order);
+
+        classicCaseService.cancelClassicCaseMark(1L, "回滚");
+
+        assertEquals(StatusConstants.NO, order.getIsClassicCase());
+        assertNull(order.getClassicCaseBy());
+        assertNull(order.getClassicCaseRemark());
+        assertNull(order.getClassicCaseTime());
+        verify(orderMainMapper).updateById(order);
+    }
+
+    @Test
+    void cancelClassicCaseMark_isNoOpForMissingOrUnmarkedOrder() {
+        when(orderMainMapper.selectById(2L)).thenReturn(null);
+        classicCaseService.cancelClassicCaseMark(2L, "回滚");
+
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(3L);
+        order.setIsClassicCase(StatusConstants.NO);
+        when(orderMainMapper.selectById(3L)).thenReturn(order);
+        classicCaseService.cancelClassicCaseMark(3L, "回滚");
+
+        verify(orderMainMapper, never()).updateById(any(OrderMainEntity.class));
     }
 }

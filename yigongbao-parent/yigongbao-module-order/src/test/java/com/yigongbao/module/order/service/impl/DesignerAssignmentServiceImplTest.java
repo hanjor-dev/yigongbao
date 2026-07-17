@@ -22,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 
@@ -46,6 +47,7 @@ class DesignerAssignmentServiceImplTest {
     @Mock private DictService dictService;
     @Mock private RebuildProjectService rebuildProjectService;
     @Mock private com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private DesignerAssignmentServiceImpl service;
 
@@ -154,6 +156,7 @@ class DesignerAssignmentServiceImplTest {
         when(orderMainService.getById(1L)).thenReturn(order);
         UserEntity designer = buildDesigner(100L, "7.1");
         when(userMapper.selectById(100L)).thenReturn(designer);
+        when(userMapper.selectAllDesignersByPermission(null)).thenReturn(List.of(designer));
         OrderItemEntity item = new OrderItemEntity();
         item.setProjectId(10L);
         when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
@@ -236,8 +239,8 @@ class DesignerAssignmentServiceImplTest {
     }
 
     @Test
-    @DisplayName("manualAssign — 专业方向不匹配，抛 DESIGNER_SPECIALTY_MISMATCH")
-    void manualAssign_specialtyMismatch_shouldThrow() {
+    @DisplayName("manualAssign — 专业方向不匹配时，当前版本仍允许已授权设计师分配")
+    void manualAssign_specialtyMismatch_shouldStillAssign_whenPermissionGranted() {
         when(orderMainService.getById(1L)).thenReturn(buildPendingDesignOrder(1L));
         UserEntity designer = buildDesigner(100L, "7.2"); // 设计师是 7.2
         when(userMapper.selectById(100L)).thenReturn(designer);
@@ -247,9 +250,8 @@ class DesignerAssignmentServiceImplTest {
         item.setProjectId(10L);
         when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
         when(rebuildProjectService.getSpecialtyByProjectId(10L)).thenReturn("7.1"); // 订单是 7.1
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.manualAssignDesigner(1L, 100L));
-        assertEquals(ErrorCodeEnum.DESIGNER_SPECIALTY_MISMATCH.getCode(), ex.getCode());
+        service.manualAssignDesigner(1L, 100L);
+        verify(orderMainService).updateById(argThat(o -> Long.valueOf(100L).equals(o.getDesignerId())));
     }
 
     @Test
@@ -258,6 +260,7 @@ class DesignerAssignmentServiceImplTest {
         when(orderMainService.getById(1L)).thenReturn(buildPendingDesignOrder(1L));
         UserEntity designer = buildDesigner(100L, "7.1");
         when(userMapper.selectById(100L)).thenReturn(designer);
+        when(userMapper.selectAllDesignersByPermission(null)).thenReturn(List.of(designer));
         // 订单无明细 → getOrderSpecialty 返回 null → 跳过 specialty 校验
         when(orderItemMapper.selectList(any())).thenReturn(List.of());
         service.manualAssignDesigner(1L, 100L);

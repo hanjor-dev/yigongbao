@@ -166,4 +166,27 @@ class OrderCancelApplyControllerTest {
 
         verify(cancelApplyService, times(1)).getCancelApplyDetail(APPLY_ID);
     }
+
+    @Test
+    void listPendingApplies_delegatesQuery() throws Exception {
+        mockMvc.perform(post("/order/cancel-apply/pending/list")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+        verify(cancelApplyService).listPendingApplies(any());
+    }
+
+    @Test
+    void listMyApplies_delegatesQuery() throws Exception {
+        mockMvc.perform(post("/order/cancel-apply/my-applies")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+        verify(cancelApplyService).listMyApplies(any());
+    }
+
+    @Test
+    void history_delegatesOrderId() throws Exception {
+        mockMvc.perform(get("/order/cancel-apply/order/{orderId}/history", ORDER_ID))
+                .andExpect(status().isOk());
+        verify(cancelApplyService).getCancelApplyHistory(ORDER_ID);
+    }
 }
