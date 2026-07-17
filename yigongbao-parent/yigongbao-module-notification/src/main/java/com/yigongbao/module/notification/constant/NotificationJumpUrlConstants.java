@@ -17,6 +17,9 @@ public class NotificationJumpUrlConstants {
     /** 订单修改申请页，bizId = applyId */
     public static final String MODIFY_APPLY = "/modifyApply";
 
+    /** 取消申请审核页，bizId = cancelApplyId。 */
+    public static final String CANCEL_APPLY_AUDIT = "/order/cancel-apply/audit";
+
     /** 生产流转卡页，bizId = recordId */
     public static final String PRODUCTION_RECORD = "/manufacture";
 

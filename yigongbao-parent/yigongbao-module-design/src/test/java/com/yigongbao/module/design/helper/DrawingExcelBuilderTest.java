@@ -1,9 +1,17 @@
 package com.yigongbao.module.design.helper;
 
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.util.Units;
+import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
+import org.apache.poi.xssf.usermodel.XSSFPicture;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,6 +53,150 @@ class DrawingExcelBuilderTest {
             // 13 条产品：第1页11条，第2页2条，共2页
             assertEquals(2, wb.getNumberOfSheets());
         }
+    }
+
+    @Test
+    void build_withWideScreenshot_shouldPreserveAspectRatioInsideSlot() throws Exception {
+        DrawingExcelBuilder builder = new DrawingExcelBuilder();
+
+        DrawingExcelBuilder.ProductRow row = new DrawingExcelBuilder.ProductRow();
+        row.setPackageFileName("模型.stl");
+        row.setProductName("产品");
+        row.setScreenshotBytes(createPng(1600, 900));
+
+        DrawingExcelBuilder.BuildContext ctx = new DrawingExcelBuilder.BuildContext();
+        ctx.setOrderCode("ORD-001");
+        ctx.setPackageCode("PKG-001");
+        ctx.setRows(List.of(row));
+
+        byte[] result = builder.build(ctx);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(result))) {
+            XSSFSheet sheet = wb.getSheetAt(0);
+            XSSFPicture picture = sheet.getDrawingPatriarch().getShapes().stream()
+                    .filter(XSSFPicture.class::isInstance)
+                    .map(XSSFPicture.class::cast)
+                    .findFirst()
+                    .orElseThrow();
+            XSSFClientAnchor anchor = picture.getPreferredSize();
+
+            double left = xPositionInEmu(sheet, anchor.getCol1(), anchor.getDx1());
+            double right = xPositionInEmu(sheet, anchor.getCol2(), anchor.getDx2());
+            double top = yPositionInEmu(sheet, anchor.getRow1(), anchor.getDy1());
+            double bottom = yPositionInEmu(sheet, anchor.getRow2(), anchor.getDy2());
+
+            assertEquals(1600d / 900d, (right - left) / (bottom - top), 0.03d);
+            assertTrue(left >= xPositionInEmu(sheet, 0, 0));
+            assertTrue(right <= xPositionInEmu(sheet, 4, 0));
+            assertTrue(top >= yPositionInEmu(sheet, 2, 0));
+            assertTrue(bottom <= yPositionInEmu(sheet, 12, 0));
+            assertEquals(
+                    (xPositionInEmu(sheet, 0, 0) + xPositionInEmu(sheet, 4, 0)) / 2,
+                    (left + right) / 2,
+                    Units.EMU_PER_PIXEL * 2);
+            assertEquals(
+                    (yPositionInEmu(sheet, 2, 0) + yPositionInEmu(sheet, 12, 0)) / 2,
+                    (top + bottom) / 2,
+                    Units.EMU_PER_PIXEL * 2);
+        }
+    }
+
+    @Test
+    void build_withPortraitScreenshot_shouldPreserveAspectRatioInsideSlot() throws Exception {
+        DrawingExcelBuilder builder = new DrawingExcelBuilder();
+
+        DrawingExcelBuilder.ProductRow row = new DrawingExcelBuilder.ProductRow();
+        row.setPackageFileName("模型.stl");
+        row.setProductName("产品");
+        row.setScreenshotBytes(createPng(600, 1200));
+
+        DrawingExcelBuilder.BuildContext ctx = new DrawingExcelBuilder.BuildContext();
+        ctx.setOrderCode("ORD-001");
+        ctx.setPackageCode("PKG-001");
+        ctx.setRows(List.of(row));
+
+        byte[] result = builder.build(ctx);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(result))) {
+            XSSFSheet sheet = wb.getSheetAt(0);
+            XSSFPicture picture = sheet.getDrawingPatriarch().getShapes().stream()
+                    .filter(XSSFPicture.class::isInstance)
+                    .map(XSSFPicture.class::cast)
+                    .findFirst()
+                    .orElseThrow();
+            XSSFClientAnchor anchor = picture.getPreferredSize();
+
+            double left = xPositionInEmu(sheet, anchor.getCol1(), anchor.getDx1());
+            double right = xPositionInEmu(sheet, anchor.getCol2(), anchor.getDx2());
+            double top = yPositionInEmu(sheet, anchor.getRow1(), anchor.getDy1());
+            double bottom = yPositionInEmu(sheet, anchor.getRow2(), anchor.getDy2());
+
+            assertEquals(600d / 1200d, (right - left) / (bottom - top), 0.03d);
+            assertTrue(left >= xPositionInEmu(sheet, 0, 0));
+            assertTrue(right <= xPositionInEmu(sheet, 4, 0));
+            assertTrue(top >= yPositionInEmu(sheet, 2, 0));
+            assertTrue(bottom <= yPositionInEmu(sheet, 12, 0));
+            assertEquals(
+                    (xPositionInEmu(sheet, 0, 0) + xPositionInEmu(sheet, 4, 0)) / 2,
+                    (left + right) / 2,
+                    Units.EMU_PER_PIXEL * 2);
+            assertEquals(
+                    (yPositionInEmu(sheet, 2, 0) + yPositionInEmu(sheet, 12, 0)) / 2,
+                    (top + bottom) / 2,
+                    Units.EMU_PER_PIXEL * 2);
+        }
+    }
+
+    @Test
+    void build_withUnreadableScreenshot_shouldStillInsertPicture() throws Exception {
+        DrawingExcelBuilder builder = new DrawingExcelBuilder();
+
+        DrawingExcelBuilder.ProductRow row = new DrawingExcelBuilder.ProductRow();
+        row.setPackageFileName("模型.stl");
+        row.setProductName("产品");
+        row.setScreenshotBytes(new byte[]{0x01, 0x02, 0x03, 0x04});
+
+        DrawingExcelBuilder.BuildContext ctx = new DrawingExcelBuilder.BuildContext();
+        ctx.setOrderCode("ORD-001");
+        ctx.setPackageCode("PKG-001");
+        ctx.setRows(List.of(row));
+
+        byte[] result = builder.build(ctx);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(result))) {
+            XSSFSheet sheet = wb.getSheetAt(0);
+            assertNotNull(sheet.getDrawingPatriarch());
+            assertTrue(sheet.getDrawingPatriarch().getShapes().stream()
+                    .anyMatch(XSSFPicture.class::isInstance));
+        }
+    }
+
+    private byte[] createPng(int width, int height) throws Exception {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            ImageIO.write(image, "png", output);
+            return output.toByteArray();
+        }
+    }
+
+    private double xPositionInEmu(XSSFSheet sheet, int col, int dx) {
+        double position = dx;
+        for (int i = 0; i < col; i++) {
+            position += Units.columnWidthToEMU(sheet.getColumnWidth(i));
+        }
+        return position;
+    }
+
+    private double yPositionInEmu(XSSFSheet sheet, int rowIndex, int dy) {
+        double position = dy;
+        for (int i = 0; i < rowIndex; i++) {
+            Row row = sheet.getRow(i);
+            double points = row == null || row.getHeightInPoints() < 0
+                    ? sheet.getDefaultRowHeightInPoints()
+                    : row.getHeightInPoints();
+            position += points * Units.EMU_PER_POINT;
+        }
+        return position;
     }
 
     private List<DrawingExcelBuilder.ProductRow> buildRows(int count) {

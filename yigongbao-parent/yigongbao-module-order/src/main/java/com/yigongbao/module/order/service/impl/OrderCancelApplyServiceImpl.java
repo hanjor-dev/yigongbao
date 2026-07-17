@@ -17,9 +17,9 @@ import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.module.order.convert.OrderCancelApplyConvert;
+import com.yigongbao.module.order.dto.order.CancelApplyPageQueryDTO;
 import com.yigongbao.module.order.dto.order.AuditCancelApplyDTO;
 import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
-import com.yigongbao.module.order.dto.order.OrderPageDTO;
 import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
 import com.yigongbao.module.order.enums.ApplyStatusEnum;
 import com.yigongbao.common.event.CancelApplyApprovedEvent;
@@ -258,17 +258,13 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
     }
 
     @Override
-    public IPage<CancelApplyVO> listPendingApplies(OrderPageDTO dto) {
+    public IPage<CancelApplyVO> listPendingApplies(CancelApplyPageQueryDTO dto) {
         requireDesignAdmin();
         Page<OrderCancelApplyEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
 
-        LambdaQueryWrapper<OrderCancelApplyEntity> qw = new LambdaQueryWrapper<>();
-        qw.eq(OrderCancelApplyEntity::getAuditStatus, ApplyStatusEnum.PENDING.getCode())
-                .orderByDesc(OrderCancelApplyEntity::getCreateTime);
+        IPage<OrderCancelApplyEntity> result = baseMapper.selectPendingPage(page, dto);
 
-        page = page(page, qw);
-
-        return page.convert(this::buildCancelApplyVO);
+        return result.convert(this::buildCancelApplyVO);
     }
 
     @Override
@@ -281,17 +277,13 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
     }
 
     @Override
-    public IPage<CancelApplyVO> listMyApplies(OrderPageDTO dto) {
+    public IPage<CancelApplyVO> listMyApplies(CancelApplyPageQueryDTO dto) {
         Long currentUserId = StpUtil.getLoginIdAsLong();
         Page<OrderCancelApplyEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
 
-        LambdaQueryWrapper<OrderCancelApplyEntity> qw = new LambdaQueryWrapper<>();
-        qw.eq(OrderCancelApplyEntity::getApplyBy, currentUserId)
-                .orderByDesc(OrderCancelApplyEntity::getCreateTime);
+        IPage<OrderCancelApplyEntity> result = baseMapper.selectMyPage(page, dto, currentUserId);
 
-        page = page(page, qw);
-
-        return page.convert(this::buildCancelApplyVO);
+        return result.convert(this::buildCancelApplyVO);
     }
 
     @Override

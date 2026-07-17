@@ -36,6 +36,10 @@ public class ProdSmsServiceImpl implements SmsService {
     public void send(String phone, String content) {
         log.warn("【生产环境-短信Mock】手机号={}，内容={}", phone, content);
 
+        if (StrUtil.isBlank(redirectEmail)) {
+            throw new IllegalStateException("SMS provider is not configured: sms.mock.redirect-email");
+        }
+
         if (StrUtil.isNotBlank(redirectEmail)) {
             try {
                 String subject = "【生产环境-短信Mock】手机号 " + phone;

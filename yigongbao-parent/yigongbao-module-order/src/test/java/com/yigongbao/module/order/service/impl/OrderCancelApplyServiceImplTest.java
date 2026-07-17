@@ -19,7 +19,7 @@ import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.module.order.convert.OrderCancelApplyConvert;
 import com.yigongbao.module.order.dto.order.AuditCancelApplyDTO;
 import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
-import com.yigongbao.module.order.dto.order.OrderPageDTO;
+import com.yigongbao.module.order.dto.order.CancelApplyPageQueryDTO;
 import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
 import com.yigongbao.module.order.enums.ApplyStatusEnum;
 import com.yigongbao.module.order.mapper.OrderCancelApplyMapper;
@@ -27,6 +27,7 @@ import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserService;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -86,6 +87,23 @@ class OrderCancelApplyServiceImplTest {
         assertEquals(1, ApplyStatusEnum.PENDING.getCode());
         assertEquals(2, ApplyStatusEnum.APPROVED.getCode());
         assertEquals(3, ApplyStatusEnum.REJECTED.getCode());
+    }
+
+    @Test
+    void listPendingApplies_passesOrderCodeFilterToMapper() {
+        CancelApplyPageQueryDTO query = new CancelApplyPageQueryDTO();
+        query.setOrderCode("ORD-20260717");
+        query.setApplyBy(1001L);
+        query.setPageNum(1);
+        query.setPageSize(20);
+
+        when(userService.getCurrentUserRoleCode()).thenReturn(RoleCodeConstants.DESIGN_ADMIN);
+        when(cancelApplyMapper.selectPendingPage(any(Page.class), eq(query)))
+                .thenReturn(new Page<>());
+
+        cancelApplyService.listPendingApplies(query);
+
+        verify(cancelApplyMapper).selectPendingPage(any(Page.class), eq(query));
     }
 
     @BeforeEach
@@ -446,7 +464,7 @@ class OrderCancelApplyServiceImplTest {
 
     @Test
     void listPendingApplies_RequiresDesignAdmin() {
-        OrderPageDTO dto = new OrderPageDTO();
+        CancelApplyPageQueryDTO dto = new CancelApplyPageQueryDTO();
         try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
             stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
             when(userService.getCurrentUserRoleCode()).thenReturn("USER");

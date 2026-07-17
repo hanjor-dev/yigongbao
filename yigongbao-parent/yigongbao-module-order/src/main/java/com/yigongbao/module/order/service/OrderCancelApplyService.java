@@ -3,8 +3,8 @@ package com.yigongbao.module.order.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.order.dto.order.AuditCancelApplyDTO;
+import com.yigongbao.module.order.dto.order.CancelApplyPageQueryDTO;
 import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
-import com.yigongbao.module.order.dto.order.OrderPageDTO;
 import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
 import com.yigongbao.module.order.vo.order.CancelApplyVO;
 
@@ -60,7 +60,7 @@ public interface OrderCancelApplyService extends IService<OrderCancelApplyEntity
      * @param dto 分页参数
      * @return 待审核申请列表
      */
-    IPage<CancelApplyVO> listPendingApplies(OrderPageDTO dto);
+    IPage<CancelApplyVO> listPendingApplies(CancelApplyPageQueryDTO dto);
 
     /**
      * 检查订单是否有待审核的取消申请
@@ -76,7 +76,7 @@ public interface OrderCancelApplyService extends IService<OrderCancelApplyEntity
      * @param dto 分页参数
      * @return 我的申请列表
      */
-    IPage<CancelApplyVO> listMyApplies(OrderPageDTO dto);
+    IPage<CancelApplyVO> listMyApplies(CancelApplyPageQueryDTO dto);
 
     /**
      * 查询订单的取消申请历史记录

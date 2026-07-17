@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.yigongbao.module.order.mapper.OrderCancelApplyMapper">
+
+    <sql id="cancelApplyPageConditions">
+        AND oca.is_deleted = 0
+        <if test="query.orderCode != null and query.orderCode != ''">
+            AND om.order_code LIKE CONCAT('%', #{query.orderCode}, '%')
+        </if>
+        <if test="query.applyByName != null and query.applyByName != ''">
+            AND applicant.real_name LIKE CONCAT('%', #{query.applyByName}, '%')
+        </if>
+        <if test="query.applyBy != null">
+            AND oca.apply_by = #{query.applyBy}
+        </if>
+        <if test="query.createTimeStart != null">
+            AND oca.create_time &gt;= #{query.createTimeStart}
+        </if>
+        <if test="query.createTimeEnd != null">
+            AND oca.create_time &lt;= #{query.createTimeEnd}
+        </if>
+    </sql>
+
+    <select id="selectPendingPage" resultType="com.yigongbao.module.order.entity.OrderCancelApplyEntity">
+        SELECT oca.*
+        FROM order_cancel_apply oca
+        LEFT JOIN order_main om ON om.id = oca.order_id AND om.is_deleted = 0
+        LEFT JOIN sys_user applicant ON applicant.id = oca.apply_by AND applicant.is_deleted = 0
+        WHERE oca.audit_status = 1
+        <include refid="cancelApplyPageConditions"/>
+        ORDER BY oca.create_time DESC
+    </select>
+
+    <select id="selectMyPage" resultType="com.yigongbao.module.order.entity.OrderCancelApplyEntity">
+        SELECT oca.*
+        FROM order_cancel_apply oca
+        LEFT JOIN order_main om ON om.id = oca.order_id AND om.is_deleted = 0
+        LEFT JOIN sys_user applicant ON applicant.id = oca.apply_by AND applicant.is_deleted = 0
+        WHERE oca.apply_by = #{applyBy}
+        <include refid="cancelApplyPageConditions"/>
+        ORDER BY oca.create_time DESC
+    </select>
+
+</mapper>

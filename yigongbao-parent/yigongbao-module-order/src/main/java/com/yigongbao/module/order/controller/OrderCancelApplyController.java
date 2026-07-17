@@ -6,8 +6,8 @@ import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.module.order.dto.order.AuditCancelApplyDTO;
+import com.yigongbao.module.order.dto.order.CancelApplyPageQueryDTO;
 import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
-import com.yigongbao.module.order.dto.order.OrderPageDTO;
 import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.vo.order.CancelApplyVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -74,7 +74,7 @@ public class OrderCancelApplyController {
      */
     @PostMapping("/pending/list")
     @Operation(summary = "查询待审核申请列表", description = "设计管理员查询所有待审核的取消申请")
-    public Result<IPage<CancelApplyVO>> listPendingApplies(@Valid @RequestBody OrderPageDTO dto) {
+    public Result<IPage<CancelApplyVO>> listPendingApplies(@Valid @RequestBody CancelApplyPageQueryDTO dto) {
         IPage<CancelApplyVO> page = cancelApplyService.listPendingApplies(dto);
         return Result.success(page);
     }
@@ -84,7 +84,7 @@ public class OrderCancelApplyController {
      */
     @PostMapping("/my-applies")
     @Operation(summary = "查询我的申请列表", description = "查询当前用户提交的所有取消申请")
-    public Result<IPage<CancelApplyVO>> listMyApplies(@Valid @RequestBody OrderPageDTO dto) {
+    public Result<IPage<CancelApplyVO>> listMyApplies(@Valid @RequestBody CancelApplyPageQueryDTO dto) {
         IPage<CancelApplyVO> page = cancelApplyService.listMyApplies(dto);
         return Result.success(page);
     }

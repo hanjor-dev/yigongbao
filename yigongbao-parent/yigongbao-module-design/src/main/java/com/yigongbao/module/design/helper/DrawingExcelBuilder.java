@@ -252,6 +252,7 @@ public class DrawingExcelBuilder {
             // 判断图片格式（PNG/JPG）
             int pictureType = detectPictureType(screenshotBytes);
             int pictureIdx = wb.addPicture(screenshotBytes, pictureType);
+            int[] imageSize = getImageDimensions(screenshotBytes);
 
             // 图片区域：产品名行下方，占槽位主体（高度10行，宽度4列：标签2列+值2列）
             int colStart = coord[3] - 2;      // 标签列起始位置（产品名称值列向左2列）
@@ -259,24 +260,131 @@ public class DrawingExcelBuilder {
             int rowStart = coord[2] + 1;      // productNameRow + 1
             int rowEnd = rowStart + 10;       // 向下10行
 
-            // 使用 CreationHelper 创建锚点，图片精确填充目标单元格区域，留出 padding 避免覆盖边框
-            int padding = 10;
-            CreationHelper helper = wb.getCreationHelper();
-            XSSFDrawing drawing = sheet.createDrawingPatriarch();
-            ClientAnchor anchor = helper.createClientAnchor();
-            anchor.setCol1(colStart);
-            anchor.setRow1(rowStart);
-            anchor.setDx1(padding * Units.EMU_PER_PIXEL);
-            anchor.setDy1(padding * Units.EMU_PER_PIXEL);
-            anchor.setCol2(colEnd);
-            anchor.setRow2(rowEnd);
-            anchor.setDx2(-padding * Units.EMU_PER_PIXEL);
-            anchor.setDy2(-padding * Units.EMU_PER_PIXEL);
+            // 根据原图尺寸按比例缩放，避免将任意比例图片强制拉伸到固定槽位。
+            XSSFClientAnchor anchor;
+            if (imageSize == null) {
+                // 尺寸解析失败时仍然插入图片，退回固定槽位矩形，避免生成空白槽位。
+                log.warn("截图尺寸无法解析，使用槽位矩形兜底嵌图，coord={}", coord);
+                anchor = createFallbackAnchor(colStart, colEnd, rowStart, rowEnd, 10);
+            } else {
+                anchor = createContainAnchor(
+                        sheet, colStart, colEnd, rowStart, rowEnd, imageSize[0], imageSize[1], 10);
+            }
             anchor.setAnchorType(ClientAnchor.AnchorType.MOVE_AND_RESIZE);
+
+            XSSFDrawing drawing = sheet.getDrawingPatriarch() != null
+                    ? sheet.getDrawingPatriarch() : sheet.createDrawingPatriarch();
             drawing.createPicture(anchor, pictureIdx);
         } catch (Exception e) {
             log.warn("截图嵌入失败，coord={}, error={}", coord, e.getMessage());
         }
+    }
+
+    /** 创建旧逻辑的固定槽位锚点，作为图片尺寸无法解析时的兜底方案。 */
+    private XSSFClientAnchor createFallbackAnchor(
+            int colStart, int colEnd, int rowStart, int rowEnd, int paddingPixels) {
+        int padding = paddingPixels * Units.EMU_PER_PIXEL;
+        XSSFClientAnchor anchor = new XSSFClientAnchor();
+        anchor.setCol1(colStart);
+        anchor.setRow1(rowStart);
+        anchor.setDx1(padding);
+        anchor.setDy1(padding);
+        anchor.setCol2(colEnd);
+        anchor.setRow2(rowEnd);
+        anchor.setDx2(-padding);
+        anchor.setDy2(-padding);
+        return anchor;
+    }
+
+    /**
+     * 创建等比例缩放并居中的图片锚点，图片边界不会超出指定单元格区域。
+     * XSSF 锚点的偏移量使用 EMU，列宽和行高也统一换算到 EMU 后计算。
+     */
+    private XSSFClientAnchor createContainAnchor(
+            XSSFSheet sheet, int colStart, int colEnd, int rowStart, int rowEnd,
+            int imageWidth, int imageHeight, int paddingPixels) {
+        double padding = (double) paddingPixels * Units.EMU_PER_PIXEL;
+        double slotLeft = columnPositionInEmu(sheet, colStart);
+        double slotRight = columnPositionInEmu(sheet, colEnd);
+        double slotTop = rowPositionInEmu(sheet, rowStart);
+        double slotBottom = rowPositionInEmu(sheet, rowEnd);
+
+        double availableWidth = slotRight - slotLeft - padding * 2;
+        double availableHeight = slotBottom - slotTop - padding * 2;
+        double imageWidthInEmu = imageWidth * (double) Units.EMU_PER_PIXEL;
+        double imageHeightInEmu = imageHeight * (double) Units.EMU_PER_PIXEL;
+        double scale = Math.min(availableWidth / imageWidthInEmu, availableHeight / imageHeightInEmu);
+
+        double displayWidth = imageWidthInEmu * scale;
+        double displayHeight = imageHeightInEmu * scale;
+        double imageLeft = slotLeft + padding + (availableWidth - displayWidth) / 2;
+        double imageTop = slotTop + padding + (availableHeight - displayHeight) / 2;
+
+        int[] fromColumn = locateColumn(sheet, colEnd, imageLeft);
+        int[] toColumn = locateColumn(sheet, colEnd, imageLeft + displayWidth);
+        int[] fromRow = locateRow(sheet, rowEnd, imageTop);
+        int[] toRow = locateRow(sheet, rowEnd, imageTop + displayHeight);
+
+        XSSFClientAnchor anchor = new XSSFClientAnchor();
+        anchor.setCol1(fromColumn[0]);
+        anchor.setDx1(fromColumn[1]);
+        anchor.setCol2(toColumn[0]);
+        anchor.setDx2(toColumn[1]);
+        anchor.setRow1(fromRow[0]);
+        anchor.setDy1(fromRow[1]);
+        anchor.setRow2(toRow[0]);
+        anchor.setDy2(toRow[1]);
+        return anchor;
+    }
+
+    private double columnPositionInEmu(XSSFSheet sheet, int colIndex) {
+        double position = 0;
+        for (int i = 0; i < colIndex; i++) {
+            position += Units.columnWidthToEMU(sheet.getColumnWidth(i));
+        }
+        return position;
+    }
+
+    private double rowPositionInEmu(XSSFSheet sheet, int rowIndex) {
+        double position = 0;
+        for (int i = 0; i < rowIndex; i++) {
+            position += rowHeightInEmu(sheet, i);
+        }
+        return position;
+    }
+
+    private double rowHeightInEmu(XSSFSheet sheet, int rowIndex) {
+        Row row = sheet.getRow(rowIndex);
+        double points = row == null || row.getHeightInPoints() < 0
+                ? sheet.getDefaultRowHeightInPoints()
+                : row.getHeightInPoints();
+        return points * Units.EMU_PER_POINT;
+    }
+
+    /** 将绝对 EMU 坐标转换为 XSSF 的 {cellIndex, cellOffset} 锚点坐标。 */
+    private int[] locateColumn(XSSFSheet sheet, int endColumn, double position) {
+        double current = 0;
+        for (int col = 0; col < endColumn; col++) {
+            double next = current + Units.columnWidthToEMU(sheet.getColumnWidth(col));
+            if (position < next - 0.5) {
+                return new int[]{col, (int) Math.round(position - current)};
+            }
+            current = next;
+        }
+        return new int[]{endColumn, 0};
+    }
+
+    /** 将绝对 EMU 坐标转换为 XSSF 的 {rowIndex, rowOffset} 锚点坐标。 */
+    private int[] locateRow(XSSFSheet sheet, int endRow, double position) {
+        double current = 0;
+        for (int row = 0; row < endRow; row++) {
+            double next = current + rowHeightInEmu(sheet, row);
+            if (position < next - 0.5) {
+                return new int[]{row, (int) Math.round(position - current)};
+            }
+            current = next;
+        }
+        return new int[]{endRow, 0};
     }
 
     /**
@@ -304,7 +412,7 @@ public class DrawingExcelBuilder {
         } catch (Exception e) {
             log.warn("读取图片尺寸失败: {}", e.getMessage());
         }
-        return new int[]{100, 100}; // 默认尺寸
+        return null;
     }
 
     private void setCell(Sheet sheet, int rowIdx, int colIdx, String value) {

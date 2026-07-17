@@ -6,6 +6,139 @@
 SET NAMES utf8mb4;
 
 -- ============================================================
+-- 0. order cancel apply resources and role permissions
+-- Resource rows are resolved by resource_code so this remains safe
+-- when online auto-increment values differ from init.sql.
+-- ============================================================
+
+SELECT '0. order cancel apply resources and role permissions' AS step;
+
+SET @order_resource_parent_id = (
+    SELECT id FROM sys_resource
+    WHERE resource_code = 'Order' AND is_deleted = 0
+    LIMIT 1
+);
+
+INSERT INTO sys_resource (
+    parent_id, resource_name, resource_code, resource_type,
+    icon, path, component, redirect, sort, visible, status, remark,
+    create_time, update_time, create_by, update_by, is_deleted
+)
+SELECT @order_resource_parent_id, '我的申请Tab', 'order:TabMyCancel', 3,
+       NULL, NULL, NULL, NULL, 23, 1, 1, NULL,
+       NOW(), NOW(), NULL, NULL, 0
+WHERE @order_resource_parent_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM sys_resource
+      WHERE resource_code = 'order:TabMyCancel' AND is_deleted = 0
+  );
+
+INSERT INTO sys_resource (
+    parent_id, resource_name, resource_code, resource_type,
+    icon, path, component, redirect, sort, visible, status, remark,
+    create_time, update_time, create_by, update_by, is_deleted
+)
+SELECT @order_resource_parent_id, '待审核申请列表', 'order:CancelApply', 3,
+       NULL, NULL, NULL, NULL, 24, 1, 1, NULL,
+       NOW(), NOW(), NULL, NULL, 0
+WHERE @order_resource_parent_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM sys_resource
+      WHERE resource_code = 'order:CancelApply' AND is_deleted = 0
+  );
+
+INSERT INTO sys_resource (
+    parent_id, resource_name, resource_code, resource_type,
+    icon, path, component, redirect, sort, visible, status, remark,
+    create_time, update_time, create_by, update_by, is_deleted
+)
+SELECT @order_resource_parent_id, '审核通过', 'order:CancelApprove', 3,
+       NULL, NULL, NULL, NULL, 25, 1, 1, NULL,
+       NOW(), NOW(), NULL, NULL, 0
+WHERE @order_resource_parent_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM sys_resource
+      WHERE resource_code = 'order:CancelApprove' AND is_deleted = 0
+  );
+
+INSERT INTO sys_resource (
+    parent_id, resource_name, resource_code, resource_type,
+    icon, path, component, redirect, sort, visible, status, remark,
+    create_time, update_time, create_by, update_by, is_deleted
+)
+SELECT @order_resource_parent_id, '审核驳回', 'order:CancelReject', 3,
+       NULL, NULL, NULL, NULL, 26, 1, 1, NULL,
+       NOW(), NOW(), NULL, NULL, 0
+WHERE @order_resource_parent_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM sys_resource
+      WHERE resource_code = 'order:CancelReject' AND is_deleted = 0
+  );
+
+INSERT INTO sys_resource (
+    parent_id, resource_name, resource_code, resource_type,
+    icon, path, component, redirect, sort, visible, status, remark,
+    create_time, update_time, create_by, update_by, is_deleted
+)
+SELECT @order_resource_parent_id, '取消申请历史', 'order:CancelHistory', 3,
+       NULL, NULL, NULL, NULL, 27, 1, 1, NULL,
+       NOW(), NOW(), NULL, NULL, 0
+WHERE @order_resource_parent_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM sys_resource
+      WHERE resource_code = 'order:CancelHistory' AND is_deleted = 0
+  );
+
+INSERT INTO sys_role_resource (role_id, resource_id)
+SELECT r.id, res.id
+FROM sys_role r
+JOIN sys_resource res ON res.resource_code = 'order:TabMyCancel' AND res.is_deleted = 0
+WHERE r.role_code IN ('admin', 'salesman', 'salesman-self')
+  AND r.is_deleted = 0
+  AND NOT EXISTS (
+      SELECT 1 FROM sys_role_resource rr
+      WHERE rr.role_id = r.id AND rr.resource_id = res.id
+  );
+
+INSERT INTO sys_role_resource (role_id, resource_id)
+SELECT r.id, res.id
+FROM sys_role r
+JOIN sys_resource res ON res.resource_code = 'order:Cancel' AND res.is_deleted = 0
+WHERE r.role_code = 'salesman-self'
+  AND r.is_deleted = 0
+  AND NOT EXISTS (
+      SELECT 1 FROM sys_role_resource rr
+      WHERE rr.role_id = r.id AND rr.resource_id = res.id
+  );
+
+INSERT INTO sys_role_resource (role_id, resource_id)
+SELECT r.id, res.id
+FROM sys_role r
+JOIN sys_resource res ON res.resource_code = 'design:Cancel' AND res.is_deleted = 0
+WHERE r.role_code = 'designer'
+  AND r.is_deleted = 0
+  AND NOT EXISTS (
+      SELECT 1 FROM sys_role_resource rr
+      WHERE rr.role_id = r.id AND rr.resource_id = res.id
+  );
+
+INSERT INTO sys_role_resource (role_id, resource_id)
+SELECT r.id, res.id
+FROM sys_role r
+JOIN sys_resource res
+  ON res.resource_code IN (
+      'order:CancelApply', 'order:CancelApprove',
+      'order:CancelReject', 'order:CancelHistory'
+  )
+ AND res.is_deleted = 0
+WHERE r.role_code = 'designer-manager'
+  AND r.is_deleted = 0
+  AND NOT EXISTS (
+      SELECT 1 FROM sys_role_resource rr
+      WHERE rr.role_id = r.id AND rr.resource_id = res.id
+  );
+
+-- ============================================================
 -- 1. Service provider data migration from migration_20260627_service_provider.sql
 -- ============================================================
 
