@@ -48,6 +48,8 @@ public interface DesignDocService {
      */
     void downloadDrawing(Long orderId, Long packageId, HttpServletResponse response);
 
+    void downloadDrawing(Long orderId, Long packageId, String productCategory, HttpServletResponse response);
+
     /**
      * 获取指令单预览 URL（在线模式）
      * <p>
@@ -74,6 +76,8 @@ public interface DesignDocService {
      */
     DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId);
 
+    DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId, String productCategory);
+
     /**
      * 查询指令单版本历史列表
      *
@@ -91,6 +95,8 @@ public interface DesignDocService {
      * @return 版本列表（按 versionSeq 倒序）
      */
     List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId);
+
+    List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId, String productCategory);
 
     /**
      * 上传修订版指令单
@@ -118,6 +124,8 @@ public interface DesignDocService {
      */
     void uploadRevisedDrawing(Long orderId, Long packageId, Long id, MultipartFile file);
 
+    void uploadRevisedDrawing(Long orderId, Long packageId, String productCategory, Long id, MultipartFile file);
+
     /**
      * 确认图纸（在线模式）
      * <p>
@@ -130,6 +138,8 @@ public interface DesignDocService {
      * @param id        图纸记录ID
      */
     void confirmDrawing(Long orderId, Long packageId, Long id);
+
+    void confirmDrawing(Long orderId, Long packageId, String productCategory, Long id);
 
     /**
      * 确认指令单（在线模式）
@@ -161,4 +171,6 @@ public interface DesignDocService {
      * @return key=packageId，value=最新版图纸 VO
      */
     Map<Long, DesignDocVersionVO> getLatestDrawingMap(Collection<Long> packageIds);
+
+    Map<Long, List<DesignDocVersionVO>> getLatestDrawingGroups(Collection<Long> packageIds);
 }

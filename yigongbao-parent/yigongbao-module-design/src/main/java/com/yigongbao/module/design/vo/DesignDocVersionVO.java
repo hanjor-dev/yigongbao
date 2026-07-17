@@ -46,6 +46,9 @@ public class DesignDocVersionVO {
     /** 图纸是否已确认（0=未确认，1=已确认；仅图纸版本有意义，指令单版本为 null） */
     private Integer isConfirmed;
 
+    /** 图纸所属产品分类；指令单为空 */
+    private String productCategory;
+
     /** 确认时间（可为空） */
     private LocalDateTime confirmTime;
 }
