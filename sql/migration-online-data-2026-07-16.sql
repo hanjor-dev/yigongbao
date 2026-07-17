@@ -426,10 +426,20 @@ WHERE pr.is_deleted = 0
   );
 
 -- ============================================================
--- 6. Verification and manual follow-up reports
+-- 6. Update regional administrator data scope
 -- ============================================================
 
-SELECT '6. verification summary' AS step;
+UPDATE sys_role
+SET data_scope_type = 'dept'
+WHERE id = 3
+  AND role_name = '区域管理员'
+  AND data_scope_type = 'self';
+
+-- ============================================================
+-- 7. Verification and manual follow-up reports
+-- ============================================================
+
+SELECT '7. verification summary' AS step;
 
 SELECT
     COUNT(*) AS total_active_records,
