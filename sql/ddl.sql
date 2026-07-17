@@ -1528,6 +1528,7 @@ CREATE TABLE design_drawing (
     source_type         VARCHAR(20)     DEFAULT 'AUTO' COMMENT '版本来源：AUTO=自动生成，MANUAL=手动上传',
     template_file_id    VARCHAR(32)     DEFAULT NULL COMMENT '模板文件ID（系统生成）',
     template_file_url   VARCHAR(512)    DEFAULT NULL COMMENT '模板文件URL',
+    qr_file_id          VARCHAR(32)     DEFAULT NULL COMMENT '生成该图纸版本时使用的二维码文件ID（10.21）',
     revised_file_id     VARCHAR(32)     DEFAULT NULL COMMENT '修订版文件ID（设计师上传）',
     revised_file_url    VARCHAR(512)    DEFAULT NULL COMMENT '修订版文件URL',
     generate_time       DATETIME        DEFAULT NULL COMMENT '生成时间',
