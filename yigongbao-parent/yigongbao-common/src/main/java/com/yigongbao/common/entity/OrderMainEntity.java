@@ -279,24 +279,24 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
      */
     private String dataEvaluationOpinion;
 
-    // ==================== 两级审核信息 ====================
+    // ==================== 审核信息（区域字段仅兼容历史订单） ====================
     /**
-     * 大区审核状态：0-待审核，1-通过，2-驳回
+     * 历史区域审核状态：0-待审核，1-通过，2-驳回；新订单不再使用
      */
     private Integer regionalAuditStatus;
 
     /**
-     * 大区审核备注
+     * 历史区域审核备注
      */
     private String regionalAuditRemark;
 
     /**
-     * 大区审核时间
+     * 历史区域审核时间
      */
     private LocalDateTime regionalAuditTime;
 
     /**
-     * 大区审核人ID
+     * 历史区域审核人ID
      */
     private Long regionalAuditBy;
 

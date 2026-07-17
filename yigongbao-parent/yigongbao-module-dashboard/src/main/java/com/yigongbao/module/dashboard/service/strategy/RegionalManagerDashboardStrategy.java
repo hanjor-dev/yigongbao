@@ -2,6 +2,7 @@ package com.yigongbao.module.dashboard.service.strategy;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.dashboard.dto.DashboardQueryDTO;
 import com.yigongbao.module.dashboard.enums.TimeRangeEnum;
 import com.yigongbao.module.dashboard.util.TimeRangeUtil;
@@ -69,9 +70,9 @@ public class RegionalManagerDashboardStrategy implements DashboardStrategy {
             .in("operator_id", operatorIds)
             .between("create_time", range[0], range[1]));
 
-        long pendingAudit = orderMapper.selectCount(new QueryWrapper<OrderMainEntity>()
-            .in("operator_id", operatorIds)
-            .eq("regional_audit_status", 0));
+            long pendingAudit = orderMapper.selectCount(new QueryWrapper<OrderMainEntity>()
+                .in("operator_id", operatorIds)
+                .eq("status", FlowStatusEnum.PENDING_DATA_AUDIT.getValue()));
 
         long inProgress = orderMapper.selectCount(new QueryWrapper<OrderMainEntity>()
             .in("operator_id", operatorIds)
@@ -87,7 +88,7 @@ public class RegionalManagerDashboardStrategy implements DashboardStrategy {
 
         return List.of(
             CardVO.builder().key("deptOrders").title("部门订单").value(total).unit("单").build(),
-            CardVO.builder().key("pendingAudit").title("待审核订单").value(pendingAudit).unit("单").build(),
+            CardVO.builder().key("pendingAudit").title("待设计审核订单").value(pendingAudit).unit("单").build(),
             CardVO.builder().key("inProgress").title("进行中订单").value(inProgress).unit("单").build(),
             CardVO.builder().key("completedOrders").title("已完成").value(completed).unit("单").build(),
             CardVO.builder().key("avgOrders").title("人均订单数").value(String.format("%.1f", avgOrders)).unit("单").build()

@@ -49,6 +49,8 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
+import org.mockito.ArgumentCaptor;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -197,5 +199,45 @@ class OrderModifyApplyServiceImplBoundaryTest {
         assertThat(apply.getAuditUserId()).isEqualTo(2L);
         verify(applyMapper).updateById(apply);
         verify(eventPublisher, times(2)).publishEvent(any());
+    }
+
+    @Test
+    void auditApply_approvalResetsOnlyDesignAuditStatus() {
+        UserEntity manager = new UserEntity();
+        manager.setId(2L);
+        manager.setRealName("设计管理员");
+        manager.setRoleCode(RoleCodeEnum.DESIGNER_MANAGER.getCode());
+        UserEntity applicant = new UserEntity();
+        applicant.setRoleCode("BUSINESS_USER");
+
+        OrderModificationApplyEntity apply = new OrderModificationApplyEntity();
+        apply.setId(10L);
+        apply.setOrderId(20L);
+        apply.setApplyUserId(1L);
+        apply.setApplyUserName("业务员");
+        apply.setStatus(ApplyStatusEnum.PENDING.getCode());
+        apply.setExpireTime(java.time.LocalDateTime.now().plusHours(1));
+        apply.setModificationContent("{}");
+
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(20L);
+        order.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.ORDER.getValue());
+
+        when(userService.getById(2L)).thenReturn(manager);
+        when(userService.getById(1L)).thenReturn(applicant);
+        when(applyMapper.selectById(10L)).thenReturn(apply);
+        when(orderMainMapper.selectById(20L)).thenReturn(order);
+        AuditApplyDTO dto = new AuditApplyDTO();
+        dto.setResult(ApplyStatusEnum.APPROVED.getCode());
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(2L);
+            service.auditApply(10L, dto);
+        }
+
+        ArgumentCaptor<LambdaUpdateWrapper<OrderMainEntity>> captor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(orderMainMapper).update(any(), captor.capture());
+        assertThat(captor.getValue().getSqlSet()).doesNotContain("regionalAuditStatus");
+        assertThat(captor.getValue().getSqlSet()).contains("designAuditStatus");
     }
 }

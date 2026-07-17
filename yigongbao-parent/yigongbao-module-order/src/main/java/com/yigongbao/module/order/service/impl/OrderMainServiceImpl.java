@@ -697,7 +697,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     }
 
     /**
-     * 审核驳回（两级审核）
+     * 审核驳回
      *
      * 【驳回规则】
      * - 必须填写驳回原因（remark）
@@ -796,7 +796,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         boolean updated = update(new LambdaUpdateWrapper<OrderMainEntity>()
                 .eq(OrderMainEntity::getId, id)
                 .eq(OrderMainEntity::getVersion, version)
-                .eq(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.REJECTED)
+                // 以流程状态作为重新提交前置条件，兼容历史上仅被区域管理员驳回的试用订单
+                .eq(OrderMainEntity::getStatus, FlowStatusEnum.DATA_AUDIT_REJECTED.getValue())
                 .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING)
                 .set(OrderMainEntity::getDesignAuditTime, null)
                 .set(OrderMainEntity::getDesignAuditBy, null)
@@ -950,13 +951,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             order.setPhase(FlowPhaseEnum.ORDER.getValue());
             order.setStatus(FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
             order.setVersion(0);
-            // 试用订单初始化两级审核状态
-            if (DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(draft.getBusinessType())) {
-                order.setRegionalAuditStatus(AuditStatusConstants.PENDING);
-                order.setDesignAuditStatus(AuditStatusConstants.PENDING);
-            } else {
-                order.setDesignAuditStatus(AuditStatusConstants.PENDING);
-            }
+            // 所有类型订单统一初始化设计审核状态，试用订单不再经过区域管理员审核
+            order.setDesignAuditStatus(AuditStatusConstants.PENDING);
             // 从医院表补充地区冗余字段（草稿中已复制 hospitalId，此处补充 area 字段）
             fillAreaFromHospital(order, order.getHospitalId());
 

@@ -16,6 +16,7 @@ import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
+import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.order.convert.OrderConvert;
 import com.yigongbao.module.order.mapper.OrderDraftMapper;
 import com.yigongbao.module.order.mapper.OrderFileMapper;
@@ -36,17 +37,18 @@ import com.yigongbao.module.system.user.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.apache.ibatis.session.Configuration;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.apache.ibatis.builder.MapperBuilderAssistant;
-import org.apache.ibatis.session.Configuration;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -398,6 +400,62 @@ class OrderMainServiceImplStateTransitionTest {
     }
 
     @Test
+    void createFromDraft_trialOrderDoesNotInitializeRegionalAudit() {
+        OrderDraftEntity draft = new OrderDraftEntity();
+        draft.setId(31L);
+        draft.setOperatorId(11L);
+        draft.setOrderType(1);
+        draft.setBusinessType("11.3");
+        when(codeGeneratorService.generate(any())).thenReturn("ORD-31");
+        when(userService.getById(11L)).thenReturn(null);
+        when(orderItemDraftMapper.selectList(any())).thenReturn(java.util.List.of());
+        when(fileService.listByBiz(anyString(), anyLong())).thenReturn(java.util.List.of());
+        doNothing().when(orderDataValidator).validateOrderType(eq(11L), eq(1));
+        doAnswer(invocation -> {
+            OrderMainEntity created = invocation.getArgument(0);
+            created.setId(301L);
+            return true;
+        }).when(service).save(any(OrderMainEntity.class));
+        when(flowFacade.executeFlow(eq(301L), eq(FlowActionEnum.CREATE), any()))
+                .thenReturn(TransitionResult.of(FlowPhaseEnum.ORDER.getValue(),
+                        FlowStatusEnum.PENDING_DATA_AUDIT.getValue()));
+
+        service.createFromDraft(draft);
+
+        verify(service).save(argThat(order ->
+                order.getRegionalAuditStatus() == null
+                        && order.getDesignAuditStatus() != null
+                        && order.getDesignAuditStatus() == com.yigongbao.common.constant.AuditStatusConstants.PENDING));
+    }
+
+    @Test
+    void resubmit_legacyRegionalRejectedOrderUsesDesignAuditAsCurrentGate() {
+        Long orderId = 32L;
+        Long userId = 11L;
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(orderId);
+        order.setCreateBy(userId);
+        order.setStatus(FlowStatusEnum.DATA_AUDIT_REJECTED.getValue());
+        order.setRegionalAuditStatus(com.yigongbao.common.constant.AuditStatusConstants.REJECTED);
+        order.setDesignAuditStatus(com.yigongbao.common.constant.AuditStatusConstants.PENDING);
+
+        when(orderQueryHelper.getCurrentUserId()).thenReturn(userId);
+        when(userService.getById(userId)).thenReturn(null);
+        doReturn(order).when(service).getById(orderId);
+        when(flowFacade.executeFlow(eq(orderId), eq(FlowActionEnum.RESUBMIT), any(), eq(3)))
+                .thenReturn(TransitionResult.of(FlowPhaseEnum.ORDER.getValue(),
+                        FlowStatusEnum.PENDING_DATA_AUDIT.getValue()));
+        doReturn(true).when(service).update(any(LambdaUpdateWrapper.class));
+
+        service.resubmit(orderId, 3);
+
+        ArgumentCaptor<LambdaUpdateWrapper<OrderMainEntity>> captor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(service).update(captor.capture());
+        assertThat(captor.getValue().getSqlSegment()).doesNotContain("designAuditStatus");
+        assertThat(captor.getValue().getSqlSegment()).contains("status");
+    }
+
+    @Test
     void createOrder_rejectsWhenCurrentUserDoesNotExist() {
         com.yigongbao.module.order.dto.order.CreateOrderDTO dto = new com.yigongbao.module.order.dto.order.CreateOrderDTO();
         when(orderQueryHelper.getCurrentUserId()).thenReturn(11L);
@@ -453,6 +511,54 @@ class OrderMainServiceImplStateTransitionTest {
         verify(orderDataValidator).validateAndFillMasterForOrder(any(), eq(101L), eq(201L), eq(301L),
                 isNull(), isNull(), isNull(), eq(userId), eq(OrderDataValidator.ValidateMode.DIRECT));
         verify(flowFacade).executeFlow(eq(100L), eq(FlowActionEnum.CREATE), any());
+        verify(eventPublisher).publishEvent(any());
+    }
+
+    @Test
+    void createOrder_trialOrderUsesOnlyDesignAudit() {
+        Long userId = 12L;
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setRealName("试用订单操作员");
+        user.setPhone("13800000001");
+        user.setDeptId(22L);
+        user.setDeptName("试用科室");
+
+        com.yigongbao.module.order.dto.order.CreateOrderDTO dto = new com.yigongbao.module.order.dto.order.CreateOrderDTO();
+        dto.setOrderType(1);
+        dto.setNeedsPhysicalDelivery(0);
+        dto.setBusinessType("11.3");
+        dto.setOrgId(102L);
+        dto.setHospitalId(202L);
+        dto.setHospitalDeptId(302L);
+        dto.setPatientName("试用患者");
+        dto.setApprovalFileIds(java.util.List.of("approval-file-1"));
+        dto.setItems(java.util.List.of());
+
+        when(orderQueryHelper.getCurrentUserId()).thenReturn(userId);
+        when(codeGeneratorService.generate(any())).thenReturn("ORD-TRIAL-100");
+        when(configService.getConfigValue(any())).thenReturn("false");
+        when(userService.getById(userId)).thenReturn(user);
+        FileVO approvalFile = new FileVO();
+        approvalFile.setId("approval-file-1");
+        when(fileService.listByIds(any())).thenReturn(java.util.List.of(approvalFile));
+        doAnswer(invocation -> {
+            OrderMainEntity order = invocation.getArgument(0);
+            order.setId(101L);
+            return true;
+        }).when(service).save(any(OrderMainEntity.class));
+
+        Long orderId = service.createOrder(dto);
+
+        org.junit.jupiter.api.Assertions.assertEquals(101L, orderId);
+        ArgumentCaptor<OrderMainEntity> orderCaptor = ArgumentCaptor.forClass(OrderMainEntity.class);
+        verify(service).save(orderCaptor.capture());
+        OrderMainEntity savedOrder = orderCaptor.getValue();
+        assertThat(savedOrder.getBusinessType()).isEqualTo("11.3");
+        assertThat(savedOrder.getStatus()).isEqualTo(FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
+        assertThat(savedOrder.getDesignAuditStatus()).isEqualTo(0);
+        assertThat(savedOrder.getRegionalAuditStatus()).isNull();
+        verify(flowFacade).executeFlow(eq(101L), eq(FlowActionEnum.CREATE), any());
         verify(eventPublisher).publishEvent(any());
     }
 }

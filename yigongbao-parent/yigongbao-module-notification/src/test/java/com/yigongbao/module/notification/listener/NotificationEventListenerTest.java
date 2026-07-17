@@ -2,6 +2,7 @@ package com.yigongbao.module.notification.listener;
 
 import com.yigongbao.common.constant.RoleCodeConstants;
 import com.yigongbao.common.event.CancelApplySubmittedEvent;
+import com.yigongbao.common.event.OrderSubmittedEvent;
 import com.yigongbao.module.notification.dto.CancelApplyNotificationData;
 import com.yigongbao.module.notification.mapper.CancelApplyQueryMapper;
 import com.yigongbao.module.notification.mapper.NotificationMessageMapper;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,5 +56,17 @@ class NotificationEventListenerTest {
                 eq(RoleCodeConstants.DESIGN_ADMIN),
                 any(),
                 any());
+    }
+
+    @Test
+    void onOrderSubmitted_trialOrderNotifiesDesignManagers() {
+        OrderSubmittedEvent event = new OrderSubmittedEvent(
+                this, 100L, "ORD-100", "11.3", "患者", "机构", "业务员",
+                200L, 300L, 400L, 500L);
+
+        listener.onOrderSubmitted(event);
+
+        verify(notificationService).send(eq(RoleCodeConstants.DESIGN_ADMIN), any(), any());
+        verify(notificationService, never()).send(eq(RoleCodeConstants.REGIONAL_ADMIN), any(), any());
     }
 }

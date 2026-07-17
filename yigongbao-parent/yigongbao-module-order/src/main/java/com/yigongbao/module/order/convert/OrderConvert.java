@@ -1,6 +1,7 @@
 package com.yigongbao.module.order.convert;
 
 import cn.hutool.core.util.StrUtil;
+import com.yigongbao.common.constant.AuditStatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.module.order.vo.AuditInfo;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
@@ -90,35 +91,13 @@ public class OrderConvert {
      * @return 审核进度描述
      */
     private String calculateAuditProgress(OrderMainEntity order) {
-        String businessType = order.getBusinessType();
-
-        if ("11.3".equals(businessType)) {
-            // 试用订单：两级审核
-            Integer regionalStatus = order.getRegionalAuditStatus();
-            Integer designStatus = order.getDesignAuditStatus();
-
-            if (regionalStatus == null || regionalStatus == 0) {
-                return "等待区域管理员审核";
-            } else if (regionalStatus == 2) {
-                return "区域管理员驳回";
-            } else if (regionalStatus == 1 && designStatus == 0) {
-                return "等待设计管理员审核";
-            } else if (designStatus == 2) {
-                return "设计管理员驳回";
-            } else if (designStatus == 1) {
-                return "数据审核通过";
-            }
-        } else {
-            // 其他订单：单级审核
-            Integer designStatus = order.getDesignAuditStatus();
-
-            if (designStatus == null || designStatus == 0) {
-                return "等待设计管理员审核";
-            } else if (designStatus == 2) {
-                return "设计管理员驳回";
-            } else if (designStatus == 1) {
-                return "数据审核通过";
-            }
+        Integer designStatus = order.getDesignAuditStatus();
+        if (designStatus == null || designStatus == AuditStatusConstants.PENDING) {
+            return "等待设计管理员审核";
+        } else if (designStatus == AuditStatusConstants.REJECTED) {
+            return "设计管理员驳回";
+        } else if (designStatus == AuditStatusConstants.PASSED) {
+            return "数据审核通过";
         }
 
         return "未知状态";
@@ -132,35 +111,13 @@ public class OrderConvert {
      * @return 审核环节标识
      */
     private String calculateAuditStage(OrderMainEntity order) {
-        String businessType = order.getBusinessType();
-
-        if ("11.3".equals(businessType)) {
-            // 试用订单
-            Integer regionalStatus = order.getRegionalAuditStatus();
-            Integer designStatus = order.getDesignAuditStatus();
-
-            if (regionalStatus != null && regionalStatus == 2) {
-                return "REGIONAL_REJECTED";
-            } else if (designStatus != null && designStatus == 2) {
-                return "DESIGN_REJECTED";
-            } else if (regionalStatus == null || regionalStatus == 0) {
-                return "REGIONAL_PENDING";
-            } else if (regionalStatus == 1 && (designStatus == null || designStatus == 0)) {
-                return "DESIGN_PENDING";
-            } else if (designStatus == 1) {
-                return "PASSED";
-            }
-        } else {
-            // 其他订单
-            Integer designStatus = order.getDesignAuditStatus();
-
-            if (designStatus != null && designStatus == 2) {
-                return "DESIGN_REJECTED";
-            } else if (designStatus == null || designStatus == 0) {
-                return "DESIGN_PENDING";
-            } else if (designStatus == 1) {
-                return "PASSED";
-            }
+        Integer designStatus = order.getDesignAuditStatus();
+        if (designStatus != null && designStatus == AuditStatusConstants.REJECTED) {
+            return "DESIGN_REJECTED";
+        } else if (designStatus == null || designStatus == AuditStatusConstants.PENDING) {
+            return "DESIGN_PENDING";
+        } else if (designStatus == AuditStatusConstants.PASSED) {
+            return "PASSED";
         }
 
         return "UNKNOWN";

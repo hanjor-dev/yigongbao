@@ -1,7 +1,6 @@
 package com.yigongbao.module.notification.listener;
 
 import cn.hutool.json.JSONUtil;
-import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.event.*;
 import com.yigongbao.module.notification.constant.NotificationJumpUrlConstants;
@@ -60,9 +59,7 @@ public class NotificationEventListener {
     // ==================== 订单相关通知 ====================
 
     /**
-     * 订单提交事件
-     * 试用订单 → 通知订单所属部门的区域管理员
-     * 其他订单 → 通知全部设计管理员
+     * 订单提交事件，统一通知全部设计管理员。
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onOrderSubmitted(OrderSubmittedEvent event) {
@@ -82,23 +79,17 @@ public class NotificationEventListener {
                     .bizId(event.getOrderId())
                     .jumpUrl(NotificationJumpUrlConstants.ORDER_DETAIL)
                     .build();
-            if (DictCodeConstants.ORDER_BUSINESS_TYPE_TRIAL.equals(event.getBusinessType())) {
-                log.info("试用订单，通知区域管理员: orderId={}, deptId={}", event.getOrderId(), event.getDeptId());
-                notificationService.send(RoleCodeEnum.REGIONAL_MANAGER.getCode(),
-                        NotificationContext.ofDept(event.getDeptId()), dto);
-            } else {
-                log.info("普通订单，通知全部设计管理员: orderId={}", event.getOrderId());
-                notificationService.send(RoleCodeEnum.DESIGNER_MANAGER.getCode(),
-                        NotificationContext.all(), dto);
-            }
+            log.info("订单提交，通知全部设计管理员: orderId={}", event.getOrderId());
+            notificationService.send(RoleCodeEnum.DESIGNER_MANAGER.getCode(),
+                    NotificationContext.all(), dto);
         } catch (Exception e) {
             log.error("订单提交通知发送失败: orderId={}", event.getOrderId(), e);
         }
     }
 
     /**
-     * 区域审核通过事件（仅试用订单触发）
-     * 通知全部设计管理员
+     * 历史区域审核通过事件兼容监听。
+     * 当前试用订单不再触发区域审核；保留该监听仅用于兼容历史事件重放。
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onRegionalAuditPassed(RegionalAuditPassedEvent event) {

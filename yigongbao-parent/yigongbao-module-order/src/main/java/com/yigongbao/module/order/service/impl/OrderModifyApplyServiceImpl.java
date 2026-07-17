@@ -269,7 +269,6 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             if (order != null && FlowPhaseEnum.ORDER.getValue().equals(order.getPhase())) {
                 LambdaUpdateWrapper<OrderMainEntity> updateWrapper = new LambdaUpdateWrapper<>();
                 updateWrapper.eq(OrderMainEntity::getId, apply.getOrderId())
-                        .set(OrderMainEntity::getRegionalAuditStatus, AuditStatusConstants.PENDING)
                         .set(OrderMainEntity::getDesignAuditStatus, AuditStatusConstants.PENDING);
                 orderMainMapper.update(null, updateWrapper);
                 log.info("修改申请审核通过，重置订单审核状态: orderId={}, phase={}", apply.getOrderId(), order.getPhase());

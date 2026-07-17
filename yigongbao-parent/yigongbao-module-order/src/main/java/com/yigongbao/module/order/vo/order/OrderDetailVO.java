@@ -278,18 +278,18 @@ public class OrderDetailVO implements Serializable {
 
     /**
      * 审核进度描述（前端直接展示）
-     * 如："等待区域管理员审核" / "等待设计管理员审核" / "区域管理员驳回"
+     * 如："等待设计管理员审核" / "设计管理员驳回"
      */
     private String auditProgress;
 
     /**
      * 当前审核环节（用于前端判断显示哪些操作按钮）
-     * 枚举值：REGIONAL_PENDING / DESIGN_PENDING / PASSED / REGIONAL_REJECTED / DESIGN_REJECTED
+     * 枚举值：DESIGN_PENDING / PASSED / DESIGN_REJECTED
      */
     private String auditStage;
 
     /**
-     * 区域审核信息（仅试用订单返回）
+     * 历史区域审核信息（兼容旧试用订单，新订单不再产生）
      */
     private AuditInfo regionalAudit;
 

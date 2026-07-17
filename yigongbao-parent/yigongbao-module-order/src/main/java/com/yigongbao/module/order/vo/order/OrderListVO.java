@@ -247,7 +247,7 @@ public class OrderListVO implements Serializable {
     // ==================== 审核信息 ====================
 
     /**
-     * 区域审核信息（试用订单专用）
+     * 历史区域审核信息（兼容旧试用订单，新订单不再产生）
      */
     private AuditInfo regionalAudit;
 
