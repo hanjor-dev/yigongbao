@@ -1,11 +1,17 @@
 package com.yigongbao.module.design.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.EncodeHintType;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
@@ -29,19 +35,30 @@ import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.vo.DesignDocVersionVO;
 import com.yigongbao.module.design.vo.DocItemVO;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.system.config.service.ConfigService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -78,6 +95,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     private final DesignScreenshotService screenshotService;
     private final DesignPackageFileScreenshotMapper screenshotMapper;
     private final com.yigongbao.module.design.helper.DesignQueryHelper designQueryHelper;
+    private final ConfigService configService;
     /** 进程内按数据包串行生成，避免 preview/download 并发产生重复版本和文件。 */
     private static final ConcurrentHashMap<String, Object> DRAWING_LOCKS = new ConcurrentHashMap<>();
 
@@ -485,7 +503,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         // 查询最新版本
         DesignDrawingEntity latest = drawingService.getLatestVersion(packageId);
 
-        // 当前二维码只影响 AUTO 图纸；当前关联暂时缺失时不使已有图纸失效。
+        // 当前二维码只影响 AUTO 图纸；没有前端二维码时由生成过程使用后端兜底二维码。
         FileVO currentQrFile = currentQrFile(orderId);
 
         // 判断打印信息是否在上次生成后发生变化
@@ -495,7 +513,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         if (latest == null) {
             // 场景1：首次，生成 A/1
             log.info("图纸首次生成，packageId={}", packageId);
-            return doGenerateDrawing(order, pkg, null, 1, requireQrFile(currentQrFile));
+            return doGenerateDrawing(order, pkg, null, 1, currentQrFile);
         }
 
         boolean manual = StatusConstants.SOURCE_TYPE_MANUAL.equals(latest.getSourceType());
@@ -513,24 +531,17 @@ public class DesignDocServiceImpl implements DesignDocService {
         if (!manual) {
             // 场景2：未封版（自动生成的版本），覆盖当前版本
             log.info("打印信息已变化，覆盖当前图纸版本，packageId={}, version={}", packageId, latest.getVersion());
-            return doGenerateDrawing(order, pkg, latest, latest.getVersionSeq(), requireQrFile(currentQrFile));
+            return doGenerateDrawing(order, pkg, latest, latest.getVersionSeq(), currentQrFile);
         } else {
             // 场景3：已封版（手动上传的版本），新建下一版本
             log.info("打印信息已变化，新建下一图纸版本，packageId={}, prevVersion={}", packageId, latest.getVersion());
-            return doGenerateDrawing(order, pkg, null, latest.getVersionSeq() + 1, requireQrFile(currentQrFile));
+            return doGenerateDrawing(order, pkg, null, latest.getVersionSeq() + 1, currentQrFile);
         }
     }
 
     private FileVO currentQrFile(Long orderId) {
         List<FileVO> files = fileService.listByBiz(FileBizTypeEnum.DRAWING_QR_IMAGE.getDictCode(), orderId);
         return files == null || files.isEmpty() ? null : files.get(0);
-    }
-
-    private FileVO requireQrFile(FileVO qrFile) {
-        if (qrFile == null || qrFile.getId() == null) {
-            throw new BusinessException(ErrorCodeEnum.DRAWING_QR_IMAGE_REQUIRED);
-        }
-        return qrFile;
     }
 
     /**
@@ -709,7 +720,7 @@ public class DesignDocServiceImpl implements DesignDocService {
                 // 覆盖现有版本，先记录旧文件ID以便删除
                 toOverride.setTemplateFileId(fileVO.getId());
                 toOverride.setTemplateFileUrl(fileVO.getFileUrl());
-                toOverride.setQrFileId(qrFile.getId());
+                toOverride.setQrFileId(ctx.getQrFileId());
                 toOverride.setGenerateTime(now);
                 toOverride.setSourceType(StatusConstants.SOURCE_TYPE_AUTO);
                 // 数据已变，重置确认状态，强制重新确认
@@ -736,7 +747,7 @@ public class DesignDocServiceImpl implements DesignDocService {
                 entity.setGenerateTime(now);
                 entity.setTemplateFileId(fileVO.getId());
                 entity.setTemplateFileUrl(fileVO.getFileUrl());
-                entity.setQrFileId(qrFile.getId());
+                entity.setQrFileId(ctx.getQrFileId());
                 // 新版本初始为未确认状态
                 entity.setIsConfirmed(StatusConstants.NOT_CONFIRMED);
                 drawingService.save(entity);
@@ -922,13 +933,90 @@ public class DesignDocServiceImpl implements DesignDocService {
         ctx.setRows(rows);
         ctx.setDesignerName(order.getDesignerName());
         ctx.setGenerateDate(generateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        loadQrBytes(ctx, order.getId(), qrFile);
+        return ctx;
+    }
+
+    /**
+     * 优先读取前端上传的二维码；订单尚未上传时恢复后端二维码作为兜底。
+     */
+    private void loadQrBytes(DrawingExcelBuilder.BuildContext ctx, Long orderId, FileVO qrFile) {
+        if (qrFile != null && qrFile.getId() != null) {
+            try {
+                byte[] bytes = fileService.downloadToBytes(qrFile.getId());
+                if (bytes != null && bytes.length > 0) {
+                    ctx.setQrBytes(bytes);
+                    ctx.setQrFileId(qrFile.getId());
+                    return;
+                }
+                log.warn("前端二维码文件为空，改用后端兜底二维码，orderId={}, qrFileId={}",
+                        orderId, qrFile.getId());
+            } catch (IOException e) {
+                log.warn("读取前端二维码失败，改用后端兜底二维码，orderId={}, qrFileId={}",
+                        orderId, qrFile.getId(), e);
+            }
+        }
+
         try {
-            ctx.setQrBytes(fileService.downloadToBytes(qrFile.getId()));
-        } catch (IOException e) {
-            log.error("读取图纸二维码图片失败，orderId={}, qrFileId={}", order.getId(), qrFile.getId(), e);
+            ctx.setQrBytes(generateFallbackQrCode(buildViewerQrContent(orderId), 500, 500));
+            ctx.setQrFileId(null);
+        } catch (Exception e) {
+            log.error("生成后端兜底二维码失败，orderId={}", orderId, e);
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
-        return ctx;
+    }
+
+    private String buildViewerQrContent(Long orderId) {
+        String baseUrl = configService.getConfigValue(SystemConfigKeyEnum.IMAGING_VIEWER_BASE_URL.getKey());
+        if (baseUrl == null || baseUrl.isBlank()) {
+            log.warn("影像查看器配置未设置，使用订单标识作为二维码兜底内容，orderId={}", orderId);
+            return "order:" + orderId;
+        }
+        String json = String.format(
+                "{\"paths\":{\"dcmPath\":{\"path\":\"/api/imaging/v1/dcm\",\"params\":{\"orderId\":%d},\"type\":\"post\"}," +
+                "\"stlPath\":{\"path\":\"/api/imaging/v1/stl\",\"params\":{\"orderId\":%d},\"type\":\"post\"}," +
+                "\"markPath\":{\"path\":\"/api/imaging/v1/mark\",\"params\":{},\"type\":\"post\"}}," +
+                "\"token\":{\"Authorization\":\"\"}}",
+                orderId, orderId);
+        String kv = Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
+        return baseUrl + "?kv=" + kv;
+    }
+
+    private byte[] generateFallbackQrCode(String content, int width, int height) throws Exception {
+        Map<EncodeHintType, Object> hints = new HashMap<>();
+        hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L);
+        hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+        hints.put(EncodeHintType.MARGIN, 0);
+
+        BitMatrix matrix = new QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, width, height, hints);
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                image.setRGB(x, y, matrix.get(x, y) ? 0x2563EB : 0xFFFFFF);
+            }
+        }
+
+        try (InputStream logoStream = new ClassPathResource("static/ico.png").getInputStream()) {
+            BufferedImage logo = ImageIO.read(logoStream);
+            int logoSize = (int) (width * 0.25);
+            int logoMargin = 2;
+            int logoX = (width - logoSize) / 2;
+            int logoY = (height - logoSize) / 2;
+            Graphics2D graphics = image.createGraphics();
+            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            graphics.setColor(java.awt.Color.WHITE);
+            graphics.fillRect(logoX - logoMargin, logoY - logoMargin,
+                    logoSize + logoMargin * 2, logoSize + logoMargin * 2);
+            graphics.drawImage(logo, logoX, logoY, logoSize, logoSize, null);
+            graphics.dispose();
+        } catch (Exception e) {
+            log.warn("后端兜底二维码Logo嵌入失败，使用纯色二维码: {}", e.getMessage());
+        }
+
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            ImageIO.write(image, "PNG", output);
+            return output.toByteArray();
+        }
     }
 
     /** DesignInstructionEntity → DocItemVO */

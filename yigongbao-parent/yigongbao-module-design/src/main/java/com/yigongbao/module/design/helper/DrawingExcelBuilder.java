@@ -66,8 +66,10 @@ public class DrawingExcelBuilder {
         private String designerName;
         /** 展开后的产品×文件行列表 */
         private List<ProductRow> rows;
-        /** 前端生成的二维码 PNG 字节（null 时跳过二维码嵌入） */
+        /** 前端图片或后端兜底二维码的 PNG 字节（null 时跳过二维码嵌入） */
         private byte[] qrBytes;
+        /** 服务层用于保存图纸版本快照的前端二维码文件 ID，后端兜底时为空。 */
+        private String qrFileId;
     }
 
     /**
@@ -132,7 +134,7 @@ public class DrawingExcelBuilder {
         log.info("开始生成图纸，orderCode={}, rowCount={}, totalPages={}",
                 ctx.getOrderCode(), n, totalPages);
 
-        // 二维码由前端生成，所有分页复用同一份图片字节
+        // 前端图片或后端兜底二维码所有分页复用同一份图片字节
         byte[] qrBytes = ctx.getQrBytes();
 
         try (InputStream is = new ClassPathResource(TEMPLATE_PATH).getInputStream();

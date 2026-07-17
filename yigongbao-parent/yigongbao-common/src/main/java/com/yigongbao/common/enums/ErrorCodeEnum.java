@@ -401,7 +401,7 @@ public enum ErrorCodeEnum {
     PRODUCT_STATUS_NOT_ALLOW_WAREHOUSE_IN(825, "产品当前状态不允许入库", 3),
     PRODUCT_STATUS_NOT_ALLOW_WAREHOUSE_OUT(836, "产品当前状态不允许出库", 3),
 
-    // ==================== 图纸二维码（837） ====================
+    /** 历史错误码，图纸二维码缺失时现已改用后端兜底，不再主动返回。 */
     DRAWING_QR_IMAGE_REQUIRED(837, "请先上传图纸二维码图片", 3);
 
     /**

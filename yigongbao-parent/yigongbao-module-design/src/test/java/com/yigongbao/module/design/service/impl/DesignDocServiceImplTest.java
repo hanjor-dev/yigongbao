@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
@@ -27,6 +28,7 @@ import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.vo.DocItemVO;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.system.config.service.ConfigService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -80,6 +82,7 @@ class DesignDocServiceImplTest {
     @Mock private DesignScreenshotService screenshotService;
     @Mock private DesignQueryHelper designQueryHelper;
     @Mock private DesignPackageFileScreenshotMapper screenshotMapper;
+    @Mock private ConfigService configService;
 
     @InjectMocks
     private DesignDocServiceImpl docService;
@@ -96,6 +99,8 @@ class DesignDocServiceImplTest {
     void setUp() throws IOException {
         doNothing().when(designQueryHelper).checkIsAssignedDesigner(any());
         when(screenshotMapper.getLatestUpdateTime(anyLong())).thenReturn(null);
+        when(configService.getConfigValue(SystemConfigKeyEnum.IMAGING_VIEWER_BASE_URL.getKey()))
+                .thenReturn("http://viewer/#/aiView");
         FileVO qrFileVO = new FileVO();
         qrFileVO.setId("qr-file-001");
         qrFileVO.setFileUrl("http://storage/test-qr.png");
@@ -362,8 +367,8 @@ class DesignDocServiceImplTest {
         }
 
         @Test
-        @DisplayName("首次生成但没有当前二维码时抛出明确错误")
-        void firstTimeWithoutQr_throwsRequiredError() throws Exception {
+        @DisplayName("首次生成但没有前端二维码时使用后端兜底二维码")
+        void firstTimeWithoutQr_usesBackendFallback() throws Exception {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
 
@@ -372,12 +377,21 @@ class DesignDocServiceImplTest {
                 when(productService.count(any())).thenReturn(1L);
                 when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(null);
                 when(fileService.listByBiz("10.21", ORDER_ID)).thenReturn(Collections.emptyList());
+                when(productService.list(any(LambdaQueryWrapper.class)))
+                        .thenReturn(List.of(new DesignProductEntity()));
+                when(productFileService.listByProductIds(any())).thenReturn(Collections.emptyList());
+                when(screenshotService.listFileIdsByPackageFileIds(any())).thenReturn(Collections.emptyMap());
+                when(drawingBuilder.build(any())).thenReturn(new byte[]{4, 5, 6});
+                when(fileService.uploadBytes(any(), any(), any())).thenReturn(mockFileVO);
+                when(drawingService.save(any())).thenReturn(true);
 
-                BusinessException ex = assertThrows(BusinessException.class,
-                        () -> docService.getDrawingPreviewUrl(ORDER_ID, PACKAGE_ID));
+                DocItemVO result = docService.getDrawingPreviewUrl(ORDER_ID, PACKAGE_ID);
 
-                assertEquals(ErrorCodeEnum.DRAWING_QR_IMAGE_REQUIRED.getCode(), ex.getCode());
-                verify(drawingBuilder, never()).build(any());
+                assertEquals("file-001", result.getFileId());
+                verify(drawingBuilder).build(argThat(ctx ->
+                        ctx.getQrBytes() != null && ctx.getQrBytes().length > 0));
+                verify(drawingService).save(argThat(e -> e.getQrFileId() == null));
+                verify(fileService, never()).downloadToBytes(anyString());
             }
         }
 
