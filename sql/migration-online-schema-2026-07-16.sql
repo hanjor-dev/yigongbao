@@ -243,6 +243,13 @@ SELECT '7. production_product: allow delayed product_no generation' AS step;
 ALTER TABLE production_product
     MODIFY COLUMN product_no VARCHAR(50) NULL COMMENT '产品编号（分配设备时生成）';
 
+SELECT '8. design_drawing: add QR image snapshot file ID' AS step;
+CALL ygb_add_column_if_missing(
+    'design_drawing',
+    'qr_file_id',
+    'ALTER TABLE design_drawing ADD COLUMN qr_file_id VARCHAR(32) DEFAULT NULL COMMENT ''生成该图纸版本时使用的二维码文件ID（10.21）'' AFTER template_file_url'
+);
+
 DROP PROCEDURE IF EXISTS ygb_add_column_if_missing;
 DROP PROCEDURE IF EXISTS ygb_add_index_if_missing;
 DROP PROCEDURE IF EXISTS ygb_drop_index_if_exists;
