@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
@@ -95,10 +96,17 @@ class DesignDocServiceImplTest {
     private FileVO mockFileVO;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws IOException {
         doNothing().when(designQueryHelper).checkIsAssignedDesigner(any());
         when(screenshotMapper.getLatestUpdateTime(anyLong())).thenReturn(null);
-        when(configService.getConfigValue(anyString())).thenReturn("http://viewer.test");
+        when(configService.getConfigValue(SystemConfigKeyEnum.IMAGING_VIEWER_BASE_URL.getKey()))
+                .thenReturn("http://viewer/#/aiView");
+        FileVO qrFileVO = new FileVO();
+        qrFileVO.setId("qr-file-001");
+        qrFileVO.setFileUrl("http://storage/test-qr.png");
+        when(fileService.listByBiz(eq("10.21"), anyLong())).thenReturn(List.of(qrFileVO));
+        doReturn(new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A})
+                .when(fileService).downloadToBytes("qr-file-001");
         order = new OrderMainEntity();
         order.setId(ORDER_ID);
         order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
@@ -352,7 +360,38 @@ class DesignDocServiceImplTest {
                 assertEquals("A/1", result.getVersion());
                 assertEquals("file-001", result.getFileId());
                 assertEquals(0, result.getIsConfirmed());
-                verify(drawingService).save(argThat(e -> Integer.valueOf(0).equals(e.getIsConfirmed())));
+                verify(drawingService).save(argThat(e -> Integer.valueOf(0).equals(e.getIsConfirmed())
+                        && "qr-file-001".equals(e.getQrFileId())));
+                verify(fileService).downloadToBytes("qr-file-001");
+            }
+        }
+
+        @Test
+        @DisplayName("首次生成但没有前端二维码时使用后端兜底二维码")
+        void firstTimeWithoutQr_usesBackendFallback() throws Exception {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+
+                when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+                when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+                when(productService.count(any())).thenReturn(1L);
+                when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(null);
+                when(fileService.listByBiz("10.21", ORDER_ID)).thenReturn(Collections.emptyList());
+                when(productService.list(any(LambdaQueryWrapper.class)))
+                        .thenReturn(List.of(new DesignProductEntity()));
+                when(productFileService.listByProductIds(any())).thenReturn(Collections.emptyList());
+                when(screenshotService.listFileIdsByPackageFileIds(any())).thenReturn(Collections.emptyMap());
+                when(drawingBuilder.build(any())).thenReturn(new byte[]{4, 5, 6});
+                when(fileService.uploadBytes(any(), any(), any())).thenReturn(mockFileVO);
+                when(drawingService.save(any())).thenReturn(true);
+
+                DocItemVO result = docService.getDrawingPreviewUrl(ORDER_ID, PACKAGE_ID);
+
+                assertEquals("file-001", result.getFileId());
+                verify(drawingBuilder).build(argThat(ctx ->
+                        ctx.getQrBytes() != null && ctx.getQrBytes().length > 0));
+                verify(drawingService).save(argThat(e -> e.getQrFileId() == null));
+                verify(fileService, never()).downloadToBytes(anyString());
             }
         }
 
@@ -372,6 +411,7 @@ class DesignDocServiceImplTest {
                 latest.setGenerateTime(generateTime);
                 latest.setTemplateFileId("file-001");
                 latest.setTemplateFileUrl("http://storage/test.xlsx");
+                latest.setQrFileId("qr-file-001");
                 latest.setIsConfirmed(1);
 
                 when(orderMainService.getById(ORDER_ID)).thenReturn(order);
@@ -390,6 +430,99 @@ class DesignDocServiceImplTest {
                 verify(drawingService, never()).updateById(any());
                 verify(drawingBuilder, never()).build(any());
             }
+        }
+
+        @Test
+        @DisplayName("当前二维码替换后，自动图纸重新生成并记录新二维码快照")
+        void qrChanged_regeneratesAutoDrawing() throws Exception {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+
+                LocalDateTime generateTime = LocalDateTime.now().minusMinutes(10);
+                LocalDateTime dataTime = generateTime.minusMinutes(5);
+                DesignDrawingEntity latest = new DesignDrawingEntity();
+                latest.setId(1L);
+                latest.setVersionSeq(1);
+                latest.setVersion("A/1");
+                latest.setGenerateTime(generateTime);
+                latest.setTemplateFileId("old-file");
+                latest.setQrFileId("old-qr-file");
+
+                when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+                when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+                when(productService.count(any())).thenReturn(1L);
+                when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(latest);
+                when(designProductMapper.getLatestUpdateTime(PACKAGE_ID)).thenReturn(dataTime);
+                pkg.setUpdateTime(dataTime);
+                when(productService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(new DesignProductEntity()));
+                when(productFileService.listByProductIds(any())).thenReturn(Collections.emptyList());
+                when(screenshotService.listFileIdsByPackageFileIds(any())).thenReturn(Collections.emptyMap());
+                when(drawingBuilder.build(any())).thenReturn(new byte[]{4, 5, 6});
+                when(fileService.uploadBytes(any(), any(), any())).thenReturn(mockFileVO);
+                when(drawingService.updateById(any())).thenReturn(true);
+
+                docService.getDrawingPreviewUrl(ORDER_ID, PACKAGE_ID);
+
+                verify(drawingService).updateById(argThat(e -> "qr-file-001".equals(e.getQrFileId())));
+                verify(fileService).downloadToBytes("qr-file-001");
+            }
+        }
+
+        @Test
+        @DisplayName("当前二维码替换后，手工图纸保持原版本不自动重生成")
+        void qrChanged_keepsManualDrawing() throws Exception {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+
+                LocalDateTime generateTime = LocalDateTime.now().minusMinutes(10);
+                LocalDateTime dataTime = generateTime.minusMinutes(5);
+                DesignDrawingEntity latest = new DesignDrawingEntity();
+                latest.setId(1L);
+                latest.setVersionSeq(1);
+                latest.setVersion("A/1");
+                latest.setSourceType(com.yigongbao.common.constant.StatusConstants.SOURCE_TYPE_MANUAL);
+                latest.setGenerateTime(generateTime);
+                latest.setTemplateFileId("manual-file");
+                latest.setQrFileId("old-qr-file");
+
+                when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+                when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+                when(productService.count(any())).thenReturn(1L);
+                when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(latest);
+                when(designProductMapper.getLatestUpdateTime(PACKAGE_ID)).thenReturn(dataTime);
+                pkg.setUpdateTime(dataTime);
+
+                DocItemVO result = docService.getDrawingPreviewUrl(ORDER_ID, PACKAGE_ID);
+
+                assertEquals("manual-file", result.getFileId());
+                verify(drawingBuilder, never()).build(any());
+                verify(drawingService, never()).updateById(any());
+                verify(drawingService, never()).save(any());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("downloadDrawing（线下模式）")
+    class DownloadDrawing {
+
+        @Test
+        void firstTime_generatesWithCurrentQrAndDownloadsDrawing() throws Exception {
+            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+            when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+            when(productService.count(any())).thenReturn(1L);
+            when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(null);
+            when(productService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(new DesignProductEntity()));
+            when(productFileService.listByProductIds(any())).thenReturn(Collections.emptyList());
+            when(screenshotService.listFileIdsByPackageFileIds(any())).thenReturn(Collections.emptyMap());
+            when(drawingBuilder.build(any())).thenReturn(new byte[]{4, 5, 6});
+            when(fileService.uploadBytes(any(), any(), any())).thenReturn(mockFileVO);
+            when(drawingService.save(any())).thenReturn(true);
+
+            docService.downloadDrawing(ORDER_ID, PACKAGE_ID, mock(HttpServletResponse.class));
+
+            verify(fileService).download(eq("file-001"), any(HttpServletResponse.class));
+            verify(drawingService).save(argThat(e -> "qr-file-001".equals(e.getQrFileId())));
         }
     }
 

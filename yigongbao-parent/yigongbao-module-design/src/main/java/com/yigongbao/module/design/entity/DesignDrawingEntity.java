@@ -62,6 +62,11 @@ public class DesignDrawingEntity extends BaseEntity {
     private String templateFileUrl;
 
     /**
+     * 生成该图纸版本时实际使用的二维码文件ID（文件业务类型10.21）
+     */
+    private String qrFileId;
+
+    /**
      * 修订版文件ID（设计师上传）
      */
     private String revisedFileId;

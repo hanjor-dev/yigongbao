@@ -194,6 +194,11 @@ INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, so
 VALUES
 (100, 50, '10.20', '免费业务审批文件', NULL, 2, 20, 1);
 
+-- 图纸二维码图片（10.21）
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, dict_value, level, sort, status)
+VALUES
+(102, 50, '10.21', '图纸二维码图片', NULL, 2, 21, 1);
+
 -- ------------------------------------------------------------
 -- 订单业务类型（父节点 id=68，dict_code=11）
 -- 用于区分订单的业务类型（业务/测试/试用/代理）

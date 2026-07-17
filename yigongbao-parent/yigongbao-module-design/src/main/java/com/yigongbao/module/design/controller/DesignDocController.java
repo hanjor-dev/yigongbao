@@ -5,8 +5,10 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.service.DesignDocService;
+import com.yigongbao.module.design.service.DesignQrImageService;
 import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.vo.DesignDocVersionVO;
+import com.yigongbao.module.design.vo.DesignQrImageVO;
 import com.yigongbao.module.design.vo.DocItemVO;
 import com.yigongbao.module.design.vo.ScreenshotVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,7 +38,28 @@ import java.util.List;
 public class DesignDocController {
 
     private final DesignDocService docService;
+    private final DesignQrImageService qrImageService;
     private final DesignScreenshotService screenshotService;
+
+    /**
+     * 查询订单当前图纸二维码图片。
+     */
+    @Operation(summary = "查询订单当前图纸二维码图片")
+    @GetMapping("/{orderId}/qr-image")
+    public Result<DesignQrImageVO> getQrImage(@PathVariable Long orderId) {
+        return Result.success(qrImageService.getCurrent(orderId));
+    }
+
+    /**
+     * 上传/替换订单当前图纸二维码图片。
+     */
+    @Operation(summary = "上传订单图纸二维码图片")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPLOAD, operation = "上传图纸二维码图片")
+    @PostMapping("/{orderId}/qr-image")
+    public Result<DesignQrImageVO> uploadQrImage(@PathVariable Long orderId,
+                                                  @RequestParam("file") MultipartFile file) {
+        return Result.success(qrImageService.upload(orderId, file));
+    }
 
     /**
      * 下载指令单（线下模式）

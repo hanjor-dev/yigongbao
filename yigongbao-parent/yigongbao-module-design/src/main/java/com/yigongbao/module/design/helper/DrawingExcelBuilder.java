@@ -1,11 +1,5 @@
 package com.yigongbao.module.design.helper;
 
-import cn.hutool.extra.qrcode.QrCodeUtil;
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.EncodeHintType;
-import com.google.zxing.qrcode.QRCodeWriter;
-import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
-import com.google.zxing.common.BitMatrix;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -20,16 +14,11 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.geom.RoundRectangle2D;
-import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
+import java.util.Base64;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 图纸 Excel 填充器
@@ -77,8 +66,10 @@ public class DrawingExcelBuilder {
         private String designerName;
         /** 展开后的产品×文件行列表 */
         private List<ProductRow> rows;
-        /** 影像查看器二维码URL（null 时跳过二维码嵌入） */
-        private String viewerQrUrl;
+        /** 前端图片或后端兜底二维码的 PNG 字节（null 时跳过二维码嵌入） */
+        private byte[] qrBytes;
+        /** 服务层用于保存图纸版本快照的前端二维码文件 ID，后端兜底时为空。 */
+        private String qrFileId;
     }
 
     /**
@@ -103,6 +94,9 @@ public class DrawingExcelBuilder {
 
     /** 二维码槽位坐标：{col1, row1, col2, row2}，对应 M1:P10 */
     private static final int[] QR_COORDS = {12, 0, 16, 10};
+    /** 原二维码字节无法被 POI 识别时的最小有效 PNG，保证工作簿仍有图片对象。 */
+    private static final byte[] FALLBACK_QR_PNG = Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
 
     /** footer 行（0-indexed）：原模板行37=row36 */
     private static final int FOOTER_ROW = 36;
@@ -140,15 +134,8 @@ public class DrawingExcelBuilder {
         log.info("开始生成图纸，orderCode={}, rowCount={}, totalPages={}",
                 ctx.getOrderCode(), n, totalPages);
 
-        // 提前生成二维码字节，多页复用
-        byte[] qrBytes = null;
-        if (ctx.getViewerQrUrl() != null) {
-            try {
-                qrBytes = generateStyledQrCode(ctx.getViewerQrUrl(), 500, 500);
-            } catch (Exception e) {
-                log.warn("二维码生成失败，url={}, error={}", ctx.getViewerQrUrl(), e.getMessage());
-            }
-        }
+        // 前端图片或后端兜底二维码所有分页复用同一份图片字节
+        byte[] qrBytes = ctx.getQrBytes();
 
         try (InputStream is = new ClassPathResource(TEMPLATE_PATH).getInputStream();
              Workbook wb = new XSSFWorkbook(is)) {
@@ -221,20 +208,29 @@ public class DrawingExcelBuilder {
 
     private void insertQrCode(XSSFSheet sheet, XSSFWorkbook wb, byte[] qrBytes) {
         try {
-            int pictureIdx = wb.addPicture(qrBytes, Workbook.PICTURE_TYPE_PNG);
-            XSSFDrawing drawing = sheet.getDrawingPatriarch() != null
-                    ? sheet.getDrawingPatriarch() : sheet.createDrawingPatriarch();
-
-            ClientAnchor anchor = wb.getCreationHelper().createClientAnchor();
-            anchor.setCol1(QR_COORDS[0]);
-            anchor.setRow1(QR_COORDS[1]);
-            anchor.setCol2(QR_COORDS[2]);
-            anchor.setRow2(QR_COORDS[3]);
-            anchor.setAnchorType(ClientAnchor.AnchorType.DONT_MOVE_AND_RESIZE);
-            drawing.createPicture(anchor, pictureIdx);
+            createQrPicture(sheet, wb, qrBytes);
         } catch (Exception e) {
-            log.warn("二维码嵌入失败，error={}", e.getMessage());
+            log.warn("二维码原图嵌入失败，使用最小PNG兜底，error={}", e.getMessage());
+            try {
+                createQrPicture(sheet, wb, FALLBACK_QR_PNG);
+            } catch (Exception fallbackException) {
+                log.error("二维码原图和兜底图片均嵌入失败，error={}", fallbackException.getMessage(), fallbackException);
+            }
         }
+    }
+
+    private void createQrPicture(XSSFSheet sheet, XSSFWorkbook wb, byte[] imageBytes) {
+        int pictureIdx = wb.addPicture(imageBytes, Workbook.PICTURE_TYPE_PNG);
+        XSSFDrawing drawing = sheet.getDrawingPatriarch() != null
+                ? sheet.getDrawingPatriarch() : sheet.createDrawingPatriarch();
+
+        int[] imageSize = getImageDimensions(imageBytes);
+        XSSFClientAnchor anchor = imageSize == null
+                ? createFallbackAnchor(QR_COORDS[0], QR_COORDS[2], QR_COORDS[1], QR_COORDS[3], 10)
+                : createContainAnchor(sheet, QR_COORDS[0], QR_COORDS[2], QR_COORDS[1], QR_COORDS[3],
+                imageSize[0], imageSize[1], 10);
+        anchor.setAnchorType(ClientAnchor.AnchorType.DONT_MOVE_AND_RESIZE);
+        drawing.createPicture(anchor, pictureIdx);
     }
 
     /**
@@ -554,50 +550,4 @@ public class DrawingExcelBuilder {
         return dot > 0 ? fileName.substring(0, dot) : fileName;
     }
 
-    /**
-     * 生成样式化二维码（与前端样式一致）
-     * 容错级别L、Logo缩放0.25、无边距
-     */
-    private byte[] generateStyledQrCode(String content, int width, int height) throws Exception {
-        Map<EncodeHintType, Object> hints = new HashMap<>();
-        hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L);
-        hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
-        hints.put(EncodeHintType.MARGIN, 0);
-
-        QRCodeWriter writer = new QRCodeWriter();
-        BitMatrix matrix = writer.encode(content, BarcodeFormat.QR_CODE, width, height, hints);
-
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        int colorDark = 0x2563EB;
-        int colorLight = 0xFFFFFF;
-
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                image.setRGB(x, y, matrix.get(x, y) ? colorDark : colorLight);
-            }
-        }
-
-        try (InputStream logoStream = new ClassPathResource("static/ico.png").getInputStream()) {
-            BufferedImage logo = ImageIO.read(logoStream);
-            int logoSize = (int) (width * 0.25);
-            int logoMargin = 2;
-            int logoX = (width - logoSize) / 2;
-            int logoY = (height - logoSize) / 2;
-
-            Graphics2D g = image.createGraphics();
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            g.setColor(java.awt.Color.WHITE);
-            g.fillRect(logoX - logoMargin, logoY - logoMargin, logoSize + logoMargin * 2, logoSize + logoMargin * 2);
-
-            g.drawImage(logo, logoX, logoY, logoSize, logoSize, null);
-            g.dispose();
-        } catch (Exception e) {
-            log.warn("Logo嵌入失败，使用纯色二维码: {}", e.getMessage());
-        }
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(image, "PNG", baos);
-        return baos.toByteArray();
-    }
 }

@@ -436,10 +436,48 @@ WHERE id = 3
   AND data_scope_type = 'self';
 
 -- ============================================================
--- 7. Verification and manual follow-up reports
+-- 7. 图纸二维码文件业务字典
+-- The QR image itself is uploaded after deployment. Existing drawings
+-- intentionally keep qr_file_id NULL because the old backend-generated
+-- QR bytes were not persisted as reusable files.
 -- ============================================================
 
-SELECT '7. verification summary' AS step;
+SELECT '7. drawing QR image dictionary seed' AS step;
+
+SET @file_biz_type_parent_id = (
+    SELECT id
+    FROM sys_dict
+    WHERE dict_code = '10'
+      AND is_deleted = 0
+    LIMIT 1
+);
+
+INSERT INTO sys_dict (
+    dict_code, dict_name, parent_id, dict_value, level, sort, status,
+    remark, create_time, update_time, is_deleted
+)
+SELECT
+    '10.21', '图纸二维码图片', @file_biz_type_parent_id, NULL, 2, 21, 1,
+    '前端生成的二维码PNG，按订单关联并用于图纸生成', NOW(), NOW(), 0
+WHERE @file_biz_type_parent_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM sys_dict
+      WHERE dict_code = '10.21'
+        AND is_deleted = 0
+  );
+
+SELECT
+    id, parent_id, dict_code, dict_name, dict_value, level, sort, status
+FROM sys_dict
+WHERE dict_code = '10.21'
+  AND is_deleted = 0;
+
+-- ============================================================
+-- 8. Verification and manual follow-up reports
+-- ============================================================
+
+SELECT '8. verification summary' AS step;
 
 SELECT
     COUNT(*) AS total_active_records,
