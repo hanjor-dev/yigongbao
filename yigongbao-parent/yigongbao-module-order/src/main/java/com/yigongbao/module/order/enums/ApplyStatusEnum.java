@@ -13,10 +13,10 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum ApplyStatusEnum {
 
-    PENDING(0, "待审核"),
-    APPROVED(1, "已通过"),
-    REJECTED(2, "已驳回"),
-    EXPIRED(3, "已过期");
+    PENDING(1, "待审核"),
+    APPROVED(2, "已通过"),
+    REJECTED(3, "已驳回"),
+    EXPIRED(4, "已过期");
 
     private final Integer code;
     private final String desc;

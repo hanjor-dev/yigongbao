@@ -19,6 +19,7 @@ import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.module.order.convert.OrderCancelApplyConvert;
 import com.yigongbao.module.order.dto.order.AuditCancelApplyDTO;
 import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
+import com.yigongbao.module.order.dto.order.OrderPageDTO;
 import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
 import com.yigongbao.module.order.enums.ApplyStatusEnum;
 import com.yigongbao.module.order.mapper.OrderCancelApplyMapper;
@@ -80,6 +81,13 @@ class OrderCancelApplyServiceImplTest {
     private static final String APPLY_REASON = "客户取消订单";
     private static final String AUDIT_REASON = "审核通过";
 
+    @Test
+    void applyStatusCodes_MatchDatabaseContract() {
+        assertEquals(1, ApplyStatusEnum.PENDING.getCode());
+        assertEquals(2, ApplyStatusEnum.APPROVED.getCode());
+        assertEquals(3, ApplyStatusEnum.REJECTED.getCode());
+    }
+
     @BeforeEach
     void setUp() throws Exception {
         // 反射注入 baseMapper（继承 ServiceImpl 时必须）
@@ -92,6 +100,11 @@ class OrderCancelApplyServiceImplTest {
             MapperBuilderAssistant assistant = new MapperBuilderAssistant(
                     new org.apache.ibatis.session.Configuration(), "");
             TableInfoHelper.initTableInfo(assistant, OrderMainEntity.class);
+        }
+        if (TableInfoHelper.getTableInfo(OrderCancelApplyEntity.class) == null) {
+            MapperBuilderAssistant assistant = new MapperBuilderAssistant(
+                    new org.apache.ibatis.session.Configuration(), "");
+            TableInfoHelper.initTableInfo(assistant, OrderCancelApplyEntity.class);
         }
     }
 
@@ -241,6 +254,47 @@ class OrderCancelApplyServiceImplTest {
         }
     }
 
+    @Test
+    void submitCancelApply_CompletedOrderRejected() {
+        CancelOrderApplyDTO dto = new CancelOrderApplyDTO();
+        dto.setOrderId(ORDER_ID);
+
+        OrderMainEntity order = buildOrderEntity(ORDER_ID, 80, 8010, StatusConstants.NO);
+        order.setCreateBy(CURRENT_USER_ID);
+
+        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
+            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> cancelApplyService.submitCancelApply(dto));
+
+            assertEquals(ErrorCodeEnum.ORDER_PHASE_NOT_ALLOW_APPLY.getCode(), exception.getCode());
+            verify(cancelApplyMapper, never()).insert(any(OrderCancelApplyEntity.class));
+        }
+    }
+
+    @Test
+    void submitCancelApply_ConcurrentPendingClaimRejected() {
+        CancelOrderApplyDTO dto = new CancelOrderApplyDTO();
+        dto.setOrderId(ORDER_ID);
+
+        OrderMainEntity order = buildOrderEntity(ORDER_ID, 20, 2010, StatusConstants.NO);
+        order.setCreateBy(CURRENT_USER_ID);
+
+        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
+            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+            when(orderMainService.update(any(LambdaUpdateWrapper.class))).thenReturn(false);
+
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> cancelApplyService.submitCancelApply(dto));
+
+            assertEquals(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING.getCode(), exception.getCode());
+            verify(cancelApplyMapper, never()).insert(any(OrderCancelApplyEntity.class));
+        }
+    }
+
     /**
      * 构建订单实体
      */
@@ -265,6 +319,7 @@ class OrderCancelApplyServiceImplTest {
         dto.setReason(AUDIT_REASON);
 
         OrderCancelApplyEntity apply = buildCancelApplyEntity(APPLY_ID, ORDER_ID, ApplyStatusEnum.PENDING.getCode());
+        apply.setApplyBy(7777L);
         OrderMainEntity order = buildOrderEntity(ORDER_ID, 20, 2010, StatusConstants.YES);
         UserEntity auditor = new UserEntity();
         auditor.setId(CURRENT_USER_ID);
@@ -285,6 +340,7 @@ class OrderCancelApplyServiceImplTest {
             when(userService.getById(CURRENT_USER_ID)).thenReturn(auditor);
             when(flowFacade.executeFlow(eq(ORDER_ID), eq(FlowActionEnum.CANCEL), any(FlowOperator.class)))
                     .thenReturn(transitionResult);
+            when(cancelApplyMapper.update(any(), any())).thenReturn(1);
             when(orderMainService.update(any(LambdaUpdateWrapper.class))).thenReturn(true);
             when(cancelApplyMapper.updateById(any(OrderCancelApplyEntity.class))).thenReturn(1);
 
@@ -294,7 +350,7 @@ class OrderCancelApplyServiceImplTest {
             // Assert
             verify(flowFacade, times(1)).executeFlow(eq(ORDER_ID), eq(FlowActionEnum.CANCEL), any(FlowOperator.class));
             verify(orderMainService, times(1)).update(any(LambdaUpdateWrapper.class));
-            verify(cancelApplyMapper, times(1)).updateById(any(OrderCancelApplyEntity.class));
+            verify(cancelApplyMapper, never()).updateById(any(OrderCancelApplyEntity.class));
             verify(eventPublisher, times(1)).publishEvent(any(CancelApplyApprovedEvent.class));
         }
     }
@@ -318,6 +374,7 @@ class OrderCancelApplyServiceImplTest {
             when(userService.getCurrentUserRoleCode()).thenReturn(RoleCodeConstants.DESIGN_ADMIN);
             when(cancelApplyMapper.selectById(APPLY_ID)).thenReturn(apply);
             when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+            when(cancelApplyMapper.update(any(), any())).thenReturn(1);
             when(cancelApplyMapper.updateById(any(OrderCancelApplyEntity.class))).thenReturn(1);
             when(orderMainService.update(any(LambdaUpdateWrapper.class))).thenReturn(true);
 
@@ -326,9 +383,100 @@ class OrderCancelApplyServiceImplTest {
 
             // Assert
             verify(flowFacade, never()).executeFlow(any(), any(), any());
-            verify(cancelApplyMapper, times(1)).updateById(any(OrderCancelApplyEntity.class));
+            verify(cancelApplyMapper, never()).updateById(any(OrderCancelApplyEntity.class));
             verify(orderMainService, times(1)).update(any(LambdaUpdateWrapper.class));
             verify(eventPublisher, times(1)).publishEvent(any(CancelApplyRejectedEvent.class));
+        }
+    }
+
+    @Test
+    void auditCancelApply_OrderUpdateFailureRollsBack() {
+        AuditCancelApplyDTO dto = new AuditCancelApplyDTO();
+        dto.setApproved(true);
+
+        OrderCancelApplyEntity apply = buildCancelApplyEntity(APPLY_ID, ORDER_ID, ApplyStatusEnum.PENDING.getCode());
+        OrderMainEntity order = buildOrderEntity(ORDER_ID, 20, 2010, StatusConstants.YES);
+        order.setVersion(4);
+
+        TransitionResult transitionResult = new TransitionResult();
+        transitionResult.setTargetPhase(90);
+        transitionResult.setTargetStatus(9010);
+
+        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
+            when(userService.getCurrentUserRoleCode()).thenReturn(RoleCodeConstants.DESIGN_ADMIN);
+            when(cancelApplyMapper.selectById(APPLY_ID)).thenReturn(apply);
+            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+            when(flowFacade.executeFlow(eq(ORDER_ID), eq(FlowActionEnum.CANCEL), any(FlowOperator.class)))
+                    .thenReturn(transitionResult);
+            when(cancelApplyMapper.update(any(), any())).thenReturn(1);
+            when(orderMainService.update(any(LambdaUpdateWrapper.class))).thenReturn(false);
+
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> cancelApplyService.auditCancelApply(APPLY_ID, dto));
+
+            assertEquals(ErrorCodeEnum.ORDER_VERSION_CONFLICT.getCode(), exception.getCode());
+            verify(cancelApplyMapper, never()).updateById(any(OrderCancelApplyEntity.class));
+            verify(eventPublisher, never()).publishEvent(any(CancelApplyApprovedEvent.class));
+        }
+    }
+
+    @Test
+    void auditCancelApply_SecondApprovalRejectedByConditionalUpdate() {
+        AuditCancelApplyDTO dto = new AuditCancelApplyDTO();
+        dto.setApproved(true);
+
+        OrderCancelApplyEntity apply = buildCancelApplyEntity(APPLY_ID, ORDER_ID, ApplyStatusEnum.PENDING.getCode());
+        OrderMainEntity order = buildOrderEntity(ORDER_ID, 20, 2010, StatusConstants.YES);
+
+        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
+            when(userService.getCurrentUserRoleCode()).thenReturn(RoleCodeConstants.DESIGN_ADMIN);
+            when(cancelApplyMapper.selectById(APPLY_ID)).thenReturn(apply);
+            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+            when(cancelApplyMapper.update(any(), any())).thenReturn(0);
+
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> cancelApplyService.auditCancelApply(APPLY_ID, dto));
+
+            assertEquals(ErrorCodeEnum.CANCEL_APPLY_ALREADY_AUDITED.getCode(), exception.getCode());
+            verify(flowFacade, never()).executeFlow(any(), any(), any());
+        }
+    }
+
+    @Test
+    void listPendingApplies_RequiresDesignAdmin() {
+        OrderPageDTO dto = new OrderPageDTO();
+        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
+            when(userService.getCurrentUserRoleCode()).thenReturn("USER");
+
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> cancelApplyService.listPendingApplies(dto));
+
+            assertEquals(ErrorCodeEnum.PERMISSION_DENIED.getCode(), exception.getCode());
+            verify(cancelApplyMapper, never()).selectPage(any(), any());
+        }
+    }
+
+    @Test
+    void getCancelApplyDetail_UnrelatedUserRejected() {
+        OrderCancelApplyEntity apply = buildCancelApplyEntity(APPLY_ID, ORDER_ID, ApplyStatusEnum.PENDING.getCode());
+        apply.setApplyBy(7777L);
+        OrderMainEntity order = buildOrderEntity(ORDER_ID, 20, 2010, StatusConstants.NO);
+        order.setCreateBy(9999L);
+        order.setDesignerId(8888L);
+
+        try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+            stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(CURRENT_USER_ID);
+            when(userService.getCurrentUserRoleCode()).thenReturn("USER");
+            when(cancelApplyMapper.selectById(APPLY_ID)).thenReturn(apply);
+            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> cancelApplyService.getCancelApplyDetail(APPLY_ID));
+
+            assertEquals(ErrorCodeEnum.PERMISSION_DENIED.getCode(), exception.getCode());
         }
     }
 

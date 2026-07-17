@@ -37,9 +37,9 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -94,13 +94,13 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
         }
 
         // 2. 验证订单阶段≥20
-        if (order.getPhase() < 20) {
+        if (order.getPhase() == null || order.getPhase() < 20 || order.getPhase() >= 80) {
             log.warn("提交取消申请失败，订单阶段不允许: orderId={}, phase={}", orderId, order.getPhase());
             throw new BusinessException(ErrorCodeEnum.ORDER_PHASE_NOT_ALLOW_APPLY);
         }
 
         // 3. 验证无待审核的取消申请
-        if (StatusConstants.YES == order.getHasPendingCancelApply()) {
+        if (Integer.valueOf(StatusConstants.YES).equals(order.getHasPendingCancelApply())) {
             log.warn("提交取消申请失败，存在待审核申请: orderId={}", orderId);
             throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
         }
@@ -114,18 +114,25 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
             throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
         }
 
-        // 5. 创建取消申请记录
+        // 5. 原子抢占订单待审核标记，防止并发提交多个申请
+        boolean markerClaimed = orderMainService.update(new LambdaUpdateWrapper<OrderMainEntity>()
+                .eq(OrderMainEntity::getId, orderId)
+                .and(wrapper -> wrapper
+                        .eq(OrderMainEntity::getHasPendingCancelApply, StatusConstants.NO)
+                        .or()
+                        .isNull(OrderMainEntity::getHasPendingCancelApply))
+                .set(OrderMainEntity::getHasPendingCancelApply, StatusConstants.YES));
+        if (!markerClaimed) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING);
+        }
+
+        // 6. 创建取消申请记录
         OrderCancelApplyEntity apply = new OrderCancelApplyEntity();
         apply.setOrderId(orderId);
         apply.setApplyBy(currentUserId);
         apply.setApplyReason(dto.getReason());
         apply.setAuditStatus(ApplyStatusEnum.PENDING.getCode());
         save(apply);
-
-        // 6. 更新订单待审核标记
-        orderMainService.update(new LambdaUpdateWrapper<OrderMainEntity>()
-                .eq(OrderMainEntity::getId, orderId)
-                .set(OrderMainEntity::getHasPendingCancelApply, StatusConstants.YES));
 
         // 7. 发布申请提交事件
         eventPublisher.publishEvent(new CancelApplySubmittedEvent(this, apply.getId(), orderId, currentUserId));
@@ -172,7 +179,20 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
 
         String auditorName = getUserRealName(currentUserId);
 
-        if (dto.getApproved()) {
+        boolean approved = Boolean.TRUE.equals(dto.getApproved());
+        boolean claimed = update(new LambdaUpdateWrapper<OrderCancelApplyEntity>()
+                .eq(OrderCancelApplyEntity::getId, applyId)
+                .eq(OrderCancelApplyEntity::getAuditStatus, ApplyStatusEnum.PENDING.getCode())
+                .set(OrderCancelApplyEntity::getAuditStatus,
+                        approved ? ApplyStatusEnum.APPROVED.getCode() : ApplyStatusEnum.REJECTED.getCode())
+                .set(OrderCancelApplyEntity::getAuditBy, currentUserId)
+                .set(OrderCancelApplyEntity::getAuditReason, dto.getReason())
+                .set(OrderCancelApplyEntity::getAuditTime, LocalDateTime.now()));
+        if (!claimed) {
+            throw new BusinessException(ErrorCodeEnum.CANCEL_APPLY_ALREADY_AUDITED);
+        }
+
+        if (approved) {
             // 审核通过：执行订单取消流程
             try {
                 TransitionResult result = flowFacade.executeFlow(
@@ -181,18 +201,16 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
                         new FlowOperator(currentUserId, auditorName, dto.getReason()));
 
                 // 更新订单状态和标记
-                orderMainService.update(new LambdaUpdateWrapper<OrderMainEntity>()
+                Integer version = order.getVersion() == null ? 0 : order.getVersion();
+                boolean orderUpdated = orderMainService.update(new LambdaUpdateWrapper<OrderMainEntity>()
                         .eq(OrderMainEntity::getId, orderId)
+                        .eq(OrderMainEntity::getVersion, version)
                         .set(OrderMainEntity::getPhase, result.getTargetPhase())
                         .set(OrderMainEntity::getStatus, result.getFinalStatus())
                         .set(OrderMainEntity::getHasPendingCancelApply, StatusConstants.NO));
-
-                // 更新申请记录
-                apply.setAuditStatus(ApplyStatusEnum.APPROVED.getCode());
-                apply.setAuditBy(currentUserId);
-                apply.setAuditReason(dto.getReason());
-                apply.setAuditTime(LocalDateTime.now());
-                updateById(apply);
+                if (!orderUpdated) {
+                    throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+                }
 
                 // 发布审核通过事件
                 eventPublisher.publishEvent(new CancelApplyApprovedEvent(
@@ -208,16 +226,15 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
 
         } else {
             // 审核驳回：更新申请记录并清除订单标记
-            apply.setAuditStatus(ApplyStatusEnum.REJECTED.getCode());
-            apply.setAuditBy(currentUserId);
-            apply.setAuditReason(dto.getReason());
-            apply.setAuditTime(LocalDateTime.now());
-            updateById(apply);
-
             // 清除订单待审核标记
-            orderMainService.update(new LambdaUpdateWrapper<OrderMainEntity>()
+            Integer version = order.getVersion() == null ? 0 : order.getVersion();
+            boolean orderUpdated = orderMainService.update(new LambdaUpdateWrapper<OrderMainEntity>()
                     .eq(OrderMainEntity::getId, orderId)
+                    .eq(OrderMainEntity::getVersion, version)
                     .set(OrderMainEntity::getHasPendingCancelApply, StatusConstants.NO));
+            if (!orderUpdated) {
+                throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+            }
 
             // 发布审核驳回事件
             eventPublisher.publishEvent(new CancelApplyRejectedEvent(
@@ -235,11 +252,14 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
             throw new BusinessException(ErrorCodeEnum.CANCEL_APPLY_NOT_FOUND);
         }
 
+        OrderMainEntity order = orderMainService.getById(apply.getOrderId());
+        ensureCanView(apply, order);
         return buildCancelApplyVO(apply);
     }
 
     @Override
     public IPage<CancelApplyVO> listPendingApplies(OrderPageDTO dto) {
+        requireDesignAdmin();
         Page<OrderCancelApplyEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
 
         LambdaQueryWrapper<OrderCancelApplyEntity> qw = new LambdaQueryWrapper<>();
@@ -257,7 +277,7 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
         if (order == null) {
             return false;
         }
-        return StatusConstants.YES == order.getHasPendingCancelApply();
+        return Integer.valueOf(StatusConstants.YES).equals(order.getHasPendingCancelApply());
     }
 
     @Override
@@ -276,6 +296,15 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
 
     @Override
     public List<CancelApplyVO> getCancelApplyHistory(Long orderId) {
+        OrderMainEntity order = orderMainService.getById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (!isDesignAdmin() && !Objects.equals(currentUserId, order.getCreateBy())
+                && !Objects.equals(currentUserId, order.getDesignerId())) {
+            throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+        }
         LambdaQueryWrapper<OrderCancelApplyEntity> qw = new LambdaQueryWrapper<>();
         qw.eq(OrderCancelApplyEntity::getOrderId, orderId)
                 .orderByDesc(OrderCancelApplyEntity::getCreateTime);
@@ -328,5 +357,27 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
      */
     private String getCurrentUserRoleCode() {
         return userService.getCurrentUserRoleCode();
+    }
+
+    private void requireDesignAdmin() {
+        if (!isDesignAdmin()) {
+            throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+        }
+    }
+
+    private boolean isDesignAdmin() {
+        return RoleCodeConstants.DESIGN_ADMIN.equals(getCurrentUserRoleCode());
+    }
+
+    private void ensureCanView(OrderCancelApplyEntity apply, OrderMainEntity order) {
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (!isDesignAdmin() && !Objects.equals(currentUserId, apply.getApplyBy())
+                && !Objects.equals(currentUserId, order.getCreateBy())
+                && !Objects.equals(currentUserId, order.getDesignerId())) {
+            throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+        }
     }
 }

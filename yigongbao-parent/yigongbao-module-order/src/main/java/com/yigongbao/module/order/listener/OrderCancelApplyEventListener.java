@@ -14,7 +14,8 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -43,7 +44,7 @@ public class OrderCancelApplyEventListener {
      *
      * @param event 取消申请提交事件
      */
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Async
     public void handleCancelApplySubmitted(CancelApplySubmittedEvent event) {
         if (event == null || event.getApplyId() == null || event.getOrderId() == null) {
@@ -106,7 +107,7 @@ public class OrderCancelApplyEventListener {
      *
      * @param event 取消申请审核通过事件
      */
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Async
     public void handleCancelApplyApproved(CancelApplyApprovedEvent event) {
         if (event == null || event.getApplyId() == null || event.getOrderId() == null) {
@@ -155,7 +156,7 @@ public class OrderCancelApplyEventListener {
      *
      * @param event 取消申请审核驳回事件
      */
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Async
     public void handleCancelApplyRejected(CancelApplyRejectedEvent event) {
         if (event == null || event.getApplyId() == null || event.getOrderId() == null) {
