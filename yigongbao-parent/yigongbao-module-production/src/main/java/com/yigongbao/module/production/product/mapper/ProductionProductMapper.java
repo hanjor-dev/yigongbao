@@ -56,7 +56,7 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "LEFT JOIN sys_user u_in ON pp.warehouse_in_user_id = u_in.id " +
             "LEFT JOIN sys_user u_out ON pp.warehouse_out_user_id = u_out.id " +
             "WHERE pp.is_deleted = 0 AND pr.is_deleted = 0 " +
-            "  AND pp.status IN ('in_process', 'fail', 'pass', 'completed') " +
+            "  AND pp.status IN ('in_process', 'fail', 'pass', 'pending_warehouse_in', 'warehoused', 'warehouse_out', 'completed') " +
             "<if test='dto.recordNo != null and dto.recordNo != \"\"'>" +
             "  AND pr.record_no LIKE CONCAT('%', #{dto.recordNo}, '%') " +
             "</if>" +
@@ -106,7 +106,7 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "INNER JOIN production_record pr ON pp.production_record_id = pr.id " +
             "LEFT JOIN order_main om ON pr.order_id = om.id AND om.is_deleted = 0 " +
             "WHERE pp.is_deleted = 0 AND pr.is_deleted = 0 " +
-            "  AND pp.status IN ('in_process', 'fail', 'pass', 'completed') " +
+            "  AND pp.status IN ('in_process', 'fail', 'pass', 'pending_warehouse_in', 'warehoused', 'warehouse_out', 'completed') " +
             "<if test='dto.recordNo != null and dto.recordNo != \"\"'>" +
             "  AND pr.record_no LIKE CONCAT('%', #{dto.recordNo}, '%') " +
             "</if>" +
