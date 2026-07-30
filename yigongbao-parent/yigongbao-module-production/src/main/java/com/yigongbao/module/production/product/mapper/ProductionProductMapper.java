@@ -36,12 +36,14 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
     @Select("<script>" +
             "SELECT " +
             "    pp.product_no, pp.product_name, pp.spec_name, pp.material_name, pp.color_name, " +
-            "    pp.cert_no, pp.file_name, pp.udi_code, pp.status AS product_status, pp.current_process_type, " +
+            "    pp.cert_no, pp.file_name, pp.udi_code, pp.status AS product_status, " +
+            "    pr.current_process AS current_process_type, " +
             "    pp.qc_result, pp.qc_time, pp.qc_remark, pp.warehouse_in_time, pp.warehouse_out_time, pp.create_time, " +
             "    pr.order_code, pr.order_type, pr.hospital_name, pr.hospital_dept_name, pr.doctor_name, pr.patient_name, " +
             "    pr.is_urgent, pr.is_postal, pr.expected_delivery_date, " +
-            "    pr.record_no, pr.production_batch_no, pr.version_no, pr.design_package_code, " +
-            "    pr.processing_center_name, pr.print_device_code, pr.print_start_time, pr.print_finish_time, " +
+            "    pr.record_no, pr.production_batch_no, pr.design_package_code, " +
+            "    COALESCE(pc.center_name, om.center_name) AS processing_center_name, " +
+            "    pr.print_device_code, pr.print_start_time, pr.print_finish_time, " +
             "    pr.material_batch_no, pr.pack_operator_name, pr.pack_time, " +
             "    u_qc.real_name AS qc_user_name, " +
             "    u_in.real_name AS warehouse_in_user_name, " +
@@ -52,11 +54,12 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "FROM production_product pp " +
             "INNER JOIN production_record pr ON pp.production_record_id = pr.id " +
             "LEFT JOIN order_main om ON pr.order_id = om.id AND om.is_deleted = 0 " +
+            "LEFT JOIN processing_center pc ON om.center_id = pc.id AND pc.is_deleted = 0 " +
             "LEFT JOIN sys_user u_qc ON pp.qc_user_id = u_qc.id " +
             "LEFT JOIN sys_user u_in ON pp.warehouse_in_user_id = u_in.id " +
             "LEFT JOIN sys_user u_out ON pp.warehouse_out_user_id = u_out.id " +
             "WHERE pp.is_deleted = 0 AND pr.is_deleted = 0 " +
-            "  AND pp.status IN ('in_process', 'fail', 'pass', 'pending_warehouse_in', 'warehoused', 'warehouse_out', 'completed') " +
+            "  AND pp.status IN ('in_process', 'fail', 'pass', 'pending_warehouse_in', 'warehoused', 'warehouse_out', 'completed', 'cancelled') " +
             "<if test='dto.recordNo != null and dto.recordNo != \"\"'>" +
             "  AND pr.record_no LIKE CONCAT('%', #{dto.recordNo}, '%') " +
             "</if>" +
@@ -79,7 +82,7 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "  </foreach>" +
             "</if>" +
             "<if test='dto.centerIds != null and dto.centerIds.size() > 0'>" +
-            "  AND pr.processing_center_id IN " +
+            "  AND om.center_id IN " +
             "  <foreach collection='dto.centerIds' item='centerId' open='(' separator=',' close=')'>" +
             "    #{centerId}" +
             "  </foreach>" +
@@ -106,7 +109,7 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "INNER JOIN production_record pr ON pp.production_record_id = pr.id " +
             "LEFT JOIN order_main om ON pr.order_id = om.id AND om.is_deleted = 0 " +
             "WHERE pp.is_deleted = 0 AND pr.is_deleted = 0 " +
-            "  AND pp.status IN ('in_process', 'fail', 'pass', 'pending_warehouse_in', 'warehoused', 'warehouse_out', 'completed') " +
+            "  AND pp.status IN ('in_process', 'fail', 'pass', 'pending_warehouse_in', 'warehoused', 'warehouse_out', 'completed', 'cancelled') " +
             "<if test='dto.recordNo != null and dto.recordNo != \"\"'>" +
             "  AND pr.record_no LIKE CONCAT('%', #{dto.recordNo}, '%') " +
             "</if>" +
@@ -129,7 +132,7 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "  </foreach>" +
             "</if>" +
             "<if test='dto.centerIds != null and dto.centerIds.size() > 0'>" +
-            "  AND pr.processing_center_id IN " +
+            "  AND om.center_id IN " +
             "  <foreach collection='dto.centerIds' item='centerId' open='(' separator=',' close=')'>" +
             "    #{centerId}" +
             "  </foreach>" +
