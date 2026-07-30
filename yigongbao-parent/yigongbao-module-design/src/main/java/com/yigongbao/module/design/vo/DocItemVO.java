@@ -30,7 +30,4 @@ public class DocItemVO {
 
     /** 是否已确认（0=未确认，1=已确认）；上传修订版或手动确认后置1，重新生成时自动重置为0 */
     private Integer isConfirmed;
-
-    /** 图纸所属产品分类；指令单为空 */
-    private String productCategory;
 }

@@ -31,9 +31,6 @@ public class DesignDrawingEntity extends BaseEntity {
      */
     private Long packageId;
 
-    /** 产品分类字典码，同一数据包内按分类分别生成图纸 */
-    private String productCategory;
-
     /**
      * 总页数
      */

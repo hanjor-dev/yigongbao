@@ -1416,8 +1416,6 @@ CREATE TABLE design_product (
     package_id      BIGINT          NOT NULL COMMENT '数据包ID',
     product_id      BIGINT          NOT NULL COMMENT '产品ID',
     product_name    VARCHAR(128)    DEFAULT NULL COMMENT '产品名称（冗余）',
-    product_category VARCHAR(32)    DEFAULT NULL COMMENT '打印时产品分类快照',
-    product_category_name VARCHAR(64) DEFAULT NULL COMMENT '打印时产品分类名称快照',
     spec_id         BIGINT          NOT NULL COMMENT '型号规格ID',
     spec_name       VARCHAR(128)    DEFAULT NULL COMMENT '型号规格名称（冗余）',
     cert_no         VARCHAR(64)     DEFAULT NULL COMMENT '注册证号（冗余）',
@@ -1520,7 +1518,6 @@ CREATE TABLE design_drawing (
     id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     order_id            BIGINT          NOT NULL COMMENT '订单ID',
     package_id          BIGINT          NOT NULL COMMENT '数据包ID',
-    product_category    VARCHAR(32)     DEFAULT NULL COMMENT '产品分类字典码；同包按分类分别出图',
     page_count          INT             DEFAULT 1 COMMENT '总页数',
     version             VARCHAR(10)     DEFAULT 'A/1' COMMENT '版本号（与指令单同步）',
     version_seq         INT             DEFAULT 1 COMMENT '版本序号',
@@ -1553,7 +1550,7 @@ CREATE TABLE design_drawing (
     KEY idx_design_drawing_package_id (package_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='图纸表';
 -- 防止并发生成时同一数据包写入重复版本号
-CREATE UNIQUE INDEX uk_design_drawing_pkg_cat_ver ON design_drawing ((CASE WHEN is_deleted = 0 THEN package_id ELSE NULL END), (CASE WHEN is_deleted = 0 THEN product_category ELSE NULL END), (CASE WHEN is_deleted = 0 THEN version_seq ELSE NULL END));
+CREATE UNIQUE INDEX uk_design_drawing_pkg_ver ON design_drawing ((CASE WHEN is_deleted = 0 THEN package_id ELSE NULL END), (CASE WHEN is_deleted = 0 THEN version_seq ELSE NULL END));
 
 
 -- ============================================================

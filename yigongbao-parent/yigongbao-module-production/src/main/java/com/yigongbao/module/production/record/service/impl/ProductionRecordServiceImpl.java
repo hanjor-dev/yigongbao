@@ -146,13 +146,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 new LambdaQueryWrapper<ProductionProductEntity>()
                         .eq(ProductionProductEntity::getProductionRecordId, id));
         vo.setProducts(products.stream().map(this::toProductVO).collect(Collectors.toList()));
-        fillDesignFiles(vo, record);
+        fillDesignFiles(vo, record.getDesignPackageId());
         fillFlowCardFile(vo, record);
         return vo;
     }
 
-    private void fillDesignFiles(ProductionRecordVO vo, ProductionRecordEntity record) {
-        Long designPackageId = record.getDesignPackageId();
+    private void fillDesignFiles(ProductionRecordVO vo, Long designPackageId) {
         if (designPackageId == null) return;
         DesignPackageEntity pkg = designPackageMapper.selectById(designPackageId);
         if (pkg != null) {
@@ -178,7 +177,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             DesignDrawingEntity drawing = designDrawingMapper.selectOne(
                     new LambdaQueryWrapper<DesignDrawingEntity>()
                             .eq(DesignDrawingEntity::getPackageId, designPackageId)
-                            .eq(DesignDrawingEntity::getProductCategory, record.getProductCategory())
                             .orderByDesc(DesignDrawingEntity::getVersionSeq)
                             .last("LIMIT 1"));
             if (drawing != null) {

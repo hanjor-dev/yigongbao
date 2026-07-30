@@ -39,12 +39,6 @@ public class DesignProductEntity extends BaseEntity {
      */
     private String productName;
 
-    /** 产品分类字典码快照 */
-    private String productCategory;
-
-    /** 产品分类名称快照 */
-    private String productCategoryName;
-
     /**
      * 型号规格ID
      */

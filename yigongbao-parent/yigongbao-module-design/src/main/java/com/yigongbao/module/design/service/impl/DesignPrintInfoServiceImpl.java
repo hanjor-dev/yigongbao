@@ -324,8 +324,6 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                 // productName/certNo 均从主数据取，覆盖前端传值，保证 Excel 填充时不为空
                 ProductVO product = productMap.get(item.getProductId());
                 entity.setProductName(product != null ? product.getProductName() : null);
-                entity.setProductCategory(product != null ? product.getCategory() : null);
-                entity.setProductCategoryName(product != null ? product.getCategoryName() : null);
                 ProductSpecEntity spec = specMap.get(item.getSpecId());
                 entity.setCertNo(spec.getCertNo());
                 entity.setSpecName(spec.getSpecName());

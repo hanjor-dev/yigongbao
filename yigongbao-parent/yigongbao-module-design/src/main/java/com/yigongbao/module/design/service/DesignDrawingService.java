@@ -21,8 +21,6 @@ public interface DesignDrawingService extends IService<DesignDrawingEntity> {
      */
     DesignDrawingEntity getLatestVersion(Long packageId);
 
-    DesignDrawingEntity getLatestVersion(Long packageId, String productCategory);
-
     /**
      * 查询数据包的版本历史列表（按 version_seq 倒序）
      *
@@ -30,6 +28,4 @@ public interface DesignDrawingService extends IService<DesignDrawingEntity> {
      * @return 版本历史列表
      */
     List<DesignDrawingEntity> listVersions(Long packageId);
-
-    List<DesignDrawingEntity> listVersions(Long packageId, String productCategory);
 }

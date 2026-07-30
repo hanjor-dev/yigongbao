@@ -134,16 +134,10 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void downloadDrawing(Long orderId, Long packageId, HttpServletResponse response) {
-        downloadDrawing(orderId, packageId, null, response);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void downloadDrawing(Long orderId, Long packageId, String productCategory, HttpServletResponse response) {
         log.info("下载图纸模板，orderId={}, packageId={}", orderId, packageId);
         checkDesignPhase(orderId);
         // 按需生成或复用已有版本
-        DesignDrawingEntity entity = ensureDrawing(orderId, packageId, productCategory);
+        DesignDrawingEntity entity = ensureDrawing(orderId, packageId);
         // 流式下载模板文件
         try {
             fileService.download(entity.getTemplateFileId(), response);
@@ -184,16 +178,10 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId) {
-        return getDrawingPreviewUrl(orderId, packageId, null);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId, String productCategory) {
         log.info("获取图纸预览URL，orderId={}, packageId={}", orderId, packageId);
         checkDesignPhase(orderId);
         // 按需生成或复用已有版本
-        DesignDrawingEntity entity = ensureDrawing(orderId, packageId, productCategory);
+        DesignDrawingEntity entity = ensureDrawing(orderId, packageId);
         // 构造返回 VO
         DocItemVO vo = toDrawingDocItemVO(entity);
         log.info("获取图纸预览URL完成，packageId={}, version={}, isConfirmed={}", packageId, entity.getVersion(), entity.getIsConfirmed());
@@ -220,16 +208,10 @@ public class DesignDocServiceImpl implements DesignDocService {
      */
     @Override
     public List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId) {
-        return listDrawingVersions(orderId, packageId, null);
-    }
-
-    @Override
-    public List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId, String productCategory) {
         log.info("查询图纸版本列表，orderId={}, packageId={}", orderId, packageId);
         checkDesignPhase(orderId);
         validatePackage(orderId, packageId);
-        String category = resolveCategory(packageId, productCategory);
-        return (category == null ? drawingService.listVersions(packageId) : drawingService.listVersions(packageId, category)).stream()
+        return drawingService.listVersions(packageId).stream()
                 .map(this::toDrawingVersionVO)
                 .collect(Collectors.toList());
     }
@@ -292,12 +274,6 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void uploadRevisedDrawing(Long orderId, Long packageId, Long id, MultipartFile file) {
-        uploadRevisedDrawing(orderId, packageId, null, id, file);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void uploadRevisedDrawing(Long orderId, Long packageId, String productCategory, Long id, MultipartFile file) {
         log.info("上传修订版图纸，orderId={}, packageId={}, id={}", orderId, packageId, id);
         // 经典案例保护：经典案例订单不允许上传新的图纸文件
         orderMainService.checkNotClassicCase(orderId, "上传图纸");
@@ -305,9 +281,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         validatePackage(orderId, packageId);
 
         // 查询当前最新版本
-        String category = resolveCategory(packageId, productCategory);
-        DesignDrawingEntity latest = category == null ? drawingService.getLatestVersion(packageId)
-                : drawingService.getLatestVersion(packageId, category);
+        DesignDrawingEntity latest = drawingService.getLatestVersion(packageId);
         if (latest == null) {
             throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
         }
@@ -323,7 +297,6 @@ public class DesignDocServiceImpl implements DesignDocService {
         DesignDrawingEntity newEntity = new DesignDrawingEntity();
         newEntity.setOrderId(orderId);
         newEntity.setPackageId(packageId);
-        newEntity.setProductCategory(category);
         newEntity.setVersion(newVersion);
         newEntity.setVersionSeq(newVersionSeq);
         newEntity.setSourceType(StatusConstants.SOURCE_TYPE_MANUAL);
@@ -349,19 +322,11 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void confirmDrawing(Long orderId, Long packageId, Long id) {
-        confirmDrawing(orderId, packageId, null, id);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void confirmDrawing(Long orderId, Long packageId, String productCategory, Long id) {
         log.info("确认图纸，orderId={}, packageId={}, id={}", orderId, packageId, id);
         checkDesignPhase(orderId);
         validatePackage(orderId, packageId);
         DesignDrawingEntity entity = drawingService.getById(id);
-        String category = resolveCategory(packageId, productCategory);
-        if (entity == null || !entity.getPackageId().equals(packageId)
-                || (category != null && !Objects.equals(entity.getProductCategory(), category))) {
+        if (entity == null || !entity.getPackageId().equals(packageId)) {
             throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
         }
         entity.setIsConfirmed(1);
@@ -442,23 +407,6 @@ public class DesignDocServiceImpl implements DesignDocService {
         return result;
     }
 
-    @Override
-    public Map<Long, List<DesignDocVersionVO>> getLatestDrawingGroups(Collection<Long> packageIds) {
-        if (packageIds == null || packageIds.isEmpty()) return Collections.emptyMap();
-        List<DesignDrawingEntity> all = drawingService.list(new LambdaQueryWrapper<DesignDrawingEntity>()
-                .in(DesignDrawingEntity::getPackageId, packageIds)
-                .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED)
-                .orderByDesc(DesignDrawingEntity::getVersionSeq));
-        Map<Long, Map<String, DesignDocVersionVO>> grouped = new java.util.LinkedHashMap<>();
-        for (DesignDrawingEntity entity : all) {
-            grouped.computeIfAbsent(entity.getPackageId(), k -> new java.util.LinkedHashMap<>())
-                    .putIfAbsent(entity.getProductCategory(), toDrawingVersionVO(entity));
-        }
-        Map<Long, List<DesignDocVersionVO>> result = new java.util.LinkedHashMap<>();
-        grouped.forEach((pkg, values) -> result.put(pkg, new ArrayList<>(values.values())));
-        return result;
-    }
-
     // ==================== 核心私有方法：按需生成 ====================
 
     /**
@@ -496,7 +444,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         DesignInstructionEntity latest = instructionService.getLatestVersion(packageId);
 
         // 判断打印信息是否在上次生成后发生变化
-        boolean dataChanged = isPrintInfoChangedSince(packageId, null,
+        boolean dataChanged = isPrintInfoChangedSince(packageId,
                 latest != null ? latest.getGenerateTime() : null);
 
         if (latest == null) {
@@ -533,15 +481,14 @@ public class DesignDocServiceImpl implements DesignDocService {
      * @param packageId 数据包ID
      * @return 有效的 DesignDrawingEntity（已持久化）
      */
-    private DesignDrawingEntity ensureDrawing(Long orderId, Long packageId, String productCategory) {
-        String category = resolveCategory(packageId, productCategory);
-        String lockKey = orderId + ":" + packageId + ":" + category;
+    private DesignDrawingEntity ensureDrawing(Long orderId, Long packageId) {
+        String lockKey = orderId + ":" + packageId;
         synchronized (DRAWING_LOCKS.computeIfAbsent(lockKey, ignored -> new Object())) {
-            return ensureDrawingLocked(orderId, packageId, category);
+            return ensureDrawingLocked(orderId, packageId);
         }
     }
 
-    private DesignDrawingEntity ensureDrawingLocked(Long orderId, Long packageId, String productCategory) {
+    private DesignDrawingEntity ensureDrawingLocked(Long orderId, Long packageId) {
         log.info("按需确保图纸有效，orderId={}, packageId={}", orderId, packageId);
 
         // 加载基础数据
@@ -549,29 +496,27 @@ public class DesignDocServiceImpl implements DesignDocService {
         DesignPackageEntity pkg = validatePackage(orderId, packageId);
 
         // 前置校验：打印信息已填写
-        LambdaQueryWrapper<DesignProductEntity> productQuery = new LambdaQueryWrapper<DesignProductEntity>()
-                .eq(DesignProductEntity::getPackageId, packageId);
-        if (productCategory != null) productQuery.eq(DesignProductEntity::getProductCategory, productCategory);
-        long productCount = productService.count(productQuery);
+        long productCount = productService.count(
+                new LambdaQueryWrapper<DesignProductEntity>()
+                        .eq(DesignProductEntity::getPackageId, packageId));
         if (productCount == 0) {
             throw new BusinessException(ErrorCodeEnum.PRINT_INFO_REQUIRED);
         }
 
         // 查询最新版本
-        DesignDrawingEntity latest = productCategory == null ? drawingService.getLatestVersion(packageId)
-                : drawingService.getLatestVersion(packageId, productCategory);
+        DesignDrawingEntity latest = drawingService.getLatestVersion(packageId);
 
         // 当前二维码只影响 AUTO 图纸；没有前端二维码时由生成过程使用后端兜底二维码。
         FileVO currentQrFile = currentQrFile(orderId);
 
         // 判断打印信息是否在上次生成后发生变化
-        boolean dataChanged = isPrintInfoChangedSince(packageId, productCategory,
+        boolean dataChanged = isPrintInfoChangedSince(packageId,
                 latest != null ? latest.getGenerateTime() : null);
 
         if (latest == null) {
             // 场景1：首次，生成 A/1
             log.info("图纸首次生成，packageId={}", packageId);
-            return doGenerateDrawing(order, pkg, productCategory, null, 1, currentQrFile);
+            return doGenerateDrawing(order, pkg, null, 1, currentQrFile);
         }
 
         boolean manual = StatusConstants.SOURCE_TYPE_MANUAL.equals(latest.getSourceType());
@@ -596,11 +541,11 @@ public class DesignDocServiceImpl implements DesignDocService {
         if (!manual) {
             // 场景2：未封版（自动生成的版本），覆盖当前版本
             log.info("打印信息已变化，覆盖当前图纸版本，packageId={}, version={}", packageId, latest.getVersion());
-            return doGenerateDrawing(order, pkg, productCategory, latest, latest.getVersionSeq(), currentQrFile);
+            return doGenerateDrawing(order, pkg, latest, latest.getVersionSeq(), currentQrFile);
         } else {
             // 场景3：已封版（手动上传的版本），新建下一版本
             log.info("打印信息已变化，新建下一图纸版本，packageId={}, prevVersion={}", packageId, latest.getVersion());
-            return doGenerateDrawing(order, pkg, productCategory, null, latest.getVersionSeq() + 1, currentQrFile);
+            return doGenerateDrawing(order, pkg, null, latest.getVersionSeq() + 1, currentQrFile);
         }
     }
 
@@ -624,7 +569,7 @@ public class DesignDocServiceImpl implements DesignDocService {
      * @param sinceTime 上次生成时间；为 null 时返回 true（视为首次，需要生成）
      * @return true=打印信息有变化或从未生成，false=无变化
      */
-    private boolean isPrintInfoChangedSince(Long packageId, String productCategory, LocalDateTime sinceTime) {
+    private boolean isPrintInfoChangedSince(Long packageId, LocalDateTime sinceTime) {
         if (sinceTime == null) {
             return true;
         }
@@ -643,23 +588,6 @@ public class DesignDocServiceImpl implements DesignDocService {
             return true;
         }
         return dataLastModified.isAfter(sinceTime);
-    }
-
-    private String resolveCategory(Long packageId, String requestedCategory) {
-        if (requestedCategory != null && !requestedCategory.isBlank()) {
-            return requestedCategory;
-        }
-        List<DesignProductEntity> products = productService.list(
-                new LambdaQueryWrapper<DesignProductEntity>()
-                        .eq(DesignProductEntity::getPackageId, packageId));
-        if (products == null) return null;
-        List<String> categories = products.stream().map(DesignProductEntity::getProductCategory)
-                .filter(Objects::nonNull).distinct().toList();
-        if (categories.isEmpty()) return null;
-        if (categories.size() != 1) {
-            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "混合产品数据包必须指定 productCategory");
-        }
-        return categories.get(0);
     }
 
     /**
@@ -762,7 +690,7 @@ public class DesignDocServiceImpl implements DesignDocService {
      * @return 已持久化的 DesignDrawingEntity
      */
     protected DesignDrawingEntity doGenerateDrawing(
-            OrderMainEntity order, DesignPackageEntity pkg, String productCategory,
+            OrderMainEntity order, DesignPackageEntity pkg,
             DesignDrawingEntity toOverride, int versionSeq, FileVO qrFile) {
 
         Long packageId = pkg.getId();
@@ -774,9 +702,6 @@ public class DesignDocServiceImpl implements DesignDocService {
                 new LambdaQueryWrapper<DesignProductEntity>()
                         .eq(DesignProductEntity::getPackageId, packageId)
                         .orderByAsc(DesignProductEntity::getSortOrder));
-        if (productCategory != null) {
-            products = products.stream().filter(p -> Objects.equals(productCategory, p.getProductCategory())).toList();
-        }
         List<Long> productIds = products.stream().map(DesignProductEntity::getId).toList();
         List<DesignProductFileEntity> allProductFiles = productFileService.listByProductIds(productIds);
 
@@ -802,7 +727,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         }
 
         // 上传 OSS（文件名前加患者姓名）
-        String filename = order.getPatientName() + "-" + productCategory + "图纸.xlsx";
+        String filename = order.getPatientName() + "图纸.xlsx";
         FileVO fileVO = fileService.uploadBytes(bytes, filename, FileBizTypeEnum.DRAWING_FILE.getDictCode());
 
         // 持久化
@@ -812,7 +737,6 @@ public class DesignDocServiceImpl implements DesignDocService {
                 // 覆盖现有版本，先记录旧文件ID以便删除
                 toOverride.setTemplateFileId(fileVO.getId());
                 toOverride.setTemplateFileUrl(fileVO.getFileUrl());
-                toOverride.setProductCategory(productCategory);
                 toOverride.setQrFileId(ctx.getQrFileId());
                 toOverride.setGenerateTime(now);
                 toOverride.setSourceType(StatusConstants.SOURCE_TYPE_AUTO);
@@ -835,7 +759,6 @@ public class DesignDocServiceImpl implements DesignDocService {
                 DesignDrawingEntity entity = new DesignDrawingEntity();
                 entity.setOrderId(order.getId());
                 entity.setPackageId(packageId);
-                entity.setProductCategory(productCategory);
                 entity.setVersion(version);
                 entity.setVersionSeq(versionSeq);
                 entity.setSourceType("AUTO");
@@ -1151,7 +1074,6 @@ public class DesignDocServiceImpl implements DesignDocService {
         vo.setTemplateFileUrl(entity.getTemplateFileUrl());
         vo.setGenerateTime(entity.getGenerateTime());
         vo.setIsConfirmed(entity.getIsConfirmed());
-        vo.setProductCategory(entity.getProductCategory());
         return vo;
     }
 
@@ -1185,7 +1107,6 @@ public class DesignDocServiceImpl implements DesignDocService {
         vo.setGenerateTime(entity.getGenerateTime());
         vo.setRevisedUploadTime(entity.getRevisedUploadTime());
         vo.setIsConfirmed(entity.getIsConfirmed());
-        vo.setProductCategory(entity.getProductCategory());
         vo.setConfirmTime(entity.getConfirmTime());
         return vo;
     }

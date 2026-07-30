@@ -30,25 +30,10 @@ public class DesignDrawingServiceImpl
     }
 
     @Override
-    public DesignDrawingEntity getLatestVersion(Long packageId, String productCategory) {
-        return lambdaQuery().eq(DesignDrawingEntity::getPackageId, packageId)
-                .eq(DesignDrawingEntity::getProductCategory, productCategory)
-                .orderByDesc(DesignDrawingEntity::getVersionSeq).last("LIMIT 1")
-                .oneOpt().orElse(null);
-    }
-
-    @Override
     public List<DesignDrawingEntity> listVersions(Long packageId) {
         return lambdaQuery()
                 .eq(DesignDrawingEntity::getPackageId, packageId)
                 .orderByDesc(DesignDrawingEntity::getVersionSeq)
                 .list();
-    }
-
-    @Override
-    public List<DesignDrawingEntity> listVersions(Long packageId, String productCategory) {
-        return lambdaQuery().eq(DesignDrawingEntity::getPackageId, packageId)
-                .eq(DesignDrawingEntity::getProductCategory, productCategory)
-                .orderByDesc(DesignDrawingEntity::getVersionSeq).list();
     }
 }
