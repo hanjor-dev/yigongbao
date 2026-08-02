@@ -460,10 +460,14 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             // 批量获取最新版指令单和图纸，填入各包
             Set<Long> packageIds = packages.stream().map(DesignPackageVO::getId).collect(Collectors.toSet());
             Map<Long, DesignDocVersionVO> latestInstructions = designDocService.getLatestInstructionMap(packageIds);
-            Map<Long, DesignDocVersionVO> latestDrawings = designDocService.getLatestDrawingMap(packageIds);
+            Map<Long, List<DesignDocVersionVO>> latestDrawings = designDocService.getLatestDrawingGroups(packageIds);
             for (DesignPackageVO pkg : packages) {
                 pkg.setLatestInstruction(latestInstructions.get(pkg.getId()));
-                pkg.setLatestDrawing(latestDrawings.get(pkg.getId()));
+                List<DesignDocVersionVO> drawings = latestDrawings.get(pkg.getId());
+                pkg.setLatestDrawings(drawings);
+                if (drawings != null && drawings.size() == 1) {
+                    pkg.setLatestDrawing(drawings.get(0));
+                }
             }
         }
         vo.setPackageList(packages);
@@ -714,10 +718,17 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
                     new LambdaQueryWrapper<DesignDrawingEntity>()
                             .in(DesignDrawingEntity::getPackageId, packageIds)
                             .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED));
-            Set<Long> pkgsWithDrawing = drawings.stream()
-                    .map(DesignDrawingEntity::getPackageId)
-                    .collect(Collectors.toSet());
-            check.setHasDrawing(pkgsWithDrawing.containsAll(packageIds));
+            Map<Long, Set<String>> requiredCategories = products.stream()
+                    .collect(Collectors.groupingBy(DesignProductEntity::getPackageId,
+                            Collectors.mapping(DesignProductEntity::getProductCategory, Collectors.toSet())));
+            Map<Long, Set<String>> drawingCategories = drawings.stream()
+                    .collect(Collectors.groupingBy(DesignDrawingEntity::getPackageId,
+                            Collectors.mapping(DesignDrawingEntity::getProductCategory, Collectors.toSet())));
+            check.setHasDrawing(packageIds.stream().allMatch(pkgId -> {
+                Set<String> required = requiredCategories.getOrDefault(pkgId, Collections.emptySet());
+                Set<String> actual = drawingCategories.getOrDefault(pkgId, Collections.emptySet());
+                return !required.isEmpty() && actual.containsAll(required);
+            }));
         } else {
             // 无数据包时，后续所有检查均为 false
             check.setHasPrintInfo(false);
@@ -740,13 +751,19 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
 
         // 8. 图纸确认状态：复用步骤4已查询的 drawings，按 versionSeq 倒序取各包最新版
         if (!packages.isEmpty()) {
-            Map<Long, DesignDrawingEntity> latestDrawingByPkg = new java.util.LinkedHashMap<>();
+            Map<String, DesignDrawingEntity> latestDrawingByPkgCategory = new java.util.LinkedHashMap<>();
             drawings.stream()
                     .sorted((a, b) -> Integer.compare(b.getVersionSeq(), a.getVersionSeq()))
-                    .forEach(d -> latestDrawingByPkg.putIfAbsent(d.getPackageId(), d));
-            boolean allDrawingConfirmed = packageIds.stream().allMatch(pkgId -> {
-                DesignDrawingEntity drawing = latestDrawingByPkg.get(pkgId);
-                return drawing != null && Objects.equals(StatusConstants.CONFIRMED, drawing.getIsConfirmed());
+                    .forEach(d -> latestDrawingByPkgCategory.putIfAbsent(d.getPackageId() + ":" + d.getProductCategory(), d));
+            List<DesignProductEntity> confirmationProducts = designProductMapper.selectList(
+                    new LambdaQueryWrapper<DesignProductEntity>().in(DesignProductEntity::getPackageId, packageIds)
+                            .eq(DesignProductEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+            boolean allDrawingConfirmed = confirmationProducts.stream().collect(Collectors.groupingBy(DesignProductEntity::getPackageId,
+                    Collectors.mapping(DesignProductEntity::getProductCategory, Collectors.toSet()))).entrySet().stream().allMatch(entry -> {
+                return entry.getValue().stream().allMatch(category -> {
+                    DesignDrawingEntity drawing = latestDrawingByPkgCategory.get(entry.getKey() + ":" + category);
+                    return drawing != null && Objects.equals(StatusConstants.CONFIRMED, drawing.getIsConfirmed());
+                });
             });
             check.setHasDrawingConfirmed(allDrawingConfirmed);
         } else {
@@ -954,20 +971,28 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
                 new LambdaQueryWrapper<DesignDrawingEntity>()
                         .in(DesignDrawingEntity::getPackageId, packageIds)
                         .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED));
-        Set<Long> pkgsWithDrawing = drawings.stream().map(DesignDrawingEntity::getPackageId).collect(Collectors.toSet());
-        if (!pkgsWithDrawing.containsAll(packageIds)) {
+        Map<Long, Set<String>> requiredCategories = products.stream().collect(Collectors.groupingBy(
+                DesignProductEntity::getPackageId, Collectors.mapping(DesignProductEntity::getProductCategory, Collectors.toSet())));
+        Map<Long, Set<String>> drawingCategories = drawings.stream().collect(Collectors.groupingBy(
+                DesignDrawingEntity::getPackageId, Collectors.mapping(DesignDrawingEntity::getProductCategory, Collectors.toSet())));
+        boolean hasAllDrawings = packageIds.stream().allMatch(pkgId -> {
+            Set<String> required = requiredCategories.getOrDefault(pkgId, Collections.emptySet());
+            return !required.isEmpty() && drawingCategories.getOrDefault(pkgId, Collections.emptySet()).containsAll(required);
+        });
+        if (!hasAllDrawings) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请生成图纸");
         }
 
         // 图纸确认状态：按 versionSeq 倒序取各包最新版
-        Map<Long, DesignDrawingEntity> latestDrawingByPkg = new java.util.LinkedHashMap<>();
+        Map<String, DesignDrawingEntity> latestDrawingByPkg = new java.util.LinkedHashMap<>();
         drawings.stream()
                 .sorted((a, b) -> Integer.compare(b.getVersionSeq(), a.getVersionSeq()))
-                .forEach(d -> latestDrawingByPkg.putIfAbsent(d.getPackageId(), d));
-        boolean allDrawingConfirmed = packageIds.stream().allMatch(pkgId -> {
-            DesignDrawingEntity drawing = latestDrawingByPkg.get(pkgId);
-            return drawing != null && Objects.equals(StatusConstants.CONFIRMED, drawing.getIsConfirmed());
-        });
+                .forEach(d -> latestDrawingByPkg.putIfAbsent(d.getPackageId() + ":" + d.getProductCategory(), d));
+        boolean allDrawingConfirmed = requiredCategories.entrySet().stream().allMatch(entry -> entry.getValue().stream()
+                .allMatch(category -> {
+                    DesignDrawingEntity drawing = latestDrawingByPkg.get(entry.getKey() + ":" + category);
+                    return drawing != null && Objects.equals(StatusConstants.CONFIRMED, drawing.getIsConfirmed());
+                }));
         if (!allDrawingConfirmed) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_SUBMIT_CHECK_FAILED, "请确认图纸");
         }

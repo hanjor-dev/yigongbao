@@ -88,4 +88,7 @@ public class DesignPackageVO implements Serializable {
      * 最新版图纸（无则为 null）
      */
     private DesignDocVersionVO latestDrawing;
+
+    /** 各产品分类最新版图纸 */
+    private List<DesignDocVersionVO> latestDrawings;
 }

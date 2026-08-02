@@ -72,7 +72,7 @@ public class ProductLedgerExcelBuilder {
             String[] headers = {
                 "产品编号", "产品名称", "型号规格", "材质", "颜色", "注册证号", "打印文件名", "UDI码",
                 "产品状态", "当前工序", "订单编号", "订单类型", "医院", "科室", "医生", "患者",
-                "是否加急", "是否邮寄", "期望交付时间", "流转卡编号", "生产批号", "版本号",
+                "是否加急", "是否邮寄", "期望交付时间", "流转卡编号", "生产批号",
                 "设计数据包编号", "加工中心", "打印机编号", "打印开始时间", "打印完成时间", "原材料批号",
                 "打印操作员", "清洗操作员", "固化操作员", "包装操作员", "包装时间",
                 "质检结果", "质检员", "质检时间", "质检备注", "入库时间", "入库人", "出库时间", "出库人", "创建时间"
@@ -82,7 +82,7 @@ public class ProductLedgerExcelBuilder {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers[i]);
                 cell.setCellStyle(headerStyle);
-                sheet.setColumnWidth(i, 4000);
+                sheet.setColumnWidth(i, 4500);
             }
 
             // 填充数据行
@@ -112,7 +112,6 @@ public class ProductLedgerExcelBuilder {
                 setCell(row, colIndex++, formatDateTime(data.get("expected_delivery_date")), dataStyle);
                 setCell(row, colIndex++, data.get("record_no"), dataStyle);
                 setCell(row, colIndex++, data.get("production_batch_no"), dataStyle);
-                setCell(row, colIndex++, data.get("version_no"), dataStyle);
                 setCell(row, colIndex++, data.get("design_package_code"), dataStyle);
                 setCell(row, colIndex++, data.get("processing_center_name"), dataStyle);
                 setCell(row, colIndex++, data.get("print_device_code"), dataStyle);

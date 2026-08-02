@@ -81,8 +81,13 @@ public class DesignDocController {
     @GetMapping("/{orderId}/package/{packageId}/drawing/download")
     public void downloadDrawing(@PathVariable Long orderId,
                                 @PathVariable Long packageId,
+                                @RequestParam(required = false) String productCategory,
                                 HttpServletResponse response) {
-        docService.downloadDrawing(orderId, packageId, response);
+        if (productCategory == null || productCategory.isBlank()) {
+            docService.downloadDrawing(orderId, packageId, response);
+        } else {
+            docService.downloadDrawing(orderId, packageId, productCategory, response);
+        }
     }
 
     /**
@@ -103,8 +108,11 @@ public class DesignDocController {
     @Operation(summary = "获取图纸预览 URL（在线模式，按需自动生成）")
     @GetMapping("/{orderId}/package/{packageId}/drawing/preview-url")
     public Result<DocItemVO> getDrawingPreviewUrl(@PathVariable Long orderId,
-                                                   @PathVariable Long packageId) {
-        return Result.success(docService.getDrawingPreviewUrl(orderId, packageId));
+                                                   @PathVariable Long packageId,
+                                                   @RequestParam(required = false) String productCategory) {
+        return Result.success(productCategory == null || productCategory.isBlank()
+                ? docService.getDrawingPreviewUrl(orderId, packageId)
+                : docService.getDrawingPreviewUrl(orderId, packageId, productCategory));
     }
 
     /**
@@ -123,8 +131,11 @@ public class DesignDocController {
     @Operation(summary = "查询图纸版本列表")
     @GetMapping("/{orderId}/package/{packageId}/drawing/versions")
     public Result<List<DesignDocVersionVO>> listDrawingVersions(@PathVariable Long orderId,
-                                                                 @PathVariable Long packageId) {
-        return Result.success(docService.listDrawingVersions(orderId, packageId));
+                                                                 @PathVariable Long packageId,
+                                                                 @RequestParam(required = false) String productCategory) {
+        return Result.success(productCategory == null || productCategory.isBlank()
+                ? docService.listDrawingVersions(orderId, packageId)
+                : docService.listDrawingVersions(orderId, packageId, productCategory));
     }
 
     /**
@@ -150,8 +161,13 @@ public class DesignDocController {
     public Result<Void> uploadRevisedDrawing(@PathVariable Long orderId,
                                               @PathVariable Long packageId,
                                               @PathVariable Long id,
+                                              @RequestParam(required = false) String productCategory,
                                               @RequestParam("file") MultipartFile file) {
-        docService.uploadRevisedDrawing(orderId, packageId, id, file);
+        if (productCategory == null || productCategory.isBlank()) {
+            docService.uploadRevisedDrawing(orderId, packageId, id, file);
+        } else {
+            docService.uploadRevisedDrawing(orderId, packageId, productCategory, id, file);
+        }
         return Result.success();
     }
 
@@ -165,8 +181,13 @@ public class DesignDocController {
     @PostMapping("/{orderId}/package/{packageId}/drawing/confirm/{id}")
     public Result<Void> confirmDrawing(@PathVariable Long orderId,
                                        @PathVariable Long packageId,
-                                       @PathVariable Long id) {
-        docService.confirmDrawing(orderId, packageId, id);
+                                       @PathVariable Long id,
+                                       @RequestParam(required = false) String productCategory) {
+        if (productCategory == null || productCategory.isBlank()) {
+            docService.confirmDrawing(orderId, packageId, id);
+        } else {
+            docService.confirmDrawing(orderId, packageId, productCategory, id);
+        }
         return Result.success();
     }
 
