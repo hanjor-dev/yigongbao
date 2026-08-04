@@ -191,6 +191,8 @@ CREATE TABLE sys_user (
     order_column_settings  TEXT         COMMENT '订单列配置（JSON，用户个人自定义列显示设置）',
     design_column_settings TEXT         COMMENT '设计工单列配置（JSON，用户个人自定义列显示设置）',
     production_column_settings TEXT     COMMENT '生产流转卡列配置（JSON，用户个人自定义列显示设置）',
+    quality_column_settings TEXT        COMMENT '质检列表列配置（JSON，用户个人自定义列显示设置）',
+    warehouse_column_settings TEXT      COMMENT '仓储列表列配置（JSON，用户个人自定义列显示设置）',
 
     -- 通用字段
     create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1557,7 +1559,7 @@ CREATE TABLE design_drawing (
     KEY idx_design_drawing_package_id (package_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='图纸表';
 -- 防止并发生成时同一数据包写入重复版本号
-CREATE UNIQUE INDEX uk_design_drawing_pkg_cat_ver ON design_drawing ((CASE WHEN is_deleted = 0 THEN package_id ELSE NULL END), (CASE WHEN is_deleted = 0 THEN product_category ELSE NULL END), (CASE WHEN is_deleted = 0 THEN version_seq ELSE NULL END));
+CREATE UNIQUE INDEX uk_design_drawing_pkg_cat_ver ON design_drawing ((CASE WHEN is_deleted = 0 THEN package_id ELSE NULL END), (CASE WHEN is_deleted = 0 THEN COALESCE(product_category, '__LEGACY_NULL__') ELSE NULL END), (CASE WHEN is_deleted = 0 THEN version_seq ELSE NULL END));
 
 
 -- ============================================================

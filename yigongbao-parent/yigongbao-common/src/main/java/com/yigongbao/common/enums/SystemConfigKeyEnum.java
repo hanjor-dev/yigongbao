@@ -257,7 +257,9 @@ public enum SystemConfigKeyEnum {
     /**
      * 生产流转卡列表默认列配置（JSON格式）
      */
-    PRODUCTION_COLUMN_CONFIG("production.column.config", "生产流转卡列表默认列配置");
+    PRODUCTION_COLUMN_CONFIG("production.column.config", "生产流转卡列表默认列配置"),
+    QUALITY_COLUMN_CONFIG("quality.column.config", "质检列表默认列配置"),
+    WAREHOUSE_COLUMN_CONFIG("warehouse.column.config", "仓储列表默认列配置");
 
     /**
      * 配置键

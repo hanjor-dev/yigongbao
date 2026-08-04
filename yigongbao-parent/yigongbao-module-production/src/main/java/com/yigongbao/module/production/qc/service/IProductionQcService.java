@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.qc.dto.BatchUpdateUdiDTO;
 import com.yigongbao.module.production.qc.dto.ProductionQcPageDTO;
+import com.yigongbao.module.production.qc.dto.SaveQcColumnConfigDTO;
+import com.yigongbao.module.production.qc.vo.QcColumnConfigVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 
 import java.util.List;
@@ -14,6 +16,10 @@ public interface IProductionQcService {
     void transferToPacking(Long recordId);
     List<ProductionProductVO> listProductsByRecordId(Long recordId);
     IPage<ProductionRecordVO> listQcRecords(ProductionQcPageDTO dto);
+
+    QcColumnConfigVO getColumnConfig();
+
+    void saveColumnConfig(SaveQcColumnConfigDTO dto);
 
     /**
      * 批量更新产品UDI码

@@ -3,11 +3,13 @@ package com.yigongbao.module.production.warehouse.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.module.production.warehouse.dto.ListWarehouseDTO;
 import com.yigongbao.module.production.warehouse.dto.ListWarehouseProductDTO;
+import com.yigongbao.module.production.warehouse.dto.SaveWarehouseColumnConfigDTO;
 import com.yigongbao.module.production.warehouse.dto.WarehouseInProductDTO;
 import com.yigongbao.module.production.warehouse.dto.WarehouseOutProductDTO;
 import com.yigongbao.module.production.warehouse.vo.WarehouseDetailVO;
 import com.yigongbao.module.production.warehouse.vo.WarehouseProductVO;
 import com.yigongbao.module.production.warehouse.vo.WarehouseRecordVO;
+import com.yigongbao.module.production.warehouse.vo.WarehouseColumnConfigVO;
 
 /**
  * 仓储管理服务接口
@@ -17,6 +19,10 @@ import com.yigongbao.module.production.warehouse.vo.WarehouseRecordVO;
  */
 public interface IWarehouseService {
     IPage<WarehouseRecordVO> listWarehouse(ListWarehouseDTO dto);
+
+    WarehouseColumnConfigVO getColumnConfig();
+
+    void saveColumnConfig(SaveWarehouseColumnConfigDTO dto);
 
     WarehouseDetailVO getWarehouseDetail(Long recordId);
 

@@ -183,4 +183,14 @@ public class UserEntity extends BaseEntity implements Serializable {
      * 生产流转卡列配置（JSON，用户个人自定义列显示设置）
      */
     private String productionColumnSettings;
+
+    /**
+     * 质检列表列配置（JSON，用户个人自定义列显示设置）
+     */
+    private String qualityColumnSettings;
+
+    /**
+     * 仓储列表列配置（JSON，用户个人自定义列显示设置）
+     */
+    private String warehouseColumnSettings;
 }

@@ -191,6 +191,8 @@ CREATE TABLE sys_user (
     order_column_settings  TEXT         COMMENT '订单列配置（JSON，用户个人自定义列显示设置）',
     design_column_settings TEXT         COMMENT '设计工单列配置（JSON，用户个人自定义列显示设置）',
     production_column_settings TEXT     COMMENT '生产流转卡列配置（JSON，用户个人自定义列显示设置）',
+    quality_column_settings TEXT        COMMENT '质检列表列配置（JSON，用户个人自定义列显示设置）',
+    warehouse_column_settings TEXT      COMMENT '仓储列表列配置（JSON，用户个人自定义列显示设置）',
 
     -- 通用字段
     create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

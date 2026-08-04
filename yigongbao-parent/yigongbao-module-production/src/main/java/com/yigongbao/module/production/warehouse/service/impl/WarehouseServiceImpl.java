@@ -2,10 +2,14 @@ package com.yigongbao.module.production.warehouse.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -20,10 +24,16 @@ import com.yigongbao.module.production.warehouse.dto.ListWarehouseDTO;
 import com.yigongbao.module.production.warehouse.dto.ListWarehouseProductDTO;
 import com.yigongbao.module.production.warehouse.dto.WarehouseInProductDTO;
 import com.yigongbao.module.production.warehouse.dto.WarehouseOutProductDTO;
+import com.yigongbao.module.production.warehouse.dto.SaveWarehouseColumnConfigDTO;
 import com.yigongbao.module.production.warehouse.service.IWarehouseService;
 import com.yigongbao.module.production.warehouse.vo.WarehouseDetailVO;
 import com.yigongbao.module.production.warehouse.vo.WarehouseProductVO;
 import com.yigongbao.module.production.warehouse.vo.WarehouseRecordVO;
+import com.yigongbao.module.production.warehouse.vo.WarehouseColumnConfigVO;
+import com.yigongbao.module.production.util.ColumnConfigValidator;
+import com.yigongbao.module.system.config.service.ConfigService;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -47,11 +57,86 @@ public class WarehouseServiceImpl implements IWarehouseService {
     private final ProductionProductMapper productMapper;
     private final ProductionRecordMapper recordMapper;
     private final IProductionRecordService recordService;
+    private final UserService userService;
+    private final ConfigService configService;
+    private final ObjectMapper objectMapper;
 
     @Override
     public IPage<WarehouseRecordVO> listWarehouse(ListWarehouseDTO dto) {
         Page<WarehouseRecordVO> page = new Page<>(dto.getPage(), dto.getSize());
         return recordMapper.listWarehouse(page, dto);
+    }
+
+    @Override
+    public WarehouseColumnConfigVO getColumnConfig() {
+        try {
+            Long currentUserId = StpUtil.getLoginIdAsLong();
+            UserEntity user = userService.getById(currentUserId);
+            if (user != null && StrUtil.isNotBlank(user.getWarehouseColumnSettings())) {
+                try {
+                    return objectMapper.readValue(user.getWarehouseColumnSettings(), WarehouseColumnConfigVO.class);
+                } catch (JsonProcessingException e) {
+                    log.warn("解析用户仓储列配置失败，降级为系统默认，userId={}", currentUserId, e);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("获取当前用户仓储列配置失败，使用系统默认配置", e);
+        }
+
+        String configJson = configService.getConfigValue(SystemConfigKeyEnum.WAREHOUSE_COLUMN_CONFIG.getKey());
+        if (StrUtil.isBlank(configJson)) {
+            log.warn("系统默认仓储列配置为空");
+            return new WarehouseColumnConfigVO();
+        }
+        try {
+            return objectMapper.readValue(configJson, WarehouseColumnConfigVO.class);
+        } catch (JsonProcessingException e) {
+            log.error("解析系统仓储列配置失败", e);
+            return new WarehouseColumnConfigVO();
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void saveColumnConfig(SaveWarehouseColumnConfigDTO dto) {
+        ColumnConfigValidator.validate("warehouse", dto == null ? null : dto.getColumns());
+        Long currentUserId;
+        try {
+            currentUserId = StpUtil.getLoginIdAsLong();
+        } catch (Exception e) {
+            log.error("获取当前登录用户失败", e);
+            throw new BusinessException(ErrorCodeEnum.UNAUTHORIZED);
+        }
+
+        UserEntity user = userService.getById(currentUserId);
+        if (user == null) {
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+        }
+
+        WarehouseColumnConfigVO configVO = new WarehouseColumnConfigVO();
+        if (dto.getColumns() != null) {
+            List<WarehouseColumnConfigVO.ColumnItemVO> columnItems = dto.getColumns().stream()
+                    .map(item -> {
+                        WarehouseColumnConfigVO.ColumnItemVO column = new WarehouseColumnConfigVO.ColumnItemVO();
+                        column.setField(item.getField());
+                        column.setLabel(item.getLabel());
+                        column.setVisible(item.getVisible());
+                        column.setSort(item.getSort());
+                        column.setWidth(item.getWidth());
+                        column.setFixed(item.getFixed());
+                        return column;
+                    }).collect(Collectors.toList());
+            configVO.setColumns(columnItems);
+        }
+
+        try {
+            user.setWarehouseColumnSettings(objectMapper.writeValueAsString(configVO));
+            userService.updateById(user);
+            log.info("保存仓储列配置成功: userId={}", currentUserId);
+        } catch (JsonProcessingException e) {
+            log.error("序列化仓储列配置失败: userId={}", currentUserId, e);
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR);
+        }
     }
 
     @Override

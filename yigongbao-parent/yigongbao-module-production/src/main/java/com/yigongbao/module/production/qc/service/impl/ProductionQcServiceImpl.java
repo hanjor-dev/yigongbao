@@ -3,10 +3,13 @@ package com.yigongbao.module.production.qc.service.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -19,12 +22,17 @@ import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.qc.dto.BatchUpdateUdiDTO;
 import com.yigongbao.module.production.qc.dto.ProductionQcPageDTO;
+import com.yigongbao.module.production.qc.dto.SaveQcColumnConfigDTO;
 import com.yigongbao.module.production.qc.service.IProductionQcService;
+import com.yigongbao.module.production.qc.vo.QcColumnConfigVO;
+import com.yigongbao.module.production.util.ColumnConfigValidator;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
+import com.yigongbao.module.system.config.service.ConfigService;
+import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -54,6 +62,9 @@ public class ProductionQcServiceImpl implements IProductionQcService {
     private final com.yigongbao.module.order.mapper.OrderMainMapper orderMainMapper;
     private final com.yigongbao.module.system.user.mapper.UserMapper userMapper;
     private final com.yigongbao.module.production.product.service.IProductionProductService productService;
+    private final UserService userService;
+    private final ConfigService configService;
+    private final ObjectMapper objectMapper;
 
     /**
      * 标记产品质检合格，回写流转卡合格计数
@@ -197,6 +208,78 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             log.info("质检列表查询-默认: status={}, includeFollowingStatuses=true", FlowStatusEnum.QC_IN_PROGRESS.getValue());
         }
         return recordService.pageRecords(pageDTO);
+    }
+
+    @Override
+    public QcColumnConfigVO getColumnConfig() {
+        try {
+            Long currentUserId = StpUtil.getLoginIdAsLong();
+            com.yigongbao.module.system.user.entity.UserEntity user = userService.getById(currentUserId);
+            if (user != null && StrUtil.isNotBlank(user.getQualityColumnSettings())) {
+                try {
+                    return objectMapper.readValue(user.getQualityColumnSettings(), QcColumnConfigVO.class);
+                } catch (JsonProcessingException e) {
+                    log.warn("解析用户质检列配置失败，降级为系统默认，userId={}", currentUserId, e);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("获取当前用户质检列配置失败，使用系统默认配置", e);
+        }
+
+        String configJson = configService.getConfigValue(SystemConfigKeyEnum.QUALITY_COLUMN_CONFIG.getKey());
+        if (StrUtil.isBlank(configJson)) {
+            log.warn("系统默认质检列配置为空");
+            return new QcColumnConfigVO();
+        }
+        try {
+            return objectMapper.readValue(configJson, QcColumnConfigVO.class);
+        } catch (JsonProcessingException e) {
+            log.error("解析系统质检列配置失败", e);
+            return new QcColumnConfigVO();
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void saveColumnConfig(SaveQcColumnConfigDTO dto) {
+        ColumnConfigValidator.validate("quality", dto == null ? null : dto.getColumns());
+        Long currentUserId;
+        try {
+            currentUserId = StpUtil.getLoginIdAsLong();
+        } catch (Exception e) {
+            log.error("获取当前登录用户失败", e);
+            throw new BusinessException(ErrorCodeEnum.UNAUTHORIZED);
+        }
+
+        com.yigongbao.module.system.user.entity.UserEntity user = userService.getById(currentUserId);
+        if (user == null) {
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+        }
+
+        QcColumnConfigVO configVO = new QcColumnConfigVO();
+        if (dto.getColumns() != null) {
+            List<QcColumnConfigVO.ColumnItemVO> columnItems = dto.getColumns().stream()
+                    .map(item -> {
+                        QcColumnConfigVO.ColumnItemVO column = new QcColumnConfigVO.ColumnItemVO();
+                        column.setField(item.getField());
+                        column.setLabel(item.getLabel());
+                        column.setVisible(item.getVisible());
+                        column.setSort(item.getSort());
+                        column.setWidth(item.getWidth());
+                        column.setFixed(item.getFixed());
+                        return column;
+                    }).collect(Collectors.toList());
+            configVO.setColumns(columnItems);
+        }
+
+        try {
+            user.setQualityColumnSettings(objectMapper.writeValueAsString(configVO));
+            userService.updateById(user);
+            log.info("保存质检列配置成功: userId={}", currentUserId);
+        } catch (JsonProcessingException e) {
+            log.error("序列化质检列配置失败: userId={}", currentUserId, e);
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR);
+        }
     }
 
     /**
