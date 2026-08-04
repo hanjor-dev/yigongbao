@@ -1,6 +1,7 @@
 package com.yigongbao.module.production.product.vo;
 
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -20,6 +21,8 @@ public class ProductionProductDetailVO {
     private String productName;
     /** 打印文件名 */
     private String fileName;
+    /** 产品重量，单位：克 */
+    private BigDecimal weight;
     /** 产品状态代码 */
     private String status;
     /** 质检结果（pass/fail） */

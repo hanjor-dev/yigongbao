@@ -1816,6 +1816,7 @@ CREATE TABLE production_product (
     material_name VARCHAR(100) COMMENT '材质名称',
     color_name VARCHAR(100) COMMENT '颜色名称',
     file_name VARCHAR(255) COMMENT '打印文件名',
+    weight DECIMAL(10,2) COMMENT '产品重量，单位：克',
     udi_code VARCHAR(200) COMMENT 'UDI码（仅医疗器械）',
     udi_di VARCHAR(100) COMMENT 'UDI-DI（设备标识符）',
     udi_pi VARCHAR(100) COMMENT 'UDI-PI（生产标识符）',

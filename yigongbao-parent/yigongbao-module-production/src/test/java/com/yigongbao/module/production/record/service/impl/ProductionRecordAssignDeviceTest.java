@@ -22,7 +22,10 @@ import com.yigongbao.module.production.device.service.IDeviceUsageCounterService
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.product.service.IProductNumberService;
+import com.yigongbao.module.production.product.entity.ProductionProductEntity;
+import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
+import com.yigongbao.module.production.record.dto.AssignProductWeightDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.system.config.service.ConfigService;
@@ -46,6 +49,9 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.math.BigDecimal;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -78,6 +84,7 @@ class ProductionRecordAssignDeviceTest {
     @Mock private IDeviceUsageCounterService deviceUsageCounterService;
     @Mock private IProductNumberService productNumberService;
     @Mock private ProductionProcessMapper processMapper;
+    @Mock private ProductionProductMapper productMapper;
 
     @Spy
     @InjectMocks
@@ -136,6 +143,10 @@ class ProductionRecordAssignDeviceTest {
         AssignDeviceDTO dto = new AssignDeviceDTO();
         dto.setDeviceId(2L);
         dto.setMaterial("树脂");
+        ProductionProductEntity product1 = product(11L);
+        ProductionProductEntity product2 = product(12L);
+        product2.setWeight(new BigDecimal("5.00"));
+        dto.setProductWeights(List.of(weight(11L, "12.35"), weight(12L, null)));
         UserEntity user = new UserEntity();
         user.setRealName("生产员");
         doReturn(record).when(service).getById(1L);
@@ -145,6 +156,8 @@ class ProductionRecordAssignDeviceTest {
         when(userMapper.selectById(7L)).thenReturn(user);
         when(processMapper.update(isNull(), any())).thenReturn(1);
         when(deviceUsageCounterService.incrementAndGet(2L)).thenReturn(3);
+        when(productMapper.selectList(any())).thenReturn(List.of(product1, product2));
+        when(productMapper.updateById(any(ProductionProductEntity.class))).thenReturn(1);
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
@@ -153,9 +166,92 @@ class ProductionRecordAssignDeviceTest {
 
         assertThat(record.getPrintDeviceId()).isEqualTo(2L);
         assertThat(record.getPrintDeviceCode()).isEqualTo("SLA-002");
+        assertThat(product1.getWeight()).isEqualByComparingTo("12.35");
+        assertThat(product2.getWeight()).isNull();
+        verify(productMapper).updateById(product1);
+        verify(productMapper).updateById(product2);
         verify(processMapper).update(isNull(), any());
         verify(deviceUsageCounterService).incrementAndGet(2L);
         verify(productNumberService).generateFormalNumbers(1L, 2L, 3);
+    }
+
+    @Test
+    void assignDevice_rejectsIncompleteProductWeights() {
+        ProductionRecordEntity record = pendingRecord(1L);
+        DeviceEntity device = readyDevice(2L);
+        AssignDeviceDTO dto = new AssignDeviceDTO();
+        dto.setDeviceId(2L);
+        dto.setProductWeights(List.of(weight(11L, "12.35")));
+        doReturn(record).when(service).getById(1L);
+        when(deviceMapper.selectById(2L)).thenReturn(device);
+        when(productMapper.selectList(any())).thenReturn(List.of(product(11L), product(12L)));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.assignDevice(1L, dto));
+
+        assertThat(exception.getMessage()).contains("重量");
+        verifyNoInteractions(processMapper, productNumberService, deviceUsageCounterService);
+    }
+
+    @Test
+    void assignDevice_rejectsDuplicateProductWeight() {
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> assignWithProducts(
+                        List.of(weight(11L, "1.00"), weight(11L, "2.00")),
+                        List.of(product(11L), product(12L))));
+
+        assertThat(exception.getMessage()).contains("重复");
+    }
+
+    @Test
+    void assignDevice_rejectsForeignOrNegativeProductWeight() {
+        BusinessException foreignException = assertThrows(BusinessException.class,
+                () -> assignWithProducts(
+                        List.of(weight(999L, "1.00")),
+                        List.of(product(11L))));
+        assertThat(foreignException.getMessage()).contains("当前流转卡");
+
+        BusinessException negativeException = assertThrows(BusinessException.class,
+                () -> assignWithProducts(
+                        List.of(weight(11L, "-0.01")),
+                        List.of(product(11L))));
+        assertThat(negativeException.getMessage()).contains("不能小于0");
+    }
+
+    private void assignWithProducts(List<AssignProductWeightDTO> weights,
+                                    List<ProductionProductEntity> products) {
+        ProductionRecordEntity record = pendingRecord(1L);
+        AssignDeviceDTO dto = new AssignDeviceDTO();
+        dto.setDeviceId(2L);
+        dto.setProductWeights(weights);
+        doReturn(record).when(service).getById(1L);
+        when(deviceMapper.selectById(2L)).thenReturn(readyDevice(2L));
+        when(productMapper.selectList(any())).thenReturn(products);
+        service.assignDevice(1L, dto);
+    }
+
+    private DeviceEntity readyDevice(Long id) {
+        DeviceEntity device = new DeviceEntity();
+        device.setId(id);
+        device.setDeviceId("SLA-" + id);
+        device.setDeviceName("打印机" + id);
+        device.setState(0);
+        device.setConnectionStatus(1);
+        return device;
+    }
+
+    private ProductionProductEntity product(Long id) {
+        ProductionProductEntity product = new ProductionProductEntity();
+        product.setId(id);
+        product.setProductionRecordId(1L);
+        return product;
+    }
+
+    private AssignProductWeightDTO weight(Long productId, String value) {
+        AssignProductWeightDTO dto = new AssignProductWeightDTO();
+        dto.setProductId(productId);
+        dto.setWeight(value == null ? null : new BigDecimal(value));
+        return dto;
     }
 
     private ProductionRecordEntity pendingRecord(Long id) {

@@ -40,6 +40,7 @@ import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
+import com.yigongbao.module.production.record.dto.AssignProductWeightDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.ProductLedgerExportDTO;
 import com.yigongbao.module.production.record.dto.SaveProductionColumnConfigDTO;
@@ -66,10 +67,13 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -698,6 +702,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
         }
 
+        saveProductWeights(recordId, dto.getProductWeights());
+
         record.setPrintDeviceId(device.getId());
         record.setPrintDeviceCode(device.getDeviceId());
         record.setPrintDeviceName(device.getDeviceName());
@@ -726,6 +732,58 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         log.info("分配打印设备并生成产品编号: recordId={}, deviceId={}, deviceNo={}, usageCount={}",
             recordId, device.getId(), device.getDeviceId(), usageCount);
+    }
+
+    /** 校验并保存当前流转卡下所有生产产品的重量，单位：克 */
+    private void saveProductWeights(Long recordId, List<AssignProductWeightDTO> requests) {
+        if (requests == null || requests.isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "产品重量列表不能为空");
+        }
+
+        List<ProductionProductEntity> products = productMapper.selectList(
+                new LambdaQueryWrapper<ProductionProductEntity>()
+                        .eq(ProductionProductEntity::getProductionRecordId, recordId));
+        if (products == null || products.isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "流转卡关联产品不能为空");
+        }
+
+        Map<Long, ProductionProductEntity> productMap = products.stream()
+                .collect(Collectors.toMap(ProductionProductEntity::getId, product -> product));
+        Set<Long> submittedProductIds = new HashSet<>();
+        for (AssignProductWeightDTO request : requests) {
+            if (request == null || request.getProductId() == null) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "产品ID不能为空");
+            }
+            if (!submittedProductIds.add(request.getProductId())) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "产品重量不能重复提交");
+            }
+
+            ProductionProductEntity product = productMap.get(request.getProductId());
+            if (product == null) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "产品不属于当前流转卡");
+            }
+
+            BigDecimal weight = request.getWeight();
+            if (weight != null) {
+                if (weight.signum() < 0) {
+                    throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "产品重量不能小于0克");
+                }
+                if (weight.scale() > 2 || weight.compareTo(new BigDecimal("99999999.99")) > 0) {
+                    throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "产品重量最多支持8位整数和2位小数");
+                }
+            }
+            product.setWeight(weight);
+        }
+
+        if (submittedProductIds.size() != productMap.size()) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "必须提交当前流转卡全部产品的重量");
+        }
+
+        for (ProductionProductEntity product : products) {
+            if (productMapper.updateById(product) <= 0) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "产品重量保存失败");
+            }
+        }
     }
 
     /** 将产品 Entity 转为 VO，并填充状态中文名 */

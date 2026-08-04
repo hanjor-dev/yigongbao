@@ -1,9 +1,12 @@
 package com.yigongbao.module.production.product.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.yigongbao.common.entity.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -34,6 +37,9 @@ public class ProductionProductEntity extends BaseEntity {
     private String colorName;
     /** 打印文件名 */
     private String fileName;
+    /** 产品重量，单位：克 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private BigDecimal weight;
     /** UDI码（医疗器械质检合格时生成） */
     private String udiCode;
     /** UDI-DI 设备标识符 */
