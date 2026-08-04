@@ -25,7 +25,6 @@ import com.yigongbao.module.design.entity.DesignModelEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignReviewEntity;
-import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.helper.DesignQueryHelper;
 import com.yigongbao.module.design.enums.DesignModeEnum;
 import com.yigongbao.module.design.service.DesignFileService;
@@ -37,6 +36,8 @@ import com.yigongbao.module.design.mapper.DesignPackageMapper;
 import com.yigongbao.module.design.mapper.DesignProductMapper;
 import com.yigongbao.module.design.mapper.DesignReviewMapper;
 import com.yigongbao.module.design.vo.DesignColumnConfigVO;
+import com.yigongbao.module.design.vo.DesignDocVersionVO;
+import com.yigongbao.module.design.vo.DesignPackageVO;
 import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
 import com.yigongbao.module.design.vo.DesignWorkorderListVO;
 import com.yigongbao.module.design.vo.SubmitCheckVO;
@@ -68,6 +69,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -262,6 +264,91 @@ class DesignWorkorderServiceImplTest {
             assertNotNull(vo);
             assertEquals(10L, vo.getId());
             assertEquals("ORD-10", vo.getOrderCode());
+        }
+
+        @Test
+        @DisplayName("无图纸时 latestDrawings 返回空数组")
+        void getWorkorderDetail_noDrawing_returnsEmptyLatestDrawings() {
+            when(orderMainService.getById(10L)).thenReturn(buildOrder(10L));
+            DesignPackageVO pkg = new DesignPackageVO();
+            pkg.setId(1L);
+            when(designFileService.listPackages(10L)).thenReturn(List.of(pkg));
+            when(designDocService.getLatestDrawingGroups(anySet())).thenReturn(Collections.emptyMap());
+
+            DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
+
+            assertNotNull(vo.getPackageList().get(0).getLatestDrawings());
+            assertTrue(vo.getPackageList().get(0).getLatestDrawings().isEmpty());
+        }
+
+        @Test
+        @DisplayName("多分类包只生成一张图纸时 latestDrawing 仍为空")
+        void getWorkorderDetail_multiCategoryWithOneDrawing_doesNotFillLegacyField() {
+            when(orderMainService.getById(10L)).thenReturn(buildOrder(10L));
+            DesignPackageVO pkg = new DesignPackageVO();
+            pkg.setId(1L);
+            when(designFileService.listPackages(10L)).thenReturn(List.of(pkg));
+            DesignDocVersionVO drawing = new DesignDocVersionVO();
+            drawing.setId(100L);
+            drawing.setProductCategory("17.1");
+            when(designDocService.getLatestDrawingGroups(anySet()))
+                    .thenReturn(Map.of(1L, List.of(drawing)));
+            DesignProductEntity model = new DesignProductEntity();
+            model.setPackageId(1L);
+            model.setProductCategory("17.1");
+            DesignProductEntity guide = new DesignProductEntity();
+            guide.setPackageId(1L);
+            guide.setProductCategory("17.2");
+            when(designProductMapper.selectList(any(Wrapper.class))).thenReturn(List.of(model, guide));
+
+            DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
+
+            assertEquals(1, vo.getPackageList().get(0).getLatestDrawings().size());
+            assertNull(vo.getPackageList().get(0).getLatestDrawing());
+        }
+
+        @Test
+        @DisplayName("单分类包继续回填 latestDrawing")
+        void getWorkorderDetail_singleCategory_fillsLegacyField() {
+            when(orderMainService.getById(10L)).thenReturn(buildOrder(10L));
+            DesignPackageVO pkg = new DesignPackageVO();
+            pkg.setId(1L);
+            when(designFileService.listPackages(10L)).thenReturn(List.of(pkg));
+            DesignDocVersionVO drawing = new DesignDocVersionVO();
+            drawing.setId(100L);
+            drawing.setProductCategory("17.1");
+            when(designDocService.getLatestDrawingGroups(anySet()))
+                    .thenReturn(Map.of(1L, List.of(drawing)));
+            DesignProductEntity model = new DesignProductEntity();
+            model.setPackageId(1L);
+            model.setProductCategory("17.1");
+            when(designProductMapper.selectList(any(Wrapper.class))).thenReturn(List.of(model));
+
+            DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
+
+            assertSame(drawing, vo.getPackageList().get(0).getLatestDrawing());
+        }
+
+        @Test
+        @DisplayName("历史无分类包继续回填 latestDrawing")
+        void getWorkorderDetail_legacyNullCategory_fillsLegacyField() {
+            when(orderMainService.getById(10L)).thenReturn(buildOrder(10L));
+            DesignPackageVO pkg = new DesignPackageVO();
+            pkg.setId(1L);
+            when(designFileService.listPackages(10L)).thenReturn(List.of(pkg));
+            DesignDocVersionVO drawing = new DesignDocVersionVO();
+            drawing.setId(100L);
+            drawing.setProductCategory(null);
+            when(designDocService.getLatestDrawingGroups(anySet()))
+                    .thenReturn(Map.of(1L, List.of(drawing)));
+            DesignProductEntity legacyProduct = new DesignProductEntity();
+            legacyProduct.setPackageId(1L);
+            legacyProduct.setProductCategory(null);
+            when(designProductMapper.selectList(any(Wrapper.class))).thenReturn(List.of(legacyProduct));
+
+            DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
+
+            assertSame(drawing, vo.getPackageList().get(0).getLatestDrawing());
         }
 
         @Test

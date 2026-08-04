@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -124,6 +125,60 @@ class DesignDocControllerTest {
         mockMvc.perform(get("/design/workorder/1/package/2/drawing/versions"))
                 .andExpect(status().isOk());
         verify(docService).listDrawingVersions(1L, 2L);
+    }
+
+    @Test
+    void drawingDownload_withProductCategory_delegatesCategoryOverload() throws Exception {
+        mockMvc.perform(get("/design/workorder/1/package/2/drawing/download")
+                        .param("productCategory", "17.1"))
+                .andExpect(status().isOk());
+
+        verify(docService).downloadDrawing(eq(1L), eq(2L), eq("17.1"), any());
+        verify(docService, never()).downloadDrawing(eq(1L), eq(2L), any());
+    }
+
+    @Test
+    void drawingPreview_withProductCategory_delegatesCategoryOverload() throws Exception {
+        mockMvc.perform(get("/design/workorder/1/package/2/drawing/preview-url")
+                        .param("productCategory", "17.2"))
+                .andExpect(status().isOk());
+
+        verify(docService).getDrawingPreviewUrl(1L, 2L, "17.2");
+        verify(docService, never()).getDrawingPreviewUrl(1L, 2L);
+    }
+
+    @Test
+    void drawingVersions_withProductCategory_delegatesCategoryOverload() throws Exception {
+        mockMvc.perform(get("/design/workorder/1/package/2/drawing/versions")
+                        .param("productCategory", "17.1"))
+                .andExpect(status().isOk());
+
+        verify(docService).listDrawingVersions(1L, 2L, "17.1");
+        verify(docService, never()).listDrawingVersions(1L, 2L);
+    }
+
+    @Test
+    void uploadRevisedDrawing_withProductCategory_delegatesCategoryOverload() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "drawing.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[]{1});
+
+        mockMvc.perform(multipart("/design/workorder/1/package/2/drawing/upload-revised/3")
+                        .file(file)
+                        .param("productCategory", "17.2"))
+                .andExpect(status().isOk());
+
+        verify(docService).uploadRevisedDrawing(eq(1L), eq(2L), eq("17.2"), eq(3L), any());
+        verify(docService, never()).uploadRevisedDrawing(eq(1L), eq(2L), eq(3L), any());
+    }
+
+    @Test
+    void confirmDrawing_withProductCategory_delegatesCategoryOverload() throws Exception {
+        mockMvc.perform(post("/design/workorder/1/package/2/drawing/confirm/3")
+                        .param("productCategory", "17.1"))
+                .andExpect(status().isOk());
+
+        verify(docService).confirmDrawing(1L, 2L, "17.1", 3L);
+        verify(docService, never()).confirmDrawing(1L, 2L, 3L);
     }
 
     @Test

@@ -42,6 +42,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
@@ -62,6 +63,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -99,6 +101,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     private final DesignPackageFileScreenshotMapper screenshotMapper;
     private final com.yigongbao.module.design.helper.DesignQueryHelper designQueryHelper;
     private final ConfigService configService;
+    private final TransactionTemplate transactionTemplate;
     /** 进程内按数据包串行生成，避免 preview/download 并发产生重复版本和文件。 */
     private static final ConcurrentHashMap<String, Object> DRAWING_LOCKS = new ConcurrentHashMap<>();
 
@@ -132,18 +135,20 @@ public class DesignDocServiceImpl implements DesignDocService {
      * </p>
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void downloadDrawing(Long orderId, Long packageId, HttpServletResponse response) {
         downloadDrawing(orderId, packageId, null, response);
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void downloadDrawing(Long orderId, Long packageId, String productCategory, HttpServletResponse response) {
         log.info("下载图纸模板，orderId={}, packageId={}", orderId, packageId);
-        checkDesignPhase(orderId);
-        // 按需生成或复用已有版本
-        DesignDrawingEntity entity = ensureDrawing(orderId, packageId, productCategory);
+        // 图纸准备在短事务内完成；事务提交释放行锁后再开始文件流传输。
+        DesignDrawingEntity entity = transactionTemplate.execute(status -> {
+            // 必须在事务内其他数据库读取之前加锁，避免 MySQL RR 快照读取到等待前的旧版本。
+            lockPackageForDrawingMutation(orderId, packageId);
+            checkDesignPhase(orderId);
+            return ensureDrawing(orderId, packageId, productCategory);
+        });
         // 流式下载模板文件
         try {
             fileService.download(entity.getTemplateFileId(), response);
@@ -191,6 +196,8 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId, String productCategory) {
         log.info("获取图纸预览URL，orderId={}, packageId={}", orderId, packageId);
+        // 必须在事务内其他数据库读取之前加锁，避免 MySQL RR 快照读取到等待前的旧版本。
+        lockPackageForDrawingMutation(orderId, packageId);
         checkDesignPhase(orderId);
         // 按需生成或复用已有版本
         DesignDrawingEntity entity = ensureDrawing(orderId, packageId, productCategory);
@@ -299,16 +306,19 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public void uploadRevisedDrawing(Long orderId, Long packageId, String productCategory, Long id, MultipartFile file) {
         log.info("上传修订版图纸，orderId={}, packageId={}, id={}", orderId, packageId, id);
+        // 必须在事务内其他数据库读取之前加锁，等待后再建立一致性读快照。
+        lockPackageForDrawingMutation(orderId, packageId);
         // 经典案例保护：经典案例订单不允许上传新的图纸文件
         orderMainService.checkNotClassicCase(orderId, "上传图纸");
         checkDesignPhase(orderId);
-        validatePackage(orderId, packageId);
 
         // 查询当前最新版本
         String category = resolveCategory(packageId, productCategory);
         DesignDrawingEntity latest = category == null ? drawingService.getLatestVersion(packageId)
                 : drawingService.getLatestVersion(packageId, category);
-        if (latest == null) {
+        if (latest == null || !Objects.equals(latest.getId(), id)
+                || !Objects.equals(latest.getPackageId(), packageId)
+                || (category != null && !Objects.equals(latest.getProductCategory(), category))) {
             throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
         }
 
@@ -356,17 +366,20 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public void confirmDrawing(Long orderId, Long packageId, String productCategory, Long id) {
         log.info("确认图纸，orderId={}, packageId={}, id={}", orderId, packageId, id);
+        // 必须在事务内其他数据库读取之前加锁，等待后再建立一致性读快照。
+        lockPackageForDrawingMutation(orderId, packageId);
         checkDesignPhase(orderId);
-        validatePackage(orderId, packageId);
-        DesignDrawingEntity entity = drawingService.getById(id);
         String category = resolveCategory(packageId, productCategory);
-        if (entity == null || !entity.getPackageId().equals(packageId)
-                || (category != null && !Objects.equals(entity.getProductCategory(), category))) {
+        DesignDrawingEntity latest = category == null ? drawingService.getLatestVersion(packageId)
+                : drawingService.getLatestVersion(packageId, category);
+        if (latest == null || !Objects.equals(latest.getId(), id)
+                || !Objects.equals(latest.getPackageId(), packageId)
+                || (category != null && !Objects.equals(latest.getProductCategory(), category))) {
             throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
         }
-        entity.setIsConfirmed(1);
-        entity.setConfirmTime(LocalDateTime.now());
-        drawingService.updateById(entity);
+        latest.setIsConfirmed(StatusConstants.CONFIRMED);
+        latest.setConfirmTime(LocalDateTime.now());
+        drawingService.updateById(latest);
         log.info("确认图纸成功，id={}", id);
     }
 
@@ -445,12 +458,25 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Override
     public Map<Long, List<DesignDocVersionVO>> getLatestDrawingGroups(Collection<Long> packageIds) {
         if (packageIds == null || packageIds.isEmpty()) return Collections.emptyMap();
+        List<DesignProductEntity> products = productService.list(new LambdaQueryWrapper<DesignProductEntity>()
+                .in(DesignProductEntity::getPackageId, packageIds));
+        Map<Long, Set<String>> currentCategories = (products == null ? Collections.<DesignProductEntity>emptyList() : products)
+                .stream()
+                .filter(product -> product.getProductCategory() != null
+                        && !product.getProductCategory().isBlank())
+                .collect(Collectors.groupingBy(DesignProductEntity::getPackageId,
+                        Collectors.mapping(DesignProductEntity::getProductCategory, Collectors.toSet())));
         List<DesignDrawingEntity> all = drawingService.list(new LambdaQueryWrapper<DesignDrawingEntity>()
                 .in(DesignDrawingEntity::getPackageId, packageIds)
                 .eq(DesignDrawingEntity::getIsDeleted, StatusConstants.NOT_DELETED)
                 .orderByDesc(DesignDrawingEntity::getVersionSeq));
         Map<Long, Map<String, DesignDocVersionVO>> grouped = new java.util.LinkedHashMap<>();
         for (DesignDrawingEntity entity : all) {
+            Set<String> categories = currentCategories.getOrDefault(entity.getPackageId(), Collections.emptySet());
+            boolean currentCategoryDrawing = categories.isEmpty()
+                    ? entity.getProductCategory() == null
+                    : categories.contains(entity.getProductCategory());
+            if (!currentCategoryDrawing) continue;
             grouped.computeIfAbsent(entity.getPackageId(), k -> new java.util.LinkedHashMap<>())
                     .putIfAbsent(entity.getProductCategory(), toDrawingVersionVO(entity));
         }
@@ -546,7 +572,7 @@ public class DesignDocServiceImpl implements DesignDocService {
 
         // 加载基础数据
         OrderMainEntity order = orderMainService.getById(orderId);
-        DesignPackageEntity pkg = validatePackage(orderId, packageId);
+        DesignPackageEntity pkg = lockPackageForDrawingMutation(orderId, packageId);
 
         // 前置校验：打印信息已填写
         LambdaQueryWrapper<DesignProductEntity> productQuery = new LambdaQueryWrapper<DesignProductEntity>()
@@ -646,15 +672,18 @@ public class DesignDocServiceImpl implements DesignDocService {
     }
 
     private String resolveCategory(Long packageId, String requestedCategory) {
-        if (requestedCategory != null && !requestedCategory.isBlank()) {
-            return requestedCategory;
-        }
         List<DesignProductEntity> products = productService.list(
                 new LambdaQueryWrapper<DesignProductEntity>()
                         .eq(DesignProductEntity::getPackageId, packageId));
-        if (products == null) return null;
-        List<String> categories = products.stream().map(DesignProductEntity::getProductCategory)
-                .filter(Objects::nonNull).distinct().toList();
+        List<String> categories = (products == null ? Collections.<DesignProductEntity>emptyList() : products)
+                .stream().map(DesignProductEntity::getProductCategory)
+                .filter(category -> category != null && !category.isBlank()).distinct().toList();
+        if (requestedCategory != null && !requestedCategory.isBlank()) {
+            if (!categories.contains(requestedCategory)) {
+                throw new BusinessException(ErrorCodeEnum.DOC_VERSION_NOT_FOUND);
+            }
+            return requestedCategory;
+        }
         if (categories.isEmpty()) return null;
         if (categories.size() != 1) {
             throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "混合产品数据包必须指定 productCategory");
@@ -977,6 +1006,22 @@ public class DesignDocServiceImpl implements DesignDocService {
     private DesignPackageEntity validatePackage(Long orderId, Long packageId) {
         DesignPackageEntity pkg = packageService.getById(packageId);
         if (pkg == null || !pkg.getOrderId().equals(orderId)) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
+        }
+        return pkg;
+    }
+
+    /**
+     * 锁定图纸所属数据包，保证同一数据包的生成、修订和确认按事务串行执行。
+     */
+    private DesignPackageEntity lockPackageForDrawingMutation(Long orderId, Long packageId) {
+        DesignPackageEntity pkg = packageService.getOne(
+                new LambdaQueryWrapper<DesignPackageEntity>()
+                        .eq(DesignPackageEntity::getId, packageId)
+                        .eq(DesignPackageEntity::getOrderId, orderId)
+                        .last("FOR UPDATE"),
+                false);
+        if (pkg == null) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
         }
         return pkg;

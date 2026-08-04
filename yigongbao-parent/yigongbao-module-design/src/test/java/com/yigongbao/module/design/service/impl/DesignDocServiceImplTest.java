@@ -29,6 +29,10 @@ import com.yigongbao.module.design.service.DesignScreenshotService;
 import com.yigongbao.module.design.vo.DocItemVO;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.system.config.service.ConfigService;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.apache.ibatis.session.Configuration;
+import org.junit.jupiter.api.BeforeAll;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,17 +40,26 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -68,6 +81,15 @@ import static org.mockito.Mockito.*;
 @DisplayName("DesignDocServiceImpl 单元测试")
 class DesignDocServiceImplTest {
 
+    @BeforeAll
+    static void initLambdaMetadata() {
+        Configuration configuration = new Configuration();
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "");
+        TableInfoHelper.initTableInfo(assistant, DesignPackageEntity.class);
+        TableInfoHelper.initTableInfo(assistant, DesignProductEntity.class);
+        TableInfoHelper.initTableInfo(assistant, DesignDrawingEntity.class);
+    }
+
     @Mock private OrderMainService orderMainService;
     @Mock private DesignPackageService packageService;
     @Mock private DesignProductService productService;
@@ -83,6 +105,7 @@ class DesignDocServiceImplTest {
     @Mock private DesignQueryHelper designQueryHelper;
     @Mock private DesignPackageFileScreenshotMapper screenshotMapper;
     @Mock private ConfigService configService;
+    @Mock private TransactionTemplate transactionTemplate;
 
     @InjectMocks
     private DesignDocServiceImpl docService;
@@ -98,6 +121,10 @@ class DesignDocServiceImplTest {
     @BeforeEach
     void setUp() throws IOException {
         doNothing().when(designQueryHelper).checkIsAssignedDesigner(any());
+        when(transactionTemplate.execute(any(TransactionCallback.class))).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
         when(screenshotMapper.getLatestUpdateTime(anyLong())).thenReturn(null);
         when(configService.getConfigValue(SystemConfigKeyEnum.IMAGING_VIEWER_BASE_URL.getKey()))
                 .thenReturn("http://viewer/#/aiView");
@@ -118,6 +145,7 @@ class DesignDocServiceImplTest {
         pkg.setOrderId(ORDER_ID);
         pkg.setPackageCode("PKG-001");
         pkg.setUpdateTime(LocalDateTime.now().minusDays(1));
+        when(packageService.getOne(any(LambdaQueryWrapper.class), eq(false))).thenReturn(pkg);
 
         mockFileVO = new FileVO();
         mockFileVO.setId("file-001");
@@ -146,6 +174,90 @@ class DesignDocServiceImplTest {
             assertEquals("A/1", versions.get(0).getVersion());
             assertEquals("drawing-1", versions.get(0).getTemplateFileId());
         }
+    }
+
+    @Nested
+    @DisplayName("getLatestDrawingGroups")
+    class GetLatestDrawingGroups {
+
+        @Test
+        @DisplayName("已有分类产品时只返回当前分类图纸")
+        void filtersLegacyAndRemovedCategories() {
+            DesignProductEntity modelProduct = product(PACKAGE_ID, "17.1");
+            DesignProductEntity guideProduct = product(PACKAGE_ID, "17.2");
+            when(productService.list(any(LambdaQueryWrapper.class)))
+                    .thenReturn(List.of(modelProduct, guideProduct));
+            when(drawingService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(
+                    drawing(PACKAGE_ID, "17.3", 4L, 4),
+                    drawing(PACKAGE_ID, null, 3L, 3),
+                    drawing(PACKAGE_ID, "17.1", 2L, 2),
+                    drawing(PACKAGE_ID, "17.2", 1L, 1)));
+
+            Map<Long, List<com.yigongbao.module.design.vo.DesignDocVersionVO>> result =
+                    docService.getLatestDrawingGroups(List.of(PACKAGE_ID));
+
+            Set<String> categories = result.get(PACKAGE_ID).stream()
+                    .map(com.yigongbao.module.design.vo.DesignDocVersionVO::getProductCategory)
+                    .collect(Collectors.toSet());
+            assertEquals(Set.of("17.1", "17.2"), categories);
+            assertEquals(2, result.get(PACKAGE_ID).size());
+
+            ArgumentCaptor<LambdaQueryWrapper<DesignDrawingEntity>> queryCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+            verify(drawingService).list(queryCaptor.capture());
+            String sqlSegment = queryCaptor.getValue().getSqlSegment();
+            assertTrue(sqlSegment.contains("isDeleted"), sqlSegment);
+            assertTrue(sqlSegment.contains("versionSeq"), sqlSegment);
+            assertTrue(sqlSegment.toUpperCase().contains("ORDER BY"), sqlSegment);
+        }
+
+        @Test
+        @DisplayName("空白产品分类按历史无分类数据处理")
+        void blankProductCategory_usesLegacyNullCategoryDrawing() {
+            when(productService.list(any(LambdaQueryWrapper.class)))
+                    .thenReturn(List.of(product(PACKAGE_ID, " ")));
+            when(drawingService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(
+                    drawing(PACKAGE_ID, " ", 2L, 2),
+                    drawing(PACKAGE_ID, null, 1L, 1)));
+
+            Map<Long, List<com.yigongbao.module.design.vo.DesignDocVersionVO>> result =
+                    docService.getLatestDrawingGroups(List.of(PACKAGE_ID));
+
+            assertEquals(1, result.get(PACKAGE_ID).size());
+            assertNull(result.get(PACKAGE_ID).get(0).getProductCategory());
+        }
+
+        @Test
+        @DisplayName("纯历史产品只返回空分类图纸")
+        void legacyPackageKeepsOnlyLegacyDrawing() {
+            when(productService.list(any(LambdaQueryWrapper.class)))
+                    .thenReturn(List.of(product(PACKAGE_ID, null)));
+            when(drawingService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(
+                    drawing(PACKAGE_ID, "17.1", 2L, 2),
+                    drawing(PACKAGE_ID, null, 1L, 1)));
+
+            Map<Long, List<com.yigongbao.module.design.vo.DesignDocVersionVO>> result =
+                    docService.getLatestDrawingGroups(List.of(PACKAGE_ID));
+
+            assertEquals(1, result.get(PACKAGE_ID).size());
+            assertNull(result.get(PACKAGE_ID).get(0).getProductCategory());
+        }
+    }
+
+    private DesignProductEntity product(Long packageId, String category) {
+        DesignProductEntity product = new DesignProductEntity();
+        product.setPackageId(packageId);
+        product.setProductCategory(category);
+        return product;
+    }
+
+    private DesignDrawingEntity drawing(Long packageId, String category, Long id, int versionSeq) {
+        DesignDrawingEntity drawing = new DesignDrawingEntity();
+        drawing.setId(id);
+        drawing.setPackageId(packageId);
+        drawing.setProductCategory(category);
+        drawing.setVersion("A/" + versionSeq);
+        drawing.setVersionSeq(versionSeq);
+        return drawing;
     }
 
     // ==================== getInstructionPreviewUrl（在线模式） ====================
@@ -513,6 +625,14 @@ class DesignDocServiceImplTest {
     class DownloadDrawing {
 
         @Test
+        @DisplayName("文件流传输不包含在图纸准备事务中")
+        void streamingIsOutsideDrawingPreparationTransaction() throws NoSuchMethodException {
+            assertNull(DesignDocServiceImpl.class.getMethod(
+                    "downloadDrawing", Long.class, Long.class, String.class, HttpServletResponse.class)
+                    .getAnnotation(Transactional.class));
+        }
+
+        @Test
         void firstTime_generatesWithCurrentQrAndDownloadsDrawing() throws Exception {
             when(orderMainService.getById(ORDER_ID)).thenReturn(order);
             when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
@@ -648,6 +768,7 @@ class DesignDocServiceImplTest {
                 assertEquals(ErrorCodeEnum.DOC_VERSION_NOT_FOUND.getCode(), ex.getCode());
             }
         }
+
     }
 
     // ==================== uploadRevisedDrawing ====================
@@ -699,6 +820,95 @@ class DesignDocServiceImplTest {
                 assertEquals(ErrorCodeEnum.DOC_VERSION_NOT_FOUND.getCode(), ex.getCode());
             }
         }
+
+        @Test
+        @DisplayName("路径 ID 不是分类最新版时拒绝上传且无文件副作用")
+        void staleId_throwsBeforeUploadingFile() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+                when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+                when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+                when(productService.list(any(LambdaQueryWrapper.class)))
+                        .thenReturn(List.of(product(PACKAGE_ID, "17.1")));
+                DesignDrawingEntity latest = drawing(PACKAGE_ID, "17.1", 2L, 2);
+                when(drawingService.getLatestVersion(PACKAGE_ID, "17.1")).thenReturn(latest);
+                when(fileService.uploadFile(any(), any())).thenReturn(mockFileVO);
+
+                BusinessException ex = assertThrows(BusinessException.class,
+                        () -> docService.uploadRevisedDrawing(ORDER_ID, PACKAGE_ID, "17.1", 1L,
+                                mock(MultipartFile.class)));
+
+                assertEquals(ErrorCodeEnum.DOC_VERSION_NOT_FOUND.getCode(), ex.getCode());
+                verify(fileService, never()).uploadFile(any(), any());
+                verify(drawingService, never()).save(any());
+            }
+        }
+
+        @Test
+        @DisplayName("事务首次数据库读取即锁定数据包行")
+        void locksPackageRowBeforeOtherDatabaseReads() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+                when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+                when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+                DesignDrawingEntity latest = drawing(PACKAGE_ID, null, 1L, 1);
+                when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(latest);
+                when(fileService.uploadFile(any(), any())).thenReturn(mockFileVO);
+                when(drawingService.save(any())).thenReturn(true);
+
+                docService.uploadRevisedDrawing(ORDER_ID, PACKAGE_ID, 1L, mock(MultipartFile.class));
+
+                InOrder inOrder = inOrder(packageService, orderMainService, designQueryHelper, drawingService);
+                inOrder.verify(packageService).getOne(any(LambdaQueryWrapper.class), eq(false));
+                inOrder.verify(orderMainService).checkNotClassicCase(ORDER_ID, "上传图纸");
+                inOrder.verify(designQueryHelper).checkDesignPhase(ORDER_ID);
+                inOrder.verify(drawingService).getLatestVersion(PACKAGE_ID);
+                ArgumentCaptor<LambdaQueryWrapper<DesignPackageEntity>> queryCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+                verify(packageService).getOne(queryCaptor.capture(), eq(false));
+                assertTrue(queryCaptor.getValue().getSqlSegment().toUpperCase().contains("FOR UPDATE"));
+            }
+        }
+
+        @Test
+        @DisplayName("解析分类时忽略空白分类")
+        void blankCategory_isIgnoredWhenResolvingCurrentCategory() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+                when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+                when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+                when(productService.list(any(LambdaQueryWrapper.class)))
+                        .thenReturn(List.of(product(PACKAGE_ID, " "), product(PACKAGE_ID, "17.1")));
+                DesignDrawingEntity latest = drawing(PACKAGE_ID, "17.1", 1L, 1);
+                when(drawingService.getLatestVersion(PACKAGE_ID, "17.1")).thenReturn(latest);
+                when(fileService.uploadFile(any(), any())).thenReturn(mockFileVO);
+                when(drawingService.save(any())).thenReturn(true);
+
+                assertDoesNotThrow(() -> docService.uploadRevisedDrawing(
+                        ORDER_ID, PACKAGE_ID, 1L, mock(MultipartFile.class)));
+
+                verify(drawingService).getLatestVersion(PACKAGE_ID, "17.1");
+            }
+        }
+
+        @Test
+        @DisplayName("已移除分类拒绝修订且无文件副作用")
+        void removedCategory_isRejectedBeforeUploadingFile() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+                when(productService.list(any(LambdaQueryWrapper.class)))
+                        .thenReturn(List.of(product(PACKAGE_ID, "17.2")));
+                DesignDrawingEntity removedCategoryDrawing = drawing(PACKAGE_ID, "17.1", 1L, 1);
+                when(drawingService.getLatestVersion(PACKAGE_ID, "17.1")).thenReturn(removedCategoryDrawing);
+
+                BusinessException ex = assertThrows(BusinessException.class,
+                        () -> docService.uploadRevisedDrawing(ORDER_ID, PACKAGE_ID, "17.1", 1L,
+                                mock(MultipartFile.class)));
+
+                assertEquals(ErrorCodeEnum.DOC_VERSION_NOT_FOUND.getCode(), ex.getCode());
+                verify(fileService, never()).uploadFile(any(), any());
+                verify(drawingService, never()).save(any());
+            }
+        }
     }
 
     // ==================== confirmDrawing ====================
@@ -720,6 +930,7 @@ class DesignDocServiceImplTest {
                 entity.setId(1L);
                 entity.setPackageId(PACKAGE_ID);
                 entity.setIsConfirmed(0);
+                when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(entity);
                 when(drawingService.getById(1L)).thenReturn(entity);
                 when(drawingService.updateById(any())).thenReturn(true);
 
@@ -738,7 +949,7 @@ class DesignDocServiceImplTest {
 
                 when(orderMainService.getById(ORDER_ID)).thenReturn(order);
                 when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
-                when(drawingService.getById(999L)).thenReturn(null);
+                when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(null);
 
                 BusinessException ex = assertThrows(BusinessException.class,
                         () -> docService.confirmDrawing(ORDER_ID, PACKAGE_ID, 999L));
@@ -758,11 +969,55 @@ class DesignDocServiceImplTest {
                 DesignDrawingEntity entity = new DesignDrawingEntity();
                 entity.setId(1L);
                 entity.setPackageId(999L); // 不属于当前 packageId
+                when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(entity);
                 when(drawingService.getById(1L)).thenReturn(entity);
 
                 BusinessException ex = assertThrows(BusinessException.class,
                         () -> docService.confirmDrawing(ORDER_ID, PACKAGE_ID, 1L));
                 assertEquals(ErrorCodeEnum.DOC_VERSION_NOT_FOUND.getCode(), ex.getCode());
+            }
+        }
+
+        @Test
+        @DisplayName("历史版本不能代替分类最新版确认")
+        void historicalVersion_throwsException() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+                when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+                when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+                when(productService.list(any(LambdaQueryWrapper.class)))
+                        .thenReturn(List.of(product(PACKAGE_ID, "17.1")));
+                DesignDrawingEntity latest = drawing(PACKAGE_ID, "17.1", 2L, 2);
+                when(drawingService.getLatestVersion(PACKAGE_ID, "17.1")).thenReturn(latest);
+                when(drawingService.getById(1L)).thenReturn(drawing(PACKAGE_ID, "17.1", 1L, 1));
+
+                BusinessException ex = assertThrows(BusinessException.class,
+                        () -> docService.confirmDrawing(ORDER_ID, PACKAGE_ID, "17.1", 1L));
+
+                assertEquals(ErrorCodeEnum.DOC_VERSION_NOT_FOUND.getCode(), ex.getCode());
+                verify(drawingService, never()).updateById(any());
+            }
+        }
+
+        @Test
+        @DisplayName("分类最新版确认成功")
+        void categoryLatestVersion_confirmsSuccessfully() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+                when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+                when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+                when(productService.list(any(LambdaQueryWrapper.class)))
+                        .thenReturn(List.of(product(PACKAGE_ID, "17.1")));
+                DesignDrawingEntity latest = drawing(PACKAGE_ID, "17.1", 2L, 2);
+                latest.setIsConfirmed(0);
+                when(drawingService.getLatestVersion(PACKAGE_ID, "17.1")).thenReturn(latest);
+                when(drawingService.getById(2L)).thenReturn(latest);
+                when(drawingService.updateById(any())).thenReturn(true);
+
+                docService.confirmDrawing(ORDER_ID, PACKAGE_ID, "17.1", 2L);
+
+                verify(drawingService).updateById(argThat(entity -> entity.getId().equals(2L)
+                        && Integer.valueOf(1).equals(entity.getIsConfirmed())));
             }
         }
     }
@@ -831,6 +1086,7 @@ class DesignDocServiceImplTest {
                 assertEquals(ErrorCodeEnum.DOC_VERSION_NOT_FOUND.getCode(), ex.getCode());
             }
         }
+
     }
 
     // ==================== 辅助方法 ====================

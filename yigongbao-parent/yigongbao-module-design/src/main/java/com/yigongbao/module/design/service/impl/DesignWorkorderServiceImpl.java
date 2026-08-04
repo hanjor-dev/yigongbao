@@ -461,12 +461,23 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             Set<Long> packageIds = packages.stream().map(DesignPackageVO::getId).collect(Collectors.toSet());
             Map<Long, DesignDocVersionVO> latestInstructions = designDocService.getLatestInstructionMap(packageIds);
             Map<Long, List<DesignDocVersionVO>> latestDrawings = designDocService.getLatestDrawingGroups(packageIds);
+            List<DesignProductEntity> products = designProductMapper.selectList(
+                    new LambdaQueryWrapper<DesignProductEntity>()
+                            .in(DesignProductEntity::getPackageId, packageIds));
+            Map<Long, Set<String>> productCategories = products.stream()
+                    .filter(product -> product.getProductCategory() != null
+                            && !product.getProductCategory().isBlank())
+                    .collect(Collectors.groupingBy(DesignProductEntity::getPackageId,
+                            Collectors.mapping(DesignProductEntity::getProductCategory, Collectors.toSet())));
             for (DesignPackageVO pkg : packages) {
                 pkg.setLatestInstruction(latestInstructions.get(pkg.getId()));
-                List<DesignDocVersionVO> drawings = latestDrawings.get(pkg.getId());
+                List<DesignDocVersionVO> drawings = latestDrawings.getOrDefault(pkg.getId(), Collections.emptyList());
                 pkg.setLatestDrawings(drawings);
-                if (drawings != null && drawings.size() == 1) {
+                int categoryCount = productCategories.getOrDefault(pkg.getId(), Collections.emptySet()).size();
+                if (categoryCount <= 1 && drawings.size() == 1) {
                     pkg.setLatestDrawing(drawings.get(0));
+                } else {
+                    pkg.setLatestDrawing(null);
                 }
             }
         }
