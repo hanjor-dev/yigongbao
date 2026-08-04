@@ -2,6 +2,8 @@ package com.yigongbao.module.production.product.vo;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 /**
  * 生产产品 VO（简要信息，用于流转卡详情和质检列表）
  *
@@ -25,6 +27,8 @@ public class ProductionProductVO {
     private String colorName;
     /** 打印文件名 */
     private String fileName;
+    /** 产品重量，单位：克 */
+    private BigDecimal weight;
     /** 产品状态代码（in_process/fail/pass/completed/cancelled） */
     private String status;
     /** 产品状态中文名 */

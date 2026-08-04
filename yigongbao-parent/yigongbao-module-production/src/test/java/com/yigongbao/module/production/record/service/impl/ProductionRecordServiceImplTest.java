@@ -51,6 +51,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -120,6 +121,7 @@ class ProductionRecordServiceImplTest {
         record.setContentUpdateTime(record.getFlowCardGenerateTime());
         ProductionProductEntity product = new ProductionProductEntity();
         product.setId(10L);
+        product.setWeight(new BigDecimal("12.35"));
         when(recordMapper.selectById(1L)).thenReturn(record);
         when(productMapper.selectList(any())).thenReturn(List.of(product));
 
@@ -128,6 +130,7 @@ class ProductionRecordServiceImplTest {
         assertNotNull(vo);
         assertEquals("REC-001", vo.getRecordNo());
         assertEquals(1, vo.getProducts().size());
+        assertEquals(new BigDecimal("12.35"), vo.getProducts().get(0).getWeight());
     }
 
     @Test
