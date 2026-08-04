@@ -1,6 +1,7 @@
 package com.yigongbao.module.production.process.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -28,9 +29,11 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -55,6 +58,7 @@ class ProductionProcessServiceImplTest {
         Field f = ServiceImpl.class.getDeclaredField("baseMapper");
         f.setAccessible(true);
         f.set(processService, processMapper);
+        initTableInfo(ProductionRecordEntity.class);
     }
 
     // ---- startProcess ----
@@ -89,10 +93,12 @@ class ProductionProcessServiceImplTest {
     void startProcess_postProcess_updatesRecordStatus() {
         ProductionRecordEntity rec = rec(1L, 10L);
         rec.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
+        rec.setPrintFinishTime(LocalDateTime.of(2026, 7, 19, 19, 33, 42));
         when(recordMapper.selectById(1L)).thenReturn(rec);
         ProductionProcessEntity p = proc(1L, 1L, "wash");
         p.setStatus(ProcessStatusEnum.PENDING.getCode());
         when(processMapper.selectOne(any(), anyBoolean())).thenReturn(p);
+        when(processMapper.selectList(any())).thenReturn(List.of(p));
         when(deviceMapper.selectById(2L)).thenReturn(null);
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
@@ -102,6 +108,44 @@ class ProductionProcessServiceImplTest {
         verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
                 FlowStatusEnum.POST_PROCESSING.getValue().equals(((ProductionRecordEntity) r).getStatus())
                         && "wash".equals(((ProductionRecordEntity) r).getCurrentProcess())));
+    }
+
+    @Test
+    void startProcess_postProcess_preservesFixedScheduleTime() {
+        ProductionRecordEntity rec = rec(1L, 10L);
+        rec.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
+        rec.setPrintFinishTime(LocalDateTime.of(2026, 7, 19, 19, 33, 42));
+        when(recordMapper.selectById(1L)).thenReturn(rec);
+        ProductionProcessEntity p = proc(1L, 1L, "wash");
+        LocalDateTime expectedStart = LocalDateTime.of(2026, 7, 19, 19, 35, 42);
+        p.setStartTime(expectedStart);
+        p.setEndTime(expectedStart.plusMinutes(10));
+        when(processMapper.selectOne(any(), anyBoolean())).thenReturn(p);
+        when(deviceMapper.selectById(2L)).thenReturn(null);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            when(userMapper.selectById(1L)).thenReturn(null);
+            processService.startProcess(1L, startDto("wash", 2L));
+        }
+
+        assertEquals(expectedStart, p.getStartTime());
+        assertEquals(expectedStart.plusMinutes(10), p.getEndTime());
+    }
+
+    @Test
+    void startProcess_postProcess_withoutPrintFinishTime_throwsException() {
+        ProductionRecordEntity rec = rec(1L, 10L);
+        rec.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
+        when(recordMapper.selectById(1L)).thenReturn(rec);
+        ProductionProcessEntity p = proc(1L, 1L, "wash");
+        when(processMapper.selectOne(any(), anyBoolean())).thenReturn(p);
+
+        assertEquals(ErrorCodeEnum.PARAM_ERROR.getCode(),
+                assertThrows(BusinessException.class,
+                        () -> processService.startProcess(1L, startDto("wash", 2L))).getCode());
+        assertEquals(ProcessStatusEnum.PENDING.getCode(), p.getStatus());
+        verify(processMapper, never()).updateById(any(ProductionProcessEntity.class));
     }
 
     // ---- finishProcess ----
@@ -126,10 +170,18 @@ class ProductionProcessServiceImplTest {
     void finishProcess_wash_advancesToCure() {
         ProductionProcessEntity p = proc(1L, 1L, "wash");
         p.setStatus(ProcessStatusEnum.IN_PROGRESS.getCode());
-        p.setStartTime(LocalDateTime.now());
+        LocalDateTime expectedStart = LocalDateTime.of(2026, 7, 19, 19, 35, 42);
+        p.setStartTime(expectedStart);
+        p.setDeviceId(2L);
         when(processMapper.selectOne(any(), anyBoolean())).thenReturn(p);
-        when(recordMapper.selectById(1L)).thenReturn(rec(1L, 10L));
+        DeviceEntity device = new DeviceEntity();
+        device.setProcessingMinutes(1);
+        when(deviceMapper.selectById(2L)).thenReturn(device);
+        ProductionRecordEntity record = rec(1L, 10L);
+        record.setPrintFinishTime(LocalDateTime.of(2026, 7, 19, 19, 33, 42));
+        when(recordMapper.selectById(1L)).thenReturn(record);
         processService.finishProcess(1L, "wash");
+        assertEquals(expectedStart.plusMinutes(10), p.getEndTime());
         verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
                 ProcessTypeEnum.CURE.getCode().equals(((ProductionRecordEntity) r).getCurrentProcess())));
     }
@@ -141,13 +193,60 @@ class ProductionProcessServiceImplTest {
         p.setStartTime(LocalDateTime.now());
         when(processMapper.selectOne(any(), anyBoolean())).thenReturn(p);
         ProductionRecordEntity rec = rec(1L, 10L);
+        rec.setPrintFinishTime(LocalDateTime.of(2026, 7, 19, 19, 33, 42));
         when(recordMapper.selectById(1L)).thenReturn(rec);
+        when(processMapper.selectList(any())).thenReturn(List.of(p));
         when(productMapper.selectCount(any())).thenReturn(1L);
         processService.finishProcess(1L, "clean_dry");
         verify(recordMapper).update(isNull(), any());
         verify(recordService).triggerFlowIfAllReach(10L,
                 FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
         verify(recordService).reconcileOrderProductionStatus(10L);
+    }
+
+    @Test
+    void schedulePostProcessing_setsFixedTimesFromPrintFinishTime() {
+        ProductionProcessEntity wash = proc(1L, 1L, "wash");
+        ProductionProcessEntity cure = proc(2L, 1L, "cure");
+        ProductionProcessEntity cleanDry = proc(3L, 1L, "clean_dry");
+        ProductionProcessEntity pack = proc(4L, 1L, "pack");
+        when(processMapper.selectList(any())).thenReturn(List.of(wash, cure, cleanDry, pack));
+
+        processService.schedulePostProcessing(1L,
+                LocalDateTime.of(2026, 7, 19, 19, 33, 42, 123_000_000));
+        processService.schedulePostProcessing(1L,
+                LocalDateTime.of(2026, 7, 19, 19, 33, 42, 999_000_000));
+
+        assertEquals(LocalDateTime.of(2026, 7, 19, 19, 35, 42), wash.getStartTime());
+        assertEquals(LocalDateTime.of(2026, 7, 19, 19, 45, 42), wash.getEndTime());
+        assertEquals(LocalDateTime.of(2026, 7, 19, 19, 46, 42), cure.getStartTime());
+        assertEquals(LocalDateTime.of(2026, 7, 19, 20, 26, 42), cure.getEndTime());
+        assertEquals(LocalDateTime.of(2026, 7, 19, 20, 27, 42), cleanDry.getStartTime());
+        assertEquals(LocalDateTime.of(2026, 7, 19, 20, 37, 42), cleanDry.getEndTime());
+        verify(processMapper, times(6)).updateById(any(ProductionProcessEntity.class));
+        verify(processMapper, never()).updateById(org.mockito.ArgumentMatchers.<ProductionProcessEntity>argThat(process ->
+                ProcessTypeEnum.PACK.getCode().equals(process.getProcessType())));
+    }
+
+    @Test
+    void schedulePostProcessing_withoutPrintFinishTime_throwsException() {
+        assertEquals(ErrorCodeEnum.PARAM_ERROR.getCode(),
+                assertThrows(BusinessException.class,
+                        () -> processService.schedulePostProcessing(1L, null)).getCode());
+        verify(processMapper, never()).selectList(any());
+    }
+
+    @Test
+    void schedulePostProcessing_duplicateProcess_throwsException() {
+        ProductionProcessEntity wash1 = proc(1L, 1L, "wash");
+        ProductionProcessEntity wash2 = proc(2L, 1L, "wash");
+        when(processMapper.selectList(any())).thenReturn(List.of(wash1, wash2));
+
+        assertEquals(ErrorCodeEnum.PARAM_ERROR.getCode(),
+                assertThrows(BusinessException.class,
+                        () -> processService.schedulePostProcessing(1L,
+                                LocalDateTime.of(2026, 7, 19, 19, 33, 42))).getCode());
+        verify(processMapper, never()).updateById(any(ProductionProcessEntity.class));
     }
 
     // ---- helpers ----
@@ -174,5 +273,13 @@ class ProductionProcessServiceImplTest {
         dto.setProcessType(processType);
         dto.setPrimaryDeviceId(deviceId);
         return dto;
+    }
+
+    private void initTableInfo(Class<?> entityClass) {
+        if (TableInfoHelper.getTableInfo(entityClass) == null) {
+            MapperBuilderAssistant assistant = new MapperBuilderAssistant(
+                    new org.apache.ibatis.session.Configuration(), "");
+            TableInfoHelper.initTableInfo(assistant, entityClass);
+        }
     }
 }

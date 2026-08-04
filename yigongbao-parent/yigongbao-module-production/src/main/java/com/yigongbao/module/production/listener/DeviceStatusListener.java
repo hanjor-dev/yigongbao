@@ -10,6 +10,7 @@ import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.constants.ProductionConstants;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
+import com.yigongbao.module.production.process.service.IProductionProcessService;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
@@ -36,6 +37,7 @@ public class DeviceStatusListener {
     private final ProductionRecordMapper recordMapper;
     private final ProductionProcessMapper processMapper;
     private final IProductionRecordService recordService;
+    private final IProductionProcessService processService;
     private final OrderMainMapper orderMainMapper;
     private final com.yigongbao.module.production.product.mapper.ProductionProductMapper productMapper;
 
@@ -88,21 +90,33 @@ public class DeviceStatusListener {
                 log.debug("设备变为空闲，未找到打印中的流转卡: deviceId={}", deviceId);
                 return;
             }
-            LocalDateTime now = LocalDateTime.now();
-            records.forEach(record -> {
-                recordMapper.update(null,
+            LocalDateTime now = LocalDateTime.now().withNano(0);
+            List<ProductionRecordEntity> completedRecords = new java.util.ArrayList<>();
+            for (ProductionRecordEntity record : records) {
+                int updated = recordMapper.update(null,
                         new LambdaUpdateWrapper<ProductionRecordEntity>()
                                 .eq(ProductionRecordEntity::getId, record.getId())
+                                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINTING.getValue())
                                 .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINT_COMPLETED.getValue())
                                 .set(ProductionRecordEntity::getCurrentProcess, null)
                                 .set(ProductionRecordEntity::getPrintFinishTime, now)
                                 .set(ProductionRecordEntity::getContentUpdateTime, now));
+                if (updated == 0) {
+                    log.info("打印完成事件状态更新未生效，跳过重复处理: recordId={}, deviceId={}",
+                            record.getId(), deviceId);
+                    continue;
+                }
+                processService.schedulePostProcessing(record.getId(), now);
                 updatePrintProcessEndTime(record.getId(), now);
+                completedRecords.add(record);
 
                 log.info("设备状态变更触发打印完成: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
-            });
-            Long orderId = records.get(0).getOrderId();
+            }
+            if (completedRecords.isEmpty()) {
+                return;
+            }
+            Long orderId = completedRecords.get(0).getOrderId();
             recordService.triggerFlowIfAllReach(orderId,
                     FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
             recordService.reconcileOrderProductionStatus(orderId);

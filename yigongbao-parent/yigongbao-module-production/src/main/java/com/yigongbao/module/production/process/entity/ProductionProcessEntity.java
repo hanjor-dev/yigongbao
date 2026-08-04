@@ -40,9 +40,13 @@ public class ProductionProcessEntity extends BaseEntity {
     private String secondaryDeviceName;
     /** 工序参数（JSON格式） */
     private String processParams;
-    /** 工序开始时间 */
+    /**
+     * 工序开始时间：打印工序来自设备状态事件；wash/cure/clean_dry 为固定排程时间；pack 为包装操作时间
+     */
     private LocalDateTime startTime;
-    /** 工序结束时间（= 开始时间 + 设备配置耗时，未配置则为实际完成时间） */
+    /**
+     * 工序结束时间：打印工序来自设备状态事件；wash/cure/clean_dry 为固定排程时间；pack 为包装操作时间
+     */
     private LocalDateTime endTime;
     /** 操作员ID */
     private Long operatorId;

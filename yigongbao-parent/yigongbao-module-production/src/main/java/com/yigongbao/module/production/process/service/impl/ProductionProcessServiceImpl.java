@@ -35,7 +35,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -49,6 +51,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessMapper, ProductionProcessEntity>
         implements IProductionProcessService {
+
+    private static final int WASH_START_INTERVAL_MINUTES = 2;
+    private static final int WASH_DURATION_MINUTES = 10;
+    private static final int CURE_START_INTERVAL_MINUTES = 1;
+    private static final int CURE_DURATION_MINUTES = 40;
+    private static final int CLEAN_DRY_START_INTERVAL_MINUTES = 1;
+    private static final int CLEAN_DRY_DURATION_MINUTES = 10;
 
     private final ProductionRecordMapper recordMapper;
     private final ProductionProductMapper productMapper;
@@ -69,6 +78,42 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             BeanUtil.copyProperties(p, vo);
             return vo;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * 根据打印完成时间计算并保存固定的后处理工序时间。
+     * 计算保留秒级时间，重复调用使用同一基准，不会产生时间累加。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void schedulePostProcessing(Long recordId, LocalDateTime printFinishTime) {
+        if (recordId == null || printFinishTime == null) {
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR.getCode(), "打印完成时间不能为空，无法计算后处理时间");
+        }
+
+        LocalDateTime printEnd = printFinishTime.withNano(0);
+        Map<String, LocalDateTime[]> schedule = buildPostProcessingSchedule(printEnd);
+        List<ProductionProcessEntity> processes = list(
+                new LambdaQueryWrapper<ProductionProcessEntity>()
+                        .eq(ProductionProcessEntity::getProductionRecordId, recordId)
+                        .orderByAsc(ProductionProcessEntity::getProcessOrder));
+
+        for (String processType : schedule.keySet()) {
+            List<ProductionProcessEntity> matches = processes.stream()
+                    .filter(process -> processType.equals(process.getProcessType()))
+                    .toList();
+            if (matches.size() > 1) {
+                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR.getCode(),
+                        "流转卡存在重复后处理工序: " + processType);
+            }
+            if (matches.size() == 1) {
+                LocalDateTime[] times = schedule.get(processType);
+                ProductionProcessEntity process = matches.get(0);
+                process.setStartTime(times[0]);
+                process.setEndTime(times[1]);
+                updateById(process);
+            }
+        }
     }
 
     /** 开始工序：记录设备、操作员、开始时间；非打印工序同步更新流转卡状态为后处理中 */
@@ -106,6 +151,14 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                 throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_START_POST_PROCESS);
             }
         }
+        if (isPostProcessingType(dto.getProcessType())
+                && (process.getStartTime() == null || process.getEndTime() == null)) {
+            schedulePostProcessing(recordId, record.getPrintFinishTime());
+            LocalDateTime[] times = buildPostProcessingSchedule(record.getPrintFinishTime())
+                    .get(dto.getProcessType());
+            process.setStartTime(times[0]);
+            process.setEndTime(times[1]);
+        }
         process.setDeviceId(dto.getPrimaryDeviceId());
         DeviceEntity device = deviceMapper.selectById(dto.getPrimaryDeviceId());
         if (device != null) {
@@ -125,7 +178,9 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             }
         }
         process.setProcessParams(dto.getProcessParams());
-        process.setStartTime(LocalDateTime.now());
+        if (!isPostProcessingType(dto.getProcessType())) {
+            process.setStartTime(LocalDateTime.now());
+        }
         Long userId = StpUtil.getLoginIdAsLong();
         UserEntity operator = userMapper.selectById(userId);
         process.setOperatorId(userId);
@@ -165,23 +220,33 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         if (!ProcessStatusEnum.IN_PROGRESS.getCode().equals(process.getStatus())) {
             throw new BusinessException(ErrorCodeEnum.PROCESS_NOT_IN_PROGRESS);
         }
-        LocalDateTime endTime;
-        if (process.getDeviceId() != null) {
-            DeviceEntity device = deviceMapper.selectById(process.getDeviceId());
-            if (device != null && device.getProcessingMinutes() != null && device.getProcessingMinutes() > 0) {
-                endTime = process.getStartTime().plusMinutes(device.getProcessingMinutes());
+        ProductionRecordEntity record = recordMapper.selectById(recordId);
+        if (record == null) return;
+
+        if (isPostProcessingType(processType)) {
+            if (process.getStartTime() == null || process.getEndTime() == null) {
+                schedulePostProcessing(recordId, record.getPrintFinishTime());
+                LocalDateTime[] times = buildPostProcessingSchedule(record.getPrintFinishTime())
+                        .get(processType);
+                process.setStartTime(times[0]);
+                process.setEndTime(times[1]);
+            }
+        } else {
+            LocalDateTime endTime;
+            if (process.getDeviceId() != null) {
+                DeviceEntity device = deviceMapper.selectById(process.getDeviceId());
+                if (device != null && device.getProcessingMinutes() != null && device.getProcessingMinutes() > 0) {
+                    endTime = process.getStartTime().plusMinutes(device.getProcessingMinutes());
+                } else {
+                    endTime = LocalDateTime.now();
+                }
             } else {
                 endTime = LocalDateTime.now();
             }
-        } else {
-            endTime = LocalDateTime.now();
+            process.setEndTime(endTime);
         }
-        process.setEndTime(endTime);
         process.setStatus(ProcessStatusEnum.COMPLETED.getCode());
         updateById(process);
-
-        ProductionRecordEntity record = recordMapper.selectById(recordId);
-        if (record == null) return;
 
         if (ProcessTypeEnum.WASH.getCode().equals(processType)) {
             record.setCurrentProcess(ProcessTypeEnum.CURE.getCode());
@@ -226,6 +291,30 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             case "pack" -> DeviceTypeEnum.SEALING_MACHINE.getCode();
             default -> null;
         };
+    }
+
+    private boolean isPostProcessingType(String processType) {
+        return ProcessTypeEnum.WASH.getCode().equals(processType)
+                || ProcessTypeEnum.CURE.getCode().equals(processType)
+                || ProcessTypeEnum.CLEAN_DRY.getCode().equals(processType);
+    }
+
+    private Map<String, LocalDateTime[]> buildPostProcessingSchedule(LocalDateTime printFinishTime) {
+        if (printFinishTime == null) {
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR.getCode(), "打印完成时间不能为空，无法计算后处理时间");
+        }
+        LocalDateTime washStart = printFinishTime.withNano(0).plusMinutes(WASH_START_INTERVAL_MINUTES);
+        LocalDateTime washEnd = washStart.plusMinutes(WASH_DURATION_MINUTES);
+        LocalDateTime cureStart = washEnd.plusMinutes(CURE_START_INTERVAL_MINUTES);
+        LocalDateTime cureEnd = cureStart.plusMinutes(CURE_DURATION_MINUTES);
+        LocalDateTime cleanDryStart = cureEnd.plusMinutes(CLEAN_DRY_START_INTERVAL_MINUTES);
+        LocalDateTime cleanDryEnd = cleanDryStart.plusMinutes(CLEAN_DRY_DURATION_MINUTES);
+
+        Map<String, LocalDateTime[]> schedule = new HashMap<>();
+        schedule.put(ProcessTypeEnum.WASH.getCode(), new LocalDateTime[]{washStart, washEnd});
+        schedule.put(ProcessTypeEnum.CURE.getCode(), new LocalDateTime[]{cureStart, cureEnd});
+        schedule.put(ProcessTypeEnum.CLEAN_DRY.getCode(), new LocalDateTime[]{cleanDryStart, cleanDryEnd});
+        return schedule;
     }
 
     /** 检查订单下所有流转卡是否都完成后处理，如果是则更新订单生产结束时间 */

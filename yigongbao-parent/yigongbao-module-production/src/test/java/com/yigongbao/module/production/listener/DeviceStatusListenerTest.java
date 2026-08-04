@@ -8,6 +8,7 @@ import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.production.constants.ProductionConstants;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
+import com.yigongbao.module.production.process.service.IProductionProcessService;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
@@ -26,6 +27,7 @@ import org.mockito.quality.Strictness;
 
 import static org.mockito.ArgumentMatchers.any;
 import java.util.List;
+import java.time.LocalDateTime;
 import static org.mockito.Mockito.*;
 
 /**
@@ -43,6 +45,7 @@ class DeviceStatusListenerTest {
     @Mock private IProductionRecordService recordService;
     @Mock private OrderMainMapper orderMainMapper;
     @Mock private ProductionProductMapper productMapper;
+    @Mock private IProductionProcessService processService;
 
     @InjectMocks
     private DeviceStatusListener listener;
@@ -80,14 +83,32 @@ class DeviceStatusListenerTest {
 
     @Test
     void onDeviceStateChange_busyToIdle_setsPrintCompletedAndTriggersFlow() {
-        when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
+        ProductionRecordEntity record = record(1L, 10L);
+        record.setStatus(FlowStatusEnum.PRINTING.getValue());
+        when(recordMapper.selectList(any())).thenReturn(List.of(record));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
 
         listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_BUSY, ProductionConstants.DEVICE_STATE_IDLE));
 
         verify(recordMapper).update(isNull(), any());
+        verify(processService).schedulePostProcessing(eq(1L), argThat(time ->
+                time != null && time.getNano() == 0));
         verify(recordService).triggerFlowIfAllReach(10L,
                 FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
         verify(recordService).reconcileOrderProductionStatus(10L);
+    }
+
+    @Test
+    void onDeviceStateChange_busyToIdle_whenStatusUpdateLost_doesNotScheduleAgain() {
+        ProductionRecordEntity record = record(1L, 10L);
+        record.setStatus(FlowStatusEnum.PRINTING.getValue());
+        when(recordMapper.selectList(any())).thenReturn(List.of(record));
+        when(recordMapper.update(isNull(), any())).thenReturn(0);
+
+        listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_BUSY, ProductionConstants.DEVICE_STATE_IDLE));
+
+        verify(processService, never()).schedulePostProcessing(any(), any(LocalDateTime.class));
+        verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
     }
 
     @Test
