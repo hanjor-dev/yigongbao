@@ -1,6 +1,7 @@
 package com.yigongbao.module.production.helper;
 
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
@@ -56,6 +57,12 @@ class ProductLedgerExcelBuilderTest {
             var dataRow = sheet.getRow(1);
 
             assertHeaders(headerRow);
+            IntStream.range(0, EXPECTED_HEADERS.size()).forEach(index ->
+                    assertEquals(HorizontalAlignment.CENTER, headerRow.getCell(index).getCellStyle().getAlignment(),
+                            "表头列 " + index + " 应居中"));
+            IntStream.range(0, EXPECTED_HEADERS.size()).forEach(index ->
+                    assertEquals(HorizontalAlignment.CENTER, dataRow.getCell(index).getCellStyle().getAlignment(),
+                            "数据列 " + index + " 应居中"));
             assertEquals(2, sheet.getLastRowNum() + 1, "一万条以内不应添加额外标题行");
             assertEquals(CellType.NUMERIC, dataRow.getCell(0).getCellType());
             assertEquals(1d, dataRow.getCell(0).getNumericCellValue());
@@ -84,6 +91,18 @@ class ProductLedgerExcelBuilderTest {
             assertEquals("业务员B", dataRow.getCell(19).getStringCellValue());
             assertEquals("已出库", dataRow.getCell(20).getStringCellValue());
             assertEquals("", dataRow.getCell(21).getStringCellValue());
+        }
+    }
+
+    @Test
+    void buildWidensOnlyProductNameColumnByOneThird() throws Exception {
+        byte[] workbookBytes = new ProductLedgerExcelBuilder().build(List.of(), 0);
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(workbookBytes))) {
+            var sheet = workbook.getSheet("生产产品台账");
+            IntStream.range(0, EXPECTED_HEADERS.size()).forEach(index ->
+                    assertEquals(index == 5 ? 6000 : 4500, sheet.getColumnWidth(index),
+                            "列 " + index + " 宽度不符合约定"));
         }
     }
 
@@ -177,6 +196,8 @@ class ProductLedgerExcelBuilderTest {
             assertEquals(0, warningRegion.getLastRow());
             assertEquals(0, warningRegion.getFirstColumn());
             assertEquals(21, warningRegion.getLastColumn());
+            assertEquals(HorizontalAlignment.LEFT,
+                    sheet.getRow(0).getCell(0).getCellStyle().getAlignment(), "警告应保持左对齐");
             assertNull(sheet.getRow(1), "警告与表头之间应保留空白行");
             assertHeaders(sheet.getRow(2));
         }
