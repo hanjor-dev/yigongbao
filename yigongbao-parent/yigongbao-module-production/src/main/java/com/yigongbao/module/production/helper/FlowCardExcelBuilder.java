@@ -44,8 +44,6 @@ public class FlowCardExcelBuilder {
         private LocalDateTime printStartTime;
         private LocalDateTime printFinishTime;
         private String designerAssetNo;
-        /** 包装材质（用于PACK工序显示，如：纸封袋、PE符合食品包装袋） */
-        private String packMaterial;
         private List<ProcessInfo> processes;
         private List<ProductInfo> products;
     }
@@ -188,12 +186,10 @@ public class FlowCardExcelBuilder {
      * 转换工序参数为显示文本
      * <p>
      * 根据工序类型解析JSON格式的工序参数，生成适合Excel显示的多行文本。
-     * 特殊处理：PACK工序的包装材质从BuildContext获取（存储在production_record表），不在processParams中。
-     *
      * @param process 工序信息（包含设备编号、时间等）
      * @param processType 工序类型代码（print/wash/cure/clean_dry/pack）
      * @param processParams 工序参数JSON字符串（存储在production_process.process_params）
-     * @param context 构建上下文（包含record级别的共享数据，如包装材质）
+     * @param context 构建上下文（用于记录解析异常所属的流转卡）
      * @return 格式化的参数文本，多行用换行符分隔；解析失败或参数为空时返回"-"
      */
     private String convertProcessParams(ProcessInfo process, String processType, String processParams, BuildContext context) {
@@ -214,9 +210,20 @@ public class FlowCardExcelBuilder {
                     lines.add("清洗模式：" + p.getStr("cleanMode", "-"));
                     lines.add("加热：" + p.getStr("heating", "-"));
                 } else if (ProcessTypeEnum.PACK.getCode().equals(processType)) {
-                    lines.add("热封温度：" + p.getStr("sealTemperature", "-") + "℃");
-                    lines.add("热封时间：" + p.getStr("sealTime", "-") + "s");
-                    lines.add("包装材质：" + StrUtil.blankToDefault(context.getPackMaterial(), "-"));
+                    String sealTemperature = p.getStr("sealTemperature");
+                    if (StrUtil.isNotBlank(sealTemperature)) {
+                        lines.add("纸塑袋热封温度：" + sealTemperature + "℃");
+                    }
+                    String zipBagSealTemperature = p.getStr("zipBagSealTemperature");
+                    if (StrUtil.isNotBlank(zipBagSealTemperature)) {
+                        lines.add("PE复合食品包装袋热封温度：" + zipBagSealTemperature + "℃");
+                    }
+                    String sealTime = p.containsKey("zipBagSealTime")
+                        ? p.getStr("zipBagSealTime")
+                        : p.getStr("sealTime");
+                    if (StrUtil.isNotBlank(sealTime)) {
+                        lines.add("热封时间：" + sealTime + "秒");
+                    }
                 }
             }
         } catch (Exception e) {
