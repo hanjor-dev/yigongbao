@@ -25,9 +25,9 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
     /**
      * 查询生产产品台账数据（用于Excel导出）
      * <p>
-     * 查询维度：产品级别（非订单级别、非流转卡级别），包含产品信息、订单信息、流转卡信息、工序人员、质检仓储信息。
+     * 查询维度：产品级别（非订单级别、非流转卡级别），包含台账导出所需的产品、订单和生产时长信息。
      * 数据权限：通过 dto.hospitalIds 或 dto.centerIds 自动过滤（由Service层填充）。
-     * 性能优化：使用子查询获取各工序操作员，避免多表JOIN导致笛卡尔积。
+     * 性能优化：使用标量聚合子查询计算后处理时长，避免多表JOIN导致产品行重复。
      * </p>
      *
      * @param dto 查询条件（包含recordNo/orderCode/productNo/时间范围/权限过滤ID）
@@ -35,29 +35,42 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
      */
     @Select("<script>" +
             "SELECT " +
-            "    pp.product_no, pp.product_name, pp.spec_name, pp.material_name, pp.color_name, " +
-            "    pp.cert_no, pp.file_name, pp.udi_code, pp.status AS product_status, " +
-            "    pr.current_process AS current_process_type, " +
-            "    pp.qc_result, pp.qc_time, pp.qc_remark, pp.warehouse_in_time, pp.warehouse_out_time, pp.create_time, " +
-            "    pr.order_code, pr.order_type, pr.hospital_name, pr.hospital_dept_name, pr.doctor_name, pr.patient_name, " +
-            "    pr.is_urgent, pr.is_postal, pr.expected_delivery_date, " +
-            "    pr.record_no, pr.production_batch_no, pr.design_package_code, " +
-            "    COALESCE(pc.center_name, om.center_name) AS processing_center_name, " +
-            "    pr.print_device_code, pr.print_start_time, pr.print_finish_time, " +
-            "    pr.material_batch_no, pr.pack_operator_name, pr.pack_time, " +
-            "    u_qc.real_name AS qc_user_name, " +
-            "    u_in.real_name AS warehouse_in_user_name, " +
-            "    u_out.real_name AS warehouse_out_user_name, " +
-            "    (SELECT operator_name FROM production_process WHERE production_record_id = pr.id AND process_type = 'print' AND is_deleted = 0 LIMIT 1) AS print_operator, " +
-            "    (SELECT operator_name FROM production_process WHERE production_record_id = pr.id AND process_type = 'wash' AND is_deleted = 0 LIMIT 1) AS wash_operator, " +
-            "    (SELECT operator_name FROM production_process WHERE production_record_id = pr.id AND process_type = 'cure' AND is_deleted = 0 LIMIT 1) AS cure_operator " +
+            "    om.order_code AS order_code, " +
+            "    om.create_time AS order_create_time, " +
+            "    pp.product_no AS product_no, " +
+            "    pp.file_name AS file_name, " +
+            "    pp.product_name AS product_name, " +
+            "    pp.spec_name AS spec_name, " +
+            "    pp.color_name AS color_name, " +
+            "    pp.material_name AS material_name, " +
+            "    CASE WHEN pr.print_start_time IS NOT NULL AND pr.print_finish_time IS NOT NULL " +
+            "              AND pr.print_finish_time &gt;= pr.print_start_time " +
+            "         THEN TIMESTAMPDIFF(SECOND, pr.print_start_time, pr.print_finish_time) " +
+            "         ELSE NULL END AS print_duration_seconds, " +
+            "    pp.weight AS weight, " +
+            "    (SELECT CASE " +
+            "                WHEN COUNT(*) = 0 THEN 0 " +
+            "                WHEN SUM(CASE WHEN p_process.start_time IS NULL OR p_process.end_time IS NULL " +
+            "                                   OR p_process.end_time &lt; p_process.start_time " +
+            "                              THEN 1 ELSE 0 END) &gt; 0 THEN NULL " +
+            "                ELSE SUM(TIMESTAMPDIFF(SECOND, p_process.start_time, p_process.end_time)) " +
+            "            END " +
+            "       FROM production_process p_process " +
+            "      WHERE p_process.production_record_id = pr.id " +
+            "        AND p_process.process_type IN ('wash', 'cure', 'clean_dry') " +
+            "        AND p_process.is_deleted = 0) AS processing_duration_seconds, " +
+            "    om.hospital_name AS hospital_name, " +
+            "    om.patient_name AS patient_name, " +
+            "    om.patient_gender AS patient_gender, " +
+            "    om.patient_age AS patient_age, " +
+            "    pr.producer_name AS producer_name, " +
+            "    om.doctor_name AS doctor_name, " +
+            "    om.hospital_dept_name AS hospital_dept_name, " +
+            "    om.operator_name AS business_operator, " +
+            "    pp.warehouse_out_time AS warehouse_out_time " +
             "FROM production_product pp " +
             "INNER JOIN production_record pr ON pp.production_record_id = pr.id " +
-            "LEFT JOIN order_main om ON pr.order_id = om.id AND om.is_deleted = 0 " +
-            "LEFT JOIN processing_center pc ON om.center_id = pc.id AND pc.is_deleted = 0 " +
-            "LEFT JOIN sys_user u_qc ON pp.qc_user_id = u_qc.id " +
-            "LEFT JOIN sys_user u_in ON pp.warehouse_in_user_id = u_in.id " +
-            "LEFT JOIN sys_user u_out ON pp.warehouse_out_user_id = u_out.id " +
+            "INNER JOIN order_main om ON pr.order_id = om.id AND om.is_deleted = 0 " +
             "WHERE pp.is_deleted = 0 AND pr.is_deleted = 0 " +
             "  AND pp.status IN ('in_process', 'fail', 'pass', 'pending_warehouse_in', 'warehoused', 'warehouse_out', 'completed', 'cancelled') " +
             "<if test='dto.recordNo != null and dto.recordNo != \"\"'>" +
@@ -70,10 +83,10 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "  AND pp.product_no LIKE CONCAT('%', #{dto.productNo}, '%') " +
             "</if>" +
             "<if test='dto.startTime != null'>" +
-            "  AND pp.create_time &gt;= #{dto.startTime} " +
+            "  AND om.create_time &gt;= #{dto.startTime} " +
             "</if>" +
             "<if test='dto.endTime != null'>" +
-            "  AND pp.create_time &lt;= #{dto.endTime} " +
+            "  AND om.create_time &lt;= #{dto.endTime} " +
             "</if>" +
             "<if test='dto.hospitalIds != null and dto.hospitalIds.size() > 0'>" +
             "  AND om.hospital_id IN " +
@@ -87,7 +100,7 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "    #{centerId}" +
             "  </foreach>" +
             "</if>" +
-            "ORDER BY pp.create_time DESC " +
+            "ORDER BY om.create_time DESC, pp.id DESC " +
             "LIMIT 10000" +
             "</script>")
     List<Map<String, Object>> listProductLedgerData(@Param("dto") ProductLedgerExportDTO dto);
@@ -107,7 +120,7 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "SELECT COUNT(1) " +
             "FROM production_product pp " +
             "INNER JOIN production_record pr ON pp.production_record_id = pr.id " +
-            "LEFT JOIN order_main om ON pr.order_id = om.id AND om.is_deleted = 0 " +
+            "INNER JOIN order_main om ON pr.order_id = om.id AND om.is_deleted = 0 " +
             "WHERE pp.is_deleted = 0 AND pr.is_deleted = 0 " +
             "  AND pp.status IN ('in_process', 'fail', 'pass', 'pending_warehouse_in', 'warehoused', 'warehouse_out', 'completed', 'cancelled') " +
             "<if test='dto.recordNo != null and dto.recordNo != \"\"'>" +
@@ -120,10 +133,10 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "  AND pp.product_no LIKE CONCAT('%', #{dto.productNo}, '%') " +
             "</if>" +
             "<if test='dto.startTime != null'>" +
-            "  AND pp.create_time &gt;= #{dto.startTime} " +
+            "  AND om.create_time &gt;= #{dto.startTime} " +
             "</if>" +
             "<if test='dto.endTime != null'>" +
-            "  AND pp.create_time &lt;= #{dto.endTime} " +
+            "  AND om.create_time &lt;= #{dto.endTime} " +
             "</if>" +
             "<if test='dto.hospitalIds != null and dto.hospitalIds.size() > 0'>" +
             "  AND om.hospital_id IN " +
