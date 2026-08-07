@@ -2,6 +2,7 @@ package com.yigongbao.module.production.record.service.impl;
 
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -45,6 +46,7 @@ import org.mockito.InjectMocks;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -99,6 +101,11 @@ class ProductionRecordServiceImplTest {
             MapperBuilderAssistant assistant = new MapperBuilderAssistant(
                     new org.apache.ibatis.session.Configuration(), "");
             TableInfoHelper.initTableInfo(assistant, OrderMainEntity.class);
+        }
+        if (TableInfoHelper.getTableInfo(ProductionProcessEntity.class) == null) {
+            MapperBuilderAssistant assistant = new MapperBuilderAssistant(
+                    new org.apache.ibatis.session.Configuration(), "");
+            TableInfoHelper.initTableInfo(assistant, ProductionProcessEntity.class);
         }
     }
 
@@ -260,16 +267,60 @@ class ProductionRecordServiceImplTest {
     void getDeviceConfig_existingRecord_copiesAssignedDeviceFields() {
         ProductionRecordEntity record = new ProductionRecordEntity();
         record.setId(22L);
+        record.setMaterial("光敏树脂");
         record.setPrintDeviceId(3L);
         record.setPrintDeviceCode("SLA-003");
         record.setPrintDeviceName("打印机3");
         when(recordMapper.selectById(22L)).thenReturn(record);
+        ProductionProcessEntity printProcess = new ProductionProcessEntity();
+        printProcess.setProcessType("print");
+        printProcess.setProcessParams("{\"layerHeight\":0.05}");
+        when(processMapper.selectOne(any())).thenReturn(printProcess);
 
         var config = recordService.getDeviceConfig(22L);
 
         assertEquals(3L, config.getPrintDeviceId());
         assertEquals("SLA-003", config.getPrintDeviceCode());
         assertEquals("打印机3", config.getPrintDeviceName());
+        assertEquals("光敏树脂", config.getMaterial());
+        assertEquals("{\"layerHeight\":0.05}", config.getPrintParams());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<LambdaQueryWrapper<ProductionProcessEntity>> queryCaptor =
+                ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(processMapper).selectOne(queryCaptor.capture());
+        LambdaQueryWrapper<ProductionProcessEntity> query = queryCaptor.getValue();
+        String sqlSegment = query.getSqlSegment().toLowerCase().replace("_", "");
+        assertTrue(sqlSegment.contains("productionrecordid"));
+        assertTrue(sqlSegment.contains("processtype"));
+        assertFalse(sqlSegment.contains("limit"));
+        assertTrue(query.getParamNameValuePairs().containsValue(22L));
+        assertTrue(query.getParamNameValuePairs().containsValue("print"));
+    }
+
+    @Test
+    void getDeviceConfig_withoutPrintProcess_returnsNullPrintParams() {
+        ProductionRecordEntity record = new ProductionRecordEntity();
+        record.setId(23L);
+        record.setMaterial("尼龙");
+        when(recordMapper.selectById(23L)).thenReturn(record);
+        when(processMapper.selectOne(any())).thenReturn(null);
+
+        var config = recordService.getDeviceConfig(23L);
+
+        assertEquals("尼龙", config.getMaterial());
+        assertNull(config.getPrintParams());
+    }
+
+    @Test
+    void getDeviceConfig_recordNotFound_throwsException() {
+        when(recordMapper.selectById(99L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> recordService.getDeviceConfig(99L));
+
+        assertEquals(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND.getCode(), exception.getCode());
+        verify(processMapper, never()).selectOne(any());
     }
 
     // ---- getQrCodeUrl ----

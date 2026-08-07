@@ -25,4 +25,8 @@ public class DeviceConfigVO {
     private String printDeviceCode;
     /** 打印机名称 */
     private String printDeviceName;
+    /** 打印材质 */
+    private String material;
+    /** 打印参数（JSON格式） */
+    private String printParams;
 }

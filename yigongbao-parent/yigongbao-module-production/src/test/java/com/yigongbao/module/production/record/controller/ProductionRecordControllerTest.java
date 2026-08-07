@@ -5,6 +5,7 @@ import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.AssignProductWeightDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
+import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -25,7 +26,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(ProductionRecordController.class)
+@WebMvcTest(value = ProductionRecordController.class,
+        properties = "spring.jackson.default-property-inclusion=non_null")
 class ProductionRecordControllerTest {
 
     @SpringBootApplication
@@ -161,6 +163,29 @@ class ProductionRecordControllerTest {
         mockMvc.perform(get("/production/record/{id}/device-config", 7L))
                 .andExpect(status().isOk());
         verify(recordService).getDeviceConfig(7L);
+    }
+
+    @Test
+    void getDeviceConfig_returnsPrintSettings() throws Exception {
+        DeviceConfigVO config = new DeviceConfigVO();
+        config.setMaterial("光敏树脂");
+        config.setPrintParams("{\"layerHeight\":0.05}");
+        when(recordService.getDeviceConfig(7L)).thenReturn(config);
+
+        mockMvc.perform(get("/production/record/{id}/device-config", 7L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.material").value("光敏树脂"))
+                .andExpect(jsonPath("$.data.printParams").value("{\"layerHeight\":0.05}"));
+    }
+
+    @Test
+    void getDeviceConfig_omitsNullPrintSettings() throws Exception {
+        when(recordService.getDeviceConfig(7L)).thenReturn(new DeviceConfigVO());
+
+        mockMvc.perform(get("/production/record/{id}/device-config", 7L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.material").doesNotExist())
+                .andExpect(jsonPath("$.data.printParams").doesNotExist());
     }
 
     @Test

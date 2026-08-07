@@ -599,6 +599,13 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
         DeviceConfigVO vo = new DeviceConfigVO();
         BeanUtil.copyProperties(record, vo);
+        ProductionProcessEntity printProcess = processMapper.selectOne(
+                new LambdaQueryWrapper<ProductionProcessEntity>()
+                        .eq(ProductionProcessEntity::getProductionRecordId, recordId)
+                        .eq(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PRINT.getCode()));
+        if (printProcess != null) {
+            vo.setPrintParams(printProcess.getProcessParams());
+        }
         return vo;
     }
 
