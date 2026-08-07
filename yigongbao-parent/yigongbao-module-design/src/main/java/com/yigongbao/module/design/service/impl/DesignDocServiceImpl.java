@@ -86,6 +86,9 @@ public class DesignDocServiceImpl implements DesignDocService {
     private static final String QR_SOURCE_FRONTEND_FILE = "FRONTEND_FILE";
     private static final String QR_SOURCE_BACKEND_FALLBACK = "BACKEND_FALLBACK";
 
+    private record DrawingDownload(DesignDrawingEntity entity, OrderMainEntity order) {
+    }
+
     private final OrderMainService orderMainService;
     private final DesignPackageService packageService;
     private final DesignProductService productService;
@@ -143,20 +146,23 @@ public class DesignDocServiceImpl implements DesignDocService {
     public void downloadDrawing(Long orderId, Long packageId, String productCategory, HttpServletResponse response) {
         log.info("下载图纸模板，orderId={}, packageId={}", orderId, packageId);
         // 图纸准备在短事务内完成；事务提交释放行锁后再开始文件流传输。
-        DesignDrawingEntity entity = transactionTemplate.execute(status -> {
+        DrawingDownload download = transactionTemplate.execute(status -> {
             // 必须在事务内其他数据库读取之前加锁，避免 MySQL RR 快照读取到等待前的旧版本。
             lockPackageForDrawingMutation(orderId, packageId);
-            checkDesignPhase(orderId);
-            return ensureDrawing(orderId, packageId, productCategory);
+            OrderMainEntity order = checkDesignPhase(orderId);
+            DesignDrawingEntity entity = ensureDrawing(orderId, packageId, productCategory);
+            return new DrawingDownload(entity, order);
         });
+        String filename = buildDrawingFilename(download.order(), download.entity().getProductCategory());
         // 流式下载模板文件
         try {
-            fileService.download(entity.getTemplateFileId(), response);
+            fileService.download(download.entity().getTemplateFileId(), filename, response);
         } catch (IOException e) {
-            log.error("图纸模板下载失败，packageId={}, templateFileId={}", packageId, entity.getTemplateFileId(), e);
+            log.error("图纸模板下载失败，packageId={}, templateFileId={}",
+                    packageId, download.entity().getTemplateFileId(), e);
             throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
-        log.info("图纸模板下载完成，packageId={}, version={}", packageId, entity.getVersion());
+        log.info("图纸模板下载完成，packageId={}, version={}", packageId, download.entity().getVersion());
     }
 
     // ==================== 在线模式：预览 URL 接口 ====================
@@ -691,6 +697,14 @@ public class DesignDocServiceImpl implements DesignDocService {
         return categories.get(0);
     }
 
+    private String buildDrawingFilename(OrderMainEntity order, String productCategory) {
+        String categoryName = designQueryHelper.getDictName(productCategory);
+        if (categoryName == null || categoryName.isBlank()) {
+            categoryName = "未分类";
+        }
+        return order.getPatientName() + "-" + categoryName + "图纸.xlsx";
+    }
+
     /**
      * 返回两个时间中较晚的一个，任一为 null 时返回另一个
      */
@@ -831,7 +845,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         }
 
         // 上传 OSS（文件名前加患者姓名）
-        String filename = order.getPatientName() + "-" + productCategory + "图纸.xlsx";
+        String filename = buildDrawingFilename(order, productCategory);
         FileVO fileVO = fileService.uploadBytes(bytes, filename, FileBizTypeEnum.DRAWING_FILE.getDictCode());
 
         // 持久化

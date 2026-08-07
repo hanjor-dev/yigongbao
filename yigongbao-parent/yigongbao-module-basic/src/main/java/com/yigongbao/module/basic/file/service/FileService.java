@@ -134,6 +134,16 @@ public interface FileService {
     void download(String id, HttpServletResponse response) throws IOException;
 
     /**
+     * 使用指定的展示文件名下载文件到响应流。
+     *
+     * @param id 文件ID
+     * @param downloadFilename 本次下载展示的文件名；为空时使用文件原始名称
+     * @param response HTTP 响应
+     * @throws IOException IO异常
+     */
+    void download(String id, String downloadFilename, HttpServletResponse response) throws IOException;
+
+    /**
      * 下载文件内容到字节数组（供服务端内部使用，如嵌入 Excel）
      *
      * @param id 文件ID

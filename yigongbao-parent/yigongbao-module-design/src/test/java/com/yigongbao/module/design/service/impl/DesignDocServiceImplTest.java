@@ -59,6 +59,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -139,6 +140,8 @@ class DesignDocServiceImplTest {
         order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
         order.setDesignerId(USER_ID);
         order.setOrderCode("ORD-001");
+        order.setPatientName("零五");
+        when(designQueryHelper.checkDesignPhase(ORDER_ID)).thenReturn(order);
 
         pkg = new DesignPackageEntity();
         pkg.setId(PACKAGE_ID);
@@ -647,8 +650,132 @@ class DesignDocServiceImplTest {
 
             docService.downloadDrawing(ORDER_ID, PACKAGE_ID, mock(HttpServletResponse.class));
 
-            verify(fileService).download(eq("file-001"), any(HttpServletResponse.class));
+            verify(fileService).download(eq("file-001"), eq("零五-未分类图纸.xlsx"),
+                    any(HttpServletResponse.class));
             verify(drawingService).save(argThat(e -> "qr-file-001".equals(e.getQrFileId())));
+        }
+
+        @Test
+        @DisplayName("复用历史分类图纸时使用产品类型中文名称下载")
+        void existingDrawing_downloadsWithChineseCategoryName() throws Exception {
+            AtomicBoolean transactionActive = new AtomicBoolean(false);
+            when(transactionTemplate.execute(any(TransactionCallback.class))).thenAnswer(invocation -> {
+                TransactionCallback<?> callback = invocation.getArgument(0);
+                transactionActive.set(true);
+                try {
+                    return callback.doInTransaction(mock(TransactionStatus.class));
+                } finally {
+                    transactionActive.set(false);
+                }
+            });
+            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+            DesignProductEntity product = new DesignProductEntity();
+            product.setProductCategory("17.2");
+            when(productService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(product));
+            when(productService.count(any())).thenReturn(1L);
+
+            DesignDrawingEntity latest = new DesignDrawingEntity();
+            latest.setId(1L);
+            latest.setPackageId(PACKAGE_ID);
+            latest.setProductCategory("17.2");
+            latest.setVersion("A/1");
+            latest.setVersionSeq(1);
+            latest.setSourceType(com.yigongbao.common.constant.StatusConstants.SOURCE_TYPE_AUTO);
+            latest.setTemplateFileId("legacy-file");
+            latest.setGenerateTime(LocalDateTime.now());
+            latest.setQrFileId("qr-file-001");
+            when(drawingService.getLatestVersion(PACKAGE_ID, "17.2")).thenReturn(latest);
+            when(designProductMapper.getLatestUpdateTime(PACKAGE_ID))
+                    .thenReturn(latest.getGenerateTime().minusMinutes(1));
+            when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+            when(designQueryHelper.getDictName("17.2")).thenAnswer(invocation -> {
+                assertFalse(transactionActive.get(), "下载展示名应在图纸准备事务提交后解析");
+                return "导板类";
+            });
+
+            HttpServletResponse response = mock(HttpServletResponse.class);
+            docService.downloadDrawing(ORDER_ID, PACKAGE_ID, "17.2", response);
+
+            verify(fileService).download("legacy-file", "零五-导板类图纸.xlsx", response);
+            verify(fileService, never()).uploadBytes(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("产品类型字典缺失时历史图纸使用未分类下载名")
+        void existingDrawing_withoutCategoryName_downloadsWithFallbackName() throws Exception {
+            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+            DesignProductEntity product = new DesignProductEntity();
+            product.setProductCategory("17.2");
+            when(productService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(product));
+            when(productService.count(any())).thenReturn(1L);
+
+            DesignDrawingEntity latest = new DesignDrawingEntity();
+            latest.setId(1L);
+            latest.setPackageId(PACKAGE_ID);
+            latest.setProductCategory("17.2");
+            latest.setVersion("A/1");
+            latest.setVersionSeq(1);
+            latest.setSourceType(com.yigongbao.common.constant.StatusConstants.SOURCE_TYPE_AUTO);
+            latest.setTemplateFileId("legacy-file");
+            latest.setGenerateTime(LocalDateTime.now());
+            latest.setQrFileId("qr-file-001");
+            when(drawingService.getLatestVersion(PACKAGE_ID, "17.2")).thenReturn(latest);
+            when(designProductMapper.getLatestUpdateTime(PACKAGE_ID))
+                    .thenReturn(latest.getGenerateTime().minusMinutes(1));
+            when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+
+            HttpServletResponse response = mock(HttpServletResponse.class);
+            docService.downloadDrawing(ORDER_ID, PACKAGE_ID, "17.2", response);
+
+            verify(fileService).download("legacy-file", "零五-未分类图纸.xlsx", response);
+            verify(fileService, never()).uploadBytes(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("首次生成分类图纸时使用产品类型中文名称上传")
+        void newDrawing_uploadsWithChineseCategoryName() throws Exception {
+            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+            when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+            DesignProductEntity product = new DesignProductEntity();
+            product.setId(1L);
+            product.setProductCategory("17.2");
+            when(productService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(product));
+            when(productService.count(any())).thenReturn(1L);
+            when(drawingService.getLatestVersion(PACKAGE_ID, "17.2")).thenReturn(null);
+            when(productFileService.listByProductIds(any())).thenReturn(Collections.emptyList());
+            when(screenshotService.listFileIdsByPackageFileIds(any())).thenReturn(Collections.emptyMap());
+            when(drawingBuilder.build(any())).thenReturn(new byte[]{4, 5, 6});
+            when(fileService.uploadBytes(any(), any(), any())).thenReturn(mockFileVO);
+            when(drawingService.save(any())).thenReturn(true);
+            when(designQueryHelper.getDictName("17.2")).thenReturn("导板类");
+
+            docService.getDrawingPreviewUrl(ORDER_ID, PACKAGE_ID, "17.2");
+
+            verify(fileService).uploadBytes(any(), eq("零五-导板类图纸.xlsx"),
+                    eq(com.yigongbao.common.enums.FileBizTypeEnum.DRAWING_FILE.getDictCode()));
+        }
+
+        @Test
+        @DisplayName("产品类型字典缺失时首次生成图纸使用未分类上传名")
+        void newDrawing_withoutCategoryName_uploadsWithFallbackName() throws Exception {
+            when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+            when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+            DesignProductEntity product = new DesignProductEntity();
+            product.setId(1L);
+            product.setProductCategory("17.2");
+            when(productService.list(any(LambdaQueryWrapper.class))).thenReturn(List.of(product));
+            when(productService.count(any())).thenReturn(1L);
+            when(drawingService.getLatestVersion(PACKAGE_ID, "17.2")).thenReturn(null);
+            when(productFileService.listByProductIds(any())).thenReturn(Collections.emptyList());
+            when(screenshotService.listFileIdsByPackageFileIds(any())).thenReturn(Collections.emptyMap());
+            when(drawingBuilder.build(any())).thenReturn(new byte[]{4, 5, 6});
+            when(fileService.uploadBytes(any(), any(), any())).thenReturn(mockFileVO);
+            when(drawingService.save(any())).thenReturn(true);
+
+            docService.getDrawingPreviewUrl(ORDER_ID, PACKAGE_ID, "17.2");
+
+            verify(fileService).uploadBytes(any(), eq("零五-未分类图纸.xlsx"),
+                    eq(com.yigongbao.common.enums.FileBizTypeEnum.DRAWING_FILE.getDictCode()));
         }
     }
 

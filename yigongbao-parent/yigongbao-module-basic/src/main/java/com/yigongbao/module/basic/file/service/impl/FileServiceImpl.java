@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.x.file.storage.core.FileInfo;
 import org.dromara.x.file.storage.core.FileStorageService;
 import org.dromara.x.file.storage.core.Downloader;
+import org.springframework.http.ContentDisposition;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,7 +25,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -205,6 +205,12 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public void download(String id, jakarta.servlet.http.HttpServletResponse response) throws IOException {
+        download(id, null, response);
+    }
+
+    @Override
+    public void download(String id, String downloadFilename,
+                         jakarta.servlet.http.HttpServletResponse response) throws IOException {
         FileDetail detail = fileRecorderService.getDetailById(id);
         if (detail == null) {
             log.warn("文件不存在: id={}", id);
@@ -213,9 +219,11 @@ public class FileServiceImpl implements FileService {
         FileInfo fileInfo = fileRecorderService.getById(id);
         // 设置响应头，触发浏览器文件下载
         response.setContentType("application/octet-stream");
-        response.setHeader("Content-Disposition",
-                "attachment;filename=" + URLEncoder.encode(
-                        detail.getOriginalFilename(), StandardCharsets.UTF_8));
+        String responseFilename = StrUtil.blankToDefault(downloadFilename, detail.getOriginalFilename());
+        response.setHeader("Content-Disposition", ContentDisposition.attachment()
+                .filename(responseFilename, StandardCharsets.UTF_8)
+                .build()
+                .toString());
         // 使用框架的 outputStream 方法直接将文件写入响应流，避免内存中转
         Downloader downloader = fileStorageService.download(fileInfo);
         downloader.setProgressMonitor((progressSize, allSize) ->

@@ -347,6 +347,44 @@ class FileServiceImplTest {
     class DownloadTests {
 
         @Test
+        @DisplayName("download: 指定下载文件名时覆盖响应头名称")
+        void download_withOverrideFilename_shouldUseOverrideName() throws Exception {
+            FileInfo fileInfo = createFileInfo(testDetail.getId(), testDetail.getObjectType(), testDetail.getObjectId());
+            org.dromara.x.file.storage.core.Downloader downloader =
+                    mock(org.dromara.x.file.storage.core.Downloader.class);
+            when(fileRecorderService.getDetailById(testDetail.getId())).thenReturn(testDetail);
+            when(fileRecorderService.getById(testDetail.getId())).thenReturn(fileInfo);
+            when(fileStorageService.download(fileInfo)).thenReturn(downloader);
+            org.springframework.mock.web.MockHttpServletResponse response =
+                    new org.springframework.mock.web.MockHttpServletResponse();
+
+            fileService.download(testDetail.getId(), "零 五-医疗器械图纸.xlsx", response);
+
+            String contentDisposition = response.getHeader("Content-Disposition");
+            assertNotNull(contentDisposition);
+            assertTrue(contentDisposition.contains("filename*="));
+            assertTrue(contentDisposition.contains("%E9%9B%B6%20%E4%BA%94-%E5%8C%BB%E7%96%97%E5%99%A8%E6%A2%B0%E5%9B%BE%E7%BA%B8.xlsx"));
+            assertFalse(contentDisposition.contains("+"));
+        }
+
+        @Test
+        @DisplayName("download: 旧签名仍使用持久化原始文件名")
+        void download_withoutOverrideFilename_shouldUseOriginalName() throws Exception {
+            FileInfo fileInfo = createFileInfo(testDetail.getId(), testDetail.getObjectType(), testDetail.getObjectId());
+            org.dromara.x.file.storage.core.Downloader downloader =
+                    mock(org.dromara.x.file.storage.core.Downloader.class);
+            when(fileRecorderService.getDetailById(testDetail.getId())).thenReturn(testDetail);
+            when(fileRecorderService.getById(testDetail.getId())).thenReturn(fileInfo);
+            when(fileStorageService.download(fileInfo)).thenReturn(downloader);
+            org.springframework.mock.web.MockHttpServletResponse response =
+                    new org.springframework.mock.web.MockHttpServletResponse();
+
+            fileService.download(testDetail.getId(), response);
+
+            assertTrue(response.getHeader("Content-Disposition").contains("test.jpg"));
+        }
+
+        @Test
         @DisplayName("download: 文件不存在时抛出异常")
         void download_whenNotExists_shouldThrowException() {
             when(fileRecorderService.getDetailById("not-exists")).thenReturn(null);
