@@ -34,6 +34,9 @@ import java.util.Map;
 public class ProductLedgerExcelBuilder {
 
     private static final String SHEET_NAME = "生产产品台账";
+    private static final int DEFAULT_COLUMN_WIDTH = 4500;
+    private static final int PRODUCT_NAME_COLUMN_INDEX = 5;
+    private static final int PRODUCT_NAME_COLUMN_WIDTH = 6000;
     private static final int EXCEL_CELL_MAX_LENGTH = 32767;
     private static final int LAST_COLUMN_INDEX = 21;
     private static final DateTimeFormatter OUTPUT_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy年M月d日");
@@ -83,7 +86,8 @@ public class ProductLedgerExcelBuilder {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(HEADERS[i]);
                 cell.setCellStyle(headerStyle);
-                sheet.setColumnWidth(i, 4500);
+                sheet.setColumnWidth(i,
+                        i == PRODUCT_NAME_COLUMN_INDEX ? PRODUCT_NAME_COLUMN_WIDTH : DEFAULT_COLUMN_WIDTH);
             }
 
             CellStyle dataStyle = createDataStyle(workbook);
@@ -149,7 +153,7 @@ public class ProductLedgerExcelBuilder {
 
     private CellStyle createDataStyle(Workbook workbook) {
         CellStyle style = workbook.createCellStyle();
-        style.setAlignment(HorizontalAlignment.LEFT);
+        style.setAlignment(HorizontalAlignment.CENTER);
         applyBorders(style);
         return style;
     }
