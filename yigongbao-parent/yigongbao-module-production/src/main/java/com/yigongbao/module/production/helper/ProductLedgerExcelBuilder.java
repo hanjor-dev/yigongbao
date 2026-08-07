@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -200,19 +201,25 @@ public class ProductLedgerExcelBuilder {
         if (value == null) {
             return null;
         }
+        Double numericValue;
         if (value instanceof Number number) {
-            return number.doubleValue();
+            numericValue = number.doubleValue();
+        } else {
+            try {
+                numericValue = Double.valueOf(String.valueOf(value).trim());
+            } catch (NumberFormatException exception) {
+                return null;
+            }
         }
-        try {
-            return Double.valueOf(String.valueOf(value).trim());
-        } catch (NumberFormatException exception) {
-            return null;
-        }
+        return Double.isFinite(numericValue) ? numericValue : null;
     }
 
     private String formatOrderDate(Object value) {
         if (value == null) {
             return "";
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toLocalDateTime().toLocalDate().format(OUTPUT_DATE_FORMATTER);
         }
         if (value instanceof LocalDateTime dateTime) {
             return dateTime.toLocalDate().format(OUTPUT_DATE_FORMATTER);

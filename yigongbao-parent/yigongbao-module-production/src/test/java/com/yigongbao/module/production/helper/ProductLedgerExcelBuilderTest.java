@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -94,6 +95,8 @@ class ProductLedgerExcelBuilderTest {
         zeroMinutes.put("processing_duration_seconds", 0L);
         zeroMinutes.put("patient_gender", "其他");
         zeroMinutes.put("color_name", "   ");
+        zeroMinutes.put("weight", Double.NaN);
+        zeroMinutes.put("patient_age", Double.POSITIVE_INFINITY);
         zeroMinutes.put("product_name", "x".repeat(32768));
 
         Map<String, Object> oneHour = emptyLedgerData();
@@ -111,6 +114,7 @@ class ProductLedgerExcelBuilderTest {
         oneHourOneMinute.put("material_name", " 钛合金 ");
 
         Map<String, Object> flooredMinutes = emptyLedgerData();
+        flooredMinutes.put("order_create_time", Timestamp.valueOf("2026-08-09 10:11:12.123456789"));
         flooredMinutes.put("file_name", ".patient.v2.stl");
         flooredMinutes.put("processing_duration_seconds", 2428L);
         flooredMinutes.put("color_name", " ");
@@ -150,6 +154,7 @@ class ProductLedgerExcelBuilderTest {
             assertEquals("1小时1分钟", row3.getCell(10).getStringCellValue());
 
             var row4 = sheet.getRow(4);
+            assertEquals("2026年8月9日", row4.getCell(2).getStringCellValue());
             assertEquals(".patient.v2", row4.getCell(4).getStringCellValue());
             assertEquals("", row4.getCell(7).getStringCellValue());
             assertEquals("40分钟", row4.getCell(10).getStringCellValue());

@@ -25,10 +25,10 @@ public class ProductLedgerExportDTO {
     /** 产品编号（模糊查询） */
     private String productNo;
 
-    /** 创建时间起（产品创建时间） */
+    /** 创建时间起（订单创建时间） */
     private LocalDateTime startTime;
 
-    /** 创建时间止（产品创建时间） */
+    /** 创建时间止（订单创建时间） */
     private LocalDateTime endTime;
 
     /**
