@@ -500,3 +500,18 @@ FROM information_schema.columns
 WHERE table_schema = DATABASE()
   AND table_name = 'production_product'
   AND column_name = 'weight';
+
+-- ============================================================
+-- 七、更新工序参数配置
+-- ============================================================
+
+SET NAMES utf8mb4;
+
+UPDATE sys_config
+SET config_value = '{"print":{"layerThickness":{"label":"层厚","type":"number","unit":"mm","required":true},"laserPower":{"label":"激光器功率","type":"number","unit":"mW","required":true}},"wash":{"alcoholBatchNo":{"label":"酒精批号","type":"text","required":true},"soakLevel":{"label":"浸泡程度","type":"select","options":["完全浸泡","部分浸泡"],"default":"完全浸泡","required":true}},"cure":{"cureMode":{"label":"固化模式","type":"select","options":["HIGH","LOW"],"default":"HIGH","required":true}},"clean_dry":{"alcoholBatchNo":{"label":"酒精批号","type":"text","required":true},"cleanMode":{"label":"清洗模式","type":"select","options":["变波","脱气"],"default":"变波","required":true},"heating":{"label":"加热","type":"select","options":["开","关"],"default":"关","required":true}},"pack":{"17.1":{"label":"模型类","zipBagSeal":{"label":"PE复合食品包装袋热封","type":"switch","required":false,"dependents":{"zipBagSealTemperature":{"label":"PE复合食品包装袋热封温度","type":"number","unit":"℃","default":130,"required":true},"zipBagSealTime":{"label":"热封时间","type":"number","unit":"秒","default":3,"required":true}}}},"17.2":{"label":"导板","sealTemperature":{"label":"纸塑袋热封温度","type":"number","unit":"℃","default":122,"required":true},"zipBagSeal":{"label":"PE复合食品包装袋热封","type":"switch","required":false,"dependents":{"zipBagSealTemperature":{"label":"PE复合食品包装袋热封温度","type":"number","unit":"℃","default":130,"required":true},"zipBagSealTime":{"label":"热封时间","type":"number","unit":"秒","default":3,"required":true}}}}}}'
+WHERE config_key = 'production.process.params.config';
+
+SELECT config_key,
+       config_value
+FROM sys_config
+WHERE config_key = 'production.process.params.config';

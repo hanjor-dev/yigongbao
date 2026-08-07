@@ -347,8 +347,8 @@ class FileServiceImplTest {
     class DownloadTests {
 
         @Test
-        @DisplayName("download: 指定下载文件名时覆盖响应头名称")
-        void download_withOverrideFilename_shouldUseOverrideName() throws Exception {
+        @DisplayName("download: 中文下载文件名使用前端可解码的百分号编码")
+        void download_withOverrideFilename_shouldUsePercentEncodedName() throws Exception {
             FileInfo fileInfo = createFileInfo(testDetail.getId(), testDetail.getObjectType(), testDetail.getObjectId());
             org.dromara.x.file.storage.core.Downloader downloader =
                     mock(org.dromara.x.file.storage.core.Downloader.class);
@@ -362,8 +362,10 @@ class FileServiceImplTest {
 
             String contentDisposition = response.getHeader("Content-Disposition");
             assertNotNull(contentDisposition);
-            assertTrue(contentDisposition.contains("filename*="));
-            assertTrue(contentDisposition.contains("%E9%9B%B6%20%E4%BA%94-%E5%8C%BB%E7%96%97%E5%99%A8%E6%A2%B0%E5%9B%BE%E7%BA%B8.xlsx"));
+            String encodedFilename = "%E9%9B%B6%20%E4%BA%94-%E5%8C%BB%E7%96%97%E5%99%A8%E6%A2%B0%E5%9B%BE%E7%BA%B8.xlsx";
+            assertEquals("attachment; filename=" + encodedFilename
+                    + "; filename*=UTF-8''" + encodedFilename, contentDisposition);
+            assertFalse(contentDisposition.contains("=?UTF-8?Q?"));
             assertFalse(contentDisposition.contains("+"));
         }
 
