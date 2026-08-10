@@ -21,6 +21,10 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface ProductionRecordMapper extends BaseMapper<ProductionRecordEntity> {
 
+    /** 按主键锁定流转卡，串行化设备分配与释放操作。 */
+    @Select("SELECT * FROM production_record WHERE id = #{id} AND is_deleted = 0 FOR UPDATE")
+    ProductionRecordEntity selectByIdForUpdate(@Param("id") Long id);
+
     @Select("<script>" +
             "SELECT r.id AS recordId, r.record_no AS recordNo, r.order_code AS orderNo, " +
             "r.hospital_name AS hospitalName, r.hospital_dept_name AS hospitalDeptName, " +

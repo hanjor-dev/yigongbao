@@ -95,6 +95,14 @@ public class ProductionRecordController {
         return Result.success();
     }
 
+    @Operation(summary = "强制释放打印设备配置")
+    @OperationLog(module = "生产管理", businessType = OperationTypeEnum.CANCEL, operation = "强制释放打印设备配置")
+    @PostMapping("/{id}/release-device")
+    public Result<Void> releaseDevice(@PathVariable Long id) {
+        recordService.releaseDevice(id);
+        return Result.success();
+    }
+
     @Operation(summary = "流转卡取消预查询")
     @GetMapping("/{id}/cancel-preview")
     public Result<CancelPreviewVO> getCancelPreview(@PathVariable Long id) {

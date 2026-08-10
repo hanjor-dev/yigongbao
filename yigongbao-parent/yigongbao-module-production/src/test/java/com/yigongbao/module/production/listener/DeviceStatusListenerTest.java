@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.util.List;
 import java.time.LocalDateTime;
 import static org.mockito.Mockito.*;
@@ -71,14 +72,30 @@ class DeviceStatusListenerTest {
     @Test
     void onDeviceStateChange_idleToBusy_setsPrintingNoFlow() {
         when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
+        when(productMapper.selectList(any())).thenReturn(List.of(pendingProduct(101L)));
+        when(productMapper.update(isNull(), any())).thenReturn(1);
 
         listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE, ProductionConstants.DEVICE_STATE_BUSY));
 
-        verify(recordMapper).updateById((ProductionRecordEntity) argThat(r ->
-                FlowStatusEnum.PRINTING.getValue().equals(((ProductionRecordEntity) r).getStatus())));
+        verify(recordMapper).update(isNull(), any());
         verify(recordService).triggerFlowIfAllReach(10L,
                 FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
         verify(recordService).reconcileOrderProductionStatus(10L);
+    }
+
+    @Test
+    void onDeviceStateChange_idleToBusy_whenReleaseWins_doesNotStartPrint() {
+        when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
+        when(recordMapper.update(isNull(), any())).thenReturn(0);
+
+        listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE, ProductionConstants.DEVICE_STATE_BUSY));
+
+        verify(recordMapper).update(isNull(), any());
+        verifyNoInteractions(processMapper, productMapper, processService, orderMainMapper);
+        verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
+        verify(recordService, never()).reconcileOrderProductionStatus(any());
     }
 
     @Test
@@ -87,6 +104,7 @@ class DeviceStatusListenerTest {
         record.setStatus(FlowStatusEnum.PRINTING.getValue());
         when(recordMapper.selectList(any())).thenReturn(List.of(record));
         when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
 
         listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_BUSY, ProductionConstants.DEVICE_STATE_IDLE));
 
@@ -96,6 +114,108 @@ class DeviceStatusListenerTest {
         verify(recordService).triggerFlowIfAllReach(10L,
                 FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
         verify(recordService).reconcileOrderProductionStatus(10L);
+    }
+
+    @Test
+    void onDeviceStateChange_busyToIdle_advancesEveryAffectedOrder() {
+        ProductionRecordEntity first = record(1L, 10L);
+        first.setStatus(FlowStatusEnum.PRINTING.getValue());
+        ProductionRecordEntity second = record(2L, 20L);
+        second.setStatus(FlowStatusEnum.PRINTING.getValue());
+        when(recordMapper.selectList(any())).thenReturn(List.of(first, second));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
+
+        listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_BUSY,
+                ProductionConstants.DEVICE_STATE_IDLE));
+
+        verify(recordService).triggerFlowIfAllReach(10L,
+                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
+        verify(recordService).triggerFlowIfAllReach(20L,
+                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
+        verify(recordService).reconcileOrderProductionStatus(10L);
+        verify(recordService).reconcileOrderProductionStatus(20L);
+    }
+
+    @Test
+    void onDeviceStateChange_busyToIdle_whenPrintProcessMissing_rollsBackByThrowing() {
+        ProductionRecordEntity record = record(1L, 10L);
+        record.setStatus(FlowStatusEnum.PRINTING.getValue());
+        when(recordMapper.selectList(any())).thenReturn(List.of(record));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(0);
+
+        assertThrows(com.yigongbao.common.exception.BusinessException.class,
+                () -> listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_BUSY,
+                        ProductionConstants.DEVICE_STATE_IDLE)));
+
+        verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
+    }
+
+    @Test
+    void onDeviceStateChange_idleToBusy_advancesEveryAffectedOrder() {
+        when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L), record(2L, 20L)));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
+        when(productMapper.selectList(any()))
+                .thenReturn(List.of(pendingProduct(101L)), List.of(pendingProduct(102L)));
+        when(productMapper.update(isNull(), any())).thenReturn(1);
+
+        listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE,
+                ProductionConstants.DEVICE_STATE_BUSY));
+
+        verify(recordService).triggerFlowIfAllReach(10L,
+                FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
+        verify(recordService).triggerFlowIfAllReach(20L,
+                FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
+        verify(recordService).reconcileOrderProductionStatus(10L);
+        verify(recordService).reconcileOrderProductionStatus(20L);
+    }
+
+    @Test
+    void onDeviceStateChange_idleToBusy_whenPrintProcessMissing_rollsBackByThrowing() {
+        when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(0);
+
+        assertThrows(com.yigongbao.common.exception.BusinessException.class,
+                () -> listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE,
+                        ProductionConstants.DEVICE_STATE_BUSY)));
+
+        verifyNoInteractions(productMapper, orderMainMapper);
+        verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
+    }
+
+    @Test
+    void onDeviceStateChange_idleToBusy_whenNoPendingProduct_rollsBackByThrowing() {
+        when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
+        when(productMapper.selectList(any())).thenReturn(List.of(pendingProduct(101L)));
+        when(productMapper.update(isNull(), any())).thenReturn(0);
+
+        assertThrows(com.yigongbao.common.exception.BusinessException.class,
+                () -> listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE,
+                        ProductionConstants.DEVICE_STATE_BUSY)));
+
+        verifyNoInteractions(orderMainMapper);
+        verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
+    }
+
+    @Test
+    void onDeviceStateChange_idleToBusy_whenOnlySomeProductsUpdated_rollsBackByThrowing() {
+        when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
+        when(productMapper.selectList(any())).thenReturn(List.of(pendingProduct(101L), pendingProduct(102L)));
+        when(productMapper.update(isNull(), any())).thenReturn(1);
+
+        assertThrows(com.yigongbao.common.exception.BusinessException.class,
+                () -> listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE,
+                        ProductionConstants.DEVICE_STATE_BUSY)));
+
+        verifyNoInteractions(orderMainMapper);
+        verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
     }
 
     @Test
@@ -131,6 +251,14 @@ class DeviceStatusListenerTest {
         r.setOrderId(orderId);
         r.setRecordNo("REC-00" + id);
         return r;
+    }
+
+    private ProductionProductEntity pendingProduct(Long id) {
+        ProductionProductEntity product = new ProductionProductEntity();
+        product.setId(id);
+        product.setProductionRecordId(1L);
+        product.setStatus(com.yigongbao.module.production.enums.ProductStatusEnum.PENDING.getCode());
+        return product;
     }
 
     private void initTableInfo(Class<?> entityClass) {

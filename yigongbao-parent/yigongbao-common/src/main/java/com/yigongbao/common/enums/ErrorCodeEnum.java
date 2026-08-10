@@ -400,6 +400,8 @@ public enum ErrorCodeEnum {
     PRODUCT_HAS_FAIL(824, "存在质检不合格的产品，无法流转到包装", 3),
     PRODUCT_STATUS_NOT_ALLOW_WAREHOUSE_IN(825, "产品当前状态不允许入库", 3),
     PRODUCT_STATUS_NOT_ALLOW_WAREHOUSE_OUT(836, "产品当前状态不允许出库", 3),
+    RECORD_STATUS_NOT_ALLOW_RELEASE_DEVICE(838, "只有待打印状态的流转卡才能释放打印设备", 3),
+    RECORD_DEVICE_ALREADY_ASSIGNED(839, "流转卡已分配打印设备，请先释放后重新提交", 3),
 
     /** 历史错误码，图纸二维码缺失时现已改用后端兜底，不再主动返回。 */
     DRAWING_QR_IMAGE_REQUIRED(837, "请先上传图纸二维码图片", 3);

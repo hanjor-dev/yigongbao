@@ -1799,6 +1799,7 @@ CREATE TABLE production_record (
     KEY idx_order_id (order_id),
     KEY idx_design_package_id (design_package_id),
     KEY idx_status (status),
+    KEY idx_print_device_status (print_device_id, status, is_deleted),
     KEY idx_production_batch_no (production_batch_no),
     KEY idx_processing_center_id (processing_center_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产流转卡表';

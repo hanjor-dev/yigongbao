@@ -73,6 +73,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -123,6 +124,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             FlowStatusEnum.WAREHOUSE_OUT.getValue(),
             FlowStatusEnum.COMPLETED.getValue()
     );
+
+    private static final Set<String> DEVICE_OPERATION_ROLES = Set.of(
+            RoleCodeEnum.ADMIN.getCode(),
+            RoleCodeEnum.COMPANY_ADMIN.getCode(),
+            RoleCodeEnum.PRODUCTION_WORKER.getCode(),
+            RoleCodeEnum.PRODUCTION_MANAGER.getCode());
 
     private static final Map<Integer, FlowActionEnum> ACTION_TO_REACH_STATUS = Map.of(
             FlowStatusEnum.PENDING_PRINT.getValue(), FlowActionEnum.DOWNLOAD_DATA_PACKAGE,
@@ -677,22 +684,28 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     @Override
     @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void assignDevice(Long recordId, AssignDeviceDTO dto) {
-        ProductionRecordEntity record = getById(recordId);
+        // 先做一次无锁快速校验；随后按“设备 -> 流转卡”的固定顺序加锁，
+        // 避免与“设备状态落库 -> 监听器更新流转卡”的事务形成死锁环。
+        ProductionRecordEntity record = baseMapper.selectById(recordId);
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
-        DeviceEntity device = deviceMapper.selectById(dto.getDeviceId());
+        validateRecordCanAssignDevice(record);
+
+        DeviceEntity device = deviceMapper.selectByIdForUpdate(dto.getDeviceId());
         if (device == null) {
             throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
-        }
-        // 校验流转卡状态：只有 PENDING_PRINT 才能分配打印机
-        if (!FlowStatusEnum.PENDING_PRINT.getValue().equals(record.getStatus())) {
-            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_ASSIGN_DEVICE);
         }
         // 校验设备在线且未被占用
         if (resolveDeviceStatus(device) != 0) {
             throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
         }
+
+        record = baseMapper.selectByIdForUpdate(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        validateRecordCanAssignDevice(record);
 
         // 检查是否有其他流转卡正在使用该设备（悲观锁防止并发分配）
         ProductionRecordEntity conflictRecord = baseMapper.selectOne(new LambdaQueryWrapper<ProductionRecordEntity>()
@@ -709,6 +722,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
         }
 
+        Long userId = StpUtil.getLoginIdAsLong();
+        com.yigongbao.module.system.user.entity.UserEntity currentUser = userMapper.selectById(userId);
+        validateDeviceOperationAccess(currentUser, record, device);
+
         saveProductWeights(recordId, dto.getProductWeights());
 
         record.setPrintDeviceId(device.getId());
@@ -720,10 +737,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
         record.setContentUpdateTime(java.time.LocalDateTime.now());
         updateById(record);
-        Long userId = StpUtil.getLoginIdAsLong();
-        com.yigongbao.module.system.user.entity.UserEntity currentUser = userMapper.selectById(userId);
         String realName = currentUser != null ? currentUser.getRealName() : null;
-        processMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionProcessEntity>()
+        int processUpdated = processMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionProcessEntity>()
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)
                 .eq(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PRINT.getCode())
                 .set(ProductionProcessEntity::getDeviceId, device.getId())
@@ -733,12 +749,106 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .set(ProductionProcessEntity::getOperatorName, realName)
                 .set(dto.getPrintParams() != null, ProductionProcessEntity::getProcessParams, dto.getPrintParams()));
 
+        if (processUpdated != 1) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
+                    "打印工序记录缺失或重复，无法分配设备");
+        }
+
         // 累加设备当日上机次数并生成正式产品编号
         Integer usageCount = deviceUsageCounterService.incrementAndGet(device.getId());
         productNumberService.generateFormalNumbers(recordId, device.getId(), usageCount);
 
         log.info("分配打印设备并生成产品编号: recordId={}, deviceId={}, deviceNo={}, usageCount={}",
             recordId, device.getId(), device.getDeviceId(), usageCount);
+    }
+
+    private void validateRecordCanAssignDevice(ProductionRecordEntity record) {
+        if (!FlowStatusEnum.PENDING_PRINT.getValue().equals(record.getStatus())) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_ASSIGN_DEVICE);
+        }
+        if (record.getPrintDeviceId() != null) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_DEVICE_ALREADY_ASSIGNED);
+        }
+    }
+
+    /** 撤销待打印流转卡的整次打印设备配置提交，使设备可重新分配。 */
+    @Override
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public void releaseDevice(Long recordId) {
+        ProductionRecordEntity record = baseMapper.selectByIdForUpdate(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        if (!FlowStatusEnum.PENDING_PRINT.getValue().equals(record.getStatus())) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_RELEASE_DEVICE);
+        }
+        Long userId = StpUtil.getLoginIdAsLong();
+        UserEntity currentUser = userMapper.selectById(userId);
+        validateDeviceOperationAccess(currentUser, record, null);
+
+        Long releasedDeviceId = record.getPrintDeviceId();
+        String releasedDeviceCode = record.getPrintDeviceCode();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        int updated = baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getId, recordId)
+                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue())
+                .set(ProductionRecordEntity::getPrintDeviceId, null)
+                .set(ProductionRecordEntity::getPrintDeviceCode, null)
+                .set(ProductionRecordEntity::getPrintDeviceName, null)
+                .set(ProductionRecordEntity::getMaterial, null)
+                .set(ProductionRecordEntity::getContentUpdateTime, now));
+        if (updated == 0) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_NOT_ALLOW_RELEASE_DEVICE);
+        }
+
+        int releasedProcessUpdated = processMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionProcessEntity>()
+                .eq(ProductionProcessEntity::getProductionRecordId, recordId)
+                .eq(ProductionProcessEntity::getProcessType, ProcessTypeEnum.PRINT.getCode())
+                .set(ProductionProcessEntity::getDeviceId, null)
+                .set(ProductionProcessEntity::getDeviceNo, null)
+                .set(ProductionProcessEntity::getDeviceName, null)
+                .set(ProductionProcessEntity::getProcessParams, null)
+                .set(ProductionProcessEntity::getOperatorId, null)
+                .set(ProductionProcessEntity::getOperatorName, null));
+        if (releasedProcessUpdated != 1) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
+                    "打印工序记录缺失或重复，无法释放设备配置");
+        }
+
+        productMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionProductEntity>()
+                .eq(ProductionProductEntity::getProductionRecordId, recordId)
+                .set(ProductionProductEntity::getProductNo, null)
+                .set(ProductionProductEntity::getWeight, null));
+
+        log.info("强制释放打印设备配置: recordId={}, releasedDeviceId={}, releasedDeviceCode={}",
+                recordId, releasedDeviceId, releasedDeviceCode);
+    }
+
+    private void validateDeviceOperationAccess(UserEntity currentUser,
+                                               ProductionRecordEntity record,
+                                               DeviceEntity device) {
+        if (currentUser == null || !DEVICE_OPERATION_ROLES.contains(currentUser.getRoleCode())) {
+            log.warn("用户无权操作流转卡打印设备: userId={}, roleCode={}, recordId={}",
+                    currentUser != null ? currentUser.getId() : null,
+                    currentUser != null ? currentUser.getRoleCode() : null,
+                    record.getId());
+            throw new BusinessException(ErrorCodeEnum.FORBIDDEN);
+        }
+        if (RoleCodeEnum.ADMIN.getCode().equals(currentUser.getRoleCode())
+                || RoleCodeEnum.COMPANY_ADMIN.getCode().equals(currentUser.getRoleCode())) {
+            return;
+        }
+        OrderMainEntity order = orderMainMapper.selectById(record.getOrderId());
+        if (currentUser.getCenterId() == null || order == null
+                || !Objects.equals(currentUser.getCenterId(), order.getCenterId())
+                || (device != null && !Objects.equals(currentUser.getCenterId(), device.getCenterId()))) {
+            log.warn("生产角色尝试操作其他加工中心的流转卡或设备: userId={}, userCenterId={}, recordId={}, orderId={}, deviceId={}, deviceCenterId={}",
+                    currentUser.getId(), currentUser.getCenterId(), record.getId(), record.getOrderId(),
+                    device != null ? device.getId() : null,
+                    device != null ? device.getCenterId() : null);
+            throw new BusinessException(ErrorCodeEnum.FORBIDDEN);
+        }
     }
 
     /** 校验并保存当前流转卡下所有生产产品的重量，单位：克 */

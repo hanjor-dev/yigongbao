@@ -1,6 +1,8 @@
 package com.yigongbao.module.production.record.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yigongbao.common.enums.OperationTypeEnum;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.AssignProductWeightDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
@@ -64,6 +66,25 @@ class ProductionRecordControllerTest {
                 .andExpect(status().isOk());
 
         verify(recordService).assignDevice(7L, dto);
+    }
+
+    @Test
+    void releaseDevice_delegatesRecordId() throws Exception {
+        mockMvc.perform(post("/production/record/{id}/release-device", 7L))
+                .andExpect(status().isOk());
+
+        verify(recordService).releaseDevice(7L);
+    }
+
+    @Test
+    void releaseDevice_usesCancelOperationLog() throws Exception {
+        OperationLog operationLog = ProductionRecordController.class
+                .getDeclaredMethod("releaseDevice", Long.class)
+                .getAnnotation(OperationLog.class);
+
+        assertThat(operationLog).isNotNull();
+        assertThat(operationLog.businessType()).isEqualTo(OperationTypeEnum.CANCEL);
+        assertThat(operationLog.operation()).isEqualTo("强制释放打印设备配置");
     }
 
     @Test
