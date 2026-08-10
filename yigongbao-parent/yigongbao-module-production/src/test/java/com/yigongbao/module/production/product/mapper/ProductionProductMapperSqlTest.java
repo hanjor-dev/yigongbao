@@ -66,7 +66,7 @@ class ProductionProductMapperSqlTest {
             "pp.warehouse_out_time AS warehouse_out_time");
 
     @Test
-    void exportQueriesUseOrderMainForJoinTimeRangeAndPermissions() {
+    void exportQueriesUsePrintStartTimeForRangeAndOrderMainForPermissions() {
         var exportQueries = exportQueries();
 
         assertTrue(exportQueries.size() == 2, "expected both export queries to be present");
@@ -74,10 +74,14 @@ class ProductionProductMapperSqlTest {
             String query = entry.getValue();
             assertTrue(query.contains("INNER JOIN order_main om ON pr.order_id = om.id AND om.is_deleted = 0"),
                     () -> entry.getKey() + " must require a non-deleted order");
-            assertTrue(query.contains("AND om.create_time &gt;= #{dto.startTime}"),
-                    () -> entry.getKey() + " must apply startTime to the order creation time");
-            assertTrue(query.contains("AND om.create_time &lt;= #{dto.endTime}"),
-                    () -> entry.getKey() + " must apply endTime to the order creation time");
+            assertTrue(query.contains("AND pr.print_start_time &gt;= #{dto.startTime}"),
+                    () -> entry.getKey() + " must apply startTime to the print start time");
+            assertTrue(query.contains("AND pr.print_start_time &lt;= #{dto.endTime}"),
+                    () -> entry.getKey() + " must apply endTime to the print start time");
+            assertFalse(query.contains("AND om.create_time &gt;= #{dto.startTime}"),
+                    () -> entry.getKey() + " must not apply startTime to the order creation time");
+            assertFalse(query.contains("AND om.create_time &lt;= #{dto.endTime}"),
+                    () -> entry.getKey() + " must not apply endTime to the order creation time");
             assertFalse(query.contains("pp.create_time &gt;="),
                     () -> entry.getKey() + " must not apply startTime to the product creation time");
             assertFalse(query.contains("pp.create_time &lt;="),
