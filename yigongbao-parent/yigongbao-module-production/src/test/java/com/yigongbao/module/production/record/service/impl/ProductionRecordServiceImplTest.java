@@ -3,7 +3,9 @@ package com.yigongbao.module.production.record.service.impl;
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.entity.OrderMainEntity;
@@ -29,6 +31,7 @@ import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
+import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.SaveProductionColumnConfigDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
@@ -54,6 +57,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -138,6 +142,36 @@ class ProductionRecordServiceImplTest {
         assertEquals("REC-001", vo.getRecordNo());
         assertEquals(1, vo.getProducts().size());
         assertEquals(new BigDecimal("12.35"), vo.getProducts().get(0).getWeight());
+    }
+
+    // ---- pageRecords ----
+
+    @Test
+    void pageRecords_mapsProductionEndTimeToPrintFinishTimeForListCompatibility() {
+        LocalDateTime printFinishTime = LocalDateTime.of(2026, 8, 10, 10, 30);
+        LocalDateTime postProcessingEndTime = LocalDateTime.of(2026, 8, 10, 11, 45);
+        ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.PRINT_COMPLETED.getValue());
+        record.setPrintFinishTime(printFinishTime);
+        record.setPostProcessingEndTime(postProcessingEndTime);
+
+        Page<ProductionRecordEntity> entityPage = new Page<>(1, 10);
+        entityPage.setRecords(List.of(record));
+        entityPage.setTotal(1);
+        when(recordMapper.selectPage(any(Page.class), any())).thenReturn(entityPage);
+        when(productMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(orderMainMapper.selectList(any())).thenReturn(List.of(order(10L, ProductionConstants.ORDER_TYPE_MEDICAL)));
+
+        ProductionRecordPageDTO dto = new ProductionRecordPageDTO();
+        dto.setProcessingCenterId(20L);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+
+            IPage<ProductionRecordVO> result = recordService.pageRecords(dto);
+
+            assertEquals(printFinishTime, result.getRecords().get(0).getPrintFinishTime());
+            assertEquals(printFinishTime, result.getRecords().get(0).getPostProcessingEndTime());
+        }
     }
 
     @Test
