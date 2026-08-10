@@ -329,6 +329,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         return result.convert(e -> {
             ProductionRecordVO vo = new ProductionRecordVO();
             BeanUtil.copyProperties(e, vo);
+            // 临时兼容：生产列表“生产结束时间”列仍绑定 postProcessingEndTime，现阶段改为展示打印完成时间。
+            // 仅覆盖列表 VO，实体中的真实后处理结束时间及其他接口语义保持不变。
+            vo.setPostProcessingEndTime(e.getPrintFinishTime());
             fillCurrentProcessName(vo);
             vo.setProducts(productMap.getOrDefault(e.getId(), java.util.Collections.emptyList()));
             OrderMainEntity order = orderMap.get(e.getOrderId());
