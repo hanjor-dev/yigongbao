@@ -3,6 +3,7 @@ package com.yigongbao.module.basic.device.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.event.DeviceStateChangeEvent;
 import com.yigongbao.module.basic.device.dto.CreateDeviceDTO;
 import com.yigongbao.module.basic.device.dto.DeviceStatusPushDTO;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
@@ -14,10 +15,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 
@@ -38,6 +42,10 @@ class DeviceServiceImplTest {
     @Mock
     private IDeviceStateLogService deviceStateLogService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Spy
     @InjectMocks
     private DeviceServiceImpl deviceService;
 
@@ -100,9 +108,61 @@ class DeviceServiceImplTest {
             entity.setId(1L);
             return 1;
         });
+        doReturn(true).when(deviceService).saveBatch(anyList());
 
         deviceService.batchUpdateDeviceStatus(dto);
 
-        verify(deviceMapper, times(1)).insert(any(DeviceEntity.class));
+        verify(deviceService).saveBatch(anyList());
+    }
+
+    @Test
+    void batchUpdateDeviceStatus_publishesStateChangeAfterDeviceUpdate() {
+        DeviceStatusPushDTO dto = new DeviceStatusPushDTO();
+        dto.setCenterName("武汉嘉一");
+        DeviceStatusPushDTO.DeviceStatus status = new DeviceStatusPushDTO.DeviceStatus();
+        status.setId("SLA-001");
+        status.setState(1);
+        dto.setDevices(Arrays.asList(status));
+
+        ProcessingCenterEntity center = new ProcessingCenterEntity();
+        center.setId(1L);
+        center.setCenterName("武汉嘉一");
+        DeviceEntity existing = new DeviceEntity();
+        existing.setId(2L);
+        existing.setDeviceId("SLA-001");
+        existing.setState(0);
+
+        when(processingCenterMapper.selectOne(any())).thenReturn(center);
+        when(deviceMapper.selectList(any())).thenReturn(Arrays.asList(existing));
+        when(deviceMapper.updateById(existing)).thenReturn(1);
+
+        deviceService.batchUpdateDeviceStatus(dto);
+
+        InOrder inOrder = inOrder(deviceMapper, eventPublisher);
+        inOrder.verify(deviceMapper).updateById(existing);
+        inOrder.verify(eventPublisher).publishEvent(any(DeviceStateChangeEvent.class));
+    }
+
+    @Test
+    void batchUpdateDeviceStatus_doesNotPublishWhenDeviceUpdateFails() {
+        DeviceStatusPushDTO dto = new DeviceStatusPushDTO();
+        dto.setCenterName("武汉嘉一");
+        DeviceStatusPushDTO.DeviceStatus status = new DeviceStatusPushDTO.DeviceStatus();
+        status.setId("SLA-001");
+        status.setState(1);
+        dto.setDevices(Arrays.asList(status));
+        ProcessingCenterEntity center = new ProcessingCenterEntity();
+        center.setId(1L);
+        DeviceEntity existing = new DeviceEntity();
+        existing.setId(2L);
+        existing.setDeviceId("SLA-001");
+        existing.setState(0);
+        when(processingCenterMapper.selectOne(any())).thenReturn(center);
+        when(deviceMapper.selectList(any())).thenReturn(Arrays.asList(existing));
+        when(deviceMapper.updateById(existing)).thenReturn(0);
+
+        assertThrows(BusinessException.class, () -> deviceService.batchUpdateDeviceStatus(dto));
+
+        verifyNoInteractions(eventPublisher);
     }
 }

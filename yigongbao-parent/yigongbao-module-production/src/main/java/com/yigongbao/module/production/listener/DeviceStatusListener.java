@@ -3,7 +3,10 @@ package com.yigongbao.module.production.listener;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.exception.BusinessException;
 import java.util.List;
+import java.util.Objects;
 import com.yigongbao.common.event.DeviceStateChangeEvent;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -61,23 +64,43 @@ public class DeviceStatusListener {
                 return;
             }
             LocalDateTime now = LocalDateTime.now();
+            List<ProductionRecordEntity> startedRecords = new java.util.ArrayList<>();
             records.forEach(record -> {
-                record.setStatus(FlowStatusEnum.PRINTING.getValue());
-                record.setCurrentProcess(com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode());
-                record.setPrintStartTime(now);
-                record.setContentUpdateTime(now);
-                recordMapper.updateById(record);
+                int updated = recordMapper.update(null,
+                        new LambdaUpdateWrapper<ProductionRecordEntity>()
+                                .eq(ProductionRecordEntity::getId, record.getId())
+                                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue())
+                                .eq(ProductionRecordEntity::getPrintDeviceId, deviceId)
+                                .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINTING.getValue())
+                                .set(ProductionRecordEntity::getCurrentProcess,
+                                        com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode())
+                                .set(ProductionRecordEntity::getPrintStartTime, now)
+                                .set(ProductionRecordEntity::getContentUpdateTime, now));
+                if (updated == 0) {
+                    log.info("打印开始事件状态更新未生效，跳过重复或已释放记录: recordId={}, deviceId={}",
+                            record.getId(), deviceId);
+                    return;
+                }
                 updatePrintProcessStartTime(record.getId(), now);
                 updateProductStatusToInProcess(record.getId());
+                startedRecords.add(record);
 
                 log.info("设备状态变更触发打印开始: recordId={}, recordNo={}, deviceId={}",
                         record.getId(), record.getRecordNo(), deviceId);
             });
-            Long orderId = records.get(0).getOrderId();
-            updateOrderProductionStartTime(orderId, now);
-            recordService.triggerFlowIfAllReach(orderId,
-                    FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
-            recordService.reconcileOrderProductionStatus(orderId);
+            if (startedRecords.isEmpty()) {
+                return;
+            }
+            startedRecords.stream()
+                    .map(ProductionRecordEntity::getOrderId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .forEach(orderId -> {
+                        updateOrderProductionStartTime(orderId, now);
+                        recordService.triggerFlowIfAllReach(orderId,
+                                FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
+                        recordService.reconcileOrderProductionStatus(orderId);
+                    });
         }
         // 占用 → 空闲：打印完成，只查询打印中的流转卡
         else if (!ProductionConstants.DEVICE_STATE_IDLE.equals(oldState)
@@ -116,16 +139,21 @@ public class DeviceStatusListener {
             if (completedRecords.isEmpty()) {
                 return;
             }
-            Long orderId = completedRecords.get(0).getOrderId();
-            recordService.triggerFlowIfAllReach(orderId,
-                    FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-            recordService.reconcileOrderProductionStatus(orderId);
+            completedRecords.stream()
+                    .map(ProductionRecordEntity::getOrderId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .forEach(orderId -> {
+                        recordService.triggerFlowIfAllReach(orderId,
+                                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
+                        recordService.reconcileOrderProductionStatus(orderId);
+                    });
         }
     }
 
     /** 更新打印工序开始时间 */
     private void updatePrintProcessStartTime(Long recordId, LocalDateTime startTime) {
-        processMapper.update(null,
+        int updated = processMapper.update(null,
                 new LambdaUpdateWrapper<com.yigongbao.module.production.process.entity.ProductionProcessEntity>()
                         .eq(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getProductionRecordId, recordId)
                         .eq(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getProcessType,
@@ -133,11 +161,15 @@ public class DeviceStatusListener {
                         .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getStatus,
                                 ProcessStatusEnum.IN_PROGRESS.getCode())
                         .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getStartTime, startTime));
+        if (updated != 1) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
+                    "打印工序记录缺失或重复，无法开始打印");
+        }
     }
 
     /** 更新打印工序结束时间 */
     private void updatePrintProcessEndTime(Long recordId, LocalDateTime endTime) {
-        processMapper.update(null,
+        int updated = processMapper.update(null,
                 new LambdaUpdateWrapper<com.yigongbao.module.production.process.entity.ProductionProcessEntity>()
                         .eq(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getProductionRecordId, recordId)
                         .eq(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getProcessType,
@@ -145,17 +177,36 @@ public class DeviceStatusListener {
                         .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getStatus,
                                 ProcessStatusEnum.COMPLETED.getCode())
                         .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getEndTime, endTime));
+        if (updated != 1) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
+                    "打印工序记录缺失或重复，无法完成打印");
+        }
     }
 
     /** 更新流转卡下所有待生产产品状态为生产中 */
     private void updateProductStatusToInProcess(Long recordId) {
-        productMapper.update(null,
+        List<com.yigongbao.module.production.product.entity.ProductionProductEntity> products =
+                productMapper.selectList(
+                        new LambdaQueryWrapper<com.yigongbao.module.production.product.entity.ProductionProductEntity>()
+                                .eq(com.yigongbao.module.production.product.entity.ProductionProductEntity::getProductionRecordId,
+                                        recordId)
+                                .select(com.yigongbao.module.production.product.entity.ProductionProductEntity::getId)
+                                .last("FOR UPDATE"));
+        if (products == null || products.isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
+                    "流转卡没有生产产品，无法开始打印");
+        }
+        int updated = productMapper.update(null,
                 new LambdaUpdateWrapper<com.yigongbao.module.production.product.entity.ProductionProductEntity>()
                         .eq(com.yigongbao.module.production.product.entity.ProductionProductEntity::getProductionRecordId, recordId)
                         .eq(com.yigongbao.module.production.product.entity.ProductionProductEntity::getStatus,
                                 com.yigongbao.module.production.enums.ProductStatusEnum.PENDING.getCode())
                         .set(com.yigongbao.module.production.product.entity.ProductionProductEntity::getStatus,
                                 com.yigongbao.module.production.enums.ProductStatusEnum.IN_PROCESS.getCode()));
+        if (updated != products.size()) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
+                    "流转卡产品状态不一致，无法开始打印");
+        }
     }
 
     /** 更新订单生产开始时间（仅当为空时更新） */

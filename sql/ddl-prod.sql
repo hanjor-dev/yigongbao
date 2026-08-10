@@ -1767,6 +1767,7 @@ CREATE TABLE production_record (
     KEY idx_order_id (order_id),
     KEY idx_design_package_id (design_package_id),
     KEY idx_status (status),
+    KEY idx_print_device_status (print_device_id, status, is_deleted),
     KEY idx_production_batch_no (production_batch_no),
     KEY idx_processing_center_id (processing_center_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产流转卡表';
@@ -1779,7 +1780,7 @@ CREATE TABLE production_product (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
     production_record_id BIGINT NOT NULL COMMENT '流转卡ID',
     print_file_id BIGINT NOT NULL COMMENT '打印文件ID',
-    product_no VARCHAR(50) NOT NULL COMMENT '产品编号',
+    product_no VARCHAR(50) NULL COMMENT '产品编号（分配设备时生成）',
     product_name VARCHAR(200) COMMENT '产品名称',
     spec_name VARCHAR(200) COMMENT '型号规格名称',
     cert_no VARCHAR(200) COMMENT '注册证号',

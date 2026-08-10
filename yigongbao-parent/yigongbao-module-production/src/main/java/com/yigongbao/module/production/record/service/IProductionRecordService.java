@@ -41,6 +41,8 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
 
     void assignDevice(Long recordId, AssignDeviceDTO dto);
 
+    void releaseDevice(Long recordId);
+
     /**
      * 聚合触发：同订单所有活跃流转卡均达到 requiredStatus 时触发 Flow 并回写 order_main
      */

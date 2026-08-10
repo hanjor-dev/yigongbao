@@ -222,6 +222,7 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         List<DeviceEntity> toCreate = new ArrayList<>();
         List<DeviceEntity> toUpdate = new ArrayList<>();
         List<DeviceStateLogEntity> stateLogs = new ArrayList<>();
+        List<DeviceStateChangeEvent> stateChangeEvents = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
 
         for (DeviceStatusPushDTO.DeviceStatus deviceStatus : dto.getDevices()) {
@@ -261,7 +262,8 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
                     stateLog.setChangeTime(now);
                     stateLog.setChangeType("auto");
                     stateLogs.add(stateLog);
-                    eventPublisher.publishEvent(new DeviceStateChangeEvent(this, device.getId(), oldState, deviceStatus.getState()));
+                    stateChangeEvents.add(new DeviceStateChangeEvent(
+                            this, device.getId(), oldState, deviceStatus.getState()));
                 } else {
                     log.info("设备状态未变化: deviceId={}, state={}", device.getDeviceId(), oldState);
                 }
@@ -272,11 +274,17 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
             saveBatch(toCreate);
         }
         for (DeviceEntity device : toUpdate) {
-            updateById(device);
+            if (!updateById(device)) {
+                throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR.getCode(),
+                        "设备状态更新失败: " + device.getDeviceId());
+            }
         }
         if (!stateLogs.isEmpty()) {
             deviceStateLogService.saveBatch(stateLogs);
         }
+        // 设备状态必须先落库，再同步通知生产监听器。这样设备分配事务加行锁后，
+        // 要么读取到新状态并拒绝分配，要么先完成分配再由事件推进打印，不会漏事件。
+        stateChangeEvents.forEach(eventPublisher::publishEvent);
 
         log.info("批量更新设备状态: centerName={}, deviceCount={}, 新增={}, 更新={}",
             dto.getCenterName(), dto.getDevices().size(), toCreate.size(), toUpdate.size());
