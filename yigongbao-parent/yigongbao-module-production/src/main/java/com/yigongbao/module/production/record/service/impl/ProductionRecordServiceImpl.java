@@ -383,7 +383,16 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         // 回写订单操作人和加工中心信息（当前生产员）
         Long userId = StpUtil.getLoginIdAsLong();
         UserEntity currentUser = userMapper.selectById(userId);
-        String realName = currentUser != null ? currentUser.getRealName() : null;
+        if (currentUser == null) {
+            log.warn("接单失败，当前用户不存在: recordId={}, userId={}", recordId, userId);
+            throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+        }
+        if (currentUser.getCenterId() == null || StrUtil.isBlank(currentUser.getCenterName())) {
+            log.warn("接单失败，生产员未绑定有效生产中心: recordId={}, userId={}, centerId={}, centerName={}",
+                    recordId, userId, currentUser.getCenterId(), currentUser.getCenterName());
+            throw new BusinessException(ErrorCodeEnum.PROCESSING_CENTER_NOT_FOUND);
+        }
+        String realName = currentUser.getRealName();
 
         // 更新本条流转卡状态和生产员信息：DESIGN_COMPLETED → PENDING_PRINT（幂等）
         int updated = baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
@@ -391,49 +400,40 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.DESIGN_COMPLETED.getValue())
                 .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue())
                 .set(ProductionRecordEntity::getProducerId, userId)
-                .set(ProductionRecordEntity::getProducerName, realName));
+                .set(ProductionRecordEntity::getProducerName, realName)
+                .set(ProductionRecordEntity::getProcessingCenterId, currentUser.getCenterId())
+                .set(ProductionRecordEntity::getProcessingCenterName, currentUser.getCenterName()));
 
-        // 检查更新结果，如果影响行数为0，说明流转卡已被其他用户认领
-        if (updated == 0) {
-            log.warn("流转卡已被其他用户认领: recordId={}, userId={}", recordId, userId);
+        // 条件认领必须恰好更新一行，否则按已认领处理，不能继续修改订单
+        if (updated != 1) {
+            log.warn("流转卡认领失败: recordId={}, userId={}, updated={}", recordId, userId, updated);
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_ALREADY_CLAIMED);
         }
 
         // 订单归属加工中心：首次下载时确定（使用条件更新保证幂等）
-        if (currentUser != null && currentUser.getCenterId() != null) {
-            com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<OrderMainEntity> updateWrapper =
-                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
-            updateWrapper.eq(OrderMainEntity::getId, order.getId())
-                .isNull(OrderMainEntity::getCenterId)  // 仅在未分配时更新
-                .set(OrderMainEntity::getCenterId, currentUser.getCenterId())
-                .set(OrderMainEntity::getCenterName, currentUser.getCenterName())
-                .set(OrderMainEntity::getCurrentHandlerId, userId)
-                .set(OrderMainEntity::getCurrentHandlerName, realName)
-                .set(OrderMainEntity::getProducerId, userId);
+        com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<OrderMainEntity> updateWrapper =
+            new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+        updateWrapper.eq(OrderMainEntity::getId, order.getId())
+            .isNull(OrderMainEntity::getCenterId)  // 仅在未分配时更新
+            .set(OrderMainEntity::getCenterId, currentUser.getCenterId())
+            .set(OrderMainEntity::getCenterName, currentUser.getCenterName())
+            .set(OrderMainEntity::getCurrentHandlerId, userId)
+            .set(OrderMainEntity::getCurrentHandlerName, realName)
+            .set(OrderMainEntity::getProducerId, userId);
 
-            int orderUpdated = orderMainMapper.update(null, updateWrapper);
-            if (orderUpdated > 0) {
-                log.info("订单归属加工中心: orderId={}, centerId={}, centerName={}, producerId={}",
-                    order.getId(), currentUser.getCenterId(), currentUser.getCenterName(), userId);
-            } else {
-                // 已被其他事务分配，仅更新操作人信息
-                OrderMainEntity orderUpdate = new OrderMainEntity();
-                orderUpdate.setId(order.getId());
-                orderUpdate.setCurrentHandlerId(userId);
-                orderUpdate.setCurrentHandlerName(realName);
-                orderUpdate.setProducerId(userId);
-                orderMainMapper.updateById(orderUpdate);
-                log.info("订单已归属其他加工中心，仅更新操作人: orderId={}, producerId={}", order.getId(), userId);
-            }
+        int orderUpdated = orderMainMapper.update(null, updateWrapper);
+        if (orderUpdated > 0) {
+            log.info("订单归属加工中心: orderId={}, centerId={}, centerName={}, producerId={}",
+                order.getId(), currentUser.getCenterId(), currentUser.getCenterName(), userId);
         } else {
-            // 用户未绑定加工中心，仅更新操作人信息
+            // 订单已有加工中心，不覆盖既有归属，仅更新操作人信息
             OrderMainEntity orderUpdate = new OrderMainEntity();
             orderUpdate.setId(order.getId());
             orderUpdate.setCurrentHandlerId(userId);
             orderUpdate.setCurrentHandlerName(realName);
             orderUpdate.setProducerId(userId);
             orderMainMapper.updateById(orderUpdate);
-            log.warn("生产员未绑定加工中心，跳过订单加工中心分配: orderId={}, userId={}", order.getId(), userId);
+            log.info("订单已归属其他加工中心，仅更新操作人: orderId={}, producerId={}", order.getId(), userId);
         }
 
         log.info("下载设计数据包，流转卡推进到待打印: recordId={}, orderId={}, designPackageId={}, producerId={}",

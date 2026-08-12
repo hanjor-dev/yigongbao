@@ -3,6 +3,7 @@ package com.yigongbao.module.production.record.service.impl;
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -111,6 +112,8 @@ class ProductionRecordServiceImplTest {
                     new org.apache.ibatis.session.Configuration(), "");
             TableInfoHelper.initTableInfo(assistant, ProductionProcessEntity.class);
         }
+        lenient().when(userMapper.selectById(1L))
+                .thenReturn(productionWorker(1L, 88L, "生产中心A"));
     }
 
     // ---- getRecordDetail ----
@@ -376,6 +379,146 @@ class ProductionRecordServiceImplTest {
     }
 
     // ---- downloadDataPackage ----
+
+    @Test
+    void downloadDataPackage_success_persistsProducerAndProcessingCenterSnapshot() {
+        ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.DESIGN_COMPLETED.getValue());
+        record.setDesignPackageId(1L);
+        when(recordMapper.selectOne(any())).thenReturn(record);
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(designPackageMapper.selectById(1L)).thenReturn(pkg(1L, 10L));
+        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        order.setStatus(FlowStatusEnum.DESIGN_COMPLETED.getValue());
+        when(orderMainMapper.selectById(10L)).thenReturn(order);
+        when(orderMainMapper.update(isNull(), any())).thenReturn(1);
+        when(userMapper.selectById(1L)).thenReturn(productionWorker(1L, 88L, "生产中心A"));
+        when(flowFacade.getAvailableActions(10L)).thenReturn(List.of("OTHER_ACTION"));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+            recordService.downloadDataPackage(1L);
+        }
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<LambdaUpdateWrapper<ProductionRecordEntity>> captor =
+                ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(recordMapper).update(isNull(), captor.capture());
+
+        LambdaUpdateWrapper<ProductionRecordEntity> update = captor.getValue();
+        String normalizedSqlSet = update.getSqlSet().replace("_", "").toLowerCase();
+        assertTrue(normalizedSqlSet.contains("producerid"), update.getSqlSet());
+        assertTrue(normalizedSqlSet.contains("producername"), update.getSqlSet());
+        assertTrue(normalizedSqlSet.contains("processingcenterid"), update.getSqlSet());
+        assertTrue(normalizedSqlSet.contains("processingcentername"), update.getSqlSet());
+        assertTrue(update.getParamNameValuePairs().containsValue(88L));
+        assertTrue(update.getParamNameValuePairs().containsValue("生产中心A"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<LambdaUpdateWrapper<OrderMainEntity>> orderCaptor =
+                ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(orderMainMapper).update(isNull(), orderCaptor.capture());
+        assertTrue(orderCaptor.getValue().getParamNameValuePairs().containsValue(88L));
+        assertTrue(orderCaptor.getValue().getParamNameValuePairs().containsValue("生产中心A"));
+        verify(orderMainMapper, never()).updateById(any(OrderMainEntity.class));
+    }
+
+    @Test
+    void downloadDataPackage_orderAlreadyAssigned_doesNotOverwriteExistingCenter() {
+        prepareDownloadClaim(productionWorker(1L, 88L, "生产中心A"));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(orderMainMapper.update(isNull(), any())).thenReturn(0);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+            recordService.downloadDataPackage(1L);
+        }
+
+        verify(orderMainMapper).updateById(argThat((OrderMainEntity update) ->
+                update.getCenterId() == null
+                        && update.getCenterName() == null
+                        && Long.valueOf(1L).equals(update.getProducerId())));
+    }
+
+    @Test
+    void downloadDataPackage_currentUserMissing_rejectsBeforeClaimUpdate() {
+        prepareDownloadClaim(null);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> recordService.downloadDataPackage(1L));
+            assertEquals(ErrorCodeEnum.USER_NOT_FOUND.getCode(), exception.getCode());
+        }
+
+        verify(recordMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).updateById(any(OrderMainEntity.class));
+    }
+
+    @Test
+    void downloadDataPackage_centerIdMissing_rejectsBeforeClaimUpdate() {
+        prepareDownloadClaim(productionWorker(1L, null, "生产中心A"));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> recordService.downloadDataPackage(1L));
+            assertEquals(ErrorCodeEnum.PROCESSING_CENTER_NOT_FOUND.getCode(), exception.getCode());
+        }
+
+        verify(recordMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).updateById(any(OrderMainEntity.class));
+    }
+
+    @Test
+    void downloadDataPackage_centerNameBlank_rejectsBeforeClaimUpdate() {
+        prepareDownloadClaim(productionWorker(1L, 88L, "  "));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> recordService.downloadDataPackage(1L));
+            assertEquals(ErrorCodeEnum.PROCESSING_CENTER_NOT_FOUND.getCode(), exception.getCode());
+        }
+
+        verify(recordMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).updateById(any(OrderMainEntity.class));
+    }
+
+    @Test
+    void downloadDataPackage_sameUserRepeatedClaim_doesNotUpdateOrder() {
+        prepareDownloadClaim(productionWorker(1L, 88L, "生产中心A"));
+        when(recordMapper.update(isNull(), any())).thenReturn(0);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> recordService.downloadDataPackage(1L));
+            assertEquals(ErrorCodeEnum.PRODUCTION_RECORD_ALREADY_CLAIMED.getCode(), exception.getCode());
+        }
+
+        verify(orderMainMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).updateById(any(OrderMainEntity.class));
+    }
+
+    @Test
+    void downloadDataPackage_differentCenterLosesClaim_doesNotOverwriteWinner() {
+        prepareDownloadClaim(productionWorker(2L, 99L, "生产中心B"));
+        when(userMapper.selectById(2L)).thenReturn(productionWorker(2L, 99L, "生产中心B"));
+        when(recordMapper.update(isNull(), any())).thenReturn(0);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(2L);
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> recordService.downloadDataPackage(1L));
+            assertEquals(ErrorCodeEnum.PRODUCTION_RECORD_ALREADY_CLAIMED.getCode(), exception.getCode());
+        }
+
+        verify(orderMainMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).updateById(any(OrderMainEntity.class));
+    }
 
     @Test
     void downloadDataPackage_designPackageNotFound_throwsException() {
@@ -796,6 +939,27 @@ class ProductionRecordServiceImplTest {
         r.setOrderId(orderId);
         r.setStatus(status);
         return r;
+    }
+
+    private void prepareDownloadClaim(UserEntity currentUser) {
+        ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.DESIGN_COMPLETED.getValue());
+        record.setDesignPackageId(1L);
+        when(recordMapper.selectOne(any())).thenReturn(record);
+        when(designPackageMapper.selectById(1L)).thenReturn(pkg(1L, 10L));
+        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        order.setStatus(FlowStatusEnum.DESIGN_COMPLETED.getValue());
+        when(orderMainMapper.selectById(10L)).thenReturn(order);
+        when(userMapper.selectById(1L)).thenReturn(currentUser);
+        when(flowFacade.getAvailableActions(10L)).thenReturn(List.of("OTHER_ACTION"));
+    }
+
+    private UserEntity productionWorker(Long id, Long centerId, String centerName) {
+        UserEntity user = new UserEntity();
+        user.setId(id);
+        user.setRealName("生产员A");
+        user.setCenterId(centerId);
+        user.setCenterName(centerName);
+        return user;
     }
 
     private DeviceEntity device(Long id) {
