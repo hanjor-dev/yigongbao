@@ -17,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -61,6 +62,9 @@ class DictServiceImplTest {
         Field baseMapperField = ServiceImpl.class.getDeclaredField("baseMapper");
         baseMapperField.setAccessible(true);
         baseMapperField.set(dictService, dictMapper);
+
+        when(dictMapper.acquireRootCodeLock(anyString(), anyInt())).thenReturn(1);
+        when(dictMapper.releaseRootCodeLock(anyString())).thenReturn(1);
 
         // 初始化根节点实体
         rootEntity = new DictEntity();
@@ -207,6 +211,103 @@ class DictServiceImplTest {
     }
 
     @Test
+    @DisplayName("create: 根编码超过两位时按数字递增")
+    void create_rootNodeWithThreeDigitCode_shouldUseNumericMaximum() {
+        when(dictMapper.acquireRootCodeLock(anyString(), anyInt())).thenReturn(1);
+        when(dictMapper.selectMaxRootCode()).thenReturn(100L);
+        when(dictMapper.releaseRootCodeLock(anyString())).thenReturn(1);
+        when(dictMapper.selectCount(any())).thenReturn(0L);
+        when(dictMapper.insert(any(DictEntity.class))).thenReturn(1);
+
+        dictService.create(createDTO);
+
+        ArgumentCaptor<DictEntity> entityCaptor = ArgumentCaptor.forClass(DictEntity.class);
+        verify(dictMapper).insert(entityCaptor.capture());
+        assertEquals("101", entityCaptor.getValue().getDictCode());
+        verify(dictMapper, never()).lockCodeAllocation(anyLong());
+        verify(dictMapper).releaseRootCodeLock(anyString());
+    }
+
+    @Test
+    @DisplayName("create: 根编码锁获取失败时拒绝创建")
+    void create_rootNodeWhenLockUnavailable_shouldThrowServerError() {
+        when(dictMapper.acquireRootCodeLock(anyString(), anyInt())).thenReturn(0);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> dictService.create(createDTO)
+        );
+
+        assertEquals(ErrorCodeEnum.SERVER_ERROR.getCode(), exception.getCode());
+        verify(dictMapper, never()).insert(any(DictEntity.class));
+        verify(dictMapper, never()).releaseRootCodeLock(anyString());
+    }
+
+    @Test
+    @DisplayName("create: 根节点保存异常时仍释放编码锁")
+    void create_rootNodeWhenSaveFails_shouldReleaseLock() {
+        when(dictMapper.acquireRootCodeLock(anyString(), anyInt())).thenReturn(1);
+        when(dictMapper.selectMaxRootCode()).thenReturn(100L);
+        when(dictMapper.selectCount(any())).thenReturn(0L);
+        when(dictMapper.insert(any(DictEntity.class))).thenThrow(new RuntimeException("insert failed"));
+
+        assertThrows(RuntimeException.class, () -> dictService.create(createDTO));
+
+        verify(dictMapper).releaseRootCodeLock(anyString());
+    }
+
+    @Test
+    @DisplayName("create: 子编码超过两位时按数字递增")
+    void create_childNodeWithThreeDigitSuffix_shouldUseNumericMaximum() {
+        createDTO.setParentId(1L);
+
+        when(dictMapper.lockCodeAllocation(1L)).thenReturn(1L);
+        when(dictMapper.selectMaxChildSuffix(1L)).thenReturn(100L);
+        when(dictMapper.selectById(1L)).thenReturn(rootEntity);
+        when(dictMapper.selectCount(any())).thenReturn(0L);
+        when(dictMapper.insert(any(DictEntity.class))).thenReturn(1);
+
+        dictService.create(createDTO);
+
+        ArgumentCaptor<DictEntity> entityCaptor = ArgumentCaptor.forClass(DictEntity.class);
+        verify(dictMapper).insert(entityCaptor.capture());
+        assertEquals("1.101", entityCaptor.getValue().getDictCode());
+        verify(dictMapper).lockCodeAllocation(1L);
+    }
+
+    @Test
+    @DisplayName("create: 子编码超过 Integer 上限时仍按 Long 递增")
+    void create_childNodeAboveIntegerLimit_shouldUseLongSuffix() {
+        createDTO.setParentId(1L);
+        when(dictMapper.lockCodeAllocation(1L)).thenReturn(1L);
+        when(dictMapper.selectMaxChildSuffix(1L)).thenReturn(2_147_483_648L);
+        when(dictMapper.selectById(1L)).thenReturn(rootEntity);
+        when(dictMapper.selectCount(any())).thenReturn(0L);
+        when(dictMapper.insert(any(DictEntity.class))).thenReturn(1);
+
+        dictService.create(createDTO);
+
+        ArgumentCaptor<DictEntity> entityCaptor = ArgumentCaptor.forClass(DictEntity.class);
+        verify(dictMapper).insert(entityCaptor.capture());
+        assertEquals("1.2147483649", entityCaptor.getValue().getDictCode());
+    }
+
+    @Test
+    @DisplayName("create: 父节点不存在时拒绝创建子字典")
+    void create_childNodeWhenParentLockMissing_shouldThrowDataNotFound() {
+        createDTO.setParentId(999L);
+        when(dictMapper.lockCodeAllocation(999L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> dictService.create(createDTO)
+        );
+
+        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+        verify(dictMapper, never()).insert(any(DictEntity.class));
+    }
+
+    @Test
     @DisplayName("create: 字典编码已存在时抛出异常")
     void create_whenDictCodeExists_shouldThrowException() {
         when(dictMapper.selectList(any())).thenReturn(Arrays.asList(rootEntity));
@@ -279,13 +380,13 @@ class DictServiceImplTest {
     @Test
     @DisplayName("remove: 删除成功（无子节点）")
     void remove_shouldSuccess() {
-        when(dictMapper.selectById(2L)).thenReturn(childEntity);
+        when(dictMapper.selectById(1L)).thenReturn(rootEntity);
         when(dictMapper.selectCount(any())).thenReturn(0L);
-        when(dictMapper.deleteById(2L)).thenReturn(1);
+        when(dictMapper.deleteById(1L)).thenReturn(1);
 
-        dictService.remove(2L);
+        dictService.remove(1L);
 
-        verify(dictMapper, times(1)).deleteById(2L);
+        verify(dictMapper, times(1)).deleteById(1L);
     }
 
     @Test
@@ -320,11 +421,11 @@ class DictServiceImplTest {
     void updateStatus_shouldSuccess() {
         when(dictMapper.selectById(1L)).thenReturn(rootEntity);
         when(dictMapper.selectList(any())).thenReturn(Collections.emptyList());
-        when(dictMapper.update(any(), any())).thenReturn(1);
+        when(dictMapper.updateById(any(DictEntity.class))).thenReturn(1);
 
         dictService.updateStatus(1L, 0);
 
-        verify(dictMapper, times(1)).update(any(), any());
+        verify(dictMapper, times(1)).updateById(any(DictEntity.class));
     }
 
     // ==================== listTree 测试 ====================

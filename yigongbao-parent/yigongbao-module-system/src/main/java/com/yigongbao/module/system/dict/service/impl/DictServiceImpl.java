@@ -15,8 +15,11 @@ import com.yigongbao.module.system.dict.vo.DictVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import cn.hutool.core.util.StrUtil;
 
 import java.util.ArrayList;
@@ -39,6 +42,8 @@ import java.util.stream.Collectors;
 public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> implements DictService {
 
     private static final Long ROOT_PARENT_ID = 0L;
+    private static final String ROOT_CODE_LOCK_NAME = "yigongbao:sys_dict:root_code";
+    private static final int ROOT_CODE_LOCK_TIMEOUT_SECONDS = 5;
 
     /**
      * 字典类型列表（根节点）
@@ -194,6 +199,34 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void create(CreateDictDTO dto) {
+        boolean releaseRootLockImmediately = false;
+        if (ROOT_PARENT_ID.equals(dto.getParentId())) {
+            Integer lockResult = baseMapper.acquireRootCodeLock(
+                    ROOT_CODE_LOCK_NAME, ROOT_CODE_LOCK_TIMEOUT_SECONDS);
+            if (!Integer.valueOf(1).equals(lockResult)) {
+                log.warn("根字典编码锁获取失败: result={}", lockResult);
+                throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
+            }
+            releaseRootLockImmediately = !registerRootLockReleaseAfterTransaction();
+        } else {
+            // 子节点通过锁定父节点串行分配编码，避免并发创建生成相同 dictCode
+            Long lockedParentId = baseMapper.lockCodeAllocation(dto.getParentId());
+            if (lockedParentId == null) {
+                throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+            }
+        }
+
+        try {
+            createWithAllocatedCode(dto);
+        } finally {
+            // 单元测试或无事务调用场景没有事务同步回调，需要立即释放命名锁。
+            if (releaseRootLockImmediately) {
+                releaseRootCodeLock();
+            }
+        }
+    }
+
+    private void createWithAllocatedCode(CreateDictDTO dto) {
         // 校验字典编码唯一性
         String newDictCode = generateDictCode(dto.getParentId());
         if (isDictCodeExists(newDictCode, null)) {
@@ -221,6 +254,36 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
         save(entity);
         log.info("创建字典: id={}, dictCode={}, dictName={}, parentId={}",
             entity.getId(), newDictCode, dto.getDictName(), dto.getParentId());
+    }
+
+    private boolean registerRootLockReleaseAfterTransaction() {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return false;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public int getOrder() {
+                // 在 MyBatis 关闭事务 SqlSession 前，用持有命名锁的同一连接释放锁。
+                return DataSourceUtils.CONNECTION_SYNCHRONIZATION_ORDER - 2;
+            }
+
+            @Override
+            public void afterCompletion(int status) {
+                releaseRootCodeLock();
+            }
+        });
+        return true;
+    }
+
+    private void releaseRootCodeLock() {
+        try {
+            Integer releaseResult = baseMapper.releaseRootCodeLock(ROOT_CODE_LOCK_NAME);
+            if (!Integer.valueOf(1).equals(releaseResult)) {
+                log.warn("根字典编码锁释放异常: result={}", releaseResult);
+            }
+        } catch (Exception e) {
+            log.error("根字典编码锁释放失败", e);
+        }
     }
 
     /**
@@ -332,7 +395,7 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
     private String generateDictCode(Long parentId) {
         if (ROOT_PARENT_ID.equals(parentId)) {
             // 根节点：查询最大根编码 + 1
-            return String.valueOf(getMaxRootCode() + 1);
+            return String.valueOf(nextCodePart(getMaxRootCode()));
         } else {
             // 子节点：查询父节点编码 + "." + 查询最大子编码的最后一个分段 + 1
             DictEntity parent = super.getById(parentId);
@@ -346,8 +409,21 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
             }
             // 解析最大子编码的最后一个分段
             String[] parts = maxChildCode.split("\\.");
-            int lastPart = Integer.parseInt(parts[parts.length - 1]);
-            return parentCode + "." + (lastPart + 1);
+            long lastPart = Long.parseLong(parts[parts.length - 1]);
+            String newCode = parentCode + "." + nextCodePart(lastPart);
+            if (newCode.length() > 32) {
+                throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
+            }
+            return newCode;
+        }
+    }
+
+    private long nextCodePart(long current) {
+        try {
+            return Math.addExact(current, 1L);
+        } catch (ArithmeticException e) {
+            log.error("字典编码数值已达到上限: current={}", current);
+            throw new BusinessException(ErrorCodeEnum.SERVER_ERROR);
         }
     }
 
@@ -390,16 +466,9 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
      *
      * @return 最大根编码的数值
      */
-    private int getMaxRootCode() {
-        List<DictEntity> list = list(new LambdaQueryWrapper<DictEntity>()
-                .eq(DictEntity::getParentId, ROOT_PARENT_ID)
-                .orderByDesc(DictEntity::getDictCode)
-                .last("LIMIT 1"));
-        if (list.isEmpty()) {
-            return 0;
-        }
-        String maxCode = list.get(0).getDictCode();
-        return Integer.parseInt(maxCode);
+    private long getMaxRootCode() {
+        Long maxCode = baseMapper.selectMaxRootCode();
+        return maxCode != null ? maxCode : 0L;
     }
 
     /**
@@ -409,14 +478,15 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, DictEntity> impleme
      * @return 最大子编码，不存在返回 null
      */
     private String getMaxChildCode(Long parentId) {
-        List<DictEntity> list = list(new LambdaQueryWrapper<DictEntity>()
-                .eq(DictEntity::getParentId, parentId)
-                .orderByDesc(DictEntity::getDictCode)
-                .last("LIMIT 1"));
-        if (list.isEmpty()) {
+        Long maxSuffix = baseMapper.selectMaxChildSuffix(parentId);
+        if (maxSuffix == null) {
             return null;
         }
-        return list.get(0).getDictCode();
+        DictEntity parent = super.getById(parentId);
+        if (parent == null) {
+            return null;
+        }
+        return parent.getDictCode() + "." + maxSuffix;
     }
 
     /**
