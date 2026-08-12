@@ -151,6 +151,7 @@ public class FlowCardExcelBuilder {
             }
 
             setCellValue(sheet, rowIndex, 0, product.getProductNo());
+            centerCellHorizontally(row.getCell(0));
             setCellValue(sheet, rowIndex, 2, product.getProductName());
             setCellValue(sheet, rowIndex, 3, product.getSpecName());
             setCellValue(sheet, rowIndex, 4, "1");
@@ -172,6 +173,14 @@ public class FlowCardExcelBuilder {
                 targetCell.setCellStyle(sourceCell.getCellStyle());
             }
         }
+    }
+
+    private void centerCellHorizontally(Cell cell) {
+        if (cell == null) return;
+        CellStyle centeredStyle = cell.getSheet().getWorkbook().createCellStyle();
+        centeredStyle.cloneStyleFrom(cell.getCellStyle());
+        centeredStyle.setAlignment(HorizontalAlignment.CENTER);
+        cell.setCellStyle(centeredStyle);
     }
 
     private int getProcessRowIndex(String processType) {
@@ -198,8 +207,9 @@ public class FlowCardExcelBuilder {
             if (StrUtil.isNotBlank(processParams)) {
                 JSONObject p = JSONUtil.parseObj(processParams);
                 if (ProcessTypeEnum.PRINT.getCode().equals(processType)) {
-                    lines.add("层厚：" + p.getStr("layerThickness", "-") + "mm");
-                    lines.add("激光器功率：" + p.getStr("laserPower", "-") + "mW");
+                    // 数据字段映射：layerThickness=层厚、laserPower=激光器功率；Excel 固定按层厚、激光器功率顺序展示
+                    lines.add("层厚：" + p.getStr("layerThickness", "-") + " mm");
+                    lines.add("激光器功率：" + p.getStr("laserPower", "-") + " mW");
                 } else if (ProcessTypeEnum.WASH.getCode().equals(processType)) {
                     lines.add("酒精批号：" + p.getStr("alcoholBatchNo", "-"));
                     lines.add("浸泡程度：" + p.getStr("soakLevel", "-"));

@@ -1,6 +1,7 @@
 package com.yigongbao.module.production.helper;
 
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -101,6 +102,37 @@ class FlowCardExcelBuilderTest {
         String params = readPackParams(builder.build(context));
 
         assertEquals("纸塑袋热封温度：180℃\n热封时间：30秒", params);
+    }
+
+    @Test
+    void buildPrintParamsShowsChineseLabels() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        FlowCardExcelBuilder.ProcessInfo process = new FlowCardExcelBuilder.ProcessInfo();
+        process.setProcessType("print");
+        process.setProcessParams("{\"laserPower\":12,\"layerThickness\":12}");
+        context.setProcesses(List.of(process));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(builder.build(context)))) {
+            String params = workbook.getSheetAt(0).getRow(8).getCell(4).getStringCellValue();
+            assertEquals("层厚：12 mm\n激光器功率：12 mW", params);
+        }
+    }
+
+    @Test
+    void buildProductsCentersProductNumbersOnEveryRow() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        FlowCardExcelBuilder.ProductInfo first = new FlowCardExcelBuilder.ProductInfo();
+        first.setProductNo("PROD001");
+        FlowCardExcelBuilder.ProductInfo second = new FlowCardExcelBuilder.ProductInfo();
+        second.setProductNo("PROD002");
+        context.setProducts(List.of(first, second));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(builder.build(context)))) {
+            assertEquals(HorizontalAlignment.CENTER,
+                    workbook.getSheetAt(0).getRow(16).getCell(0).getCellStyle().getAlignment());
+            assertEquals(HorizontalAlignment.CENTER,
+                    workbook.getSheetAt(0).getRow(17).getCell(0).getCellStyle().getAlignment());
+        }
     }
 
     private FlowCardExcelBuilder.BuildContext buildPackContext(String processParams) {
