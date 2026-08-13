@@ -79,7 +79,8 @@ BEGIN
         c.order_center_id = om.center_id,
         c.device_center_id = d.center_id,
         c.user_center_id = su.center_id,
-        c.resolved_center_id = COALESCE(pr.processing_center_id, om.center_id, d.center_id, su.center_id);
+        c.resolved_center_id = COALESCE(pr.processing_center_id, om.center_id, d.center_id, su.center_id)
+    WHERE c.record_id = pr.id;
 
     SELECT COUNT(*) INTO v_candidate_count
     FROM tmp_production_record_center_backfill;

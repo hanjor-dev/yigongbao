@@ -10,9 +10,23 @@ param(
 
 $ErrorActionPreference = "Stop"
 $migrationFile = (Resolve-Path (Join-Path $PSScriptRoot "..\migration-production-record-processing-center-2026-08-13.sql")).Path
+$migrationSql = Get-Content -LiteralPath $migrationFile -Raw -Encoding UTF8
 
 if ($TestDatabase -notmatch '^codex_[a-zA-Z0-9_]+$') {
     throw "Refusing to recreate non-test database: $TestDatabase"
+}
+
+$updateStatements = [regex]::Matches(
+    $migrationSql,
+    '(?ims)^\s*UPDATE\s+.+?(?=^\s*(?:SELECT|UPDATE|DELETE|INSERT|IF|COMMIT|DROP|END\s+IF|END\s+\$\$))'
+)
+if ($updateStatements.Count -eq 0) {
+    throw "Migration contains no UPDATE statements to verify."
+}
+foreach ($statement in $updateStatements) {
+    if ($statement.Value -notmatch '(?im)^\s*WHERE\b') {
+        throw "Unsafe migration UPDATE without explicit WHERE: $($statement.Value.Trim())"
+    }
 }
 
 $previousMysqlPassword = $env:MYSQL_PWD
@@ -52,8 +66,7 @@ function Invoke-MySql {
 
 function Invoke-Migration {
     param([switch]$ExpectFailure)
-    $sql = Get-Content -LiteralPath $migrationFile -Raw -Encoding UTF8
-    Invoke-MySql -Sql $sql -ExpectFailure:$ExpectFailure
+    Invoke-MySql -Sql $migrationSql -ExpectFailure:$ExpectFailure
 }
 
 function Assert-Scalar {
