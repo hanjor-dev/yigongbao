@@ -19,7 +19,7 @@ pr.print_start_time <= endTime
 ## 查询语义
 
 - `startTime` 非空：继续使用 `pr.print_start_time >= startTime`。
-- `endTime` 非空：使用 `pr.print_start_time < endTime + 1 天`。
+- `endTime` 非空：忽略其时分秒，取其日历日期的次日零点作为排他上界。
 - 两者均为空：不增加时间条件。
 - 时间范围继续按流转卡打印开始时间 `production_record.print_start_time` 筛选。
 - 明细查询与总数查询必须使用完全相同的时间条件。
@@ -45,24 +45,45 @@ print_start_time <  2026-08-14 00:00:00
 ## 实现设计
 
 保留 `ProductLedgerExportDTO.endTime` 的 `LocalDateTime` 类型和 Controller 接口不变。在
-`ProductionProductMapper` 的明细与计数 SQL 中，通过 MySQL `DATE_ADD(#{dto.endTime}, INTERVAL 1 DAY)`
-计算排他上界：
+`ProductionProductMapper` 的明细与计数 SQL 中，通过 MySQL
+`DATE_ADD(DATE(#{dto.endTime}), INTERVAL 1 DAY)` 先截取日历日期，再计算排他上界：
 
 ```sql
-AND pr.print_start_time < DATE_ADD(#{dto.endTime}, INTERVAL 1 DAY)
+AND pr.print_start_time < DATE_ADD(DATE(#{dto.endTime}), INTERVAL 1 DAY)
 ```
 
-Service 层现有的“开始时间不能晚于结束时间”校验保持不变。数据权限、产品状态范围、排序、1 万条限制和 Excel 展示均不修改。
+因此即使调用方传入 `2026-08-13T15:00:00`，结束日期仍只解释为 2026-08-13，
+有效上界为 `2026-08-14T00:00:00`，不会多包含次日下午。
+
+Service 层将范围校验同步调整为比较实际查询边界：
+
+```text
+exclusiveEnd = endTime.toLocalDate().plusDays(1).atStartOfDay()
+startTime 必须早于 exclusiveEnd
+```
+
+这样 `startTime=2026-08-13T15:00:00`、`endTime=2026-08-13T00:00:00` 是有效的同日范围；
+若 `startTime >= 2026-08-14T00:00:00`，则继续抛出“开始时间不能晚于结束时间”。
+
+数据权限、产品状态范围、排序、1 万条限制和 Excel 展示均不修改。
 
 ## 测试
 
 先更新 `ProductionProductMapperSqlTest`，使测试在旧 SQL 下失败，再修改生产 SQL：
 
-- 明细查询使用 `print_start_time < DATE_ADD(endTime, INTERVAL 1 DAY)`；
+- 明细查询使用 `print_start_time < DATE_ADD(DATE(endTime), INTERVAL 1 DAY)`；
 - 计数查询使用相同条件；
 - 两条查询不再包含 `print_start_time <= endTime`；
 - 开始时间条件仍为 `print_start_time >= startTime`；
 - 其他过滤条件保持原有契约。
+
+为 Service 范围校验增加单元测试，覆盖同一天内“开始时刻晚于结束日期零点”仍合法，以及开始时刻达到次日零点时被拒绝。
+
+增加使用真实测试数据库执行的 Mapper 边界测试，至少插入并验证：
+
+- 结束日期当天下午的打印记录被命中；
+- 次日零点的打印记录不被命中；
+- 非零点 `endTime` 仍以该日次日零点为上界。
 
 完成后运行 Mapper SQL 契约测试和生产模块完整测试。
 
