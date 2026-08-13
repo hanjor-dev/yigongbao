@@ -4,6 +4,7 @@ import com.yigongbao.module.dashboard.enums.TimeRangeEnum;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -92,5 +93,14 @@ class TimeRangeUtilTest {
         assertEquals(12, labels.size());
         assertEquals("1月", labels.get(0));
         assertEquals("12月", labels.get(11));
+    }
+
+    @Test
+    void exclusiveRangeEndsAtNextDayStart() {
+        LocalDateTime[] range = TimeRangeUtil.getStartAndEndExclusiveTime(
+                TimeRangeEnum.CUSTOM, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 13));
+
+        assertEquals(LocalDateTime.of(2026, 8, 1, 0, 0), range[0]);
+        assertEquals(LocalDateTime.of(2026, 8, 14, 0, 0), range[1]);
     }
 }

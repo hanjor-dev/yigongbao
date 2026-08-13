@@ -31,6 +31,12 @@ public class TimeRangeUtil {
         return getStartAndEndTime(timeRange);
     }
 
+    /** 返回左闭右开的时间范围：[startInclusive, endExclusive)。 */
+    public static LocalDateTime[] getStartAndEndExclusiveTime(TimeRangeEnum timeRange, LocalDate startDate, LocalDate endDate) {
+        LocalDateTime[] inclusive = getStartAndEndTime(timeRange, startDate, endDate);
+        return new LocalDateTime[]{inclusive[0], inclusive[1].toLocalDate().plusDays(1).atStartOfDay()};
+    }
+
     /**
      * 获取时间范围的起止时间（预定义范围）
      * @return [startTime, endTime]
