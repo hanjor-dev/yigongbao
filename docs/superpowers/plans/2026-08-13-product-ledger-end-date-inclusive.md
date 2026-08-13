@@ -4,7 +4,7 @@
 
 **Goal:** 让生产产品台账导出的结束日期包含所选日期全天，并确保次日零点及之后的数据不被误导出。
 
-**Architecture:** 保留接口 DTO 的 `LocalDateTime` 类型。Service 在查询前把结束时间规范化为所选日期的次日零点并据此校验范围，Mapper 使用跨 MySQL/H2 的 `print_start_time < endTime` 半开区间；SQL 契约测试、Service 单元测试和真实 Mapper/H2 边界测试共同锁定行为。
+**Architecture:** 保留接口 DTO 的 `LocalDateTime` 类型。Service 创建查询 DTO 副本，把副本的结束时间规范化为所选日期的次日零点并据此校验范围，Mapper 使用跨 MySQL/H2 的 `print_start_time < endTime` 半开区间；SQL 契约测试、Service 单元测试和真实 Mapper/H2 边界测试共同锁定行为。
 
 **Tech Stack:** Java 21、Spring Boot、MyBatis-Plus、MySQL、H2 MySQL compatibility mode、JUnit 5、Mockito、Maven
 
@@ -13,7 +13,7 @@
 ## 文件结构
 
 - Modify: `yigongbao-parent/yigongbao-module-production/src/main/java/com/yigongbao/module/production/product/mapper/ProductionProductMapper.java` — 明细和计数查询的结束日期条件。
-- Modify: `yigongbao-parent/yigongbao-module-production/src/main/java/com/yigongbao/module/production/record/service/impl/ProductionRecordServiceImpl.java` — 规范化结束时间并按实际排他上界校验范围。
+- Modify: `yigongbao-parent/yigongbao-module-production/src/main/java/com/yigongbao/module/production/record/service/impl/ProductionRecordServiceImpl.java` — 创建查询副本、规范化结束时间并按实际排他上界校验范围。
 - Modify: `yigongbao-parent/yigongbao-module-production/src/test/java/com/yigongbao/module/production/product/mapper/ProductionProductMapperSqlTest.java` — 锁定两条 SQL 的半开区间契约。
 - Create: `yigongbao-parent/yigongbao-module-production/src/test/java/com/yigongbao/module/production/product/mapper/ProductionProductLedgerDateBoundaryTest.java` — 通过隔离的 H2 MySQL 模式数据库执行 Mapper，验证日期边界。
 - Create: `yigongbao-parent/yigongbao-module-production/src/test/java/com/yigongbao/module/production/record/service/impl/ProductionRecordLedgerDateValidationTest.java` — 隔离验证 Service 的有效范围判断。
@@ -82,7 +82,7 @@ Expected: 同日有效范围测试 FAIL，因为旧逻辑直接比较原始 `sta
 
 - [ ] **Step 4: 按排他上界校验**
 
-在 Service 中先规范化非空的结束时间，再仅当开始时间也非空时校验：
+在 Service 中先复制 DTO，再规范化副本中非空的结束时间；仅当开始时间也非空时校验：
 
 ```java
 LocalDateTime exclusiveEnd = dto.getEndTime().toLocalDate().plusDays(1).atStartOfDay();
@@ -91,6 +91,8 @@ if (dto.getStartTime() != null && !dto.getStartTime().isBefore(exclusiveEnd)) {
     throw new BusinessException(ErrorCodeEnum.PARAM_ERROR.getCode(), "开始时间不能晚于结束时间");
 }
 ```
+
+增加重复调用测试：同一原始 DTO 连续调用两次，捕获两次 Mapper 参数均为相同的次日零点，并断言原始 DTO 未被修改。
 
 - [ ] **Step 5: 运行测试并确认 GREEN**
 

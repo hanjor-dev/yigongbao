@@ -76,8 +76,10 @@ class ProductionProductMapperSqlTest {
                     () -> entry.getKey() + " must require a non-deleted order");
             assertTrue(query.contains("AND pr.print_start_time &gt;= #{dto.startTime}"),
                     () -> entry.getKey() + " must apply startTime to the print start time");
-            assertTrue(query.contains("AND pr.print_start_time &lt;= #{dto.endTime}"),
-                    () -> entry.getKey() + " must apply endTime to the print start time");
+            assertTrue(query.contains("AND pr.print_start_time &lt; #{dto.endTime}"),
+                    () -> entry.getKey() + " must treat endTime as an exclusive print-start upper bound");
+            assertFalse(query.contains("AND pr.print_start_time &lt;= #{dto.endTime}"),
+                    () -> entry.getKey() + " must not include the next-day midnight boundary");
             assertFalse(query.contains("AND om.create_time &gt;= #{dto.startTime}"),
                     () -> entry.getKey() + " must not apply startTime to the order creation time");
             assertFalse(query.contains("AND om.create_time &lt;= #{dto.endTime}"),

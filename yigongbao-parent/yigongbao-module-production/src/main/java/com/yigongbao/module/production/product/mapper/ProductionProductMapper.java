@@ -86,7 +86,7 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "  AND pr.print_start_time &gt;= #{dto.startTime} " +
             "</if>" +
             "<if test='dto.endTime != null'>" +
-            "  AND pr.print_start_time &lt;= #{dto.endTime} " +
+            "  AND pr.print_start_time &lt; #{dto.endTime} " +
             "</if>" +
             "<if test='dto.hospitalIds != null and dto.hospitalIds.size() > 0'>" +
             "  AND om.hospital_id IN " +
@@ -136,7 +136,7 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "  AND pr.print_start_time &gt;= #{dto.startTime} " +
             "</if>" +
             "<if test='dto.endTime != null'>" +
-            "  AND pr.print_start_time &lt;= #{dto.endTime} " +
+            "  AND pr.print_start_time &lt; #{dto.endTime} " +
             "</if>" +
             "<if test='dto.hospitalIds != null and dto.hospitalIds.size() > 0'>" +
             "  AND om.hospital_id IN " +

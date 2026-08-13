@@ -45,12 +45,14 @@ print_start_time <  2026-08-14 00:00:00
 ## 实现设计
 
 保留 `ProductLedgerExportDTO.endTime` 的 `LocalDateTime` 类型和 Controller 接口不变。Service 在查询前
-忽略原始结束时间的时分秒，将 DTO 中的 `endTime` 规范化为该日历日期的次日零点：
+创建查询 DTO 副本，忽略原始结束时间的时分秒，将副本中的 `endTime` 规范化为该日历日期的次日零点：
 
 ```text
 exclusiveEnd = endTime.toLocalDate().plusDays(1).atStartOfDay()
 dto.endTime = exclusiveEnd
 ```
+
+原始请求 DTO 不被修改，因此同一请求对象被重试或重复调用时不会再次增加一天。
 
 `ProductionProductMapper` 的明细与计数 SQL 只使用规范化后的排他上界：
 
@@ -86,6 +88,7 @@ startTime 必须早于 exclusiveEnd
 为 Service 规范化和范围校验增加单元测试，捕获传给 Mapper 的 DTO，并覆盖：
 
 - 原始结束时间无论是否为零点，传入 Mapper 时均为该日期的次日零点；
+- 同一原始 DTO 重复导出时，两次 Mapper 上界一致，原始 DTO 保持不变；
 - 同一天内“开始时刻晚于结束日期零点”仍合法；
 - 开始时刻达到次日零点时被拒绝。
 

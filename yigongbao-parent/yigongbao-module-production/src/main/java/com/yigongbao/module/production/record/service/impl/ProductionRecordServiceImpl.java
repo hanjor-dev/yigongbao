@@ -68,6 +68,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -1275,31 +1276,36 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
      */
     @Override
     public byte[] exportProductLedger(ProductLedgerExportDTO dto) {
-        // 应用数据权限：根据用户角色自动注入 hospitalIds 或 centerIds
-        applyDataScopeForExport(dto);
+        ProductLedgerExportDTO queryDto = BeanUtil.copyProperties(dto, ProductLedgerExportDTO.class);
 
-        // 时间范围合理性校验
-        if (dto.getStartTime() != null && dto.getEndTime() != null
-            && dto.getStartTime().isAfter(dto.getEndTime())) {
-            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR.getCode(), "开始时间不能晚于结束时间");
+        // 应用数据权限：根据用户角色自动注入 hospitalIds 或 centerIds
+        applyDataScopeForExport(queryDto);
+
+        // 结束日期按整天处理：规范化为次日零点，并作为排他上界
+        if (queryDto.getEndTime() != null) {
+            LocalDateTime exclusiveEnd = queryDto.getEndTime().toLocalDate().plusDays(1).atStartOfDay();
+            queryDto.setEndTime(exclusiveEnd);
+            if (queryDto.getStartTime() != null && !queryDto.getStartTime().isBefore(exclusiveEnd)) {
+                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR.getCode(), "开始时间不能晚于结束时间");
+            }
         }
 
         // 查询总数
-        Long totalCount = productMapper.countProductLedgerData(dto);
+        Long totalCount = productMapper.countProductLedgerData(queryDto);
         if (totalCount == 0) {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), "未查询到符合条件的数据");
         }
 
         // 查询数据（最多1万条）
-        List<Map<String, Object>> dataList = productMapper.listProductLedgerData(dto);
+        List<Map<String, Object>> dataList = productMapper.listProductLedgerData(queryDto);
 
-        log.info("导出生产产品台账: 总数={}, 实际导出={}, dto={}", totalCount, dataList.size(), dto);
+        log.info("导出生产产品台账: 总数={}, 实际导出={}, dto={}", totalCount, dataList.size(), queryDto);
 
         // 生成Excel
         try {
             return productLedgerExcelBuilder.build(dataList, totalCount);
         } catch (Exception e) {
-            log.error("导出生产产品台账失败: dto={}", dto, e);
+            log.error("导出生产产品台账失败: dto={}", queryDto, e);
             throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR.getCode(), "Excel生成失败：" + e.getMessage());
         }
     }
