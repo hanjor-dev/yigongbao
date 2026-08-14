@@ -58,8 +58,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
@@ -94,8 +92,7 @@ class ProductionRecordServiceImplTest {
     @Mock private FlowCardExcelBuilder flowCardExcelBuilder;
     @Mock private com.yigongbao.module.basic.file.service.FileService fileService;
     @Mock private PrinterDeviceUsageChecker usageChecker;
-    @Mock private ObjectProvider<PrinterDeviceUsageChecker> usageCheckerProvider;
-    @Mock private ObjectProvider<PrinterAvailabilityService> availabilityServiceProvider;
+    @Mock private PrinterAvailabilityService availabilityService;
 
     @InjectMocks
     private ProductionRecordServiceImpl recordService;
@@ -105,11 +102,9 @@ class ProductionRecordServiceImplTest {
         Field f = ServiceImpl.class.getDeclaredField("baseMapper");
         f.setAccessible(true);
         f.set(recordService, recordMapper);
-        PrinterAvailabilityService availabilityService = new PrinterAvailabilityService(usageChecker);
-        lenient().when(usageCheckerProvider.getObject()).thenReturn(usageChecker);
-        lenient().when(availabilityServiceProvider.getObject()).thenReturn(availabilityService);
-        ReflectionTestUtils.setField(recordService, "printerDeviceUsageCheckerProvider", usageCheckerProvider);
-        ReflectionTestUtils.setField(recordService, "printerAvailabilityServiceProvider", availabilityServiceProvider);
+        PrinterAvailabilityService realAvailabilityService = new PrinterAvailabilityService(usageChecker);
+        lenient().when(availabilityService.toPrinterVOs(any())).thenAnswer(invocation ->
+                realAvailabilityService.toPrinterVOs(invocation.getArgument(0)));
 
         if (TableInfoHelper.getTableInfo(ProductionRecordEntity.class) == null) {
             MapperBuilderAssistant assistant = new MapperBuilderAssistant(

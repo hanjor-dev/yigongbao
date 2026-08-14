@@ -54,7 +54,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -94,10 +93,7 @@ class ProductionRecordAssignDeviceTest {
     @Mock private ProductionProcessMapper processMapper;
     @Mock private ProductionProductMapper productMapper;
     @Mock private PrinterDeviceUsageChecker usageChecker;
-    @Mock private ObjectProvider<PrinterDeviceUsageChecker> usageCheckerProvider;
-    @Mock private ObjectProvider<PrinterAvailabilityService> availabilityServiceProvider;
-
-    private PrinterAvailabilityService availabilityService;
+    @Mock private PrinterAvailabilityService availabilityService;
 
     @Spy
     @InjectMocks
@@ -114,11 +110,11 @@ class ProductionRecordAssignDeviceTest {
     @BeforeEach
     void setBaseMapper() {
         ReflectionTestUtils.setField(service, "baseMapper", recordMapper);
-        availabilityService = spy(new PrinterAvailabilityService(usageChecker));
-        lenient().when(usageCheckerProvider.getObject()).thenReturn(usageChecker);
-        lenient().when(availabilityServiceProvider.getObject()).thenReturn(availabilityService);
-        ReflectionTestUtils.setField(service, "printerDeviceUsageCheckerProvider", usageCheckerProvider);
-        ReflectionTestUtils.setField(service, "printerAvailabilityServiceProvider", availabilityServiceProvider);
+        PrinterAvailabilityService realAvailabilityService = new PrinterAvailabilityService(usageChecker);
+        lenient().doAnswer(invocation -> {
+            realAvailabilityService.requireAvailable(invocation.getArgument(0), invocation.getArgument(1));
+            return null;
+        }).when(availabilityService).requireAvailable(any(DeviceEntity.class), anyBoolean());
     }
 
     @Test

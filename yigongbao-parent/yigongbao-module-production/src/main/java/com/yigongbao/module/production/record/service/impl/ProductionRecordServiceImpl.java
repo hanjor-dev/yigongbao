@@ -65,8 +65,6 @@ import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -115,10 +113,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final ApplicationEventPublisher eventPublisher;
     private final IDeviceUsageCounterService deviceUsageCounterService;
     private final IProductNumberService productNumberService;
-    @Autowired
-    private ObjectProvider<PrinterDeviceUsageChecker> printerDeviceUsageCheckerProvider;
-    @Autowired
-    private ObjectProvider<PrinterAvailabilityService> printerAvailabilityServiceProvider;
+    private final PrinterDeviceUsageChecker printerDeviceUsageChecker;
+    private final PrinterAvailabilityService printerAvailabilityService;
 
     private static final List<Integer> NORMAL_PRODUCTION_STATUSES = List.of(
             FlowStatusEnum.DESIGN_COMPLETED.getValue(),
@@ -656,8 +652,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
 
         // 3. 批量查询生产占用并统一转换为 PrinterVO
-        Map<Long, PrinterVO> printerById = printerAvailabilityServiceProvider.getObject()
-            .toPrinterVOs(devices).stream()
+        Map<Long, PrinterVO> printerById = printerAvailabilityService.toPrinterVOs(devices).stream()
             .collect(Collectors.toMap(PrinterVO::getId, vo -> vo));
         Map<Long, List<PrinterVO>> centerPrintersMap = devices.stream()
             .collect(Collectors.groupingBy(
@@ -694,9 +689,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (device == null) {
             throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
         }
-        PrinterDeviceUsageChecker usageChecker = printerDeviceUsageCheckerProvider.getObject();
-        boolean activeUsage = usageChecker.isInUse(device.getId());
-        printerAvailabilityServiceProvider.getObject().requireAvailable(device, activeUsage);
+        boolean activeUsage = printerDeviceUsageChecker.isInUse(device.getId());
+        printerAvailabilityService.requireAvailable(device, activeUsage);
 
         ProductionRecordEntity record = baseMapper.selectByIdForUpdate(recordId);
         if (record == null) {
