@@ -10,6 +10,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.service.PrinterDeviceUsageChecker;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -48,6 +49,7 @@ import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
+import com.yigongbao.module.production.record.service.PrinterAvailabilityService;
 import com.yigongbao.module.production.helper.FlowCardExcelBuilder;
 import com.yigongbao.common.event.ProductionCardClaimedEvent;
 import com.yigongbao.module.production.device.service.IDeviceUsageCounterService;
@@ -63,6 +65,8 @@ import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -111,6 +115,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final ApplicationEventPublisher eventPublisher;
     private final IDeviceUsageCounterService deviceUsageCounterService;
     private final IProductNumberService productNumberService;
+    @Autowired
+    private ObjectProvider<PrinterDeviceUsageChecker> printerDeviceUsageCheckerProvider;
+    @Autowired
+    private ObjectProvider<PrinterAvailabilityService> printerAvailabilityServiceProvider;
 
     private static final List<Integer> NORMAL_PRODUCTION_STATUSES = List.of(
             FlowStatusEnum.DESIGN_COMPLETED.getValue(),
@@ -647,21 +655,14 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                     .eq(DeviceEntity::getIsDeleted, StatusConstants.NO));
         }
 
-        // 3. 转换为 PrinterVO 并按加工中心分组
+        // 3. 批量查询生产占用并统一转换为 PrinterVO
+        Map<Long, PrinterVO> printerById = printerAvailabilityServiceProvider.getObject()
+            .toPrinterVOs(devices).stream()
+            .collect(Collectors.toMap(PrinterVO::getId, vo -> vo));
         Map<Long, List<PrinterVO>> centerPrintersMap = devices.stream()
-            .map(d -> {
-                PrinterVO vo = new PrinterVO();
-                vo.setId(d.getId());
-                vo.setDeviceNo(d.getDeviceId());
-                vo.setDeviceName(d.getDeviceName());
-                int statusCode = resolveDeviceStatus(d);
-                vo.setStatus(statusCode);
-                vo.setStatusName(statusCode == 0 ? "空闲" : "占用");
-                return new Object[]{d.getCenterId(), d.getCenterName(), vo};
-            })
             .collect(Collectors.groupingBy(
-                arr -> (Long) arr[0],
-                Collectors.mapping(arr -> (PrinterVO) arr[2], Collectors.toList())
+                DeviceEntity::getCenterId,
+                Collectors.mapping(d -> printerById.get(d.getId()), Collectors.toList())
             ));
 
         // 4. 构建返回结果（保留加工中心名称）
@@ -688,43 +689,20 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     @Override
     @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void assignDevice(Long recordId, AssignDeviceDTO dto) {
-        // 先做一次无锁快速校验；随后按“设备 -> 流转卡”的固定顺序加锁，
-        // 避免与“设备状态落库 -> 监听器更新流转卡”的事务形成死锁环。
-        ProductionRecordEntity record = baseMapper.selectById(recordId);
-        if (record == null) {
-            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
-        }
-        validateRecordCanAssignDevice(record);
-
+        // 始终按“设备 -> 流转卡”顺序加锁，锁设备后再查询实时占用。
         DeviceEntity device = deviceMapper.selectByIdForUpdate(dto.getDeviceId());
         if (device == null) {
             throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
         }
-        // 校验设备在线且未被占用
-        if (resolveDeviceStatus(device) != 0) {
-            throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
-        }
+        PrinterDeviceUsageChecker usageChecker = printerDeviceUsageCheckerProvider.getObject();
+        boolean activeUsage = usageChecker.isInUse(device.getId());
+        printerAvailabilityServiceProvider.getObject().requireAvailable(device, activeUsage);
 
-        record = baseMapper.selectByIdForUpdate(recordId);
+        ProductionRecordEntity record = baseMapper.selectByIdForUpdate(recordId);
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
         validateRecordCanAssignDevice(record);
-
-        // 检查是否有其他流转卡正在使用该设备（悲观锁防止并发分配）
-        ProductionRecordEntity conflictRecord = baseMapper.selectOne(new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getPrintDeviceId, device.getId())
-                .in(ProductionRecordEntity::getStatus, List.of(
-                        FlowStatusEnum.PENDING_PRINT.getValue(),
-                        FlowStatusEnum.PRINTING.getValue()))
-                .ne(ProductionRecordEntity::getId, recordId)
-                .select(ProductionRecordEntity::getId)
-                .last("LIMIT 1 FOR UPDATE"));
-        if (conflictRecord != null) {
-            log.warn("设备已被其他流转卡占用: deviceId={}, conflictRecordId={}, currentRecordId={}",
-                device.getId(), conflictRecord.getId(), recordId);
-            throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
-        }
 
         Long userId = StpUtil.getLoginIdAsLong();
         com.yigongbao.module.system.user.entity.UserEntity currentUser = userMapper.selectById(userId);
@@ -927,15 +905,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 .filter(e -> e.getCode().equals(vo.getCurrentProcess()))
                 .findFirst()
                 .ifPresent(e -> vo.setCurrentProcessName(e.getDesc()));
-    }
-
-    /** 返回设备可用状态：0=空闲可用，1=占用不可用（state=0空闲，非0占用） */
-    private int resolveDeviceStatus(DeviceEntity device) {
-        if (device.getConnectionStatus() == null || device.getConnectionStatus() == 0) {
-            return 1;  // 离线视为占用
-        }
-        // state=0 空闲，非0 占用
-        return (device.getState() != null && device.getState() == 0) ? 0 : 1;
     }
 
     @Override

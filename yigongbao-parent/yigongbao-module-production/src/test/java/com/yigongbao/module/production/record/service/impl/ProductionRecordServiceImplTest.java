@@ -11,8 +11,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.service.PrinterDeviceUsageChecker;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
@@ -36,6 +38,7 @@ import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.SaveProductionColumnConfigDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
+import com.yigongbao.module.production.record.service.PrinterAvailabilityService;
 import com.yigongbao.module.production.record.vo.ProductionColumnConfigVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import com.yigongbao.module.system.config.service.ConfigService;
@@ -55,6 +58,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
@@ -62,6 +67,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -87,6 +93,9 @@ class ProductionRecordServiceImplTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private FlowCardExcelBuilder flowCardExcelBuilder;
     @Mock private com.yigongbao.module.basic.file.service.FileService fileService;
+    @Mock private PrinterDeviceUsageChecker usageChecker;
+    @Mock private ObjectProvider<PrinterDeviceUsageChecker> usageCheckerProvider;
+    @Mock private ObjectProvider<PrinterAvailabilityService> availabilityServiceProvider;
 
     @InjectMocks
     private ProductionRecordServiceImpl recordService;
@@ -96,6 +105,11 @@ class ProductionRecordServiceImplTest {
         Field f = ServiceImpl.class.getDeclaredField("baseMapper");
         f.setAccessible(true);
         f.set(recordService, recordMapper);
+        PrinterAvailabilityService availabilityService = new PrinterAvailabilityService(usageChecker);
+        lenient().when(usageCheckerProvider.getObject()).thenReturn(usageChecker);
+        lenient().when(availabilityServiceProvider.getObject()).thenReturn(availabilityService);
+        ReflectionTestUtils.setField(recordService, "printerDeviceUsageCheckerProvider", usageCheckerProvider);
+        ReflectionTestUtils.setField(recordService, "printerAvailabilityServiceProvider", availabilityServiceProvider);
 
         if (TableInfoHelper.getTableInfo(ProductionRecordEntity.class) == null) {
             MapperBuilderAssistant assistant = new MapperBuilderAssistant(
@@ -358,6 +372,45 @@ class ProductionRecordServiceImplTest {
 
         assertEquals(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND.getCode(), exception.getCode());
         verify(processMapper, never()).selectOne(any());
+    }
+
+    @Test
+    void listPrinters_usesBulkUsageAndSharedAvailabilityFields() {
+        UserEntity admin = new UserEntity();
+        admin.setRoleCode(RoleCodeEnum.ADMIN.getCode());
+        when(userMapper.selectById(1L)).thenReturn(admin);
+        DeviceEntity free = device(1L);
+        free.setConnectionStatus(1);
+        free.setState(0);
+        DeviceEntity active = device(2L);
+        active.setConnectionStatus(1);
+        active.setState(0);
+        DeviceEntity working = device(3L);
+        working.setConnectionStatus(1);
+        working.setState(1);
+        DeviceEntity offline = device(4L);
+        offline.setConnectionStatus(0);
+        offline.setState(0);
+        List<DeviceEntity> devices = List.of(free, active, working, offline);
+        when(deviceMapper.selectList(any())).thenReturn(devices);
+        when(usageChecker.findActiveDeviceIds(List.of(1L, 2L, 3L, 4L))).thenReturn(Set.of(2L));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            var result = recordService.listPrinters();
+
+            assertEquals(1, result.size());
+            var printers = result.get(0).getPrinters();
+            assertEquals(List.of(0, 1, 1, 1), printers.stream().map(p -> p.getStatus()).toList());
+            assertEquals(List.of("空闲", "占用", "占用", "占用"),
+                    printers.stream().map(p -> p.getStatusName()).toList());
+            assertEquals(List.of(true, false, false, false),
+                    printers.stream().map(p -> p.getAvailable()).toList());
+            assertEquals("工作中", printers.get(2).getDeviceStateName());
+            assertEquals(0, printers.get(3).getConnectionStatus());
+        }
+
+        verify(usageChecker).findActiveDeviceIds(List.of(1L, 2L, 3L, 4L));
     }
 
     // ---- getQrCodeUrl ----

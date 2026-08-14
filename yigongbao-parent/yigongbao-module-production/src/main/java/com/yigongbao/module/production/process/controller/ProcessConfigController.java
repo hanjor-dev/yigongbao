@@ -13,6 +13,7 @@ import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.production.enums.ProcessTypeEnum;
 import com.yigongbao.module.production.process.vo.ProcessingCenterDevicesVO;
 import com.yigongbao.module.production.record.vo.PrinterVO;
+import com.yigongbao.module.production.record.service.PrinterAvailabilityService;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
@@ -46,6 +47,7 @@ public class ProcessConfigController {
     private final ObjectMapper objectMapper;
     private final DeviceMapper deviceMapper;
     private final UserMapper userMapper;
+    private final PrinterAvailabilityService printerAvailabilityService;
 
     private static final List<Map<String, Object>> PROCESS_STEPS = Arrays.stream(ProcessTypeEnum.values())
             .map(e -> {
@@ -100,19 +102,13 @@ public class ProcessConfigController {
         Map<Long, String> centerNameMap = devices.stream()
                 .collect(Collectors.toMap(DeviceEntity::getCenterId, DeviceEntity::getCenterName, (v1, v2) -> v1));
 
+        Map<Long, PrinterVO> printerById = printerAvailabilityService.toPrinterVOs(devices).stream()
+                .collect(Collectors.toMap(PrinterVO::getId, vo -> vo));
+
         Map<Long, List<PrinterVO>> grouped = devices.stream()
                 .collect(Collectors.groupingBy(
                         DeviceEntity::getCenterId,
-                        Collectors.mapping(d -> {
-                            PrinterVO vo = new PrinterVO();
-                            vo.setId(d.getId());
-                            vo.setDeviceNo(d.getDeviceId());
-                            vo.setDeviceName(d.getDeviceName());
-                            int s = (d.getConnectionStatus() == null || d.getConnectionStatus() == 0 || (d.getState() != null && d.getState() != 0)) ? 1 : 0;
-                            vo.setStatus(s);
-                            vo.setStatusName(s == 0 ? "空闲" : "占用");
-                            return vo;
-                        }, Collectors.toList())
+                        Collectors.mapping(d -> printerById.get(d.getId()), Collectors.toList())
                 ));
 
         List<ProcessingCenterDevicesVO> result = grouped.entrySet().stream()

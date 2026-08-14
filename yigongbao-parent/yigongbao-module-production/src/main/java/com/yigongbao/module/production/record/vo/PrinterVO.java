@@ -13,7 +13,11 @@ public class PrinterVO {
     private Long id;
     private String deviceNo;
     private String deviceName;
-    /** 0=离线, 1=可使用, 2=使用中 */
+    /** 0=可用, 1=不可用 */
     private Integer status;
     private String statusName;
+    private Integer deviceState;
+    private String deviceStateName;
+    private Integer connectionStatus;
+    private Boolean available;
 }

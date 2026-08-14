@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.service.PrinterDeviceUsageChecker;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
@@ -29,6 +31,7 @@ import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.AssignProductWeightDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
+import com.yigongbao.module.production.record.service.PrinterAvailabilityService;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
@@ -51,6 +54,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -89,6 +93,11 @@ class ProductionRecordAssignDeviceTest {
     @Mock private IProductNumberService productNumberService;
     @Mock private ProductionProcessMapper processMapper;
     @Mock private ProductionProductMapper productMapper;
+    @Mock private PrinterDeviceUsageChecker usageChecker;
+    @Mock private ObjectProvider<PrinterDeviceUsageChecker> usageCheckerProvider;
+    @Mock private ObjectProvider<PrinterAvailabilityService> availabilityServiceProvider;
+
+    private PrinterAvailabilityService availabilityService;
 
     @Spy
     @InjectMocks
@@ -105,17 +114,46 @@ class ProductionRecordAssignDeviceTest {
     @BeforeEach
     void setBaseMapper() {
         ReflectionTestUtils.setField(service, "baseMapper", recordMapper);
+        availabilityService = spy(new PrinterAvailabilityService(usageChecker));
+        lenient().when(usageCheckerProvider.getObject()).thenReturn(usageChecker);
+        lenient().when(availabilityServiceProvider.getObject()).thenReturn(availabilityService);
+        ReflectionTestUtils.setField(service, "printerDeviceUsageCheckerProvider", usageCheckerProvider);
+        ReflectionTestUtils.setField(service, "printerAvailabilityServiceProvider", availabilityServiceProvider);
     }
 
     @Test
     void assignDevice_rejectsRecordNotFound() {
-        when(recordMapper.selectById(1L)).thenReturn(null);
+        AssignDeviceDTO dto = new AssignDeviceDTO();
+        dto.setDeviceId(2L);
+        when(deviceMapper.selectByIdForUpdate(2L)).thenReturn(readyDevice(2L));
+        when(usageChecker.isInUse(2L)).thenReturn(false);
+        when(recordMapper.selectByIdForUpdate(1L)).thenReturn(null);
 
         BusinessException exception = assertThrows(BusinessException.class,
-                () -> service.assignDevice(1L, new AssignDeviceDTO()));
+                () -> service.assignDevice(1L, dto));
 
-        assertThat(exception.getMessage()).contains("流转卡");
-        verifyNoInteractions(deviceMapper, processMapper, productNumberService);
+        assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND.getCode());
+        InOrder order = inOrder(deviceMapper, usageChecker, availabilityService, recordMapper);
+        order.verify(deviceMapper).selectByIdForUpdate(2L);
+        order.verify(usageChecker).isInUse(2L);
+        order.verify(availabilityService).requireAvailable(any(DeviceEntity.class), eq(false));
+        order.verify(recordMapper).selectByIdForUpdate(1L);
+        verify(recordMapper, never()).selectById(any());
+        verifyNoInteractions(processMapper, productNumberService);
+    }
+
+    @Test
+    void assignDevice_rejectsMissingDeviceBeforeLookingUpRecord() {
+        AssignDeviceDTO dto = new AssignDeviceDTO();
+        dto.setDeviceId(2L);
+        when(deviceMapper.selectByIdForUpdate(2L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.assignDevice(1L, dto));
+
+        assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND.getCode());
+        verifyNoInteractions(usageChecker, availabilityService);
+        verifyNoInteractions(recordMapper);
     }
 
     @Test
@@ -123,17 +161,17 @@ class ProductionRecordAssignDeviceTest {
         ProductionRecordEntity record = pendingRecord(1L);
         DeviceEntity device = new DeviceEntity();
         device.setId(2L);
+        device.setState(0);
         device.setConnectionStatus(0);
-        when(recordMapper.selectById(1L)).thenReturn(record);
         when(deviceMapper.selectByIdForUpdate(2L)).thenReturn(device);
-        when(recordMapper.selectByIdForUpdate(1L)).thenReturn(record);
         AssignDeviceDTO dto = new AssignDeviceDTO();
         dto.setDeviceId(2L);
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> service.assignDevice(1L, dto));
 
-        assertThat(exception.getMessage()).contains("设备");
+        assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.DEVICE_NOT_AVAILABLE.getCode());
+        verify(recordMapper, never()).selectByIdForUpdate(any());
         verifyNoInteractions(processMapper, productNumberService);
     }
 
@@ -156,11 +194,9 @@ class ProductionRecordAssignDeviceTest {
         UserEntity user = new UserEntity();
         user.setRealName("生产员");
         user.setRoleCode(com.yigongbao.common.enums.RoleCodeEnum.ADMIN.getCode());
-        when(recordMapper.selectById(1L)).thenReturn(record);
         when(recordMapper.selectByIdForUpdate(1L)).thenReturn(record);
         doReturn(true).when(service).updateById(any(ProductionRecordEntity.class));
         when(deviceMapper.selectByIdForUpdate(2L)).thenReturn(device);
-        when(recordMapper.selectOne(any())).thenReturn(null);
         when(userMapper.selectById(7L)).thenReturn(user);
         when(processMapper.update(isNull(), any())).thenReturn(1);
         when(deviceUsageCounterService.incrementAndGet(2L)).thenReturn(3);
@@ -181,9 +217,60 @@ class ProductionRecordAssignDeviceTest {
         verify(processMapper).update(isNull(), any());
         verify(deviceUsageCounterService).incrementAndGet(2L);
         verify(productNumberService).generateFormalNumbers(1L, 2L, 3);
-        InOrder lockOrder = inOrder(deviceMapper, recordMapper);
+        InOrder lockOrder = inOrder(deviceMapper, usageChecker, availabilityService, recordMapper, service);
         lockOrder.verify(deviceMapper).selectByIdForUpdate(2L);
+        lockOrder.verify(usageChecker).isInUse(2L);
+        lockOrder.verify(availabilityService).requireAvailable(device, false);
         lockOrder.verify(recordMapper).selectByIdForUpdate(1L);
+        lockOrder.verify(service).updateById(record);
+        verify(recordMapper, never()).selectById(any());
+        verify(recordMapper, never()).selectOne(any());
+    }
+
+    @Test
+    void assignDevice_rejectsEveryNonIdlePrinterState() {
+        AssignDeviceDTO dto = new AssignDeviceDTO();
+        dto.setDeviceId(2L);
+        for (int state = 1; state <= 6; state++) {
+            DeviceEntity device = readyDevice(2L);
+            device.setState(state);
+            when(deviceMapper.selectByIdForUpdate(2L)).thenReturn(device);
+
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> service.assignDevice(1L, dto), "state " + state);
+
+            assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.DEVICE_NOT_AVAILABLE.getCode());
+        }
+        verify(usageChecker, times(6)).isInUse(2L);
+        verify(recordMapper, never()).selectByIdForUpdate(any());
+    }
+
+    @Test
+    void assignDevice_rejectsIdleDeviceWithActiveProductionUsage() {
+        AssignDeviceDTO dto = new AssignDeviceDTO();
+        dto.setDeviceId(2L);
+        when(deviceMapper.selectByIdForUpdate(2L)).thenReturn(readyDevice(2L));
+        when(usageChecker.isInUse(2L)).thenReturn(true);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.assignDevice(1L, dto));
+
+        assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.DEVICE_NOT_AVAILABLE.getCode());
+        verify(availabilityService).requireAvailable(any(DeviceEntity.class), eq(true));
+        verify(recordMapper, never()).selectByIdForUpdate(any());
+    }
+
+    @Test
+    void assignDevice_usageCheckFailureDoesNotContinue() {
+        AssignDeviceDTO dto = new AssignDeviceDTO();
+        dto.setDeviceId(2L);
+        when(deviceMapper.selectByIdForUpdate(2L)).thenReturn(readyDevice(2L));
+        when(usageChecker.isInUse(2L)).thenThrow(new IllegalStateException("usage query failed"));
+
+        assertThrows(IllegalStateException.class, () -> service.assignDevice(1L, dto));
+
+        verifyNoInteractions(availabilityService);
+        verify(recordMapper, never()).selectByIdForUpdate(any());
     }
 
     @Test
@@ -345,7 +432,8 @@ class ProductionRecordAssignDeviceTest {
     void assignDevice_rejectsRecordThatAlreadyHasDevice() {
         ProductionRecordEntity record = pendingRecord(1L);
         record.setPrintDeviceId(2L);
-        when(recordMapper.selectById(1L)).thenReturn(record);
+        when(deviceMapper.selectByIdForUpdate(3L)).thenReturn(readyDevice(3L));
+        when(recordMapper.selectByIdForUpdate(1L)).thenReturn(record);
 
         AssignDeviceDTO dto = new AssignDeviceDTO();
         dto.setDeviceId(3L);
@@ -355,7 +443,10 @@ class ProductionRecordAssignDeviceTest {
 
         assertThat(exception.getCode()).isEqualTo(
                 com.yigongbao.common.enums.ErrorCodeEnum.RECORD_DEVICE_ALREADY_ASSIGNED.getCode());
-        verifyNoInteractions(deviceMapper, processMapper, productNumberService, deviceUsageCounterService);
+        verify(deviceMapper).selectByIdForUpdate(3L);
+        verify(usageChecker).isInUse(3L);
+        verify(availabilityService).requireAvailable(any(DeviceEntity.class), eq(false));
+        verifyNoInteractions(processMapper, productNumberService, deviceUsageCounterService);
     }
 
     @Test
