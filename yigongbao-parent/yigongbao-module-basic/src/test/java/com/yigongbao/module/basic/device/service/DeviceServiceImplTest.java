@@ -251,11 +251,34 @@ class DeviceServiceImplTest {
     @Test
     void deviceConvert_populatesPrinterStateName() {
         DeviceEntity entity = new DeviceEntity();
+        entity.setDeviceType(DeviceTypeEnum.PRINTER_SLA.getCode());
         entity.setState(2);
 
         DeviceVO vo = DeviceConvert.toVO(entity);
 
         assertEquals("打印完成", vo.getStateName());
+    }
+
+    @Test
+    void deviceConvert_populatesOccupiedNameForNonPrinterStateOne() {
+        DeviceEntity entity = new DeviceEntity();
+        entity.setDeviceType(DeviceTypeEnum.WASH_CONTAINER.getCode());
+        entity.setState(1);
+
+        DeviceVO vo = DeviceConvert.toVO(entity);
+
+        assertEquals("占用", vo.getStateName());
+    }
+
+    @Test
+    void deviceConvert_doesNotUsePrinterNameForInvalidNonPrinterState() {
+        DeviceEntity entity = new DeviceEntity();
+        entity.setDeviceType(DeviceTypeEnum.WASH_CONTAINER.getCode());
+        entity.setState(2);
+
+        DeviceVO vo = DeviceConvert.toVO(entity);
+
+        assertNull(vo.getStateName());
     }
 
     @Test
@@ -296,6 +319,26 @@ class DeviceServiceImplTest {
         verify(deviceMapper, times(2)).updateById(any(DeviceEntity.class));
         verify(deviceStateLogService).saveBatch(anyList());
         verify(eventPublisher, times(2)).publishEvent(any(DeviceStateChangeEvent.class));
+    }
+
+    @Test
+    void batchUpdateDeviceStatus_stopsBeforeUpdatesWhenAutoCreateBatchFails() {
+        DeviceStatusPushDTO dto = statusPush(
+                deviceStatus("SLA-NEW", 0),
+                deviceStatus("WASH-001", 1));
+        DeviceEntity existing = existingDevice("WASH-001", DeviceTypeEnum.WASH_CONTAINER.getCode(), 0);
+        when(processingCenterMapper.selectOne(any())).thenReturn(processingCenter());
+        when(deviceMapper.selectList(any())).thenReturn(Arrays.asList(existing));
+        doReturn(false).when(deviceService).saveBatch(anyList());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.batchUpdateDeviceStatus(dto));
+
+        assertTrue(exception.getMessage().contains("设备批量创建失败"));
+        verify(deviceService).saveBatch(anyList());
+        verify(deviceMapper, never()).updateById(any(DeviceEntity.class));
+        verifyNoInteractions(deviceStateLogService);
+        verifyNoInteractions(eventPublisher);
     }
 
     private DeviceStatusPushDTO statusPush(String deviceId, Integer state) {

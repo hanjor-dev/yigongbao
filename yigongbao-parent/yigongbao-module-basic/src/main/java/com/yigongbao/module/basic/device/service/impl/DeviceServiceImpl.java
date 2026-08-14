@@ -290,8 +290,8 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
             }
         }
 
-        if (!toCreate.isEmpty()) {
-            saveBatch(toCreate);
+        if (!toCreate.isEmpty() && !saveBatch(toCreate)) {
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR.getCode(), "设备批量创建失败");
         }
         for (DeviceEntity device : toUpdate) {
             if (!updateById(device)) {
