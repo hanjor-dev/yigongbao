@@ -71,6 +71,7 @@ class DeviceServiceImplTest {
         Field baseMapperField = ServiceImpl.class.getDeclaredField("baseMapper");
         baseMapperField.setAccessible(true);
         baseMapperField.set(deviceService, deviceMapper);
+        when(deviceStateLogService.save(any())).thenReturn(true);
     }
 
     @Test
@@ -521,6 +522,25 @@ class DeviceServiceImplTest {
         doThrow(new IllegalStateException("log failed")).when(deviceStateLogService).save(any());
 
         assertThrows(IllegalStateException.class, () -> deviceService.updateDeviceState(device.getId(), 1));
+    }
+
+    @Test
+    void updateDeviceState_throwsSystemErrorWhenStateLogSaveReturnsFalse() {
+        DeviceEntity printer = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(printer.getId())).thenReturn(printer);
+        when(printerDeviceUsageCheckerProvider.getIfAvailable()).thenReturn(printerDeviceUsageChecker);
+        when(printerDeviceUsageChecker.isInUse(printer.getId())).thenReturn(false);
+        when(deviceMapper.updateById(printer)).thenReturn(1);
+        when(deviceStateLogService.save(any())).thenReturn(false);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.updateDeviceState(printer.getId(), 6));
+
+        assertEquals(ErrorCodeEnum.SYSTEM_ERROR.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("状态日志保存失败"));
+        verify(deviceMapper).updateById(printer);
+        verify(deviceStateLogService).save(any());
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test

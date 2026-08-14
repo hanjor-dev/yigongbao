@@ -171,7 +171,10 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
             log.setNewState(state);
             log.setChangeTime(LocalDateTime.now());
             log.setChangeType("manual");
-            deviceStateLogService.save(log);
+            if (!deviceStateLogService.save(log)) {
+                throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR.getCode(),
+                        "设备状态日志保存失败: " + entity.getDeviceId());
+            }
         }
 
         log.info("更新设备状态: deviceId={}, {} -> {}", entity.getDeviceId(), oldState, state);

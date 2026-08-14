@@ -10,10 +10,17 @@ import com.yigongbao.module.basic.device.service.IDeviceService;
 import com.yigongbao.module.production.ProductionTestConfiguration;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -28,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(classes = ProductionTestConfiguration.class)
 @ActiveProfiles("test")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
+@Import(PrinterDeviceStateConcurrencyIntegrationTest.LockAttemptTestConfiguration.class)
 class PrinterDeviceStateConcurrencyIntegrationTest {
 
     @Autowired
@@ -49,6 +58,9 @@ class PrinterDeviceStateConcurrencyIntegrationTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private DeviceLockAttemptProbe lockAttemptProbe;
 
     @BeforeEach
     void cleanDatabase() {
@@ -70,12 +82,14 @@ class PrinterDeviceStateConcurrencyIntegrationTest {
 
         CountDownLatch deviceLocked = new CountDownLatch(1);
         CountDownLatch allowBind = new CountDownLatch(1);
-        CountDownLatch stateChangeStarted = new CountDownLatch(1);
+        CountDownLatch lockAttempted = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         Future<Void> bindFuture = null;
         Future<BusinessException> stateChangeFuture = null;
 
         try {
+            lockAttemptProbe.reset(lockAttempted);
+
             bindFuture = executor.submit(() -> {
                 new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
                     DeviceEntity locked = deviceMapper.selectByIdForUpdate(printer.getId());
@@ -96,7 +110,6 @@ class PrinterDeviceStateConcurrencyIntegrationTest {
             assertTrue(deviceLocked.await(5, TimeUnit.SECONDS), "事务 A 未及时取得设备行锁");
 
             stateChangeFuture = executor.submit(() -> {
-                stateChangeStarted.countDown();
                 try {
                     deviceService.updateDeviceState(printer.getId(), 6);
                     return null;
@@ -105,7 +118,8 @@ class PrinterDeviceStateConcurrencyIntegrationTest {
                 }
             });
 
-            assertTrue(stateChangeStarted.await(5, TimeUnit.SECONDS), "事务 B 未及时开始状态修改");
+            assertTrue(lockAttempted.await(5, TimeUnit.SECONDS),
+                    "事务 B 未及时进入第二次设备行锁查询");
             Future<BusinessException> blockedStateChange = stateChangeFuture;
             assertThrows(TimeoutException.class,
                     () -> blockedStateChange.get(300, TimeUnit.MILLISECONDS),
@@ -147,6 +161,52 @@ class PrinterDeviceStateConcurrencyIntegrationTest {
                 throw cause;
             }
             throw exception;
+        }
+    }
+
+    static final class DeviceLockAttemptProbe {
+        private final AtomicInteger attempts = new AtomicInteger();
+        private volatile CountDownLatch secondAttempt = new CountDownLatch(0);
+
+        void reset(CountDownLatch secondAttempt) {
+            attempts.set(0);
+            this.secondAttempt = secondAttempt;
+        }
+
+        void beforeLockAttempt() {
+            if (attempts.incrementAndGet() == 2) {
+                secondAttempt.countDown();
+            }
+        }
+    }
+
+    @Aspect
+    static final class DeviceMapperLockAttemptAspect {
+        private final DeviceLockAttemptProbe probe;
+
+        DeviceMapperLockAttemptAspect(DeviceLockAttemptProbe probe) {
+            this.probe = probe;
+        }
+
+        @Around("bean(deviceMapper) && execution(* selectByIdForUpdate(..))")
+        Object observeLockAttempt(ProceedingJoinPoint joinPoint) throws Throwable {
+            probe.beforeLockAttempt();
+            return joinPoint.proceed();
+        }
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    @EnableAspectJAutoProxy
+    static class LockAttemptTestConfiguration {
+
+        @Bean
+        DeviceLockAttemptProbe deviceLockAttemptProbe() {
+            return new DeviceLockAttemptProbe();
+        }
+
+        @Bean
+        DeviceMapperLockAttemptAspect deviceMapperLockAttemptAspect(DeviceLockAttemptProbe probe) {
+            return new DeviceMapperLockAttemptAspect(probe);
         }
     }
 }
