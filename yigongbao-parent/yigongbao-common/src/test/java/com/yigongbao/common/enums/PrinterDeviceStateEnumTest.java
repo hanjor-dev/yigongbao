@@ -9,6 +9,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PrinterDeviceStateEnumTest {
@@ -72,9 +73,9 @@ class PrinterDeviceStateEnumTest {
     }
 
     @Test
-    void isInUse_returnsFalseWhenImplementationReturnsNull() {
+    void isInUse_failsClosedWhenImplementationReturnsNull() {
         PrinterDeviceUsageChecker checker = deviceIds -> null;
 
-        assertFalse(checker.isInUse(42L));
+        assertThrows(NullPointerException.class, () -> checker.isInUse(42L));
     }
 }

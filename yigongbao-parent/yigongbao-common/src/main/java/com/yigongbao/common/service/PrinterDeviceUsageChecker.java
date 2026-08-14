@@ -2,6 +2,7 @@ package com.yigongbao.common.service;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -24,7 +25,10 @@ public interface PrinterDeviceUsageChecker {
         if (deviceId == null) {
             return false;
         }
-        Set<Long> activeDeviceIds = findActiveDeviceIds(List.of(deviceId));
-        return activeDeviceIds != null && activeDeviceIds.contains(deviceId);
+        Set<Long> activeDeviceIds = Objects.requireNonNull(
+                findActiveDeviceIds(List.of(deviceId)),
+                "findActiveDeviceIds must not return null"
+        );
+        return activeDeviceIds.contains(deviceId);
     }
 }
