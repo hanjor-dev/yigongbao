@@ -81,6 +81,8 @@ class DeviceWebSocketHandlerTest {
         verify(deviceService).batchUpdateDeviceStatus(captor.capture());
         DeviceStatusPushDTO dto = captor.getValue();
         assertEquals("武汉嘉一", dto.getCenterName());
+        assertEquals(List.of("SLA-000", "SLA-001", "SLA-002", "SLA-003", "SLA-004", "SLA-005", "SLA-006"),
+            dto.getDevices().stream().map(DeviceStatusPushDTO.DeviceStatus::getId).toList());
         assertEquals(List.of(0, 1, 2, 3, 4, 5, 6),
             dto.getDevices().stream().map(DeviceStatusPushDTO.DeviceStatus::getState).toList());
         verify(session).sendMessage(new TextMessage("{\"code\":200,\"message\":\"success\"}"));
