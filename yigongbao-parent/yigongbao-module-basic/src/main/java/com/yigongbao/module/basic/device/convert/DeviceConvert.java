@@ -3,6 +3,7 @@ package com.yigongbao.module.basic.device.convert;
 import com.yigongbao.module.basic.device.dto.CreateDeviceDTO;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.vo.DeviceVO;
+import com.yigongbao.common.enums.PrinterDeviceStateEnum;
 import org.springframework.beans.BeanUtils;
 
 public class DeviceConvert {
@@ -16,6 +17,10 @@ public class DeviceConvert {
     public static DeviceVO toVO(DeviceEntity entity) {
         DeviceVO vo = new DeviceVO();
         BeanUtils.copyProperties(entity, vo);
+        PrinterDeviceStateEnum state = PrinterDeviceStateEnum.fromCode(entity.getState());
+        if (state != null) {
+            vo.setStateName(state.getName());
+        }
         return vo;
     }
 }

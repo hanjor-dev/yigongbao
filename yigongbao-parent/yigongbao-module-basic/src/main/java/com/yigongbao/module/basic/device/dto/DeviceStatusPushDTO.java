@@ -28,7 +28,7 @@ public class DeviceStatusPushDTO {
         /** 设备编号 */
         private String id;
 
-        /** 设备状态（0=空闲，1=占用） */
+        /** 设备状态（0=空闲，1=工作中，2=打印完成，3=报警，4=暂停，5=准备就绪，6=离线） */
         private Integer state;
     }
 }

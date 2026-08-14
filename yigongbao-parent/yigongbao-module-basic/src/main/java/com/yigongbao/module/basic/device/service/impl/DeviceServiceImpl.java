@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.StatusConstants;
+import com.yigongbao.common.enums.PrinterDeviceStateEnum;
 import com.yigongbao.common.event.DeviceStateChangeEvent;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -36,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -219,6 +221,24 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         Map<String, DeviceEntity> deviceMap = existingDevices.stream()
                 .collect(Collectors.toMap(DeviceEntity::getDeviceId, d -> d));
 
+        // 先校验整批数据，再构建任何写入或事件，避免无效批次产生部分变更。
+        for (DeviceStatusPushDTO.DeviceStatus deviceStatus : dto.getDevices()) {
+            if (!allowedRanges.isEmpty() && !isDeviceIdInRanges(deviceStatus.getId(), allowedRanges)) {
+                continue;
+            }
+            DeviceEntity existing = deviceMap.get(deviceStatus.getId());
+            boolean printer = existing == null
+                    || DeviceTypeEnum.PRINTER_SLA.getCode().equals(existing.getDeviceType());
+            Integer state = deviceStatus.getState();
+            if (printer) {
+                if (!PrinterDeviceStateEnum.isValid(state)) {
+                    throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "打印设备状态必须为0-6");
+                }
+            } else if (state == null || (state != 0 && state != 1)) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "非打印设备状态必须为0或1");
+            }
+        }
+
         List<DeviceEntity> toCreate = new ArrayList<>();
         List<DeviceEntity> toUpdate = new ArrayList<>();
         List<DeviceStateLogEntity> stateLogs = new ArrayList<>();
@@ -251,7 +271,7 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
                 device.setLastHeartbeat(now);
                 toUpdate.add(device);
 
-                if (!oldState.equals(deviceStatus.getState())) {
+                if (!Objects.equals(oldState, deviceStatus.getState())) {
                     log.info("设备状态变更: deviceId={}, {} -> {}",
                         device.getDeviceId(), oldState, deviceStatus.getState());
 

@@ -30,8 +30,11 @@ public class DeviceVO {
     /** 所属加工中心名称（冗余字段） */
     private String centerName;
 
-    /** 设备状态（0=空闲，1=占用） */
+    /** 设备状态（0=空闲，1=工作中，2=打印完成，3=报警，4=暂停，5=准备就绪，6=离线） */
     private Integer state;
+
+    /** 设备状态名称 */
+    private String stateName;
 
     /** 连接状态（0=离线，1=在线） */
     private Integer connectionStatus;
