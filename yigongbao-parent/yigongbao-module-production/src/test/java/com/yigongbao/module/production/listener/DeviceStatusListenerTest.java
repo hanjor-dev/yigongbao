@@ -77,7 +77,7 @@ class DeviceStatusListenerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {0, 3, 4, 5})
+    @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
     void onDeviceStateChange_newWorking_startsOnlyPendingRecordWithExistingSideEffects(int oldState) {
         when(recordMapper.selectList(any())).thenReturn(List.of(recordWithStatus(
                 1L, 10L, FlowStatusEnum.PENDING_PRINT)));
@@ -103,7 +103,7 @@ class DeviceStatusListenerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {0, 3, 4, 5})
+    @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
     void onDeviceStateChange_newWorking_whenConditionalUpdateLoses_doesNotRunStartSideEffects(int oldState) {
         when(recordMapper.selectList(any())).thenReturn(List.of(recordWithStatus(
                 1L, 10L, FlowStatusEnum.PENDING_PRINT)));
@@ -118,6 +118,34 @@ class DeviceStatusListenerTest {
         verifyNoInteractions(processMapper, productMapper, processService, orderMainMapper);
         verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
         verify(recordService, never()).reconcileOrderProductionStatus(any());
+    }
+
+    @Test
+    void onDeviceStateChange_duplicateWorkingEvent_runsStartSideEffectsOnce() {
+        ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PENDING_PRINT);
+        when(recordMapper.selectList(any())).thenReturn(List.of(record));
+        when(recordMapper.update(isNull(), any())).thenReturn(1, 0);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
+        when(productMapper.selectList(any())).thenReturn(List.of(pendingProduct(101L)));
+        when(productMapper.update(isNull(), any())).thenReturn(1);
+
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.IDLE.getCode(),
+                PrinterDeviceStateEnum.WORKING.getCode()));
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
+                PrinterDeviceStateEnum.WORKING.getCode()));
+
+        verify(recordMapper, times(2)).selectList(argThat(query -> queryHasStatus(query,
+                FlowStatusEnum.PENDING_PRINT)));
+        verify(recordMapper, times(2)).update(isNull(), argThat(update -> updateHasStatus(update,
+                FlowStatusEnum.PENDING_PRINT)));
+        verify(processMapper, times(1)).update(isNull(), any());
+        verify(productMapper, times(1)).selectList(any());
+        verify(productMapper, times(1)).update(isNull(), any());
+        verify(orderMainMapper, times(1)).update(isNull(), any());
+        verifyNoInteractions(processService);
+        verify(recordService, times(1)).triggerFlowIfAllReach(10L,
+                FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
+        verify(recordService, times(1)).reconcileOrderProductionStatus(10L);
     }
 
     @ParameterizedTest
@@ -368,17 +396,6 @@ class DeviceStatusListenerTest {
                 FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
         verify(recordService, times(1)).reconcileOrderProductionStatus(10L);
         verifyNoInteractions(productMapper, orderMainMapper);
-    }
-
-    @Test
-    void onDeviceStateChange_otherStateCombination_doesNothing() {
-        when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
-
-        listener.onDeviceStateChange(event(1L,
-                PrinterDeviceStateEnum.WORKING.getCode(), PrinterDeviceStateEnum.WORKING.getCode()));
-
-        verify(recordMapper, never()).updateById((ProductionRecordEntity) any());
-        verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
     }
 
     private DeviceStateChangeEvent event(Long deviceId, Integer oldState, Integer newState) {
