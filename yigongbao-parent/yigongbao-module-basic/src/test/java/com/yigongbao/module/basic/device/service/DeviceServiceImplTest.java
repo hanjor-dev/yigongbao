@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.event.DeviceStateChangeEvent;
+import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.service.PrinterDeviceUsageChecker;
 import com.yigongbao.module.basic.device.convert.DeviceConvert;
 import com.yigongbao.module.basic.device.dto.CreateDeviceDTO;
 import com.yigongbao.module.basic.device.dto.DeviceStatusPushDTO;
@@ -29,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.ObjectProvider;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.List;
@@ -52,6 +55,12 @@ class DeviceServiceImplTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private ObjectProvider<PrinterDeviceUsageChecker> printerDeviceUsageCheckerProvider;
+
+    @Mock
+    private PrinterDeviceUsageChecker printerDeviceUsageChecker;
 
     @Spy
     @InjectMocks
@@ -339,6 +348,304 @@ class DeviceServiceImplTest {
         verify(deviceMapper, never()).updateById(any(DeviceEntity.class));
         verifyNoInteractions(deviceStateLogService);
         verifyNoInteractions(eventPublisher);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
+    void updateDeviceState_acceptsEveryPrinterStateAfterLockWhenPrinterIsUnused(int state) {
+        DeviceEntity printer = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), state == 0 ? 1 : 0);
+        when(deviceMapper.selectByIdForUpdate(printer.getId())).thenReturn(printer);
+        when(printerDeviceUsageCheckerProvider.getIfAvailable()).thenReturn(printerDeviceUsageChecker);
+        when(printerDeviceUsageChecker.isInUse(printer.getId())).thenReturn(false);
+        when(deviceMapper.updateById(printer)).thenReturn(1);
+
+        deviceService.updateDeviceState(printer.getId(), state);
+
+        assertEquals(state, printer.getState());
+        InOrder order = inOrder(deviceMapper, printerDeviceUsageCheckerProvider, printerDeviceUsageChecker);
+        order.verify(deviceMapper).selectByIdForUpdate(printer.getId());
+        order.verify(printerDeviceUsageCheckerProvider).getIfAvailable();
+        order.verify(printerDeviceUsageChecker).isInUse(printer.getId());
+        order.verify(deviceMapper).updateById(printer);
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(ints = {-1, 7})
+    void updateDeviceState_rejectsInvalidPrinterStateAfterLock(Integer state) {
+        DeviceEntity printer = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(printer.getId())).thenReturn(printer);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.updateDeviceState(printer.getId(), state));
+
+        assertEquals(ErrorCodeEnum.INVALID_PARAMETER.getCode(), exception.getCode());
+        assertEquals(0, printer.getState());
+        verify(deviceMapper).selectByIdForUpdate(printer.getId());
+        verify(deviceMapper, never()).updateById(any(DeviceEntity.class));
+        verifyNoInteractions(printerDeviceUsageCheckerProvider, printerDeviceUsageChecker,
+                deviceStateLogService, eventPublisher);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
+    void updateDeviceState_rejectsEveryManualStateWhenPrinterIsActive(int state) {
+        DeviceEntity printer = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(printer.getId())).thenReturn(printer);
+        when(printerDeviceUsageCheckerProvider.getIfAvailable()).thenReturn(printerDeviceUsageChecker);
+        when(printerDeviceUsageChecker.isInUse(printer.getId())).thenReturn(true);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.updateDeviceState(printer.getId(), state));
+
+        assertEquals(ErrorCodeEnum.DEVICE_NOT_AVAILABLE.getCode(), exception.getCode());
+        assertEquals(0, printer.getState());
+        InOrder order = inOrder(deviceMapper, printerDeviceUsageChecker);
+        order.verify(deviceMapper).selectByIdForUpdate(printer.getId());
+        order.verify(printerDeviceUsageChecker).isInUse(printer.getId());
+        verify(deviceMapper, never()).updateById(any(DeviceEntity.class));
+        verifyNoInteractions(deviceStateLogService, eventPublisher);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1})
+    void updateDeviceState_acceptsBinaryStateForNonPrinterWithoutUsageChecker(int state) {
+        DeviceEntity device = existingDevice("WASH-001", DeviceTypeEnum.WASH_CONTAINER.getCode(), 1 - state);
+        when(deviceMapper.selectByIdForUpdate(device.getId())).thenReturn(device);
+        when(deviceMapper.updateById(device)).thenReturn(1);
+
+        deviceService.updateDeviceState(device.getId(), state);
+
+        assertEquals(state, device.getState());
+        verifyNoInteractions(printerDeviceUsageCheckerProvider, printerDeviceUsageChecker, eventPublisher);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(ints = {2, 3, 4, 5, 6})
+    void updateDeviceState_rejectsNonBinaryStateForNonPrinterWithoutUsageChecker(Integer state) {
+        DeviceEntity device = existingDevice("WASH-001", DeviceTypeEnum.WASH_CONTAINER.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(device.getId())).thenReturn(device);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.updateDeviceState(device.getId(), state));
+
+        assertEquals(ErrorCodeEnum.INVALID_PARAMETER.getCode(), exception.getCode());
+        assertEquals(0, device.getState());
+        verify(deviceMapper, never()).updateById(any(DeviceEntity.class));
+        verifyNoInteractions(printerDeviceUsageCheckerProvider, printerDeviceUsageChecker,
+                deviceStateLogService, eventPublisher);
+    }
+
+    @Test
+    void updateDeviceState_failsClosedWhenPrinterUsageCheckerIsMissing() {
+        DeviceEntity printer = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(printer.getId())).thenReturn(printer);
+        when(printerDeviceUsageCheckerProvider.getIfAvailable()).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.updateDeviceState(printer.getId(), 6));
+
+        assertEquals(ErrorCodeEnum.SYSTEM_ERROR.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("打印设备占用检查"));
+        assertEquals(0, printer.getState());
+        verify(deviceMapper, never()).updateById(any(DeviceEntity.class));
+        verifyNoInteractions(deviceStateLogService, eventPublisher);
+    }
+
+    @Test
+    void updateDeviceState_failsClosedWithContextWhenPrinterUsageCheckerThrows() {
+        DeviceEntity printer = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(printer.getId())).thenReturn(printer);
+        when(printerDeviceUsageCheckerProvider.getIfAvailable()).thenReturn(printerDeviceUsageChecker);
+        when(printerDeviceUsageChecker.isInUse(printer.getId())).thenThrow(new IllegalStateException("query failed"));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.updateDeviceState(printer.getId(), 6));
+
+        assertEquals(ErrorCodeEnum.SYSTEM_ERROR.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("打印设备占用检查"));
+        assertInstanceOf(IllegalStateException.class, exception.getCause());
+        assertEquals(0, printer.getState());
+        verify(deviceMapper, never()).updateById(any(DeviceEntity.class));
+        verifyNoInteractions(deviceStateLogService, eventPublisher);
+    }
+
+    @Test
+    void updateDeviceState_wrapsBusinessExceptionThrownByPrinterUsageChecker() {
+        DeviceEntity printer = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        BusinessException checkerFailure = new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "checker failed");
+        when(deviceMapper.selectByIdForUpdate(printer.getId())).thenReturn(printer);
+        when(printerDeviceUsageCheckerProvider.getIfAvailable()).thenReturn(printerDeviceUsageChecker);
+        when(printerDeviceUsageChecker.isInUse(printer.getId())).thenThrow(checkerFailure);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.updateDeviceState(printer.getId(), 6));
+
+        assertEquals(ErrorCodeEnum.SYSTEM_ERROR.getCode(), exception.getCode());
+        assertSame(checkerFailure, exception.getCause());
+        assertTrue(exception.getMessage().contains("deviceId=" + printer.getId()));
+        verify(deviceMapper, never()).updateById(any(DeviceEntity.class));
+    }
+
+    @Test
+    void updateDeviceState_comparesNullOldStateSafely() {
+        DeviceEntity device = existingDevice("WASH-001", DeviceTypeEnum.WASH_CONTAINER.getCode(), null);
+        when(deviceMapper.selectByIdForUpdate(device.getId())).thenReturn(device);
+        when(deviceMapper.updateById(device)).thenReturn(1);
+
+        assertDoesNotThrow(() -> deviceService.updateDeviceState(device.getId(), 0));
+
+        verify(deviceStateLogService).save(any());
+    }
+
+    @Test
+    void updateDeviceState_doesNotWriteLogWhenDatabaseUpdateFails() {
+        DeviceEntity device = existingDevice("WASH-001", DeviceTypeEnum.WASH_CONTAINER.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(device.getId())).thenReturn(device);
+        when(deviceMapper.updateById(device)).thenReturn(0);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.updateDeviceState(device.getId(), 1));
+
+        assertEquals(ErrorCodeEnum.SYSTEM_ERROR.getCode(), exception.getCode());
+        verifyNoInteractions(deviceStateLogService, eventPublisher);
+    }
+
+    @Test
+    void updateDeviceState_propagatesStateLogWriteFailure() {
+        DeviceEntity device = existingDevice("WASH-001", DeviceTypeEnum.WASH_CONTAINER.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(device.getId())).thenReturn(device);
+        when(deviceMapper.updateById(device)).thenReturn(1);
+        doThrow(new IllegalStateException("log failed")).when(deviceStateLogService).save(any());
+
+        assertThrows(IllegalStateException.class, () -> deviceService.updateDeviceState(device.getId(), 1));
+    }
+
+    @Test
+    void removeDevice_rejectsActivePrinterEvenWhenRealtimeStateIsIdle() {
+        DeviceEntity printer = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(printer.getId())).thenReturn(printer);
+        when(printerDeviceUsageCheckerProvider.getIfAvailable()).thenReturn(printerDeviceUsageChecker);
+        when(printerDeviceUsageChecker.isInUse(printer.getId())).thenReturn(true);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.removeDevice(printer.getId()));
+
+        assertEquals(ErrorCodeEnum.DEVICE_NOT_AVAILABLE.getCode(), exception.getCode());
+        InOrder order = inOrder(deviceMapper, printerDeviceUsageChecker);
+        order.verify(deviceMapper).selectByIdForUpdate(printer.getId());
+        order.verify(printerDeviceUsageChecker).isInUse(printer.getId());
+        verify(deviceMapper, never()).deleteById(printer.getId());
+    }
+
+    @Test
+    void removeDevice_rejectsNonIdlePrinterAfterUsageCheck() {
+        DeviceEntity printer = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 6);
+        when(deviceMapper.selectByIdForUpdate(printer.getId())).thenReturn(printer);
+        when(printerDeviceUsageCheckerProvider.getIfAvailable()).thenReturn(printerDeviceUsageChecker);
+        when(printerDeviceUsageChecker.isInUse(printer.getId())).thenReturn(false);
+
+        assertThrows(BusinessException.class, () -> deviceService.removeDevice(printer.getId()));
+
+        verify(printerDeviceUsageChecker).isInUse(printer.getId());
+        verify(deviceMapper, never()).deleteById(printer.getId());
+    }
+
+    @Test
+    void removeDevice_deletesUnusedIdlePrinterAfterLockAndUsageCheck() {
+        DeviceEntity printer = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(printer.getId())).thenReturn(printer);
+        when(printerDeviceUsageCheckerProvider.getIfAvailable()).thenReturn(printerDeviceUsageChecker);
+        when(printerDeviceUsageChecker.isInUse(printer.getId())).thenReturn(false);
+        when(deviceMapper.deleteById(printer.getId())).thenReturn(1);
+
+        deviceService.removeDevice(printer.getId());
+
+        InOrder order = inOrder(deviceMapper, printerDeviceUsageChecker);
+        order.verify(deviceMapper).selectByIdForUpdate(printer.getId());
+        order.verify(printerDeviceUsageChecker).isInUse(printer.getId());
+        order.verify(deviceMapper).deleteById(printer.getId());
+    }
+
+    @Test
+    void removeDevice_failsClosedWhenPrinterUsageCheckerIsMissing() {
+        DeviceEntity printer = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(printer.getId())).thenReturn(printer);
+        when(printerDeviceUsageCheckerProvider.getIfAvailable()).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.removeDevice(printer.getId()));
+
+        assertEquals(ErrorCodeEnum.SYSTEM_ERROR.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("打印设备占用检查"));
+        verify(deviceMapper, never()).deleteById(printer.getId());
+    }
+
+    @Test
+    void removeDevice_failsClosedWhenPrinterUsageCheckerThrows() {
+        DeviceEntity printer = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(printer.getId())).thenReturn(printer);
+        when(printerDeviceUsageCheckerProvider.getIfAvailable()).thenReturn(printerDeviceUsageChecker);
+        when(printerDeviceUsageChecker.isInUse(printer.getId())).thenThrow(new IllegalStateException("query failed"));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.removeDevice(printer.getId()));
+
+        assertEquals(ErrorCodeEnum.SYSTEM_ERROR.getCode(), exception.getCode());
+        assertInstanceOf(IllegalStateException.class, exception.getCause());
+        verify(deviceMapper, never()).deleteById(printer.getId());
+    }
+
+    @Test
+    void removeDevice_preservesNonPrinterRulesWithoutUsageChecker() {
+        DeviceEntity idle = existingDevice("WASH-001", DeviceTypeEnum.WASH_CONTAINER.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(idle.getId())).thenReturn(idle);
+        when(deviceMapper.deleteById(idle.getId())).thenReturn(1);
+
+        deviceService.removeDevice(idle.getId());
+
+        verify(deviceMapper).deleteById(idle.getId());
+        verifyNoInteractions(printerDeviceUsageCheckerProvider, printerDeviceUsageChecker);
+    }
+
+    @Test
+    void removeDevice_rejectsOccupiedNonPrinterWithoutUsageChecker() {
+        DeviceEntity occupied = existingDevice("WASH-001", DeviceTypeEnum.WASH_CONTAINER.getCode(), 1);
+        when(deviceMapper.selectByIdForUpdate(occupied.getId())).thenReturn(occupied);
+
+        assertThrows(BusinessException.class, () -> deviceService.removeDevice(occupied.getId()));
+
+        verify(deviceMapper, never()).deleteById(occupied.getId());
+        verifyNoInteractions(printerDeviceUsageCheckerProvider, printerDeviceUsageChecker);
+    }
+
+    @Test
+    void removeDevice_throwsWhenDeleteFails() {
+        DeviceEntity idle = existingDevice("WASH-001", DeviceTypeEnum.WASH_CONTAINER.getCode(), 0);
+        when(deviceMapper.selectByIdForUpdate(idle.getId())).thenReturn(idle);
+        when(deviceMapper.deleteById(idle.getId())).thenReturn(0);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> deviceService.removeDevice(idle.getId()));
+
+        assertEquals(ErrorCodeEnum.SYSTEM_ERROR.getCode(), exception.getCode());
+    }
+
+    @Test
+    void lockedLookupMissingDeviceReturnsDataNotFoundForUpdateAndRemove() {
+        when(deviceMapper.selectByIdForUpdate(999L)).thenReturn(null);
+
+        BusinessException updateException = assertThrows(
+                BusinessException.class, () -> deviceService.updateDeviceState(999L, 0));
+        BusinessException removeException = assertThrows(
+                BusinessException.class, () -> deviceService.removeDevice(999L));
+
+        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), updateException.getCode());
+        assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), removeException.getCode());
+        verify(deviceMapper, times(2)).selectByIdForUpdate(999L);
+        verify(deviceMapper, never()).selectById(999L);
     }
 
     private DeviceStatusPushDTO statusPush(String deviceId, Integer state) {

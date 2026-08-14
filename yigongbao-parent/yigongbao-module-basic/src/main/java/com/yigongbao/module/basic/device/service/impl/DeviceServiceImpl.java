@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.PrinterDeviceStateEnum;
 import com.yigongbao.common.event.DeviceStateChangeEvent;
+import com.yigongbao.common.service.PrinterDeviceUsageChecker;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.module.basic.device.convert.DeviceConvert;
@@ -30,6 +31,7 @@ import com.yigongbao.module.basic.processingCenter.mapper.ProcessingCenterMapper
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
@@ -56,6 +58,7 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
     private final ProcessingCenterMapper processingCenterMapper;
     private final IDeviceStateLogService deviceStateLogService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ObjectProvider<PrinterDeviceUsageChecker> printerDeviceUsageCheckerProvider;
 
     /**
      * 分页查询设备列表
@@ -143,17 +146,25 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateDeviceState(Long id, Integer state) {
-        DeviceEntity entity = getById(id);
+        DeviceEntity entity = baseMapper.selectByIdForUpdate(id);
         if (entity == null) {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
 
+        validateManualState(entity, state);
+        if (isPrinter(entity)) {
+            ensurePrinterNotInUse(id);
+        }
+
         Integer oldState = entity.getState();
         entity.setState(state);
-        updateById(entity);
+        if (!updateById(entity)) {
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR.getCode(),
+                    "设备状态更新失败: " + entity.getDeviceId());
+        }
 
         // 状态发生变化时记录状态变更日志
-        if (!oldState.equals(state)) {
+        if (!Objects.equals(oldState, state)) {
             DeviceStateLogEntity log = new DeviceStateLogEntity();
             log.setDeviceId(entity.getDeviceId());
             log.setOldState(oldState);
@@ -413,16 +424,69 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void removeDevice(Long id) {
-        DeviceEntity entity = getById(id);
+        DeviceEntity entity = baseMapper.selectByIdForUpdate(id);
         if (entity == null) {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
-        // 占用中的设备不允许删除（state非0表示占用）
-        if (entity.getState() != null && entity.getState() != 0) {
+
+        boolean printer = isPrinter(entity);
+        if (printer) {
+            ensurePrinterNotInUse(id);
+        }
+        // 打印机必须实时处于空闲；其他设备维持原有的非0不可删除规则。
+        if ((printer && !Objects.equals(entity.getState(), 0))
+                || (!printer && entity.getState() != null && entity.getState() != 0)) {
             throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "设备当前处于占用状态，不允许删除");
         }
 
-        removeById(id);
+        if (!removeById(id)) {
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR.getCode(),
+                    "设备删除失败: " + entity.getDeviceId());
+        }
         log.info("删除设备: id={}, deviceId={}", entity.getId(), entity.getDeviceId());
+    }
+
+    private void validateManualState(DeviceEntity entity, Integer state) {
+        if (isPrinter(entity)) {
+            if (!PrinterDeviceStateEnum.isValid(state)) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "打印设备状态必须为0-6");
+            }
+            return;
+        }
+        if (state == null || (state != 0 && state != 1)) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "非打印设备状态必须为0或1");
+        }
+    }
+
+    private boolean isPrinter(DeviceEntity entity) {
+        return DeviceTypeEnum.PRINTER_SLA.getCode().equals(entity.getDeviceType());
+    }
+
+    private void ensurePrinterNotInUse(Long deviceId) {
+        PrinterDeviceUsageChecker checker;
+        try {
+            checker = printerDeviceUsageCheckerProvider.getIfAvailable();
+        } catch (RuntimeException exception) {
+            throw usageCheckFailure(deviceId, exception);
+        }
+        if (checker == null) {
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR.getCode(),
+                    "打印设备占用检查器不可用: deviceId=" + deviceId);
+        }
+
+        boolean inUse;
+        try {
+            inUse = checker.isInUse(deviceId);
+        } catch (RuntimeException exception) {
+            throw usageCheckFailure(deviceId, exception);
+        }
+        if (inUse) {
+            throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
+        }
+    }
+
+    private BusinessException usageCheckFailure(Long deviceId, RuntimeException cause) {
+        return new BusinessException(ErrorCodeEnum.SYSTEM_ERROR.getCode(),
+                "打印设备占用检查失败: deviceId=" + deviceId, cause);
     }
 }

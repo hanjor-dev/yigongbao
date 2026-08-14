@@ -83,7 +83,7 @@ public class DeviceController {
     @PutMapping("/{id}/state")
     public Result<Void> updateState(
             @PathVariable Long id,
-            @RequestParam @NotNull @Min(0) @Max(1) Integer state) {
+            @RequestParam @NotNull @Min(0) @Max(6) Integer state) {
         deviceService.updateDeviceState(id, state);
         return Result.success();
     }
