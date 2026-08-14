@@ -4,26 +4,28 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
-import com.yigongbao.common.exception.BusinessException;
-import java.util.List;
-import java.util.Objects;
+import com.yigongbao.common.enums.PrinterDeviceStateEnum;
 import com.yigongbao.common.event.DeviceStateChangeEvent;
+import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
-import com.yigongbao.module.production.constants.ProductionConstants;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
-import com.yigongbao.module.production.process.service.IProductionProcessService;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
+import com.yigongbao.module.production.process.service.IProductionProcessService;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
-import java.time.LocalDateTime;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * 设备状态监听器
@@ -37,6 +39,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DeviceStatusListener {
 
+    private static final Set<Integer> PRINT_FINISH_PREVIOUS_STATES = Set.of(
+            PrinterDeviceStateEnum.WORKING.getCode(),
+            PrinterDeviceStateEnum.PRINT_FINISHED.getCode(),
+            PrinterDeviceStateEnum.OFFLINE.getCode());
+
     private final ProductionRecordMapper recordMapper;
     private final ProductionProcessMapper processMapper;
     private final IProductionRecordService recordService;
@@ -44,7 +51,7 @@ public class DeviceStatusListener {
     private final OrderMainMapper orderMainMapper;
     private final com.yigongbao.module.production.product.mapper.ProductionProductMapper productMapper;
 
-    /** 监听设备状态变更：0→非0 触发打印开始并更新流转卡状态；非0→0 触发打印完成并聚合推进 Flow */
+    /** 监听设备状态变更：进入工作中触发打印开始；合法前置状态→空闲触发打印完成并聚合推进 Flow */
     @EventListener
     @Transactional(rollbackFor = Exception.class)
     public void onDeviceStateChange(DeviceStateChangeEvent event) {
@@ -52,9 +59,8 @@ public class DeviceStatusListener {
         Integer oldState = event.getOldState();
         Integer newState = event.getNewState();
 
-        // 空闲 → 占用：打印开始，只查询待打印的流转卡
-        if (ProductionConstants.DEVICE_STATE_IDLE.equals(oldState)
-                && !ProductionConstants.DEVICE_STATE_IDLE.equals(newState)) {
+        // 进入工作中：打印开始，只查询待打印的流转卡
+        if (isPrintStart(newState)) {
             List<ProductionRecordEntity> records = recordMapper.selectList(
                     new LambdaQueryWrapper<ProductionRecordEntity>()
                             .eq(ProductionRecordEntity::getPrintDeviceId, deviceId)
@@ -102,9 +108,8 @@ public class DeviceStatusListener {
                         recordService.reconcileOrderProductionStatus(orderId);
                     });
         }
-        // 占用 → 空闲：打印完成，只查询打印中的流转卡
-        else if (!ProductionConstants.DEVICE_STATE_IDLE.equals(oldState)
-                && ProductionConstants.DEVICE_STATE_IDLE.equals(newState)) {
+        // 工作中/打印完成/离线 → 空闲：打印完成，只查询打印中的流转卡
+        else if (isPrintFinish(oldState, newState)) {
             List<ProductionRecordEntity> records = recordMapper.selectList(
                     new LambdaQueryWrapper<ProductionRecordEntity>()
                             .eq(ProductionRecordEntity::getPrintDeviceId, deviceId)
@@ -149,6 +154,15 @@ public class DeviceStatusListener {
                         recordService.reconcileOrderProductionStatus(orderId);
                     });
         }
+    }
+
+    private boolean isPrintStart(Integer newState) {
+        return PrinterDeviceStateEnum.WORKING.getCode().equals(newState);
+    }
+
+    private boolean isPrintFinish(Integer oldState, Integer newState) {
+        return PrinterDeviceStateEnum.IDLE.getCode().equals(newState)
+                && PRINT_FINISH_PREVIOUS_STATES.contains(oldState);
     }
 
     /** 更新打印工序开始时间 */

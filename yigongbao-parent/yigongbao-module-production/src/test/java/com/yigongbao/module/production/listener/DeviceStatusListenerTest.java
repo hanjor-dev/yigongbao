@@ -1,11 +1,14 @@
 package com.yigongbao.module.production.listener;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.enums.PrinterDeviceStateEnum;
 import com.yigongbao.common.event.DeviceStateChangeEvent;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
-import com.yigongbao.module.production.constants.ProductionConstants;
+import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.process.service.IProductionProcessService;
@@ -14,21 +17,24 @@ import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
-import com.yigongbao.module.order.mapper.OrderMainMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import java.util.List;
 import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
@@ -63,61 +69,123 @@ class DeviceStatusListenerTest {
     void onDeviceStateChange_noAssociatedRecord_doesNothing() {
         when(recordMapper.selectList(any())).thenReturn(List.of());
 
-        listener.onDeviceStateChange(event(1L, 0, 1));
+        listener.onDeviceStateChange(event(1L,
+                PrinterDeviceStateEnum.IDLE.getCode(), PrinterDeviceStateEnum.WORKING.getCode()));
 
         verify(recordMapper, never()).updateById((ProductionRecordEntity) any());
         verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
     }
 
-    @Test
-    void onDeviceStateChange_idleToBusy_setsPrintingNoFlow() {
-        when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
+    @ParameterizedTest
+    @ValueSource(ints = {0, 3, 4, 5})
+    void onDeviceStateChange_newWorking_startsOnlyPendingRecordWithExistingSideEffects(int oldState) {
+        when(recordMapper.selectList(any())).thenReturn(List.of(recordWithStatus(
+                1L, 10L, FlowStatusEnum.PENDING_PRINT)));
         when(recordMapper.update(isNull(), any())).thenReturn(1);
         when(processMapper.update(isNull(), any())).thenReturn(1);
         when(productMapper.selectList(any())).thenReturn(List.of(pendingProduct(101L)));
         when(productMapper.update(isNull(), any())).thenReturn(1);
 
-        listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE, ProductionConstants.DEVICE_STATE_BUSY));
+        listener.onDeviceStateChange(event(1L, oldState, PrinterDeviceStateEnum.WORKING.getCode()));
 
-        verify(recordMapper).update(isNull(), any());
+        verify(recordMapper).selectList(argThat(query -> queryHasStatus(query,
+                FlowStatusEnum.PENDING_PRINT)));
+        verify(recordMapper).update(isNull(), argThat(update -> updateHasStatus(update,
+                FlowStatusEnum.PENDING_PRINT)));
+        verify(processMapper).update(isNull(), any());
+        verify(productMapper).selectList(any());
+        verify(productMapper).update(isNull(), any());
+        verify(orderMainMapper).update(isNull(), any());
+        verifyNoInteractions(processService);
         verify(recordService).triggerFlowIfAllReach(10L,
                 FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
         verify(recordService).reconcileOrderProductionStatus(10L);
     }
 
-    @Test
-    void onDeviceStateChange_idleToBusy_whenReleaseWins_doesNotStartPrint() {
-        when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
+    @ParameterizedTest
+    @ValueSource(ints = {0, 3, 4, 5})
+    void onDeviceStateChange_newWorking_whenConditionalUpdateLoses_doesNotRunStartSideEffects(int oldState) {
+        when(recordMapper.selectList(any())).thenReturn(List.of(recordWithStatus(
+                1L, 10L, FlowStatusEnum.PENDING_PRINT)));
         when(recordMapper.update(isNull(), any())).thenReturn(0);
 
-        listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE, ProductionConstants.DEVICE_STATE_BUSY));
+        listener.onDeviceStateChange(event(1L, oldState, PrinterDeviceStateEnum.WORKING.getCode()));
 
-        verify(recordMapper).update(isNull(), any());
+        verify(recordMapper).selectList(argThat(query -> queryHasStatus(query,
+                FlowStatusEnum.PENDING_PRINT)));
+        verify(recordMapper).update(isNull(), argThat(update -> updateHasStatus(update,
+                FlowStatusEnum.PENDING_PRINT)));
         verifyNoInteractions(processMapper, productMapper, processService, orderMainMapper);
         verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
         verify(recordService, never()).reconcileOrderProductionStatus(any());
     }
 
-    @Test
-    void onDeviceStateChange_busyToIdle_setsPrintCompletedAndTriggersFlow() {
-        ProductionRecordEntity record = record(1L, 10L);
-        record.setStatus(FlowStatusEnum.PRINTING.getValue());
-        when(recordMapper.selectList(any())).thenReturn(List.of(record));
+    @ParameterizedTest
+    @ValueSource(ints = {2, 3, 4, 5, 6})
+    void onDeviceStateChange_idleToNonWorking_doesNotStartOrRunAnyProductionSideEffect(int newState) {
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.IDLE.getCode(), newState));
+
+        verifyNoInteractions(recordMapper, processMapper, productMapper, orderMainMapper,
+                processService, recordService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2, 6})
+    void onDeviceStateChange_finishPreviousStateToIdle_completesPrintingRecord(int oldState) {
+        ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING);
+        stubRecordQueryByStatus(record);
         when(recordMapper.update(isNull(), any())).thenReturn(1);
         when(processMapper.update(isNull(), any())).thenReturn(1);
 
-        listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_BUSY, ProductionConstants.DEVICE_STATE_IDLE));
+        listener.onDeviceStateChange(event(1L, oldState, PrinterDeviceStateEnum.IDLE.getCode()));
 
-        verify(recordMapper).update(isNull(), any());
+        verify(recordMapper).selectList(argThat(query -> queryHasStatus(query,
+                FlowStatusEnum.PRINTING)));
+        verify(recordMapper).update(isNull(), argThat(update -> updateHasStatus(update,
+                FlowStatusEnum.PRINTING)));
         verify(processService).schedulePostProcessing(eq(1L), argThat(time ->
                 time != null && time.getNano() == 0));
+        verify(processMapper).update(isNull(), any());
+        verifyNoInteractions(productMapper, orderMainMapper);
         verify(recordService).triggerFlowIfAllReach(10L,
                 FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
         verify(recordService).reconcileOrderProductionStatus(10L);
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {3, 4, 5})
+    void onDeviceStateChange_nonFinishPreviousStateToIdle_keepsPrintingRecordUntouched(int oldState) {
+        when(recordMapper.selectList(any())).thenReturn(List.of(recordWithStatus(
+                1L, 10L, FlowStatusEnum.PRINTING)));
+
+        listener.onDeviceStateChange(event(1L, oldState, PrinterDeviceStateEnum.IDLE.getCode()));
+
+        verifyNoInteractions(recordMapper, processMapper, productMapper, orderMainMapper,
+                processService, recordService);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "1, PENDING_PRINT", "1, PRINT_COMPLETED", "1, PRINT_FAILED",
+            "2, PENDING_PRINT", "2, PRINT_COMPLETED", "2, PRINT_FAILED",
+            "6, PENDING_PRINT", "6, PRINT_COMPLETED", "6, PRINT_FAILED"
+    })
+    void onDeviceStateChange_finishEventWithNonPrintingRecord_doesNotRunCompletionSideEffects(
+            int oldState, FlowStatusEnum recordStatus) {
+        ProductionRecordEntity record = recordWithStatus(1L, 10L, recordStatus);
+        stubRecordQueryByStatus(record);
+
+        listener.onDeviceStateChange(event(1L, oldState, PrinterDeviceStateEnum.IDLE.getCode()));
+
+        verify(recordMapper).selectList(argThat(query -> queryHasStatus(query,
+                FlowStatusEnum.PRINTING)));
+        verify(recordMapper, never()).update(isNull(), any());
+        verifyNoInteractions(processMapper, productMapper, orderMainMapper, processService,
+                recordService);
+    }
+
     @Test
-    void onDeviceStateChange_busyToIdle_advancesEveryAffectedOrder() {
+    void onDeviceStateChange_workingToIdle_advancesEveryAffectedOrder() {
         ProductionRecordEntity first = record(1L, 10L);
         first.setStatus(FlowStatusEnum.PRINTING.getValue());
         ProductionRecordEntity second = record(2L, 20L);
@@ -126,8 +194,8 @@ class DeviceStatusListenerTest {
         when(recordMapper.update(isNull(), any())).thenReturn(1);
         when(processMapper.update(isNull(), any())).thenReturn(1);
 
-        listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_BUSY,
-                ProductionConstants.DEVICE_STATE_IDLE));
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
+                PrinterDeviceStateEnum.IDLE.getCode()));
 
         verify(recordService).triggerFlowIfAllReach(10L,
                 FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
@@ -138,7 +206,7 @@ class DeviceStatusListenerTest {
     }
 
     @Test
-    void onDeviceStateChange_busyToIdle_whenPrintProcessMissing_rollsBackByThrowing() {
+    void onDeviceStateChange_workingToIdle_whenPrintProcessMissing_rollsBackByThrowing() {
         ProductionRecordEntity record = record(1L, 10L);
         record.setStatus(FlowStatusEnum.PRINTING.getValue());
         when(recordMapper.selectList(any())).thenReturn(List.of(record));
@@ -146,14 +214,14 @@ class DeviceStatusListenerTest {
         when(processMapper.update(isNull(), any())).thenReturn(0);
 
         assertThrows(com.yigongbao.common.exception.BusinessException.class,
-                () -> listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_BUSY,
-                        ProductionConstants.DEVICE_STATE_IDLE)));
+                () -> listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
+                        PrinterDeviceStateEnum.IDLE.getCode())));
 
         verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
     }
 
     @Test
-    void onDeviceStateChange_idleToBusy_advancesEveryAffectedOrder() {
+    void onDeviceStateChange_newWorking_advancesEveryAffectedOrder() {
         when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L), record(2L, 20L)));
         when(recordMapper.update(isNull(), any())).thenReturn(1);
         when(processMapper.update(isNull(), any())).thenReturn(1);
@@ -161,8 +229,8 @@ class DeviceStatusListenerTest {
                 .thenReturn(List.of(pendingProduct(101L)), List.of(pendingProduct(102L)));
         when(productMapper.update(isNull(), any())).thenReturn(1);
 
-        listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE,
-                ProductionConstants.DEVICE_STATE_BUSY));
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.IDLE.getCode(),
+                PrinterDeviceStateEnum.WORKING.getCode()));
 
         verify(recordService).triggerFlowIfAllReach(10L,
                 FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
@@ -173,21 +241,21 @@ class DeviceStatusListenerTest {
     }
 
     @Test
-    void onDeviceStateChange_idleToBusy_whenPrintProcessMissing_rollsBackByThrowing() {
+    void onDeviceStateChange_newWorking_whenPrintProcessMissing_rollsBackByThrowing() {
         when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
         when(recordMapper.update(isNull(), any())).thenReturn(1);
         when(processMapper.update(isNull(), any())).thenReturn(0);
 
         assertThrows(com.yigongbao.common.exception.BusinessException.class,
-                () -> listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE,
-                        ProductionConstants.DEVICE_STATE_BUSY)));
+                () -> listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.IDLE.getCode(),
+                        PrinterDeviceStateEnum.WORKING.getCode())));
 
         verifyNoInteractions(productMapper, orderMainMapper);
         verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
     }
 
     @Test
-    void onDeviceStateChange_idleToBusy_whenNoPendingProduct_rollsBackByThrowing() {
+    void onDeviceStateChange_newWorking_whenNoPendingProduct_rollsBackByThrowing() {
         when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
         when(recordMapper.update(isNull(), any())).thenReturn(1);
         when(processMapper.update(isNull(), any())).thenReturn(1);
@@ -195,15 +263,15 @@ class DeviceStatusListenerTest {
         when(productMapper.update(isNull(), any())).thenReturn(0);
 
         assertThrows(com.yigongbao.common.exception.BusinessException.class,
-                () -> listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE,
-                        ProductionConstants.DEVICE_STATE_BUSY)));
+                () -> listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.IDLE.getCode(),
+                        PrinterDeviceStateEnum.WORKING.getCode())));
 
         verifyNoInteractions(orderMainMapper);
         verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
     }
 
     @Test
-    void onDeviceStateChange_idleToBusy_whenOnlySomeProductsUpdated_rollsBackByThrowing() {
+    void onDeviceStateChange_newWorking_whenOnlySomeProductsUpdated_rollsBackByThrowing() {
         when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
         when(recordMapper.update(isNull(), any())).thenReturn(1);
         when(processMapper.update(isNull(), any())).thenReturn(1);
@@ -211,31 +279,103 @@ class DeviceStatusListenerTest {
         when(productMapper.update(isNull(), any())).thenReturn(1);
 
         assertThrows(com.yigongbao.common.exception.BusinessException.class,
-                () -> listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_IDLE,
-                        ProductionConstants.DEVICE_STATE_BUSY)));
+                () -> listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.IDLE.getCode(),
+                        PrinterDeviceStateEnum.WORKING.getCode())));
 
         verifyNoInteractions(orderMainMapper);
         verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
     }
 
     @Test
-    void onDeviceStateChange_busyToIdle_whenStatusUpdateLost_doesNotScheduleAgain() {
+    void onDeviceStateChange_workingToIdle_whenStatusUpdateLost_doesNotScheduleAgain() {
         ProductionRecordEntity record = record(1L, 10L);
         record.setStatus(FlowStatusEnum.PRINTING.getValue());
         when(recordMapper.selectList(any())).thenReturn(List.of(record));
         when(recordMapper.update(isNull(), any())).thenReturn(0);
 
-        listener.onDeviceStateChange(event(1L, ProductionConstants.DEVICE_STATE_BUSY, ProductionConstants.DEVICE_STATE_IDLE));
+        listener.onDeviceStateChange(event(1L,
+                PrinterDeviceStateEnum.WORKING.getCode(), PrinterDeviceStateEnum.IDLE.getCode()));
 
         verify(processService, never()).schedulePostProcessing(any(), any(LocalDateTime.class));
         verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
     }
 
     @Test
+    void onDeviceStateChange_newDeviceWorkingToPrintFinishedToIdle_completesOnlyAtIdle() {
+        stubSuccessfulFinish();
+
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
+                PrinterDeviceStateEnum.PRINT_FINISHED.getCode()));
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.PRINT_FINISHED.getCode(),
+                PrinterDeviceStateEnum.IDLE.getCode()));
+
+        verifySingleCompletion();
+    }
+
+    @Test
+    void onDeviceStateChange_legacyDeviceWorkingToIdle_completesOnce() {
+        stubSuccessfulFinish();
+
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
+                PrinterDeviceStateEnum.IDLE.getCode()));
+
+        verifySingleCompletion();
+    }
+
+    @Test
+    void onDeviceStateChange_workingToOfflineToIdle_completesOnlyAfterRecoveryToIdle() {
+        stubSuccessfulFinish();
+
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
+                PrinterDeviceStateEnum.OFFLINE.getCode()));
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.OFFLINE.getCode(),
+                PrinterDeviceStateEnum.IDLE.getCode()));
+
+        verifySingleCompletion();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {3, 4})
+    void onDeviceStateChange_alarmOrPauseToOfflineToIdle_completesOnlyAtFinalIdle(int initialState) {
+        stubSuccessfulFinish();
+
+        listener.onDeviceStateChange(event(1L, initialState,
+                PrinterDeviceStateEnum.OFFLINE.getCode()));
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.OFFLINE.getCode(),
+                PrinterDeviceStateEnum.IDLE.getCode()));
+
+        verifySingleCompletion();
+    }
+
+    @Test
+    void onDeviceStateChange_duplicatePrintFinishedToIdleEvent_runsCompletionSideEffectsOnce() {
+        ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING);
+        stubRecordQueryByStatus(record);
+        when(recordMapper.update(isNull(), any())).thenReturn(1, 0);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
+
+        DeviceStateChangeEvent event = event(1L, PrinterDeviceStateEnum.PRINT_FINISHED.getCode(),
+                PrinterDeviceStateEnum.IDLE.getCode());
+        listener.onDeviceStateChange(event);
+        listener.onDeviceStateChange(event);
+
+        verify(recordMapper, times(2)).selectList(argThat(query -> queryHasStatus(query,
+                FlowStatusEnum.PRINTING)));
+        verify(recordMapper, times(2)).update(isNull(), any());
+        verify(processService, times(1)).schedulePostProcessing(eq(1L), any(LocalDateTime.class));
+        verify(processMapper, times(1)).update(isNull(), any());
+        verify(recordService, times(1)).triggerFlowIfAllReach(10L,
+                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
+        verify(recordService, times(1)).reconcileOrderProductionStatus(10L);
+        verifyNoInteractions(productMapper, orderMainMapper);
+    }
+
+    @Test
     void onDeviceStateChange_otherStateCombination_doesNothing() {
         when(recordMapper.selectList(any())).thenReturn(List.of(record(1L, 10L)));
 
-        listener.onDeviceStateChange(event(1L, 1, 1));
+        listener.onDeviceStateChange(event(1L,
+                PrinterDeviceStateEnum.WORKING.getCode(), PrinterDeviceStateEnum.WORKING.getCode()));
 
         verify(recordMapper, never()).updateById((ProductionRecordEntity) any());
         verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
@@ -251,6 +391,59 @@ class DeviceStatusListenerTest {
         r.setOrderId(orderId);
         r.setRecordNo("REC-00" + id);
         return r;
+    }
+
+    private ProductionRecordEntity recordWithStatus(Long id, Long orderId, FlowStatusEnum status) {
+        ProductionRecordEntity record = record(id, orderId);
+        record.setStatus(status.getValue());
+        return record;
+    }
+
+    private boolean queryHasStatus(Object query, FlowStatusEnum status) {
+        if (!(query instanceof LambdaQueryWrapper<?> wrapper)) {
+            return false;
+        }
+        wrapper.getSqlSegment();
+        return wrapper.getParamNameValuePairs().containsValue(status.getValue());
+    }
+
+    private boolean updateHasStatus(Object update, FlowStatusEnum status) {
+        if (!(update instanceof LambdaUpdateWrapper<?> wrapper)) {
+            return false;
+        }
+        wrapper.getSqlSegment();
+        return wrapper.getParamNameValuePairs().containsValue(status.getValue());
+    }
+
+    private void stubRecordQueryByStatus(ProductionRecordEntity record) {
+        when(recordMapper.selectList(any())).thenAnswer(invocation -> {
+            Object query = invocation.getArgument(0);
+            if (!queryHasStatus(query, FlowStatusEnum.PRINTING)) {
+                throw new AssertionError("打印完成查询必须限定 PRINTING 状态");
+            }
+            if (FlowStatusEnum.PRINTING.getValue().equals(record.getStatus())) {
+                return List.of(record);
+            }
+            return List.of();
+        });
+    }
+
+    private void stubSuccessfulFinish() {
+        stubRecordQueryByStatus(recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
+    }
+
+    private void verifySingleCompletion() {
+        verify(recordMapper, times(1)).selectList(argThat(query -> queryHasStatus(query,
+                FlowStatusEnum.PRINTING)));
+        verify(recordMapper, times(1)).update(isNull(), any());
+        verify(processService, times(1)).schedulePostProcessing(eq(1L), any(LocalDateTime.class));
+        verify(processMapper, times(1)).update(isNull(), any());
+        verify(recordService, times(1)).triggerFlowIfAllReach(10L,
+                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
+        verify(recordService, times(1)).reconcileOrderProductionStatus(10L);
+        verifyNoInteractions(productMapper, orderMainMapper);
     }
 
     private ProductionProductEntity pendingProduct(Long id) {
