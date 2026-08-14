@@ -11,8 +11,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -20,11 +18,9 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 class DeviceWebSocketHandlerTest {
 
     @Mock
@@ -47,7 +43,7 @@ class DeviceWebSocketHandlerTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(session.getId()).thenReturn("test-session-id");
+        when(session.getId()).thenReturn("test-session-id");
     }
 
     @Test
@@ -59,7 +55,7 @@ class DeviceWebSocketHandlerTest {
         handler.handleTextMessage(session, message);
 
         verify(deviceService, times(1)).batchUpdateDeviceStatus(any());
-        verify(connectionManager, times(1)).addSession(anyString(), any());
+        verify(connectionManager).addSession("武汉嘉一", session);
         verify(session).sendMessage(new TextMessage("{\"code\":200,\"message\":\"success\"}"));
     }
 
@@ -85,6 +81,7 @@ class DeviceWebSocketHandlerTest {
             dto.getDevices().stream().map(DeviceStatusPushDTO.DeviceStatus::getId).toList());
         assertEquals(List.of(0, 1, 2, 3, 4, 5, 6),
             dto.getDevices().stream().map(DeviceStatusPushDTO.DeviceStatus::getState).toList());
+        verify(connectionManager).addSession("武汉嘉一", session);
         verify(session).sendMessage(new TextMessage("{\"code\":200,\"message\":\"success\"}"));
     }
 
