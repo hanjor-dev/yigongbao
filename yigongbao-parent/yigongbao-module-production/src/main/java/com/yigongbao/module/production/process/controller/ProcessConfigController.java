@@ -9,6 +9,7 @@ import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
+import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.production.enums.ProcessTypeEnum;
 import com.yigongbao.module.production.process.vo.ProcessingCenterDevicesVO;
@@ -102,7 +103,10 @@ public class ProcessConfigController {
         Map<Long, String> centerNameMap = devices.stream()
                 .collect(Collectors.toMap(DeviceEntity::getCenterId, DeviceEntity::getCenterName, (v1, v2) -> v1));
 
-        Map<Long, PrinterVO> printerById = printerAvailabilityService.toPrinterVOs(devices).stream()
+        List<PrinterVO> deviceViews = DeviceTypeEnum.PRINTER_SLA.getCode().equals(deviceType)
+                ? printerAvailabilityService.toPrinterVOs(devices)
+                : devices.stream().map(this::toNonPrinterVO).toList();
+        Map<Long, PrinterVO> printerById = deviceViews.stream()
                 .collect(Collectors.toMap(PrinterVO::getId, vo -> vo));
 
         Map<Long, List<PrinterVO>> grouped = devices.stream()
@@ -123,5 +127,25 @@ public class ProcessConfigController {
                 .collect(Collectors.toList());
 
         return Result.success(result);
+    }
+
+    private PrinterVO toNonPrinterVO(DeviceEntity device) {
+        int status = device.getConnectionStatus() == null
+                || device.getConnectionStatus() == 0
+                || (device.getState() != null && device.getState() != 0) ? 1 : 0;
+        String deviceStateName = device.getState() == null
+                ? null
+                : device.getState() == 0 ? "空闲" : "占用";
+        PrinterVO vo = new PrinterVO();
+        vo.setId(device.getId());
+        vo.setDeviceNo(device.getDeviceId());
+        vo.setDeviceName(device.getDeviceName());
+        vo.setStatus(status);
+        vo.setStatusName(status == 0 ? "空闲" : "占用");
+        vo.setDeviceState(device.getState());
+        vo.setDeviceStateName(deviceStateName);
+        vo.setConnectionStatus(device.getConnectionStatus());
+        vo.setAvailable(status == 0);
+        return vo;
     }
 }

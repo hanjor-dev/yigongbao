@@ -3,6 +3,7 @@ package com.yigongbao.module.production.process.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.common.service.PrinterDeviceUsageChecker;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
+import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.production.record.service.PrinterAvailabilityService;
 import com.yigongbao.module.system.config.service.ConfigService;
@@ -66,7 +67,7 @@ class ProcessConfigControllerTest {
         try (org.mockito.MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
             mockMvc.perform(get("/production/process-config/devices")
-                            .param("deviceType", "PRINTER"))
+                            .param("deviceType", DeviceTypeEnum.PRINTER_SLA.getCode()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data").isArray())
                     .andExpect(jsonPath("$.data[0].devices[0].status").value(0))
@@ -84,6 +85,29 @@ class ProcessConfigControllerTest {
         }
         verify(deviceMapper).selectList(any());
         verify(usageChecker).findActiveDeviceIds(List.of(1L, 2L, 3L, 4L));
+    }
+
+    @Test
+    void devices_nonPrinterPreservesBinaryStateWithoutPrinterUsageLookup() throws Exception {
+        UserEntity user = new UserEntity();
+        when(userMapper.selectById(1L)).thenReturn(user);
+        when(deviceMapper.selectList(any())).thenReturn(List.of(device(5L, 1, 1)));
+
+        try (org.mockito.MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            mockMvc.perform(get("/production/process-config/devices")
+                            .param("deviceType", DeviceTypeEnum.WASH_CONTAINER.getCode()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data[0].devices[0].status").value(1))
+                    .andExpect(jsonPath("$.data[0].devices[0].statusName").value("占用"))
+                    .andExpect(jsonPath("$.data[0].devices[0].deviceState").value(1))
+                    .andExpect(jsonPath("$.data[0].devices[0].deviceStateName").value("占用"))
+                    .andExpect(jsonPath("$.data[0].devices[0].connectionStatus").value(1))
+                    .andExpect(jsonPath("$.data[0].devices[0].available").value(false));
+        }
+
+        verify(deviceMapper).selectList(any());
+        verifyNoInteractions(usageChecker);
     }
 
     private DeviceEntity device(Long id, Integer connectionStatus, Integer state) {
