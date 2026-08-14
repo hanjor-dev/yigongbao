@@ -1676,7 +1676,7 @@ CREATE TABLE device (
     device_type VARCHAR(50) COMMENT '设备类型',
     center_id BIGINT COMMENT '所属加工中心ID',
     center_name VARCHAR(100) COMMENT '所属加工中心名称',
-    state TINYINT DEFAULT 0 COMMENT '设备状态（0=空闲，1=占用）',
+    state TINYINT DEFAULT 0 COMMENT '设备状态（0=空闲，1=工作中，2=打印完成，3=报警，4=暂停，5=准备就绪，6=离线）',
     connection_status TINYINT DEFAULT 0 COMMENT '连接状态（0=离线，1=在线）',
     last_heartbeat DATETIME COMMENT '最后心跳时间',
     processing_minutes INT COMMENT '加工耗时（单位：分钟）',
