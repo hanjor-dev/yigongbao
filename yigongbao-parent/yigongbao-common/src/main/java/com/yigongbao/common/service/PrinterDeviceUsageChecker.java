@@ -9,9 +9,22 @@ import java.util.Set;
  */
 public interface PrinterDeviceUsageChecker {
 
+    /**
+     * 查找正在被生产占用的设备 ID。
+     * <p>
+     * 实现必须在输入为 {@code null} 或空集合时返回空集合，忽略输入中的
+     * {@code null} 元素，并且始终返回非 {@code null} 集合。
+     *
+     * @param deviceIds 待查询的设备 ID
+     * @return 正在被生产占用的设备 ID 集合，永不为 {@code null}
+     */
     Set<Long> findActiveDeviceIds(Collection<Long> deviceIds);
 
     default boolean isInUse(Long deviceId) {
-        return deviceId != null && findActiveDeviceIds(List.of(deviceId)).contains(deviceId);
+        if (deviceId == null) {
+            return false;
+        }
+        Set<Long> activeDeviceIds = findActiveDeviceIds(List.of(deviceId));
+        return activeDeviceIds != null && activeDeviceIds.contains(deviceId);
     }
 }

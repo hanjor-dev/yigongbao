@@ -2,6 +2,8 @@ package com.yigongbao.common.enums;
 
 import com.yigongbao.common.service.PrinterDeviceUsageChecker;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Set;
 
@@ -27,6 +29,12 @@ class PrinterDeviceStateEnumTest {
         assertFalse(PrinterDeviceStateEnum.isValid(null));
         assertFalse(PrinterDeviceStateEnum.isValid(-1));
         assertFalse(PrinterDeviceStateEnum.isValid(7));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
+    void isValid_acceptsConfiguredCodes(int code) {
+        assertTrue(PrinterDeviceStateEnum.isValid(code));
     }
 
     @Test
@@ -61,5 +69,12 @@ class PrinterDeviceStateEnumTest {
         };
 
         assertFalse(checker.isInUse(null));
+    }
+
+    @Test
+    void isInUse_returnsFalseWhenImplementationReturnsNull() {
+        PrinterDeviceUsageChecker checker = deviceIds -> null;
+
+        assertFalse(checker.isInUse(42L));
     }
 }
