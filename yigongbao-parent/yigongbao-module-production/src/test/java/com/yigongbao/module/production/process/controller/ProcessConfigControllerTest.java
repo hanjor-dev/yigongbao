@@ -18,7 +18,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
-import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -63,7 +62,6 @@ class ProcessConfigControllerTest {
                 device(3L, 1, 5),
                 device(4L, 0, 0));
         when(deviceMapper.selectList(any())).thenReturn(devices);
-        when(usageChecker.findActiveDeviceIds(List.of(1L, 2L, 3L, 4L))).thenReturn(Set.of(2L));
         try (org.mockito.MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
             mockMvc.perform(get("/production/process-config/devices")
@@ -76,22 +74,24 @@ class ProcessConfigControllerTest {
                     .andExpect(jsonPath("$.data[0].devices[0].deviceState").value(0))
                     .andExpect(jsonPath("$.data[0].devices[0].deviceStateName").value("空闲"))
                     .andExpect(jsonPath("$.data[0].devices[0].connectionStatus").value(1))
-                    .andExpect(jsonPath("$.data[0].devices[1].status").value(1))
-                    .andExpect(jsonPath("$.data[0].devices[1].statusName").value("占用"))
-                    .andExpect(jsonPath("$.data[0].devices[1].available").value(false))
+                    .andExpect(jsonPath("$.data[0].devices[1].status").value(0))
+                    .andExpect(jsonPath("$.data[0].devices[1].statusName").value("空闲"))
+                    .andExpect(jsonPath("$.data[0].devices[1].available").value(true))
                     .andExpect(jsonPath("$.data[0].devices[2].deviceStateName").value("准备就绪"))
                     .andExpect(jsonPath("$.data[0].devices[2].available").value(false))
                     .andExpect(jsonPath("$.data[0].devices[3].available").value(false));
         }
         verify(deviceMapper).selectList(any());
-        verify(usageChecker).findActiveDeviceIds(List.of(1L, 2L, 3L, 4L));
+        verifyNoInteractions(usageChecker);
     }
 
     @Test
     void devices_nonPrinterPreservesBinaryStateWithoutPrinterUsageLookup() throws Exception {
         UserEntity user = new UserEntity();
         when(userMapper.selectById(1L)).thenReturn(user);
-        when(deviceMapper.selectList(any())).thenReturn(List.of(device(5L, 1, 1)));
+        DeviceEntity washDevice = device(5L, 1, 1);
+        washDevice.setDeviceType(DeviceTypeEnum.WASH_CONTAINER.getCode());
+        when(deviceMapper.selectList(any())).thenReturn(List.of(washDevice));
 
         try (org.mockito.MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
@@ -113,6 +113,7 @@ class ProcessConfigControllerTest {
     private DeviceEntity device(Long id, Integer connectionStatus, Integer state) {
         DeviceEntity device = new DeviceEntity();
         device.setId(id);
+        device.setDeviceType(DeviceTypeEnum.PRINTER_SLA.getCode());
         device.setDeviceId("SLA-" + id);
         device.setDeviceName("打印机" + id);
         device.setCenterId(10L);

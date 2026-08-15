@@ -12,6 +12,7 @@ import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
+import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.design.mapper.DesignDrawingMapper;
@@ -110,11 +111,11 @@ class ProductionRecordAssignDeviceTest {
     @BeforeEach
     void setBaseMapper() {
         ReflectionTestUtils.setField(service, "baseMapper", recordMapper);
-        PrinterAvailabilityService realAvailabilityService = new PrinterAvailabilityService(usageChecker);
+        PrinterAvailabilityService realAvailabilityService = new PrinterAvailabilityService();
         lenient().doAnswer(invocation -> {
-            realAvailabilityService.requireAvailable(invocation.getArgument(0), invocation.getArgument(1));
+            realAvailabilityService.requireAvailable(invocation.getArgument(0));
             return null;
-        }).when(availabilityService).requireAvailable(any(DeviceEntity.class), anyBoolean());
+        }).when(availabilityService).requireAvailable(any(DeviceEntity.class));
     }
 
     @Test
@@ -132,7 +133,7 @@ class ProductionRecordAssignDeviceTest {
         InOrder order = inOrder(deviceMapper, usageChecker, availabilityService, recordMapper);
         order.verify(deviceMapper).selectByIdForUpdate(2L);
         order.verify(usageChecker).isInUse(2L);
-        order.verify(availabilityService).requireAvailable(any(DeviceEntity.class), eq(false));
+        order.verify(availabilityService).requireAvailable(any(DeviceEntity.class));
         order.verify(recordMapper).selectByIdForUpdate(1L);
         verify(recordMapper, never()).selectById(any());
         verifyNoInteractions(processMapper, productNumberService);
@@ -157,6 +158,7 @@ class ProductionRecordAssignDeviceTest {
         ProductionRecordEntity record = pendingRecord(1L);
         DeviceEntity device = new DeviceEntity();
         device.setId(2L);
+        device.setDeviceType(DeviceTypeEnum.PRINTER_SLA.getCode());
         device.setState(0);
         device.setConnectionStatus(0);
         when(deviceMapper.selectByIdForUpdate(2L)).thenReturn(device);
@@ -176,6 +178,7 @@ class ProductionRecordAssignDeviceTest {
         ProductionRecordEntity record = pendingRecord(1L);
         DeviceEntity device = new DeviceEntity();
         device.setId(2L);
+        device.setDeviceType(DeviceTypeEnum.PRINTER_SLA.getCode());
         device.setDeviceId("SLA-002");
         device.setDeviceName("打印机2");
         device.setState(0);
@@ -216,7 +219,7 @@ class ProductionRecordAssignDeviceTest {
         InOrder lockOrder = inOrder(deviceMapper, usageChecker, availabilityService, recordMapper, service);
         lockOrder.verify(deviceMapper).selectByIdForUpdate(2L);
         lockOrder.verify(usageChecker).isInUse(2L);
-        lockOrder.verify(availabilityService).requireAvailable(device, false);
+        lockOrder.verify(availabilityService).requireAvailable(device);
         lockOrder.verify(recordMapper).selectByIdForUpdate(1L);
         lockOrder.verify(service).updateById(record);
         verify(recordMapper, never()).selectById(any());
@@ -252,7 +255,7 @@ class ProductionRecordAssignDeviceTest {
                 () -> service.assignDevice(1L, dto));
 
         assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.DEVICE_NOT_AVAILABLE.getCode());
-        verify(availabilityService).requireAvailable(any(DeviceEntity.class), eq(true));
+        verify(availabilityService).requireAvailable(any(DeviceEntity.class));
         verify(recordMapper, never()).selectByIdForUpdate(any());
     }
 
@@ -441,7 +444,7 @@ class ProductionRecordAssignDeviceTest {
                 com.yigongbao.common.enums.ErrorCodeEnum.RECORD_DEVICE_ALREADY_ASSIGNED.getCode());
         verify(deviceMapper).selectByIdForUpdate(3L);
         verify(usageChecker).isInUse(3L);
-        verify(availabilityService).requireAvailable(any(DeviceEntity.class), eq(false));
+        verify(availabilityService).requireAvailable(any(DeviceEntity.class));
         verifyNoInteractions(processMapper, productNumberService, deviceUsageCounterService);
     }
 
@@ -578,6 +581,7 @@ class ProductionRecordAssignDeviceTest {
     private DeviceEntity readyDevice(Long id) {
         DeviceEntity device = new DeviceEntity();
         device.setId(id);
+        device.setDeviceType(DeviceTypeEnum.PRINTER_SLA.getCode());
         device.setDeviceId("SLA-" + id);
         device.setDeviceName("打印机" + id);
         device.setState(0);

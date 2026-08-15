@@ -651,7 +651,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                     .eq(DeviceEntity::getIsDeleted, StatusConstants.NO));
         }
 
-        // 3. 批量查询生产占用并统一转换为 PrinterVO
+        // 3. 按打印机物理状态统一转换为 PrinterVO
         Map<Long, PrinterVO> printerById = printerAvailabilityService.toPrinterVOs(devices).stream()
             .collect(Collectors.toMap(PrinterVO::getId, vo -> vo));
         Map<Long, List<PrinterVO>> centerPrintersMap = devices.stream()
@@ -690,7 +690,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
         }
         boolean activeUsage = printerDeviceUsageChecker.isInUse(device.getId());
-        printerAvailabilityService.requireAvailable(device, activeUsage);
+        printerAvailabilityService.requireAvailable(device);
+        if (activeUsage) {
+            throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
+        }
 
         ProductionRecordEntity record = baseMapper.selectByIdForUpdate(recordId);
         if (record == null) {
