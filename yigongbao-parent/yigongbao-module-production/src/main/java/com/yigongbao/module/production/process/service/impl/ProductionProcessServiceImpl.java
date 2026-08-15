@@ -120,6 +120,10 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
     @Override
     @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void startProcess(Long recordId, StartProcessDTO dto) {
+        if (ProcessTypeEnum.PRINT.getCode().equals(dto.getProcessType())) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
+                    "打印工序只能由设备状态事件推进");
+        }
         ProductionRecordEntity record = recordMapper.selectById(recordId);
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
@@ -159,6 +163,7 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             process.setStartTime(times[0]);
             process.setEndTime(times[1]);
         }
+        requirePreviousPostProcessesCompleted(recordId, dto.getProcessType());
         process.setDeviceId(dto.getPrimaryDeviceId());
         DeviceEntity device = deviceMapper.selectById(dto.getPrimaryDeviceId());
         if (device != null) {
@@ -211,6 +216,10 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
     @Override
     @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void finishProcess(Long recordId, String processType) {
+        if (ProcessTypeEnum.PRINT.getCode().equals(processType)) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
+                    "打印工序只能由设备状态事件推进");
+        }
         ProductionProcessEntity process = getOne(new LambdaQueryWrapper<ProductionProcessEntity>()
                 .eq(ProductionProcessEntity::getProductionRecordId, recordId)
                 .eq(ProductionProcessEntity::getProcessType, processType));
@@ -297,6 +306,30 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
         return ProcessTypeEnum.WASH.getCode().equals(processType)
                 || ProcessTypeEnum.CURE.getCode().equals(processType)
                 || ProcessTypeEnum.CLEAN_DRY.getCode().equals(processType);
+    }
+
+    private void requirePreviousPostProcessesCompleted(Long recordId, String processType) {
+        List<String> orderedTypes = List.of(
+                ProcessTypeEnum.WASH.getCode(),
+                ProcessTypeEnum.CURE.getCode(),
+                ProcessTypeEnum.CLEAN_DRY.getCode());
+        int currentIndex = orderedTypes.indexOf(processType);
+        if (currentIndex <= 0) {
+            return;
+        }
+        List<ProductionProcessEntity> processes = list(new LambdaQueryWrapper<ProductionProcessEntity>()
+                .eq(ProductionProcessEntity::getProductionRecordId, recordId));
+        for (String previousType : orderedTypes.subList(0, currentIndex)) {
+            ProductionProcessEntity previous = processes.stream()
+                    .filter(item -> previousType.equals(item.getProcessType()))
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
+                            "前置工序缺失: " + previousType));
+            if (!ProcessStatusEnum.COMPLETED.getCode().equals(previous.getStatus())) {
+                throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
+                        "前置工序未完成: " + previousType);
+            }
+        }
     }
 
     private Map<String, LocalDateTime[]> buildPostProcessingSchedule(LocalDateTime printFinishTime) {

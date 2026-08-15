@@ -6,6 +6,7 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
+import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
@@ -71,6 +72,9 @@ public class ProductionPackServiceImpl implements IProductionPackService {
         if (device == null) {
             throw new BusinessException(ErrorCodeEnum.PACK_DEVICE_NOT_FOUND);
         }
+        if (!DeviceTypeEnum.SEALING_MACHINE.getCode().equals(device.getDeviceType())) {
+            throw new BusinessException(ErrorCodeEnum.DEVICE_TYPE_MISMATCH);
+        }
         record.setPackDeviceId(dto.getPrimaryDeviceId());
         record.setPackDeviceNo(device.getDeviceId());
 
@@ -119,7 +123,11 @@ public class ProductionPackServiceImpl implements IProductionPackService {
             }
         }
 
-        processMapper.update(null, updateWrapper);
+        int processUpdated = processMapper.update(null, updateWrapper);
+        if (processUpdated != 1) {
+            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
+                    "包装工序记录缺失或重复，无法填写包装信息");
+        }
         log.info("填写包装信息: recordId={}, recordNo={}, primaryDeviceId={}",
             recordId, record.getRecordNo(), dto.getPrimaryDeviceId());
     }
