@@ -14,7 +14,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.common.service.PrinterDeviceUsageChecker;
+import com.yigongbao.common.service.PrinterRecordUsageChecker;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
@@ -92,7 +92,7 @@ class ProductionRecordServiceImplTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private FlowCardExcelBuilder flowCardExcelBuilder;
     @Mock private com.yigongbao.module.basic.file.service.FileService fileService;
-    @Mock private PrinterDeviceUsageChecker usageChecker;
+    @Mock private PrinterRecordUsageChecker usageChecker;
     @Mock private PrinterAvailabilityService availabilityService;
 
     @InjectMocks

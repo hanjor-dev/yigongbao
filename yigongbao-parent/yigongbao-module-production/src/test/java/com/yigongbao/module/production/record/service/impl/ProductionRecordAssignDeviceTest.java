@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.common.service.PrinterDeviceUsageChecker;
+import com.yigongbao.common.service.PrinterRecordUsageChecker;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
@@ -93,7 +93,7 @@ class ProductionRecordAssignDeviceTest {
     @Mock private IProductNumberService productNumberService;
     @Mock private ProductionProcessMapper processMapper;
     @Mock private ProductionProductMapper productMapper;
-    @Mock private PrinterDeviceUsageChecker usageChecker;
+    @Mock private PrinterRecordUsageChecker usageChecker;
     @Mock private PrinterAvailabilityService availabilityService;
 
     @Spy

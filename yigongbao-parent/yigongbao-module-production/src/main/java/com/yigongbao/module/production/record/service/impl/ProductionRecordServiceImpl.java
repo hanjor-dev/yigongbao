@@ -10,7 +10,6 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.common.service.PrinterDeviceUsageChecker;
 import com.yigongbao.common.service.PrinterRecordUsageChecker;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
@@ -114,8 +113,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final ApplicationEventPublisher eventPublisher;
     private final IDeviceUsageCounterService deviceUsageCounterService;
     private final IProductNumberService productNumberService;
-    private final PrinterDeviceUsageChecker printerDeviceUsageChecker;
-    private final PrinterRecordUsageChecker printerRecordUsageChecker;
+    private final PrinterRecordUsageChecker printerDeviceUsageChecker;
     private final PrinterAvailabilityService printerAvailabilityService;
 
     private static final List<Integer> NORMAL_PRODUCTION_STATUSES = List.of(
@@ -702,7 +700,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         validateDeviceOperationAccess(currentUser, record, device);
 
         return new PrinterOccupationVO(
-                printerRecordUsageChecker.isInUseByOtherRecord(deviceId, recordId));
+                printerDeviceUsageChecker.isInUseByOtherRecord(deviceId, recordId));
     }
 
     /** 为流转卡分配打印机；校验流转卡状态为待打印、设备在线且空闲，同步更新打印工序记录 */
