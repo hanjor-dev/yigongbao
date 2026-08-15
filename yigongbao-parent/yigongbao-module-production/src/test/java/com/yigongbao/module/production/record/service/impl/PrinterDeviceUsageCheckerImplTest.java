@@ -1,6 +1,6 @@
 package com.yigongbao.module.production.record.service.impl;
 
-import com.yigongbao.common.service.PrinterDeviceUsageChecker;
+import com.yigongbao.common.service.PrinterRecordUsageChecker;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.production.ProductionTestConfiguration;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
@@ -25,7 +25,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class PrinterDeviceUsageCheckerImplTest {
 
     @Autowired
-    private PrinterDeviceUsageChecker checker;
+    private PrinterRecordUsageChecker checker;
 
     @Autowired
     private ProductionRecordMapper recordMapper;

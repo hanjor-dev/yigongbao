@@ -301,7 +301,7 @@ public enum ErrorCodeEnum {
     CANCEL_APPLY_ALREADY_AUDITED(744, "取消申请已审核", 3),
     ORDER_PHASE_NOT_ALLOW_APPLY(745, "订单阶段不允许提交取消申请", 3),
 
-    // ==================== 生产设备与产品编号相关 826-831 ====================
+    // ==================== 生产设备与产品编号相关 826-831、840 ====================
     DEVICE_USAGE_COUNTER_UPDATE_FAILED(826, "设备上机次数更新失败，请重试", 3),
     PRODUCT_NUMBER_DUPLICATE(827, "产品编号重复：%s", 3),
     RECORD_NO_PRODUCT_FOR_NUMBER_GENERATION(828, "流转卡无产品，无法生成编号", 3),

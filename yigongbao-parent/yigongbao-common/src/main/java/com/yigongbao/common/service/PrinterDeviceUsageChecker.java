@@ -21,17 +21,6 @@ public interface PrinterDeviceUsageChecker {
      */
     Set<Long> findActiveDeviceIds(Collection<Long> deviceIds);
 
-    /**
-     * 查询设备是否被除指定流转卡以外的活跃生产记录占用。
-     *
-     * @param deviceId 设备 ID
-     * @param excludedRecordId 需排除的流转卡记录 ID，可为 {@code null}
-     * @return 是否存在其他活跃生产记录
-     */
-    default boolean isInUseByOtherRecord(Long deviceId, Long excludedRecordId) {
-        throw new UnsupportedOperationException("Query by excluded record is not supported");
-    }
-
     default boolean isInUse(Long deviceId) {
         if (deviceId == null) {
             return false;
