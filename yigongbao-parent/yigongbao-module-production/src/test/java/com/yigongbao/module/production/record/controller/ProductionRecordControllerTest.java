@@ -116,6 +116,13 @@ class ProductionRecordControllerTest {
     }
 
     @Test
+    void assignDevice_requestModelIncludesOccupiedConfirmation() {
+        assertThat(AssignDeviceDTO.class.getDeclaredFields())
+                .anyMatch(field -> field.getName().equals("confirmOccupied")
+                        && field.getType().equals(Boolean.class));
+    }
+
+    @Test
     void assignDevice_bindsProductWeightsFromJson() throws Exception {
         mockMvc.perform(post("/production/record/{id}/assign-device", 7L)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -128,6 +135,29 @@ class ProductionRecordControllerTest {
         assertThat(captor.getValue().getProductWeights().get(0).getWeight())
                 .isEqualByComparingTo("12.35");
         assertThat(captor.getValue().getProductWeights().get(1).getWeight()).isNull();
+    }
+
+    @Test
+    void assignDevice_bindsOmittedFalseAndTrueOccupiedConfirmation() throws Exception {
+        String weights = "\"productWeights\":[{\"productId\":101,\"weight\":12.35}]";
+        mockMvc.perform(post("/production/record/{id}/assign-device", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deviceId\":8," + weights + "}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/production/record/{id}/assign-device", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deviceId\":8,\"confirmOccupied\":false," + weights + "}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/production/record/{id}/assign-device", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deviceId\":8,\"confirmOccupied\":true," + weights + "}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<AssignDeviceDTO> captor = ArgumentCaptor.forClass(AssignDeviceDTO.class);
+        verify(recordService, org.mockito.Mockito.times(3)).assignDevice(eq(7L), captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(AssignDeviceDTO::getConfirmOccupied)
+                .containsExactly(null, false, true);
     }
 
     @Test

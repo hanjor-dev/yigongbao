@@ -25,4 +25,6 @@ public class AssignDeviceDTO {
     private String material;
     /** 打印参数（JSON格式，如层厚、支撑密度等） */
     private String printParams;
+    /** 打印机已被其他流转卡占用时，是否确认共享分配 */
+    private Boolean confirmOccupied;
 }

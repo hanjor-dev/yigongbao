@@ -712,11 +712,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (device == null) {
             throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
         }
-        boolean activeUsage = printerDeviceUsageChecker.isInUse(device.getId());
         printerAvailabilityService.requireAvailable(device);
-        if (activeUsage) {
-            throw new BusinessException(ErrorCodeEnum.DEVICE_NOT_AVAILABLE);
-        }
 
         ProductionRecordEntity record = baseMapper.selectByIdForUpdate(recordId);
         if (record == null) {
@@ -727,6 +723,11 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         Long userId = StpUtil.getLoginIdAsLong();
         com.yigongbao.module.system.user.entity.UserEntity currentUser = userMapper.selectById(userId);
         validateDeviceOperationAccess(currentUser, record, device);
+
+        boolean occupied = printerDeviceUsageChecker.isInUseByOtherRecord(device.getId(), recordId);
+        if (occupied && !Boolean.TRUE.equals(dto.getConfirmOccupied())) {
+            throw new BusinessException(ErrorCodeEnum.PRINTER_OCCUPIED_CONFIRM_REQUIRED);
+        }
 
         saveProductWeights(recordId, dto.getProductWeights());
 
