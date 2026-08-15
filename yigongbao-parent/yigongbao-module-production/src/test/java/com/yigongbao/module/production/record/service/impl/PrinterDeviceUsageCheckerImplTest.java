@@ -63,8 +63,39 @@ class PrinterDeviceUsageCheckerImplTest {
         verifyNoInteractions(mapper);
     }
 
+    @Test
+    void excludesCurrentRecordButStillFindsOtherActiveRecordsOnTheSameDevice() {
+        insertRecord(1001L, 50L, FlowStatusEnum.PENDING_PRINT, 0);
+        insertRecord(1002L, 50L, FlowStatusEnum.PRINTING, 0);
+        insertRecord(1003L, 50L, FlowStatusEnum.PRINT_COMPLETED, 0);
+        insertRecord(1004L, 50L, FlowStatusEnum.PRINTING, 1);
+
+        assertThat(checker.isInUseByOtherRecord(50L, 1001L)).isTrue();
+    }
+
+    @Test
+    void returnsFalseWhenTheCurrentRecordIsTheOnlyActiveRecordOnTheDevice() {
+        insertRecord(2001L, 60L, FlowStatusEnum.PENDING_PRINT, 0);
+
+        assertThat(checker.isInUseByOtherRecord(60L, 2001L)).isFalse();
+    }
+
+    @Test
+    void nullDeviceReturnsFalseWithoutQueryingMapper() {
+        ProductionRecordMapper mapper = mock(ProductionRecordMapper.class);
+        PrinterDeviceUsageCheckerImpl directChecker = new PrinterDeviceUsageCheckerImpl(mapper);
+
+        assertThat(directChecker.isInUseByOtherRecord(null, 2001L)).isFalse();
+        verifyNoInteractions(mapper);
+    }
+
     private void insertRecord(Long deviceId, FlowStatusEnum status, int isDeleted) {
+        insertRecord(null, deviceId, status, isDeleted);
+    }
+
+    private void insertRecord(Long id, Long deviceId, FlowStatusEnum status, int isDeleted) {
         ProductionRecordEntity record = new ProductionRecordEntity();
+        record.setId(id);
         record.setPrintDeviceId(deviceId);
         record.setStatus(status.getValue());
         record.setIsDeleted(isDeleted);

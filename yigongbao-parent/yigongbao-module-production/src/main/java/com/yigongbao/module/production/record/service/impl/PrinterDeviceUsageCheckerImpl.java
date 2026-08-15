@@ -51,4 +51,20 @@ public class PrinterDeviceUsageCheckerImpl implements PrinterDeviceUsageChecker 
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
     }
+
+    @Override
+    public boolean isInUseByOtherRecord(Long deviceId, Long excludedRecordId) {
+        if (deviceId == null) {
+            return false;
+        }
+
+        LambdaQueryWrapper<ProductionRecordEntity> query = new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getPrintDeviceId, deviceId)
+                .eq(ProductionRecordEntity::getIsDeleted, 0)
+                .in(ProductionRecordEntity::getStatus,
+                        FlowStatusEnum.PENDING_PRINT.getValue(),
+                        FlowStatusEnum.PRINTING.getValue())
+                .ne(excludedRecordId != null, ProductionRecordEntity::getId, excludedRecordId);
+        return recordMapper.selectCount(query) > 0;
+    }
 }

@@ -308,6 +308,7 @@ public enum ErrorCodeEnum {
     DEVICE_ID_INVALID_FORMAT(829, "设备编号格式无效，必须为1-999的整数", 3),
     DEVICE_ID_OUT_OF_RANGE(830, "设备编号超出范围（1-999）", 3),
     ASSIGN_DEVICE_FAILED(831, "分配设备失败", 3),
+    PRINTER_OCCUPIED_CONFIRM_REQUIRED(840, "打印机已被占用，请确认后重试", 3),
 
     // ==================== UDI相关 832-835 ====================
     PRODUCTION_RECORD_ALREADY_CLAIMED(832, "流转卡已被其他用户认领", 3),
