@@ -59,4 +59,4 @@
 - [x] Run `git diff --check` and inspect `git diff --stat` plus the full diff.
 - [x] Confirm the four acceptance criteria and cache behavior line by line.
 - [x] Update `task_plan.md`, `findings.md`, and `progress.md` with final evidence.
-- [ ] Commit only the reviewed Builder source, Builder test, migration SQL, specification, and implementation plan to `codex/flow-card-excel-adjustments`.
+- [x] Commit only the reviewed Builder source, Builder test, migration SQL, specification, and implementation plan to `codex/flow-card-excel-adjustments`.
