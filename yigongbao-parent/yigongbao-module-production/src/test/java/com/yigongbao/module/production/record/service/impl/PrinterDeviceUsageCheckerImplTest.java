@@ -81,6 +81,20 @@ class PrinterDeviceUsageCheckerImplTest {
     }
 
     @Test
+    void completedRecordsDoNotOccupyTheDevice() {
+        insertRecord(3001L, 70L, FlowStatusEnum.PRINT_COMPLETED, 0);
+
+        assertThat(checker.isInUseByOtherRecord(70L, null)).isFalse();
+    }
+
+    @Test
+    void deletedActiveRecordsDoNotOccupyTheDevice() {
+        insertRecord(4001L, 80L, FlowStatusEnum.PRINTING, 1);
+
+        assertThat(checker.isInUseByOtherRecord(80L, null)).isFalse();
+    }
+
+    @Test
     void nullDeviceReturnsFalseWithoutQueryingMapper() {
         ProductionRecordMapper mapper = mock(ProductionRecordMapper.class);
         PrinterDeviceUsageCheckerImpl directChecker = new PrinterDeviceUsageCheckerImpl(mapper);
