@@ -1,5 +1,6 @@
 package com.yigongbao.module.production.product.vo;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,6 +22,9 @@ public class ProductionProductDetailVO {
     private String productName;
     /** 打印文件名 */
     private String fileName;
+    /** 打印设备编码 */
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    private String printDeviceCode;
     /** 产品重量，单位：克 */
     private BigDecimal weight;
     /** 产品状态代码 */
