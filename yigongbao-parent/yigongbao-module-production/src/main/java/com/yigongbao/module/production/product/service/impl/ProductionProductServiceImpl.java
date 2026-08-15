@@ -129,6 +129,7 @@ public class ProductionProductServiceImpl extends ServiceImpl<ProductionProductM
             BeanUtil.copyProperties(p, vo);
             ProductionRecordEntity record = recordMap.get(p.getProductionRecordId());
             if (record != null) {
+                vo.setPrintDeviceCode(record.getPrintDeviceCode());
                 vo.setRecordNo(record.getRecordNo());
                 vo.setProductionBatchNo(record.getProductionBatchNo());
                 vo.setRecordStatus(record.getStatus());
