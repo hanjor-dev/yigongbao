@@ -8,6 +8,7 @@ import com.yigongbao.module.production.record.dto.AssignProductWeightDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
+import com.yigongbao.module.production.record.vo.PrinterOccupationVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -39,6 +40,27 @@ class ProductionRecordControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @MockBean private IProductionRecordService recordService;
+
+    @Test
+    void printerOccupation_returnsOccupiedStatusAndBindsParameters() throws Exception {
+        when(recordService.getPrinterOccupation(7L, 8L))
+                .thenReturn(new PrinterOccupationVO(true));
+
+        mockMvc.perform(get("/production/record/{recordId}/printer-occupation", 7L)
+                        .param("deviceId", "8"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.occupied").value(true));
+
+        verify(recordService).getPrinterOccupation(7L, 8L);
+    }
+
+    @Test
+    void printerOccupation_rejectsMissingDeviceIdWithoutCallingService() throws Exception {
+        mockMvc.perform(get("/production/record/{recordId}/printer-occupation", 7L))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(recordService);
+    }
 
     @Test
     void assignDevice_rejectsMissingDeviceId() throws Exception {
@@ -94,6 +116,13 @@ class ProductionRecordControllerTest {
     }
 
     @Test
+    void assignDevice_requestModelIncludesOccupiedConfirmation() {
+        assertThat(AssignDeviceDTO.class.getDeclaredFields())
+                .anyMatch(field -> field.getName().equals("confirmOccupied")
+                        && field.getType().equals(Boolean.class));
+    }
+
+    @Test
     void assignDevice_bindsProductWeightsFromJson() throws Exception {
         mockMvc.perform(post("/production/record/{id}/assign-device", 7L)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -106,6 +135,29 @@ class ProductionRecordControllerTest {
         assertThat(captor.getValue().getProductWeights().get(0).getWeight())
                 .isEqualByComparingTo("12.35");
         assertThat(captor.getValue().getProductWeights().get(1).getWeight()).isNull();
+    }
+
+    @Test
+    void assignDevice_bindsOmittedFalseAndTrueOccupiedConfirmation() throws Exception {
+        String weights = "\"productWeights\":[{\"productId\":101,\"weight\":12.35}]";
+        mockMvc.perform(post("/production/record/{id}/assign-device", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deviceId\":8," + weights + "}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/production/record/{id}/assign-device", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deviceId\":8,\"confirmOccupied\":false," + weights + "}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/production/record/{id}/assign-device", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deviceId\":8,\"confirmOccupied\":true," + weights + "}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<AssignDeviceDTO> captor = ArgumentCaptor.forClass(AssignDeviceDTO.class);
+        verify(recordService, org.mockito.Mockito.times(3)).assignDevice(eq(7L), captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(AssignDeviceDTO::getConfirmOccupied)
+                .containsExactly(null, false, true);
     }
 
     @Test

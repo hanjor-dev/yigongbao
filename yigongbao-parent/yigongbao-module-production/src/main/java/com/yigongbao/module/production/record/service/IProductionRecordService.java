@@ -39,6 +39,8 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
 
     List<ProcessingCenterPrintersVO> listPrinters();
 
+    PrinterOccupationVO getPrinterOccupation(Long recordId, Long deviceId);
+
     void assignDevice(Long recordId, AssignDeviceDTO dto);
 
     void releaseDevice(Long recordId);

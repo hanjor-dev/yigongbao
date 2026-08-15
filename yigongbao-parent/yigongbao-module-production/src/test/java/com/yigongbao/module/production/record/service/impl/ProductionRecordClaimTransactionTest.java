@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.entity.OrderMainEntity;
-import com.yigongbao.common.service.PrinterDeviceUsageChecker;
+import com.yigongbao.common.service.PrinterRecordUsageChecker;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
@@ -195,7 +195,7 @@ class ProductionRecordClaimTransactionTest {
                     eventPublisher,
                     mock(IDeviceUsageCounterService.class),
                     mock(IProductNumberService.class),
-                    mock(PrinterDeviceUsageChecker.class),
+                    mock(PrinterRecordUsageChecker.class),
                     mock(PrinterAvailabilityService.class));
         }
     }

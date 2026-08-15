@@ -301,13 +301,14 @@ public enum ErrorCodeEnum {
     CANCEL_APPLY_ALREADY_AUDITED(744, "取消申请已审核", 3),
     ORDER_PHASE_NOT_ALLOW_APPLY(745, "订单阶段不允许提交取消申请", 3),
 
-    // ==================== 生产设备与产品编号相关 826-831 ====================
+    // ==================== 生产设备与产品编号相关 826-831、840 ====================
     DEVICE_USAGE_COUNTER_UPDATE_FAILED(826, "设备上机次数更新失败，请重试", 3),
     PRODUCT_NUMBER_DUPLICATE(827, "产品编号重复：%s", 3),
     RECORD_NO_PRODUCT_FOR_NUMBER_GENERATION(828, "流转卡无产品，无法生成编号", 3),
     DEVICE_ID_INVALID_FORMAT(829, "设备编号格式无效，必须为1-999的整数", 3),
     DEVICE_ID_OUT_OF_RANGE(830, "设备编号超出范围（1-999）", 3),
     ASSIGN_DEVICE_FAILED(831, "分配设备失败", 3),
+    PRINTER_OCCUPIED_CONFIRM_REQUIRED(840, "打印机已被占用，请确认后重试", 3),
 
     // ==================== UDI相关 832-835 ====================
     PRODUCTION_RECORD_ALREADY_CLAIMED(832, "流转卡已被其他用户认领", 3),

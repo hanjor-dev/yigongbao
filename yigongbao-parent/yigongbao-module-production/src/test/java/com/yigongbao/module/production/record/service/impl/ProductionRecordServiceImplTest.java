@@ -14,7 +14,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.common.service.PrinterDeviceUsageChecker;
+import com.yigongbao.common.service.PrinterRecordUsageChecker;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
@@ -22,6 +22,7 @@ import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
+import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignPackageFileEntity;
@@ -91,7 +92,7 @@ class ProductionRecordServiceImplTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private FlowCardExcelBuilder flowCardExcelBuilder;
     @Mock private com.yigongbao.module.basic.file.service.FileService fileService;
-    @Mock private PrinterDeviceUsageChecker usageChecker;
+    @Mock private PrinterRecordUsageChecker usageChecker;
     @Mock private PrinterAvailabilityService availabilityService;
 
     @InjectMocks
@@ -102,7 +103,7 @@ class ProductionRecordServiceImplTest {
         Field f = ServiceImpl.class.getDeclaredField("baseMapper");
         f.setAccessible(true);
         f.set(recordService, recordMapper);
-        PrinterAvailabilityService realAvailabilityService = new PrinterAvailabilityService(usageChecker);
+        PrinterAvailabilityService realAvailabilityService = new PrinterAvailabilityService();
         lenient().when(availabilityService.toPrinterVOs(any())).thenAnswer(invocation ->
                 realAvailabilityService.toPrinterVOs(invocation.getArgument(0)));
 
@@ -370,7 +371,7 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
-    void listPrinters_usesBulkUsageAndSharedAvailabilityFields() {
+    void listPrinters_ignoresProductionUsageAndUsesPhysicalAvailabilityFields() {
         UserEntity admin = new UserEntity();
         admin.setRoleCode(RoleCodeEnum.ADMIN.getCode());
         when(userMapper.selectById(1L)).thenReturn(admin);
@@ -388,7 +389,6 @@ class ProductionRecordServiceImplTest {
         offline.setState(0);
         List<DeviceEntity> devices = List.of(free, active, working, offline);
         when(deviceMapper.selectList(any())).thenReturn(devices);
-        when(usageChecker.findActiveDeviceIds(List.of(1L, 2L, 3L, 4L))).thenReturn(Set.of(2L));
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
@@ -396,16 +396,16 @@ class ProductionRecordServiceImplTest {
 
             assertEquals(1, result.size());
             var printers = result.get(0).getPrinters();
-            assertEquals(List.of(0, 1, 1, 1), printers.stream().map(p -> p.getStatus()).toList());
-            assertEquals(List.of("空闲", "占用", "占用", "占用"),
+            assertEquals(List.of(0, 0, 1, 1), printers.stream().map(p -> p.getStatus()).toList());
+            assertEquals(List.of("空闲", "空闲", "不可用", "不可用"),
                     printers.stream().map(p -> p.getStatusName()).toList());
-            assertEquals(List.of(true, false, false, false),
+            assertEquals(List.of(true, true, false, false),
                     printers.stream().map(p -> p.getAvailable()).toList());
             assertEquals("工作中", printers.get(2).getDeviceStateName());
             assertEquals(0, printers.get(3).getConnectionStatus());
         }
 
-        verify(usageChecker).findActiveDeviceIds(List.of(1L, 2L, 3L, 4L));
+        verifyNoInteractions(usageChecker);
     }
 
     // ---- getQrCodeUrl ----
@@ -1013,6 +1013,7 @@ class ProductionRecordServiceImplTest {
     private DeviceEntity device(Long id) {
         DeviceEntity d = new DeviceEntity();
         d.setId(id);
+        d.setDeviceType(DeviceTypeEnum.PRINTER_SLA.getCode());
         d.setDeviceId("DEV-001");
         d.setDeviceName("打印机A");
         d.setCenterId(1L);

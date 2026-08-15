@@ -1,7 +1,7 @@
 package com.yigongbao.module.production.record.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.yigongbao.common.service.PrinterDeviceUsageChecker;
+import com.yigongbao.common.service.PrinterRecordUsageChecker;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class PrinterDeviceUsageCheckerImpl implements PrinterDeviceUsageChecker {
+public class PrinterDeviceUsageCheckerImpl implements PrinterRecordUsageChecker {
 
     private final ProductionRecordMapper recordMapper;
 
@@ -50,5 +50,21 @@ public class PrinterDeviceUsageCheckerImpl implements PrinterDeviceUsageChecker 
                 .map(ProductionRecordEntity::getPrintDeviceId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+    }
+
+    @Override
+    public boolean isInUseByOtherRecord(Long deviceId, Long excludedRecordId) {
+        if (deviceId == null) {
+            return false;
+        }
+
+        LambdaQueryWrapper<ProductionRecordEntity> query = new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getPrintDeviceId, deviceId)
+                .eq(ProductionRecordEntity::getIsDeleted, 0)
+                .in(ProductionRecordEntity::getStatus,
+                        FlowStatusEnum.PENDING_PRINT.getValue(),
+                        FlowStatusEnum.PRINTING.getValue())
+                .ne(excludedRecordId != null, ProductionRecordEntity::getId, excludedRecordId);
+        return recordMapper.exists(query);
     }
 }

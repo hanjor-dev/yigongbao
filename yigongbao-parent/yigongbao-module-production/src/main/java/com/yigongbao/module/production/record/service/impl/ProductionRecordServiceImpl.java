@@ -10,7 +10,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.common.service.PrinterDeviceUsageChecker;
+import com.yigongbao.common.service.PrinterRecordUsageChecker;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -113,7 +113,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final ApplicationEventPublisher eventPublisher;
     private final IDeviceUsageCounterService deviceUsageCounterService;
     private final IProductNumberService productNumberService;
-    private final PrinterDeviceUsageChecker printerDeviceUsageChecker;
+    private final PrinterRecordUsageChecker printerDeviceUsageChecker;
     private final PrinterAvailabilityService printerAvailabilityService;
 
     private static final List<Integer> NORMAL_PRODUCTION_STATUSES = List.of(
@@ -651,7 +651,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                     .eq(DeviceEntity::getIsDeleted, StatusConstants.NO));
         }
 
-        // 3. 批量查询生产占用并统一转换为 PrinterVO
+        // 3. 按打印机物理状态统一转换为 PrinterVO
         Map<Long, PrinterVO> printerById = printerAvailabilityService.toPrinterVOs(devices).stream()
             .collect(Collectors.toMap(PrinterVO::getId, vo -> vo));
         Map<Long, List<PrinterVO>> centerPrintersMap = devices.stream()
@@ -680,6 +680,29 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             .collect(Collectors.toList());
     }
 
+    /** 返回权限范围内打印机是否被其他流转卡占用的快照。 */
+    @Override
+    public PrinterOccupationVO getPrinterOccupation(Long recordId, Long deviceId) {
+        ProductionRecordEntity record = baseMapper.selectById(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        DeviceEntity device = deviceMapper.selectById(deviceId);
+        if (device == null) {
+            throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
+        }
+        if (!Objects.equals(DeviceTypeEnum.PRINTER_SLA.getCode(), device.getDeviceType())) {
+            throw new BusinessException(ErrorCodeEnum.DEVICE_TYPE_MISMATCH);
+        }
+
+        Long userId = StpUtil.getLoginIdAsLong();
+        UserEntity currentUser = userMapper.selectById(userId);
+        validateDeviceOperationAccess(currentUser, record, device);
+
+        return new PrinterOccupationVO(
+                printerDeviceUsageChecker.isInUseByOtherRecord(deviceId, recordId));
+    }
+
     /** 为流转卡分配打印机；校验流转卡状态为待打印、设备在线且空闲，同步更新打印工序记录 */
     @Override
     @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
@@ -689,8 +712,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (device == null) {
             throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
         }
-        boolean activeUsage = printerDeviceUsageChecker.isInUse(device.getId());
-        printerAvailabilityService.requireAvailable(device, activeUsage);
+        printerAvailabilityService.requireAvailable(device);
 
         ProductionRecordEntity record = baseMapper.selectByIdForUpdate(recordId);
         if (record == null) {
@@ -701,6 +723,11 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         Long userId = StpUtil.getLoginIdAsLong();
         com.yigongbao.module.system.user.entity.UserEntity currentUser = userMapper.selectById(userId);
         validateDeviceOperationAccess(currentUser, record, device);
+
+        boolean occupied = printerDeviceUsageChecker.isInUseByOtherRecord(device.getId(), recordId);
+        if (occupied && !Boolean.TRUE.equals(dto.getConfirmOccupied())) {
+            throw new BusinessException(ErrorCodeEnum.PRINTER_OCCUPIED_CONFIRM_REQUIRED);
+        }
 
         saveProductWeights(recordId, dto.getProductWeights());
 
