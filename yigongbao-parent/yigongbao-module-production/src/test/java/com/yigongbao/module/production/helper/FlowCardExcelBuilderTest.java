@@ -58,6 +58,77 @@ class FlowCardExcelBuilderTest {
     }
 
     @Test
+    void buildHeaderUsesPrintStartDateAsProductionBatchNo() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        context.setProductionBatchNo("OLD-BATCH");
+        context.setPrintStartTime(LocalDateTime.of(2026, 8, 13, 14, 15, 24));
+
+        assertEquals("20260813", readCell(builder.build(context), 3, 2));
+    }
+
+    @Test
+    void buildHeaderFallsBackToStoredBatchNoWithoutPrintStartTime() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        context.setProductionBatchNo("STORED-BATCH");
+
+        assertEquals("STORED-BATCH", readCell(builder.build(context), 3, 2));
+    }
+
+    @Test
+    void buildHeaderShowsDashWhenPrintStartAndStoredBatchAreBlank() throws Exception {
+        FlowCardExcelBuilder.BuildContext nullBatchContext = new FlowCardExcelBuilder.BuildContext();
+        assertEquals("-", readCell(builder.build(nullBatchContext), 3, 2));
+
+        FlowCardExcelBuilder.BuildContext blankBatchContext = new FlowCardExcelBuilder.BuildContext();
+        blankBatchContext.setProductionBatchNo("   ");
+        assertEquals("-", readCell(builder.build(blankBatchContext), 3, 2));
+    }
+
+    @Test
+    void buildHeaderShowsCompleteTimeLabelsAndKeepsSeconds() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        context.setPrintStartTime(LocalDateTime.of(2026, 8, 13, 14, 15, 24));
+        context.setPrintFinishTime(LocalDateTime.of(2026, 8, 13, 16, 15, 24));
+
+        assertEquals("开始时间: 2026-08-13 14:15:24", readCell(builder.build(context), 4, 2));
+        assertEquals("结束时间: 2026-08-13 16:15:24", readCell(builder.build(context), 5, 2));
+    }
+
+    @Test
+    void buildPostProcessingTimesWithoutSeconds() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        LocalDateTime startTime = LocalDateTime.of(2026, 8, 13, 15, 1, 34);
+        LocalDateTime endTime = LocalDateTime.of(2026, 8, 13, 15, 11, 34);
+        List<FlowCardExcelBuilder.ProcessInfo> processes = new ArrayList<>();
+        for (String processType : List.of("wash", "cure", "clean_dry")) {
+            FlowCardExcelBuilder.ProcessInfo process = new FlowCardExcelBuilder.ProcessInfo();
+            process.setProcessType(processType);
+            process.setStartTime(startTime);
+            process.setEndTime(endTime);
+            processes.add(process);
+        }
+        context.setProcesses(processes);
+
+        byte[] excelBytes = builder.build(context);
+        String expected = "开始：2026-08-13 15:01\n结束：2026-08-13 15:11";
+        assertEquals(expected, readCell(excelBytes, 9, 4));
+        assertEquals(expected, readCell(excelBytes, 10, 4));
+        assertEquals(expected, readCell(excelBytes, 11, 4));
+    }
+
+    @Test
+    void buildCleanDryShowsAirCompressorDeviceNo() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        FlowCardExcelBuilder.ProcessInfo process = new FlowCardExcelBuilder.ProcessInfo();
+        process.setProcessType("clean_dry");
+        process.setDeviceNo("CLEANER-001");
+        process.setSecondaryDeviceNo("AIR-001");
+        context.setProcesses(List.of(process));
+
+        assertEquals("AIR-001", readCell(builder.build(context), 12, 3));
+    }
+
+    @Test
     void buildPackParamsForModel() throws Exception {
         FlowCardExcelBuilder.BuildContext context = buildPackContext(
             "{\"zipBagSealTime\":3,\"zipBagSealTemperature\":130}"
@@ -147,6 +218,12 @@ class FlowCardExcelBuilderTest {
     private String readPackParams(byte[] excelBytes) throws Exception {
         try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excelBytes))) {
             return workbook.getSheetAt(0).getRow(13).getCell(4).getStringCellValue();
+        }
+    }
+
+    private String readCell(byte[] excelBytes, int rowIndex, int columnIndex) throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excelBytes))) {
+            return workbook.getSheetAt(0).getRow(rowIndex).getCell(columnIndex).getStringCellValue();
         }
     }
 }

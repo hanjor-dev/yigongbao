@@ -31,6 +31,8 @@ public class FlowCardExcelBuilder {
 
     private static final String TEMPLATE_PATH = "template/流转卡模板.xlsx";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter BATCH_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter MINUTE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     @Data
     public static class BuildContext {
@@ -88,11 +90,14 @@ public class FlowCardExcelBuilder {
         setCellValue(sheet, 2, 2, context.getDesignPackageCode());
         setCellValue(sheet, 2, 5, context.getTotalProductCount() != null ?
             String.valueOf(context.getTotalProductCount()) : "-");
-        setCellValue(sheet, 3, 2, context.getProductionBatchNo());
+        String productionBatchNo = context.getPrintStartTime() == null
+            ? context.getProductionBatchNo()
+            : context.getPrintStartTime().format(BATCH_DATE_FORMATTER);
+        setCellValue(sheet, 3, 2, productionBatchNo);
         setCellValue(sheet, 3, 5, context.getMaterial());
         setCellValue(sheet, 4, 2, "开始时间: " + formatDateTime(context.getPrintStartTime()));
         setCellValue(sheet, 4, 5, context.getMaterialBatchNo());
-        setCellValue(sheet, 5, 2, "结束: " + formatDateTime(context.getPrintFinishTime()));
+        setCellValue(sheet, 5, 2, "结束时间: " + formatDateTime(context.getPrintFinishTime()));
     }
 
     private void fillProcesses(Sheet sheet, BuildContext context) {
@@ -245,8 +250,8 @@ public class FlowCardExcelBuilder {
         if (ProcessTypeEnum.WASH.getCode().equals(processType)
                 || ProcessTypeEnum.CURE.getCode().equals(processType)
                 || ProcessTypeEnum.CLEAN_DRY.getCode().equals(processType)) {
-            lines.add("开始：" + formatDateTime(process.getStartTime()));
-            lines.add("结束：" + formatDateTime(process.getEndTime()));
+            lines.add("开始：" + formatMinuteDateTime(process.getStartTime()));
+            lines.add("结束：" + formatMinuteDateTime(process.getEndTime()));
         }
 
         return lines.isEmpty() ? "-" : String.join("\n", lines);
@@ -274,5 +279,9 @@ public class FlowCardExcelBuilder {
 
     private String formatDateTime(LocalDateTime dateTime) {
         return dateTime == null ? "-" : dateTime.format(DATE_FORMATTER);
+    }
+
+    private String formatMinuteDateTime(LocalDateTime dateTime) {
+        return dateTime == null ? "-" : dateTime.format(MINUTE_FORMATTER);
     }
 }
