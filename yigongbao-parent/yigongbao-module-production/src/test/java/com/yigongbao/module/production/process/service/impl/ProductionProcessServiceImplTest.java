@@ -90,6 +90,29 @@ class ProductionProcessServiceImplTest {
     }
 
     @Test
+    void startProcess_print_isRejectedBecauseDeviceEventsOwnPrintingLifecycle() {
+        when(recordMapper.selectById(1L)).thenReturn(rec(1L, 10L));
+        assertThrows(BusinessException.class, () -> processService.startProcess(1L, startDto("print", 2L)));
+    }
+
+    @Test
+    void startProcess_cureBeforeWashCompleted_isRejected() {
+        ProductionRecordEntity rec = rec(1L, 10L);
+        rec.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
+        rec.setPrintFinishTime(LocalDateTime.of(2026, 7, 19, 19, 33, 42));
+        when(recordMapper.selectById(1L)).thenReturn(rec);
+        ProductionProcessEntity cure = proc(2L, 1L, "cure");
+        ProductionProcessEntity wash = proc(1L, 1L, "wash");
+        when(processMapper.selectOne(any(), anyBoolean())).thenReturn(cure);
+        when(processMapper.selectList(any())).thenReturn(List.of(wash, cure));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertThrows(BusinessException.class, () -> processService.startProcess(1L, startDto("cure", 2L)));
+        }
+    }
+
+    @Test
     void startProcess_postProcess_updatesRecordStatus() {
         ProductionRecordEntity rec = rec(1L, 10L);
         rec.setStatus(FlowStatusEnum.PRINT_COMPLETED.getValue());
@@ -164,6 +187,11 @@ class ProductionProcessServiceImplTest {
         p.setStatus(ProcessStatusEnum.PENDING.getCode());
         when(processMapper.selectOne(any(), anyBoolean())).thenReturn(p);
         assertThrows(BusinessException.class, () -> processService.finishProcess(1L, "wash"));
+    }
+
+    @Test
+    void finishProcess_print_isRejectedBecauseDeviceEventsOwnPrintingLifecycle() {
+        assertThrows(BusinessException.class, () -> processService.finishProcess(1L, "print"));
     }
 
     @Test

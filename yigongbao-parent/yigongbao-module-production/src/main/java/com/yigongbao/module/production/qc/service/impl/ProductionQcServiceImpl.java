@@ -85,6 +85,9 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
+        if (!FlowStatusEnum.QC_IN_PROGRESS.getValue().equals(record.getStatus())) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_STATUS_NOT_ALLOW_QC);
+        }
         // 记录之前的状态，用于判断是否需要减少不合格计数
         boolean wasFail = ProductStatusEnum.FAIL.getCode().equals(product.getStatus());
 
@@ -120,6 +123,13 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         }
         if (!ProductStatusEnum.IN_PROCESS.getCode().equals(product.getStatus())) {
             log.warn("产品状态不允许标记不合格: productId={}, currentStatus={}", productId, product.getStatus());
+            throw new BusinessException(ErrorCodeEnum.PRODUCT_STATUS_NOT_ALLOW_MARK_FAIL);
+        }
+        ProductionRecordEntity record = recordMapper.selectById(product.getProductionRecordId());
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        if (!FlowStatusEnum.QC_IN_PROGRESS.getValue().equals(record.getStatus())) {
             throw new BusinessException(ErrorCodeEnum.PRODUCT_STATUS_NOT_ALLOW_MARK_FAIL);
         }
         product.setStatus(ProductStatusEnum.FAIL.getCode());
@@ -309,6 +319,19 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         List<Long> productIds = dto.getProducts().stream()
             .map(BatchUpdateUdiDTO.ProductUdiItem::getProductId)
             .collect(Collectors.toList());
+
+        List<ProductionProductEntity> products = productMapper.selectList(
+                new LambdaQueryWrapper<ProductionProductEntity>()
+                        .in(ProductionProductEntity::getId, productIds)
+                        .eq(ProductionProductEntity::getProductionRecordId, dto.getRecordId()));
+        Set<Long> requestedProductIds = new HashSet<>(productIds);
+        Set<Long> ownedProductIds = products.stream()
+                .filter(product -> dto.getRecordId().equals(product.getProductionRecordId()))
+                .map(ProductionProductEntity::getId)
+                .collect(Collectors.toSet());
+        if (!ownedProductIds.containsAll(requestedProductIds)) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "产品不属于当前流转卡");
+        }
 
         // 检查请求内部是否有重复UDI
         Set<String> uniqueUdis = new HashSet<>(udiCodes);

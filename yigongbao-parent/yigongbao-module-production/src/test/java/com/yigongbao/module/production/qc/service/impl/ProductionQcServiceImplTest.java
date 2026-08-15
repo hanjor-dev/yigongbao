@@ -80,6 +80,19 @@ class ProductionQcServiceImplTest {
                         && QcResultEnum.PASS.getCode().equals(((ProductionProductEntity) p).getQcResult())));
     }
 
+    @Test
+    void markProductPass_beforeQcStage_isRejected() {
+        ProductionRecordEntity record = record(10L, ProductionConstants.ORDER_TYPE_NON_MEDICAL);
+        record.setStatus(FlowStatusEnum.PRINTING.getValue());
+        when(productMapper.selectById(1L)).thenReturn(product(1L, 10L));
+        when(recordMapper.selectById(10L)).thenReturn(record);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertThrows(BusinessException.class, () -> qcService.markProductPass(1L));
+        }
+    }
+
 
     @Test
     void markProductPass_failStatus_allowed() {
@@ -110,6 +123,7 @@ class ProductionQcServiceImplTest {
     @Test
     void markProductFail_setsFailStatusAndRemark() {
         when(productMapper.selectById(1L)).thenReturn(product(1L, 10L));
+        when(recordMapper.selectById(10L)).thenReturn(record(10L, ProductionConstants.ORDER_TYPE_MEDICAL));
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
             qcService.markProductFail(1L, "surface defect");
@@ -196,6 +210,7 @@ class ProductionQcServiceImplTest {
         r.setId(id);
         r.setOrderId(id * 10);
         r.setOrderType(orderType);
+        r.setStatus(FlowStatusEnum.QC_IN_PROGRESS.getValue());
         r.setRecordNo("REC-00" + id);
         r.setStatus(FlowStatusEnum.QC_IN_PROGRESS.getValue());
         return r;

@@ -65,6 +65,18 @@ class BatchUpdateUdiTest {
         when(updateWrapper.set(any(), any())).thenReturn(updateWrapper);
         when(updateWrapper.eq(any(), any())).thenReturn(updateWrapper);
         when(updateWrapper.update()).thenReturn(true);
+        when(productMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Arrays.asList(
+            product(101L, 1L), product(102L, 1L), product(103L, 1L)));
+    }
+
+    @Test
+    void batchUpdateUdi_productFromAnotherRecord_throwsException() {
+        ProductionRecordEntity record = createRecord(1L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        when(recordMapper.selectById(1L)).thenReturn(record);
+        when(productMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(product(101L, 2L)));
+        BatchUpdateUdiDTO dto = createBatchUpdateUdiDTO(1L, List.of(createProductUdiItem(101L, "UDI-001")));
+
+        assertThrows(BusinessException.class, () -> qcService.batchUpdateUdi(dto));
     }
 
     @Captor
@@ -311,5 +323,12 @@ class BatchUpdateUdiTest {
         item.setProductId(productId);
         item.setUdiCode(udiCode);
         return item;
+    }
+
+    private ProductionProductEntity product(Long id, Long recordId) {
+        ProductionProductEntity product = new ProductionProductEntity();
+        product.setId(id);
+        product.setProductionRecordId(recordId);
+        return product;
     }
 }

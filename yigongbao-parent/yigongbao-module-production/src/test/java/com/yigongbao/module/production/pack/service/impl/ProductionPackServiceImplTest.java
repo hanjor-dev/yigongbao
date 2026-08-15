@@ -9,6 +9,7 @@ import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
+import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.production.pack.dto.FillPackDTO;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
@@ -106,6 +107,41 @@ class ProductionPackServiceImplTest {
     }
 
     @Test
+    void fillPackInfo_nonSealingDevice_isRejected() {
+        ProductionRecordEntity record = record(1L);
+        when(recordMapper.selectById(1L)).thenReturn(record);
+        DeviceEntity device = new DeviceEntity();
+        device.setId(5L);
+        device.setDeviceType(DeviceTypeEnum.PRINTER_SLA.getCode());
+        when(deviceMapper.selectById(5L)).thenReturn(device);
+        FillPackDTO dto = new FillPackDTO();
+        dto.setPrimaryDeviceId(5L);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertThrows(BusinessException.class, () -> packService.fillPackInfo(1L, dto));
+        }
+    }
+
+    @Test
+    void fillPackInfo_missingPackProcess_isRejected() {
+        ProductionRecordEntity record = record(1L);
+        when(recordMapper.selectById(1L)).thenReturn(record);
+        DeviceEntity device = new DeviceEntity();
+        device.setId(5L);
+        device.setDeviceType(DeviceTypeEnum.SEALING_MACHINE.getCode());
+        when(deviceMapper.selectById(5L)).thenReturn(device);
+        when(processMapper.update(any(), any())).thenReturn(0);
+        FillPackDTO dto = new FillPackDTO();
+        dto.setPrimaryDeviceId(5L);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertThrows(BusinessException.class, () -> packService.fillPackInfo(1L, dto));
+        }
+    }
+
+    @Test
     void fillPackInfo_withProcessParams_success() {
         ProductionRecordEntity record = record(1L);
         record.setStatus(FlowStatusEnum.PACKING.getValue());
@@ -115,6 +151,7 @@ class ProductionPackServiceImplTest {
         device.setId(5L);
         device.setDeviceId("PACK-001");
         device.setDeviceName("包装机A");
+        device.setDeviceType(DeviceTypeEnum.SEALING_MACHINE.getCode());
         when(deviceMapper.selectById(5L)).thenReturn(device);
         when(userMapper.selectById(1L)).thenReturn(mockUser);
 
@@ -150,6 +187,7 @@ class ProductionPackServiceImplTest {
         primary.setId(5L);
         primary.setDeviceId("PACK-001");
         primary.setDeviceName("包装机");
+        primary.setDeviceType(DeviceTypeEnum.SEALING_MACHINE.getCode());
 
         DeviceEntity secondary = new DeviceEntity();
         secondary.setId(6L);
@@ -182,6 +220,7 @@ class ProductionPackServiceImplTest {
         DeviceEntity device = new DeviceEntity();
         device.setId(5L);
         device.setDeviceId("PACK-001");
+        device.setDeviceType(DeviceTypeEnum.SEALING_MACHINE.getCode());
         when(deviceMapper.selectById(5L)).thenReturn(device);
         when(userMapper.selectById(1L)).thenReturn(mockUser);
 
