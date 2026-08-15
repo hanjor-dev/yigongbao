@@ -23,7 +23,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(ProductionProductController.class)
+@WebMvcTest(value = ProductionProductController.class,
+        properties = "spring.jackson.default-property-inclusion=non_null")
 class ProductionProductControllerTest {
     @SpringBootApplication static class TestApplication {}
     @Autowired private MockMvc mockMvc;
