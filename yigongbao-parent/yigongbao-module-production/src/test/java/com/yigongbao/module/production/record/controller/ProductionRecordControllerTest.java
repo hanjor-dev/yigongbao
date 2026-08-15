@@ -8,6 +8,7 @@ import com.yigongbao.module.production.record.dto.AssignProductWeightDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
+import com.yigongbao.module.production.record.vo.PrinterOccupationVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -39,6 +40,27 @@ class ProductionRecordControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @MockBean private IProductionRecordService recordService;
+
+    @Test
+    void printerOccupation_returnsOccupiedStatusAndBindsParameters() throws Exception {
+        when(recordService.getPrinterOccupation(7L, 8L))
+                .thenReturn(new PrinterOccupationVO(true));
+
+        mockMvc.perform(get("/production/record/{recordId}/printer-occupation", 7L)
+                        .param("deviceId", "8"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.occupied").value(true));
+
+        verify(recordService).getPrinterOccupation(7L, 8L);
+    }
+
+    @Test
+    void printerOccupation_rejectsMissingDeviceIdWithoutCallingService() throws Exception {
+        mockMvc.perform(get("/production/record/{recordId}/printer-occupation", 7L))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(recordService);
+    }
 
     @Test
     void assignDevice_rejectsMissingDeviceId() throws Exception {

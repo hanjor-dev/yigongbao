@@ -14,6 +14,7 @@ import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.vo.CancelPreviewVO;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
+import com.yigongbao.module.production.record.vo.PrinterOccupationVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -85,6 +86,14 @@ public class ProductionRecordController {
     @GetMapping("/printers")
     public Result<List<ProcessingCenterPrintersVO>> listPrinters() {
         return Result.success(recordService.listPrinters());
+    }
+
+    @Operation(summary = "查询打印机占用状态")
+    @GetMapping("/{recordId}/printer-occupation")
+    public Result<PrinterOccupationVO> getPrinterOccupation(
+            @PathVariable Long recordId,
+            @RequestParam Long deviceId) {
+        return Result.success(recordService.getPrinterOccupation(recordId, deviceId));
     }
 
     @Operation(summary = "提交打印机配置")

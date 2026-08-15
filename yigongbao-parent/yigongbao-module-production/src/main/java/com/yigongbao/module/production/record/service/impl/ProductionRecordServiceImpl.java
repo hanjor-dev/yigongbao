@@ -11,6 +11,7 @@ import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.service.PrinterDeviceUsageChecker;
+import com.yigongbao.common.service.PrinterRecordUsageChecker;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -114,6 +115,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final IDeviceUsageCounterService deviceUsageCounterService;
     private final IProductNumberService productNumberService;
     private final PrinterDeviceUsageChecker printerDeviceUsageChecker;
+    private final PrinterRecordUsageChecker printerRecordUsageChecker;
     private final PrinterAvailabilityService printerAvailabilityService;
 
     private static final List<Integer> NORMAL_PRODUCTION_STATUSES = List.of(
@@ -678,6 +680,29 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             })
             .sorted(Comparator.comparing(ProcessingCenterPrintersVO::getCenterId))
             .collect(Collectors.toList());
+    }
+
+    /** 返回权限范围内打印机是否被其他流转卡占用的快照。 */
+    @Override
+    public PrinterOccupationVO getPrinterOccupation(Long recordId, Long deviceId) {
+        ProductionRecordEntity record = baseMapper.selectById(recordId);
+        if (record == null) {
+            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
+        }
+        DeviceEntity device = deviceMapper.selectById(deviceId);
+        if (device == null) {
+            throw new BusinessException(ErrorCodeEnum.PRINT_DEVICE_NOT_FOUND);
+        }
+        if (!Objects.equals(DeviceTypeEnum.PRINTER_SLA.getCode(), device.getDeviceType())) {
+            throw new BusinessException(ErrorCodeEnum.DEVICE_TYPE_MISMATCH);
+        }
+
+        Long userId = StpUtil.getLoginIdAsLong();
+        UserEntity currentUser = userMapper.selectById(userId);
+        validateDeviceOperationAccess(currentUser, record, device);
+
+        return new PrinterOccupationVO(
+                printerRecordUsageChecker.isInUseByOtherRecord(deviceId, recordId));
     }
 
     /** 为流转卡分配打印机；校验流转卡状态为待打印、设备在线且空闲，同步更新打印工序记录 */

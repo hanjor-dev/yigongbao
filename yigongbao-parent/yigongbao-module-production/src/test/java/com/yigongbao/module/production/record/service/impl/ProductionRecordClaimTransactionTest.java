@@ -196,6 +196,7 @@ class ProductionRecordClaimTransactionTest {
                     mock(IDeviceUsageCounterService.class),
                     mock(IProductNumberService.class),
                     mock(PrinterDeviceUsageChecker.class),
+                    mock(com.yigongbao.common.service.PrinterRecordUsageChecker.class),
                     mock(PrinterAvailabilityService.class));
         }
     }
