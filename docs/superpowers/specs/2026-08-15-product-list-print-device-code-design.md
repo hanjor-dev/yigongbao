@@ -22,10 +22,13 @@
 在 `ProductionProductDetailVO` 的流转卡信息区域增加：
 
 ```java
+@JsonInclude(JsonInclude.Include.ALWAYS)
 private String printDeviceCode;
 ```
 
-JSON 字段名保持 Jackson 默认驼峰格式 `printDeviceCode`。
+JSON 字段名保持 Jackson 默认驼峰格式 `printDeviceCode`。项目全局使用 `NON_NULL`，因此该字段
+单独使用 `ALWAYS`，确保未分配或已释放设备时响应中仍明确包含
+`"printDeviceCode": null`。
 
 ### 数据来源与组装
 
@@ -51,5 +54,8 @@ JSON 字段名保持 Jackson 默认驼峰格式 `printDeviceCode`。
 
 - 服务测试：产品关联的流转卡具有打印设备编号时，VO 正确返回 `printDeviceCode`。
 - 服务测试：流转卡打印设备编号为空时，VO 返回 `null`。
-- Controller JSON 测试：响应记录包含 `printDeviceCode` 字段及预期值。
+- 服务测试：多条产品跨多个流转卡时只执行一次流转卡批量查询，不产生逐产品查询或设备查询。
+- 服务测试：关联流转卡缺失时保持容错行为，`printDeviceCode` 为 `null`。
+- Controller JSON 测试：响应记录包含 `printDeviceCode` 字段及预期值；空值场景也明确包含
+  `"printDeviceCode": null`。
 - 执行生产模块完整测试，确认无回归。
