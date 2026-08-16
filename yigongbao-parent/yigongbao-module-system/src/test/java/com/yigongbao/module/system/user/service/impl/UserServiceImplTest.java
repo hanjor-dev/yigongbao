@@ -25,6 +25,7 @@ import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.vo.UserVO;
+import com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity;
 import com.yigongbao.module.basic.processingCenter.mapper.ProcessingCenterMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -474,6 +476,74 @@ class UserServiceImplTest {
 
         // 断言
         verify(userMapper, times(1)).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("updateUser: 生产员变更加工中心时应同步加工中心名称")
+    void updateUser_whenProductionWorkerChangesCenter_shouldSyncCenterName() {
+        Long requestedCenterId = 2L;
+        testEntity.setCenterId(1L);
+        testEntity.setCenterName("旧加工中心");
+        testEntity.setRoleId(101L);
+
+        RoleEntity productionWorkerRole = new RoleEntity();
+        productionWorkerRole.setId(101L);
+        productionWorkerRole.setRoleCode("production-worker");
+        productionWorkerRole.setDataScopeType("all");
+
+        ProcessingCenterEntity requestedCenter = new ProcessingCenterEntity();
+        requestedCenter.setId(requestedCenterId);
+        requestedCenter.setCenterName("新加工中心");
+
+        UpdateUserDTO dto = new UpdateUserDTO();
+        dto.setCenterId(requestedCenterId);
+
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(roleService.getById(101L)).thenReturn(productionWorkerRole);
+        when(deptService.getById(1L)).thenReturn(testDept);
+        when(processingCenterMapper.selectById(requestedCenterId)).thenReturn(requestedCenter);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        userService.updateUser(1L, dto);
+
+        ArgumentCaptor<UserEntity> entityCaptor = ArgumentCaptor.forClass(UserEntity.class);
+        verify(userMapper).updateById(entityCaptor.capture());
+        assertEquals(requestedCenterId, entityCaptor.getValue().getCenterId());
+        assertEquals("新加工中心", entityCaptor.getValue().getCenterName());
+    }
+
+    @Test
+    @DisplayName("updateUser: 生产管理员变更加工中心时应同步加工中心名称")
+    void updateUser_whenProductionManagerChangesCenter_shouldSyncCenterName() {
+        Long requestedCenterId = 2L;
+        testEntity.setCenterId(1L);
+        testEntity.setCenterName("旧加工中心");
+        testEntity.setRoleId(102L);
+
+        RoleEntity productionManagerRole = new RoleEntity();
+        productionManagerRole.setId(102L);
+        productionManagerRole.setRoleCode("production-manager");
+        productionManagerRole.setDataScopeType("all");
+
+        ProcessingCenterEntity requestedCenter = new ProcessingCenterEntity();
+        requestedCenter.setId(requestedCenterId);
+        requestedCenter.setCenterName("新加工中心");
+
+        UpdateUserDTO dto = new UpdateUserDTO();
+        dto.setCenterId(requestedCenterId);
+
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(roleService.getById(102L)).thenReturn(productionManagerRole);
+        when(deptService.getById(1L)).thenReturn(testDept);
+        when(processingCenterMapper.selectById(requestedCenterId)).thenReturn(requestedCenter);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+
+        userService.updateUser(1L, dto);
+
+        ArgumentCaptor<UserEntity> entityCaptor = ArgumentCaptor.forClass(UserEntity.class);
+        verify(userMapper).updateById(entityCaptor.capture());
+        assertEquals(requestedCenterId, entityCaptor.getValue().getCenterId());
+        assertEquals("新加工中心", entityCaptor.getValue().getCenterName());
     }
 
     @Test

@@ -642,9 +642,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 validateHospitalScope(effectiveRole, dto.getHospitalIds());
                 validateSpecialty(effectiveRole, dto.getSpecialtyList());
             }
-            // 生产员角色校验加工中心，并复用查询结果更新冗余字段
+            // 生产人员角色校验加工中心，并复用查询结果更新冗余字段
             Long effectiveCenterId = dto.getCenterId() != null ? dto.getCenterId() : entity.getCenterId();
-            if (effectiveRole != null && RoleCodeEnum.PRODUCTION_WORKER.getCode().equals(effectiveRole.getRoleCode())) {
+            if (effectiveRole != null && (RoleCodeEnum.PRODUCTION_WORKER.getCode().equals(effectiveRole.getRoleCode())
+                    || RoleCodeEnum.PRODUCTION_MANAGER.getCode().equals(effectiveRole.getRoleCode()))) {
                 if (effectiveCenterId == null) {
                     log.warn("生产员角色必须绑定加工中心: roleId={}", effectiveRole.getId());
                     throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "加工中心");
@@ -655,7 +656,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                     log.warn("加工中心不存在: centerId={}", effectiveCenterId);
                     throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "加工中心");
                 }
-                if (dto.getCenterId() != null && !dto.getCenterId().equals(entity.getCenterId())) {
+                if (dto.getCenterId() != null) {
                     entity.setCenterName(center.getCenterName());
                 }
             }
