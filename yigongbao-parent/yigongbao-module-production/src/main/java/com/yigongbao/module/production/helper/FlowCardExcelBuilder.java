@@ -6,6 +6,7 @@ import cn.hutool.json.JSONUtil;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
@@ -134,16 +135,26 @@ public class FlowCardExcelBuilder {
 
     private void fillProducts(Sheet sheet, BuildContext context) {
         List<ProductInfo> products = context.getProducts();
-        if (products == null || products.isEmpty()) return;
+        if (products == null || products.isEmpty()) {
+            return;
+        }
 
+        // 第 16 行作为产品模板行
         Row templateRow = sheet.getRow(16);
 
+        // 产品数量大于 1 时，需要给新增产品行腾出空间
         if (products.size() > 1 && sheet.getLastRowNum() >= 17) {
-            sheet.shiftRows(17, sheet.getLastRowNum(), products.size() - 1);
+            sheet.shiftRows(
+                    17,
+                    sheet.getLastRowNum(),
+                    products.size() - 1
+            );
         }
 
         for (int i = 0; i < products.size(); i++) {
             ProductInfo product = products.get(i);
+
+            // 产品数据从第 16 行开始
             int rowIndex = 16 + i;
 
             Row row = sheet.getRow(rowIndex);
@@ -151,17 +162,60 @@ public class FlowCardExcelBuilder {
                 row = sheet.createRow(rowIndex);
             }
 
-            // 对于第二行及以后，无论行是否已存在，都复制模板行样式以确保样式一致
+            // 第二行及以后复制模板行样式
             if (templateRow != null && i > 0) {
                 copyRowStyle(templateRow, row);
+
+                // 合并当前行第 0 列和第 1 列，即 A、B 两列
+                sheet.addMergedRegion(
+                        new CellRangeAddress(
+                                rowIndex,
+                                rowIndex,
+                                0,
+                                1
+                        )
+                );
             }
 
-            setCellValue(sheet, rowIndex, 0, product.getProductNo());
-            setCellValue(sheet, rowIndex, 2, product.getProductName());
-            setCellValue(sheet, rowIndex, 3, product.getSpecName());
-            setCellValue(sheet, rowIndex, 4, "1");
+            // 合并单元格后，数据写入左上角单元格，即第 0 列
+            setCellValue(
+                    sheet,
+                    rowIndex,
+                    0,
+                    product.getProductNo()
+            );
 
-            setCellValue(sheet, rowIndex, 5, formatProductDescription(product.getFileName()));
+            // 产品名称
+            setCellValue(
+                    sheet,
+                    rowIndex,
+                    2,
+                    product.getProductName()
+            );
+
+            // 规格
+            setCellValue(
+                    sheet,
+                    rowIndex,
+                    3,
+                    product.getSpecName()
+            );
+
+            // 数量
+            setCellValue(
+                    sheet,
+                    rowIndex,
+                    4,
+                    "1"
+            );
+
+            // 产品描述
+            setCellValue(
+                    sheet,
+                    rowIndex,
+                    5,
+                    formatProductDescription(product.getFileName())
+            );
         }
     }
 
