@@ -1083,6 +1083,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 info.setSpecName(p.getSpecName());
                 info.setMaterialName(p.getMaterialName());
                 info.setColorName(p.getColorName());
+                info.setFileName(p.getFileName());
                 return info;
             })
             .collect(Collectors.toList());

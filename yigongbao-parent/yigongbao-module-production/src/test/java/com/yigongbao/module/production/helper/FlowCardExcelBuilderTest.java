@@ -5,8 +5,10 @@ import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.ClassPathResource;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -204,6 +206,55 @@ class FlowCardExcelBuilderTest {
             assertEquals(HorizontalAlignment.CENTER,
                     workbook.getSheetAt(0).getRow(17).getCell(0).getCellStyle().getAlignment());
         }
+    }
+
+    @Test
+    void buildProductsUsesFileNameWithoutPathOrFinalExtensionAndPreservesTemplateNumberStyle() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        FlowCardExcelBuilder.ProductInfo first = new FlowCardExcelBuilder.ProductInfo();
+        first.setProductNo("PROD001");
+        first.setFileName("upper.stl");
+        FlowCardExcelBuilder.ProductInfo second = new FlowCardExcelBuilder.ProductInfo();
+        second.setProductNo("PROD002");
+        second.setFileName("folder\\lower.part.stl");
+        context.setProducts(List.of(first, second));
+
+        short templateStyleIndex;
+        try (InputStream inputStream = new ClassPathResource("template/流转卡模板.xlsx").getInputStream();
+             XSSFWorkbook template = new XSSFWorkbook(inputStream)) {
+            templateStyleIndex = template.getSheetAt(0).getRow(16).getCell(0).getCellStyle().getIndex();
+        }
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(builder.build(context)))) {
+            assertEquals("upper", workbook.getSheetAt(0).getRow(16).getCell(5).getStringCellValue());
+            assertEquals("lower.part", workbook.getSheetAt(0).getRow(17).getCell(5).getStringCellValue());
+            assertEquals(templateStyleIndex, workbook.getSheetAt(0).getRow(16).getCell(0).getCellStyle().getIndex());
+            assertEquals(templateStyleIndex, workbook.getSheetAt(0).getRow(17).getCell(0).getCellStyle().getIndex());
+        }
+    }
+
+    @Test
+    void buildProductsHandlesBlankPathOnlyExtensionlessAndDotFileNames() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        context.setProducts(List.of(
+            productWithFileName(""),
+            productWithFileName("folder/"),
+            productWithFileName("README"),
+            productWithFileName(".env")
+        ));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(builder.build(context)))) {
+            assertEquals("-", workbook.getSheetAt(0).getRow(16).getCell(5).getStringCellValue());
+            assertEquals("-", workbook.getSheetAt(0).getRow(17).getCell(5).getStringCellValue());
+            assertEquals("README", workbook.getSheetAt(0).getRow(18).getCell(5).getStringCellValue());
+            assertEquals(".env", workbook.getSheetAt(0).getRow(19).getCell(5).getStringCellValue());
+        }
+    }
+
+    private FlowCardExcelBuilder.ProductInfo productWithFileName(String fileName) {
+        FlowCardExcelBuilder.ProductInfo product = new FlowCardExcelBuilder.ProductInfo();
+        product.setFileName(fileName);
+        return product;
     }
 
     private FlowCardExcelBuilder.BuildContext buildPackContext(String processParams) {

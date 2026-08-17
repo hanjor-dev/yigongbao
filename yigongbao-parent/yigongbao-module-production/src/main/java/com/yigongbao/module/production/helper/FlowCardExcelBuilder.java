@@ -67,6 +67,7 @@ public class FlowCardExcelBuilder {
         private String specName;
         private String materialName;
         private String colorName;
+        private String fileName;
     }
 
     public byte[] build(BuildContext context) throws IOException {
@@ -156,16 +157,11 @@ public class FlowCardExcelBuilder {
             }
 
             setCellValue(sheet, rowIndex, 0, product.getProductNo());
-            centerCellHorizontally(row.getCell(0));
             setCellValue(sheet, rowIndex, 2, product.getProductName());
             setCellValue(sheet, rowIndex, 3, product.getSpecName());
             setCellValue(sheet, rowIndex, 4, "1");
 
-            String material = StrUtil.blankToDefault(product.getMaterialName(), "");
-            String color = StrUtil.blankToDefault(product.getColorName(), "");
-            String desc = StrUtil.isBlank(material) && StrUtil.isBlank(color) ? "-" :
-                StrUtil.trim(material + " " + color);
-            setCellValue(sheet, rowIndex, 5, desc);
+            setCellValue(sheet, rowIndex, 5, formatProductDescription(product.getFileName()));
         }
     }
 
@@ -180,12 +176,20 @@ public class FlowCardExcelBuilder {
         }
     }
 
-    private void centerCellHorizontally(Cell cell) {
-        if (cell == null) return;
-        CellStyle centeredStyle = cell.getSheet().getWorkbook().createCellStyle();
-        centeredStyle.cloneStyleFrom(cell.getCellStyle());
-        centeredStyle.setAlignment(HorizontalAlignment.CENTER);
-        cell.setCellStyle(centeredStyle);
+    private String formatProductDescription(String fileName) {
+        if (StrUtil.isBlank(fileName)) {
+            return "-";
+        }
+        String normalized = StrUtil.trim(fileName);
+        int fileNameStart = Math.max(normalized.lastIndexOf('/'), normalized.lastIndexOf('\\')) + 1;
+        String baseName = normalized.substring(fileNameStart);
+        if (StrUtil.isBlank(baseName)) {
+            return "-";
+        }
+        int extensionStart = baseName.lastIndexOf('.');
+        return extensionStart > 0 && extensionStart < baseName.length() - 1
+            ? baseName.substring(0, extensionStart)
+            : baseName;
     }
 
     private int getProcessRowIndex(String processType) {

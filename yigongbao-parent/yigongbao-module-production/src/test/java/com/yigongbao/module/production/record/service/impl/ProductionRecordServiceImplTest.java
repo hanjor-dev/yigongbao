@@ -198,6 +198,30 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
+    void generateFlowCardExcelMapsProductFileNameIntoBuildContext() throws Exception {
+        ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.PRINT_COMPLETED.getValue());
+        record.setRecordNo("REC-001");
+        ProductionProductEntity product = new ProductionProductEntity();
+        product.setFileName("folder/product.stl");
+        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        com.yigongbao.module.basic.file.vo.FileVO uploadedFile = new com.yigongbao.module.basic.file.vo.FileVO();
+        uploadedFile.setFileUrl("https://files/card.xlsx");
+        when(recordMapper.selectById(1L)).thenReturn(record);
+        when(productMapper.selectList(any())).thenReturn(List.of(product));
+        when(processMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(orderMainMapper.selectById(10L)).thenReturn(order);
+        when(flowCardExcelBuilder.build(any())).thenReturn(new byte[] {1});
+        when(fileService.uploadBytes(any(), anyString(), anyString())).thenReturn(uploadedFile);
+
+        recordService.generateFlowCardExcel(1L);
+
+        ArgumentCaptor<FlowCardExcelBuilder.BuildContext> contextCaptor =
+                ArgumentCaptor.forClass(FlowCardExcelBuilder.BuildContext.class);
+        verify(flowCardExcelBuilder).build(contextCaptor.capture());
+        assertEquals("folder/product.stl", contextCaptor.getValue().getProducts().get(0).getFileName());
+    }
+
+    @Test
     void getOrGenerateFlowCardExcel_reusesFreshCachedFileWithPatientPrefix() {
         ProductionRecordEntity record = record(100L, 200L, FlowStatusEnum.PRINT_COMPLETED.getValue());
         record.setFlowCardFileUrl("https://files/card.xlsx");
