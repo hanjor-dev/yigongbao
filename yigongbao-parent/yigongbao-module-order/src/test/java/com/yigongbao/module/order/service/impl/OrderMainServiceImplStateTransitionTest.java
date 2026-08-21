@@ -373,10 +373,15 @@ class OrderMainServiceImplStateTransitionTest {
         OrderDraftEntity draft = new OrderDraftEntity();
         draft.setId(30L);
         draft.setOperatorId(11L);
+        draft.setOrgId(101L);
         draft.setOrderType(1);
         draft.setBusinessType("business");
         when(codeGeneratorService.generate(any())).thenReturn("ORD-30");
-        when(userService.getById(11L)).thenReturn(null);
+        UserEntity user = new UserEntity();
+        user.setId(11L);
+        user.setOrgId(101L);
+        user.setRealName("草稿操作员");
+        when(userService.getById(11L)).thenReturn(user);
         when(orderItemDraftMapper.selectList(any())).thenReturn(java.util.List.of());
         when(fileService.listByBiz(anyString(), anyLong())).thenReturn(java.util.List.of());
         doNothing().when(orderDataValidator).validateOrderType(eq(11L), eq(1));
@@ -404,10 +409,15 @@ class OrderMainServiceImplStateTransitionTest {
         OrderDraftEntity draft = new OrderDraftEntity();
         draft.setId(31L);
         draft.setOperatorId(11L);
+        draft.setOrgId(102L);
         draft.setOrderType(1);
         draft.setBusinessType("11.3");
         when(codeGeneratorService.generate(any())).thenReturn("ORD-31");
-        when(userService.getById(11L)).thenReturn(null);
+        UserEntity user = new UserEntity();
+        user.setId(11L);
+        user.setOrgId(102L);
+        user.setRealName("草稿操作员");
+        when(userService.getById(11L)).thenReturn(user);
         when(orderItemDraftMapper.selectList(any())).thenReturn(java.util.List.of());
         when(fileService.listByBiz(anyString(), anyLong())).thenReturn(java.util.List.of());
         doNothing().when(orderDataValidator).validateOrderType(eq(11L), eq(1));
@@ -426,6 +436,27 @@ class OrderMainServiceImplStateTransitionTest {
                 order.getRegionalAuditStatus() == null
                         && order.getDesignAuditStatus() != null
                         && order.getDesignAuditStatus() == com.yigongbao.common.constant.AuditStatusConstants.PENDING));
+    }
+
+    @Test
+    void createFromDraft_rejectsDraftFromAnotherOrganization() {
+        OrderDraftEntity draft = new OrderDraftEntity();
+        draft.setId(32L);
+        draft.setOperatorId(11L);
+        draft.setOrgId(202L);
+
+        UserEntity user = new UserEntity();
+        user.setId(11L);
+        user.setOrgId(101L);
+        when(userService.getById(11L)).thenReturn(user);
+        when(codeGeneratorService.generate(any())).thenReturn("ORD-CROSS-DRAFT");
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.yigongbao.common.exception.BusinessException.class,
+                () -> service.createFromDraft(draft));
+
+        verify(service, never()).save(any(OrderMainEntity.class));
+        verifyNoInteractions(flowFacade, orderItemMapper, orderItemDraftMapper);
     }
 
     @Test
@@ -470,12 +501,35 @@ class OrderMainServiceImplStateTransitionTest {
     }
 
     @Test
+    void createOrder_rejectsOrderFromAnotherOrganization() {
+        Long userId = 11L;
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setOrgId(101L);
+
+        com.yigongbao.module.order.dto.order.CreateOrderDTO dto = new com.yigongbao.module.order.dto.order.CreateOrderDTO();
+        dto.setOrgId(202L);
+
+        when(orderQueryHelper.getCurrentUserId()).thenReturn(userId);
+        when(userService.getById(userId)).thenReturn(user);
+        when(codeGeneratorService.generate(any())).thenReturn("ORD-CROSS-ORG");
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.yigongbao.common.exception.BusinessException.class,
+                () -> service.createOrder(dto));
+
+        verify(service, never()).save(any(OrderMainEntity.class));
+        verifyNoInteractions(orderDataValidator, flowFacade, eventPublisher);
+    }
+
+    @Test
     void createOrder_buildsPendingOrderAndRecordsCreateFlow() {
         Long userId = 11L;
         UserEntity user = new UserEntity();
         user.setId(userId);
         user.setRealName("操作员");
         user.setPhone("13800000000");
+        user.setOrgId(101L);
         user.setDeptId(21L);
         user.setDeptName("影像科");
 
@@ -521,6 +575,7 @@ class OrderMainServiceImplStateTransitionTest {
         user.setId(userId);
         user.setRealName("试用订单操作员");
         user.setPhone("13800000001");
+        user.setOrgId(102L);
         user.setDeptId(22L);
         user.setDeptName("试用科室");
 

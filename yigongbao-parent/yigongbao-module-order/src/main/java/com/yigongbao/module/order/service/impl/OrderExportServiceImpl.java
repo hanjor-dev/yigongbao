@@ -423,8 +423,13 @@ public class OrderExportServiceImpl implements OrderExportService {
 
     @Override
     public void customExportOrders(OrderCustomExportDTO dto, HttpServletResponse response) {
-        // 按时间范围查询订单（最多10000条）
-        LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<OrderMainEntity>()
+        Long currentUserId = orderQueryHelper.getCurrentUserId();
+        DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+
+        // 先注入统一数据权限条件，再叠加自定义导出的时间范围和数量限制
+        LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
+        orderQueryHelper.buildDataScopeCondition(wrapper, currentUserId, scopeType);
+        wrapper
                 .ge(dto.getCreateTimeStart() != null, OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
                 .le(dto.getCreateTimeEnd() != null, OrderMainEntity::getCreateTime, dto.getCreateTimeEnd())
                 .orderByDesc(OrderMainEntity::getCreateTime)

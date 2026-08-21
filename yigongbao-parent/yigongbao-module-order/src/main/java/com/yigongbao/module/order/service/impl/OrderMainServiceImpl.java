@@ -958,19 +958,24 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
             // 提单人部门信息冗余写入（草稿提交时从提单人账号读取，创建后固化）
             String operatorName = null;
-            if (draft.getOperatorId() != null) {
-                UserEntity user = userService.getById(draft.getOperatorId());
-                if (user != null) {
-                    operatorName = user.getRealName();
-                    order.setOperatorDeptId(user.getDeptId());
-                    order.setOperatorDeptName(user.getDeptName());
-                } else {
-                    log.warn("草稿提交时提单人账号不存在，operatorDeptId/Name 将为 null，draftId={}, operatorId={}",
-                            draft.getId(), draft.getOperatorId());
-                }
-            } else {
-                log.warn("草稿无 operatorId，operatorDeptId/Name 将为 null，draftId={}", draft.getId());
+            if (draft.getOperatorId() == null) {
+                log.warn("草稿无 operatorId，无法校验订单所属机构，draftId={}", draft.getId());
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
+            UserEntity user = userService.getById(draft.getOperatorId());
+            if (user == null) {
+                log.warn("草稿提交时提单人账号不存在，draftId={}, operatorId={}",
+                        draft.getId(), draft.getOperatorId());
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+            }
+            if (!Objects.equals(order.getOrgId(), user.getOrgId())) {
+                log.warn("草稿订单机构与提单人所属机构不一致: draftId={}, operatorId={}, draftOrgId={}, userOrgId={}",
+                        draft.getId(), draft.getOperatorId(), order.getOrgId(), user.getOrgId());
+                throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+            }
+            operatorName = user.getRealName();
+            order.setOperatorDeptId(user.getDeptId());
+            order.setOperatorDeptName(user.getDeptName());
 
             // 校验订单类型与机构资质是否匹配（与直提流程保持一致）
             orderDataValidator.validateOrderType(draft.getOperatorId(), draft.getOrderType());
@@ -1070,6 +1075,12 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (currentUser == null) {
             log.warn("当前登录用户不存在: userId={}", currentUserId);
             throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+        }
+        // 订单归属机构必须与当前登录用户一致，避免通过前端参数跨机构创建订单
+        if (!Objects.equals(dto.getOrgId(), currentUser.getOrgId())) {
+            log.warn("创建订单机构与当前用户所属机构不一致: userId={}, requestOrgId={}, userOrgId={}",
+                    currentUserId, dto.getOrgId(), currentUser.getOrgId());
+            throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
         }
         order.setOperatorId(currentUserId);
         order.setOperatorName(currentUser.getRealName());

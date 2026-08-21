@@ -1,6 +1,7 @@
 package com.yigongbao.module.order.service.impl;
 
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.dto.order.OrderExportQueryDTO;
@@ -73,5 +74,19 @@ class OrderExportServiceImplTest {
                 .isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         assertThat(output.getContentAsByteArray()).isNotEmpty();
         verify(orderQueryHelper).fillRebuildProjectList(any());
+    }
+
+    @Test
+    void customExportOrders_appliesCurrentUserDataScope() {
+        when(orderQueryHelper.getCurrentUserId()).thenReturn(11L);
+        when(userHospitalService.getDataScopeType(11L)).thenReturn(DataScopeTypeEnum.ORG);
+        when(orderMainMapper.selectList(any())).thenReturn(List.of());
+
+        OrderCustomExportDTO dto = new OrderCustomExportDTO();
+        dto.setExportFields(List.of("orderCode"));
+
+        service.customExportOrders(dto, new MockHttpServletResponse());
+
+        verify(orderQueryHelper).buildDataScopeCondition(any(), eq(11L), eq(DataScopeTypeEnum.ORG));
     }
 }
