@@ -8,6 +8,7 @@ import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.service.PrinterDeviceUsageChecker;
 import com.yigongbao.module.basic.device.convert.DeviceConvert;
 import com.yigongbao.module.basic.device.dto.CreateDeviceDTO;
+import com.yigongbao.module.basic.device.dto.DevicePageDTO;
 import com.yigongbao.module.basic.device.dto.DeviceStatusPushDTO;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
@@ -32,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.List;
@@ -701,4 +703,34 @@ class DeviceServiceImplTest {
         device.setState(state);
         return device;
     }
+
+    @Test
+    void listDevices_usesDefaultPagingWhenPagingFieldsAreNull() {
+        DevicePageDTO dto = new DevicePageDTO();
+        dto.setPageNum(null);
+        dto.setPageSize(null);
+        when(deviceMapper.selectPage(any(Page.class), any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        deviceService.listDevices(dto);
+
+        ArgumentCaptor<Page> pageCaptor = ArgumentCaptor.forClass(Page.class);
+        verify(deviceMapper).selectPage(pageCaptor.capture(), any());
+        assertEquals(1L, pageCaptor.getValue().getCurrent());
+        assertEquals(10L, pageCaptor.getValue().getSize());
+    }
+
+    @Test
+    void listDevices_capsPageSizeAtOneHundred() {
+        DevicePageDTO dto = new DevicePageDTO();
+        dto.setPageNum(1);
+        dto.setPageSize(1000);
+        when(deviceMapper.selectPage(any(Page.class), any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        deviceService.listDevices(dto);
+
+        ArgumentCaptor<Page> pageCaptor = ArgumentCaptor.forClass(Page.class);
+        verify(deviceMapper).selectPage(pageCaptor.capture(), any());
+        assertEquals(100L, pageCaptor.getValue().getSize());
+    }
+
 }

@@ -1,6 +1,8 @@
 package com.yigongbao.module.basic.device.dto;
 
 import lombok.Data;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.io.Serializable;
 
 /**
@@ -15,9 +17,12 @@ public class DevicePageDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** 页码，默认第1页 */
+    @Min(value = 1, message = "页码必须大于等于1")
     private Integer pageNum = 1;
 
     /** 每页条数，默认10条 */
+    @Min(value = 1, message = "每页条数必须大于等于1")
+    @Max(value = 100, message = "每页条数不能超过100")
     private Integer pageSize = 10;
 
     /** 所属加工中心ID（精确匹配） */
@@ -27,9 +32,13 @@ public class DevicePageDTO implements Serializable {
     private String deviceType;
 
     /** 设备状态（0=空闲，1=占用） */
+    @Min(value = 0, message = "设备状态必须在0到6之间")
+    @Max(value = 6, message = "设备状态必须在0到6之间")
     private Integer state;
 
     /** 连接状态（0=离线，1=在线） */
+    @Min(value = 0, message = "连接状态必须为0或1")
+    @Max(value = 1, message = "连接状态必须为0或1")
     private Integer connectionStatus;
 
     /** 设备编号（模糊查询） */

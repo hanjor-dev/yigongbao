@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -39,5 +40,27 @@ class DeviceControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(deviceService, never()).updateDeviceState(42L, 7);
+    }
+
+    @Test
+    void list_rejectsPageSizeAboveMaximumWithoutCallingService() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/basic/device/list")
+                        .contentType("application/json")
+                        .content("{\"pageNum\":1,\"pageSize\":101}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(deviceService);
+    }
+
+    @Test
+    void list_rejectsInvalidConnectionStatusWithoutCallingService() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/basic/device/list")
+                        .contentType("application/json")
+                        .content("{\"pageNum\":1,\"pageSize\":10,\"connectionStatus\":2}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(deviceService);
     }
 }

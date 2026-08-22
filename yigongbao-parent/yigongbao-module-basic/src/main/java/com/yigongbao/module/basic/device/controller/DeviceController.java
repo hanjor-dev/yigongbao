@@ -18,6 +18,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.validation.annotation.Validated;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import java.util.Arrays;
@@ -44,7 +45,7 @@ public class DeviceController {
      */
     @Operation(summary = "分页查询设备列表")
     @PostMapping("/list")
-    public Result<IPage<DeviceVO>> list(@RequestBody DevicePageDTO dto) {
+    public Result<IPage<DeviceVO>> list(@Validated @RequestBody DevicePageDTO dto) {
         return Result.success(deviceService.listDevices(dto));
     }
 
