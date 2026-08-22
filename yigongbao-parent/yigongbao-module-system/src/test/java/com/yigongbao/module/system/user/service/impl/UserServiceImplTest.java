@@ -83,6 +83,9 @@ class UserServiceImplTest {
     private UserHospitalService userHospitalService;
 
     @Mock
+    private com.yigongbao.module.system.user.service.UserManagedOrgService userManagedOrgService;
+
+    @Mock
     private DictService dictService;
 
     @Mock
@@ -122,6 +125,7 @@ class UserServiceImplTest {
         testOrg.setId(1L);
         testOrg.setOrgName("测试机构");
         testOrg.setOrgCode("ORG-P-001");
+        testOrg.setOrgType("1.2");
         testOrg.setStatus(1);
 
         // 初始化测试部门实体
@@ -175,6 +179,12 @@ class UserServiceImplTest {
         updateSelfDTO = new UpdateUserBySelfDTO();
         updateSelfDTO.setPhone("13900000999");
         updateSelfDTO.setAvatar("/avatar/new.png");
+
+        com.yigongbao.module.system.dept.entity.DeptOrgEntity defaultDeptOrg =
+                new com.yigongbao.module.system.dept.entity.DeptOrgEntity();
+        defaultDeptOrg.setDeptId(1L);
+        defaultDeptOrg.setOrgId(1L);
+        when(deptOrgMapper.selectList(any())).thenReturn(List.of(defaultDeptOrg));
     }
 
     // ==================== listUser 测试 ====================
@@ -281,6 +291,50 @@ class UserServiceImplTest {
     }
 
     @Test
+    @DisplayName("createUser: 区域管理员未选择额外机构时保存空集合")
+    void createRegionalManager_withoutAdditionalManagedOrgs_shouldKeepPrimaryOnly() {
+        testOrg.setOrgType("1.2");
+        testDept.setDeptType("6.2");
+        RoleEntity regionalRole = new RoleEntity();
+        regionalRole.setId(3L);
+        regionalRole.setRoleName("区域管理员");
+        regionalRole.setRoleCode("regional-manager");
+        regionalRole.setAccountType("6.2");
+        regionalRole.setDataScopeType("user_orgs");
+        regionalRole.setStatus(1);
+
+        CreateUserDTO dto = new CreateUserDTO();
+        dto.setUsername("regional1");
+        dto.setRealName("区域管理员甲");
+        dto.setPhone("13900000111");
+        dto.setAccountType("6.2");
+        dto.setOrgId(1L);
+        dto.setDeptId(1L);
+        dto.setRoleId(3L);
+        dto.setManagedOrgIds(List.of());
+
+        com.yigongbao.module.system.dept.entity.DeptOrgEntity relation =
+                new com.yigongbao.module.system.dept.entity.DeptOrgEntity();
+        relation.setDeptId(1L);
+        relation.setOrgId(1L);
+        when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(deptService.getById(1L)).thenReturn(testDept);
+        when(deptOrgMapper.selectList(any())).thenReturn(List.of(relation));
+        when(roleService.getById(3L)).thenReturn(regionalRole);
+        when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("encoded");
+        when(userMapper.insert(any(UserEntity.class))).thenAnswer(invocation -> {
+            UserEntity user = invocation.getArgument(0);
+            user.setId(103L);
+            return 1;
+        });
+
+        userService.createUser(dto);
+
+        verify(userManagedOrgService).replaceManagedOrgIds(103L, 1L, List.of());
+    }
+
+    @Test
     @DisplayName("createUser: 用户名已存在时抛出异常")
     void createUser_whenUsernameExists_shouldThrowException() {
         // 准备：用户名已存在
@@ -300,7 +354,6 @@ class UserServiceImplTest {
         // 准备：用户名不存在，手机号不存在，邮箱存在
         when(userMapper.selectCount(any(LambdaQueryWrapper.class)))
                 .thenReturn(0L)  // 用户名检查
-                .thenReturn(0L)  // 手机号检查
                 .thenReturn(1L); // 邮箱检查
         CreateUserDTO dto = new CreateUserDTO();
         dto.setUsername("newuser");
@@ -476,6 +529,101 @@ class UserServiceImplTest {
 
         // 断言
         verify(userMapper, times(1)).updateById(any(UserEntity.class));
+    }
+
+    private RoleEntity regionalManagerRole() {
+        RoleEntity role = new RoleEntity();
+        role.setId(3L);
+        role.setRoleCode("regional-manager");
+        role.setDataScopeType("user_orgs");
+        role.setAccountType("6.2");
+        return role;
+    }
+
+    @Test
+    @DisplayName("updateUser: managedOrgIds为null时保持原额外机构")
+    void updateRegionalManager_nullManagedOrgIds_shouldKeepExistingRelations() {
+        testEntity.setRoleId(3L);
+        testEntity.setOrgId(1L);
+        testOrg.setOrgType("1.2");
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(roleService.getById(3L)).thenReturn(regionalManagerRole());
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+        UpdateUserDTO dto = new UpdateUserDTO();
+        dto.setManagedOrgIds(null);
+
+        userService.updateUser(1L, dto);
+
+        verify(userManagedOrgService, never()).replaceManagedOrgIds(anyLong(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("updateUser: 变更主机构且managedOrgIds为null时保留原配置并剔除新主机构")
+    void updateRegionalManager_changedPrimaryOrg_shouldNormalizeExistingRelations() {
+        testEntity.setRoleId(3L);
+        testEntity.setOrgId(1L);
+        testOrg.setId(2L);
+        testOrg.setOrgType("1.2");
+        testOrg.setStatus(1);
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(roleService.getById(3L)).thenReturn(regionalManagerRole());
+        when(orgService.getById(2L)).thenReturn(testOrg);
+        when(userManagedOrgService.getManagedOrgIds(1L)).thenReturn(List.of(2L, 3L));
+        com.yigongbao.module.system.dept.entity.DeptOrgEntity newPrimaryRelation =
+                new com.yigongbao.module.system.dept.entity.DeptOrgEntity();
+        newPrimaryRelation.setDeptId(1L);
+        newPrimaryRelation.setOrgId(2L);
+        when(deptOrgMapper.selectList(any())).thenReturn(List.of(newPrimaryRelation));
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+        UpdateUserDTO dto = new UpdateUserDTO();
+        dto.setOrgId(2L);
+        dto.setManagedOrgIds(null);
+
+        userService.updateUser(1L, dto);
+
+        verify(userManagedOrgService).replaceManagedOrgIds(1L, 2L, List.of(2L, 3L));
+    }
+
+    @Test
+    @DisplayName("updateUser: 区域管理员不能把主机构改为部门未关联机构")
+    void updateRegionalManager_primaryOrgOutsideDepartment_shouldReject() {
+        testEntity.setRoleId(3L);
+        testEntity.setOrgId(1L);
+        testEntity.setDeptId(1L);
+        OrgEntity anotherDealer = new OrgEntity();
+        anotherDealer.setId(2L);
+        anotherDealer.setOrgType("1.2");
+        anotherDealer.setStatus(1);
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(roleService.getById(3L)).thenReturn(regionalManagerRole());
+        when(orgService.getById(2L)).thenReturn(anotherDealer);
+        UpdateUserDTO dto = new UpdateUserDTO();
+        dto.setOrgId(2L);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> userService.updateUser(1L, dto));
+
+        assertEquals(ErrorCodeEnum.ORG_NOT_BELONG_TO_DEPT.getCode(), exception.getCode());
+        verify(userMapper, never()).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("updateUser: managedOrgIds为空数组时清空额外机构")
+    void updateRegionalManager_emptyManagedOrgIds_shouldClearAdditionalRelations() {
+        testEntity.setRoleId(3L);
+        testEntity.setOrgId(1L);
+        testOrg.setOrgType("1.2");
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(roleService.getById(3L)).thenReturn(regionalManagerRole());
+        when(orgService.getById(1L)).thenReturn(testOrg);
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+        UpdateUserDTO dto = new UpdateUserDTO();
+        dto.setManagedOrgIds(List.of());
+
+        userService.updateUser(1L, dto);
+
+        verify(userManagedOrgService).replaceManagedOrgIds(1L, 1L, List.of());
     }
 
     @Test
@@ -773,6 +921,8 @@ class UserServiceImplTest {
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(orgService.getById(1L)).thenReturn(testOrg);
         when(roleService.getById(2L)).thenReturn(roleWithHospitalScope);
+        when(orgService.listByIds(List.of(10L, 20L, 30L))).thenReturn(List.of(
+                hospital(10L), hospital(20L), hospital(30L)));
         when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("$2a$10$encrypted");
         when(userMapper.insert(any(UserEntity.class))).thenAnswer(invocation -> {
             UserEntity entity = invocation.getArgument(0);
@@ -894,6 +1044,7 @@ class UserServiceImplTest {
         when(userMapper.selectById(1L)).thenReturn(existingUser);
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(roleService.getById(2L)).thenReturn(newRoleWithHospitalScope);
+        when(orgService.listByIds(List.of(10L, 20L))).thenReturn(List.of(hospital(10L), hospital(20L)));
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
         // 执行
@@ -930,6 +1081,7 @@ class UserServiceImplTest {
         when(userMapper.selectById(1L)).thenReturn(existingUser);
         when(userMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(roleService.getById(2L)).thenReturn(currentRole);
+        when(orgService.listByIds(List.of(99L, 88L))).thenReturn(List.of(hospital(99L), hospital(88L)));
         when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
 
         // 执行
@@ -972,8 +1124,8 @@ class UserServiceImplTest {
         // 执行
         userService.updateUser(1L, dtoWithNewRole);
 
-        // 断言：验证未分配医院权限
-        verify(userHospitalService, never()).assignHospitals(anyLong(), anyList());
+        // 离开 hospitals 权限时应清理历史医院关系，避免残留授权。
+        verify(userHospitalService).assignHospitals(1L, Collections.emptyList());
     }
 
     /**
@@ -1209,5 +1361,13 @@ class UserServiceImplTest {
                 () -> userService.createUser(dto)
         );
         assertEquals(ErrorCodeEnum.USER_ROLE_SPECIALTY_REQUIRED.getCode(), exception.getCode());
+    }
+
+    private OrgEntity hospital(Long id) {
+        OrgEntity hospital = new OrgEntity();
+        hospital.setId(id);
+        hospital.setOrgType("1.3");
+        hospital.setStatus(1);
+        return hospital;
     }
 }

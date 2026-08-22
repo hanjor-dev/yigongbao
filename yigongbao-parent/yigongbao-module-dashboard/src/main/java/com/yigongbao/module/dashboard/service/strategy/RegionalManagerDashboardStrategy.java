@@ -10,6 +10,7 @@ import com.yigongbao.module.dashboard.vo.*;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.system.user.service.UserManagedOrgService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ public class RegionalManagerDashboardStrategy implements DashboardStrategy {
 
     private final OrderMainMapper orderMapper;
     private final UserMapper userMapper;
+    private final UserManagedOrgService userManagedOrgService;
 
     @Override
     public DashboardVO buildDashboard(Long userId, DashboardQueryDTO query) {
@@ -35,28 +37,16 @@ public class RegionalManagerDashboardStrategy implements DashboardStrategy {
         try {
             TimeRangeEnum timeRange = query.getTimeRangeEnum();
             LocalDateTime[] range = TimeRangeUtil.getStartAndEndTime(timeRange, query.getStartDate(), query.getEndDate());
-            UserEntity user = userMapper.selectById(userId);
-            if (user == null || user.getDeptId() == null) {
+            List<Long> effectiveOrgIds = userManagedOrgService.getEffectiveOrgIds(userId);
+            if (effectiveOrgIds.isEmpty()) {
                 return buildEmptyDashboard();
             }
-
-            List<UserEntity> deptUsers = userMapper.selectList(
-                new QueryWrapper<UserEntity>().eq("dept_id", user.getDeptId())
-            );
-
-            List<Long> operatorIds = deptUsers.stream()
-                .map(UserEntity::getId)
-                .collect(Collectors.toList());
-
-            if (operatorIds.isEmpty()) {
-                return buildEmptyDashboard();
-            }
-
-            int salesmanCount = deptUsers.size();
+            int salesmanCount = Math.toIntExact(userMapper.selectCount(
+                    new QueryWrapper<UserEntity>().in("org_id", effectiveOrgIds).eq("status", 1)));
 
             DashboardVO vo = new DashboardVO();
-            vo.setCards(buildCards(operatorIds, range, salesmanCount));
-            vo.setCharts(buildCharts(operatorIds, range, query));
+            vo.setCards(buildCards(effectiveOrgIds, range, salesmanCount));
+            vo.setCharts(buildCharts(effectiveOrgIds, range, query));
             vo.setTodos(new ArrayList<>());
             return vo;
         } catch (Exception e) {
@@ -65,29 +55,30 @@ public class RegionalManagerDashboardStrategy implements DashboardStrategy {
         }
     }
 
-    private List<CardVO> buildCards(List<Long> operatorIds, LocalDateTime[] range, int userCount) {
+    private List<CardVO> buildCards(List<Long> orgIds, LocalDateTime[] range, int userCount) {
         long total = orderMapper.selectCount(new QueryWrapper<OrderMainEntity>()
-            .in("operator_id", operatorIds)
+            .in("org_id", orgIds)
             .between("create_time", range[0], range[1]));
 
             long pendingAudit = orderMapper.selectCount(new QueryWrapper<OrderMainEntity>()
-                .in("operator_id", operatorIds)
-                .eq("status", FlowStatusEnum.PENDING_DATA_AUDIT.getValue()));
+                .in("org_id", orgIds)
+                .eq("status", FlowStatusEnum.PENDING_DATA_AUDIT.getValue())
+                .between("create_time", range[0], range[1]));
 
         long inProgress = orderMapper.selectCount(new QueryWrapper<OrderMainEntity>()
-            .in("operator_id", operatorIds)
+            .in("org_id", orgIds)
             .notIn("status", 6030, 8010, 9010)
             .between("create_time", range[0], range[1]));
 
         long completed = orderMapper.selectCount(new QueryWrapper<OrderMainEntity>()
-            .in("operator_id", operatorIds)
+            .in("org_id", orgIds)
             .in("status", List.of(6030, 8010))
             .between("create_time", range[0], range[1]));
 
         double avgOrders = userCount > 0 ? (double) total / userCount : 0;
 
         return List.of(
-            CardVO.builder().key("deptOrders").title("部门订单").value(total).unit("单").build(),
+            CardVO.builder().key("managedOrgOrders").title("管理机构订单").value(total).unit("单").build(),
             CardVO.builder().key("pendingAudit").title("待设计审核订单").value(pendingAudit).unit("单").build(),
             CardVO.builder().key("inProgress").title("进行中订单").value(inProgress).unit("单").build(),
             CardVO.builder().key("completedOrders").title("已完成").value(completed).unit("单").build(),
@@ -95,15 +86,15 @@ public class RegionalManagerDashboardStrategy implements DashboardStrategy {
         );
     }
 
-    private List<ChartVO> buildCharts(List<Long> operatorIds, LocalDateTime[] range, DashboardQueryDTO query) {
+    private List<ChartVO> buildCharts(List<Long> orgIds, LocalDateTime[] range, DashboardQueryDTO query) {
         return List.of(
-            buildOrderTrendChart(operatorIds, range, query),
-            buildSalesmanTop10Chart(operatorIds, range),
-            buildDailySubmissionsChart(operatorIds, range, query)
+            buildOrderTrendChart(orgIds, range, query),
+            buildSalesmanTop10Chart(orgIds, range),
+            buildDailySubmissionsChart(orgIds, range, query)
         );
     }
 
-    private ChartVO buildOrderTrendChart(List<Long> operatorIds, LocalDateTime[] range, DashboardQueryDTO query) {
+    private ChartVO buildOrderTrendChart(List<Long> orgIds, LocalDateTime[] range, DashboardQueryDTO query) {
         TimeRangeEnum timeRange = query.getTimeRangeEnum();
         List<String> xAxis = TimeRangeUtil.getXAxisLabels(timeRange, query.getStartDate(), query.getEndDate());
         List<Integer> newOrders = new ArrayList<>();
@@ -118,7 +109,7 @@ public class RegionalManagerDashboardStrategy implements DashboardStrategy {
             : timeRange;
 
         QueryWrapper<OrderMainEntity> newWrapper = new QueryWrapper<>();
-        newWrapper.in("operator_id", operatorIds).between("create_time", range[0], range[1]);
+        newWrapper.in("org_id", orgIds).between("create_time", range[0], range[1]);
         switch (effectiveRange) {
             case TODAY:
                 newWrapper.select("HOUR(create_time) as hour, COUNT(*) as count").groupBy("HOUR(create_time)");
@@ -158,7 +149,7 @@ public class RegionalManagerDashboardStrategy implements DashboardStrategy {
         }
 
         QueryWrapper<OrderMainEntity> completedWrapper = new QueryWrapper<>();
-        completedWrapper.in("operator_id", operatorIds).in("status", List.of(6030, 8010))
+        completedWrapper.in("org_id", orgIds).in("status", List.of(6030, 8010))
                         .between("update_time", range[0], range[1]);
         switch (effectiveRange) {
             case TODAY:
@@ -199,7 +190,7 @@ public class RegionalManagerDashboardStrategy implements DashboardStrategy {
         }
 
         return ChartVO.builder()
-            .key("orderTrend").title("部门订单趋势").type("line")
+            .key("orderTrend").title("管理机构订单趋势").type("line")
             .data(LineChartDataVO.builder()
                 .xAxis(xAxis)
                 .series(List.of(
@@ -210,12 +201,12 @@ public class RegionalManagerDashboardStrategy implements DashboardStrategy {
             .build();
     }
 
-    private ChartVO buildSalesmanTop10Chart(List<Long> operatorIds, LocalDateTime[] range) {
+    private ChartVO buildSalesmanTop10Chart(List<Long> orgIds, LocalDateTime[] range) {
         QueryWrapper<OrderMainEntity> wrapper = new QueryWrapper<>();
         wrapper.select("operator_id, operator_name, " +
                 "SUM(CASE WHEN status NOT IN (6030, 8010, 9010) THEN 1 ELSE 0 END) as in_progress, " +
                 "SUM(CASE WHEN status IN (6030, 8010) THEN 1 ELSE 0 END) as completed")
-               .in("operator_id", operatorIds)
+               .in("org_id", orgIds)
                .between("create_time", range[0], range[1])
                .groupBy("operator_id")
                .orderByDesc("in_progress + completed")
@@ -247,7 +238,7 @@ public class RegionalManagerDashboardStrategy implements DashboardStrategy {
             .build();
     }
 
-    private ChartVO buildDailySubmissionsChart(List<Long> operatorIds, LocalDateTime[] range, DashboardQueryDTO query) {
+    private ChartVO buildDailySubmissionsChart(List<Long> orgIds, LocalDateTime[] range, DashboardQueryDTO query) {
         TimeRangeEnum timeRange = query.getTimeRangeEnum();
         List<String> xAxis = TimeRangeUtil.getXAxisLabels(timeRange, query.getStartDate(), query.getEndDate());
         List<Integer> data = new ArrayList<>();
@@ -260,7 +251,7 @@ public class RegionalManagerDashboardStrategy implements DashboardStrategy {
             : timeRange;
 
         QueryWrapper<OrderMainEntity> wrapper = new QueryWrapper<>();
-        wrapper.in("operator_id", operatorIds).between("create_time", range[0], range[1]);
+        wrapper.in("org_id", orgIds).between("create_time", range[0], range[1]);
 
         switch (effectiveRange) {
             case TODAY:

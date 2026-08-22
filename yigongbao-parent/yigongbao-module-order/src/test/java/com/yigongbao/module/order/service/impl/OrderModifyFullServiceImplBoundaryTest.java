@@ -12,6 +12,7 @@ import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
 import com.yigongbao.module.order.dto.modify.OrderModifyFullDTO;
 import com.yigongbao.module.order.validator.OrderDataValidator;
+import com.yigongbao.module.order.validator.OrderDataScopeChecker;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -38,6 +39,7 @@ class OrderModifyFullServiceImplBoundaryTest {
     @Mock private OrderFileMapper orderFileMapper;
     @Mock private OrderModificationLogMapper logMapper;
     @Mock private OrderDataValidator validator;
+    @Mock private OrderDataScopeChecker dataScopeChecker;
     @Mock private FlowFacade flowFacade;
     @Mock private OrgService orgService;
     @Mock private HospitalDeptService hospitalDeptService;
@@ -75,5 +77,20 @@ class OrderModifyFullServiceImplBoundaryTest {
             assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED.getCode());
         }
         verifyNoInteractions(flowFacade, validator);
+    }
+
+    @Test
+    void modifyOrderFull_rejectsOrderOutsideCurrentUsersDataScope() {
+        doThrow(new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND))
+                .when(dataScopeChecker).checkOrderAccess(7L);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> service.modifyOrderFull(7L, new OrderModifyFullDTO(), false, 1L, "区域管理员",
+                            com.yigongbao.common.enums.RoleCodeEnum.REGIONAL_MANAGER.getCode()));
+            assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.ORDER_NOT_FOUND.getCode());
+        }
+        verify(orderMainMapper, never()).selectById(anyLong());
     }
 }

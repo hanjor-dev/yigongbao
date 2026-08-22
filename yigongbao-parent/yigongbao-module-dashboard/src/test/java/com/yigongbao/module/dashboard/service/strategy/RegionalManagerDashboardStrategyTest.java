@@ -8,6 +8,7 @@ import com.yigongbao.module.dashboard.vo.DashboardVO;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.system.user.service.UserManagedOrgService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -33,20 +34,16 @@ class RegionalManagerDashboardStrategyTest {
     @Mock
     private UserMapper userMapper;
 
+    @Mock
+    private UserManagedOrgService userManagedOrgService;
+
     @InjectMocks
     private RegionalManagerDashboardStrategy strategy;
 
     @Test
     void pendingCardDoesNotUseRegionalAuditStatus() {
-        UserEntity manager = new UserEntity();
-        manager.setId(1L);
-        manager.setDeptId(10L);
-        UserEntity member = new UserEntity();
-        member.setId(2L);
-        member.setDeptId(10L);
-
-        when(userMapper.selectById(1L)).thenReturn(manager);
-        when(userMapper.selectList(any())).thenReturn(List.of(member));
+        when(userManagedOrgService.getEffectiveOrgIds(1L)).thenReturn(List.of(100L, 200L));
+        when(userMapper.selectCount(any())).thenReturn(2L);
         when(orderMapper.selectCount(any())).thenReturn(0L);
         when(orderMapper.selectMaps(any())).thenReturn(List.<Map<String, Object>>of());
 
@@ -59,8 +56,11 @@ class RegionalManagerDashboardStrategyTest {
         verify(orderMapper, atLeast(4)).selectCount(captor.capture());
         assertThat(captor.getAllValues())
                 .allMatch(wrapper -> !wrapper.getSqlSegment().contains("regional_audit_status"));
-        assertThat(captor.getAllValues())
-                .anyMatch(wrapper -> wrapper.getSqlSegment().contains("status")
-                        && wrapper.getParamNameValuePairs().containsValue(FlowStatusEnum.PENDING_DATA_AUDIT.getValue()));
+        assertThat(captor.getAllValues()).allMatch(wrapper -> wrapper.getSqlSegment().contains("org_id"));
+        QueryWrapper<OrderMainEntity> pendingWrapper = captor.getAllValues().stream()
+                .filter(wrapper -> wrapper.getParamNameValuePairs()
+                        .containsValue(FlowStatusEnum.PENDING_DATA_AUDIT.getValue()))
+                .findFirst().orElseThrow();
+        assertThat(pendingWrapper.getSqlSegment()).contains("create_time", "BETWEEN");
     }
 }

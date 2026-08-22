@@ -20,6 +20,7 @@ import com.yigongbao.module.system.user.entity.UserHospitalEntity;
 import com.yigongbao.module.system.user.mapper.UserHospitalMapper;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserHospitalService;
+import com.yigongbao.module.system.user.service.UserManagedOrgService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -54,6 +55,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
     private final OrgService orgService;
     private final UserMapper userMapper;
     private final RoleService roleService;
+    private final UserManagedOrgService userManagedOrgService;
     private final com.yigongbao.module.system.config.service.ConfigService configService;
 
     /**
@@ -246,6 +248,13 @@ public class UserHospitalServiceImpl implements UserHospitalService {
             // HOSPITALS 类型需校验该医院是否在用户已分配列表中
             return getHospitalIdsByUserId(userId).contains(hospitalId);
         }
+        if (scopeType == DataScopeTypeEnum.USER_ORGS) {
+            List<Long> orgIds = userManagedOrgService.getEffectiveOrgIds(userId);
+            if (orgIds.isEmpty()) return false;
+            return orgHospitalMapper.selectCount(new LambdaQueryWrapper<OrgHospitalEntity>()
+                    .in(OrgHospitalEntity::getDistributorOrgId, orgIds)
+                    .eq(OrgHospitalEntity::getHospitalOrgId, hospitalId)) > 0;
+        }
         return false;
     }
 
@@ -282,30 +291,34 @@ public class UserHospitalServiceImpl implements UserHospitalService {
     public List<OrgVO> getOrderableHospitals(Long userId) {
         UserEntity user = userMapper.selectById(userId);
         if (user == null) throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+        DataScopeTypeEnum scopeType = getDataScopeType(userId);
 
-        // 1. 查用户所属机构（经销商或服务商）关联的所有医院
+        // 1. 区域管理员按主机构+额外管理机构并集取医院，其他角色仍只取主机构
         Long orgId = user.getOrgId();
         if (orgId == null) {
             log.warn("用户未分配机构: userId={}", userId);
             List<OrgVO> emptyResult = new ArrayList<>();
-            appendUnknownHospital(emptyResult);
+            if (scopeType != DataScopeTypeEnum.USER_ORGS) appendUnknownHospital(emptyResult);
             return emptyResult;
         }
 
+        List<Long> sourceOrgIds = scopeType == DataScopeTypeEnum.USER_ORGS
+                ? userManagedOrgService.getEffectiveOrgIds(userId)
+                : List.of(orgId);
+        if (sourceOrgIds.isEmpty()) return new ArrayList<>();
         List<Long> orgHospitalIds = orgHospitalMapper.selectList(
                         new LambdaQueryWrapper<OrgHospitalEntity>()
-                                .eq(OrgHospitalEntity::getDistributorOrgId, orgId))
-                .stream().map(OrgHospitalEntity::getHospitalOrgId).collect(Collectors.toList());
+                                .in(OrgHospitalEntity::getDistributorOrgId, sourceOrgIds))
+                .stream().map(OrgHospitalEntity::getHospitalOrgId).distinct().collect(Collectors.toList());
 
         if (orgHospitalIds.isEmpty()) {
             log.info("机构无关联医院，orgId={}", orgId);
             List<OrgVO> emptyResult = new ArrayList<>();
-            appendUnknownHospital(emptyResult);
+            if (scopeType != DataScopeTypeEnum.USER_ORGS) appendUnknownHospital(emptyResult);
             return emptyResult;
         }
 
         // 2. 按数据权限类型筛选
-        DataScopeTypeEnum scopeType = getDataScopeType(userId);
         List<Long> resultIds;
         if (scopeType == DataScopeTypeEnum.HOSPITALS) {
             // HOSPITALS 权限：取机构关联医院与用户已分配医院的交集
@@ -319,7 +332,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
         if (resultIds.isEmpty()) {
             // 即使无可操作医院，也返回"其他医院"作为兜底
             List<OrgVO> emptyResult = new ArrayList<>();
-            appendUnknownHospital(emptyResult);
+            if (scopeType != DataScopeTypeEnum.USER_ORGS) appendUnknownHospital(emptyResult);
             return emptyResult;
         }
         List<OrgVO> result = orgService.listByIds(resultIds).stream()
@@ -329,7 +342,7 @@ public class UserHospitalServiceImpl implements UserHospitalService {
                 .collect(Collectors.toList());
 
         // 追加"其他医院"作为兜底选项
-        appendUnknownHospital(result);
+        if (scopeType != DataScopeTypeEnum.USER_ORGS) appendUnknownHospital(result);
         return result;
     }
 

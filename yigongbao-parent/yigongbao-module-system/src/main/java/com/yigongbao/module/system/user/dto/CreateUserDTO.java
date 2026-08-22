@@ -100,6 +100,11 @@ public class CreateUserDTO implements Serializable {
     private List<Long> hospitalIds;
 
     /**
+     * 区域管理员额外管理机构ID列表（选填，不包含主所属机构）
+     */
+    private List<Long> managedOrgIds;
+
+    /**
      * 工号
      */
     @Size(max = 32, message = "工号长度不能超过32个字符")

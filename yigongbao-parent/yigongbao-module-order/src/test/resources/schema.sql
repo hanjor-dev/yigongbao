@@ -204,3 +204,17 @@ CREATE TABLE order_modification_log (
     modifier_name VARCHAR(100) COMMENT '修改人姓名',
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
+-- 区域管理员-额外管理机构关联表（主机构仍使用 sys_user.org_id）
+DROP TABLE IF EXISTS sys_user_managed_org;
+CREATE TABLE sys_user_managed_org (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    org_id BIGINT NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    create_by BIGINT,
+    UNIQUE KEY uk_user_managed_org (user_id, org_id),
+    KEY idx_managed_org_user (user_id),
+    KEY idx_managed_org_org (org_id)
+);

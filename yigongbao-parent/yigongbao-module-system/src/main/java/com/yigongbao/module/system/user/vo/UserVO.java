@@ -213,4 +213,10 @@ public class UserVO implements Serializable {
      * 用于前端展示用户已分配的医院名称
      */
     private List<String> hospitalNames;
+
+    /** 区域管理员额外管理机构ID列表（不含主机构） */
+    private List<Long> managedOrgIds;
+
+    /** 区域管理员实际生效机构ID列表（主机构 + 额外管理机构） */
+    private List<Long> effectiveOrgIds;
 }

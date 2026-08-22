@@ -9,6 +9,7 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -84,6 +85,7 @@ class OrderMainServiceImplStateTransitionTest {
     @Mock private com.yigongbao.module.order.helper.OrderQueryHelper orderQueryHelper;
     @Mock private ObjectMapper objectMapper;
     @Mock private OrderDataValidator orderDataValidator;
+    @Mock private com.yigongbao.module.order.validator.OrderDataScopeChecker orderDataScopeChecker;
     @Mock private OrderModifyApplyService orderModifyApplyService;
     @Mock private OrderCancelApplyService cancelApplyService;
     @Mock private OrderConvert orderConvert;
@@ -457,6 +459,28 @@ class OrderMainServiceImplStateTransitionTest {
 
         verify(service, never()).save(any(OrderMainEntity.class));
         verifyNoInteractions(flowFacade, orderItemMapper, orderItemDraftMapper);
+    }
+
+    @Test
+    void createFromDraft_rejectsHospitalOutsideOperatorsCurrentScope() {
+        OrderDraftEntity draft = new OrderDraftEntity();
+        draft.setId(33L);
+        draft.setOperatorId(11L);
+        draft.setOrgId(101L);
+        draft.setHospitalId(501L);
+
+        UserEntity user = new UserEntity();
+        user.setId(11L);
+        user.setOrgId(101L);
+        when(userService.getById(11L)).thenReturn(user);
+        when(codeGeneratorService.generate(any())).thenReturn("ORD-HOSPITAL-DENIED");
+        when(userHospitalService.hasPermissionOnHospital(11L, 501L)).thenReturn(false);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.createFromDraft(draft));
+
+        assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.HOSPITAL_SCOPE_DENIED.getCode());
+        verify(service, never()).save(any(OrderMainEntity.class));
     }
 
     @Test

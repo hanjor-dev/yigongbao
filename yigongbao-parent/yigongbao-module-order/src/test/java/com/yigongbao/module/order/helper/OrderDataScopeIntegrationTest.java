@@ -10,6 +10,7 @@ import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.service.UserService;
+import com.yigongbao.module.system.user.service.UserManagedOrgService;
 import org.mybatis.spring.annotation.MapperScan;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,8 @@ class OrderDataScopeIntegrationTest {
     @MockBean
     private UserHospitalService userHospitalService;
     @MockBean
+    private UserManagedOrgService userManagedOrgService;
+    @MockBean
     private ConfigService configService;
     @MockBean
     private DictService dictService;
@@ -79,7 +82,7 @@ class OrderDataScopeIntegrationTest {
         sameOrgOrderId = baseId;
         otherOrgOrderId = baseId + 1;
         orderQueryHelper = new OrderQueryHelper(
-                userService, userHospitalService, configService, dictService, objectMapper, orderItemMapper);
+                userService, userHospitalService, userManagedOrgService, configService, dictService, objectMapper, orderItemMapper);
     }
 
     @Test

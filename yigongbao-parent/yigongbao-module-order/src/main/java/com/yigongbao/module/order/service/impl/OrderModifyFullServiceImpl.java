@@ -21,6 +21,7 @@ import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
 import com.yigongbao.module.order.service.OrderModifyFullService;
 import com.yigongbao.module.order.validator.OrderDataValidator;
+import com.yigongbao.module.order.validator.OrderDataScopeChecker;
 import com.yigongbao.module.basic.hospitalDept.service.HospitalDeptService;
 import com.yigongbao.module.basic.hospitalDept.vo.HospitalDeptVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
@@ -62,6 +63,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     private final OrderFileMapper orderFileMapper;
     private final OrderModificationLogMapper orderModificationLogMapper;
     private final OrderDataValidator orderDataValidator;
+    private final OrderDataScopeChecker orderDataScopeChecker;
     private final FlowFacade flowFacade;
     private final OrgService orgService;
     private final HospitalDeptService hospitalDeptService;
@@ -87,6 +89,9 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void modifyOrderFull(Long orderId, OrderModifyFullDTO dto, boolean skipPermissionCheck, Long modifierId, String modifierName, String modifierRoleCode) {
+        if (!skipPermissionCheck) {
+            orderDataScopeChecker.checkOrderAccess(orderId);
+        }
         // 1. 查询当前订单
         OrderMainEntity order = orderMainMapper.selectById(orderId);
         if (order == null) {

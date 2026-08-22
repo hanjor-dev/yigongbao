@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.system.config.service.ConfigService;
@@ -540,10 +541,11 @@ public class OrderDataValidator {
         if (userId == null || hospitalId == null) {
             return;
         }
-        // 未知医院（占位医院）豁免权限校验，任何用户均可选择
+        // 未知医院仅保留给原有权限类型；账户机构集合必须严格受机构-医院关系约束。
         String unknownHospitalIdStr = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
         Long unknownHospitalId = cn.hutool.core.convert.Convert.toLong(unknownHospitalIdStr, null);
-        if (unknownHospitalId != null && hospitalId.equals(unknownHospitalId)) {
+        if (unknownHospitalId != null && hospitalId.equals(unknownHospitalId)
+                && userHospitalService.getDataScopeType(userId) != DataScopeTypeEnum.USER_ORGS) {
             return;
         }
         if (!userHospitalService.hasPermissionOnHospital(userId, hospitalId)) {

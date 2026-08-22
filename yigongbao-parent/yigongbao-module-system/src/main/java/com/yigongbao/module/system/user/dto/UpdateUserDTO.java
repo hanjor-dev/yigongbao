@@ -83,6 +83,11 @@ public class UpdateUserDTO implements Serializable {
     private List<Long> hospitalIds;
 
     /**
+     * 区域管理员额外管理机构ID列表；传空集合表示清空，null表示本次不修改
+     */
+    private List<Long> managedOrgIds;
+
+    /**
      * 工号
      */
     @Size(max = 32, message = "工号长度不能超过32个字符")

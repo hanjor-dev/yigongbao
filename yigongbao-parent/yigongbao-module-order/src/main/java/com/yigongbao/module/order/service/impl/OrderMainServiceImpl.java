@@ -36,6 +36,7 @@ import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.order.validator.OrderDataValidator;
+import com.yigongbao.module.order.validator.OrderDataScopeChecker;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
 import com.yigongbao.module.order.dto.order.OrderPageDTO;
@@ -125,6 +126,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderQueryHelper orderQueryHelper;
     private final ObjectMapper objectMapper;
     private final OrderDataValidator orderDataValidator;
+    private final OrderDataScopeChecker orderDataScopeChecker;
     private final OrderModifyApplyService orderModifyApplyService;
     private final OrderCancelApplyService cancelApplyService;
     private final com.yigongbao.module.order.convert.OrderConvert orderConvert;
@@ -188,15 +190,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      * 数据权限校验：当前用户是否有权访问该订单，无权则抛 ORDER_NOT_FOUND（不暴露存在性）
      */
     private void validateDataScope(Long orderId) {
-        Long currentUserId = getCurrentUserId();
-        DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
-        LambdaQueryWrapper<OrderMainEntity> scopeWrapper = new LambdaQueryWrapper<>();
-        scopeWrapper.eq(OrderMainEntity::getId, orderId);
-        orderQueryHelper.buildDataScopeCondition(scopeWrapper, currentUserId, scopeType);
-        if (count(scopeWrapper) == 0) {
-            log.warn("订单不在当前用户数据权限范围内，id=, userId={}, scopeType={}", orderId, currentUserId, scopeType);
-            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
-        }
+        orderDataScopeChecker.checkOrderAccess(orderId);
     }
 
     /**
@@ -437,6 +431,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             log.warn("订单不存在: orderId={}", id);
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
+        validateDataScope(id);
         // 通过 FlowFacade 获取当前状态可执行的动作
         return flowFacade.getAvailableActions(id);
     }
@@ -470,6 +465,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         BeanUtils.copyProperties(dto, entity, "id", "orderCode", "phase", "status", "createTime", "updateTime", "createBy", "updateBy", "version");
         // hospitalId 变更时同步更新地区冗余字段
         if (dto.getHospitalId() != null) {
+            Long currentUserId = getCurrentUserId();
+            if (!userHospitalService.hasPermissionOnHospital(currentUserId, dto.getHospitalId())) {
+                throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+            }
             fillAreaFromHospital(entity, dto.getHospitalId());
         }
 
@@ -640,6 +639,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void auditPass(Long id, AuditOrderDTO dto) {
+        validateDataScope(id);
         Long currentUserId = getCurrentUserId();
         OrderMainEntity entity = getById(id);
         if (entity == null) {
@@ -710,6 +710,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void auditReject(Long id, AuditOrderDTO dto) {
+        validateDataScope(id);
         Long currentUserId = getCurrentUserId();
         OrderMainEntity entity = getById(id);
         if (entity == null) {
@@ -815,6 +816,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void cancelOrder(Long id, Integer version) {
+        validateDataScope(id);
         Long currentUserId = getCurrentUserId();
         // 校验订单存在
         OrderMainEntity order = getById(id);
@@ -879,6 +881,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void manualCompleteOrder(Long orderId, Integer version) {
+        validateDataScope(orderId);
         Long currentUserId = getCurrentUserId();
         // 校验订单存在
         OrderMainEntity entity = getById(orderId);
@@ -972,6 +975,12 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                 log.warn("草稿订单机构与提单人所属机构不一致: draftId={}, operatorId={}, draftOrgId={}, userOrgId={}",
                         draft.getId(), draft.getOperatorId(), order.getOrgId(), user.getOrgId());
                 throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+            }
+            if (order.getHospitalId() != null
+                    && !userHospitalService.hasPermissionOnHospital(draft.getOperatorId(), order.getHospitalId())) {
+                log.warn("草稿医院不在提单人当前可选范围内: draftId={}, operatorId={}, hospitalId={}",
+                        draft.getId(), draft.getOperatorId(), order.getHospitalId());
+                throw new BusinessException(ErrorCodeEnum.HOSPITAL_SCOPE_DENIED);
             }
             operatorName = user.getRealName();
             order.setOperatorDeptId(user.getDeptId());

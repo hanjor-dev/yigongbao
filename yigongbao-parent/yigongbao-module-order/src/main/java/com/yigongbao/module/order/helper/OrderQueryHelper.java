@@ -22,6 +22,7 @@ import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserHospitalService;
+import com.yigongbao.module.system.user.service.UserManagedOrgService;
 import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,6 +76,7 @@ public class OrderQueryHelper {
 
     private final UserService userService;
     private final UserHospitalService userHospitalService;
+    private final UserManagedOrgService userManagedOrgService;
     private final ConfigService configService;
     private final DictService dictService;
     private final ObjectMapper objectMapper;
@@ -161,6 +163,7 @@ public class OrderQueryHelper {
      * - DEPT：只看同部门成员创建的订单（按 operator_dept_id 过滤）
      * - HOSPITALS：只看自己关联医院范围内的订单
      * - ORG：只看同机构下所有订单
+     * - USER_ORGS：按账户主机构与额外管理机构并集过滤
      * - ALL：不受限制，查看所有订单
      *
      * @param wrapper       查询条件构建器
@@ -225,6 +228,15 @@ public class OrderQueryHelper {
                         log.warn("DEPT 降级 SELF 但 currentUserId 也为 null，返回空列表");
                         wrapper.apply("1 = 0");
                     }
+                }
+                break;
+            case USER_ORGS:
+                List<Long> effectiveOrgIds = userManagedOrgService.getEffectiveOrgIds(currentUserId);
+                if (effectiveOrgIds.isEmpty()) {
+                    log.warn("USER_ORGS 类型用户无有效机构，返回空列表，userId={}", currentUserId);
+                    wrapper.apply("1 = 0");
+                } else {
+                    wrapper.in(OrderMainEntity::getOrgId, effectiveOrgIds);
                 }
                 break;
             case CENTER:

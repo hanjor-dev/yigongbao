@@ -118,7 +118,7 @@ CREATE TABLE sys_role (
     role_code           VARCHAR(32)     NOT NULL COMMENT '角色编码',
     role_desc           VARCHAR(256)    COMMENT '角色描述',
     account_type        VARCHAR(10)     NOT NULL COMMENT '账户分类（字典编码：6.1=企业账户，6.2=业务账户）',
-    data_scope_type     VARCHAR(16)     NOT NULL DEFAULT 'org' COMMENT '数据权限范围（self=仅自己，hospitals=医院范围，dept=本部门，org=本机构，all=全部）',
+    data_scope_type     VARCHAR(16)     NOT NULL DEFAULT 'org' COMMENT '数据权限范围（self/hospitals/dept/org/user_orgs/all/center）',
     status              TINYINT         DEFAULT 1 COMMENT '状态（0=禁用，1=正常）',
     remark              VARCHAR(512)    COMMENT '备注说明',
 
@@ -448,6 +448,20 @@ CREATE TABLE sys_user_hospital (
     KEY idx_user_id (user_id),
     KEY idx_hospital_id (hospital_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户-医院关联表';
+
+-- 区域管理员账户额外管理机构；主所属机构只存于 sys_user.org_id
+DROP TABLE IF EXISTS sys_user_managed_org;
+CREATE TABLE sys_user_managed_org (
+    id                  BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    user_id             BIGINT          NOT NULL COMMENT '区域管理员用户ID',
+    org_id              BIGINT          NOT NULL COMMENT '额外管理机构ID（仅经销商/服务商）',
+    create_time         DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    create_by           BIGINT          DEFAULT NULL COMMENT '创建人ID',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_managed_org (user_id, org_id),
+    KEY idx_managed_org_user (user_id),
+    KEY idx_managed_org_org (org_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='区域管理员-额外管理机构关联表';
 
 
 -- ============================================================

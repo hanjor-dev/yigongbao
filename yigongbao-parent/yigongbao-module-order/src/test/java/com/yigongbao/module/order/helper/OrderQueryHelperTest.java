@@ -18,6 +18,7 @@ import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserHospitalService;
+import com.yigongbao.module.system.user.service.UserManagedOrgService;
 import com.yigongbao.module.system.user.service.UserService;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -54,6 +55,8 @@ class OrderQueryHelperTest {
     private UserService userService;
     @Mock
     private UserHospitalService userHospitalService;
+    @Mock
+    private UserManagedOrgService userManagedOrgService;
     @Mock
     private ConfigService configService;
     @Mock
@@ -226,6 +229,27 @@ class OrderQueryHelperTest {
             orderQueryHelper.buildDataScopeCondition(wrapper, 100L, DataScopeTypeEnum.ALL);
             assertThat(wrapper.getExpression().getNormal()).isEmpty();
             verify(userHospitalService, never()).getHospitalIdsByUserId(any());
+        }
+
+        @Test
+        void userOrgsScope_filtersByPrimaryAndAdditionalManagedOrgs() {
+            when(userManagedOrgService.getEffectiveOrgIds(100L)).thenReturn(List.of(10L, 20L, 30L));
+            LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
+
+            orderQueryHelper.buildDataScopeCondition(wrapper, 100L, DataScopeTypeEnum.USER_ORGS);
+
+            assertThat(wrapper.getExpression().getNormal()).isNotEmpty();
+            verify(userManagedOrgService).getEffectiveOrgIds(100L);
+        }
+
+        @Test
+        void userOrgsScope_withoutEffectiveOrgs_blocksAllData() {
+            when(userManagedOrgService.getEffectiveOrgIds(100L)).thenReturn(List.of());
+            LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
+
+            orderQueryHelper.buildDataScopeCondition(wrapper, 100L, DataScopeTypeEnum.USER_ORGS);
+
+            assertThat(wrapper.getExpression().getNormal()).isNotEmpty();
         }
     }
 

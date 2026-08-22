@@ -40,6 +40,7 @@ import com.yigongbao.module.system.user.dto.UserPageDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserHospitalService;
+import com.yigongbao.module.system.user.service.UserManagedOrgService;
 import com.yigongbao.module.system.user.service.UserService;
 import com.yigongbao.module.system.user.vo.UserVO;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
@@ -94,6 +95,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
     private final PasswordEncoder passwordEncoder;
     private final ConfigService configService;
     private final UserHospitalService userHospitalService;
+    private final UserManagedOrgService userManagedOrgService;
     private final DeptOrgMapper deptOrgMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final StringRedisTemplate stringRedisTemplate;
@@ -242,6 +244,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 RoleEntity roleEntity = roleMap.get(vo.getRoleId());
                 if (roleEntity != null) {
                     vo.setDataScopeType(roleEntity.getDataScopeType());
+                    if (RoleCodeEnum.REGIONAL_MANAGER.getCode().equals(roleEntity.getRoleCode())) {
+                        vo.setManagedOrgIds(userManagedOrgService.getManagedOrgIds(vo.getId()));
+                        vo.setEffectiveOrgIds(userManagedOrgService.getEffectiveOrgIds(vo.getId()));
+                    }
                 }
             }
             // 填充医院ID列表和医院名称列表
@@ -380,6 +386,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 log.warn("该角色下已存在同名用户: realName={}, roleId={}", dto.getRealName(), dto.getRoleId());
                 throw new BusinessException(ErrorCodeEnum.USER_REALNAME_EXISTS_IN_ROLE);
             }
+            // 先加载角色，机构类型校验需要识别区域管理员
+            RoleEntity roleEntity = null;
+            if (dto.getRoleId() != null) {
+                roleEntity = roleService.getById(dto.getRoleId());
+                if (roleEntity == null) {
+                    log.warn("角色不存在: roleId={}", dto.getRoleId());
+                    throw new BusinessException(ErrorCodeEnum.USER_ROLE_NOT_FOUND);
+                }
+            }
             // 校验所属机构是否存在: 并获取名称设置到冗余字段
             OrgEntity orgEntity = null;
             if (dto.getOrgId() != null) {
@@ -465,22 +480,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                         log.warn("机构不属于该部门: deptId={}, orgId={}", dto.getDeptId(), dto.getOrgId());
                         throw new BusinessException(ErrorCodeEnum.ORG_NOT_BELONG_TO_DEPT);
                     }
-                    // 外部部门仅允许经销商类型机构: 防止将医院直接挂到外部部门
+                    // 普通业务角色仍仅允许经销商；区域管理员允许经销商或服务商
                     OrgEntity extOrg = orgService.getById(dto.getOrgId());
-                    if (extOrg == null || !DictCodeConstants.ORG_TYPE_DEALER.equals(extOrg.getOrgType())) {
-                        log.warn("机构类型不是经销商: orgId={}", dto.getOrgId());
+                    boolean regionalManager = roleEntity != null
+                            && RoleCodeEnum.REGIONAL_MANAGER.getCode().equals(roleEntity.getRoleCode());
+                    boolean allowedType = extOrg != null && (DictCodeConstants.ORG_TYPE_DEALER.equals(extOrg.getOrgType())
+                            || (regionalManager && DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(extOrg.getOrgType())));
+                    if (!allowedType) {
+                        log.warn("业务账户主机构类型不合法: orgId={}, regionalManager={}", dto.getOrgId(), regionalManager);
                         throw new BusinessException(ErrorCodeEnum.ORG_TYPE_MUST_BE_DEALER);
                     }
                     // hospitalIds 已由前端传入: 后续统一由 userHospitalService 处理
-                }
-            }
-            // 校验角色是否存在
-            RoleEntity roleEntity = null;
-            if (dto.getRoleId() != null) {
-                roleEntity = roleService.getById(dto.getRoleId());
-                if (roleEntity == null) {
-                    log.warn("角色不存在: roleId={}", dto.getRoleId());
-                    throw new BusinessException(ErrorCodeEnum.USER_ROLE_NOT_FOUND);
                 }
             }
             // accountType 为空时默认设置为企业账户（6.1）
@@ -492,6 +502,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             validateDeptRequired(roleEntity, deptEntity);
             // 角色业务规则校验（hospitals范围 + 设计师specialty）
             validateHospitalScope(roleEntity, dto.getHospitalIds());
+            validateManagedOrgScope(roleEntity, dto.getOrgId(), dto.getManagedOrgIds());
             validateSpecialty(roleEntity, dto.getSpecialtyList());
             // 生产员角色校验加工中心
             validateProcessingCenter(roleEntity, dto.getCenterId());
@@ -547,6 +558,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             // 插入数据库
             save(entity);
 
+            if (roleEntity != null && RoleCodeEnum.REGIONAL_MANAGER.getCode().equals(roleEntity.getRoleCode())) {
+                userManagedOrgService.replaceManagedOrgIds(entity.getId(), entity.getOrgId(), dto.getManagedOrgIds());
+            }
+
             // 仅当角色 dataScopeType=HOSPITALS 时才写入医院权限关联: 其他数据范围类型无需此表
             if (dto.getHospitalIds() != null && !dto.getHospitalIds().isEmpty()) {
                 if (roleEntity != null && DataScopeTypeEnum.HOSPITALS.getCode().equals(roleEntity.getDataScopeType())) {
@@ -584,6 +599,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 log.warn("用户不存在: id={}", id);
                 throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
             }
+            Long originalOrgId = entity.getOrgId();
             // 校验邮箱是否与其他用户重复
             if (StrUtil.isNotBlank(dto.getEmail()) && !dto.getEmail().equals(entity.getEmail())) {
                 if (isEmailExistsExcludingId(dto.getEmail(), id)) {
@@ -636,10 +652,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             // 确定本次操作生效的部门：新部门优先: 否则沿用当前部门
             Long effectiveDeptId = dto.getDeptId() != null ? dto.getDeptId() : entity.getDeptId();
             DeptEntity effectiveDept = effectiveDeptId != null ? deptService.getById(effectiveDeptId) : null;
+            Long effectiveOrgId = dto.getOrgId() != null ? dto.getOrgId() : entity.getOrgId();
             if (effectiveRole != null) {
                 // 角色业务规则校验（部门必填+类型匹配 + hospitals范围 + 设计师specialty）
                 validateDeptRequired(effectiveRole, effectiveDept);
                 validateHospitalScope(effectiveRole, dto.getHospitalIds());
+                validateManagedOrgScope(effectiveRole, effectiveOrgId, dto.getManagedOrgIds());
+                validateRegionalManagerDeptOrg(effectiveRole, effectiveDeptId, effectiveOrgId);
                 validateSpecialty(effectiveRole, dto.getSpecialtyList());
             }
             // 生产人员角色校验加工中心，并复用查询结果更新冗余字段
@@ -679,8 +698,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             }
 
             // 更新用户信息（排除不允许通过此接口修改的字段）
-            BeanUtils.copyProperties(dto, entity, "id", "username", "password", "status",
-                    "createTime", "updateTime", "createBy", "updateBy");
+            cn.hutool.core.bean.BeanUtil.copyProperties(dto, entity,
+                    cn.hutool.core.bean.copier.CopyOptions.create()
+                            .setIgnoreNullValue(true)
+                            .setIgnoreProperties("id", "username", "password", "status",
+                                    "createTime", "updateTime", "createBy", "updateBy",
+                                    "managedOrgIds", "hospitalIds", "specialtyList"));
             // 空字符串工号统一置 null: 避免触发唯一函数索引冲突（NULL 不参与唯一约束）
             if (StrUtil.isBlank(entity.getEmployeeNo())) {
                 entity.setEmployeeNo(null);
@@ -689,6 +712,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 entity.setEmail(null);
             }
             updateById(entity);
+            if (effectiveRole != null && RoleCodeEnum.REGIONAL_MANAGER.getCode().equals(effectiveRole.getRoleCode())) {
+                if (dto.getManagedOrgIds() != null) {
+                    userManagedOrgService.replaceManagedOrgIds(id, entity.getOrgId(), dto.getManagedOrgIds());
+                } else if (!Objects.equals(originalOrgId, entity.getOrgId())) {
+                    // 未提交额外机构表示保持原配置；主机构变化时仍需剔除与新主机构重复的旧关系。
+                    userManagedOrgService.replaceManagedOrgIds(
+                            id, entity.getOrgId(), userManagedOrgService.getManagedOrgIds(id));
+                }
+            } else if (newRole != null) {
+                userManagedOrgService.replaceManagedOrgIds(id, entity.getOrgId(), Collections.emptyList());
+            }
             log.info("更新用户成功: id={}", id);
         } catch (Exception e) {
             log.error("更新用户异常: id={}", id, e);
@@ -712,6 +746,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         }
         // 删除用户前先清理医院关联
         userHospitalService.assignHospitals(id, List.of());
+        userManagedOrgService.replaceManagedOrgIds(id, entity.getOrgId(), Collections.emptyList());
         removeById(id);
         log.info("删除用户成功: id={}", id);
     }
@@ -884,6 +919,66 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         if (!invalidIds.isEmpty()) {
             log.warn("存在无效的医院ID: invalidHospitalIds={}", invalidIds);
             throw new BusinessException(ErrorCodeEnum.USER_HOSPITAL_INVALID);
+        }
+    }
+
+    /** 校验区域管理员的额外管理机构；仅允许正常的经销商和服务商。 */
+    private void validateManagedOrgScope(RoleEntity role, Long primaryOrgId, List<Long> managedOrgIds) {
+        boolean regionalManager = role != null
+                && RoleCodeEnum.REGIONAL_MANAGER.getCode().equals(role.getRoleCode());
+        if (!regionalManager) {
+            if (managedOrgIds != null && !managedOrgIds.isEmpty()) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "仅区域管理员可配置额外管理机构");
+            }
+            return;
+        }
+        if (primaryOrgId == null) {
+            throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "主所属机构");
+        }
+        OrgEntity primaryOrg = orgService.getById(primaryOrgId);
+        if (primaryOrg == null
+                || !Integer.valueOf(StatusConstants.NORMAL).equals(primaryOrg.getStatus())
+                || (!DictCodeConstants.ORG_TYPE_DEALER.equals(primaryOrg.getOrgType())
+                    && !DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(primaryOrg.getOrgType()))) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "区域管理员主机构只能选择正常的经销商或服务商");
+        }
+        if (managedOrgIds == null || managedOrgIds.isEmpty()) return;
+        List<Long> distinctIds = managedOrgIds.stream()
+                .filter(Objects::nonNull)
+                .filter(id -> !id.equals(primaryOrgId))
+                .distinct()
+                .collect(Collectors.toList());
+        if (distinctIds.isEmpty()) return;
+        List<OrgEntity> orgs = orgService.listByIds(distinctIds);
+        Set<Long> validIds = orgs.stream()
+                .filter(Objects::nonNull)
+                .filter(org -> Integer.valueOf(StatusConstants.NORMAL).equals(org.getStatus()))
+                .filter(org -> DictCodeConstants.ORG_TYPE_DEALER.equals(org.getOrgType())
+                        || DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(org.getOrgType()))
+                .map(OrgEntity::getId)
+                .collect(Collectors.toSet());
+        if (validIds.size() != distinctIds.size()) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "额外管理机构只能选择正常的经销商或服务商");
+        }
+    }
+
+    /** 区域管理员的主机构必须属于其业务部门，避免通过编辑账户绕过创建时的组织约束。 */
+    private void validateRegionalManagerDeptOrg(RoleEntity role, Long deptId, Long primaryOrgId) {
+        if (role == null || !RoleCodeEnum.REGIONAL_MANAGER.getCode().equals(role.getRoleCode())) {
+            return;
+        }
+        if (deptId == null || primaryOrgId == null) {
+            return;
+        }
+        boolean belongsToDept = deptOrgMapper.selectList(
+                        new LambdaQueryWrapper<DeptOrgEntity>()
+                                .eq(DeptOrgEntity::getDeptId, deptId)
+                                .eq(DeptOrgEntity::getOrgId, primaryOrgId))
+                .stream()
+                .anyMatch(relation -> Objects.equals(relation.getOrgId(), primaryOrgId));
+        if (!belongsToDept) {
+            log.warn("区域管理员主机构不属于部门: deptId={}, orgId={}", deptId, primaryOrgId);
+            throw new BusinessException(ErrorCodeEnum.ORG_NOT_BELONG_TO_DEPT);
         }
     }
 
@@ -1063,6 +1158,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             RoleEntity roleEntity = roleService.getById(vo.getRoleId());
             if (roleEntity != null) {
                 vo.setDataScopeType(roleEntity.getDataScopeType());
+                if (RoleCodeEnum.REGIONAL_MANAGER.getCode().equals(roleEntity.getRoleCode())) {
+                    vo.setManagedOrgIds(userManagedOrgService.getManagedOrgIds(vo.getId()));
+                    vo.setEffectiveOrgIds(userManagedOrgService.getEffectiveOrgIds(vo.getId()));
+                }
             }
         }
         // 填充医院ID列表和医院名称列表
