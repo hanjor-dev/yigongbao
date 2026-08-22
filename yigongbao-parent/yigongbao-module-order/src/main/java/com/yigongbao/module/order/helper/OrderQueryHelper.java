@@ -13,6 +13,7 @@ import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
+import com.yigongbao.flow.service.FlowStatusColorResolver;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
@@ -81,6 +82,7 @@ public class OrderQueryHelper {
     private final DictService dictService;
     private final ObjectMapper objectMapper;
     private final OrderItemMapper orderItemMapper;
+    private final FlowStatusColorResolver flowStatusColorResolver;
 
     // ==================== 当前用户 ====================
 
@@ -360,6 +362,7 @@ public class OrderQueryHelper {
         vo.setPhaseName(getPhaseName(entity.getPhase()));
         vo.setStatus(entity.getStatus());
         vo.setStatusName(getStatusName(entity.getStatus()));
+        vo.setStatusColor(flowStatusColorResolver.getColor(entity.getStatus()));
         // 时间戳
         vo.setDesignStartTime(entity.getDesignStartTime());
         vo.setDesignSubmitTime(entity.getDesignSubmitTime());
@@ -491,6 +494,7 @@ public class OrderQueryHelper {
         vo.setPatientGenderName(getGenderName(entity.getPatientGender()));
         vo.setPhaseName(getPhaseName(entity.getPhase()));
         vo.setStatusName(getStatusName(entity.getStatus()));
+        vo.setStatusColor(flowStatusColorResolver.getColor(entity.getStatus()));
         vo.setBusinessTypeName(getDictName(entity.getBusinessType()));
     }
 

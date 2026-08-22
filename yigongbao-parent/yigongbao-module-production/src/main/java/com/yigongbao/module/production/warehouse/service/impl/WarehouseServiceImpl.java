@@ -13,6 +13,7 @@ import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
+import com.yigongbao.flow.service.FlowStatusColorResolver;
 import com.yigongbao.module.production.enums.ProductStatusEnum;
 import com.yigongbao.module.production.product.entity.ProductionProductEntity;
 import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
@@ -60,11 +61,15 @@ public class WarehouseServiceImpl implements IWarehouseService {
     private final UserService userService;
     private final ConfigService configService;
     private final ObjectMapper objectMapper;
+    private final FlowStatusColorResolver flowStatusColorResolver;
 
     @Override
     public IPage<WarehouseRecordVO> listWarehouse(ListWarehouseDTO dto) {
         Page<WarehouseRecordVO> page = new Page<>(dto.getPage(), dto.getSize());
-        return recordMapper.listWarehouse(page, dto);
+        return recordMapper.listWarehouse(page, dto).convert(vo -> {
+            vo.setStatusColor(flowStatusColorResolver.getColor(vo.getStatus()));
+            return vo;
+        });
     }
 
     @Override
@@ -147,6 +152,7 @@ public class WarehouseServiceImpl implements IWarehouseService {
         }
 
         WarehouseDetailVO vo = BeanUtil.copyProperties(record, WarehouseDetailVO.class);
+        vo.setStatusColor(flowStatusColorResolver.getColor(record.getStatus()));
         vo.setRecordId(record.getId());
         vo.setOrderNo(record.getOrderCode());
 

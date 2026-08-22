@@ -3,11 +3,13 @@ package com.yigongbao.module.order.controller;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
+import com.yigongbao.flow.service.FlowStatusColorResolver;
 import com.yigongbao.framework.annotation.RequireSign;
 import com.yigongbao.common.vo.SelectTreeVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
+import lombok.RequiredArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +25,10 @@ import java.util.List;
 @RestController
 @RequestMapping("/flow/select")
 @RequireSign
+@RequiredArgsConstructor
 public class FlowSelectController {
+
+    private final FlowStatusColorResolver flowStatusColorResolver;
 
     /**
      * 获取流转阶段下拉列表
@@ -65,6 +70,7 @@ public class FlowSelectController {
             SelectTreeVO vo = new SelectTreeVO();
             vo.setName(status.getName());
             vo.setValue(String.valueOf(status.getValue()));
+            vo.setColor(flowStatusColorResolver.getColor(status.getValue()));
             result.add(vo);
         }
         return Result.success(result);

@@ -30,6 +30,8 @@ public class WarehouseRecordVO {
     private Integer warehousedCount;
     private Integer warehouseOutCount;
     private Integer status;
+    /** 流转卡状态标签颜色 */
+    private String statusColor;
     private LocalDateTime earliestInTime;
     private LocalDateTime latestOutTime;
 }

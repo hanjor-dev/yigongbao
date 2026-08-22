@@ -244,6 +244,9 @@ public class OrderListVO implements Serializable {
      */
     private String statusName;
 
+    /** 当前状态标签颜色 */
+    private String statusColor;
+
     // ==================== 审核信息 ====================
 
     /**

@@ -27,6 +27,9 @@ public class DesignWorkorderListVO {
     /** 当前状态名称 */
     private String statusName;
 
+    /** 当前状态标签颜色 */
+    private String statusColor;
+
     /** 业务类型字典码 */
     private String businessType;
 

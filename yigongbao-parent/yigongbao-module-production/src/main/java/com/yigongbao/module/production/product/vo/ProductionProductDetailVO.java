@@ -43,6 +43,8 @@ public class ProductionProductDetailVO {
     private String productionBatchNo;
     /** 流转卡状态（对应 FlowStatusEnum 值） */
     private Integer recordStatus;
+    /** 流转卡状态标签颜色 */
+    private String recordStatusColor;
 
     // ===== 订单信息（来自 production_record 冗余字段）=====
     private Long orderId;
