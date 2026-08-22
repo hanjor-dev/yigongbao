@@ -78,9 +78,9 @@ spring:
       # 启用 multipart 上传
       enabled: true
       # 最大单个文件大小（全局上限 2GB，各业务类型由业务层单独校验）
-      max-file-size: 2GB
+      max-file-size: 5GB
       # 最大请求总大小（全局上限 2GB）
-      max-request-size: 2GB
+      max-request-size: 5GB
       # 文件写入磁盘的阈值
       file-size-threshold: 512KB
 
@@ -241,8 +241,8 @@ yigongbao:
     # ==================== 系统配置 ====================
     # 系统名称
     system-name: "医工宝"
-    # 文件上传最大大小（字节），默认 500MB
-    max-upload-size: 524288000
+    # 文件上传最大大小（字节），默认 5000MB
+    max-upload-size: 5242880000
     # ==================== 订单配置 ====================
     # 提交订单是否必须上传影像文件（true-必须，false-非必填）
     order-image-required: true
@@ -259,8 +259,8 @@ yigongbao:
     flow-max-design-reject: 3
   # 文件存储业务配置
   file-storage:
-    # 最大文件大小（字节），默认 500MB
-    max-file-size: 524288000
+    # 最大文件大小（字节），默认 5000MB
+    max-file-size: 5242880000
     # 允许的文件扩展名
     allowed-extensions:
       - jpg

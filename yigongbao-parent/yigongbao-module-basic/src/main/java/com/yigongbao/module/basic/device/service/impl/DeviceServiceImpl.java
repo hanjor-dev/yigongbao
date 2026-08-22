@@ -55,6 +55,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> implements IDeviceService {
 
+    private static final int DEFAULT_PAGE_NUM = 1;
+    private static final int DEFAULT_PAGE_SIZE = 10;
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final ProcessingCenterMapper processingCenterMapper;
     private final IDeviceStateLogService deviceStateLogService;
     private final ApplicationEventPublisher eventPublisher;
@@ -68,6 +72,11 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
      */
     @Override
     public IPage<DeviceVO> listDevices(DevicePageDTO dto) {
+        int pageNum = dto.getPageNum() == null || dto.getPageNum() < DEFAULT_PAGE_NUM
+                ? DEFAULT_PAGE_NUM : dto.getPageNum();
+        int pageSize = dto.getPageSize() == null || dto.getPageSize() < 1
+                ? DEFAULT_PAGE_SIZE : Math.min(dto.getPageSize(), MAX_PAGE_SIZE);
+
         // 构建查询条件
         LambdaQueryWrapper<DeviceEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(dto.getCenterId() != null, DeviceEntity::getCenterId, dto.getCenterId())
@@ -75,9 +84,10 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
                .eq(dto.getState() != null, DeviceEntity::getState, dto.getState())
                .eq(dto.getConnectionStatus() != null, DeviceEntity::getConnectionStatus, dto.getConnectionStatus())
                .like(StrUtil.isNotBlank(dto.getDeviceId()), DeviceEntity::getDeviceId, dto.getDeviceId())
-               .orderByDesc(DeviceEntity::getUpdateTime);
+               .orderByDesc(DeviceEntity::getUpdateTime)
+               .orderByDesc(DeviceEntity::getId);
 
-        IPage<DeviceEntity> page = page(new Page<>(dto.getPageNum(), dto.getPageSize()), wrapper);
+        IPage<DeviceEntity> page = page(new Page<>(pageNum, pageSize), wrapper);
         return page.convert(DeviceConvert::toVO);
     }
 
