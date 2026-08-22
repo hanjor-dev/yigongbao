@@ -183,6 +183,15 @@ class OrderControllerTest {
     }
 
     @Test
+    void statistics_delegatesService() throws Exception {
+        mockMvc.perform(get("/order/statistics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(orderMainService).statistics();
+    }
+
+    @Test
     void orderDetail_delegatesPathId() throws Exception {
         mockMvc.perform(get("/order/{id}", 33L)).andExpect(status().isOk());
         verify(orderMainService).getOrderDetail(33L);

@@ -13,6 +13,7 @@ import com.yigongbao.module.order.mapper.OrderItemDraftMapper;
 import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.vo.order.OrderListVO;
+import com.yigongbao.module.order.vo.order.OrderStatisticsVO;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -473,6 +474,28 @@ class OrderMainServiceImplListOrdersTest {
 
     @Nested
     class BoundaryAndVoConversion {
+
+        @Test
+        void statistics_returnsCountsWithinCurrentUserDataScope() {
+            when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
+            when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ORG);
+            when(orderMainMapper.selectCount(any(LambdaQueryWrapper.class)))
+                    .thenReturn(12L, 3L, 4L);
+            ArgumentCaptor<LambdaQueryWrapper> wrapperCaptor =
+                    ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+
+            OrderStatisticsVO result = orderMainService.statistics();
+
+            assertThat(result.getTotal()).isEqualTo(12L);
+            assertThat(result.getPendingAudit()).isEqualTo(3L);
+            assertThat(result.getDesigning()).isEqualTo(4L);
+            verify(orderQueryHelper, times(3))
+                    .buildDataScopeCondition(any(), eq(1L), eq(DataScopeTypeEnum.ORG));
+            verify(orderMainMapper, times(3)).selectCount(wrapperCaptor.capture());
+            assertThat(wrapperCaptor.getAllValues().get(0).getExpression().getNormal()).hasSize(0);
+            assertThat(wrapperCaptor.getAllValues().get(1).getExpression().getNormal()).hasSize(3);
+            assertThat(wrapperCaptor.getAllValues().get(2).getExpression().getNormal()).hasSize(3);
+        }
 
         @Test
         void emptyResult_returnsEmptyPage() {

@@ -11,6 +11,7 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
+import com.yigongbao.module.order.vo.order.OrderStatisticsVO;
 
 import java.util.List;
 
@@ -29,6 +30,13 @@ public interface OrderMainService extends IService<OrderMainEntity> {
      * @return 订单列表
      */
     IPage<OrderListVO> listOrders(OrderPageDTO dto);
+
+    /**
+     * 统计当前用户数据权限范围内的订单数量。
+     *
+     * @return 总订单、待审核、设计中数量
+     */
+    OrderStatisticsVO statistics();
 
     /**
      * 查询订单详情

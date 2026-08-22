@@ -28,6 +28,7 @@ import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderExportFieldVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
+import com.yigongbao.module.order.vo.order.OrderStatisticsVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
@@ -98,6 +99,12 @@ public class OrderController {
     @PostMapping("/page")
     public Result<IPage<OrderListVO>> listOrders(@Valid @RequestBody OrderPageDTO dto) {
         return Result.success(orderMainService.listOrders(dto));
+    }
+
+    @Operation(summary = "统计订单数量")
+    @GetMapping("/statistics")
+    public Result<OrderStatisticsVO> statistics() {
+        return Result.success(orderMainService.statistics());
     }
 
     @Operation(summary = "查询订单详情")

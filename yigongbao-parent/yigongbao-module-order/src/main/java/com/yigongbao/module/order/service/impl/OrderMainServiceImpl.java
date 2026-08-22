@@ -61,6 +61,7 @@ import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
+import com.yigongbao.module.order.vo.order.OrderStatisticsVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserHospitalService;
@@ -346,6 +347,30 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             ((Page<OrderListVO>) voPage).setRecords(voList);
 
             return voPage;
+    }
+
+    /**
+     * 统计当前用户数据权限范围内的订单数量。
+     */
+    @Override
+    public OrderStatisticsVO statistics() {
+        Long currentUserId = getCurrentUserId();
+        DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+
+        OrderStatisticsVO statistics = new OrderStatisticsVO();
+        statistics.setTotal(countOrders(currentUserId, scopeType, null));
+        statistics.setPendingAudit(countOrders(currentUserId, scopeType,
+                FlowStatusEnum.PENDING_DATA_AUDIT.getValue()));
+        statistics.setDesigning(countOrders(currentUserId, scopeType,
+                FlowStatusEnum.DESIGN_IN_PROGRESS.getValue()));
+        return statistics;
+    }
+
+    private long countOrders(Long currentUserId, DataScopeTypeEnum scopeType, Integer status) {
+        LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Objects.nonNull(status), OrderMainEntity::getStatus, status);
+        orderQueryHelper.buildDataScopeCondition(wrapper, currentUserId, scopeType);
+        return count(wrapper);
     }
 
     /**
