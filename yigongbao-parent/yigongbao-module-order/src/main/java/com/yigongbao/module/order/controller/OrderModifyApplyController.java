@@ -58,7 +58,7 @@ public class OrderModifyApplyController {
     @Operation(summary = "全量修改订单（v2-带时间窗口检查）",
             description = "前端传入完整订单数据，后端检查时间窗口：\n"
                     + "在窗口内：直接修改并返回成功（code=200 data=1）\n"
-                    + "超过窗口：data=-1")
+                    + "超过窗口或设计阶段需审批：data=-1")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "全量修改订单（v2）")
     @PutMapping("/{orderId}/full-v2")
     public Result<Integer> modifyOrderFullV2(@PathVariable Long orderId,

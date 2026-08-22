@@ -20,7 +20,7 @@ import com.yigongbao.module.order.vo.modify.ModificationLogVO;
 public interface OrderModifyApplyService {
 
     /**
-     * 提交修改申请（超过时间窗口时使用）
+     * 提交订单修改申请（订单超时或设计阶段使用）
      *
      * @param orderId 订单ID
      * @param dto     完整订单修改数据
@@ -69,8 +69,7 @@ public interface OrderModifyApplyService {
     OrderModificationApplyEntity getApplyEntityById(Long applyId);
 
     /**
-     * 全量修改订单（带时间窗口检查）
-     * 超出时间窗口时抛出 ORDER_MODIFY_TIME_WINDOW_EXCEEDED 异常
+     * 全量修改订单（按角色、阶段和时间窗口判断是否需要申请）
      *
      * @param orderId 订单ID
      * @param dto     修改数据

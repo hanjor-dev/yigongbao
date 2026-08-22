@@ -80,6 +80,71 @@ class OrderModifyFullServiceImplBoundaryTest {
     }
 
     @Test
+    void modifyOrderFull_rejectsDesignerDirectlyInDesignPhase() {
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(7L);
+        order.setPhase(20);
+        when(orderMainMapper.selectById(7L)).thenReturn(order);
+        UserEntity designer = new UserEntity();
+        designer.setRoleCode(com.yigongbao.common.enums.RoleCodeEnum.DESIGNER.getCode());
+        when(userService.getById(1L)).thenReturn(designer);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> service.modifyOrderFull(7L, new OrderModifyFullDTO(), false, 1L, "设计师",
+                            com.yigongbao.common.enums.RoleCodeEnum.DESIGNER.getCode()));
+            assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED.getCode());
+        }
+        verifyNoInteractions(flowFacade, validator);
+    }
+
+    @Test
+    void modifyOrderFull_rejectsNonBusinessNonAdminRole() {
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(7L);
+        order.setPhase(10);
+        when(orderMainMapper.selectById(7L)).thenReturn(order);
+        UserEntity productionWorker = new UserEntity();
+        productionWorker.setRoleCode(com.yigongbao.common.enums.RoleCodeEnum.PRODUCTION_WORKER.getCode());
+        when(userService.getById(1L)).thenReturn(productionWorker);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> service.modifyOrderFull(7L, new OrderModifyFullDTO(), false, 1L, "生产员",
+                            com.yigongbao.common.enums.RoleCodeEnum.PRODUCTION_WORKER.getCode()));
+            assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED.getCode());
+        }
+    }
+
+    @Test
+    void modifyOrderFull_appliedDesignerApplicationCanChangeAllFields() {
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(7L);
+        order.setOrderCode("ORD-7");
+        order.setPhase(20);
+        order.setVersion(0);
+        order.setPatientName("旧患者");
+        order.setPatientGender(null);
+        order.setPatientAge(20);
+        when(orderMainMapper.selectById(7L)).thenReturn(order);
+
+        OrderModifyFullDTO dto = new OrderModifyFullDTO();
+        dto.setPatientName("新患者");
+        dto.setPatientGender(null);
+        dto.setPatientAge(20);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(99L);
+            service.modifyOrderFull(7L, dto, true, 1L, "设计师", "designer");
+        }
+
+        assertThat(order.getPatientName()).isEqualTo("新患者");
+        verify(orderMainMapper).updateById(order);
+    }
+
+    @Test
     void modifyOrderFull_rejectsOrderOutsideCurrentUsersDataScope() {
         doThrow(new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND))
                 .when(dataScopeChecker).checkOrderAccess(7L);

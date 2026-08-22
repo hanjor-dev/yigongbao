@@ -40,6 +40,7 @@ import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
 import com.yigongbao.module.order.service.OrderModifyFullService;
 import com.yigongbao.module.order.utils.OrderModifyTimeWindowChecker;
+import com.yigongbao.module.order.validator.OrderDataScopeChecker;
 import com.yigongbao.module.order.vo.apply.ApplyDetailVO;
 import com.yigongbao.module.order.vo.apply.ApplyListItemVO;
 import com.yigongbao.module.order.vo.modify.ModificationLogVO;
@@ -59,6 +60,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * 订单修改申请 Service 实现类
@@ -75,6 +77,13 @@ import java.util.Objects;
 @Slf4j
 public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
 
+    private static final Set<String> ADMIN_ROLES = Set.of(
+            RoleCodeEnum.ADMIN.getCode(), RoleCodeEnum.COMPANY_ADMIN.getCode());
+    private static final Set<String> BUSINESS_ROLES = Set.of(
+            RoleCodeEnum.SALESMAN.getCode(), RoleCodeEnum.SALESMAN_SELF.getCode());
+    private static final Set<String> DESIGNER_ROLES = Set.of(
+            RoleCodeEnum.DESIGNER.getCode());
+
     private final OrderModificationLogMapper orderModificationLogMapper;
     private final OrderMainMapper orderMainMapper;
     private final OrderItemMapper orderItemMapper;
@@ -90,6 +99,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     private final ApplicationEventPublisher eventPublisher;
     private final OrderCancelApplyService cancelApplyService;
     private final com.yigongbao.module.order.validator.OrderDataValidator orderDataValidator;
+    private final OrderDataScopeChecker orderDataScopeChecker;
 
     // ==================== 申请审核流程方法 ====================
 
@@ -105,8 +115,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long submitApply(Long orderId, OrderModifyFullDTO dto) {
-        // 检查权限：设计师禁止提交修改申请
-        checkModifyPermission();
+        UserEntity currentUser = checkApplicantRole();
 
         if (dto == null) {
             throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "修改内容不能为空");
@@ -118,6 +127,9 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
+        orderDataScopeChecker.checkOrderAccess(orderId);
+        validateApplyPhase(order, currentUser.getRoleCode());
+
         // 检查是否存在待审核的取消申请
         if (cancelApplyService.hasPendingCancelApply(orderId)) {
             log.warn("订单存在待审核的取消申请，不允许提交修改申请: orderId={}", orderId);
@@ -126,7 +138,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
 
         // 检查订单所有权：只有订单创建者可以提交修改申请
         Long currentUserId = StpUtil.getLoginIdAsLong();
-        if (!currentUserId.equals(order.getOperatorId())) {
+        if (BUSINESS_ROLES.contains(currentUser.getRoleCode())
+                && !currentUserId.equals(order.getOperatorId())) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_BELONG_TO_USER);
         }
 
@@ -234,6 +247,12 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
         }
 
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (currentUserId.equals(apply.getApplyUserId())) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_AUDIT_NO_PERMISSION,
+                    "申请人不能审批自己提交的修改申请");
+        }
+
         // 校验申请状态必须为待审核
         if (!ApplyStatusEnum.PENDING.getCode().equals(apply.getStatus())) {
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_NOT_PENDING);
@@ -246,8 +265,16 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_EXPIRED);
         }
 
+        OrderMainEntity applyOrder = orderMainMapper.selectById(apply.getOrderId());
+        if (applyOrder == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        UserEntity applyUser = userService.getById(apply.getApplyUserId());
+        String applyUserRoleCode = applyUser != null ? applyUser.getRoleCode() : "";
+
         // 根据审核结果处理：1=通过，2=驳回
         if (ApplyStatusEnum.APPROVED.getCode().equals(dto.getResult())) {
+            validateApplyPhase(applyOrder, applyUserRoleCode);
             // 审核通过：先执行订单修改，成功后再更新申请状态
             OrderModifyFullDTO modifyDto;
             try {
@@ -258,9 +285,6 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             }
 
             // 执行订单修改（审核场景，跳过权限校验，使用申请人作为修改人）
-            // 查询申请人角色（用于判断修改范围）
-            UserEntity applyUser = userService.getById(apply.getApplyUserId());
-            String applyUserRoleCode = applyUser != null ? applyUser.getRoleCode() : "";
             orderModifyFullService.modifyOrderFull(apply.getOrderId(), modifyDto, true,
                 apply.getApplyUserId(), apply.getApplyUserName(), applyUserRoleCode);
 
@@ -306,18 +330,31 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         log.info("审核修改申请: applyId={}, result={}, auditUserId={}", applyId, dto.getResult(), userId);
     }
 
-    /**
-     * 检查修改权限（业务员允许，设计师禁止）
-     */
-    private void checkModifyPermission() {
+    private UserEntity checkApplicantRole() {
         Long userId = StpUtil.getLoginIdAsLong();
         UserEntity user = userService.getById(userId);
         if (user == null) {
             throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
         }
-        if (RoleCodeEnum.DESIGNER.getCode().equals(user.getRoleCode())) {
-            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_DESIGNER_NOT_ALLOWED);
+        if (!BUSINESS_ROLES.contains(user.getRoleCode()) && !DESIGNER_ROLES.contains(user.getRoleCode())) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED,
+                    "当前角色不允许提交订单修改申请");
         }
+        return user;
+    }
+
+    private void validateApplyPhase(OrderMainEntity order, String roleCode) {
+        Integer phase = order.getPhase();
+        boolean isOrderPhase = FlowPhaseEnum.ORDER.getValue().equals(phase);
+        boolean isDesignPhase = FlowPhaseEnum.DESIGN.getValue().equals(phase);
+        boolean isBusinessRole = BUSINESS_ROLES.contains(roleCode);
+        boolean isDesigner = DESIGNER_ROLES.contains(roleCode);
+
+        if ((isBusinessRole && (isOrderPhase || isDesignPhase)) || (isDesigner && isDesignPhase)) {
+            return;
+        }
+        throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED,
+                "当前角色或订单阶段不允许提交修改申请");
     }
 
     /**
@@ -440,14 +477,39 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
      */
     @Override
     public Integer modifyOrderFullV2(Long orderId, OrderModifyFullDTO dto) {
-        checkModifyPermission();
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        UserEntity currentUser = userService.getById(currentUserId);
+        if (currentUser == null) {
+            throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+        }
 
         OrderMainEntity order = orderMainMapper.selectById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
-        if (timeWindowChecker.isWithinTimeWindow(order.getCreateTime())) {
+        String roleCode = currentUser.getRoleCode();
+        boolean isAdmin = ADMIN_ROLES.contains(roleCode);
+        boolean isBusinessRole = BUSINESS_ROLES.contains(roleCode);
+        boolean isDesigner = DESIGNER_ROLES.contains(roleCode);
+        boolean isOrderPhase = FlowPhaseEnum.ORDER.getValue().equals(order.getPhase());
+        boolean isDesignPhase = FlowPhaseEnum.DESIGN.getValue().equals(order.getPhase());
+
+        if (!isAdmin && !isBusinessRole && !isDesigner) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED,
+                    "当前角色不允许修改订单");
+        }
+        if (isDesigner && !isDesignPhase) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED,
+                    "设计师仅可在设计阶段提交修改申请");
+        }
+        if (isBusinessRole && !isOrderPhase && !isDesignPhase) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED,
+                    "当前订单阶段不允许业务角色修改");
+        }
+
+        if (isAdmin || (isBusinessRole && isOrderPhase
+                && timeWindowChecker.isWithinTimeWindow(order.getCreateTime()))) {
             log.info("订单在时间窗口内，直接修改: orderId={}, createTime={}", orderId, order.getCreateTime());
             orderModifyFullService.modifyOrderFull(orderId, dto);
             return 1;

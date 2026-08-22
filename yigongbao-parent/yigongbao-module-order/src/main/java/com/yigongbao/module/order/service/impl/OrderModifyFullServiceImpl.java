@@ -57,6 +57,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     private static final int MAX_FIELD_VALUE_LENGTH = 20;
     private static final Set<String> ADMIN_ROLES = Set.of(RoleCodeEnum.ADMIN.getCode(), RoleCodeEnum.COMPANY_ADMIN.getCode());
     private static final Set<String> DESIGNER_ROLES = Set.of(RoleCodeEnum.DESIGNER.getCode(), RoleCodeEnum.DESIGNER_MANAGER.getCode());
+    private static final Set<String> BUSINESS_ROLES = Set.of(RoleCodeEnum.SALESMAN.getCode(), RoleCodeEnum.SALESMAN_SELF.getCode());
 
     private final OrderMainMapper orderMainMapper;
     private final OrderItemMapper orderItemMapper;
@@ -104,6 +105,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         String currentRoleCode = currentUser != null ? currentUser.getRoleCode() : "";
 
         boolean isAdmin = ADMIN_ROLES.contains(currentRoleCode);
+        boolean isBusinessRole = BUSINESS_ROLES.contains(currentRoleCode);
         boolean isDesigner = DESIGNER_ROLES.contains(currentRoleCode);
         int phase = order.getPhase();
         boolean isDesignPhase = phase == FlowPhaseEnum.DESIGN.getValue();
@@ -111,39 +113,28 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
 
         // 3. 权限校验（审核场景跳过）
         if (!skipPermissionCheck) {
-            if (!isAdmin) {
-                if (isDesigner) {
-                    // 设计师：只能在设计阶段修改（且只能改items，由onlyItems控制）
-                    if (!isDesignPhase) {
-                        throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED, "设计师仅可在设计阶段修改订单");
-                    }
-                } else {
-                    // 普通业务员：仅订单阶段（未提交）可改
-                    if (!isOrderPhase) {
-                        throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED, "订单提交后不允许修改");
-                    }
+            if (!isAdmin && (!isBusinessRole || !isOrderPhase)) {
+                if (isDesigner && isDesignPhase) {
+                    throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED,
+                            "设计师仅可提交修改申请，不能直接修改订单");
                 }
+                throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED,
+                        "当前角色或订单阶段不允许直接修改订单");
             }
         }
 
         // 4. 按对象 diff（基于修改人角色判断修改范围）
         List<ObjectChange> changes = new ArrayList<>();
 
-        boolean modifierIsDesigner = DESIGNER_ROLES.contains(modifierRoleCode);
-        boolean modifierIsAdmin = ADMIN_ROLES.contains(modifierRoleCode);
-        boolean onlyItems = modifierIsDesigner && !modifierIsAdmin;
-
-        if (!onlyItems) {
-            changes.add(diffOrderInfo(order, dto));
-            changes.add(diffPatient(order, dto));
-            changes.add(diffDoctor(order, dto));
-            changes.add(diffHospital(order, dto));
-            changes.add(diffDelivery(order, dto));
-        }
+        changes.add(diffOrderInfo(order, dto));
+        changes.add(diffPatient(order, dto));
+        changes.add(diffDoctor(order, dto));
+        changes.add(diffHospital(order, dto));
+        changes.add(diffDelivery(order, dto));
         if (dto.getItems() != null) {
             changes.add(diffItems(orderId, dto.getItems()));
         }
-        if (!onlyItems && (dto.getImageDataFileIds() != null || dto.getImageReportFileIds() != null)) {
+        if (dto.getImageDataFileIds() != null || dto.getImageReportFileIds() != null) {
             changes.add(diffImages(orderId, dto.getImageDataFileIds(), dto.getImageReportFileIds()));
         }
 
