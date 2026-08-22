@@ -15,6 +15,7 @@ import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
+import com.yigongbao.flow.service.FlowStatusColorResolver;
 import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
@@ -115,6 +116,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final IProductNumberService productNumberService;
     private final PrinterRecordUsageChecker printerDeviceUsageChecker;
     private final PrinterAvailabilityService printerAvailabilityService;
+    private final FlowStatusColorResolver flowStatusColorResolver;
 
     private static final List<Integer> NORMAL_PRODUCTION_STATUSES = List.of(
             FlowStatusEnum.DESIGN_COMPLETED.getValue(),
@@ -158,6 +160,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         ProductionRecordVO vo = new ProductionRecordVO();
         BeanUtil.copyProperties(record, vo);
         fillCurrentProcessName(vo);
+        fillStatusColors(vo);
         List<ProductionProductEntity> products = productMapper.selectList(
                 new LambdaQueryWrapper<ProductionProductEntity>()
                         .eq(ProductionProductEntity::getProductionRecordId, id));
@@ -359,8 +362,14 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                     vo.setProducerName(producerNameMap.get(order.getProducerId()));
                 }
             }
+            fillStatusColors(vo);
             return vo;
         });
+    }
+
+    private void fillStatusColors(ProductionRecordVO vo) {
+        vo.setStatusColor(flowStatusColorResolver.getColor(vo.getStatus()));
+        vo.setOrderStatusColor(flowStatusColorResolver.getColor(vo.getOrderStatus()));
     }
 
     @Override

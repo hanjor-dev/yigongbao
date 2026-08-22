@@ -16,6 +16,7 @@ import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.service.IProductionProductService;
 import com.yigongbao.module.production.product.vo.ProductionProductDetailVO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
+import com.yigongbao.flow.service.FlowStatusColorResolver;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
@@ -46,6 +47,7 @@ public class ProductionProductServiceImpl extends ServiceImpl<ProductionProductM
     private final ProductionRecordMapper recordMapper;
     private final UserMapper userMapper;
     private final UserHospitalService userHospitalService;
+    private final FlowStatusColorResolver flowStatusColorResolver;
 
     @Override
     public List<ProductionProductEntity> listByRecordId(Long recordId) {
@@ -133,6 +135,7 @@ public class ProductionProductServiceImpl extends ServiceImpl<ProductionProductM
                 vo.setRecordNo(record.getRecordNo());
                 vo.setProductionBatchNo(record.getProductionBatchNo());
                 vo.setRecordStatus(record.getStatus());
+                vo.setRecordStatusColor(flowStatusColorResolver.getColor(record.getStatus()));
                 vo.setOrderId(record.getOrderId());
                 vo.setOrderCode(record.getOrderCode());
                 vo.setOrderType(record.getOrderType());

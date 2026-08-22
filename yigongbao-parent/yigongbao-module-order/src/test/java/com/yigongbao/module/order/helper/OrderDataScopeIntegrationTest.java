@@ -6,6 +6,7 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.system.config.service.ConfigService;
+import com.yigongbao.flow.service.FlowStatusColorResolver;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserHospitalService;
@@ -82,7 +83,8 @@ class OrderDataScopeIntegrationTest {
         sameOrgOrderId = baseId;
         otherOrgOrderId = baseId + 1;
         orderQueryHelper = new OrderQueryHelper(
-                userService, userHospitalService, userManagedOrgService, configService, dictService, objectMapper, orderItemMapper);
+                userService, userHospitalService, userManagedOrgService, configService, dictService, objectMapper,
+                orderItemMapper, org.mockito.Mockito.mock(FlowStatusColorResolver.class));
     }
 
     @Test

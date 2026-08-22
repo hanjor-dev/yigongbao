@@ -19,6 +19,7 @@ import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
+import com.yigongbao.flow.service.FlowStatusColorResolver;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
@@ -107,6 +108,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     private final com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     private final com.yigongbao.module.order.service.OrderCancelApplyService cancelApplyService;
+    private final FlowStatusColorResolver flowStatusColorResolver;
 
     /**
      * 分页查询设计工单列表
@@ -210,6 +212,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         vo.setOrderCode(order.getOrderCode());
         vo.setStatus(order.getStatus());
         vo.setStatusName(designQueryHelper.getStatusName(order.getStatus()));
+        vo.setStatusColor(flowStatusColorResolver.getColor(order.getStatus()));
         vo.setPhase(order.getPhase());
         vo.setPhaseName(designQueryHelper.getPhaseName(order.getPhase()));
 
@@ -518,6 +521,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         vo.setOrderCode(entity.getOrderCode());
         vo.setStatus(entity.getStatus());
         vo.setStatusName(designQueryHelper.getStatusName(entity.getStatus()));
+        vo.setStatusColor(flowStatusColorResolver.getColor(entity.getStatus()));
         vo.setBusinessType(entity.getBusinessType());
         vo.setBusinessTypeName(designQueryHelper.getDictName(entity.getBusinessType()));
         vo.setOrderType(entity.getOrderType());

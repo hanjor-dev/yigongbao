@@ -116,6 +116,11 @@ public enum SystemConfigKeyEnum {
     ORDER_COLUMN_CONFIG("order.column.config", "订单列表默认列配置"),
 
     /**
+     * 订单及流转卡状态标签颜色配置（JSON 格式，按 FlowStatusEnum 状态值映射）
+     */
+    ORDER_STATUS_COLOR("order.status.color", "订单及流转卡状态标签颜色配置"),
+
+    /**
      * 订单修改申请过期时间（分钟）
      * 默认 10 分钟
      */

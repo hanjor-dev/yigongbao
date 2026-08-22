@@ -18,9 +18,11 @@ import com.yigongbao.module.system.config.mapper.ConfigMapper;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.config.vo.ConfigVO;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
+import com.yigongbao.common.event.SystemConfigChangedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.yigongbao.common.vo.SelectTreeVO;
@@ -41,6 +43,7 @@ import java.util.stream.Collectors;
 public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> implements ConfigService {
 
     private final DefaultConfigProperties defaultConfigProperties;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 分页查询配置列表
@@ -155,6 +158,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
             entity.setIsSystem(0);
             // 插入数据库
             this.save(entity);
+            eventPublisher.publishEvent(new SystemConfigChangedEvent(this, entity.getConfigKey()));
             // 记录创建成功
             log.info("创建配置: id={}, configKey={}", entity.getId(), dto.getConfigKey());
         } catch (Exception e) {
@@ -189,6 +193,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
             ConfigConvert.updateEntity(dto, entity);
             // 更新数据库
             this.updateById(entity);
+            eventPublisher.publishEvent(new SystemConfigChangedEvent(this, entity.getConfigKey()));
             // 记录更新成功
             log.info("更新配置: id={}", id);
         } catch (Exception e) {
@@ -224,6 +229,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
             }
             // 执行删除
             this.removeById(id);
+            eventPublisher.publishEvent(new SystemConfigChangedEvent(this, entity.getConfigKey()));
             // 记录删除成功
             log.info("删除配置: id={}", id);
         } catch (Exception e) {

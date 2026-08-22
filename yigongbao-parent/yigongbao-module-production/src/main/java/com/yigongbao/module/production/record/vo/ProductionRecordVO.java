@@ -51,6 +51,8 @@ public class ProductionRecordVO {
     private Integer qualifiedCount;
     private Integer unqualifiedCount;
     private Integer status;
+    /** 流转卡状态标签颜色 */
+    private String statusColor;
     private String currentProcess;
     private String currentProcessName;
     private String qrCodeUrl;
@@ -68,6 +70,8 @@ public class ProductionRecordVO {
     private LocalDateTime expectedDeliveryDate;
     // 订单关联字段（来自 order_main 关联查询）
     private Integer orderStatus;
+    /** 订单状态标签颜色 */
+    private String orderStatusColor;
     private Integer orderPhase;
     private String orgName;
     private String operatorName;

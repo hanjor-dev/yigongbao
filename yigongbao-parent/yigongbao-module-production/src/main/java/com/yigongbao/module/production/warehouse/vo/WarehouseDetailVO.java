@@ -28,6 +28,8 @@ public class WarehouseDetailVO {
     private String productionBatchNo;
     private String materialBatchNo;
     private Integer status;
+    /** 流转卡状态标签颜色 */
+    private String statusColor;
     private Integer totalCount;
     private Integer pendingWarehouseInCount;
     private Integer warehousedCount;

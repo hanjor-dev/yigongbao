@@ -229,6 +229,9 @@ public class OrderDetailVO implements Serializable {
      */
     private String statusName;
 
+    /** 当前状态标签颜色 */
+    private String statusColor;
+
     // ==================== 当前处理人 ====================
     /**
      * 当前处理人ID

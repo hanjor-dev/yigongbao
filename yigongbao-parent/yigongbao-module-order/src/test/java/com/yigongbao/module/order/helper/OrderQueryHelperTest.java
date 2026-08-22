@@ -9,6 +9,7 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
+import com.yigongbao.flow.service.FlowStatusColorResolver;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
@@ -65,6 +66,8 @@ class OrderQueryHelperTest {
     private ObjectMapper objectMapper;
     @Mock
     private OrderItemMapper orderItemMapper;
+    @Mock
+    private FlowStatusColorResolver flowStatusColorResolver;
 
     @InjectMocks
     private OrderQueryHelper orderQueryHelper;

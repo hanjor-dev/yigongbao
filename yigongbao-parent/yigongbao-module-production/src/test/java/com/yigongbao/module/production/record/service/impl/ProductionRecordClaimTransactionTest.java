@@ -8,6 +8,7 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.service.PrinterRecordUsageChecker;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
+import com.yigongbao.flow.service.FlowStatusColorResolver;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
@@ -196,7 +197,8 @@ class ProductionRecordClaimTransactionTest {
                     mock(IDeviceUsageCounterService.class),
                     mock(IProductNumberService.class),
                     mock(PrinterRecordUsageChecker.class),
-                    mock(PrinterAvailabilityService.class));
+                    mock(PrinterAvailabilityService.class),
+                    mock(FlowStatusColorResolver.class));
         }
     }
 }

@@ -25,6 +25,9 @@ public class DesignWorkorderDetailVO {
     private Integer status;
     /** 订单状态名称 */
     private String statusName;
+
+    /** 当前状态标签颜色 */
+    private String statusColor;
     /** 阶段码 */
     private Integer phase;
     /** 阶段名称 */
