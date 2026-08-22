@@ -1,5 +1,6 @@
 package com.yigongbao.module.system.user.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.entity.UserManagedOrgEntity;
 import com.yigongbao.module.system.user.mapper.UserManagedOrgMapper;
@@ -37,17 +38,28 @@ public class UserManagedOrgServiceImpl implements UserManagedOrgService {
         UserEntity user = userMapper.selectById(userId);
         if (user == null || user.getOrgId() == null) return List.of();
         OrgEntity primaryOrg = orgMapper.selectById(user.getOrgId());
-        if (primaryOrg == null
-                || !Integer.valueOf(StatusConstants.NOT_DELETED).equals(primaryOrg.getIsDeleted())
-                || !Integer.valueOf(StatusConstants.NORMAL).equals(primaryOrg.getStatus())
-                || (!DictCodeConstants.ORG_TYPE_DEALER.equals(primaryOrg.getOrgType())
-                    && !DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(primaryOrg.getOrgType()))) {
+        if (!isActiveBusinessOrg(primaryOrg)) {
             return List.of();
         }
         LinkedHashSet<Long> ids = new LinkedHashSet<>();
         ids.add(user.getOrgId());
-        ids.addAll(getManagedOrgIds(userId));
+        List<Long> managedOrgIds = getManagedOrgIds(userId);
+        if (!managedOrgIds.isEmpty()) {
+            orgMapper.selectList(new LambdaQueryWrapper<OrgEntity>()
+                            .in(OrgEntity::getId, managedOrgIds)).stream()
+                    .filter(this::isActiveBusinessOrg)
+                    .map(OrgEntity::getId)
+                    .forEach(ids::add);
+        }
         return new ArrayList<>(ids);
+    }
+
+    private boolean isActiveBusinessOrg(OrgEntity org) {
+        return org != null
+                && Integer.valueOf(StatusConstants.NOT_DELETED).equals(org.getIsDeleted())
+                && Integer.valueOf(StatusConstants.NORMAL).equals(org.getStatus())
+                && (DictCodeConstants.ORG_TYPE_DEALER.equals(org.getOrgType())
+                    || DictCodeConstants.ORG_TYPE_SERVICE_PROVIDER.equals(org.getOrgType()));
     }
 
     @Override

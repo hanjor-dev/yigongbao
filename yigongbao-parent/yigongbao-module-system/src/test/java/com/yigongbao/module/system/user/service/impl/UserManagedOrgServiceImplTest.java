@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +49,9 @@ class UserManagedOrgServiceImplTest {
         when(userMapper.selectById(7L)).thenReturn(user);
         mockActiveBusinessOrg(10L);
         when(userManagedOrgMapper.selectOrgIdsByUserId(7L)).thenReturn(List.of(20L, 30L));
+        when(orgMapper.selectList(any())).thenReturn(List.of(
+                businessOrg(20L, "1.2", 1, 0),
+                businessOrg(30L, "1.4", 1, 0)));
 
         assertThat(service.getEffectiveOrgIds(7L)).containsExactly(10L, 20L, 30L);
     }
@@ -72,6 +76,28 @@ class UserManagedOrgServiceImplTest {
         when(userMapper.selectById(7L)).thenReturn(user);
         mockActiveBusinessOrg(10L);
         when(userManagedOrgMapper.selectOrgIdsByUserId(7L)).thenReturn(List.of(10L, 20L, 20L));
+        when(orgMapper.selectList(any())).thenReturn(List.of(
+                businessOrg(10L, "1.2", 1, 0),
+                businessOrg(20L, "1.2", 1, 0)));
+
+        assertThat(service.getEffectiveOrgIds(7L)).containsExactly(10L, 20L);
+    }
+
+    @Test
+    void effectiveOrgIds_filtersDisabledDeletedAndUnsupportedManagedOrgsAtReadTime() {
+        UserEntity user = new UserEntity();
+        user.setId(7L);
+        user.setOrgId(10L);
+        when(userMapper.selectById(7L)).thenReturn(user);
+        mockActiveBusinessOrg(10L);
+        when(userManagedOrgMapper.selectOrgIdsByUserId(7L)).thenReturn(List.of(20L, 30L, 40L, 50L));
+
+        OrgEntity activeDealer = businessOrg(20L, "1.2", 1, 0);
+        OrgEntity disabledServiceProvider = businessOrg(30L, "1.4", 0, 0);
+        OrgEntity deletedDealer = businessOrg(40L, "1.2", 1, 1);
+        OrgEntity hospital = businessOrg(50L, "1.3", 1, 0);
+        when(orgMapper.selectList(any()))
+                .thenReturn(List.of(activeDealer, disabledServiceProvider, deletedDealer, hospital));
 
         assertThat(service.getEffectiveOrgIds(7L)).containsExactly(10L, 20L);
     }
@@ -122,5 +148,14 @@ class UserManagedOrgServiceImplTest {
         when(orgMapper.selectById(10L)).thenReturn(hospital);
 
         assertThat(service.getEffectiveOrgIds(7L)).isEmpty();
+    }
+
+    private OrgEntity businessOrg(Long id, String orgType, Integer status, Integer isDeleted) {
+        OrgEntity org = new OrgEntity();
+        org.setId(id);
+        org.setOrgType(orgType);
+        org.setStatus(status);
+        org.setIsDeleted(isDeleted);
+        return org;
     }
 }

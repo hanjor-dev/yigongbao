@@ -241,8 +241,10 @@ public class UserHospitalServiceImpl implements UserHospitalService {
     @Override
     public boolean hasPermissionOnHospital(Long userId, Long hospitalId) {
         if (userId == null || hospitalId == null) return false;
+        OrgEntity hospital = orgService.getById(hospitalId);
+        if (!isActiveHospital(hospital)) return false;
         DataScopeTypeEnum scopeType = getDataScopeType(userId);
-        // ALL 和 ORG 权限类型对所有医院放行
+        // ALL 和 ORG 权限类型对正常医疗机构放行
         if (scopeType == DataScopeTypeEnum.ALL || scopeType == DataScopeTypeEnum.ORG) return true;
         if (scopeType == DataScopeTypeEnum.HOSPITALS) {
             // HOSPITALS 类型需校验该医院是否在用户已分配列表中
@@ -336,14 +338,19 @@ public class UserHospitalServiceImpl implements UserHospitalService {
             return emptyResult;
         }
         List<OrgVO> result = orgService.listByIds(resultIds).stream()
-                .filter(Objects::nonNull)
-                .filter(org -> org.getStatus() != null && org.getStatus().equals(StatusConstants.NORMAL))
+                .filter(this::isActiveHospital)
                 .map(this::toOrgVO)
                 .collect(Collectors.toList());
 
         // 追加"其他医院"作为兜底选项
         if (scopeType != DataScopeTypeEnum.USER_ORGS) appendUnknownHospital(result);
         return result;
+    }
+
+    private boolean isActiveHospital(OrgEntity org) {
+        return org != null
+                && DictCodeConstants.ORG_TYPE_HOSPITAL.equals(org.getOrgType())
+                && Integer.valueOf(StatusConstants.NORMAL).equals(org.getStatus());
     }
 
     /**

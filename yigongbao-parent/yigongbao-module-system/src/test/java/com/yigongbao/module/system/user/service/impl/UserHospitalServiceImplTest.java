@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -377,10 +378,12 @@ class UserHospitalServiceImplTest {
         OrgEntity hospital1 = new OrgEntity();
         hospital1.setId(101L);
         hospital1.setOrgName("医院甲");
+        hospital1.setOrgType("1.3");
         hospital1.setStatus(1);
         OrgEntity hospital2 = new OrgEntity();
         hospital2.setId(102L);
         hospital2.setOrgName("医院乙");
+        hospital2.setOrgType("1.3");
         hospital2.setStatus(1);
         when(orgService.listByIds(any())).thenReturn(List.of(hospital1, hospital2));
         when(configService.getConfigValue(any())).thenReturn(null);
@@ -389,5 +392,60 @@ class UserHospitalServiceImplTest {
 
         assertEquals(List.of(101L, 102L), result.stream().map(OrgVO::getId).toList());
         verify(userManagedOrgService).getEffectiveOrgIds(1L);
+    }
+
+    @Test
+    @DisplayName("getOrderableHospitals: 区域管理员医院列表排除非医疗机构关系")
+    void getOrderableHospitals_userOrgsScope_shouldExcludeNonHospitalRelation() {
+        testUser.setOrgId(10L);
+        enabledRole.setDataScopeType("user_orgs");
+        when(userMapper.selectById(1L)).thenReturn(testUser);
+        when(roleService.getById(1L)).thenReturn(enabledRole);
+        when(userManagedOrgService.getEffectiveOrgIds(1L)).thenReturn(List.of(10L));
+
+        OrgHospitalEntity dirtyRelation = new OrgHospitalEntity();
+        dirtyRelation.setDistributorOrgId(10L);
+        dirtyRelation.setHospitalOrgId(201L);
+        when(orgHospitalMapper.selectList(any())).thenReturn(List.of(dirtyRelation));
+
+        OrgEntity dealer = new OrgEntity();
+        dealer.setId(201L);
+        dealer.setOrgName("误关联的经销商");
+        dealer.setOrgType("1.2");
+        dealer.setStatus(1);
+        when(orgService.listByIds(List.of(201L))).thenReturn(List.of(dealer));
+
+        List<OrgVO> result = userHospitalService.getOrderableHospitals(1L);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("hasPermissionOnHospital: 区域管理员拒绝非医疗机构关系")
+    void hasPermissionOnHospital_userOrgsScope_shouldRejectNonHospitalRelation() {
+        testUser.setOrgId(10L);
+        enabledRole.setDataScopeType("user_orgs");
+        when(userMapper.selectById(1L)).thenReturn(testUser);
+        when(roleService.getById(1L)).thenReturn(enabledRole);
+        when(userManagedOrgService.getEffectiveOrgIds(1L)).thenReturn(List.of(10L));
+
+        OrgEntity dealer = new OrgEntity();
+        dealer.setId(201L);
+        dealer.setOrgType("1.2");
+        dealer.setStatus(1);
+        when(orgService.getById(201L)).thenReturn(dealer);
+        when(orgHospitalMapper.selectCount(any())).thenReturn(1L);
+
+        assertFalse(userHospitalService.hasPermissionOnHospital(1L, 201L));
+        verify(orgHospitalMapper, never()).selectCount(any());
+    }
+
+    @Test
+    @DisplayName("hasPermissionOnHospital: 区域管理员拒绝已停用医院")
+    void hasPermissionOnHospital_userOrgsScope_shouldRejectDisabledHospital() {
+        when(orgService.getById(202L)).thenReturn(disabledHospital);
+
+        assertFalse(userHospitalService.hasPermissionOnHospital(1L, 202L));
+        verify(orgHospitalMapper, never()).selectCount(any());
     }
 }
