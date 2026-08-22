@@ -46,12 +46,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
 import org.mockito.ArgumentCaptor;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
@@ -323,6 +326,7 @@ class OrderModifyApplyServiceImplBoundaryTest {
         when(userService.getById(2L)).thenReturn(manager);
         when(applyMapper.selectById(9L)).thenReturn(apply);
         when(orderMainMapper.selectById(19L)).thenReturn(order);
+        when(applyMapper.update(any(), any())).thenReturn(1);
         AuditApplyDTO dto = new AuditApplyDTO();
         dto.setResult(ApplyStatusEnum.REJECTED.getCode());
         dto.setRemark("资料不完整");
@@ -365,6 +369,7 @@ class OrderModifyApplyServiceImplBoundaryTest {
         when(userService.getById(1L)).thenReturn(applicant);
         when(applyMapper.selectById(10L)).thenReturn(apply);
         when(orderMainMapper.selectById(20L)).thenReturn(order);
+        when(applyMapper.update(any(), any())).thenReturn(1);
         AuditApplyDTO dto = new AuditApplyDTO();
         dto.setResult(ApplyStatusEnum.APPROVED.getCode());
 
@@ -377,5 +382,46 @@ class OrderModifyApplyServiceImplBoundaryTest {
         verify(orderMainMapper).update(any(), captor.capture());
         assertThat(captor.getValue().getSqlSet()).doesNotContain("regionalAuditStatus");
         assertThat(captor.getValue().getSqlSet()).contains("designAuditStatus");
+    }
+
+    @Test
+    void auditApply_rejectsWhenPendingApplicationWasAlreadyClaimed() {
+        UserEntity manager = new UserEntity();
+        manager.setId(2L);
+        manager.setRealName("设计管理员");
+        manager.setRoleCode(RoleCodeEnum.DESIGNER_MANAGER.getCode());
+        UserEntity applicant = new UserEntity();
+        applicant.setRoleCode(RoleCodeEnum.SALESMAN.getCode());
+
+        OrderModificationApplyEntity apply = new OrderModificationApplyEntity();
+        apply.setId(11L);
+        apply.setOrderId(21L);
+        apply.setApplyUserId(1L);
+        apply.setApplyUserName("业务员");
+        apply.setStatus(ApplyStatusEnum.PENDING.getCode());
+        apply.setExpireTime(java.time.LocalDateTime.now().plusHours(1));
+        apply.setModificationContent("{}");
+
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(21L);
+        order.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.ORDER.getValue());
+
+        when(userService.getById(2L)).thenReturn(manager);
+        when(userService.getById(1L)).thenReturn(applicant);
+        when(applyMapper.selectById(11L)).thenReturn(apply);
+        when(orderMainMapper.selectById(21L)).thenReturn(order);
+        when(applyMapper.update(any(), any())).thenReturn(0);
+
+        AuditApplyDTO dto = new AuditApplyDTO();
+        dto.setResult(ApplyStatusEnum.APPROVED.getCode());
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(2L);
+            assertThatThrownBy(() -> service.auditApply(11L, dto))
+                    .isInstanceOf(com.yigongbao.common.exception.BusinessException.class)
+                    .hasMessageContaining("申请不是待审核状态");
+        }
+
+        verify(modifyFullService, never()).modifyOrderFull(anyLong(), any(), eq(true), anyLong(), anyString(), anyString());
     }
 }

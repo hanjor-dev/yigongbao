@@ -284,6 +284,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "申请内容格式错误");
             }
 
+            claimAuditApply(applyId, ApplyStatusEnum.APPROVED.getCode());
+
             // 执行订单修改（审核场景，跳过权限校验，使用申请人作为修改人）
             orderModifyFullService.modifyOrderFull(apply.getOrderId(), modifyDto, true,
                 apply.getApplyUserId(), apply.getApplyUserName(), applyUserRoleCode);
@@ -301,6 +303,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             // 订单修改成功后才更新申请状态
             apply.setStatus(ApplyStatusEnum.APPROVED.getCode());
         } else if (ApplyStatusEnum.REJECTED.getCode().equals(dto.getResult())) {
+            claimAuditApply(applyId, ApplyStatusEnum.REJECTED.getCode());
             // 审核驳回：记录驳回原因，通知订单业务人员
             apply.setStatus(ApplyStatusEnum.REJECTED.getCode());
             apply.setAuditRemark(dto.getRemark());
@@ -328,6 +331,18 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         eventPublisher.publishEvent(new com.yigongbao.common.event.NotificationRemarkUpdateEvent(this, "MODIFY_APPLY", applyId, "APPROVAL", remark));
 
         log.info("审核修改申请: applyId={}, result={}, auditUserId={}", applyId, dto.getResult(), userId);
+    }
+
+    private void claimAuditApply(Long applyId, Integer result) {
+        boolean claimed = orderModificationApplyMapper.update(null,
+                new LambdaUpdateWrapper<OrderModificationApplyEntity>()
+                        .eq(OrderModificationApplyEntity::getId, applyId)
+                        .eq(OrderModificationApplyEntity::getStatus, ApplyStatusEnum.PENDING.getCode())
+                        .set(OrderModificationApplyEntity::getStatus, result)) > 0;
+        if (!claimed) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_NOT_PENDING,
+                    "修改申请已被其他人处理");
+        }
     }
 
     private UserEntity checkApplicantRole() {
