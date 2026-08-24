@@ -6,6 +6,8 @@ import com.yigongbao.module.system.user.entity.UserManagedOrgEntity;
 import com.yigongbao.module.system.user.mapper.UserManagedOrgMapper;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserManagedOrgService;
+import com.yigongbao.module.system.user.vo.ManagedOrgScopeVO;
+import com.yigongbao.module.system.user.vo.ManagedOrgSimpleVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.mapper.OrgMapper;
 import com.yigongbao.common.constant.DictCodeConstants;
@@ -15,8 +17,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -52,6 +56,60 @@ public class UserManagedOrgServiceImpl implements UserManagedOrgService {
                     .forEach(ids::add);
         }
         return new ArrayList<>(ids);
+    }
+
+    @Override
+    public ManagedOrgScopeVO getManagedOrgScope(Long userId, Long primaryOrgId) {
+        ManagedOrgScopeVO scope = new ManagedOrgScopeVO();
+        if (userId == null) return scope;
+
+        List<Long> relationOrgIds = userManagedOrgMapper.selectOrgIdsByUserId(userId);
+        LinkedHashSet<Long> orderedRelationOrgIds = new LinkedHashSet<>();
+        if (relationOrgIds != null) {
+            relationOrgIds.stream()
+                    .filter(id -> id != null)
+                    .forEach(orderedRelationOrgIds::add);
+        }
+
+        LinkedHashSet<Long> candidateOrgIds = new LinkedHashSet<>();
+        if (primaryOrgId != null) candidateOrgIds.add(primaryOrgId);
+        candidateOrgIds.addAll(orderedRelationOrgIds);
+        if (candidateOrgIds.isEmpty()) return scope;
+
+        List<OrgEntity> orgs = orgMapper.selectList(new LambdaQueryWrapper<OrgEntity>()
+                .select(OrgEntity::getId, OrgEntity::getOrgName, OrgEntity::getOrgType,
+                        OrgEntity::getStatus, OrgEntity::getIsDeleted)
+                .in(OrgEntity::getId, candidateOrgIds));
+        Map<Long, OrgEntity> orgById = new HashMap<>();
+        if (orgs != null) {
+            orgs.stream()
+                    .filter(org -> org != null && org.getId() != null)
+                    .forEach(org -> orgById.put(org.getId(), org));
+        }
+
+        List<Long> managedOrgIds = new ArrayList<>();
+        List<ManagedOrgSimpleVO> managedOrgs = new ArrayList<>();
+        for (Long orgId : orderedRelationOrgIds) {
+            if (orgId.equals(primaryOrgId)) continue;
+            OrgEntity org = orgById.get(orgId);
+            if (!isActiveBusinessOrg(org)) continue;
+
+            managedOrgIds.add(orgId);
+            ManagedOrgSimpleVO managedOrg = new ManagedOrgSimpleVO();
+            managedOrg.setId(orgId);
+            managedOrg.setOrgName(org.getOrgName() == null ? "" : org.getOrgName());
+            managedOrgs.add(managedOrg);
+        }
+        scope.setManagedOrgIds(List.copyOf(managedOrgIds));
+        scope.setManagedOrgs(List.copyOf(managedOrgs));
+
+        if (isActiveBusinessOrg(orgById.get(primaryOrgId))) {
+            List<Long> effectiveOrgIds = new ArrayList<>();
+            effectiveOrgIds.add(primaryOrgId);
+            effectiveOrgIds.addAll(managedOrgIds);
+            scope.setEffectiveOrgIds(List.copyOf(effectiveOrgIds));
+        }
+        return scope;
     }
 
     private boolean isActiveBusinessOrg(OrgEntity org) {

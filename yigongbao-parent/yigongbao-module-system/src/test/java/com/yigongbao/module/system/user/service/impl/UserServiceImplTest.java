@@ -24,6 +24,8 @@ import com.yigongbao.module.system.user.dto.UserPageDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserHospitalService;
+import com.yigongbao.module.system.user.vo.ManagedOrgScopeVO;
+import com.yigongbao.module.system.user.vo.ManagedOrgSimpleVO;
 import com.yigongbao.module.system.user.vo.UserVO;
 import com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity;
 import com.yigongbao.module.basic.processingCenter.mapper.ProcessingCenterMapper;
@@ -39,6 +41,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.mock.web.MockHttpServletResponse;
 
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
@@ -211,7 +214,9 @@ class UserServiceImplTest {
         // 断言
         assertNotNull(result);
         assertEquals(1, result.getTotal());
+        assertNull(result.getRecords().get(0).getManagedOrgs());
         verify(userMapper, times(1)).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
+        verify(userManagedOrgService, never()).getManagedOrgScope(anyLong(), any());
     }
 
     @Test
@@ -254,6 +259,64 @@ class UserServiceImplTest {
         assertNotNull(result);
         assertEquals(1L, result.getId());
         assertEquals("测试用户", result.getRealName());
+        assertNotNull(result.getManagedOrgs());
+        assertTrue(result.getManagedOrgs().isEmpty());
+        verify(userManagedOrgService, never()).getManagedOrgScope(anyLong(), any());
+        verifyNoMoreInteractions(userManagedOrgService);
+    }
+
+    @Test
+    @DisplayName("getUserById: 区域管理员应使用同一快照填充管理机构字段")
+    void getUserById_regionalManager_shouldFillManagedOrgScopeFromSingleSnapshot() {
+        testEntity.setOrgId(10L);
+        testRole.setRoleCode("regional-manager");
+
+        ManagedOrgScopeVO scope = new ManagedOrgScopeVO();
+        scope.setManagedOrgIds(List.of(20L, 30L));
+        scope.setManagedOrgs(List.of(
+                managedOrg(20L, "经销商甲"),
+                managedOrg(30L, "服务商乙")
+        ));
+        scope.setEffectiveOrgIds(List.of(10L, 20L, 30L));
+
+        when(userMapper.selectById(1L)).thenReturn(testEntity);
+        when(roleService.getById(1L)).thenReturn(testRole);
+        when(userManagedOrgService.getManagedOrgScope(1L, 10L)).thenReturn(scope);
+
+        UserVO result = userService.getUserById(1L);
+
+        assertEquals(List.of(20L, 30L), result.getManagedOrgIds());
+        assertEquals(List.of(20L, 30L), result.getManagedOrgs().stream()
+                .map(ManagedOrgSimpleVO::getId).toList());
+        assertEquals(List.of("经销商甲", "服务商乙"), result.getManagedOrgs().stream()
+                .map(ManagedOrgSimpleVO::getOrgName).toList());
+        assertEquals(List.of(10L, 20L, 30L), result.getEffectiveOrgIds());
+        verify(userManagedOrgService, times(1)).getManagedOrgScope(1L, 10L);
+        verify(userManagedOrgService, never()).getManagedOrgIds(anyLong());
+        verify(userManagedOrgService, never()).getEffectiveOrgIds(anyLong());
+        verifyNoMoreInteractions(userManagedOrgService);
+    }
+
+    private ManagedOrgSimpleVO managedOrg(Long id, String orgName) {
+        ManagedOrgSimpleVO org = new ManagedOrgSimpleVO();
+        org.setId(id);
+        org.setOrgName(orgName);
+        return org;
+    }
+
+    @Test
+    @DisplayName("exportUsers: 不应调用管理机构快照")
+    void exportUsers_shouldNotQueryManagedOrgScope() {
+        testRole.setRoleCode("regional-manager");
+        when(userMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(testEntity));
+        when(roleService.getById(1L)).thenReturn(testRole);
+        when(userHospitalService.getHospitalIdsByUserId(1L)).thenReturn(Collections.emptyList());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        userService.exportUsers(response);
+
+        assertTrue(response.getContentAsByteArray().length > 0);
+        verify(userManagedOrgService, never()).getManagedOrgScope(anyLong(), any());
     }
 
     @Test

@@ -42,6 +42,7 @@ import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.service.UserManagedOrgService;
 import com.yigongbao.module.system.user.service.UserService;
+import com.yigongbao.module.system.user.vo.ManagedOrgScopeVO;
 import com.yigongbao.module.system.user.vo.UserVO;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -293,7 +294,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
         }
         UserVO vo = toVOWithNames(entity);
-        
+        vo.setManagedOrgs(Collections.emptyList());
+        if (vo.getRoleId() != null) {
+            RoleEntity roleEntity = roleService.getById(vo.getRoleId());
+            if (roleEntity != null) {
+                vo.setDataScopeType(roleEntity.getDataScopeType());
+                if (RoleCodeEnum.REGIONAL_MANAGER.getCode().equals(roleEntity.getRoleCode())) {
+                    ManagedOrgScopeVO scope = userManagedOrgService.getManagedOrgScope(vo.getId(), vo.getOrgId());
+                    vo.setManagedOrgIds(scope.getManagedOrgIds());
+                    vo.setManagedOrgs(scope.getManagedOrgs());
+                    vo.setEffectiveOrgIds(scope.getEffectiveOrgIds());
+                }
+            }
+        }
         return vo;
     }
 
@@ -1152,17 +1165,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         if (vo.getAccountType() != null) {
             DictVO accountTypeDict = dictService.getByDictCode(vo.getAccountType());
             vo.setAccountTypeName(accountTypeDict != null ? accountTypeDict.getDictName() : "");
-        }
-        // 填充角色的 dataScopeType
-        if (vo.getRoleId() != null) {
-            RoleEntity roleEntity = roleService.getById(vo.getRoleId());
-            if (roleEntity != null) {
-                vo.setDataScopeType(roleEntity.getDataScopeType());
-                if (RoleCodeEnum.REGIONAL_MANAGER.getCode().equals(roleEntity.getRoleCode())) {
-                    vo.setManagedOrgIds(userManagedOrgService.getManagedOrgIds(vo.getId()));
-                    vo.setEffectiveOrgIds(userManagedOrgService.getEffectiveOrgIds(vo.getId()));
-                }
-            }
         }
         // 填充医院ID列表和医院名称列表
         List<Long> hospitalIds = userHospitalService.getHospitalIdsByUserId(vo.getId());
