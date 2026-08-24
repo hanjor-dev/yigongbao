@@ -43,22 +43,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderModifyApplyController {
 
     private final OrderModifyApplyService orderModifyApplyService;
-    private final OrderModifyFullService orderModifyFullService;
-
-    @Operation(summary = "全量修改订单",
-            description = "前端传入完整订单数据，后端自动判断变更内容并应用。")
-    @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "全量修改订单")
-    @PutMapping("/{orderId}/full")
-    public Result<Void> modifyOrderFull(@PathVariable Long orderId,
-            @Valid @RequestBody OrderModifyFullDTO dto) {
-        orderModifyFullService.modifyOrderFull(orderId, dto);
-        return Result.success();
-    }
 
     @Operation(summary = "全量修改订单（v2-带时间窗口检查）",
             description = "前端传入完整订单数据，后端检查时间窗口：\n"
-                    + "在窗口内：直接修改并返回成功（code=200 data=1）\n"
-                    + "超过窗口或设计阶段需审批：data=-1")
+                    + "管理员：允许直接修改并返回成功（code=200 data=1）\n"
+                    + "业务员在订单阶段时间窗口内：直接修改并返回成功（code=200 data=1）\n"
+                    + "业务员超出窗口或设计师在设计阶段：不直接修改，返回需提交申请（code=200 data=-1）\n"
+                    + "业务员/设计师在生产及后续阶段：返回阶段不允许修改异常；其他无权限角色返回无权限异常。")
     @OperationLog(module = "订单管理", businessType = OperationTypeEnum.UPDATE, operation = "全量修改订单（v2）")
     @PutMapping("/{orderId}/full-v2")
     public Result<Integer> modifyOrderFullV2(@PathVariable Long orderId,

@@ -12,8 +12,8 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 
 /**
- * 订单修改申请清理定时任务
- * 每5分钟执行一次，清理过期申请
+ * 订单修改申请过期标记定时任务
+ * 每5分钟执行一次，仅标记过期状态，不清理申请内容，保留历史记录
  *
  * @author hanjor
  * @date 2026-06-08
@@ -26,7 +26,7 @@ public class OrderModifyApplyCleanTask {
     private final OrderModificationApplyMapper applyMapper;
 
     /**
-     * 每5分钟执行一次，清理过期申请
+     * 每5分钟执行一次，标记过期申请
      */
     @Scheduled(cron = "0 */5 * * * ?")
     public void cleanExpiredApplications() {

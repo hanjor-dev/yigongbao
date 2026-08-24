@@ -42,4 +42,18 @@ public interface OrderModifyFullService {
      * @param modifierRoleCode     修改人角色代码（用于判断修改范围）
      */
     void modifyOrderFull(Long orderId, OrderModifyFullDTO dto, boolean skipPermissionCheck, Long modifierId, String modifierName, String modifierRoleCode);
+
+    /**
+     * 全量修改订单（带审核申请上下文）
+     *
+     * @param orderId              订单ID
+     * @param dto                  完整订单数据
+     * @param skipPermissionCheck  是否跳过权限校验
+     * @param modifierId           修改人ID
+     * @param modifierName         修改人姓名
+     * @param modifierRoleCode     修改人角色代码
+     * @param applyId              关联的修改申请ID，直接修改时传null
+     */
+    void modifyOrderFull(Long orderId, OrderModifyFullDTO dto, boolean skipPermissionCheck,
+                         Long modifierId, String modifierName, String modifierRoleCode, Long applyId);
 }

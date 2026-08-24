@@ -10,6 +10,7 @@ import com.yigongbao.module.order.mapper.OrderFileMapper;
 import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
+import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.dto.modify.OrderModifyFullDTO;
 import com.yigongbao.module.order.validator.OrderDataValidator;
 import com.yigongbao.module.order.validator.OrderDataScopeChecker;
@@ -27,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
@@ -129,6 +131,7 @@ class OrderModifyFullServiceImplBoundaryTest {
         order.setPatientGender(null);
         order.setPatientAge(20);
         when(orderMainMapper.selectById(7L)).thenReturn(order);
+        when(orderMainMapper.updateById(order)).thenReturn(1);
 
         OrderModifyFullDTO dto = new OrderModifyFullDTO();
         dto.setPatientName("新患者");
@@ -157,5 +160,64 @@ class OrderModifyFullServiceImplBoundaryTest {
             assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.ORDER_NOT_FOUND.getCode());
         }
         verify(orderMainMapper, never()).selectById(anyLong());
+    }
+
+    @Test
+    void modifyOrderFull_rejectsWhenMainOrderUpdateAffectsNoRows() {
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(7L);
+        order.setOrderCode("ORD-7");
+        order.setPhase(20);
+        order.setVersion(0);
+        order.setPatientName("旧患者");
+        order.setPatientGender("12.1");
+        order.setPatientAge(20);
+        when(orderMainMapper.selectById(7L)).thenReturn(order);
+        when(orderItemMapper.selectList(any())).thenReturn(java.util.List.of());
+        when(orderFileMapper.selectList(any())).thenReturn(java.util.List.of());
+        when(orderMainMapper.updateById(order)).thenReturn(0);
+
+        OrderModifyFullDTO dto = new OrderModifyFullDTO();
+        dto.setPatientName("新患者");
+        dto.setPatientGender("12.1");
+        dto.setPatientAge(20);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(99L);
+            assertThatThrownBy(() -> service.modifyOrderFull(7L, dto, true, 1L, "业务员", "salesman"))
+                    .isInstanceOf(BusinessException.class);
+        }
+
+        verify(orderMainMapper).updateById(order);
+    }
+
+    @Test
+    void modifyOrderFull_rejectsWhenItemDeleteAffectsNoRows() {
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(7L);
+        order.setOrderCode("ORD-7");
+        order.setPhase(10);
+        order.setVersion(0);
+        when(orderMainMapper.selectById(7L)).thenReturn(order);
+        UserEntity admin = new UserEntity();
+        admin.setRoleCode("admin");
+        when(userService.getById(1L)).thenReturn(admin);
+
+        OrderItemEntity oldItem = new OrderItemEntity();
+        oldItem.setId(11L);
+        oldItem.setOrderId(7L);
+        when(orderItemMapper.selectList(any())).thenReturn(java.util.List.of(oldItem));
+        when(orderItemMapper.deleteById(11L)).thenReturn(0);
+
+        OrderModifyFullDTO dto = new OrderModifyFullDTO();
+        dto.setItems(java.util.List.of());
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertThatThrownBy(() -> service.modifyOrderFull(7L, dto, true, 1L, "管理员", "admin"))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("code")
+                    .isEqualTo(ErrorCodeEnum.SYSTEM_ERROR.getCode());
+        }
     }
 }

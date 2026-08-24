@@ -327,6 +327,7 @@ class OrderModifyApplyServiceImplBoundaryTest {
         when(applyMapper.selectById(9L)).thenReturn(apply);
         when(orderMainMapper.selectById(19L)).thenReturn(order);
         when(applyMapper.update(any(), any())).thenReturn(1);
+        when(applyMapper.updateById(apply)).thenReturn(1);
         AuditApplyDTO dto = new AuditApplyDTO();
         dto.setResult(ApplyStatusEnum.REJECTED.getCode());
         dto.setRemark("资料不完整");
@@ -370,6 +371,7 @@ class OrderModifyApplyServiceImplBoundaryTest {
         when(applyMapper.selectById(10L)).thenReturn(apply);
         when(orderMainMapper.selectById(20L)).thenReturn(order);
         when(applyMapper.update(any(), any())).thenReturn(1);
+        when(applyMapper.updateById(apply)).thenReturn(1);
         AuditApplyDTO dto = new AuditApplyDTO();
         dto.setResult(ApplyStatusEnum.APPROVED.getCode());
 
@@ -420,6 +422,55 @@ class OrderModifyApplyServiceImplBoundaryTest {
             assertThatThrownBy(() -> service.auditApply(11L, dto))
                     .isInstanceOf(com.yigongbao.common.exception.BusinessException.class)
                     .hasMessageContaining("申请不是待审核状态");
+        }
+
+        verify(modifyFullService, never()).modifyOrderFull(anyLong(), any(), eq(true), anyLong(), anyString(), anyString());
+    }
+
+    @Test
+    void modifyOrderFullV2_checksOrderDataScopeBeforeDecision() {
+        UserEntity user = new UserEntity();
+        user.setRoleCode(RoleCodeEnum.SALESMAN.getCode());
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(9L);
+        order.setPhase(10);
+        order.setCreateTime(java.time.LocalDateTime.now());
+        when(userService.getById(1L)).thenReturn(user);
+        when(orderMainMapper.selectById(9L)).thenReturn(order);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            service.modifyOrderFullV2(9L, new OrderModifyFullDTO());
+        }
+
+        verify(dataScopeChecker).checkOrderAccess(9L);
+    }
+
+    @Test
+    void auditApply_returnsExpiredErrorWhenCleanupAlreadyMarkedApplicationExpired() {
+        UserEntity manager = new UserEntity();
+        manager.setId(2L);
+        manager.setRoleCode(RoleCodeEnum.DESIGNER_MANAGER.getCode());
+
+        OrderModificationApplyEntity apply = new OrderModificationApplyEntity();
+        apply.setId(12L);
+        apply.setOrderId(22L);
+        apply.setApplyUserId(1L);
+        apply.setStatus(ApplyStatusEnum.EXPIRED.getCode());
+        apply.setExpireTime(java.time.LocalDateTime.now().minusMinutes(1));
+
+        when(userService.getById(2L)).thenReturn(manager);
+        when(applyMapper.selectById(12L)).thenReturn(apply);
+
+        AuditApplyDTO dto = new AuditApplyDTO();
+        dto.setResult(ApplyStatusEnum.APPROVED.getCode());
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(2L);
+            assertThatThrownBy(() -> service.auditApply(12L, dto))
+                    .isInstanceOf(com.yigongbao.common.exception.BusinessException.class)
+                    .extracting("code")
+                    .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_APPLY_EXPIRED.getCode());
         }
 
         verify(modifyFullService, never()).modifyOrderFull(anyLong(), any(), eq(true), anyLong(), anyString(), anyString());

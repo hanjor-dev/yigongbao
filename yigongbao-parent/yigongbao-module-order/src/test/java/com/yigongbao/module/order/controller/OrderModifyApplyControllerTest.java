@@ -3,7 +3,6 @@ package com.yigongbao.module.order.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.module.order.entity.OrderModificationApplyEntity;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
-import com.yigongbao.module.order.service.OrderModifyFullService;
 import com.yigongbao.module.order.dto.apply.AuditApplyDTO;
 import com.yigongbao.module.order.dto.modify.OrderModifyFullDTO;
 import org.junit.jupiter.api.Test;
@@ -30,7 +29,6 @@ class OrderModifyApplyControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @MockBean private OrderModifyApplyService orderModifyApplyService;
-    @MockBean private OrderModifyFullService orderModifyFullService;
 
     @Test
     void auditApply_rejectsMissingResult() throws Exception {
@@ -70,6 +68,19 @@ class OrderModifyApplyControllerTest {
     }
 
     @Test
+    void fullV2_returnsSuccessDecisionFromService() throws Exception {
+        when(orderModifyApplyService.modifyOrderFullV2(eq(7L), any(OrderModifyFullDTO.class))).thenReturn(1);
+
+        mockMvc.perform(put("/order/modify/{id}/full-v2", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new OrderModifyFullDTO())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(1));
+
+        verify(orderModifyApplyService).modifyOrderFullV2(eq(7L), any(OrderModifyFullDTO.class));
+    }
+
+    @Test
     void submitApply_buildsResponseWithExpiry() throws Exception {
         OrderModificationApplyEntity entity = new OrderModificationApplyEntity();
         entity.setExpireTime(LocalDateTime.of(2026, 7, 18, 12, 0));
@@ -84,15 +95,6 @@ class OrderModifyApplyControllerTest {
                 .andExpect(jsonPath("$.data.expireTime").exists());
 
         verify(orderModifyApplyService).submitApply(eq(7L), any(OrderModifyFullDTO.class));
-    }
-
-    @Test
-    void full_delegatesToFullModificationService() throws Exception {
-        mockMvc.perform(put("/order/modify/{id}/full", 10L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new OrderModifyFullDTO())))
-                .andExpect(status().isOk());
-        verify(orderModifyFullService).modifyOrderFull(eq(10L), any(OrderModifyFullDTO.class));
     }
 
     @Test

@@ -253,15 +253,21 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                     "申请人不能审批自己提交的修改申请");
         }
 
+        // 过期申请无论是被定时任务标记，还是刚刚超过过期时间，都统一返回过期异常。
+        if (ApplyStatusEnum.EXPIRED.getCode().equals(apply.getStatus())) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_EXPIRED);
+        }
         // 校验申请状态必须为待审核
         if (!ApplyStatusEnum.PENDING.getCode().equals(apply.getStatus())) {
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_NOT_PENDING);
         }
 
         // 校验申请是否过期，过期则更新状态并拒绝审核
-        if (apply.getExpireTime().isBefore(LocalDateTime.now())) {
+        if (apply.getExpireTime() == null || apply.getExpireTime().isBefore(LocalDateTime.now())) {
             apply.setStatus(ApplyStatusEnum.EXPIRED.getCode());
-            orderModificationApplyMapper.updateById(apply);
+            if (orderModificationApplyMapper.updateById(apply) <= 0) {
+                throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "修改申请过期状态更新失败");
+            }
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_EXPIRED);
         }
 
@@ -280,7 +286,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             try {
                 modifyDto = JSONUtil.toBean(apply.getModificationContent(), OrderModifyFullDTO.class);
             } catch (Exception e) {
-                log.error("申请内容JSON解析失败: applyId={}, content={}", applyId, apply.getModificationContent(), e);
+                log.error("申请内容JSON解析失败: applyId={}", applyId, e);
                 throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "申请内容格式错误");
             }
 
@@ -288,7 +294,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
 
             // 执行订单修改（审核场景，跳过权限校验，使用申请人作为修改人）
             orderModifyFullService.modifyOrderFull(apply.getOrderId(), modifyDto, true,
-                apply.getApplyUserId(), apply.getApplyUserName(), applyUserRoleCode);
+                apply.getApplyUserId(), apply.getApplyUserName(), applyUserRoleCode, apply.getId());
 
             // 修改成功后，仅在订单阶段时重置审核状态（数据已变更，需要重新审核）
             OrderMainEntity order = orderMainMapper.selectById(apply.getOrderId());
@@ -322,7 +328,9 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         apply.setAuditUserName(userName);
         apply.setAuditTime(LocalDateTime.now());
 
-        orderModificationApplyMapper.updateById(apply);
+        if (orderModificationApplyMapper.updateById(apply) <= 0) {
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "修改申请审核信息更新失败");
+        }
 
         // 更新原推送通知的备注（审核完成状态提示）
         String remark = ApplyStatusEnum.APPROVED.getCode().equals(dto.getResult())
@@ -502,6 +510,9 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
+
+        // 在做角色、阶段和时间窗口判断前先校验数据权限，避免通过返回值探测无权访问的订单。
+        orderDataScopeChecker.checkOrderAccess(orderId);
 
         String roleCode = currentUser.getRoleCode();
         boolean isAdmin = ADMIN_ROLES.contains(roleCode);

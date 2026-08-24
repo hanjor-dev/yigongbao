@@ -90,6 +90,13 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void modifyOrderFull(Long orderId, OrderModifyFullDTO dto, boolean skipPermissionCheck, Long modifierId, String modifierName, String modifierRoleCode) {
+        modifyOrderFull(orderId, dto, skipPermissionCheck, modifierId, modifierName, modifierRoleCode, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void modifyOrderFull(Long orderId, OrderModifyFullDTO dto, boolean skipPermissionCheck,
+                                Long modifierId, String modifierName, String modifierRoleCode, Long applyId) {
         if (!skipPermissionCheck) {
             orderDataScopeChecker.checkOrderAccess(orderId);
         }
@@ -181,11 +188,18 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             }
         }
 
-        // 7. 记录日志（使用传入的修改人信息）
+        // 7. 递增版本号并更新订单
+        order.setVersion(order.getVersion() + 1);
+        if (orderMainMapper.updateById(order) <= 0) {
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "订单主表更新失败");
+        }
+
+        // 8. 所有订单数据更新成功后再记录日志（使用传入的修改人信息）
         for (ObjectChange change : actualChanges) {
             OrderModificationLogEntity logEntity = new OrderModificationLogEntity();
             logEntity.setOrderId(orderId);
             logEntity.setOrderCode(order.getOrderCode());
+            logEntity.setApplyId(applyId);
             logEntity.setFieldName(change.getObjectType());
             logEntity.setFieldLabel(change.getObjectLabel());
             logEntity.setOldValue(change.getOldValue());
@@ -194,10 +208,6 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             logEntity.setModifierName(modifierName);
             orderModificationLogMapper.insert(logEntity);
         }
-
-        // 8. 递增版本号并更新订单
-        order.setVersion(order.getVersion() + 1);
-        orderMainMapper.updateById(order);
 
         log.info("订单修改完成: orderId={}, changeCount={}, version={}", orderId, actualChanges.size(), order.getVersion());
     }
@@ -587,7 +597,9 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         // 删除不在新列表中的项目
         for (OrderItemEntity oldItem : oldItems) {
             if (!newItemMap.containsKey(oldItem.getId())) {
-                orderItemMapper.deleteById(oldItem.getId());
+                if (orderItemMapper.deleteById(oldItem.getId()) <= 0) {
+                    throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "订单项目删除失败");
+                }
             }
         }
 
@@ -604,7 +616,9 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                     entity.setProjectDesc(newItem.getProjectDesc());
                     entity.setFormingRequirement(newItem.getFormingRequirement());
                     entity.setOtherRequirement(newItem.getOtherRequirement());
-                    orderItemMapper.updateById(entity);
+                    if (orderItemMapper.updateById(entity) <= 0) {
+                        throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "订单项目更新失败");
+                    }
                 }
             } else {
                 // 新增
@@ -618,7 +632,9 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                 entity.setProjectDesc(newItem.getProjectDesc());
                 entity.setFormingRequirement(newItem.getFormingRequirement());
                 entity.setOtherRequirement(newItem.getOtherRequirement());
-                orderItemMapper.insert(entity);
+                if (orderItemMapper.insert(entity) <= 0) {
+                    throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "订单项目新增失败");
+                }
             }
         }
     }
@@ -654,7 +670,9 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                 shouldDelete = newReportFileIds == null || !newReportFileIds.contains(oldFile.getFileId());
             }
             if (shouldDelete) {
-                orderFileMapper.deleteById(oldFile.getId());
+                if (orderFileMapper.deleteById(oldFile.getId()) <= 0) {
+                    throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "订单文件删除失败");
+                }
             }
         }
 
@@ -667,7 +685,9 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                     entity.setOrderCode(orderCode);
                     entity.setFileId(fileId);
                     entity.setFileCategory(DictCodeConstants.ORDER_FILE_CATEGORY_DCM);
-                    orderFileMapper.insert(entity);
+                    if (orderFileMapper.insert(entity) <= 0) {
+                        throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "影像数据文件新增失败");
+                    }
                 }
             }
         }
@@ -681,7 +701,9 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                     entity.setOrderCode(orderCode);
                     entity.setFileId(fileId);
                     entity.setFileCategory(DictCodeConstants.ORDER_FILE_CATEGORY_REPORT);
-                    orderFileMapper.insert(entity);
+                    if (orderFileMapper.insert(entity) <= 0) {
+                        throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "影像报告文件新增失败");
+                    }
                 }
             }
         }
