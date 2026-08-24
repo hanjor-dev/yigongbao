@@ -246,8 +246,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                 if (roleEntity != null) {
                     vo.setDataScopeType(roleEntity.getDataScopeType());
                     if (RoleCodeEnum.REGIONAL_MANAGER.getCode().equals(roleEntity.getRoleCode())) {
-                        vo.setManagedOrgIds(userManagedOrgService.getManagedOrgIds(vo.getId()));
-                        vo.setEffectiveOrgIds(userManagedOrgService.getEffectiveOrgIds(vo.getId()));
+                        ManagedOrgScopeVO scope = userManagedOrgService.getManagedOrgScope(vo.getId(), vo.getOrgId());
+                        vo.setManagedOrgIds(scope.getManagedOrgIds());
+                        vo.setEffectiveOrgIds(scope.getEffectiveOrgIds());
                     }
                 }
             }

@@ -220,6 +220,41 @@ class UserServiceImplTest {
     }
 
     @Test
+    @DisplayName("listUser: 区域管理员应使用一次机构范围快照")
+    void listUser_regionalManager_shouldUseSingleManagedOrgScopeSnapshot() {
+        testEntity.setOrgId(10L);
+        testRole.setRoleCode("regional-manager");
+        testOrg.setId(10L);
+
+        Page<UserEntity> page = new Page<>(1, 10);
+        page.setTotal(1);
+        page.setRecords(List.of(testEntity));
+
+        ManagedOrgScopeVO scope = new ManagedOrgScopeVO();
+        scope.setManagedOrgIds(List.of(20L, 30L));
+        scope.setEffectiveOrgIds(List.of(10L, 20L, 30L));
+
+        when(userMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+        when(roleService.listByIds(anySet())).thenReturn(List.of(testRole));
+        when(orgService.listByIds(anySet())).thenReturn(List.of(testOrg));
+        when(userHospitalService.listHospitalIdsByUserIds(anyList())).thenReturn(Collections.emptyMap());
+        when(userManagedOrgService.getManagedOrgScope(1L, 10L)).thenReturn(scope);
+
+        UserPageDTO pageDTO = new UserPageDTO();
+        pageDTO.setPageNum(1);
+        pageDTO.setPageSize(10);
+
+        IPage<UserVO> result = userService.listUser(pageDTO);
+
+        assertEquals(List.of(20L, 30L), result.getRecords().get(0).getManagedOrgIds());
+        assertEquals(List.of(10L, 20L, 30L), result.getRecords().get(0).getEffectiveOrgIds());
+        assertNull(result.getRecords().get(0).getManagedOrgs());
+        verify(userManagedOrgService, times(1)).getManagedOrgScope(1L, 10L);
+        verify(userManagedOrgService, never()).getManagedOrgIds(anyLong());
+        verify(userManagedOrgService, never()).getEffectiveOrgIds(anyLong());
+    }
+
+    @Test
     @DisplayName("listUser: 无数据时返回空列表")
     void listUser_whenNoData_shouldReturnEmptyList() {
         // 准备
