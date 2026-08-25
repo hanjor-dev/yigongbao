@@ -1,11 +1,13 @@
 package com.yigongbao.module.order.vo;
 
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
+import com.yigongbao.module.order.vo.order.OrderListVO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 经典案例视图对象VO
@@ -49,4 +51,10 @@ public class ClassicCaseVO extends OrderDetailVO {
      */
     @Schema(description = "标记备注")
     private String classicCaseRemark;
+
+    /**
+     * 重建项目明细列表
+     */
+    @Schema(description = "重建项目列表")
+    private List<OrderListVO.RebuildProjectItemVO> rebuildProjectList;
 }

@@ -15,6 +15,7 @@ import com.yigongbao.module.order.dto.MarkClassicCaseDTO;
 import com.yigongbao.module.order.service.IClassicCaseFileService;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.ClassicCaseVO;
+import com.yigongbao.module.order.vo.order.OrderListVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -182,6 +183,39 @@ class OrderClassicCaseServiceImplTest {
         assertNotNull(result);
         assertEquals(1, result.getTotal());
         assertEquals(1, result.getRecords().size());
+    }
+
+    @Test
+    void listClassicCases_shouldReturnRebuildProjects() {
+        ClassicCaseQueryDTO dto = new ClassicCaseQueryDTO();
+        dto.setPageNum(1);
+        dto.setPageSize(10);
+
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(1L);
+        order.setIsClassicCase(StatusConstants.YES);
+
+        Page<OrderMainEntity> page = new Page<>(1, 10);
+        page.setRecords(List.of(order));
+        page.setTotal(1);
+
+        OrderListVO orderListVO = new OrderListVO();
+        OrderListVO.RebuildProjectItemVO project = new OrderListVO.RebuildProjectItemVO();
+        project.setProjectName("膝关节");
+
+        when(orderMainMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+        when(orderQueryHelper.toOrderListVO(order)).thenReturn(orderListVO);
+        when(userService.listByIds(anyList())).thenReturn(List.of());
+        doAnswer(invocation -> {
+            invocation.<List<OrderListVO>>getArgument(0).get(0)
+                    .setRebuildProjectList(List.of(project));
+            return null;
+        }).when(orderQueryHelper).fillRebuildProjectList(anyList());
+
+        IPage<ClassicCaseVO> result = classicCaseService.listClassicCases(dto);
+
+        assertEquals("膝关节", result.getRecords().get(0).getRebuildProjectList().get(0).getProjectName());
+        verify(orderQueryHelper).fillRebuildProjectList(List.of(orderListVO));
     }
 
     @Test

@@ -32,6 +32,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * 订单经典案例服务实现
@@ -175,10 +176,16 @@ public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
 
         // 使用 OrderQueryHelper 转换为完整的 OrderListVO，然后转换为 ClassicCaseVO
         Map<Long, String> finalUserNameMap = userNameMap;
-        List<ClassicCaseVO> voList = entityPage.getRecords().stream()
-                .map(entity -> {
+        List<OrderListVO> orderListVOList = entityPage.getRecords().stream()
+                .map(entity -> orderQueryHelper.toOrderListVO(entity))
+                .collect(Collectors.toList());
+        orderQueryHelper.fillRebuildProjectList(orderListVOList);
+
+        List<ClassicCaseVO> classicCaseVOList = IntStream.range(0, entityPage.getRecords().size())
+                .mapToObj(index -> {
+                    OrderMainEntity entity = entityPage.getRecords().get(index);
                     // 先使用 OrderQueryHelper 获取包含所有翻译字段的 OrderListVO
-                    OrderListVO orderListVO = orderQueryHelper.toOrderListVO(entity);
+                    OrderListVO orderListVO = orderListVOList.get(index);
                     // 再转换为 ClassicCaseVO，添加经典案例特有字段（列表查询不包含订单明细和文件）
                     ClassicCaseVO vo = ClassicCaseConvert.toClassicCaseVOFromList(orderListVO, entity);
                     // 填充标记人姓名
@@ -191,7 +198,7 @@ public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
 
         // 构建分页结果
         Page<ClassicCaseVO> voPage = new Page<>(entityPage.getCurrent(), entityPage.getSize(), entityPage.getTotal());
-        voPage.setRecords(voList);
+        voPage.setRecords(classicCaseVOList);
         return voPage;
     }
 
