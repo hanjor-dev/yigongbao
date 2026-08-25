@@ -292,7 +292,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     .eq(StrUtil.isNotBlank(dto.getBusinessType()), OrderMainEntity::getBusinessType, dto.getBusinessType())
                     .eq(Objects.nonNull(dto.getOperatorId()), OrderMainEntity::getOperatorId, dto.getOperatorId())
                     .ge(Objects.nonNull(dto.getCreateTimeStart()), OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
-                    .le(Objects.nonNull(dto.getCreateTimeEnd()), OrderMainEntity::getCreateTime, dto.getCreateTimeEnd());
+                    .lt(Objects.nonNull(dto.getCreateTimeEnd()), OrderMainEntity::getCreateTime, toExclusiveEndTime(dto.getCreateTimeEnd()));
 
             // bodyPartIds 过滤：先查 order_item 得到 orderIds，再用 MP in 条件（避免手写 SQL）
             if (dto.getBodyPartIds() != null && !dto.getBodyPartIds().isEmpty()) {
@@ -354,6 +354,10 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             ((Page<OrderListVO>) voPage).setRecords(voList);
 
             return voPage;
+    }
+
+    private LocalDateTime toExclusiveEndTime(LocalDateTime endTime) {
+        return endTime == null ? null : endTime.toLocalDate().plusDays(1).atStartOfDay();
     }
 
     /**

@@ -56,6 +56,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
@@ -69,6 +70,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -185,6 +187,32 @@ class ProductionRecordServiceImplTest {
             assertEquals(printFinishTime, result.getRecords().get(0).getPrintFinishTime());
             assertEquals(printFinishTime, result.getRecords().get(0).getPostProcessingEndTime());
         }
+    }
+
+    @Test
+    void pageRecords_orderCreateTimeEndUsesNextDayExclusiveBoundary() {
+        ProductionRecordPageDTO dto = new ProductionRecordPageDTO();
+        dto.setProcessingCenterId(20L);
+        dto.setOrderCreateTimeEnd(LocalDateTime.of(2026, 8, 25, 0, 0));
+
+        Page<ProductionRecordEntity> entityPage = new Page<>(1, 10);
+        entityPage.setRecords(Collections.emptyList());
+        entityPage.setTotal(0);
+        when(recordMapper.selectPage(any(Page.class), any())).thenReturn(entityPage);
+        when(orderMainMapper.selectList(any())).thenReturn(Collections.emptyList());
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            recordService.pageRecords(dto);
+        }
+
+        ArgumentCaptor<LambdaQueryWrapper> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(orderMainMapper).selectList(captor.capture());
+        assertThat(captor.getValue().getExpression().getNormal()).isNotEmpty();
+        LocalDateTime exclusiveEnd = ReflectionTestUtils.invokeMethod(recordService, "toExclusiveEndTime",
+                LocalDateTime.of(2026, 8, 25, 0, 0));
+        assertThat(exclusiveEnd)
+                .isEqualTo(LocalDateTime.of(2026, 8, 26, 0, 0));
     }
 
     @Test

@@ -159,7 +159,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         wrapper.eq(queryDTO.getHospitalId() != null, OrderMainEntity::getHospitalId, queryDTO.getHospitalId());
         wrapper.eq(StrUtil.isNotBlank(queryDTO.getBusinessType()), OrderMainEntity::getBusinessType, queryDTO.getBusinessType());
         wrapper.ge(queryDTO.getCreateTimeStart() != null, OrderMainEntity::getCreateTime, queryDTO.getCreateTimeStart());
-        wrapper.le(queryDTO.getCreateTimeEnd() != null, OrderMainEntity::getCreateTime, queryDTO.getCreateTimeEnd());
+        wrapper.lt(queryDTO.getCreateTimeEnd() != null, OrderMainEntity::getCreateTime, toExclusiveEndTime(queryDTO.getCreateTimeEnd()));
 
         // 排序
         designQueryHelper.applySort(wrapper, queryDTO.getSortField(), queryDTO.getSortOrder());
@@ -191,6 +191,10 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         IPage<DesignWorkorderListVO> resultPage = new Page<>(entityPage.getCurrent(), entityPage.getSize(), entityPage.getTotal());
         resultPage.setRecords(voList);
         return resultPage;
+    }
+
+    private LocalDateTime toExclusiveEndTime(LocalDateTime endTime) {
+        return endTime == null ? null : endTime.toLocalDate().plusDays(1).atStartOfDay();
     }
 
     /**

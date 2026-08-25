@@ -6,7 +6,9 @@ import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
+import com.yigongbao.flow.service.FlowStatusColorResolver;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,9 +59,11 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -72,6 +76,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -109,6 +114,7 @@ class DesignWorkorderServiceImplTest {
     @Mock private ConfigService configService;
     @Mock private ObjectMapper objectMapper;
     @Mock private FlowFacade flowFacade;
+    @Mock private FlowStatusColorResolver flowStatusColorResolver;
     @Mock private OrderFileMapper orderFileMapper;
     @Mock private OrderCancelApplyService cancelApplyService;
     @Mock private DesignFileService designFileService;
@@ -206,6 +212,30 @@ class DesignWorkorderServiceImplTest {
 
             // 验证传入 page 方法的 Page 对象 size=100
             verify(orderMainService).page(argThat(p -> ((Page<?>) p).getSize() == 100), any());
+        }
+
+        @Test
+        @DisplayName("结束日期使用次日零点作为排他边界")
+        void listWorkorders_createTimeEndUsesNextDayExclusiveBoundary() {
+            DesignWorkorderQueryDTO dto = new DesignWorkorderQueryDTO();
+            dto.setPageNum(1);
+            dto.setPageSize(10);
+            dto.setCreateTimeEnd(LocalDateTime.of(2026, 8, 25, 0, 0));
+
+            when(designQueryHelper.getCurrentUserId()).thenReturn(1L);
+            when(designQueryHelper.getCurrentUser()).thenReturn(new UserEntity());
+            when(userHospitalService.getDataScopeType(any())).thenReturn(DataScopeTypeEnum.ALL);
+            when(orderMainService.page(any(), any())).thenReturn(new Page<>(1, 10, 0));
+
+            ArgumentCaptor<LambdaQueryWrapper> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+            service.listWorkorders(dto);
+
+            verify(orderMainService).page(any(), captor.capture());
+            assertThat(captor.getValue().getExpression().getNormal()).isNotEmpty();
+            LocalDateTime exclusiveEnd = ReflectionTestUtils.invokeMethod(service, "toExclusiveEndTime",
+                    LocalDateTime.of(2026, 8, 25, 0, 0));
+            assertThat(exclusiveEnd)
+                    .isEqualTo(LocalDateTime.of(2026, 8, 26, 0, 0));
         }
 
         @Test

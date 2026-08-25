@@ -449,6 +449,25 @@ class OrderMainServiceImplListOrdersTest {
         }
 
         @Test
+        void filterByCreateTimeEnd_usesNextDayAsExclusiveBoundary() {
+            when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
+            when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
+            mockSelectPage(List.of(), 0L);
+
+            OrderPageDTO dto = baseDto();
+            dto.setCreateTimeEnd(LocalDateTime.of(2026, 8, 25, 0, 0));
+            orderMainService.listOrders(dto);
+
+            ArgumentCaptor<LambdaQueryWrapper> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+            verify(orderMainMapper).selectPage(any(Page.class), captor.capture());
+            assertThat(captor.getValue().getExpression().getNormal()).isNotEmpty();
+            LocalDateTime exclusiveEnd = ReflectionTestUtils.invokeMethod(orderMainService, "toExclusiveEndTime",
+                    LocalDateTime.of(2026, 8, 25, 0, 0));
+            assertThat(exclusiveEnd)
+                    .isEqualTo(LocalDateTime.of(2026, 8, 26, 0, 0));
+        }
+
+        @Test
         void filterByBodyPartIds_addsMoreSegments() {
             int baseline = getBaselineSegmentCount();
             clearInvocations(orderMainMapper);

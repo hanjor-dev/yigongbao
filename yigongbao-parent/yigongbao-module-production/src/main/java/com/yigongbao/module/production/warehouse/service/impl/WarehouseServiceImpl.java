@@ -65,11 +65,17 @@ public class WarehouseServiceImpl implements IWarehouseService {
 
     @Override
     public IPage<WarehouseRecordVO> listWarehouse(ListWarehouseDTO dto) {
+        dto.setWarehouseInTimeEnd(toExclusiveEndTime(dto.getWarehouseInTimeEnd()));
+        dto.setWarehouseOutTimeEnd(toExclusiveEndTime(dto.getWarehouseOutTimeEnd()));
         Page<WarehouseRecordVO> page = new Page<>(dto.getPage(), dto.getSize());
         return recordMapper.listWarehouse(page, dto).convert(vo -> {
             vo.setStatusColor(flowStatusColorResolver.getColor(vo.getStatus()));
             return vo;
         });
+    }
+
+    private LocalDateTime toExclusiveEndTime(LocalDateTime endTime) {
+        return endTime == null ? null : endTime.toLocalDate().plusDays(1).atStartOfDay();
     }
 
     @Override
@@ -181,6 +187,8 @@ public class WarehouseServiceImpl implements IWarehouseService {
 
     @Override
     public IPage<WarehouseProductVO> listWarehouseProducts(ListWarehouseProductDTO dto) {
+        dto.setWarehouseInTimeEnd(toExclusiveEndTime(dto.getWarehouseInTimeEnd()));
+        dto.setWarehouseOutTimeEnd(toExclusiveEndTime(dto.getWarehouseOutTimeEnd()));
         Page<WarehouseProductVO> page = new Page<>(dto.getPage(), dto.getSize());
         return recordMapper.listWarehouseProducts(page, dto);
     }

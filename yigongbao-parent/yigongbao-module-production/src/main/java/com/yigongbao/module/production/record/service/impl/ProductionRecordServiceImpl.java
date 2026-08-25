@@ -295,7 +295,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             List<Long> orderIds = orderMainMapper.selectList(
                     new LambdaQueryWrapper<OrderMainEntity>()
                             .ge(dto.getOrderCreateTimeStart() != null, OrderMainEntity::getCreateTime, dto.getOrderCreateTimeStart())
-                            .le(dto.getOrderCreateTimeEnd() != null, OrderMainEntity::getCreateTime, dto.getOrderCreateTimeEnd())
+                            .lt(dto.getOrderCreateTimeEnd() != null, OrderMainEntity::getCreateTime, toExclusiveEndTime(dto.getOrderCreateTimeEnd()))
                             .select(OrderMainEntity::getId))
                     .stream().map(OrderMainEntity::getId).collect(Collectors.toList());
             if (orderIds.isEmpty()) {
@@ -365,6 +365,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             fillStatusColors(vo);
             return vo;
         });
+    }
+
+    private LocalDateTime toExclusiveEndTime(LocalDateTime endTime) {
+        return endTime == null ? null : endTime.toLocalDate().plusDays(1).atStartOfDay();
     }
 
     private void fillStatusColors(ProductionRecordVO vo) {

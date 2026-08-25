@@ -48,9 +48,9 @@ public interface ProductionRecordMapper extends BaseMapper<ProductionRecordEntit
             "</if>" +
             "<if test='dto.status != null'>AND r.status = #{dto.status}</if>" +
             "<if test='dto.warehouseInTimeStart != null'>AND p.warehouse_in_time &gt;= #{dto.warehouseInTimeStart}</if>" +
-            "<if test='dto.warehouseInTimeEnd != null'>AND p.warehouse_in_time &lt;= #{dto.warehouseInTimeEnd}</if>" +
+            "<if test='dto.warehouseInTimeEnd != null'>AND p.warehouse_in_time &lt; #{dto.warehouseInTimeEnd}</if>" +
             "<if test='dto.warehouseOutTimeStart != null'>AND p.warehouse_out_time &gt;= #{dto.warehouseOutTimeStart}</if>" +
-            "<if test='dto.warehouseOutTimeEnd != null'>AND p.warehouse_out_time &lt;= #{dto.warehouseOutTimeEnd}</if>" +
+            "<if test='dto.warehouseOutTimeEnd != null'>AND p.warehouse_out_time &lt; #{dto.warehouseOutTimeEnd}</if>" +
             "GROUP BY r.id, r.record_no, r.order_code, r.hospital_name, r.hospital_dept_name, " +
             "r.doctor_name, r.patient_name, r.is_urgent, r.is_postal, r.expected_delivery_date, " +
             "r.processing_center_name, r.design_package_code, r.production_batch_no, r.material_batch_no, r.status " +
@@ -75,9 +75,9 @@ public interface ProductionRecordMapper extends BaseMapper<ProductionRecordEntit
             "</if>" +
             "<if test='dto.status != null and dto.status != \"\"'>AND p.status = #{dto.status}</if>" +
             "<if test='dto.warehouseInTimeStart != null'>AND p.warehouse_in_time &gt;= #{dto.warehouseInTimeStart}</if>" +
-            "<if test='dto.warehouseInTimeEnd != null'>AND p.warehouse_in_time &lt;= #{dto.warehouseInTimeEnd}</if>" +
+            "<if test='dto.warehouseInTimeEnd != null'>AND p.warehouse_in_time &lt; #{dto.warehouseInTimeEnd}</if>" +
             "<if test='dto.warehouseOutTimeStart != null'>AND p.warehouse_out_time &gt;= #{dto.warehouseOutTimeStart}</if>" +
-            "<if test='dto.warehouseOutTimeEnd != null'>AND p.warehouse_out_time &lt;= #{dto.warehouseOutTimeEnd}</if>" +
+            "<if test='dto.warehouseOutTimeEnd != null'>AND p.warehouse_out_time &lt; #{dto.warehouseOutTimeEnd}</if>" +
             "ORDER BY p.create_time DESC" +
             "</script>")
     IPage<WarehouseProductVO> listWarehouseProducts(Page<WarehouseProductVO> page, @Param("dto") ListWarehouseProductDTO dto);

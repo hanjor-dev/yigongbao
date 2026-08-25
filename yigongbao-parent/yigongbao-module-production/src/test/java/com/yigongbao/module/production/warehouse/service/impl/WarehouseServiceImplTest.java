@@ -14,6 +14,11 @@ import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.warehouse.dto.WarehouseInProductDTO;
 import com.yigongbao.module.production.warehouse.dto.WarehouseOutProductDTO;
+import com.yigongbao.module.production.warehouse.dto.ListWarehouseDTO;
+import com.yigongbao.module.production.warehouse.dto.ListWarehouseProductDTO;
+import com.yigongbao.module.production.warehouse.vo.WarehouseRecordVO;
+import com.yigongbao.module.production.warehouse.vo.WarehouseProductVO;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,6 +27,8 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -37,6 +44,36 @@ class WarehouseServiceImplTest {
 
     @InjectMocks
     private WarehouseServiceImpl warehouseService;
+
+    @Test
+    void listWarehouse_normalizesDateEndToNextDayExclusiveBoundary() {
+        ListWarehouseDTO dto = new ListWarehouseDTO();
+        dto.setPage(1);
+        dto.setSize(10);
+        dto.setWarehouseInTimeEnd(LocalDateTime.of(2026, 8, 25, 0, 0));
+        when(recordMapper.listWarehouse(any(Page.class), any(ListWarehouseDTO.class)))
+                .thenReturn(new Page<WarehouseRecordVO>(1, 10));
+
+        warehouseService.listWarehouse(dto);
+
+        assertEquals(LocalDateTime.of(2026, 8, 26, 0, 0), dto.getWarehouseInTimeEnd());
+    }
+
+    @Test
+    void listWarehouseProducts_normalizesDateEndsToNextDayExclusiveBoundary() {
+        ListWarehouseProductDTO dto = new ListWarehouseProductDTO();
+        dto.setPage(1);
+        dto.setSize(10);
+        dto.setWarehouseInTimeEnd(LocalDateTime.of(2026, 8, 25, 0, 0));
+        dto.setWarehouseOutTimeEnd(LocalDateTime.of(2026, 8, 25, 0, 0));
+        when(recordMapper.listWarehouseProducts(any(Page.class), any(ListWarehouseProductDTO.class)))
+                .thenReturn(new Page<WarehouseProductVO>(1, 10));
+
+        warehouseService.listWarehouseProducts(dto);
+
+        assertEquals(LocalDateTime.of(2026, 8, 26, 0, 0), dto.getWarehouseInTimeEnd());
+        assertEquals(LocalDateTime.of(2026, 8, 26, 0, 0), dto.getWarehouseOutTimeEnd());
+    }
 
     // ==================== warehouseInProduct ====================
 
