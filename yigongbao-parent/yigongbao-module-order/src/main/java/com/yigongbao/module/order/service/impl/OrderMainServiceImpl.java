@@ -47,7 +47,9 @@ import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.entity.OrderModificationLogEntity;
+import com.yigongbao.module.order.entity.OrderModificationApplyEntity;
 import com.yigongbao.module.order.enums.OrderDraftStatusEnum;
+import com.yigongbao.module.order.enums.ApplyStatusEnum;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.service.DesignerAssignmentService;
 import com.yigongbao.module.order.service.OrderCancelApplyService;
@@ -58,6 +60,7 @@ import com.yigongbao.module.order.mapper.OrderItemDraftMapper;
 import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
+import com.yigongbao.module.order.mapper.OrderModificationApplyMapper;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
@@ -79,6 +82,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -118,6 +122,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderItemDraftMapper orderItemDraftMapper;
     private final OrderFileMapper orderFileMapper;
     private final OrderModificationLogMapper orderModificationLogMapper;
+    private final OrderModificationApplyMapper orderModificationApplyMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
     private final OrgService orgService;
@@ -339,6 +344,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             orderQueryHelper.fillRebuildProjectList(voList);
 
             // 批量填充审核信息
+            fillModifyAuditStatus(pageResult.getRecords(), voList);
             for (int i = 0; i < voList.size(); i++) {
                 orderConvert.fillAuditInfo(pageResult.getRecords().get(i), voList.get(i));
             }
@@ -348,6 +354,43 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             ((Page<OrderListVO>) voPage).setRecords(voList);
 
             return voPage;
+    }
+
+    /**
+     * 批量填充订单最新修改审核状态，避免逐条查询修改申请。
+     *
+     * @param entities 当前页订单实体
+     * @param voList   当前页订单列表 VO
+     */
+    private void fillModifyAuditStatus(List<OrderMainEntity> entities, List<OrderListVO> voList) {
+        if (entities == null || entities.isEmpty()) {
+            return;
+        }
+
+        List<Long> orderIds = entities.stream()
+                .map(OrderMainEntity::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        if (orderIds.isEmpty()) {
+            return;
+        }
+
+        List<OrderModificationApplyEntity> applies = orderModificationApplyMapper.selectList(
+                new LambdaQueryWrapper<OrderModificationApplyEntity>()
+                        .in(OrderModificationApplyEntity::getOrderId, orderIds)
+                        .eq(OrderModificationApplyEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                        .orderByDesc(OrderModificationApplyEntity::getApplyTime)
+                        .orderByDesc(OrderModificationApplyEntity::getId));
+
+        Map<Long, Integer> latestStatusMap = new HashMap<>();
+        for (OrderModificationApplyEntity apply : applies) {
+            latestStatusMap.putIfAbsent(apply.getOrderId(),
+                    ApplyStatusEnum.APPROVED.getCode().equals(apply.getStatus()) ? 1 : 2);
+        }
+
+        for (int i = 0; i < entities.size(); i++) {
+            voList.get(i).setModifyAuditStatus(latestStatusMap.getOrDefault(entities.get(i).getId(), 0));
+        }
     }
 
     /**
