@@ -288,6 +288,25 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
+    void generateFlowCardExcel_multipleDeviceCandidates_usesOnlyOneCandidateWithLimitOne() throws Exception {
+        ProductionRecordEntity record = flowCardRecord(1L, 88L);
+        ProductionProcessEntity process = process("wash", null, null);
+        List<DeviceEntity> candidates = List.of(
+                device(2L, DeviceTypeEnum.WASH_CONTAINER.getCode(), 88L, "WASH-88-FIRST"),
+                device(3L, DeviceTypeEnum.WASH_CONTAINER.getCode(), 88L, "WASH-88-SECOND"));
+        when(deviceMapper.selectOne(any())).thenAnswer(invocation -> candidates.get(0));
+
+        FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(process));
+
+        assertEquals(1, context.getProcesses().size());
+        assertEquals("WASH-88-FIRST", context.getProcesses().get(0).getDeviceNo());
+        assertNotEquals("WASH-88-SECOND", context.getProcesses().get(0).getDeviceNo());
+        ArgumentCaptor<LambdaQueryWrapper<DeviceEntity>> queryCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(deviceMapper, times(1)).selectOne(queryCaptor.capture());
+        assertThat(queryCaptor.getValue().getSqlSegment()).contains("LIMIT 1");
+    }
+
+    @Test
     void generateFlowCardExcel_cleanDryMissingSecondaryDevice_usesAirCompressor() throws Exception {
         ProductionRecordEntity record = flowCardRecord(1L, 88L);
         ProductionProcessEntity process = process("clean_dry", "CLEANER-88", null);
@@ -349,14 +368,27 @@ class ProductionRecordServiceImplTest {
     void generateFlowCardExcel_deviceFallback_doesNotCrossProcessingCenter() throws Exception {
         ProductionRecordEntity record = flowCardRecord(1L, 88L);
         ProductionProcessEntity process = process("print", null, null);
-        when(deviceMapper.selectOne(any())).thenReturn(null);
+        DeviceEntity sameCenterDevice = device(2L, DeviceTypeEnum.PRINTER_SLA.getCode(), 88L, "PRINTER-88");
+        DeviceEntity otherCenterDevice = device(3L, DeviceTypeEnum.PRINTER_SLA.getCode(), 99L, "PRINTER-99");
+        when(deviceMapper.selectOne(any())).thenAnswer(invocation -> {
+            LambdaQueryWrapper<DeviceEntity> query = invocation.getArgument(0);
+            query.getSqlSegment();
+            Object centerId = query.getParamNameValuePairs().get("MPGENVAL1");
+            boolean sameCenter = record.getProcessingCenterId().equals(centerId);
+            return sameCenter ? sameCenterDevice : otherCenterDevice;
+        });
 
         FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(process));
 
-        assertNull(context.getProcesses().get(0).getDeviceNo());
+        assertEquals("PRINTER-88", context.getProcesses().get(0).getDeviceNo());
         ArgumentCaptor<LambdaQueryWrapper<DeviceEntity>> queryCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         verify(deviceMapper).selectOne(queryCaptor.capture());
-        assertThat(queryCaptor.getValue().getSqlSegment()).contains("centerId");
+        LambdaQueryWrapper<DeviceEntity> query = queryCaptor.getValue();
+        query.getSqlSegment();
+        assertThat(query.getParamNameValuePairs())
+                .containsEntry("MPGENVAL1", record.getProcessingCenterId())
+                .containsEntry("MPGENVAL2", DeviceTypeEnum.PRINTER_SLA.getCode());
+        assertThat(query.getParamNameValuePairs().values()).doesNotContain(otherCenterDevice.getCenterId());
         verify(processMapper, never()).update(any(), any());
     }
 
@@ -371,7 +403,13 @@ class ProductionRecordServiceImplTest {
         assertNull(context.getProcesses().get(0).getDeviceNo());
         assertNull(context.getProcesses().get(0).getSecondaryDeviceNo());
         verify(processMapper, never()).update(any(), any());
-        verify(recordMapper, times(1)).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(processMapper, never()).updateById((ProductionProcessEntity) any());
+        verify(recordMapper, never()).updateById((ProductionRecordEntity) any());
+        ArgumentCaptor<LambdaUpdateWrapper<ProductionRecordEntity>> updateCaptor =
+                ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(recordMapper, times(1)).update(isNull(), updateCaptor.capture());
+        assertThat(updateCaptor.getValue().getSqlSet())
+                .doesNotContain("printDevice", "packDevice", "deviceNo");
     }
 
     @Test
