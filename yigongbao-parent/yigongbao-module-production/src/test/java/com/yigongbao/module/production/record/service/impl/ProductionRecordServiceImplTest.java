@@ -65,6 +65,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -125,6 +126,11 @@ class ProductionRecordServiceImplTest {
             MapperBuilderAssistant assistant = new MapperBuilderAssistant(
                     new org.apache.ibatis.session.Configuration(), "");
             TableInfoHelper.initTableInfo(assistant, ProductionProcessEntity.class);
+        }
+        if (TableInfoHelper.getTableInfo(DeviceEntity.class) == null) {
+            MapperBuilderAssistant assistant = new MapperBuilderAssistant(
+                    new org.apache.ibatis.session.Configuration(), "");
+            TableInfoHelper.initTableInfo(assistant, DeviceEntity.class);
         }
         lenient().when(userMapper.selectById(1L))
                 .thenReturn(productionWorker(1L, 88L, "生产中心A"));
@@ -249,6 +255,123 @@ class ProductionRecordServiceImplTest {
                 ArgumentCaptor.forClass(FlowCardExcelBuilder.BuildContext.class);
         verify(flowCardExcelBuilder).build(contextCaptor.capture());
         assertEquals("folder/product.stl", contextCaptor.getValue().getProducts().get(0).getFileName());
+    }
+
+    @Test
+    void generateFlowCardExcel_prefersAssignedProcessDeviceNo_withoutFallbackQuery() throws Exception {
+        ProductionRecordEntity record = flowCardRecord(1L, 88L);
+        ProductionProcessEntity process = process("print", "ASSIGNED-PRINTER", null);
+
+        FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(process));
+
+        assertEquals("ASSIGNED-PRINTER", context.getProcesses().get(0).getDeviceNo());
+        verify(deviceMapper, never()).selectOne(any());
+        verify(processMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void generateFlowCardExcel_missingPrimaryDevice_queriesSameCenterAndMappedTypeWithLimitOne() throws Exception {
+        ProductionRecordEntity record = flowCardRecord(1L, 88L);
+        ProductionProcessEntity process = process("wash", null, null);
+        DeviceEntity device = device(2L, DeviceTypeEnum.WASH_CONTAINER.getCode(), 88L, "WASH-88");
+        when(deviceMapper.selectOne(any())).thenReturn(device);
+
+        FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(process));
+
+        assertEquals("WASH-88", context.getProcesses().get(0).getDeviceNo());
+        ArgumentCaptor<LambdaQueryWrapper<DeviceEntity>> queryCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(deviceMapper).selectOne(queryCaptor.capture());
+        LambdaQueryWrapper<DeviceEntity> query = queryCaptor.getValue();
+        assertThat(query.getSqlSegment()).contains("LIMIT 1");
+        assertThat(query.getSqlSelect()).contains("deviceId");
+        assertThat(query.getSqlSegment()).contains("centerId", "deviceType");
+    }
+
+    @Test
+    void generateFlowCardExcel_cleanDryMissingSecondaryDevice_usesAirCompressor() throws Exception {
+        ProductionRecordEntity record = flowCardRecord(1L, 88L);
+        ProductionProcessEntity process = process("clean_dry", "CLEANER-88", null);
+        DeviceEntity compressor = device(3L, DeviceTypeEnum.AIR_COMPRESSOR.getCode(), 88L, "AIR-88");
+        when(deviceMapper.selectOne(any())).thenReturn(compressor);
+
+        FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(process));
+
+        assertEquals("CLEANER-88", context.getProcesses().get(0).getDeviceNo());
+        assertEquals("AIR-88", context.getProcesses().get(0).getSecondaryDeviceNo());
+        ArgumentCaptor<LambdaQueryWrapper<DeviceEntity>> queryCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(deviceMapper).selectOne(queryCaptor.capture());
+        assertThat(queryCaptor.getValue().getSqlSegment())
+                .contains("centerId", "deviceType")
+                .doesNotContain(DeviceTypeEnum.DRYER.getCode());
+    }
+
+    @Test
+    void generateFlowCardExcel_missingDevices_mapsAllProcessTypes_andCachesOneQueryPerType() throws Exception {
+        ProductionRecordEntity record = flowCardRecord(1L, 88L);
+        List<ProductionProcessEntity> processes = List.of(
+                process("print", null, null),
+                process("wash", null, null),
+                process("cure", null, null),
+                process("clean_dry", null, null),
+                process("pack", null, null),
+                process("wash", null, null));
+        List<LambdaQueryWrapper<DeviceEntity>> queries = new ArrayList<>();
+        when(deviceMapper.selectOne(any())).thenAnswer(invocation -> {
+            LambdaQueryWrapper<DeviceEntity> query = invocation.getArgument(0);
+            queries.add(query);
+            return device((long) queries.size(), "fallback", 88L, "FALLBACK");
+        });
+
+        FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, processes);
+
+        assertEquals(List.of("FALLBACK", "FALLBACK", "FALLBACK", "FALLBACK", "FALLBACK", "FALLBACK"),
+                context.getProcesses().stream().map(FlowCardExcelBuilder.ProcessInfo::getDeviceNo).toList());
+        assertEquals("FALLBACK", context.getProcesses().get(3).getSecondaryDeviceNo());
+        assertEquals(6, queries.size());
+        queries.forEach(query -> {
+            assertThat(query.getSqlSegment()).contains("LIMIT 1");
+            assertThat(query.getSqlSelect()).contains("deviceId");
+            assertThat(query.getSqlSegment()).contains("centerId", "deviceType");
+        });
+        assertEquals(DeviceTypeEnum.PRINTER_SLA.getCode(), ReflectionTestUtils.invokeMethod(
+                recordService, "getFlowCardDeviceType", "print"));
+        assertEquals(DeviceTypeEnum.WASH_CONTAINER.getCode(), ReflectionTestUtils.invokeMethod(
+                recordService, "getFlowCardDeviceType", "wash"));
+        assertEquals(DeviceTypeEnum.UV_CURING.getCode(), ReflectionTestUtils.invokeMethod(
+                recordService, "getFlowCardDeviceType", "cure"));
+        assertEquals(DeviceTypeEnum.ULTRASONIC_CLEANER.getCode(), ReflectionTestUtils.invokeMethod(
+                recordService, "getFlowCardDeviceType", "clean_dry"));
+        assertEquals(DeviceTypeEnum.SEALING_MACHINE.getCode(), ReflectionTestUtils.invokeMethod(
+                recordService, "getFlowCardDeviceType", "pack"));
+    }
+
+    @Test
+    void generateFlowCardExcel_deviceFallback_doesNotCrossProcessingCenter() throws Exception {
+        ProductionRecordEntity record = flowCardRecord(1L, 88L);
+        ProductionProcessEntity process = process("print", null, null);
+        when(deviceMapper.selectOne(any())).thenReturn(null);
+
+        FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(process));
+
+        assertNull(context.getProcesses().get(0).getDeviceNo());
+        ArgumentCaptor<LambdaQueryWrapper<DeviceEntity>> queryCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(deviceMapper).selectOne(queryCaptor.capture());
+        assertThat(queryCaptor.getValue().getSqlSegment()).contains("centerId");
+        verify(processMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void generateFlowCardExcel_deviceFallback_missingDevice_doesNotWriteDeviceBack() throws Exception {
+        ProductionRecordEntity record = flowCardRecord(1L, 88L);
+        ProductionProcessEntity process = process("clean_dry", null, null);
+        when(deviceMapper.selectOne(any())).thenReturn(null);
+
+        FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(process));
+
+        assertNull(context.getProcesses().get(0).getDeviceNo());
+        assertNull(context.getProcesses().get(0).getSecondaryDeviceNo());
+        verify(processMapper, never()).update(any(), any());
+        verify(recordMapper, times(1)).update(isNull(), any(LambdaUpdateWrapper.class));
     }
 
     @Test
@@ -1079,6 +1202,40 @@ class ProductionRecordServiceImplTest {
         return r;
     }
 
+    private ProductionRecordEntity flowCardRecord(Long id, Long processingCenterId) {
+        ProductionRecordEntity record = record(id, 10L, FlowStatusEnum.PRINT_COMPLETED.getValue());
+        record.setRecordNo("REC-" + id);
+        record.setProcessingCenterId(processingCenterId);
+        return record;
+    }
+
+    private ProductionProcessEntity process(String processType, String deviceNo, String secondaryDeviceNo) {
+        ProductionProcessEntity process = new ProductionProcessEntity();
+        process.setProcessType(processType);
+        process.setDeviceNo(deviceNo);
+        process.setSecondaryDeviceNo(secondaryDeviceNo);
+        return process;
+    }
+
+    private FlowCardExcelBuilder.BuildContext generateFlowCardContext(
+            ProductionRecordEntity record, List<ProductionProcessEntity> processes) throws Exception {
+        when(recordMapper.selectById(record.getId())).thenReturn(record);
+        when(productMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(processMapper.selectList(any())).thenReturn(processes);
+        when(orderMainMapper.selectById(record.getOrderId())).thenReturn(order(record.getOrderId(), ProductionConstants.ORDER_TYPE_MEDICAL));
+        when(flowCardExcelBuilder.build(any())).thenReturn(new byte[] {1});
+        com.yigongbao.module.basic.file.vo.FileVO uploadedFile = new com.yigongbao.module.basic.file.vo.FileVO();
+        uploadedFile.setFileUrl("https://files/card.xlsx");
+        when(fileService.uploadBytes(any(), anyString(), anyString())).thenReturn(uploadedFile);
+
+        recordService.generateFlowCardExcel(record.getId());
+
+        ArgumentCaptor<FlowCardExcelBuilder.BuildContext> contextCaptor =
+                ArgumentCaptor.forClass(FlowCardExcelBuilder.BuildContext.class);
+        verify(flowCardExcelBuilder).build(contextCaptor.capture());
+        return contextCaptor.getValue();
+    }
+
     private void prepareDownloadClaim(UserEntity currentUser) {
         ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.DESIGN_COMPLETED.getValue());
         record.setDesignPackageId(1L);
@@ -1108,6 +1265,14 @@ class ProductionRecordServiceImplTest {
         d.setDeviceName("打印机A");
         d.setCenterId(1L);
         d.setCenterName("加工中心A");
+        return d;
+    }
+
+    private DeviceEntity device(Long id, String deviceType, Long centerId, String deviceNo) {
+        DeviceEntity d = device(id);
+        d.setDeviceType(deviceType);
+        d.setCenterId(centerId);
+        d.setDeviceId(deviceNo);
         return d;
     }
 
