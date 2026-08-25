@@ -22,6 +22,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DateTimeException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -70,24 +71,30 @@ public class DeviceStatusListener {
                 return;
             }
             LocalDateTime now = LocalDateTime.now();
+            LocalDateTime printStartTime = event.getPrintStartTime() != null
+                    ? event.getPrintStartTime() : now;
+            LocalDateTime estimatedPrintFinishTime = resolveEstimatedPrintFinishTime(event, printStartTime);
             List<ProductionRecordEntity> startedRecords = new java.util.ArrayList<>();
             records.forEach(record -> {
-                int updated = recordMapper.update(null,
-                        new LambdaUpdateWrapper<ProductionRecordEntity>()
+                LambdaUpdateWrapper<ProductionRecordEntity> updateWrapper = new LambdaUpdateWrapper<ProductionRecordEntity>()
                                 .eq(ProductionRecordEntity::getId, record.getId())
                                 .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue())
                                 .eq(ProductionRecordEntity::getPrintDeviceId, deviceId)
                                 .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINTING.getValue())
                                 .set(ProductionRecordEntity::getCurrentProcess,
                                         com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode())
-                                .set(ProductionRecordEntity::getPrintStartTime, now)
-                                .set(ProductionRecordEntity::getContentUpdateTime, now));
+                                .set(ProductionRecordEntity::getPrintStartTime, printStartTime)
+                                .set(ProductionRecordEntity::getContentUpdateTime, now);
+                if (estimatedPrintFinishTime != null) {
+                    updateWrapper.set(ProductionRecordEntity::getPrintFinishTime, estimatedPrintFinishTime);
+                }
+                int updated = recordMapper.update(null, updateWrapper);
                 if (updated == 0) {
                     log.info("打印开始事件状态更新未生效，跳过重复或已释放记录: recordId={}, deviceId={}",
                             record.getId(), deviceId);
                     return;
                 }
-                updatePrintProcessStartTime(record.getId(), now);
+                updatePrintProcessStartTime(record.getId(), printStartTime);
                 updateProductStatusToInProcess(record.getId());
                 startedRecords.add(record);
 
@@ -121,21 +128,23 @@ public class DeviceStatusListener {
             LocalDateTime now = LocalDateTime.now().withNano(0);
             List<ProductionRecordEntity> completedRecords = new java.util.ArrayList<>();
             for (ProductionRecordEntity record : records) {
+                LocalDateTime printFinishTime = record.getPrintFinishTime() != null
+                        ? record.getPrintFinishTime() : now;
                 int updated = recordMapper.update(null,
                         new LambdaUpdateWrapper<ProductionRecordEntity>()
                                 .eq(ProductionRecordEntity::getId, record.getId())
                                 .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINTING.getValue())
                                 .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINT_COMPLETED.getValue())
                                 .set(ProductionRecordEntity::getCurrentProcess, null)
-                                .set(ProductionRecordEntity::getPrintFinishTime, now)
+                                .set(ProductionRecordEntity::getPrintFinishTime, printFinishTime)
                                 .set(ProductionRecordEntity::getContentUpdateTime, now));
                 if (updated == 0) {
                     log.info("打印完成事件状态更新未生效，跳过重复处理: recordId={}, deviceId={}",
                             record.getId(), deviceId);
                     continue;
                 }
-                processService.schedulePostProcessing(record.getId(), now);
-                updatePrintProcessEndTime(record.getId(), now);
+                processService.schedulePostProcessing(record.getId(), printFinishTime);
+                updatePrintProcessEndTime(record.getId(), printFinishTime);
                 completedRecords.add(record);
 
                 log.info("设备状态变更触发打印完成: recordId={}, recordNo={}, deviceId={}",
@@ -163,6 +172,25 @@ public class DeviceStatusListener {
     private boolean isPrintFinish(Integer oldState, Integer newState) {
         return PrinterDeviceStateEnum.IDLE.getCode().equals(newState)
                 && PRINT_FINISH_PREVIOUS_STATES.contains(oldState);
+    }
+
+    /** 获取设备事件中的预计完成时间；兼容只传预计时长的事件。 */
+    private LocalDateTime resolveEstimatedPrintFinishTime(DeviceStateChangeEvent event,
+                                                          LocalDateTime printStartTime) {
+        if (event.getEstimatedPrintFinishTime() != null) {
+            return event.getEstimatedPrintFinishTime();
+        }
+        Integer estimatedDurationMinutes = event.getEstimatedDurationMinutes();
+        if (estimatedDurationMinutes == null || estimatedDurationMinutes < 0) {
+            return null;
+        }
+        try {
+            return printStartTime.plusMinutes(estimatedDurationMinutes);
+        } catch (DateTimeException exception) {
+            log.warn("计算预计打印结束时间失败，忽略该字段: printStartTime={}, minutes={}",
+                    printStartTime, estimatedDurationMinutes);
+            return null;
+        }
     }
 
     /** 更新打印工序开始时间 */

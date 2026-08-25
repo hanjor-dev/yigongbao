@@ -26,6 +26,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -34,6 +35,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -100,6 +102,51 @@ class DeviceStatusListenerTest {
         verify(recordService).triggerFlowIfAllReach(10L,
                 FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
         verify(recordService).reconcileOrderProductionStatus(10L);
+    }
+
+    @Test
+    void onDeviceStateChange_newWorking_usesExplicitPrintTimesAndUpdatesExcelContentTime() {
+        LocalDateTime printStartTime = LocalDateTime.of(2026, 8, 25, 10, 20, 30);
+        LocalDateTime estimatedPrintFinishTime = printStartTime.plusMinutes(45);
+        when(recordMapper.selectList(any())).thenReturn(List.of(recordWithStatus(
+                1L, 10L, FlowStatusEnum.PENDING_PRINT)));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
+        when(productMapper.selectList(any())).thenReturn(List.of(pendingProduct(101L)));
+        when(productMapper.update(isNull(), any())).thenReturn(1);
+
+        listener.onDeviceStateChange(new DeviceStateChangeEvent(this, 1L,
+                PrinterDeviceStateEnum.IDLE.getCode(), PrinterDeviceStateEnum.WORKING.getCode(),
+                printStartTime, 45, estimatedPrintFinishTime));
+
+        ArgumentCaptor<LambdaUpdateWrapper> recordUpdateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(recordMapper).update(isNull(), recordUpdateCaptor.capture());
+        LambdaUpdateWrapper recordUpdate = recordUpdateCaptor.getValue();
+        assertTrue(updateHasValue(recordUpdate, printStartTime), "print_start_time 未写入显式事件时间");
+        assertTrue(updateHasValue(recordUpdate, estimatedPrintFinishTime), "print_finish_time 未写入预计结束时间");
+        assertTrue(hasContentUpdateTime(recordUpdate), "content_update_time 未更新");
+        verify(processMapper).update(isNull(), argThat(update -> updateHasValue(update, printStartTime)));
+    }
+
+    @Test
+    void onDeviceStateChange_newWorking_oldEventFallsBackToNowWithoutPredictedFinishTime() {
+        LocalDateTime before = LocalDateTime.now();
+        when(recordMapper.selectList(any())).thenReturn(List.of(recordWithStatus(
+                1L, 10L, FlowStatusEnum.PENDING_PRINT)));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
+        when(productMapper.selectList(any())).thenReturn(List.of(pendingProduct(101L)));
+        when(productMapper.update(isNull(), any())).thenReturn(1);
+
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.IDLE.getCode(),
+                PrinterDeviceStateEnum.WORKING.getCode()));
+
+        LocalDateTime after = LocalDateTime.now();
+        verify(recordMapper).update(isNull(), argThat(update ->
+                hasLocalDateTimeBetween(update, before, after)
+                        && !hasPrintFinishTime(update)));
+        verify(processMapper).update(isNull(), argThat(update ->
+                hasLocalDateTimeBetween(update, before, after)));
     }
 
     @ParameterizedTest
@@ -178,6 +225,45 @@ class DeviceStatusListenerTest {
         verify(recordService).triggerFlowIfAllReach(10L,
                 FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
         verify(recordService).reconcileOrderProductionStatus(10L);
+    }
+
+    @Test
+    void onDeviceStateChange_finishEvent_preservesPredictedPrintFinishTimeEverywhere() {
+        LocalDateTime predictedPrintFinishTime = LocalDateTime.of(2026, 8, 25, 11, 5, 30);
+        ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING);
+        record.setPrintFinishTime(predictedPrintFinishTime);
+        stubRecordQueryByStatus(record);
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
+
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
+                PrinterDeviceStateEnum.IDLE.getCode()));
+
+        verify(processService).schedulePostProcessing(1L, predictedPrintFinishTime);
+        verify(recordMapper).update(isNull(), argThat(update -> updateHasValue(update,
+                predictedPrintFinishTime)));
+        verify(processMapper).update(isNull(), argThat(update -> updateHasValue(update,
+                predictedPrintFinishTime)));
+    }
+
+    @Test
+    void onDeviceStateChange_finishEvent_withoutPredictedPrintFinishTimeUsesCurrentTime() {
+        ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING);
+        stubRecordQueryByStatus(record);
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+        when(processMapper.update(isNull(), any())).thenReturn(1);
+        LocalDateTime before = LocalDateTime.now().withNano(0);
+
+        listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
+                PrinterDeviceStateEnum.IDLE.getCode()));
+
+        LocalDateTime after = LocalDateTime.now().withNano(0);
+        verify(processService).schedulePostProcessing(eq(1L), argThat(time ->
+                time != null && !time.isBefore(before) && !time.isAfter(after)));
+        verify(recordMapper).update(isNull(), argThat(update ->
+                hasLocalDateTimeBetween(update, before, after)));
+        verify(processMapper).update(isNull(), argThat(update ->
+                hasLocalDateTimeBetween(update, before, after)));
     }
 
     @ParameterizedTest
@@ -430,6 +516,41 @@ class DeviceStatusListenerTest {
         }
         wrapper.getSqlSegment();
         return wrapper.getParamNameValuePairs().containsValue(status.getValue());
+    }
+
+    private boolean updateHasValue(Object update, LocalDateTime value) {
+        if (!(update instanceof LambdaUpdateWrapper<?> wrapper)) {
+            return false;
+        }
+        wrapper.getSqlSegment();
+        wrapper.getSqlSet();
+        return wrapper.getParamNameValuePairs().containsValue(value);
+    }
+
+    private boolean hasLocalDateTimeBetween(Object update, LocalDateTime before, LocalDateTime after) {
+        if (!(update instanceof LambdaUpdateWrapper<?> wrapper)) {
+            return false;
+        }
+        wrapper.getSqlSegment();
+        wrapper.getSqlSet();
+        return wrapper.getParamNameValuePairs().values().stream()
+                .filter(LocalDateTime.class::isInstance)
+                .map(LocalDateTime.class::cast)
+                .anyMatch(value -> !value.isBefore(before) && !value.isAfter(after));
+    }
+
+    private boolean hasPrintFinishTime(Object update) {
+        if (!(update instanceof LambdaUpdateWrapper<?> wrapper)) {
+            return false;
+        }
+        return wrapper.getSqlSet() != null && wrapper.getSqlSet().contains("printFinishTime");
+    }
+
+    private boolean hasContentUpdateTime(Object update) {
+        if (!(update instanceof LambdaUpdateWrapper<?> wrapper)) {
+            return false;
+        }
+        return wrapper.getSqlSet() != null && wrapper.getSqlSet().contains("contentUpdateTime");
     }
 
     private void stubRecordQueryByStatus(ProductionRecordEntity record) {
