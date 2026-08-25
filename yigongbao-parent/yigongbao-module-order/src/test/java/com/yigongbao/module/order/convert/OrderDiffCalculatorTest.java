@@ -83,6 +83,19 @@ class OrderDiffCalculatorTest {
         assertFieldDiff(diffs, "needsPhysicalDelivery", "是否需要实物交付", "否", "是");
     }
 
+    @Test
+    void testNeedsPhysicalDeliveryDiff_FromNoToRemotePrinting() {
+        OrderDraftEntity current = createBaseOrderDraft();
+        current.setNeedsPhysicalDelivery(StatusConstants.NO);
+
+        OrderModifyFullDTO dto = createBaseModifyDTO();
+        dto.setNeedsPhysicalDelivery(2);
+
+        List<FieldDiff> diffs = invokeCalculateBasicInfoDiff(current, dto);
+
+        assertFieldDiff(diffs, "needsPhysicalDelivery", "是否需要实物交付", "否", "异地打印");
+    }
+
     /**
      * 测试 orderType 字段差异计算
      * 场景：从"医疗器械"改为"非医疗器械"

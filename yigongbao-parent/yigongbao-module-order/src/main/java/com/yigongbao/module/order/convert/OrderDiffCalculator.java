@@ -1,5 +1,7 @@
 package com.yigongbao.module.order.convert;
 
+import com.yigongbao.common.constant.PhysicalDeliveryConstants;
+
 import cn.hutool.core.collection.CollUtil;
 import com.yigongbao.common.entity.BaseEntity;
 import com.yigongbao.common.constant.StatusConstants;
@@ -151,8 +153,8 @@ public class OrderDiffCalculator {
 
         // 是否需要实物交付
         if (!Objects.equals(current.getNeedsPhysicalDelivery(), dto.getNeedsPhysicalDelivery())) {
-            String oldDisplay = current.getNeedsPhysicalDelivery() == StatusConstants.YES ? "是" : "否";
-            String newDisplay = dto.getNeedsPhysicalDelivery() == StatusConstants.YES ? "是" : "否";
+            String oldDisplay = getPhysicalDeliveryShortName(current.getNeedsPhysicalDelivery());
+            String newDisplay = getPhysicalDeliveryShortName(dto.getNeedsPhysicalDelivery());
             diffs.add(new FieldDiff("needsPhysicalDelivery", "是否需要实物交付",
                     String.valueOf(current.getNeedsPhysicalDelivery()),
                     String.valueOf(dto.getNeedsPhysicalDelivery()),
@@ -180,6 +182,18 @@ public class OrderDiffCalculator {
         }
 
         return diffs;
+    }
+
+    private String getPhysicalDeliveryShortName(Integer value) {
+        if (value == null) {
+            return null;
+        }
+        return switch (value) {
+            case PhysicalDeliveryConstants.NO_PHYSICAL_DELIVERY -> "否";
+            case PhysicalDeliveryConstants.NEEDS_PHYSICAL_DELIVERY -> "是";
+            case PhysicalDeliveryConstants.REMOTE_PRINTING -> "异地打印";
+            default -> "未知";
+        };
     }
 
     /**

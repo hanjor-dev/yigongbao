@@ -908,8 +908,8 @@ CREATE TABLE order_draft (
 
     -- ==================== 是否需要实体交付 ====================
     -- needsPhysicalDelivery = 1：走完整生产流程（打印→后处理→质检→仓储）
-    -- needsPhysicalDelivery = 0：跳过生产阶段，直接到确认阶段
-    needs_physical_delivery TINYINT DEFAULT 1 COMMENT '是否需要实体交付：0-不需要，1-需要',
+    -- needsPhysicalDelivery = 0/2：跳过生产阶段，直接到确认阶段；2-异地打印
+    needs_physical_delivery TINYINT DEFAULT 1 COMMENT '是否需要实体交付：0-不需要，1-需要，2-异地打印',
 
     business_type   VARCHAR(20)     NOT NULL COMMENT '业务类型（字典 dict_code：11.1-业务，11.2-测试，11.3-试用，11.4-代理）',
 
@@ -1051,8 +1051,8 @@ CREATE TABLE order_main (
 
     -- ==================== 是否需要实体交付 ====================
     -- needsPhysicalDelivery = 1：走完整生产流程（打印→后处理→质检→仓储）
-    -- needsPhysicalDelivery = 0：跳过生产阶段，直接到确认阶段
-    needs_physical_delivery TINYINT DEFAULT 1 COMMENT '是否需要实体交付：0-不需要，1-需要',
+    -- needsPhysicalDelivery = 0/2：跳过生产阶段，直接到确认阶段；2-异地打印
+    needs_physical_delivery TINYINT DEFAULT 1 COMMENT '是否需要实体交付：0-不需要，1-需要，2-异地打印',
 
     business_type   VARCHAR(20)     NOT NULL COMMENT '业务类型（字典 dict_code：11.1-业务，11.2-测试，11.3-试用，11.4-代理）',
 

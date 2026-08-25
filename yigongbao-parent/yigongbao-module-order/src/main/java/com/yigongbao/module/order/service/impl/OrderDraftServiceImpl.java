@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.DictCodeConstants;
+import com.yigongbao.common.constant.PhysicalDeliveryConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
@@ -578,11 +579,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
      */
     private String getNeedsPhysicalDeliveryName(Integer needsPhysicalDelivery) {
         if (needsPhysicalDelivery == null) return null;
-        return switch (needsPhysicalDelivery) {
-            case 0 -> "不需要实体交付";
-            case 1 -> "需要实体交付";
-            default -> null;
-        };
+        return PhysicalDeliveryConstants.getDisplayName(needsPhysicalDelivery);
     }
 
     private String getBusinessTypeName(String businessType) {

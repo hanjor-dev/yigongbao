@@ -3,6 +3,7 @@ package com.yigongbao.module.order.service.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.yigongbao.common.constant.DictCodeConstants;
+import com.yigongbao.common.constant.PhysicalDeliveryConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.module.order.constant.OrderModifyObjectType;
@@ -105,6 +106,8 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "订单不存在");
         }
+        validatePhysicalDeliveryValue(dto.getNeedsPhysicalDelivery());
+        validatePhysicalDeliveryChange(order, dto.getNeedsPhysicalDelivery());
 
         // 2. 获取当前用户角色（用于权限校验）
         Long currentUserId = StpUtil.getLoginIdAsLong();
@@ -358,11 +361,27 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         return ObjectChange.of(OrderModifyObjectType.DELIVERY, "交付信息", oldValue, newValue);
     }
 
+    private void validatePhysicalDeliveryValue(Integer value) {
+        if (value != null && !PhysicalDeliveryConstants.isSupported(value)) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NEEDS_PHYSICAL_DELIVERY_INVALID);
+        }
+    }
+
+    private void validatePhysicalDeliveryChange(OrderMainEntity order, Integer newValue) {
+        if (newValue == null || !PhysicalDeliveryConstants.needsProduction(order.getNeedsPhysicalDelivery())
+                || !PhysicalDeliveryConstants.isNoPhysicalDelivery(newValue)) {
+            return;
+        }
+        if (!Objects.equals(order.getNeedsPhysicalDelivery(), newValue)) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NEEDS_PHYSICAL_DELIVERY_CHANGE_FORBIDDEN);
+        }
+    }
+
     /**
      * 格式化交付信息
      */
     private String formatDelivery(Integer needsPhysicalDelivery, String address, Integer isUrgent) {
-        String deliveryText = (needsPhysicalDelivery != null && needsPhysicalDelivery == 1) ? "需要实体交付" : "不需要实体交付";
+        String deliveryText = PhysicalDeliveryConstants.getDisplayName(needsPhysicalDelivery);
         String addressText = StrUtil.isNotBlank(address) ? "，地址:" + address : "";
         String urgentText = (isUrgent != null && isUrgent == 1) ? "，加急" : "";
         return deliveryText + addressText + urgentText;

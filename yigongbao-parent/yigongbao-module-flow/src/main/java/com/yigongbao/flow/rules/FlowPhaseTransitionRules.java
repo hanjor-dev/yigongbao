@@ -1,5 +1,7 @@
 package com.yigongbao.flow.rules;
 
+import com.yigongbao.common.constant.PhysicalDeliveryConstants;
+
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -65,7 +67,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      *
      * @param fromPhase 当前阶段
      * @param toPhase 目标阶段
-     * @param needsPhysicalDelivery 是否需要实体交付（0-不需要，1-需要）
+     * @param needsPhysicalDelivery 是否需要实体交付（0-不需要，1-需要，2-异地打印）
      *                             为 null 时按 1（需要实体交付）处理
      * @return 是否合法
      */
@@ -80,7 +82,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
         }
 
         // 不需要实体交付的订单不能进入打印/后处理/质检/仓储阶段
-        boolean needsProduction = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
+        boolean needsProduction = PhysicalDeliveryConstants.needsProduction(needsPhysicalDelivery);
         if (!needsProduction) {
             if (toPhase == FlowPhaseEnum.PRINT || toPhase == FlowPhaseEnum.POST_PROCESSING
                     || toPhase == FlowPhaseEnum.QC || toPhase == FlowPhaseEnum.WAREHOUSE) {
@@ -98,12 +100,12 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
      * 用于阶段推进时的自动跳转
      *
      * @param currentPhase 当前阶段
-     * @param needsPhysicalDelivery 是否需要实体交付（0-不需要，1-需要）
+     * @param needsPhysicalDelivery 是否需要实体交付（0-不需要，1-需要，2-异地打印）
      *                             为 null 时按 1（需要实体交付）处理
      * @return 下一个阶段，如果没有则返回 null
      */
     public static FlowPhaseEnum getNextPhase(FlowPhaseEnum currentPhase, Integer needsPhysicalDelivery) {
-        boolean needsProduction = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
+        boolean needsProduction = PhysicalDeliveryConstants.needsProduction(needsPhysicalDelivery);
         return switch (currentPhase) {
             case ORDER -> FlowPhaseEnum.DESIGN;
             case DESIGN -> needsProduction ? FlowPhaseEnum.PRINT : FlowPhaseEnum.COMPLETED;
@@ -149,7 +151,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
             Integer needsPhysicalDelivery,
             Integer orderType) {
 
-        boolean needsProduction = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
+        boolean needsProduction = PhysicalDeliveryConstants.needsProduction(needsPhysicalDelivery);
 
         // 审核通过 → 进入设计阶段，初始状态为 PENDING_DESIGN（待分配设计师）
         if (targetStatus == FlowStatusEnum.DATA_AUDIT_PASSED) {
@@ -158,7 +160,7 @@ public class FlowPhaseTransitionRules implements FlowTransitionRule {
 
         // 设计完成 → 不自动推进，停留在设计完成状态
         // - needsPhysicalDelivery=1: 等待生产员下载数据包后手动推进到打印阶段
-        // - needsPhysicalDelivery=0: 等待业务员线下确认后手动完成
+        // - needsPhysicalDelivery=0/2: 等待业务员线下确认后手动完成
         if (targetStatus == FlowStatusEnum.DESIGN_COMPLETED) {
             return new PhaseAndStatus(null, null);
         }

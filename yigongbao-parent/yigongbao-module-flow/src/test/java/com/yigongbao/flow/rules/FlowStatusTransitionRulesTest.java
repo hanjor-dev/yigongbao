@@ -109,6 +109,13 @@ class FlowStatusTransitionRulesTest {
         }
 
         @Test
+        @DisplayName("phase=PRINT, status=PENDING_PRINT(3010), needsPhysicalDelivery=2（异地打印）→ 返回空列表")
+        void print_phase_pendingPrint_remotePrinting_shouldReturn_empty() {
+            List<FlowActionEnum> actions = rules.getAvailableActions(3010, 30, 2);
+            assertEquals(List.of(FlowActionEnum.CANCEL), actions);
+        }
+
+        @Test
         @DisplayName("phase=PRINT, status=PRINTING(3020) → 返回 [COMPLETE_PRINT]")
         void print_phase_printing_shouldReturn_completePrint() {
             List<FlowActionEnum> actions = rules.getAvailableActions(3020, 30, 1);

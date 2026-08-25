@@ -158,6 +158,15 @@ class OrderControllerTest {
     }
 
     @Test
+    void saveDraft_acceptsRemotePrintingValue() throws Exception {
+        mockMvc.perform(post("/order/draft")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderType\":1,\"needsPhysicalDelivery\":2,\"businessType\":\"11.1\",\"orgId\":1,\"hospitalId\":2,\"patientName\":\"测试\"}"))
+                .andExpect(status().isOk());
+        verify(orderDraftService).saveDraft(any());
+    }
+
+    @Test
     void removeDraft_delegatesPathId() throws Exception {
         mockMvc.perform(delete("/order/draft/{id}", 31L))
                 .andExpect(status().isOk());
@@ -172,6 +181,25 @@ class OrderControllerTest {
                         .content("{\"orderType\":1,\"needsPhysicalDelivery\":0,\"businessType\":\"11.1\",\"orgId\":1,\"hospitalId\":2,\"patientName\":\"测试\",\"items\":[{\"bodyPartId\":1,\"projectId\":2}]}"))
                 .andExpect(status().isOk());
         verify(orderMainService).createOrder(any());
+    }
+
+    @Test
+    void createOrder_acceptsRemotePrintingValue() throws Exception {
+        when(orderMainService.createOrder(any())).thenReturn(33L);
+        mockMvc.perform(post("/order")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderType\":1,\"needsPhysicalDelivery\":2,\"businessType\":\"11.1\",\"orgId\":1,\"hospitalId\":2,\"patientName\":\"测试\",\"items\":[{\"bodyPartId\":1,\"projectId\":2}]}"))
+                .andExpect(status().isOk());
+        verify(orderMainService).createOrder(any());
+    }
+
+    @Test
+    void createOrder_rejectsUnsupportedPhysicalDeliveryValue() throws Exception {
+        mockMvc.perform(post("/order")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderType\":1,\"needsPhysicalDelivery\":3,\"businessType\":\"11.1\",\"orgId\":1,\"hospitalId\":2,\"patientName\":\"测试\",\"items\":[{\"bodyPartId\":1,\"projectId\":2}]}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(orderMainService);
     }
 
     @Test

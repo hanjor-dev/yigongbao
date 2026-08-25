@@ -36,10 +36,10 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
     private Integer orderType;
 
     /**
-     * 是否需要实体交付：0-不需要，1-需要
+     * 是否需要实体交付：0-不需要，1-需要，2-异地打印（按不需要实体交付流程处理）
      * 【业务说明】
      * - needsPhysicalDelivery = 1（需要实体交付）：走完整的生产流程（打印→后处理→质检→仓储）
-     * - needsPhysicalDelivery = 0（不需要实体交付）：跳过生产相关阶段，直接到确认阶段
+     * - needsPhysicalDelivery = 0（不需要实体交付）或 2（异地打印）：跳过生产相关阶段，直接到确认阶段
      * 【变更规则】
      * - 仅在订单阶段允许修改
      * - 仅允许 0→1 的变更（不需要→需要），不允许 1→0 的变更

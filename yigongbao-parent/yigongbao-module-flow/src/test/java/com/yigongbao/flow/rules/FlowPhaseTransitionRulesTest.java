@@ -174,10 +174,17 @@ class FlowPhaseTransitionRulesTest {
 
         @Test
         @DisplayName("DESIGN + needsPhysicalDelivery=0 → COMPLETED")
-        void design_noDelivery_shouldReturn_completed() {
-            assertEquals(FlowPhaseEnum.COMPLETED,
-                    FlowPhaseTransitionRules.getNextPhase(FlowPhaseEnum.DESIGN, 0));
-        }
+    void design_noDelivery_shouldReturn_completed() {
+        assertEquals(FlowPhaseEnum.COMPLETED,
+                FlowPhaseTransitionRules.getNextPhase(FlowPhaseEnum.DESIGN, 0));
+    }
+
+    @Test
+    @DisplayName("DESIGN + needsPhysicalDelivery=2（异地打印）→ COMPLETED")
+    void design_remotePrinting_shouldReturn_completed() {
+        assertEquals(FlowPhaseEnum.COMPLETED,
+                FlowPhaseTransitionRules.getNextPhase(FlowPhaseEnum.DESIGN, 2));
+    }
 
         @Test
         @DisplayName("DESIGN + needsPhysicalDelivery=null → 视为需要实体交付")

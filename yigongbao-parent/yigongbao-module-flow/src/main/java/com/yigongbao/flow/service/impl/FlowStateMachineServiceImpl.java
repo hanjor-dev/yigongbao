@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  * 【核心逻辑】
  * - 订单流程分支由 needsPhysicalDelivery 决定
  * - needsPhysicalDelivery = 1（需要实体交付）：走完整生产流程
- * - needsPhysicalDelivery = 0（不需要实体交付）：跳过生产阶段
+ * - needsPhysicalDelivery = 0（不需要实体交付）或 2（异地打印）：跳过生产阶段
  * - DESIGN_REVIEW_PASSED 等不可见状态不落库，由状态机内部吸收并推进阶段
  *
  * 【阶段推进语义】

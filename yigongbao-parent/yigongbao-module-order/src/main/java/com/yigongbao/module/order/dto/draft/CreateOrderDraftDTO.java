@@ -35,11 +35,11 @@ public class CreateOrderDraftDTO implements Serializable {
     private Integer orderType;
 
     /**
-     * 是否需要实体交付：0-不需要，1-需要
+     * 是否需要实体交付：0-不需要，1-需要，2-异地打印（按不需要实体交付流程处理）
      */
     @NotNull(message = "是否需要实体交付不能为空")
     @Min(value = 0, message = "是否需要实体交付值不合法")
-    @Max(value = 1, message = "是否需要实体交付值不合法")
+    @Max(value = 2, message = "是否需要实体交付值不合法")
     private Integer needsPhysicalDelivery;
 
     /**

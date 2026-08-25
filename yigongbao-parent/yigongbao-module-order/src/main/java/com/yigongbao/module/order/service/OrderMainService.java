@@ -175,7 +175,7 @@ public interface OrderMainService extends IService<OrderMainEntity> {
 
     /**
      * 手动完成订单（仅限不需要实体交付的订单）
-     * 前置条件：订单状态为设计完成(2030)，needsPhysicalDelivery=0
+     * 前置条件：订单状态为设计完成(2030)，needsPhysicalDelivery=0/2
      *
      * @param orderId 订单ID
      * @param version 订单版本号（乐观锁）

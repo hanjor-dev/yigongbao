@@ -43,7 +43,7 @@ public class DesignWorkorderListVO {
     /** 订单类型名称 */
     private String orderTypeName;
 
-    /** 是否需要实体交付（0=否，1=是） */
+    /** 是否需要实体交付（0=否，1=是，2=异地打印） */
     private Integer needsPhysicalDelivery;
 
     /** 实体交付名称 */

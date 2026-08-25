@@ -18,6 +18,7 @@ import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.RoleCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
+import com.yigongbao.common.constant.PhysicalDeliveryConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -100,8 +101,8 @@ import java.util.stream.Collectors;
  *
  * 【needsPhysicalDelivery 变更规则】
  * - 仅在订单阶段（phase=10）允许修改
- * - 仅允许 0→1 的变更（不需要→需要实体交付）
- * - 不允许 1→0 的变更（需要→不需要实体交付）
+ * - 允许 0/2→1 的变更（非实体交付→需要实体交付）
+ * - 不允许 1→0/2 的变更（需要实体交付→非实体交付）
  * 校验逻辑见 {@link #validateNeedsPhysicalDeliveryChange(OrderMainEntity, UpdateOrderDTO)}
  *
  * @author hanjor
@@ -469,8 +470,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      *
      * 【needsPhysicalDelivery 变更规则】
      * - 仅在订单阶段（phase=10）允许修改
-     * - 仅允许 0→1 的变更（不需要→需要实体交付）
-     * - 不允许 1→0 的变更（需要→不需要实体交付）
+     * - 允许 0/2→1 的变更（非实体交付→需要实体交付）
+     * - 不允许 1→0/2 的变更（需要实体交付→非实体交付）
      *
      * @param id 订单ID
      * @param dto 更新参数
@@ -516,6 +517,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
         Integer oldValue = entity.getNeedsPhysicalDelivery();
         Integer newValue = dto.getNeedsPhysicalDelivery();
+        if (!PhysicalDeliveryConstants.isSupported(newValue)) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NEEDS_PHYSICAL_DELIVERY_INVALID);
+        }
         // 如果值未变化，跳过校验
         if (Objects.equals(oldValue, newValue)) {
             return;
@@ -525,12 +529,13 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             log.warn("needsPhysicalDelivery 仅在订单阶段允许修改，orderId={}, phase={}", entity.getId(), entity.getPhase());
             throw new BusinessException(ErrorCodeEnum.ORDER_NEEDS_PHYSICAL_DELIVERY_CHANGE_FORBIDDEN);
         }
-        // 不允许 1→0 的变更（需要→不需要实体交付）
-        if (Objects.equals(oldValue, 1) && Objects.equals(newValue, 0)) {
-            log.warn("需要实体交付的订单不允许修改为不需要实体交付，orderId={}", entity.getId());
+        // 不允许从需要实体交付改为任一非实体交付类型（1→0 或 1→2）
+        if (PhysicalDeliveryConstants.needsProduction(oldValue)
+                && PhysicalDeliveryConstants.isNoPhysicalDelivery(newValue)) {
+            log.warn("需要实体交付的订单不允许修改为非实体交付类型，orderId={}, newValue={}", entity.getId(), newValue);
             throw new BusinessException(ErrorCodeEnum.ORDER_NEEDS_PHYSICAL_DELIVERY_CHANGE_FORBIDDEN);
         }
-        // 0→1 是允许的变更，不做额外处理
+        // 0/2→1 是允许的变更，不做额外处理
     }
 
     /**
@@ -915,7 +920,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
         // 校验必须是不需要实体交付的订单
-        if (!Objects.equals(entity.getNeedsPhysicalDelivery(), StatusConstants.NO)) {
+        if (!PhysicalDeliveryConstants.isNoPhysicalDelivery(entity.getNeedsPhysicalDelivery())) {
             log.warn("订单需要实体交付，不允许手动完成: orderId={}, needsPhysicalDelivery={}",
                 orderId, entity.getNeedsPhysicalDelivery());
             throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_TRANSITION_ERROR);

@@ -11,6 +11,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.constant.PhysicalDeliveryConstants;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
@@ -866,7 +867,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
      * 完成设计
      * 根据 needsPhysicalDelivery 标志执行不同的校验路径：
      * - 需要实体交付(needsPhysicalDelivery=1)：校验数据包、打印信息、指令单、图纸及确认状态
-     * - 不需要实体交付(needsPhysicalDelivery=0)：只校验 STL 重建模型
+     * - 不需要实体交付或异地打印(needsPhysicalDelivery=0/2)：只校验 STL 重建模型
      *
      * @param orderId 订单ID
      */
@@ -904,7 +905,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         log.info("开始完成设计校验: orderId={}, orderType={}, needsPhysicalDelivery={}, currentStatus={}",
             orderId, order.getOrderType(), order.getNeedsPhysicalDelivery(), order.getStatus());
 
-        if (Integer.valueOf(StatusConstants.YES).equals(order.getNeedsPhysicalDelivery())) {
+        if (PhysicalDeliveryConstants.needsProduction(order.getNeedsPhysicalDelivery())) {
             // 校验实体交付所需的完整数据
             log.info("执行实体交付校验: orderId={}", orderId);
             validatePhysicalDelivery(order, orderId);

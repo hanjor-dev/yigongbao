@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.constant.StatusConstants;
+import com.yigongbao.common.constant.PhysicalDeliveryConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.event.ClassicCaseMarkedEvent;
@@ -72,7 +73,7 @@ public class OrderClassicCaseServiceImpl implements IOrderClassicCaseService {
         boolean isCompleted = FlowPhaseEnum.COMPLETED.getValue().equals(order.getPhase());
         boolean isWarehouseOut = FlowStatusEnum.WAREHOUSE_OUT.getValue().equals(order.getStatus());
         boolean isDesignCompleted = FlowStatusEnum.DESIGN_COMPLETED.getValue().equals(order.getStatus());
-        boolean needsPhysicalDelivery = Integer.valueOf(StatusConstants.YES).equals(order.getNeedsPhysicalDelivery());
+        boolean needsPhysicalDelivery = PhysicalDeliveryConstants.needsProduction(order.getNeedsPhysicalDelivery());
 
         boolean canMark = isCompleted || isWarehouseOut ||
                          (isDesignCompleted && !needsPhysicalDelivery);

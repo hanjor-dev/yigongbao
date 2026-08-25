@@ -42,6 +42,7 @@ public class OrderModifyFullDTO implements Serializable {
     private Long hospitalDeptId;
 
     // ==================== 交付信息 ====================
+    /** 是否需要实体交付：0-不需要，1-需要，2-异地打印（按不需要实体交付流程处理） */
     private Integer needsPhysicalDelivery;
     private String postalAddress;
     private LocalDateTime expectedDeliveryDate;

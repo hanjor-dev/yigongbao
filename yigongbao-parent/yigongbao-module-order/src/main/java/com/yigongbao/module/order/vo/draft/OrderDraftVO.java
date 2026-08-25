@@ -46,7 +46,7 @@ public class OrderDraftVO implements Serializable {
     private String orderTypeName;
 
     /**
-     * 是否需要实体交付：0-不需要，1-需要
+     * 是否需要实体交付：0-不需要，1-需要，2-异地打印
      */
     private Integer needsPhysicalDelivery;
 

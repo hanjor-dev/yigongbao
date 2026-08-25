@@ -1,5 +1,7 @@
 package com.yigongbao.flow.rules;
 
+import com.yigongbao.common.constant.PhysicalDeliveryConstants;
+
 import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -19,7 +21,7 @@ import java.util.*;
  * - 订单类型（orderType）：仅区分医疗器械/非医疗器械，用于法规相关判断
  * - 是否需要实体交付（needsPhysicalDelivery）：用于流程分支判断
  *   - needsPhysicalDelivery = 1（需要实体交付）：走完整的生产流程（打印→后处理→质检→仓储）
- *   - needsPhysicalDelivery = 0（不需要实体交付）：跳过生产相关阶段，直接到确认阶段
+ *   - needsPhysicalDelivery = 0（不需要实体交付）或 2（异地打印）：跳过生产相关阶段，直接到确认阶段
  *
  * 【方法设计说明】：
  * - getAvailableActions: 实例方法，以 phase 为外层 switch，status 为内层判断
@@ -114,7 +116,7 @@ public class FlowStatusTransitionRules {
      *
      * @param currentStatus 当前状态值
      * @param phase 当前阶段值
-     * @param needsPhysicalDelivery 是否需要实体交付（0-不需要，1-需要）
+     * @param needsPhysicalDelivery 是否需要实体交付（0-不需要，1-需要，2-异地打印）
      * @return 可执行的动作列表
      */
     public List<FlowActionEnum> getAvailableActions(Integer currentStatus, Integer phase, Integer needsPhysicalDelivery) {
@@ -127,7 +129,7 @@ public class FlowStatusTransitionRules {
             return List.of();
         }
 
-        boolean needsProduction = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
+        boolean needsProduction = PhysicalDeliveryConstants.needsProduction(needsPhysicalDelivery);
 
         // 以阶段为外层 switch，精确区分不同阶段中相同状态码的含义
         List<FlowActionEnum> actions = switch (phaseEnum) {
@@ -332,7 +334,7 @@ public class FlowStatusTransitionRules {
     public Set<FlowStatusEnum> getValidStatusesForPhase(
             FlowPhaseEnum phase, Integer needsPhysicalDelivery) {
 
-        boolean needsProduction = needsPhysicalDelivery == null || needsPhysicalDelivery == 1;
+        boolean needsProduction = PhysicalDeliveryConstants.needsProduction(needsPhysicalDelivery);
 
         return switch (phase) {
             case ORDER -> Set.of(FlowStatusEnum.DRAFT, FlowStatusEnum.PENDING_DATA_AUDIT,

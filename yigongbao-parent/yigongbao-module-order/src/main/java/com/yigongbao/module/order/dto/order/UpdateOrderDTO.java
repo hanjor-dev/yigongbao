@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
  *
  * 【重要】needsPhysicalDelivery 变更规则：
  * - 仅在订单阶段（phase=10）允许修改
- * - 仅允许 0→1 的变更（不需要→需要实体交付）
- * - 不允许 1→0 的变更（需要→不需要实体交付）
+ * - 允许 0/2→1 的变更（非实体交付→需要实体交付）
+ * - 不允许 1→0/2 的变更（需要实体交付→非实体交付）
  * 业务校验逻辑在 OrderMainServiceImpl.updateOrder 中实现
  *
  * @author hanjor
@@ -75,7 +75,7 @@ public class UpdateOrderDTO implements Serializable {
     private LocalDateTime expectedDeliveryDate;
 
     /**
-     * 是否需要实体交付：0-不需要，1-需要
+     * 是否需要实体交付：0-不需要，1-需要，2-异地打印
      * 【变更规则】仅在订单阶段允许修改，仅允许 0→1，不允许 1→0
      */
     private Integer needsPhysicalDelivery;

@@ -489,6 +489,14 @@ class OrderQueryHelperTest {
         }
 
         @Test
+        void needsPhysicalDelivery2_isRemotePrinting() {
+            OrderMainEntity entity = buildEntity();
+            entity.setNeedsPhysicalDelivery(2);
+            OrderListVO vo = orderQueryHelper.toOrderListVO(entity);
+            assertThat(vo.getNeedsPhysicalDeliveryName()).isEqualTo("异地打印");
+        }
+
+        @Test
         void businessType_lookupDict() {
             OrderMainEntity entity = buildEntity();
             entity.setBusinessType(DictCodeConstants.ORDER_BUSINESS_TYPE_BUSINESS);

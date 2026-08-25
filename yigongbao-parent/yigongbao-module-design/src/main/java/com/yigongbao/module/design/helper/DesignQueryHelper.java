@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.constant.DictCodeConstants;
+import com.yigongbao.common.constant.PhysicalDeliveryConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -319,12 +320,17 @@ public class DesignQueryHelper {
     /**
      * 将实体交付标识翻译为中文名称
      *
-     * @param needsPhysicalDelivery 0=否，1=是
+     * @param needsPhysicalDelivery 0=否，1=是，2=异地打印
      * @return 中文名称
      */
     public String getNeedsPhysicalDeliveryName(Integer needsPhysicalDelivery) {
         if (needsPhysicalDelivery == null) return null;
-        return needsPhysicalDelivery == 1 ? "是" : "否";
+        return switch (needsPhysicalDelivery) {
+            case PhysicalDeliveryConstants.NO_PHYSICAL_DELIVERY -> "否";
+            case PhysicalDeliveryConstants.NEEDS_PHYSICAL_DELIVERY -> "是";
+            case PhysicalDeliveryConstants.REMOTE_PRINTING -> "异地打印";
+            default -> null;
+        };
     }
 
     /**
