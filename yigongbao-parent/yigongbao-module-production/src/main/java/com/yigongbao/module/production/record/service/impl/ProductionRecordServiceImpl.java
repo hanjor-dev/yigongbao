@@ -396,7 +396,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         // 首次下载负责认领流转卡；已进入生产阶段的记录仅返回文件地址，允许重复下载。
         // 后续下载不能再次覆盖生产员、加工中心或订单处理人，也不能重复触发状态流转和认领通知。
-        if (!FlowStatusEnum.DESIGN_COMPLETED.getValue().equals(record.getStatus())) {
+        if (NORMAL_PRODUCTION_STATUSES.contains(record.getStatus())
+                && !FlowStatusEnum.DESIGN_COMPLETED.getValue().equals(record.getStatus())) {
             log.info("重复下载设计数据包，跳过流转卡认领: recordId={}, designPackageId={}, status={}",
                     recordId, designPackageId, record.getStatus());
             return designPackage.getFileUrl();

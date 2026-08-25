@@ -632,6 +632,25 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
+    void downloadDataPackage_cancelledRecordDoesNotUseRedownloadBranch() {
+        ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.CANCELLED.getValue());
+        record.setDesignPackageId(1L);
+        when(recordMapper.selectOne(any())).thenReturn(record);
+        when(designPackageMapper.selectById(1L)).thenReturn(pkg(1L, 10L));
+        when(orderMainMapper.selectById(10L)).thenReturn(order(10L, ProductionConstants.ORDER_TYPE_MEDICAL));
+        when(userMapper.selectById(1L)).thenReturn(productionWorker(1L, 88L, "生产中心A"));
+        when(recordMapper.update(isNull(), any())).thenReturn(0);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            mockStp(stp);
+
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> recordService.downloadDataPackage(1L));
+            assertEquals(ErrorCodeEnum.PRODUCTION_RECORD_ALREADY_CLAIMED.getCode(), exception.getCode());
+        }
+    }
+
+    @Test
     void downloadDataPackage_differentCenterLosesClaim_doesNotOverwriteWinner() {
         prepareDownloadClaim(productionWorker(2L, 99L, "生产中心B"));
         when(userMapper.selectById(2L)).thenReturn(productionWorker(2L, 99L, "生产中心B"));
