@@ -290,6 +290,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                     .like(StrUtil.isNotBlank(dto.getPatientName()), OrderMainEntity::getPatientName, dto.getPatientName())
                     .like(StrUtil.isNotBlank(dto.getDoctorName()), OrderMainEntity::getDoctorName, dto.getDoctorName())
                     .eq(StrUtil.isNotBlank(dto.getBusinessType()), OrderMainEntity::getBusinessType, dto.getBusinessType())
+                    .eq(Objects.nonNull(dto.getNeedsPhysicalDelivery()), OrderMainEntity::getNeedsPhysicalDelivery, dto.getNeedsPhysicalDelivery())
                     .eq(Objects.nonNull(dto.getOperatorId()), OrderMainEntity::getOperatorId, dto.getOperatorId())
                     .ge(Objects.nonNull(dto.getCreateTimeStart()), OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
                     .lt(Objects.nonNull(dto.getCreateTimeEnd()), OrderMainEntity::getCreateTime, toExclusiveEndTime(dto.getCreateTimeEnd()));

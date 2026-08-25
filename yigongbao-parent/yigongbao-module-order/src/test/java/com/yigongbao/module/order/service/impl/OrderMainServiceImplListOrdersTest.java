@@ -21,6 +21,8 @@ import com.yigongbao.module.system.user.service.UserHospitalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -416,6 +418,19 @@ class OrderMainServiceImplListOrdersTest {
 
             OrderPageDTO dto = baseDto();
             dto.setStatus(2010);
+            int withFilter = executeAndGetSegmentCount(dto);
+
+            assertThat(withFilter).isGreaterThan(baseline);
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = {0, 1, 2})
+        void filterByNeedsPhysicalDelivery_includesAllSupportedValues(int needsPhysicalDelivery) {
+            int baseline = getBaselineSegmentCount();
+            clearInvocations(orderMainMapper);
+
+            OrderPageDTO dto = baseDto();
+            dto.setNeedsPhysicalDelivery(needsPhysicalDelivery);
             int withFilter = executeAndGetSegmentCount(dto);
 
             assertThat(withFilter).isGreaterThan(baseline);

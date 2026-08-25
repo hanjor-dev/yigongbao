@@ -64,6 +64,13 @@ public class OrderPageDTO implements Serializable {
     private String businessType;
 
     /**
+     * 是否需要实体交付（可选）：0-不需要，1-需要，2-异地打印
+     */
+    @Min(value = 0, message = "是否需要实体交付值不合法")
+    @Max(value = 2, message = "是否需要实体交付值不合法")
+    private Integer needsPhysicalDelivery;
+
+    /**
      * 创建时间起始（可选，闭区间）
      */
     private LocalDateTime createTimeStart;
