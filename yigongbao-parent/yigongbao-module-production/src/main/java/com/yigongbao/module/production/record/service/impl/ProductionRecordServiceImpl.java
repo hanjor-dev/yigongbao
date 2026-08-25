@@ -74,6 +74,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -1084,12 +1085,35 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         context.setPrintFinishTime(record.getPrintFinishTime());
         context.setDesignerAssetNo(designerAssetNo);
 
+        Map<String, java.util.concurrent.CompletableFuture<String>> fallbackDeviceNoFutures = new HashMap<>();
+        processes.forEach(process -> {
+            if (StrUtil.isBlank(process.getDeviceNo())) {
+                submitFlowCardDeviceNoQuery(fallbackDeviceNoFutures,
+                        getFlowCardDeviceType(process.getProcessType()), record.getProcessingCenterId());
+            }
+            if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(process.getProcessType())
+                    && StrUtil.isBlank(process.getSecondaryDeviceNo())) {
+                submitFlowCardDeviceNoQuery(fallbackDeviceNoFutures,
+                        DeviceTypeEnum.AIR_COMPRESSOR.getCode(), record.getProcessingCenterId());
+            }
+        });
+        Map<String, String> fallbackDeviceNoCache = new HashMap<>();
+        fallbackDeviceNoFutures.forEach((deviceType, future) ->
+                fallbackDeviceNoCache.put(deviceType, future.join()));
+
         List<FlowCardExcelBuilder.ProcessInfo> processInfos = processes.stream()
             .map(p -> {
                 FlowCardExcelBuilder.ProcessInfo info = new FlowCardExcelBuilder.ProcessInfo();
                 info.setProcessType(p.getProcessType());
-                info.setDeviceNo(p.getDeviceNo());
-                info.setSecondaryDeviceNo(p.getSecondaryDeviceNo());
+                info.setDeviceNo(StrUtil.isNotBlank(p.getDeviceNo())
+                        ? p.getDeviceNo()
+                        : fallbackDeviceNoCache.get(getFlowCardDeviceType(p.getProcessType())));
+                String secondaryDeviceNo = p.getSecondaryDeviceNo();
+                if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(p.getProcessType())
+                        && StrUtil.isBlank(secondaryDeviceNo)) {
+                    secondaryDeviceNo = fallbackDeviceNoCache.get(DeviceTypeEnum.AIR_COMPRESSOR.getCode());
+                }
+                info.setSecondaryDeviceNo(secondaryDeviceNo);
                 info.setProcessParams(p.getProcessParams());
                 info.setStartTime(p.getStartTime());
                 info.setEndTime(p.getEndTime());
@@ -1144,6 +1168,41 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             log.error("流转卡Excel生成失败: recordId={}", recordId, e);
             throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR);
         }
+    }
+
+    private void submitFlowCardDeviceNoQuery(
+            Map<String, java.util.concurrent.CompletableFuture<String>> deviceNoFutures,
+            String deviceType, Long processingCenterId) {
+        if (StrUtil.isBlank(deviceType) || processingCenterId == null) {
+            return;
+        }
+        deviceNoFutures.computeIfAbsent(deviceType, type ->
+                java.util.concurrent.CompletableFuture.supplyAsync(
+                        () -> queryFlowCardDeviceNo(processingCenterId, type)));
+    }
+
+    private String queryFlowCardDeviceNo(Long processingCenterId, String deviceType) {
+        DeviceEntity device = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>()
+                .select(DeviceEntity::getDeviceId)
+                .eq(DeviceEntity::getCenterId, processingCenterId)
+                .eq(DeviceEntity::getDeviceType, deviceType)
+                .eq(DeviceEntity::getIsDeleted, StatusConstants.NO)
+                .last("LIMIT 1"));
+        return device == null ? null : device.getDeviceId();
+    }
+
+    private String getFlowCardDeviceType(String processType) {
+        if (processType == null) {
+            return null;
+        }
+        return switch (processType) {
+            case "print" -> DeviceTypeEnum.PRINTER_SLA.getCode();
+            case "wash" -> DeviceTypeEnum.WASH_CONTAINER.getCode();
+            case "cure" -> DeviceTypeEnum.UV_CURING.getCode();
+            case "clean_dry" -> DeviceTypeEnum.ULTRASONIC_CLEANER.getCode();
+            case "pack" -> DeviceTypeEnum.SEALING_MACHINE.getCode();
+            default -> null;
+        };
     }
 
     private String queryDesignerAssetNo(Long orderId) {
