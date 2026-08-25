@@ -35,6 +35,8 @@ class InstructionExcelBuilderTest {
         ctx.setPackageCode("PKG-001");
         ctx.setExpectedDeliveryDate("2026-04-20");
         ctx.setVersion("A/1");
+        ctx.setDesignerName("王设计师");
+        ctx.setGenerateDate("2026-04-20");
         ctx.setRows(rows);
 
         byte[] result = builder.build(ctx);
@@ -48,6 +50,9 @@ class InstructionExcelBuilderTest {
             assertEquals("ORD-001", getCellValue(sheet, 3, 1));
             // 版本号
             assertTrue(getCellValue(sheet, 1, 6).contains("A/1"));
+            // 指令/日期：指令单元格填写设计师姓名，日期单元格保持生成日期
+            assertEquals("王设计师", getCellValue(sheet, 29, 1));
+            assertEquals("2026-04-20", getCellValue(sheet, 29, 2));
         }
     }
 
@@ -72,6 +77,8 @@ class InstructionExcelBuilderTest {
         ctx.setOrderCode("ORD-001");
         ctx.setPackageCode("PKG-001");
         ctx.setVersion("A/1");
+        ctx.setDesignerName("王设计师");
+        ctx.setGenerateDate("2026-04-20");
         ctx.setRows(rows);
 
         byte[] result = builder.build(ctx);
@@ -81,6 +88,9 @@ class InstructionExcelBuilderTest {
             Sheet sheet = wb.getSheetAt(0);
             // 产品区从 row=7 开始，20条产品，最后一条在 row=26（7+19）
             assertEquals("CERT-20", getCellValue(sheet, 26, 1));
+            // 产品区下移2行后，指令/日期区域也同步下移
+            assertEquals("王设计师", getCellValue(sheet, 31, 1));
+            assertEquals("2026-04-20", getCellValue(sheet, 31, 2));
         }
     }
 
