@@ -17,6 +17,7 @@ import org.springframework.web.socket.WebSocketSession;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -81,8 +82,27 @@ class DeviceWebSocketHandlerTest {
             dto.getDevices().stream().map(DeviceStatusPushDTO.DeviceStatus::getId).toList());
         assertEquals(List.of(0, 1, 2, 3, 4, 5, 6),
             dto.getDevices().stream().map(DeviceStatusPushDTO.DeviceStatus::getState).toList());
+        assertNull(dto.getDevices().get(0).getPrintStartTime());
+        assertNull(dto.getDevices().get(0).getEstimatedDuration());
         verify(connectionManager).addSession("武汉嘉一", session);
         verify(session).sendMessage(new TextMessage("{\"code\":200,\"message\":\"success\"}"));
+    }
+
+    @Test
+    void testHandleTextMessage_MapsPrintMetadataFromNewPayload() throws Exception {
+        String payload = "{\"center_name\":\"武汉嘉一\",\"devices\":["
+            + "{\"id\":\"SLA-001\",\"state\":1,"
+            + "\"print_start_time\":\"2026-08-25 10:20:30\","
+            + "\"estimated_duration\":\"1天2小时3分钟\"}]}";
+        when(deviceService.batchUpdateDeviceStatus(any())).thenReturn(true);
+
+        handler.handleTextMessage(session, new TextMessage(payload));
+
+        ArgumentCaptor<DeviceStatusPushDTO> captor = ArgumentCaptor.forClass(DeviceStatusPushDTO.class);
+        verify(deviceService).batchUpdateDeviceStatus(captor.capture());
+        DeviceStatusPushDTO.DeviceStatus status = captor.getValue().getDevices().get(0);
+        assertEquals("2026-08-25 10:20:30", status.getPrintStartTime());
+        assertEquals("1天2小时3分钟", status.getEstimatedDuration());
     }
 
     @Test

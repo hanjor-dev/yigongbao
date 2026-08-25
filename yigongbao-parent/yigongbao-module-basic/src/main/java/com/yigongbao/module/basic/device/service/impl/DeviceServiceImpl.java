@@ -34,12 +34,18 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.DateTimeException;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -58,6 +64,10 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
     private static final int DEFAULT_PAGE_NUM = 1;
     private static final int DEFAULT_PAGE_SIZE = 10;
     private static final int MAX_PAGE_SIZE = 100;
+    private static final DateTimeFormatter PRINT_START_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss").withResolverStyle(ResolverStyle.STRICT);
+    private static final Pattern ESTIMATED_DURATION_PATTERN =
+            Pattern.compile("^(?:(\\d+)天)?(?:(\\d+)小时)?(?:(\\d+)分钟)?$");
 
     private final ProcessingCenterMapper processingCenterMapper;
     private final IDeviceStateLogService deviceStateLogService;
@@ -306,8 +316,15 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
                     stateLog.setChangeTime(now);
                     stateLog.setChangeType("auto");
                     stateLogs.add(stateLog);
+                    LocalDateTime printStartTime = parsePrintStartTime(deviceStatus.getPrintStartTime());
+                    Integer estimatedDurationMinutes =
+                            parseEstimatedDurationMinutes(deviceStatus.getEstimatedDuration());
+                    LocalDateTime estimatedPrintFinishTime =
+                            calculateEstimatedPrintFinishTime(printStartTime, estimatedDurationMinutes,
+                                    device.getDeviceId());
                     stateChangeEvents.add(new DeviceStateChangeEvent(
-                            this, device.getId(), oldState, deviceStatus.getState()));
+                            this, device.getId(), oldState, deviceStatus.getState(), printStartTime,
+                            estimatedDurationMinutes, estimatedPrintFinishTime));
                 } else {
                     log.info("设备状态未变化: deviceId={}, state={}", device.getDeviceId(), oldState);
                 }
@@ -333,6 +350,62 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         log.info("批量更新设备状态: centerName={}, deviceCount={}, 新增={}, 更新={}",
             dto.getCenterName(), dto.getDevices().size(), toCreate.size(), toUpdate.size());
         return true;
+    }
+
+    private LocalDateTime parsePrintStartTime(String value) {
+        if (StrUtil.isBlank(value)) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(value, PRINT_START_TIME_FORMATTER);
+        } catch (DateTimeParseException exception) {
+            log.warn("解析打印开始时间失败，忽略该字段: value={}", value);
+            return null;
+        }
+    }
+
+    private Integer parseEstimatedDurationMinutes(String value) {
+        if (StrUtil.isBlank(value)) {
+            return null;
+        }
+        Matcher matcher = ESTIMATED_DURATION_PATTERN.matcher(value.trim());
+        if (!matcher.matches()) {
+            log.warn("解析预计打印耗时失败，忽略该字段: value={}", value);
+            return null;
+        }
+        try {
+            long days = parseDurationPart(matcher.group(1));
+            long hours = parseDurationPart(matcher.group(2));
+            long minutes = parseDurationPart(matcher.group(3));
+            long totalMinutes = Math.addExact(Math.multiplyExact(days, 24 * 60L),
+                    Math.addExact(Math.multiplyExact(hours, 60L), minutes));
+            if (totalMinutes > Integer.MAX_VALUE) {
+                throw new ArithmeticException("预计耗时超出分钟数范围");
+            }
+            return (int) totalMinutes;
+        } catch (NumberFormatException | ArithmeticException exception) {
+            log.warn("解析预计打印耗时失败，忽略该字段: value={}", value);
+            return null;
+        }
+    }
+
+    private long parseDurationPart(String value) {
+        return value == null ? 0 : Long.parseLong(value);
+    }
+
+    private LocalDateTime calculateEstimatedPrintFinishTime(LocalDateTime printStartTime,
+                                                             Integer estimatedDurationMinutes,
+                                                             String deviceId) {
+        if (printStartTime == null || estimatedDurationMinutes == null) {
+            return null;
+        }
+        try {
+            return printStartTime.plusMinutes(estimatedDurationMinutes);
+        } catch (DateTimeException exception) {
+            log.warn("计算预计打印结束时间失败，忽略该字段: deviceId={}, printStartTime={}, minutes={}",
+                    deviceId, printStartTime, estimatedDurationMinutes);
+            return null;
+        }
     }
 
     /**
