@@ -34,6 +34,7 @@ import org.mockito.quality.Strictness;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -241,7 +242,7 @@ class DeviceStatusListenerTest {
 
         verify(processService).schedulePostProcessing(1L, predictedPrintFinishTime);
         verify(recordMapper).update(isNull(), argThat(update -> updateHasValue(update,
-                predictedPrintFinishTime)));
+                predictedPrintFinishTime) && hasContentUpdateTime(update)));
         verify(processMapper).update(isNull(), argThat(update -> updateHasValue(update,
                 predictedPrintFinishTime)));
     }
@@ -258,12 +259,20 @@ class DeviceStatusListenerTest {
                 PrinterDeviceStateEnum.IDLE.getCode()));
 
         LocalDateTime after = LocalDateTime.now().withNano(0);
-        verify(processService).schedulePostProcessing(eq(1L), argThat(time ->
-                time != null && !time.isBefore(before) && !time.isAfter(after)));
-        verify(recordMapper).update(isNull(), argThat(update ->
-                hasLocalDateTimeBetween(update, before, after)));
-        verify(processMapper).update(isNull(), argThat(update ->
-                hasLocalDateTimeBetween(update, before, after)));
+        ArgumentCaptor<LambdaUpdateWrapper> recordUpdateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        ArgumentCaptor<LambdaUpdateWrapper> processUpdateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        ArgumentCaptor<LocalDateTime> finishTimeCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(recordMapper).update(isNull(), recordUpdateCaptor.capture());
+        verify(processMapper).update(isNull(), processUpdateCaptor.capture());
+        verify(processService).schedulePostProcessing(eq(1L), finishTimeCaptor.capture());
+
+        LocalDateTime actualFinishTime = finishTimeCaptor.getValue();
+        assertTrue(!actualFinishTime.isBefore(before) && !actualFinishTime.isAfter(after),
+                "无预测结束时间时应使用当前时间");
+        assertEquals(actualFinishTime, valueForUpdateColumn(recordUpdateCaptor.getValue(), "printFinishTime"),
+                "production_record.print_finish_time 应与排程时间一致");
+        assertEquals(actualFinishTime, valueForUpdateColumn(processUpdateCaptor.getValue(), "endTime"),
+                "打印工序 end_time 应与排程时间一致");
     }
 
     @ParameterizedTest
@@ -551,6 +560,25 @@ class DeviceStatusListenerTest {
             return false;
         }
         return wrapper.getSqlSet() != null && wrapper.getSqlSet().contains("contentUpdateTime");
+    }
+
+    private LocalDateTime valueForUpdateColumn(Object update, String column) {
+        if (!(update instanceof LambdaUpdateWrapper<?> wrapper) || wrapper.getSqlSet() == null) {
+            return null;
+        }
+        String prefix = column + "=#{ew.paramNameValuePairs.";
+        String sqlSet = wrapper.getSqlSet();
+        int valueStart = sqlSet.indexOf(prefix);
+        if (valueStart < 0) {
+            return null;
+        }
+        valueStart += prefix.length();
+        int valueEnd = sqlSet.indexOf('}', valueStart);
+        if (valueEnd < 0) {
+            return null;
+        }
+        Object value = wrapper.getParamNameValuePairs().get(sqlSet.substring(valueStart, valueEnd));
+        return value instanceof LocalDateTime ? (LocalDateTime) value : null;
     }
 
     private void stubRecordQueryByStatus(ProductionRecordEntity record) {
