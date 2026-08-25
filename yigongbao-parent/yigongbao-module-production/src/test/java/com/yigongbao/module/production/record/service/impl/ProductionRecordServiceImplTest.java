@@ -20,6 +20,7 @@ import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
+import com.yigongbao.flow.service.FlowStatusColorResolver;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
@@ -87,6 +88,7 @@ class ProductionRecordServiceImplTest {
     @Mock private ProductionProductMapper productMapper;
     @Mock private ProductionProcessMapper processMapper;
     @Mock private FlowFacade flowFacade;
+    @Mock private FlowStatusColorResolver flowStatusColorResolver;
     @Mock private UserMapper userMapper;
     @Mock private ConfigService configService;
     @Mock private UserService userService;
@@ -604,6 +606,32 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
+    void downloadDataPackage_alreadyClaimed_returnsUrlWithoutReclaiming() {
+        ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.PENDING_PRINT.getValue());
+        record.setDesignPackageId(1L);
+        when(recordMapper.selectOne(any())).thenReturn(record);
+
+        DesignPackageEntity designPackage = pkg(1L, 10L);
+        designPackage.setFileUrl("https://file/package.zip");
+        when(designPackageMapper.selectById(1L)).thenReturn(designPackage);
+
+        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        order.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
+        when(orderMainMapper.selectById(10L)).thenReturn(order);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+
+            assertEquals("https://file/package.zip", recordService.downloadDataPackage(1L));
+        }
+
+        verify(recordMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).updateById(any(OrderMainEntity.class));
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
     void downloadDataPackage_differentCenterLosesClaim_doesNotOverwriteWinner() {
         prepareDownloadClaim(productionWorker(2L, 99L, "生产中心B"));
         when(userMapper.selectById(2L)).thenReturn(productionWorker(2L, 99L, "生产中心B"));
@@ -640,46 +668,37 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
-    void downloadDataPackage_startPrintNotAvailable_idempotentSkip() {
+    void downloadDataPackage_alreadyPendingPrint_doesNotTriggerFlow() {
         ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.PENDING_PRINT.getValue());
         record.setDesignPackageId(1L);
         when(recordMapper.selectOne(any())).thenReturn(record);
-        when(recordMapper.update(any(), any())).thenReturn(1);
         when(designPackageMapper.selectById(1L)).thenReturn(pkg(1L, 10L));
-        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
-        order.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
-        when(orderMainMapper.selectById(10L)).thenReturn(order);
-        when(flowFacade.getAvailableActions(10L)).thenReturn(List.of("OTHER_ACTION"));
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
-            mockStp(stp);
             recordService.downloadDataPackage(1L);
         }
 
+        verify(recordMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).updateById(any(OrderMainEntity.class));
         verify(flowFacade, never()).executeFlow(any(), any(), any());
     }
 
     @Test
-    void downloadDataPackage_startPrintAvailable_triggersFlow() {
+    void downloadDataPackage_alreadyPendingPrint_doesNotTriggerFlowEvenWhenAvailable() {
         ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.PENDING_PRINT.getValue());
         record.setDesignPackageId(1L);
         when(recordMapper.selectOne(any())).thenReturn(record);
-        when(recordMapper.update(any(), any())).thenReturn(1);
         when(designPackageMapper.selectById(1L)).thenReturn(pkg(1L, 10L));
-        OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
-        order.setStatus(FlowStatusEnum.DESIGN_COMPLETED.getValue());
-        when(orderMainMapper.selectById(10L)).thenReturn(order);
-        when(flowFacade.getAvailableActions(10L)).thenReturn(List.of(FlowActionEnum.START_PRINT.name()));
-        TransitionResult result = buildResult();
-        when(recordMapper.selectCount(any())).thenReturn(1L).thenReturn(1L);
-        when(flowFacade.executeFlow(eq(10L), eq(FlowActionEnum.DOWNLOAD_DATA_PACKAGE), any(FlowOperator.class))).thenReturn(result);
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
-            mockStp(stp);
             recordService.downloadDataPackage(1L);
         }
 
-        verify(flowFacade).executeFlow(eq(10L), eq(FlowActionEnum.DOWNLOAD_DATA_PACKAGE), any(FlowOperator.class));
+        verify(recordMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).update(any(), any());
+        verify(orderMainMapper, never()).updateById(any(OrderMainEntity.class));
+        verify(flowFacade, never()).executeFlow(any(), any(), any());
     }
 
     // ---- triggerFlowIfAllReach ----

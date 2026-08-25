@@ -1052,7 +1052,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         ctx.setPatientName(order.getPatientName());
         ctx.setOrgName(order.getOrgName());
         ctx.setHospitalName(order.getHospitalName());
-        ctx.setContactName(order.getDoctorName());
+        ctx.setContactName(order.getOperatorName());
         ctx.setPackageCode(pkg.getPackageCode());
         ctx.setVersion(version);
         ctx.setRows(rows);

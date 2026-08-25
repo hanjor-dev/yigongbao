@@ -101,7 +101,7 @@ public class InstructionExcelBuilder {
         private String orgName;
         /** 医院名称 */
         private String hospitalName;
-        /** 联系人（医生姓名） */
+        /** 联系人（提单业务员姓名） */
         private String contactName;
         /** 数据包编号 */
         private String packageCode;

@@ -270,6 +270,30 @@ class DesignDocServiceImplTest {
     class GetInstructionPreviewUrl {
 
         @Test
+        @DisplayName("生成指令单上下文使用提单业务员姓名，业务员为空时联系人留空")
+        void buildInstructionContext_usesOrderOperatorName() throws Exception {
+            order.setDoctorName("李医生");
+            order.setOperatorName("王业务员");
+
+            var method = DesignDocServiceImpl.class.getDeclaredMethod(
+                    "buildInstructionContext", OrderMainEntity.class, DesignPackageEntity.class,
+                    List.class, String.class, LocalDateTime.class);
+            method.setAccessible(true);
+
+            InstructionExcelBuilder.BuildContext context =
+                    (InstructionExcelBuilder.BuildContext) method.invoke(
+                            docService, order, pkg, List.of(), "A/1", LocalDateTime.now());
+
+            assertEquals("王业务员", context.getContactName());
+
+            order.setOperatorName(null);
+            context = (InstructionExcelBuilder.BuildContext) method.invoke(
+                    docService, order, pkg, List.of(), "A/1", LocalDateTime.now());
+
+            assertNull(context.getContactName());
+        }
+
+        @Test
         @DisplayName("场景1：首次调用，自动生成 A/1，isConfirmed=0")
         void firstTime_generatesA1() throws Exception {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
