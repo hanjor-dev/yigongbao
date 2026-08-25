@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -35,6 +36,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.lang.reflect.Field;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 
@@ -161,6 +163,94 @@ class DeviceServiceImplTest {
         InOrder inOrder = inOrder(deviceMapper, eventPublisher);
         inOrder.verify(deviceMapper).updateById(existing);
         inOrder.verify(eventPublisher).publishEvent(any(DeviceStateChangeEvent.class));
+    }
+
+    @Test
+    void batchUpdateDeviceStatus_publishesParsedPrintMetadata() {
+        DeviceStatusPushDTO.DeviceStatus status = deviceStatus("SLA-001", 1);
+        status.setPrintStartTime("2026-08-25 10:20:30");
+        status.setEstimatedDuration("1天2小时3分钟");
+        DeviceStatusPushDTO dto = statusPush(status);
+        DeviceEntity existing = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(processingCenterMapper.selectOne(any())).thenReturn(processingCenter());
+        when(deviceMapper.selectList(any())).thenReturn(Arrays.asList(existing));
+        when(deviceMapper.updateById(existing)).thenReturn(1);
+
+        deviceService.batchUpdateDeviceStatus(dto);
+
+        ArgumentCaptor<DeviceStateChangeEvent> eventCaptor = ArgumentCaptor.forClass(DeviceStateChangeEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        DeviceStateChangeEvent event = eventCaptor.getValue();
+        assertEquals(LocalDateTime.of(2026, 8, 25, 10, 20, 30), event.getPrintStartTime());
+        assertEquals(1_563, event.getEstimatedDurationMinutes());
+        assertEquals(LocalDateTime.of(2026, 8, 26, 12, 23, 30), event.getEstimatedPrintFinishTime());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "1天2小时3分钟, 1563",
+            "2天3小时, 3060",
+            "4小时30分钟, 270",
+            "45分钟, 45",
+            "3天, 4320",
+            "6小时, 360",
+            "0分钟, 0"
+    })
+    void batchUpdateDeviceStatus_parsesChineseDurationWithOptionalUnits(String duration, Integer expectedMinutes) {
+        DeviceStatusPushDTO.DeviceStatus status = deviceStatus("SLA-001", 1);
+        status.setPrintStartTime("2026-08-25 10:20:30");
+        status.setEstimatedDuration(duration);
+        DeviceEntity existing = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(processingCenterMapper.selectOne(any())).thenReturn(processingCenter());
+        when(deviceMapper.selectList(any())).thenReturn(Arrays.asList(existing));
+        when(deviceMapper.updateById(existing)).thenReturn(1);
+
+        deviceService.batchUpdateDeviceStatus(statusPush(status));
+
+        ArgumentCaptor<DeviceStateChangeEvent> eventCaptor = ArgumentCaptor.forClass(DeviceStateChangeEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(expectedMinutes, eventCaptor.getValue().getEstimatedDurationMinutes());
+    }
+
+    @Test
+    void batchUpdateDeviceStatus_ignoresInvalidPrintMetadataAndStillUpdatesState() {
+        DeviceStatusPushDTO.DeviceStatus status = deviceStatus("SLA-001", 1);
+        status.setPrintStartTime("2026-08-25 10:20:30");
+        status.setEstimatedDuration("1天2小时3秒");
+        DeviceEntity existing = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(processingCenterMapper.selectOne(any())).thenReturn(processingCenter());
+        when(deviceMapper.selectList(any())).thenReturn(Arrays.asList(existing));
+        when(deviceMapper.updateById(existing)).thenReturn(1);
+
+        assertTrue(deviceService.batchUpdateDeviceStatus(statusPush(status)));
+
+        assertEquals(1, existing.getState());
+        ArgumentCaptor<DeviceStateChangeEvent> eventCaptor = ArgumentCaptor.forClass(DeviceStateChangeEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        DeviceStateChangeEvent event = eventCaptor.getValue();
+        assertEquals(LocalDateTime.of(2026, 8, 25, 10, 20, 30), event.getPrintStartTime());
+        assertNull(event.getEstimatedDurationMinutes());
+        assertNull(event.getEstimatedPrintFinishTime());
+    }
+
+    @Test
+    void batchUpdateDeviceStatus_ignoresInvalidPrintStartTimeWithoutBlockingValidDuration() {
+        DeviceStatusPushDTO.DeviceStatus status = deviceStatus("SLA-001", 1);
+        status.setPrintStartTime("not-a-date");
+        status.setEstimatedDuration("1小时");
+        DeviceEntity existing = existingDevice("SLA-001", DeviceTypeEnum.PRINTER_SLA.getCode(), 0);
+        when(processingCenterMapper.selectOne(any())).thenReturn(processingCenter());
+        when(deviceMapper.selectList(any())).thenReturn(Arrays.asList(existing));
+        when(deviceMapper.updateById(existing)).thenReturn(1);
+
+        assertTrue(deviceService.batchUpdateDeviceStatus(statusPush(status)));
+
+        ArgumentCaptor<DeviceStateChangeEvent> eventCaptor = ArgumentCaptor.forClass(DeviceStateChangeEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        DeviceStateChangeEvent event = eventCaptor.getValue();
+        assertNull(event.getPrintStartTime());
+        assertEquals(60, event.getEstimatedDurationMinutes());
+        assertNull(event.getEstimatedPrintFinishTime());
     }
 
     @Test
