@@ -70,6 +70,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -288,19 +290,16 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
-    void generateFlowCardExcel_multipleDeviceCandidates_usesOnlyOneCandidateWithLimitOne() throws Exception {
+    void generateFlowCardExcel_deviceFallback_usesSingleLimitedQuery() throws Exception {
         ProductionRecordEntity record = flowCardRecord(1L, 88L);
         ProductionProcessEntity process = process("wash", null, null);
-        List<DeviceEntity> candidates = List.of(
-                device(2L, DeviceTypeEnum.WASH_CONTAINER.getCode(), 88L, "WASH-88-FIRST"),
-                device(3L, DeviceTypeEnum.WASH_CONTAINER.getCode(), 88L, "WASH-88-SECOND"));
-        when(deviceMapper.selectOne(any())).thenAnswer(invocation -> candidates.get(0));
+        when(deviceMapper.selectOne(any()))
+                .thenReturn(device(2L, DeviceTypeEnum.WASH_CONTAINER.getCode(), 88L, "WASH-88-FIRST"));
 
         FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(process));
 
         assertEquals(1, context.getProcesses().size());
         assertEquals("WASH-88-FIRST", context.getProcesses().get(0).getDeviceNo());
-        assertNotEquals("WASH-88-SECOND", context.getProcesses().get(0).getDeviceNo());
         ArgumentCaptor<LambdaQueryWrapper<DeviceEntity>> queryCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         verify(deviceMapper, times(1)).selectOne(queryCaptor.capture());
         assertThat(queryCaptor.getValue().getSqlSegment()).contains("LIMIT 1");
@@ -334,7 +333,7 @@ class ProductionRecordServiceImplTest {
                 process("clean_dry", null, null),
                 process("pack", null, null),
                 process("wash", null, null));
-        List<LambdaQueryWrapper<DeviceEntity>> queries = new ArrayList<>();
+        List<LambdaQueryWrapper<DeviceEntity>> queries = Collections.synchronizedList(new ArrayList<>());
         when(deviceMapper.selectOne(any())).thenAnswer(invocation -> {
             LambdaQueryWrapper<DeviceEntity> query = invocation.getArgument(0);
             queries.add(query);
@@ -372,8 +371,7 @@ class ProductionRecordServiceImplTest {
         DeviceEntity otherCenterDevice = device(3L, DeviceTypeEnum.PRINTER_SLA.getCode(), 99L, "PRINTER-99");
         when(deviceMapper.selectOne(any())).thenAnswer(invocation -> {
             LambdaQueryWrapper<DeviceEntity> query = invocation.getArgument(0);
-            query.getSqlSegment();
-            Object centerId = query.getParamNameValuePairs().get("MPGENVAL1");
+            Object centerId = queryParamByColumn(query, "centerId");
             boolean sameCenter = record.getProcessingCenterId().equals(centerId);
             return sameCenter ? sameCenterDevice : otherCenterDevice;
         });
@@ -384,10 +382,8 @@ class ProductionRecordServiceImplTest {
         ArgumentCaptor<LambdaQueryWrapper<DeviceEntity>> queryCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         verify(deviceMapper).selectOne(queryCaptor.capture());
         LambdaQueryWrapper<DeviceEntity> query = queryCaptor.getValue();
-        query.getSqlSegment();
-        assertThat(query.getParamNameValuePairs())
-                .containsEntry("MPGENVAL1", record.getProcessingCenterId())
-                .containsEntry("MPGENVAL2", DeviceTypeEnum.PRINTER_SLA.getCode());
+        assertEquals(record.getProcessingCenterId(), queryParamByColumn(query, "centerId"));
+        assertEquals(DeviceTypeEnum.PRINTER_SLA.getCode(), queryParamByColumn(query, "deviceType"));
         assertThat(query.getParamNameValuePairs().values()).doesNotContain(otherCenterDevice.getCenterId());
         verify(processMapper, never()).update(any(), any());
     }
@@ -1238,6 +1234,17 @@ class ProductionRecordServiceImplTest {
         r.setOrderId(orderId);
         r.setStatus(status);
         return r;
+    }
+
+    private Object queryParamByColumn(LambdaQueryWrapper<DeviceEntity> query, String column) {
+        String sqlSegment = query.getSqlSegment();
+        Matcher matcher = Pattern.compile("(?i)(?:`)?" + Pattern.quote(column)
+                + "(?:`)?\\s*=\\s*#\\{ew\\.paramNameValuePairs\\.([^}]+)}")
+                .matcher(sqlSegment);
+        assertThat(matcher.find())
+                .as("SQL should bind a parameter for column %s: %s", column, sqlSegment)
+                .isTrue();
+        return query.getParamNameValuePairs().get(matcher.group(1));
     }
 
     private ProductionRecordEntity flowCardRecord(Long id, Long processingCenterId) {
