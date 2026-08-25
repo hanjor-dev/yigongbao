@@ -1,5 +1,6 @@
 package com.yigongbao.module.design.vo;
 
+import com.yigongbao.common.vo.StatusColorVO;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -28,7 +29,7 @@ public class DesignWorkorderListVO {
     private String statusName;
 
     /** 当前状态标签颜色 */
-    private String statusColor;
+    private StatusColorVO statusColor;
 
     /** 业务类型字典码 */
     private String businessType;

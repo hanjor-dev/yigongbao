@@ -1,5 +1,6 @@
 package com.yigongbao.module.production.warehouse.vo;
 
+import com.yigongbao.common.vo.StatusColorVO;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -29,7 +30,7 @@ public class WarehouseDetailVO {
     private String materialBatchNo;
     private Integer status;
     /** 流转卡状态标签颜色 */
-    private String statusColor;
+    private StatusColorVO statusColor;
     private Integer totalCount;
     private Integer pendingWarehouseInCount;
     private Integer warehousedCount;

@@ -1,5 +1,6 @@
 package com.yigongbao.module.production.record.vo;
 
+import com.yigongbao.common.vo.StatusColorVO;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import lombok.Data;
@@ -52,7 +53,7 @@ public class ProductionRecordVO {
     private Integer unqualifiedCount;
     private Integer status;
     /** 流转卡状态标签颜色 */
-    private String statusColor;
+    private StatusColorVO statusColor;
     private String currentProcess;
     private String currentProcessName;
     private String qrCodeUrl;
@@ -71,7 +72,7 @@ public class ProductionRecordVO {
     // 订单关联字段（来自 order_main 关联查询）
     private Integer orderStatus;
     /** 订单状态标签颜色 */
-    private String orderStatusColor;
+    private StatusColorVO orderStatusColor;
     private Integer orderPhase;
     private String orgName;
     private String operatorName;

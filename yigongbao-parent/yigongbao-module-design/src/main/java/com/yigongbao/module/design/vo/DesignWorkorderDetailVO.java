@@ -1,5 +1,6 @@
 package com.yigongbao.module.design.vo;
 
+import com.yigongbao.common.vo.StatusColorVO;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import lombok.Data;
@@ -27,7 +28,7 @@ public class DesignWorkorderDetailVO {
     private String statusName;
 
     /** 当前状态标签颜色 */
-    private String statusColor;
+    private StatusColorVO statusColor;
     /** 阶段码 */
     private Integer phase;
     /** 阶段名称 */

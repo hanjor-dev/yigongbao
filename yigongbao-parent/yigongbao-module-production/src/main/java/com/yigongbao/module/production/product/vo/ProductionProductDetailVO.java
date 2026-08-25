@@ -1,5 +1,6 @@
 package com.yigongbao.module.production.product.vo;
 
+import com.yigongbao.common.vo.StatusColorVO;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -44,7 +45,7 @@ public class ProductionProductDetailVO {
     /** 流转卡状态（对应 FlowStatusEnum 值） */
     private Integer recordStatus;
     /** 流转卡状态标签颜色 */
-    private String recordStatusColor;
+    private StatusColorVO recordStatusColor;
 
     // ===== 订单信息（来自 production_record 冗余字段）=====
     private Long orderId;

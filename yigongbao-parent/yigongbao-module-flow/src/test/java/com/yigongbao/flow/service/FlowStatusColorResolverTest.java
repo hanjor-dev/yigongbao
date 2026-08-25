@@ -2,6 +2,7 @@ package com.yigongbao.flow.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
+import com.yigongbao.common.vo.StatusColorVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,20 +31,22 @@ class FlowStatusColorResolverTest {
     }
 
     @Test
-    void shouldLoadConfiguredColorsAndUseDefaultForMissingStatuses() {
+    void shouldLoadConfiguredColorsAsTagColorObjects() {
         when(configService.getConfigValue(SystemConfigKeyEnum.ORDER_STATUS_COLOR.getKey()))
-                .thenReturn("{\"2020\":\"#123456\"}");
+                .thenReturn("{\"2020\":{\"bgColor\":\"#eff6ff\",\"bdColor\":\"#bfdbfe\",\"color\":\"#2563eb\"}}");
 
-        assertThat(resolver.getColor(2020)).isEqualTo("#123456");
-        assertThat(resolver.getColor(1010)).isEqualTo("#909399");
+        assertThat(resolver.getColor(2020))
+                .isEqualTo(new StatusColorVO("#eff6ff", "#bfdbfe", "#2563eb"));
+        assertThat(resolver.getColor(1010)).isNull();
         assertThat(resolver.getColor(null)).isNull();
-        assertThat(resolver.getColors()).containsEntry(2020, "#123456");
+        assertThat(resolver.getColors()).containsEntry(2020,
+                new StatusColorVO("#eff6ff", "#bfdbfe", "#2563eb"));
     }
 
     @Test
     void shouldCacheParsedColorsUntilCacheIsCleared() {
         when(configService.getConfigValue(SystemConfigKeyEnum.ORDER_STATUS_COLOR.getKey()))
-                .thenReturn("{\"2020\":\"#123456\"}");
+                .thenReturn("{\"2020\":{\"bgColor\":\"#eff6ff\",\"bdColor\":\"#bfdbfe\",\"color\":\"#2563eb\"}}");
 
         resolver.getColor(2020);
         resolver.getColor(2020);
@@ -59,12 +62,24 @@ class FlowStatusColorResolverTest {
     @Test
     void shouldIgnoreInvalidConfiguredColorsAndUnknownStatuses() {
         when(configService.getConfigValue(SystemConfigKeyEnum.ORDER_STATUS_COLOR.getKey()))
-                .thenReturn("{\"2020\":\"not-a-color\",\"9999\":\"#ffffff\",\"2030\":\"#abcdef\"}");
+                .thenReturn("{\"2020\":{\"bgColor\":\"not-a-color\",\"bdColor\":\"#bfdbfe\",\"color\":\"#2563eb\"},"
+                        + "\"9999\":{\"bgColor\":\"#eff6ff\",\"bdColor\":\"#bfdbfe\",\"color\":\"#2563eb\"},"
+                        + "\"2030\":{\"bgColor\":\"#f0fdf4\",\"bdColor\":\"#bbf7d0\",\"color\":\"#16a34a\"}}");
 
-        Map<Integer, String> colors = resolver.getColors();
+        Map<Integer, StatusColorVO> colors = resolver.getColors();
 
-        assertThat(colors).containsEntry(2020, "#409EFF");
+        assertThat(colors).doesNotContainKey(2020);
         assertThat(colors).doesNotContainKey(9999);
-        assertThat(colors).containsEntry(2030, "#abcdef");
+        assertThat(colors).containsEntry(2030,
+                new StatusColorVO("#f0fdf4", "#bbf7d0", "#16a34a"));
+    }
+
+    @Test
+    void shouldReturnNullWhenConfigurationCannotBeRead() {
+        when(configService.getConfigValue(SystemConfigKeyEnum.ORDER_STATUS_COLOR.getKey()))
+                .thenReturn(null);
+
+        assertThat(resolver.getColor(2020)).isNull();
+        assertThat(resolver.getColors()).isEmpty();
     }
 }

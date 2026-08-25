@@ -30,7 +30,7 @@ public class SelectTreeVO {
     private String value;
 
     /** 可选的展示颜色，例如流程状态标签颜色 */
-    private String color;
+    private StatusColorVO color;
 
     /**
      * 父级ID

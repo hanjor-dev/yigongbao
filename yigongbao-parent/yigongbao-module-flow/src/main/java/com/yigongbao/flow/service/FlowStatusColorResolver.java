@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.event.SystemConfigChangedEvent;
+import com.yigongbao.common.vo.StatusColorVO;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.system.config.service.ConfigService;
 import lombok.RequiredArgsConstructor;
@@ -30,17 +31,17 @@ public class FlowStatusColorResolver {
     private final ConfigService configService;
     private final ObjectMapper objectMapper;
 
-    private volatile Map<Integer, String> cachedColors;
+    private volatile Map<Integer, StatusColorVO> cachedColors;
 
-    public String getColor(Integer status) {
+    public StatusColorVO getColor(Integer status) {
         if (status == null) {
             return null;
         }
         return getColors().get(status);
     }
 
-    public Map<Integer, String> getColors() {
-        Map<Integer, String> colors = cachedColors;
+    public Map<Integer, StatusColorVO> getColors() {
+        Map<Integer, StatusColorVO> colors = cachedColors;
         if (colors == null) {
             synchronized (this) {
                 colors = cachedColors;
@@ -64,34 +65,35 @@ public class FlowStatusColorResolver {
         }
     }
 
-    private Map<Integer, String> loadColors() {
-        Map<Integer, String> colors = new HashMap<>(defaultColors());
+    private Map<Integer, StatusColorVO> loadColors() {
+        Map<Integer, StatusColorVO> colors = new HashMap<>();
         String configValue = configService.getConfigValue(SystemConfigKeyEnum.ORDER_STATUS_COLOR.getKey());
         if (configValue == null || configValue.isBlank()) {
-            return Collections.unmodifiableMap(colors);
+            return Collections.emptyMap();
         }
 
         try {
-            Map<String, String> configuredColors = objectMapper.readValue(
-                    configValue, new TypeReference<Map<String, String>>() { });
+            Map<String, StatusColorVO> configuredColors = objectMapper.readValue(
+                    configValue, new TypeReference<Map<String, StatusColorVO>>() { });
             if (configuredColors != null) {
                 configuredColors.forEach((statusValue, color) -> addIfValid(colors, statusValue, color));
             }
         } catch (Exception e) {
-            log.warn("订单状态颜色配置解析失败，使用默认颜色，configKey={}",
+            log.warn("订单状态颜色配置解析失败，返回空颜色映射，configKey={}",
                     SystemConfigKeyEnum.ORDER_STATUS_COLOR.getKey(), e);
+            return Collections.emptyMap();
         }
         return Collections.unmodifiableMap(colors);
     }
 
-    private void addIfValid(Map<Integer, String> colors, String statusValue, String color) {
+    private void addIfValid(Map<Integer, StatusColorVO> colors, String statusValue, StatusColorVO color) {
         try {
             Integer status = Integer.valueOf(statusValue);
             if (FlowStatusEnum.getByValue(status) == null) {
                 log.warn("忽略未知订单状态颜色配置: status={}", statusValue);
                 return;
             }
-            if (color == null || !HEX_COLOR_PATTERN.matcher(color).matches()) {
+            if (!isValidColor(color)) {
                 log.warn("忽略非法订单状态颜色配置: status={}, color={}", statusValue, color);
                 return;
             }
@@ -101,23 +103,14 @@ public class FlowStatusColorResolver {
         }
     }
 
-    private Map<Integer, String> defaultColors() {
-        Map<Integer, String> colors = new HashMap<>();
-        for (FlowStatusEnum status : FlowStatusEnum.values()) {
-            colors.put(status.getValue(), defaultColor(status));
-        }
-        return colors;
+    private boolean isValidColor(StatusColorVO color) {
+        return color != null
+                && isValidHex(color.getBgColor())
+                && isValidHex(color.getBdColor())
+                && isValidHex(color.getColor());
     }
 
-    private String defaultColor(FlowStatusEnum status) {
-        return switch (status) {
-            case DATA_AUDIT_REJECTED, PRINT_FAILED, QC_FAILED -> "#F56C6C";
-            case DATA_AUDIT_PASSED, DESIGN_COMPLETED, PRINT_COMPLETED,
-                 QC_PASSED, WAREHOUSED, WAREHOUSE_OUT, COMPLETED -> "#67C23A";
-            case DRAFT, CANCELLED -> "#909399";
-            case PENDING_DATA_AUDIT, PENDING_DESIGN, PENDING_PRINT,
-                 REWORK, PACKING -> "#E6A23C";
-            default -> "#409EFF";
-        };
+    private boolean isValidHex(String color) {
+        return color != null && HEX_COLOR_PATTERN.matcher(color).matches();
     }
 }

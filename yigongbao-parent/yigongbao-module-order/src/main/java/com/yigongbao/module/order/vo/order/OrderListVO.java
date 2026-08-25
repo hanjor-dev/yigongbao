@@ -1,5 +1,6 @@
 package com.yigongbao.module.order.vo.order;
 
+import com.yigongbao.common.vo.StatusColorVO;
 import com.yigongbao.module.order.vo.AuditInfo;
 import lombok.Data;
 
@@ -245,7 +246,7 @@ public class OrderListVO implements Serializable {
     private String statusName;
 
     /** 当前状态标签颜色 */
-    private String statusColor;
+    private StatusColorVO statusColor;
 
     // ==================== 审核信息 ====================
 
