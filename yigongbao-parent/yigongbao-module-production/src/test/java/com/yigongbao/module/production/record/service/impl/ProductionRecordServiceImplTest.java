@@ -239,6 +239,10 @@ class ProductionRecordServiceImplTest {
     void generateFlowCardExcelMapsProductFileNameIntoBuildContext() throws Exception {
         ProductionRecordEntity record = record(1L, 10L, FlowStatusEnum.PRINT_COMPLETED.getValue());
         record.setRecordNo("REC-001");
+        LocalDateTime printStartTime = LocalDateTime.of(2026, 8, 25, 10, 20, 30);
+        LocalDateTime printFinishTime = LocalDateTime.of(2026, 8, 25, 11, 5, 30);
+        record.setPrintStartTime(printStartTime);
+        record.setPrintFinishTime(printFinishTime);
         ProductionProductEntity product = new ProductionProductEntity();
         product.setFileName("folder/product.stl");
         OrderMainEntity order = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
@@ -257,6 +261,8 @@ class ProductionRecordServiceImplTest {
                 ArgumentCaptor.forClass(FlowCardExcelBuilder.BuildContext.class);
         verify(flowCardExcelBuilder).build(contextCaptor.capture());
         assertEquals("folder/product.stl", contextCaptor.getValue().getProducts().get(0).getFileName());
+        assertEquals(printStartTime, contextCaptor.getValue().getPrintStartTime());
+        assertEquals(printFinishTime, contextCaptor.getValue().getPrintFinishTime());
     }
 
     @Test
@@ -423,7 +429,31 @@ class ProductionRecordServiceImplTest {
 
         assertEquals("https://files/card.xlsx", file.getFileUrl());
         assertEquals("患者甲流转卡.xlsx", file.getFileName());
-        verifyNoInteractions(flowCardExcelBuilder, fileService);
+        verifyNoInteractions(flowCardExcelBuilder);
+        verify(fileService).generateDownloadUrl("https://files/card.xlsx", "患者甲流转卡.xlsx");
+    }
+
+    @Test
+    void getOrGenerateFlowCardExcel_regeneratesWhenContentWasUpdatedAfterGeneration() throws Exception {
+        LocalDateTime generatedAt = LocalDateTime.of(2026, 8, 25, 10, 0);
+        ProductionRecordEntity record = record(100L, 200L, FlowStatusEnum.PRINT_COMPLETED.getValue());
+        record.setFlowCardFileUrl("https://files/old-card.xlsx");
+        record.setFlowCardGenerateTime(generatedAt);
+        record.setContentUpdateTime(generatedAt.plusMinutes(1));
+        when(recordMapper.selectById(100L)).thenReturn(record);
+        when(productMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(processMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(orderMainMapper.selectById(200L)).thenReturn(order(200L, ProductionConstants.ORDER_TYPE_MEDICAL));
+        when(flowCardExcelBuilder.build(any())).thenReturn(new byte[] {1});
+        com.yigongbao.module.basic.file.vo.FileVO uploadedFile = new com.yigongbao.module.basic.file.vo.FileVO();
+        uploadedFile.setFileUrl("https://files/new-card.xlsx");
+        when(fileService.uploadBytes(any(), anyString(), anyString())).thenReturn(uploadedFile);
+
+        var file = recordService.getOrGenerateFlowCardExcel(100L);
+
+        assertEquals("https://files/new-card.xlsx", file.getFileUrl());
+        verify(flowCardExcelBuilder).build(any());
+        verify(fileService).uploadBytes(any(), anyString(), anyString());
     }
 
     @Test

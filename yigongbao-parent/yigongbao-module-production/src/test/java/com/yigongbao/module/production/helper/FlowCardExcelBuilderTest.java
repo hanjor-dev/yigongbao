@@ -3,8 +3,6 @@ package com.yigongbao.module.production.helper;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.ClassPathResource;
 
 import java.io.ByteArrayInputStream;
@@ -15,11 +13,9 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
 class FlowCardExcelBuilderTest {
 
-    @Autowired
-    private FlowCardExcelBuilder builder;
+    private final FlowCardExcelBuilder builder = new FlowCardExcelBuilder();
 
     @Test
     void testBuild() throws Exception {
@@ -97,6 +93,17 @@ class FlowCardExcelBuilderTest {
     }
 
     @Test
+    void buildHeaderKeepsCompleteStructureWhenTimesAreBlank() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+
+        byte[] excelBytes = builder.build(context);
+
+        assertEquals("开始时间: -", readCell(excelBytes, 4, 2));
+        assertEquals("结束时间: -", readCell(excelBytes, 5, 2));
+        assertTrue(excelBytes.length > 0);
+    }
+
+    @Test
     void buildPostProcessingTimesWithoutSeconds() throws Exception {
         FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
         LocalDateTime startTime = LocalDateTime.of(2026, 8, 13, 15, 1, 34);
@@ -128,6 +135,40 @@ class FlowCardExcelBuilderTest {
         context.setProcesses(List.of(process));
 
         assertEquals("AIR-001", readCell(builder.build(context), 12, 3));
+    }
+
+    @Test
+    void buildProcessShowsDashForMissingDeviceNumbers() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        FlowCardExcelBuilder.ProcessInfo process = new FlowCardExcelBuilder.ProcessInfo();
+        process.setProcessType("clean_dry");
+        context.setProcesses(List.of(process));
+
+        byte[] excelBytes = builder.build(context);
+
+        assertEquals("-", readCell(excelBytes, 11, 3));
+        assertEquals("-", readCell(excelBytes, 12, 3));
+    }
+
+    @Test
+    void buildPrintAndPackDoNotAppendProcessTimes() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        FlowCardExcelBuilder.ProcessInfo print = new FlowCardExcelBuilder.ProcessInfo();
+        print.setProcessType("print");
+        print.setProcessParams("{\"layerThickness\":0.05}");
+        print.setStartTime(LocalDateTime.of(2026, 8, 13, 15, 1, 34));
+        print.setEndTime(LocalDateTime.of(2026, 8, 13, 15, 11, 34));
+        FlowCardExcelBuilder.ProcessInfo pack = new FlowCardExcelBuilder.ProcessInfo();
+        pack.setProcessType("pack");
+        pack.setProcessParams("{\"sealTime\":30}");
+        pack.setStartTime(print.getStartTime());
+        pack.setEndTime(print.getEndTime());
+        context.setProcesses(List.of(print, pack));
+
+        byte[] excelBytes = builder.build(context);
+
+        assertEquals("层厚：0.05 mm\n激光器功率：- mW", readCell(excelBytes, 8, 4));
+        assertEquals("热封时间：30秒", readCell(excelBytes, 13, 4));
     }
 
     @Test
