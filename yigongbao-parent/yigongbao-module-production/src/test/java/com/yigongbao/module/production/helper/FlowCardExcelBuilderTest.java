@@ -126,6 +126,25 @@ class FlowCardExcelBuilderTest {
     }
 
     @Test
+    void buildPostProcessingTimesShowsDashWhenTimesAreBlank() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        List<FlowCardExcelBuilder.ProcessInfo> processes = new ArrayList<>();
+        for (String processType : List.of("wash", "cure", "clean_dry")) {
+            FlowCardExcelBuilder.ProcessInfo process = new FlowCardExcelBuilder.ProcessInfo();
+            process.setProcessType(processType);
+            processes.add(process);
+        }
+        context.setProcesses(processes);
+
+        byte[] excelBytes = builder.build(context);
+        String expected = "开始：-\n结束：-";
+
+        assertEquals(expected, readCell(excelBytes, 9, 4));
+        assertEquals(expected, readCell(excelBytes, 10, 4));
+        assertEquals(expected, readCell(excelBytes, 11, 4));
+    }
+
+    @Test
     void buildCleanDryShowsAirCompressorDeviceNo() throws Exception {
         FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
         FlowCardExcelBuilder.ProcessInfo process = new FlowCardExcelBuilder.ProcessInfo();
