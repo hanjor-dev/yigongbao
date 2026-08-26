@@ -6,6 +6,7 @@ import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.result.Result;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -62,7 +63,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(NotLoginException.class)
     public Result<Void> handleNotLoginException(NotLoginException e) {
-        log.warn("未登录异常: message={}", e.getMessage(), e);
+        //log.warn("未登录异常: message={}", e.getMessage(), e);
         return Result.error(ErrorCodeEnum.UNAUTHORIZED);
     }
 
@@ -208,8 +209,10 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
-    public Result<Void> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e) {
-        log.warn("请求方法不支持：{}", e.getMethod(), e);
+    public Result<Void> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e,
+                                                                      HttpServletRequest request) {
+        log.warn("请求方法不支持：接口={}, 请求方法={}, 支持方法={}",
+                request.getRequestURI(), e.getMethod(), e.getSupportedHttpMethods(), e);
         return Result.error(ErrorCodeEnum.METHOD_NOT_ALLOWED);
     }
 
