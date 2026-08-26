@@ -278,8 +278,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         UserEntity applyUser = userService.getById(apply.getApplyUserId());
         String applyUserRoleCode = applyUser != null ? applyUser.getRoleCode() : "";
 
-        // 根据审核结果处理：1=通过，2=驳回
-        if (ApplyStatusEnum.APPROVED.getCode().equals(dto.getResult())) {
+        // 审核接口结果：1=通过，2=驳回；申请状态使用 ApplyStatusEnum 的持久化编码。
+        if (AuditApplyDTO.RESULT_APPROVED == dto.getResult()) {
             validateApplyPhase(applyOrder, applyUserRoleCode);
             // 审核通过：先执行订单修改，成功后再更新申请状态
             OrderModifyFullDTO modifyDto;
@@ -308,7 +308,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
 
             // 订单修改成功后才更新申请状态
             apply.setStatus(ApplyStatusEnum.APPROVED.getCode());
-        } else if (ApplyStatusEnum.REJECTED.getCode().equals(dto.getResult())) {
+        } else if (AuditApplyDTO.RESULT_REJECTED == dto.getResult()) {
             claimAuditApply(applyId, ApplyStatusEnum.REJECTED.getCode());
             // 审核驳回：记录驳回原因，通知订单业务人员
             apply.setStatus(ApplyStatusEnum.REJECTED.getCode());
@@ -333,7 +333,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         }
 
         // 更新原推送通知的备注（审核完成状态提示）
-        String remark = ApplyStatusEnum.APPROVED.getCode().equals(dto.getResult())
+        String remark = AuditApplyDTO.RESULT_APPROVED == dto.getResult()
                 ? "该申请已被" + userName + "审核通过"
                 : "该申请已被" + userName + "审核驳回";
         eventPublisher.publishEvent(new com.yigongbao.common.event.NotificationRemarkUpdateEvent(this, "MODIFY_APPLY", applyId, "APPROVAL", remark));

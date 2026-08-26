@@ -16,6 +16,9 @@ public class AuditApplyDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    public static final int RESULT_APPROVED = 1;
+    public static final int RESULT_REJECTED = 2;
+
     /**
      * 审核结果：1=通过，2=驳回
      */

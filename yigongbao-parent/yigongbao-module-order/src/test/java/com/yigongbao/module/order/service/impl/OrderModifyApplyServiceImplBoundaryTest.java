@@ -239,7 +239,7 @@ class OrderModifyApplyServiceImplBoundaryTest {
         when(applyMapper.selectById(9L)).thenReturn(apply);
 
         AuditApplyDTO dto = new AuditApplyDTO();
-        dto.setResult(ApplyStatusEnum.APPROVED.getCode());
+        dto.setResult(AuditApplyDTO.RESULT_APPROVED);
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
             assertThatThrownBy(() -> service.auditApply(9L, dto))
@@ -329,7 +329,7 @@ class OrderModifyApplyServiceImplBoundaryTest {
         when(applyMapper.update(any(), any())).thenReturn(1);
         when(applyMapper.updateById(apply)).thenReturn(1);
         AuditApplyDTO dto = new AuditApplyDTO();
-        dto.setResult(ApplyStatusEnum.REJECTED.getCode());
+        dto.setResult(AuditApplyDTO.RESULT_REJECTED);
         dto.setRemark("资料不完整");
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
@@ -373,7 +373,7 @@ class OrderModifyApplyServiceImplBoundaryTest {
         when(applyMapper.update(any(), any())).thenReturn(1);
         when(applyMapper.updateById(apply)).thenReturn(1);
         AuditApplyDTO dto = new AuditApplyDTO();
-        dto.setResult(ApplyStatusEnum.APPROVED.getCode());
+        dto.setResult(AuditApplyDTO.RESULT_APPROVED);
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(2L);
@@ -415,7 +415,7 @@ class OrderModifyApplyServiceImplBoundaryTest {
         when(applyMapper.update(any(), any())).thenReturn(0);
 
         AuditApplyDTO dto = new AuditApplyDTO();
-        dto.setResult(ApplyStatusEnum.APPROVED.getCode());
+        dto.setResult(AuditApplyDTO.RESULT_APPROVED);
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(2L);
@@ -463,7 +463,7 @@ class OrderModifyApplyServiceImplBoundaryTest {
         when(applyMapper.selectById(12L)).thenReturn(apply);
 
         AuditApplyDTO dto = new AuditApplyDTO();
-        dto.setResult(ApplyStatusEnum.APPROVED.getCode());
+        dto.setResult(AuditApplyDTO.RESULT_APPROVED);
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(2L);
