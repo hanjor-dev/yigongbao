@@ -451,6 +451,11 @@ public class OrderDetailVO implements Serializable {
         private String fileUrl;
 
         /**
+         * 带原始文件名响应头的短时效下载地址
+         */
+        private String downloadUrl;
+
+        /**
          * 缩略图访问URL
          */
         private String thUrl;

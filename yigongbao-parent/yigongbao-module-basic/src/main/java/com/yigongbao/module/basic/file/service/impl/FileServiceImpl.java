@@ -8,6 +8,9 @@ import com.yigongbao.module.basic.file.config.FileStorageProperties;
 import com.yigongbao.module.basic.file.entity.FileDetail;
 import com.yigongbao.module.basic.file.provider.FileUploadConfigProvider;
 import com.yigongbao.module.basic.file.service.FileService;
+import com.yigongbao.module.basic.file.service.FileDownloadUrlRequest;
+import com.yigongbao.module.basic.file.service.FileDownloadUrlByUrlRequest;
+import com.yigongbao.module.basic.file.service.FileDownloadUrlService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,6 +77,7 @@ public class FileServiceImpl implements FileService {
     private final FileRecorderService fileRecorderService;
     private final FileStorageProperties fileStorageProperties;
     private final FileUploadConfigProvider fileUploadConfigProvider;
+    private final FileDownloadUrlService fileDownloadUrlService;
 
     // ==================== 上传 ====================
 
@@ -150,7 +154,7 @@ public class FileServiceImpl implements FileService {
         fileRecorderService.updateById(detail);
 
         log.info("关联文件: fileId={}, bizType={}, bizId={}", fileId, bizType, bizId);
-        return fileRecorderService.toFileVO(detail);
+        return toFileVOWithDownloadUrl(detail);
     }
 
     @Override
@@ -176,7 +180,7 @@ public class FileServiceImpl implements FileService {
             log.warn("文件不存在: id={}", id);
             throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
         }
-        return fileRecorderService.toFileVO(detail);
+        return toFileVOWithDownloadUrl(detail);
     }
 
     @Override
@@ -185,7 +189,7 @@ public class FileServiceImpl implements FileService {
             return List.of();
         }
         List<FileDetail> details = fileRecorderService.listByIds(ids);
-        return details.stream().map(fileRecorderService::toFileVO).toList();
+        return toFileVOListWithDownloadUrls(details);
     }
 
     @Override
@@ -196,8 +200,40 @@ public class FileServiceImpl implements FileService {
                         bizId != null ? bizId.toString() : null)
                 .orderByDesc(FileDetail::getCreateTime);
         List<FileDetail> details = fileRecorderService.list(wrapper);
-        return details.stream()
-                .map(fileRecorderService::toFileVO)
+        return toFileVOListWithDownloadUrls(details);
+    }
+
+    @Override
+    public String generateDownloadUrl(String fileUrl, String downloadFilename) {
+        if (StrUtil.isBlank(fileUrl) || fileDownloadUrlService == null) {
+            return null;
+        }
+        return fileDownloadUrlService.generate(
+                fileStorageService.getFileInfoByUrl(fileUrl), downloadFilename);
+    }
+
+    @Override
+    public List<String> generateDownloadUrls(List<FileDownloadUrlByUrlRequest> requests) {
+        if (CollUtil.isEmpty(requests) || fileDownloadUrlService == null) {
+            return List.of();
+        }
+        List<String> urls = requests.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(FileDownloadUrlByUrlRequest::fileUrl)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
+                .toList();
+        java.util.Map<String, FileInfo> fileInfoMap = fileRecorderService.listByUrls(urls).stream()
+                .collect(Collectors.toMap(FileDetail::getUrl, fileRecorderService::toFileInfo,
+                        (first, ignored) -> first));
+        return requests.stream()
+                .map(request -> {
+                    if (request == null) {
+                        return null;
+                    }
+                    FileInfo fileInfo = fileInfoMap.get(request.fileUrl());
+                    return fileDownloadUrlService.generate(fileInfo, request.downloadName());
+                })
                 .toList();
     }
 
@@ -264,6 +300,48 @@ public class FileServiceImpl implements FileService {
     }
 
     // ==================== 校验工具方法 ====================
+
+    /**
+     * 将数据库文件记录转换为前端 VO，并补充短时效下载地址。
+     */
+    private FileVO toFileVOWithDownloadUrl(FileDetail detail) {
+        if (detail == null) {
+            return null;
+        }
+        FileVO vo = fileRecorderService.toFileVO(detail);
+        if (vo == null || fileDownloadUrlService == null) {
+            return vo;
+        }
+        vo.setDownloadUrl(fileDownloadUrlService.generate(
+                fileRecorderService.toFileInfo(detail), detail.getOriginalFilename()));
+        return vo;
+    }
+
+    /**
+     * 批量转换文件记录。数据库查询保持一次完成，签名地址按批次生成，避免 N+1 查询。
+     */
+    private List<FileVO> toFileVOListWithDownloadUrls(List<FileDetail> details) {
+        if (CollUtil.isEmpty(details)) {
+            return List.of();
+        }
+        List<FileVO> result = details.stream()
+                .map(fileRecorderService::toFileVO)
+                .toList();
+        if (fileDownloadUrlService == null) {
+            return result;
+        }
+        List<FileDownloadUrlRequest> requests = details.stream()
+                .map(detail -> new FileDownloadUrlRequest(
+                        fileRecorderService.toFileInfo(detail), detail.getOriginalFilename()))
+                .toList();
+        List<String> downloadUrls = fileDownloadUrlService.generateBatch(requests);
+        for (int i = 0; i < result.size() && i < downloadUrls.size(); i++) {
+            if (result.get(i) != null) {
+                result.get(i).setDownloadUrl(downloadUrls.get(i));
+            }
+        }
+        return result;
+    }
 
     /**
      * 解析允许上传的文件扩展名配置字符串为集合
@@ -450,7 +528,7 @@ public class FileServiceImpl implements FileService {
 
             // 5. 从数据库查询完整记录（含 createTime、createBy 等自动填充字段）
             FileDetail detail = fileRecorderService.getDetailById(fileInfo.getId());
-            return fileRecorderService.toFileVO(detail);
+            return toFileVOWithDownloadUrl(detail);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {

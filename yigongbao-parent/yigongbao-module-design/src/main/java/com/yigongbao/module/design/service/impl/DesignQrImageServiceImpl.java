@@ -179,6 +179,7 @@ public class DesignQrImageServiceImpl implements DesignQrImageService {
         vo.setFileId(file.getId());
         vo.setFileName(file.getFileName());
         vo.setFileUrl(file.getFileUrl());
+        vo.setDownloadUrl(file.getDownloadUrl());
         vo.setFileSize(file.getFileSize());
         vo.setFileHash(file.getFileHash());
         vo.setUploadTime(file.getCreateTime());

@@ -43,6 +43,7 @@ public class DesignModelVO implements Serializable {
      * 文件访问地址（来自 FileVO）
      */
     private String fileUrl;
+    private String downloadUrl;
 
     /**
      * 文件大小（字节，来自 FileVO）

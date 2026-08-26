@@ -105,6 +105,7 @@ public class ImagingServiceImpl implements ImagingService {
             if (fileVO != null) {
                 vo.setFileName(fileVO.getFileName());
                 vo.setFileUrl(fileVO.getFileUrl());
+                vo.setDownloadUrl(fileVO.getDownloadUrl());
                 vo.setFileSize(fileVO.getFileSize());
             }
             return vo;
@@ -239,6 +240,7 @@ public class ImagingServiceImpl implements ImagingService {
             if (fileVO != null) {
                 vo.setFileName(fileVO.getFileName());
                 vo.setFileUrl(fileVO.getFileUrl());
+                vo.setDownloadUrl(fileVO.getDownloadUrl());
                 vo.setFileSize(fileVO.getFileSize());
                 // 颜色匹配：文件名去扩展名后与 part_colors.part_detail 精确比对
                 String nameWithoutExt = FileUtil.mainName(fileVO.getFileName());
@@ -300,6 +302,7 @@ public class ImagingServiceImpl implements ImagingService {
         vo.setFileExt(f.getFileExt());
         vo.setFilePath(f.getFilePath());
         vo.setFileUrl(f.getFileUrl());
+        vo.setDownloadUrl(fileService.generateDownloadUrl(f.getFileUrl(), f.getFileName()));
         vo.setFileSize(f.getFileSize());
         // 使用 Hutool FileUtil.mainName() 去扩展名后，精确匹配颜色配置
         String nameWithoutExt = FileUtil.mainName(f.getFileName());

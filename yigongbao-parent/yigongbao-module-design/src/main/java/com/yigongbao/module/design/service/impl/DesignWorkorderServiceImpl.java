@@ -509,6 +509,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         FileBizTypeEnum biz = FileBizTypeEnum.getByDictCode(orderFile.getFileCategory());
         item.setFileCategoryName(biz != null ? biz.getName() : null);
         item.setFileUrl(fileVO.getFileUrl());
+        item.setDownloadUrl(fileVO.getDownloadUrl());
         item.setThUrl(fileVO.getThUrl());
         item.setFileSize(fileVO.getFileSize());
         item.setFileSizeText(fileVO.getFileSizeText());

@@ -22,6 +22,7 @@ import org.dromara.x.file.storage.core.recorder.FileRecorder;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.List;
 
 /**
  * 文件记录服务
@@ -102,6 +103,17 @@ public class FileRecorderService extends ServiceImpl<FileDetailMapper, FileDetai
         FileDetail detail = getOne(new LambdaQueryWrapper<FileDetail>()
                 .eq(FileDetail::getUrl, url));
         return toFileInfo(detail);
+    }
+
+    /**
+     * 按 URL 批量查询文件记录，供历史 URL 字段的聚合接口使用。
+     */
+    public List<FileDetail> listByUrls(List<String> urls) {
+        if (urls == null || urls.isEmpty()) {
+            return List.of();
+        }
+        return list(new LambdaQueryWrapper<FileDetail>()
+                .in(FileDetail::getUrl, urls));
     }
 
     /**

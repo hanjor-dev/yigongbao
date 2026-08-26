@@ -31,11 +31,17 @@ public class DesignDocVersionVO {
     /** 系统生成的模板文件访问URL */
     private String templateFileUrl;
 
+    /** 带原始文件名响应头的短时效下载地址 */
+    private String templateDownloadUrl;
+
     /** 修订版文件ID（可为空），前端通过 GET /basic/file/download/{fileId} 下载 */
     private String revisedFileId;
 
     /** 设计师上传的修订版文件访问URL（可为空） */
     private String revisedFileUrl;
+
+    /** 带原始文件名响应头的短时效下载地址 */
+    private String revisedDownloadUrl;
 
     /** 生成时间 */
     private LocalDateTime generateTime;

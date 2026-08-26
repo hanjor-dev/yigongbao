@@ -261,6 +261,7 @@ yigongbao:
   file-storage:
     # 最大文件大小（字节），默认 5000MB
     max-file-size: 5242880000
+    download-url-expire-minutes: 10
     # 允许的文件扩展名
     allowed-extensions:
       - jpg

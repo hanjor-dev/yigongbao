@@ -1196,6 +1196,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         vo.setVersion(entity.getVersion());
         vo.setFileId(entity.getTemplateFileId());
         vo.setTemplateFileUrl(entity.getTemplateFileUrl());
+        vo.setTemplateDownloadUrl(fileService.generateDownloadUrl(entity.getTemplateFileUrl(), null));
         vo.setGenerateTime(entity.getGenerateTime());
         vo.setIsConfirmed(entity.getIsConfirmed());
         return vo;
@@ -1208,6 +1209,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         vo.setVersion(entity.getVersion());
         vo.setFileId(entity.getTemplateFileId());
         vo.setTemplateFileUrl(entity.getTemplateFileUrl());
+        vo.setTemplateDownloadUrl(fileService.generateDownloadUrl(entity.getTemplateFileUrl(), null));
         vo.setGenerateTime(entity.getGenerateTime());
         vo.setIsConfirmed(entity.getIsConfirmed());
         vo.setProductCategory(entity.getProductCategory());
@@ -1222,8 +1224,10 @@ public class DesignDocServiceImpl implements DesignDocService {
         vo.setSourceType(entity.getSourceType());
         vo.setTemplateFileId(entity.getTemplateFileId());
         vo.setTemplateFileUrl(entity.getTemplateFileUrl());
+        vo.setTemplateDownloadUrl(fileService.generateDownloadUrl(entity.getTemplateFileUrl(), null));
         vo.setRevisedFileId(entity.getRevisedFileId());
         vo.setRevisedFileUrl(entity.getRevisedFileUrl());
+        vo.setRevisedDownloadUrl(fileService.generateDownloadUrl(entity.getRevisedFileUrl(), null));
         vo.setGenerateTime(entity.getGenerateTime());
         vo.setRevisedUploadTime(entity.getRevisedUploadTime());
         vo.setIsConfirmed(entity.getIsConfirmed());
@@ -1239,8 +1243,10 @@ public class DesignDocServiceImpl implements DesignDocService {
         vo.setSourceType(entity.getSourceType());
         vo.setTemplateFileId(entity.getTemplateFileId());
         vo.setTemplateFileUrl(entity.getTemplateFileUrl());
+        vo.setTemplateDownloadUrl(fileService.generateDownloadUrl(entity.getTemplateFileUrl(), null));
         vo.setRevisedFileId(entity.getRevisedFileId());
         vo.setRevisedFileUrl(entity.getRevisedFileUrl());
+        vo.setRevisedDownloadUrl(fileService.generateDownloadUrl(entity.getRevisedFileUrl(), null));
         vo.setGenerateTime(entity.getGenerateTime());
         vo.setRevisedUploadTime(entity.getRevisedUploadTime());
         vo.setIsConfirmed(entity.getIsConfirmed());

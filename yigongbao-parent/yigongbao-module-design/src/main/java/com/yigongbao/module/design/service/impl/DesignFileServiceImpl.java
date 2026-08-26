@@ -11,6 +11,7 @@ import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.basic.file.service.FileService;
+import com.yigongbao.module.basic.file.service.FileDownloadUrlByUrlRequest;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.design.dto.ArchiveFileInfo;
 import com.yigongbao.module.design.entity.DesignModelEntity;
@@ -370,6 +371,7 @@ public class DesignFileServiceImpl implements DesignFileService {
                     vo.setFileSize(f.getFileSize());
                     vo.setSortOrder(f.getSortOrder());
                     vo.setFileUrl(f.getFileUrl());
+                    vo.setDownloadUrl(fileService.generateDownloadUrl(f.getFileUrl(), f.getFileName()));
                     return vo;
                 })
                 .collect(Collectors.toList());
@@ -609,13 +611,19 @@ public class DesignFileServiceImpl implements DesignFileService {
         vo.setFileId(entity.getFileId());
         vo.setFileName(entity.getFileName());
         vo.setFileUrl(entity.getFileUrl());
+        vo.setDownloadUrl(fileService.generateDownloadUrl(entity.getFileUrl(), entity.getFileName()));
         vo.setFileSize(entity.getFileSize());
         vo.setFileCount(entity.getFileCount());
         vo.setUploadTime(entity.getUploadTime());
 
         // 包内文件列表
-        List<DesignPackageFileVO> fileVOs = files.stream()
-                .map(f -> {
+        List<FileDownloadUrlByUrlRequest> requests = files.stream()
+                .map(f -> new FileDownloadUrlByUrlRequest(f.getFileUrl(), f.getFileName()))
+                .toList();
+        List<String> packageDownloadUrls = fileService.generateDownloadUrls(requests);
+        List<DesignPackageFileVO> fileVOs = new ArrayList<>();
+        for (int i = 0; i < files.size(); i++) {
+            DesignPackageFileEntity f = files.get(i);
                     DesignPackageFileVO fileVO = new DesignPackageFileVO();
                     fileVO.setId(f.getId());
                     fileVO.setPackageId(f.getPackageId());
@@ -626,9 +634,9 @@ public class DesignFileServiceImpl implements DesignFileService {
                     fileVO.setSortOrder(f.getSortOrder());
                     fileVO.setHasPrintInfo(filledFileIds.contains(f.getId()));
                     fileVO.setFileUrl(f.getFileUrl());
-                    return fileVO;
-                })
-                .collect(Collectors.toList());
+            fileVO.setDownloadUrl(i < packageDownloadUrls.size() ? packageDownloadUrls.get(i) : null);
+            fileVOs.add(fileVO);
+        }
         vo.setFiles(fileVOs);
 
         return vo;
@@ -648,6 +656,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         if (fileVO != null) {
             vo.setFileName(fileVO.getFileName());
             vo.setFileUrl(fileVO.getFileUrl());
+            vo.setDownloadUrl(fileVO.getDownloadUrl());
             vo.setFileSize(fileVO.getFileSize());
             vo.setFileExt(fileVO.getFileExt());
         }

@@ -25,6 +25,9 @@ public class DocItemVO {
     /** 系统生成的模板文件访问URL */
     private String templateFileUrl;
 
+    /** 带原始文件名响应头的短时效下载地址 */
+    private String templateDownloadUrl;
+
     /** 生成时间 */
     private LocalDateTime generateTime;
 

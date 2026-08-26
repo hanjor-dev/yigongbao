@@ -179,6 +179,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             com.yigongbao.module.basic.file.vo.FileVO pkgFile = new com.yigongbao.module.basic.file.vo.FileVO();
             pkgFile.setFileName(pkg.getFileName());
             pkgFile.setFileUrl(pkg.getFileUrl());
+            pkgFile.setDownloadUrl(fileService.generateDownloadUrl(pkg.getFileUrl(), pkg.getFileName()));
             pkgFile.setFileSize(pkg.getFileSize());
             vo.setDataPackageFile(pkgFile);
 
@@ -192,6 +193,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                         ? instruction.getRevisedFileUrl() : instruction.getTemplateFileUrl();
                 com.yigongbao.module.basic.file.vo.FileVO instrFile = new com.yigongbao.module.basic.file.vo.FileVO();
                 instrFile.setFileUrl(url);
+                instrFile.setDownloadUrl(fileService.generateDownloadUrl(url, null));
                 vo.setInstructionFile(instrFile);
             }
 
@@ -206,6 +208,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                         ? drawing.getRevisedFileUrl() : drawing.getTemplateFileUrl();
                 com.yigongbao.module.basic.file.vo.FileVO drawFile = new com.yigongbao.module.basic.file.vo.FileVO();
                 drawFile.setFileUrl(url);
+                drawFile.setDownloadUrl(fileService.generateDownloadUrl(url, null));
                 vo.setDrawingFile(drawFile);
             }
         }
@@ -231,6 +234,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             com.yigongbao.module.basic.file.vo.FileVO fileVO = new com.yigongbao.module.basic.file.vo.FileVO();
             fileVO.setFileUrl(record.getFlowCardFileUrl());
             fileVO.setFileName(patientName + "流转卡.xlsx");
+            fileVO.setDownloadUrl(fileService.generateDownloadUrl(
+                    record.getFlowCardFileUrl(), fileVO.getFileName()));
             vo.setFlowCardFile(fileVO);
         }
     }
@@ -1044,6 +1049,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             com.yigongbao.module.basic.file.vo.FileVO fileVO = new com.yigongbao.module.basic.file.vo.FileVO();
             fileVO.setFileUrl(record.getFlowCardFileUrl());
             fileVO.setFileName(patientName + "流转卡.xlsx");
+            fileVO.setDownloadUrl(fileService.generateDownloadUrl(
+                    record.getFlowCardFileUrl(), fileVO.getFileName()));
             return fileVO;
         }
     }

@@ -34,6 +34,8 @@ public class ScreenshotVO implements Serializable {
      */
     private String fileUrl;
 
+    private String downloadUrl;
+
     /**
      * 文件大小（字节）
      */

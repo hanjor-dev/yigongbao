@@ -177,6 +177,7 @@ yigongbao:
   file-storage:
     # 最大文件大小（字节），全局上限 2GB
     max-file-size: 2147483648
+    download-url-expire-minutes: 10
 
 # 短信配置
 sms:

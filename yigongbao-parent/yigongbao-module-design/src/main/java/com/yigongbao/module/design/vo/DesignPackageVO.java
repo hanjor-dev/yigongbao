@@ -58,6 +58,7 @@ public class DesignPackageVO implements Serializable {
      * 文件访问地址
      */
     private String fileUrl;
+    private String downloadUrl;
 
     /**
      * 文件大小（字节）

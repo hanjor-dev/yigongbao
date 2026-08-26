@@ -1383,6 +1383,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         vo.setFileCategory(orderFile.getFileCategory());
         vo.setFileCategoryName(getFileCategoryName(orderFile.getFileCategory()));
         vo.setFileUrl(fileVO.getFileUrl());
+        vo.setDownloadUrl(fileVO.getDownloadUrl());
         vo.setThUrl(fileVO.getThUrl());
         vo.setFileSize(fileVO.getFileSize());
         vo.setFileSizeText(fileVO.getFileSizeText());

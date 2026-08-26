@@ -23,6 +23,7 @@ public class DcmPackageVO {
 
     @Schema(description = "文件访问地址")
     private String fileUrl;
+    private String downloadUrl;
 
     @Schema(description = "文件大小（字节）")
     private Long fileSize;

@@ -152,10 +152,7 @@ public interface FileDownloadUrlService {
 
     String generate(FileInfo fileInfo, String downloadFileName);
 
-    List<String> generateBatch(
-            List<FileInfo> fileInfos,
-            List<String> downloadFileNames
-    );
+    List<String> generateBatch(List<FileDownloadUrlRequest> requests);
 }
 ~~~
 
@@ -171,14 +168,14 @@ fileStorageService
         .setFilename(fileInfo.getFilename())
         .setMethod(Constant.GeneratePresignedUrl.Method.GET)
         .setExpiration(expiration)
-        .putQueryParams(
-                "response-content-disposition",
+        .putResponseHeaders(
+                Constant.Metadata.CONTENT_DISPOSITION,
                 contentDisposition
         )
         .generatePresignedUrl();
 ~~~
 
-response-content-disposition 必须在生成签名时作为查询参数参与签名，不能在签名 URL 生成后由前端追加。
+Content-Disposition 必须通过 x-file-storage 的响应头覆盖参数参与签名，不能在签名 URL 生成后由前端追加；OSS/COS 适配器会把它转换为平台要求的 `response-content-disposition` 参数。
 
 文件名使用：
 
@@ -186,7 +183,7 @@ response-content-disposition 必须在生成签名时作为查询参数参与签
 Content-Disposition: attachment; filename*=UTF-8''<encoded-file-name>
 ~~~
 
-文件名必须清理 CR/LF，并进行 UTF-8 百分号编码；空文件名时回退到 originalFilename。
+文件名必须清理 CR/LF，并进行 UTF-8 百分号编码；ASCII 兼容客户端使用安全的 `filename` 回退名，现代客户端使用 `filename*` 原始 UTF-8 文件名。
 
 ### 3.4 平台选择
 
@@ -359,7 +356,7 @@ yigongbao:
 默认单文件降级，不影响整个详情接口：
 
 - 记录告警日志。
-- downloadUrl 生成失败时保留 fileUrl。
+- downloadUrl 生成失败时保留原有 fileUrl，新增 downloadUrl 为空；受保护文件的下载按钮不得回退到 fileUrl，且不得把签名地址写入日志。
 - 不因一个文件签名失败而丢弃其他文件。
 
 ---
@@ -488,7 +485,7 @@ Content-Disposition: attachment; filename*=UTF-8''<expected-name>
 | 风险 | 应对 |
 |---|---|
 | 自定义业务 VO 只复制 fileUrl | 复用 FileVO 或统一公共转换器 |
-| 参数未参与签名 | 使用 putQueryParams 后再生成 URL |
+| 参数未参与签名 | 使用 putResponseHeaders 后再生成 URL |
 | URL 过期 | 默认 10 分钟并监控 |
 | CDN 丢弃参数 | 先用源站验证，再配置 CDN |
 | 单条转换重复查询 | 批量查询后传递 FileInfo |

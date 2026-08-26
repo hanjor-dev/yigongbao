@@ -125,6 +125,17 @@ public interface FileService {
     List<FileVO> listByBiz(String bizType, Long bizId);
 
     /**
+     * 根据历史业务表中保存的文件 URL 生成下载地址。
+     * 适用于尚未保存 file_detail.id、但 URL 已由 x-file-storage 记录的兼容场景。
+     */
+    String generateDownloadUrl(String fileUrl, String downloadFilename);
+
+    /**
+     * 根据历史业务表中的 URL 批量生成下载地址，避免逐条查询 file_detail。
+     */
+    List<String> generateDownloadUrls(List<FileDownloadUrlByUrlRequest> requests);
+
+    /**
      * 下载文件到响应流
      *
      * @param id 文件ID

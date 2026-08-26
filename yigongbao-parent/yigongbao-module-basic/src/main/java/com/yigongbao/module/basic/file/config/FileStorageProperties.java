@@ -21,4 +21,9 @@ public class FileStorageProperties {
      * 全局上限，各业务类型的实际限制由业务层自行校验
      */
     private long maxFileSize = 5242880000L;
+
+    /**
+     * 预签名下载地址有效期（分钟）。
+     */
+    private long downloadUrlExpireMinutes = 10L;
 }

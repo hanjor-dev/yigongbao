@@ -18,6 +18,7 @@ public class DesignQrImageVO implements Serializable {
     private String fileId;
     private String fileName;
     private String fileUrl;
+    private String downloadUrl;
     private Long fileSize;
     private String fileHash;
     private LocalDateTime uploadTime;

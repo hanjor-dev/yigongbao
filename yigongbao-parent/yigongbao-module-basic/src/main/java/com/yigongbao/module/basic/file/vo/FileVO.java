@@ -50,6 +50,11 @@ public class FileVO implements Serializable {
     private String fileUrl;
 
     /**
+     * 带原始文件名响应头的短时效下载地址。文件内容不经过业务服务。
+     */
+    private String downloadUrl;
+
+    /**
      * 文件大小（字节）
      */
     private Long fileSize;

@@ -662,6 +662,7 @@ public class OrderDraftServiceImpl extends ServiceImpl<OrderDraftMapper, OrderDr
         vo.setFileCategory(fileCategory);
         vo.setFileCategoryName(getFileCategoryName(fileCategory));
         vo.setFileUrl(fileVO.getFileUrl());
+        vo.setDownloadUrl(fileVO.getDownloadUrl());
         vo.setThUrl(fileVO.getThUrl());
         vo.setFileSize(fileVO.getFileSize());
         vo.setFileSizeText(fileVO.getFileSizeText());

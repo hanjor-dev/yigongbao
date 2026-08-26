@@ -183,6 +183,7 @@ public class DesignScreenshotServiceImpl
         vo.setFileId(fileVO.getId());
         vo.setFileName(fileVO.getFileName());
         vo.setFileUrl(fileVO.getFileUrl());
+        vo.setDownloadUrl(fileVO.getDownloadUrl());
         vo.setFileSize(fileVO.getFileSize());
         vo.setUploadTime(fileVO.getCreateTime());
         return vo;

@@ -430,7 +430,8 @@ class ProductionRecordServiceImplTest {
 
         assertEquals("https://files/card.xlsx", file.getFileUrl());
         assertEquals("患者甲流转卡.xlsx", file.getFileName());
-        verifyNoInteractions(flowCardExcelBuilder, fileService);
+        verifyNoInteractions(flowCardExcelBuilder);
+        verify(fileService).generateDownloadUrl("https://files/card.xlsx", "患者甲流转卡.xlsx");
     }
 
     @Test
