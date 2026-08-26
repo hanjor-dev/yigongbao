@@ -35,4 +35,7 @@ public class OrderModificationDiff implements Serializable {
      * 影像报告差异
      */
     private ImageDiff imageReport;
+
+    /** 免费业务审批文件差异 */
+    private ImageDiff approvalFile;
 }

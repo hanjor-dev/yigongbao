@@ -172,7 +172,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         if (StrUtil.isNotBlank(dto.getBusinessType()) && !dto.getBusinessType().equals(order.getBusinessType())) {
             // 修改申请场景：审批文件传 null，如果改为试用订单且缺少审批文件会在审核时处理
             orderDataValidator.validateBusinessTypeRestrictions(
-                    currentUserId, dto.getBusinessType(), null);
+                    currentUserId, dto.getBusinessType(), dto.getApprovalFileIds());
             log.info("业务类型修改申请通过账户限制验证: userId={}, orderId={}, {} -> {}",
                     currentUserId, orderId, order.getBusinessType(), dto.getBusinessType());
         }
@@ -641,6 +641,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 if (diff.getItems() != null && diff.getItems().isChanged()) changeCount++;
                 if (diff.getImageData() != null && diff.getImageData().isChanged()) changeCount++;
                 if (diff.getImageReport() != null && diff.getImageReport().isChanged()) changeCount++;
+                if (diff.getApprovalFile() != null && diff.getApprovalFile().isChanged()) changeCount++;
                 vo.setChangeCount(changeCount);
                 vo.setChangeSummary(buildChangeSummary(diff));
             } catch (Exception e) {
@@ -674,6 +675,9 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         }
         if (diff.getImageReport() != null && diff.getImageReport().isChanged()) {
             parts.add("影像报告");
+        }
+        if (diff.getApprovalFile() != null && diff.getApprovalFile().isChanged()) {
+            parts.add("审批文件");
         }
         if (diff.getItems() != null && diff.getItems().isChanged()) {
             parts.add("重建项目");

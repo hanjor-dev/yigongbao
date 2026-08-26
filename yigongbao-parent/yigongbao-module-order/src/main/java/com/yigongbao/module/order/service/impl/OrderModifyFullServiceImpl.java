@@ -104,6 +104,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         }
         validateFileIds(dto.getImageDataFileIds(), "影像数据");
         validateFileIds(dto.getImageReportFileIds(), "影像报告");
+        validateFileIds(dto.getApprovalFileIds(), "审批");
         if (!skipPermissionCheck) {
             orderDataScopeChecker.checkOrderAccess(orderId);
         }
@@ -112,6 +113,9 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "订单不存在");
         }
+        // 全量修改接口允许调用方只提交实际编辑过的普通字段；缺失字段沿用现值，避免被反序列化为 null 后误清空。
+        // 文件列表和 items 保留独立语义：null=不修改，空数组=清空，非空数组=替换。
+        mergeMissingScalarFields(order, dto);
         validatePhysicalDeliveryValue(dto.getNeedsPhysicalDelivery());
         validatePhysicalDeliveryChange(order, dto.getNeedsPhysicalDelivery());
 
@@ -151,7 +155,10 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             changes.add(diffItems(orderId, dto.getItems()));
         }
         if (dto.getImageDataFileIds() != null || dto.getImageReportFileIds() != null) {
-            changes.add(diffImages(orderId, dto.getImageDataFileIds(), dto.getImageReportFileIds()));
+            changes.add(diffImages(orderId, dto.getImageDataFileIds(), dto.getImageReportFileIds(),
+                    dto.getApprovalFileIds()));
+        } else if (dto.getApprovalFileIds() != null) {
+            changes.add(diffImages(orderId, null, null, dto.getApprovalFileIds()));
         }
 
         // 5. 过滤无变化
@@ -175,7 +182,8 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                 }
                 // 验证 businessType 修改权限
                 if (!Objects.equals(order.getBusinessType(), dto.getBusinessType())) {
-                    orderDataValidator.validateBusinessTypeRestrictions(modifierId, dto.getBusinessType(), null);
+                    orderDataValidator.validateBusinessTypeRestrictions(modifierId, dto.getBusinessType(),
+                            dto.getApprovalFileIds());
                     log.info("业务类型修改二次验证通过: orderId={}, modifierId={}, {} -> {}",
                             orderId, modifierId, order.getBusinessType(), dto.getBusinessType());
                 }
@@ -193,7 +201,8 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             } else if (OrderModifyObjectType.ITEMS.equals(objectType)) {
                 applyItemsChange(orderId, order.getOrderCode(), dto.getItems());
             } else if (OrderModifyObjectType.IMAGES.equals(objectType)) {
-                applyImagesChange(orderId, order.getOrderCode(), dto.getImageDataFileIds(), dto.getImageReportFileIds());
+                applyImagesChange(orderId, order.getOrderCode(), dto.getImageDataFileIds(),
+                        dto.getImageReportFileIds(), dto.getApprovalFileIds());
             }
         }
 
@@ -544,7 +553,8 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     /**
      * 对比影像文件
      */
-    private ObjectChange diffImages(Long orderId, List<String> newDataFileIds, List<String> newReportFileIds) {
+    private ObjectChange diffImages(Long orderId, List<String> newDataFileIds, List<String> newReportFileIds,
+                                    List<String> newApprovalFileIds) {
         // 查询当前影像文件
         List<OrderFileEntity> oldFiles = orderFileMapper.selectList(
             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderFileEntity>()
@@ -577,6 +587,18 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             if (!oldReportIds.equals(newReportIds)) {
                 oldParts.add("影像报告" + oldReportIds.size() + "个");
                 newParts.add("影像报告" + newReportIds.size() + "个");
+            }
+        }
+
+        if (newApprovalFileIds != null) {
+            Set<String> oldApprovalIds = oldFiles.stream()
+                    .filter(f -> DictCodeConstants.ORDER_FILE_CATEGORY_APPROVAL.equals(f.getFileCategory()))
+                    .map(OrderFileEntity::getFileId)
+                    .collect(Collectors.toSet());
+            Set<String> newApprovalIds = new LinkedHashSet<>(newApprovalFileIds);
+            if (!oldApprovalIds.equals(newApprovalIds)) {
+                oldParts.add("审批文件" + oldApprovalIds.size() + "个");
+                newParts.add("审批文件" + newApprovalIds.size() + "个");
             }
         }
 
@@ -713,7 +735,8 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     /**
      * 应用影像文件变更
      */
-    private void applyImagesChange(Long orderId, String orderCode, List<String> newDataFileIds, List<String> newReportFileIds) {
+    private void applyImagesChange(Long orderId, String orderCode, List<String> newDataFileIds,
+                                   List<String> newReportFileIds, List<String> newApprovalFileIds) {
         // 查询当前影像文件
         List<OrderFileEntity> oldFiles = orderFileMapper.selectList(
             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderFileEntity>()
@@ -731,9 +754,14 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             .filter(f -> DictCodeConstants.ORDER_FILE_CATEGORY_REPORT.equals(f.getFileCategory()))
             .map(OrderFileEntity::getFileId)
             .collect(Collectors.toList());
+        List<String> oldApprovalFileIds = oldFiles.stream()
+            .filter(f -> DictCodeConstants.ORDER_FILE_CATEGORY_APPROVAL.equals(f.getFileCategory()))
+            .map(OrderFileEntity::getFileId)
+            .collect(Collectors.toList());
 
         Set<String> newDataIds = newDataFileIds == null ? null : new LinkedHashSet<>(newDataFileIds);
         Set<String> newReportIds = newReportFileIds == null ? null : new LinkedHashSet<>(newReportFileIds);
+        Set<String> newApprovalIds = newApprovalFileIds == null ? null : new LinkedHashSet<>(newApprovalFileIds);
 
         // 删除不在新列表中的文件
         for (OrderFileEntity oldFile : oldFiles) {
@@ -742,6 +770,8 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                 shouldDelete = newDataIds != null && !newDataIds.contains(oldFile.getFileId());
             } else if (DictCodeConstants.ORDER_FILE_CATEGORY_REPORT.equals(oldFile.getFileCategory())) {
                 shouldDelete = newReportIds != null && !newReportIds.contains(oldFile.getFileId());
+            } else if (DictCodeConstants.ORDER_FILE_CATEGORY_APPROVAL.equals(oldFile.getFileCategory())) {
+                shouldDelete = newApprovalIds != null && !newApprovalIds.contains(oldFile.getFileId());
             }
             if (shouldDelete) {
                 if (orderFileMapper.deleteById(oldFile.getId()) <= 0) {
@@ -781,6 +811,21 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                 }
             }
         }
+
+        if (newApprovalIds != null) {
+            for (String fileId : newApprovalIds) {
+                if (!oldApprovalFileIds.contains(fileId)) {
+                    OrderFileEntity entity = new OrderFileEntity();
+                    entity.setOrderId(orderId);
+                    entity.setOrderCode(orderCode);
+                    entity.setFileId(fileId);
+                    entity.setFileCategory(DictCodeConstants.ORDER_FILE_CATEGORY_APPROVAL);
+                    if (orderFileMapper.insert(entity) <= 0) {
+                        throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "审批文件新增失败");
+                    }
+                }
+            }
+        }
     }
 
     private void validateFileIds(List<String> fileIds, String categoryName) {
@@ -793,5 +838,25 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                         categoryName + "文件ID不能为空");
             }
         }
+    }
+
+    private void mergeMissingScalarFields(OrderMainEntity order, OrderModifyFullDTO dto) {
+        if (dto.getOrderType() == null) dto.setOrderType(order.getOrderType());
+        if (dto.getBusinessType() == null) dto.setBusinessType(order.getBusinessType());
+        if (dto.getIsPostal() == null) dto.setIsPostal(order.getIsPostal());
+        if (dto.getEstimatedCost() == null) dto.setEstimatedCost(order.getEstimatedCost());
+        if (dto.getDataEvaluationOpinion() == null) dto.setDataEvaluationOpinion(order.getDataEvaluationOpinion());
+        if (dto.getPatientName() == null) dto.setPatientName(order.getPatientName());
+        if (dto.getPatientGender() == null) dto.setPatientGender(order.getPatientGender());
+        if (dto.getPatientAge() == null) dto.setPatientAge(order.getPatientAge());
+        if (dto.getDoctorId() == null) dto.setDoctorId(order.getDoctorId());
+        if (dto.getDoctorName() == null) dto.setDoctorName(order.getDoctorName());
+        if (dto.getDoctorPhone() == null) dto.setDoctorPhone(order.getDoctorPhone());
+        if (dto.getHospitalId() == null) dto.setHospitalId(order.getHospitalId());
+        if (dto.getHospitalDeptId() == null) dto.setHospitalDeptId(order.getHospitalDeptId());
+        if (dto.getNeedsPhysicalDelivery() == null) dto.setNeedsPhysicalDelivery(order.getNeedsPhysicalDelivery());
+        if (dto.getPostalAddress() == null) dto.setPostalAddress(order.getPostalAddress());
+        if (dto.getExpectedDeliveryDate() == null) dto.setExpectedDeliveryDate(order.getExpectedDeliveryDate());
+        if (dto.getIsUrgent() == null) dto.setIsUrgent(order.getIsUrgent());
     }
 }

@@ -255,6 +255,22 @@ class OrderDiffCalculatorTest {
         assertNull(diff.getImageReport());
     }
 
+    @Test
+    void calculateDiff_includesApprovalFileChanges() {
+        OrderDraftEntity current = createBaseOrderDraft();
+        OrderModifyFullDTO dto = createBaseModifyDTO();
+        dto.setApprovalFileIds(List.of("approval-new"));
+
+        OrderModificationDiff diff = diffCalculator.calculateDiff(
+                current,
+                List.of(),
+                List.of(createFile(12L, "approval-old", "10.20")),
+                dto);
+
+        assertEquals(List.of("approval-old"), diff.getApprovalFile().getDeleted());
+        assertEquals(List.of("approval-new"), diff.getApprovalFile().getAdded());
+    }
+
     private OrderItemEntity createItem(Long id, String projectName) {
         OrderItemEntity item = new OrderItemEntity();
         item.setId(id);

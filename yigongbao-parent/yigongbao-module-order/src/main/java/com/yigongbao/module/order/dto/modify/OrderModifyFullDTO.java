@@ -54,4 +54,6 @@ public class OrderModifyFullDTO implements Serializable {
     // ==================== 影像文件（全量替换） ====================
     private List<String> imageDataFileIds;
     private List<String> imageReportFileIds;
+    /** 免费业务审批文件，全量替换；null 表示不修改，空数组表示清空。 */
+    private List<String> approvalFileIds;
 }

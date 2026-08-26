@@ -40,6 +40,7 @@ public class OrderDiffCalculator {
 
     private static final String FILE_CATEGORY_IMAGE_DATA = "10.1";
     private static final String FILE_CATEGORY_IMAGE_REPORT = "10.2";
+    private static final String FILE_CATEGORY_APPROVAL = "10.20";
 
     private final OrgService orgService;
     private final HospitalDeptService hospitalDeptService;
@@ -289,6 +290,10 @@ public class OrderDiffCalculator {
         // 影像报告差异
         if (dto.getImageReportFileIds() != null) {
             diff.setImageReport(calculateImageDiff(currentFiles, dto.getImageReportFileIds(), FILE_CATEGORY_IMAGE_REPORT));
+        }
+        // 免费业务审批文件差异
+        if (dto.getApprovalFileIds() != null) {
+            diff.setApprovalFile(calculateImageDiff(currentFiles, dto.getApprovalFileIds(), FILE_CATEGORY_APPROVAL));
         }
     }
 

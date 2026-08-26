@@ -302,6 +302,74 @@ class OrderModifyFullServiceImplBoundaryTest {
     }
 
     @Test
+    void modifyOrderFull_replacesApprovalFilesWithoutTouchingImages() {
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(7L);
+        order.setOrderCode("ORD-7");
+        order.setPhase(10);
+        order.setVersion(0);
+        when(orderMainMapper.selectById(7L)).thenReturn(order);
+        when(orderMainMapper.updateById(order)).thenReturn(1);
+
+        OrderFileEntity approvalFile = new OrderFileEntity();
+        approvalFile.setId(12L);
+        approvalFile.setFileId("approval-old");
+        approvalFile.setFileCategory("10.20");
+        OrderFileEntity dataFile = new OrderFileEntity();
+        dataFile.setId(10L);
+        dataFile.setFileId("data-old");
+        dataFile.setFileCategory("10.1");
+        when(orderFileMapper.selectList(any())).thenReturn(java.util.List.of(approvalFile, dataFile));
+        when(orderFileMapper.deleteById(12L)).thenReturn(1);
+        when(orderFileMapper.insert(any(OrderFileEntity.class))).thenReturn(1);
+
+        OrderModifyFullDTO dto = new OrderModifyFullDTO();
+        dto.setApprovalFileIds(java.util.List.of("approval-new"));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            service.modifyOrderFull(7L, dto, true, 1L, "管理员", "admin");
+        }
+
+        verify(orderFileMapper).deleteById(12L);
+        verify(orderFileMapper, never()).deleteById(10L);
+        ArgumentCaptor<OrderFileEntity> captor = ArgumentCaptor.forClass(OrderFileEntity.class);
+        verify(orderFileMapper).insert(captor.capture());
+        assertThat(captor.getValue().getFileId()).isEqualTo("approval-new");
+        assertThat(captor.getValue().getFileCategory()).isEqualTo("10.20");
+    }
+
+    @Test
+    void modifyOrderFull_keepsOmittedScalarFieldsUnchanged() {
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(7L);
+        order.setOrderCode("ORD-7");
+        order.setPhase(10);
+        order.setVersion(0);
+        order.setPatientName("旧患者");
+        order.setPatientGender("12.1");
+        order.setPatientAge(44);
+        order.setDoctorName("旧医生");
+        order.setDoctorPhone("13800000000");
+        when(orderMainMapper.selectById(7L)).thenReturn(order);
+        when(orderMainMapper.updateById(order)).thenReturn(1);
+
+        OrderModifyFullDTO dto = new OrderModifyFullDTO();
+        dto.setPatientName("新患者");
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            service.modifyOrderFull(7L, dto, true, 1L, "管理员", "admin");
+        }
+
+        assertThat(order.getPatientName()).isEqualTo("新患者");
+        assertThat(order.getPatientGender()).isEqualTo("12.1");
+        assertThat(order.getPatientAge()).isEqualTo(44);
+        assertThat(order.getDoctorName()).isEqualTo("旧医生");
+        assertThat(order.getDoctorPhone()).isEqualTo("13800000000");
+    }
+
+    @Test
     void modifyOrderFull_rejectsBlankImageFileId() {
         OrderModifyFullDTO dto = new OrderModifyFullDTO();
         dto.setImageDataFileIds(java.util.Arrays.asList((String) null));
