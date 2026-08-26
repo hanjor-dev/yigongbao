@@ -53,7 +53,10 @@ import com.yigongbao.module.design.vo.DesignWorkorderListVO;
 import com.yigongbao.module.design.vo.SubmitCheckVO;
 import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
+import com.yigongbao.module.order.entity.OrderModificationApplyEntity;
 import com.yigongbao.module.order.mapper.OrderFileMapper;
+import com.yigongbao.module.order.mapper.OrderModificationApplyMapper;
+import com.yigongbao.module.order.enums.ApplyStatusEnum;
 import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.service.OrderItemService;
 import com.yigongbao.module.order.service.OrderMainService;
@@ -70,6 +73,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -106,6 +110,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     private final DesignFileService designFileService;
     private final DesignDocService designDocService;
     private final OrderFileMapper orderFileMapper;
+    private final OrderModificationApplyMapper orderModificationApplyMapper;
     private final com.yigongbao.module.order.mapper.OrderDesignerAssignmentLogMapper assignmentLogMapper;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     private final com.yigongbao.module.order.service.OrderCancelApplyService cancelApplyService;
@@ -186,6 +191,9 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
 
         // 批量填充驳回原因
         fillRejectReason(voList);
+
+        // 批量填充最新修改审核状态
+        fillModifyAuditStatus(entities, voList);
 
         // 构建返回分页对象
         IPage<DesignWorkorderListVO> resultPage = new Page<>(entityPage.getCurrent(), entityPage.getSize(), entityPage.getTotal());
@@ -647,6 +655,47 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         }
         for (DesignWorkorderListVO vo : voList) {
             vo.setRejectReason(rejectReasonByOrderId.get(vo.getId()));
+        }
+    }
+
+    /**
+     * 批量填充工单列表的最新修改审核状态（避免逐条查询）
+     *
+     * @param entities 当前页订单实体
+     * @param voList   当前页工单列表 VO
+     */
+    private void fillModifyAuditStatus(List<OrderMainEntity> entities, List<DesignWorkorderListVO> voList) {
+        if (CollUtil.isEmpty(entities)) {
+            return;
+        }
+
+        List<Long> orderIds = entities.stream()
+                .map(OrderMainEntity::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        if (orderIds.isEmpty()) {
+            return;
+        }
+
+        List<OrderModificationApplyEntity> applies = orderModificationApplyMapper.selectList(
+                new LambdaQueryWrapper<OrderModificationApplyEntity>()
+                        .select(OrderModificationApplyEntity::getId,
+                                OrderModificationApplyEntity::getOrderId,
+                                OrderModificationApplyEntity::getStatus,
+                                OrderModificationApplyEntity::getApplyTime)
+                        .in(OrderModificationApplyEntity::getOrderId, orderIds)
+                        .eq(OrderModificationApplyEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                        .orderByDesc(OrderModificationApplyEntity::getApplyTime)
+                        .orderByDesc(OrderModificationApplyEntity::getId));
+
+        Map<Long, Integer> latestStatusMap = new HashMap<>();
+        for (OrderModificationApplyEntity apply : applies) {
+            latestStatusMap.putIfAbsent(apply.getOrderId(),
+                    ApplyStatusEnum.APPROVED.getCode().equals(apply.getStatus()) ? 1 : 2);
+        }
+
+        for (int i = 0; i < entities.size(); i++) {
+            voList.get(i).setModifyAuditStatus(latestStatusMap.getOrDefault(entities.get(i).getId(), 0));
         }
     }
 

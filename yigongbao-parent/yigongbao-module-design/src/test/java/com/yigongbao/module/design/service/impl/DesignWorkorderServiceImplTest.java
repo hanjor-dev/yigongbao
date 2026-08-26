@@ -44,6 +44,9 @@ import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
 import com.yigongbao.module.design.vo.DesignWorkorderListVO;
 import com.yigongbao.module.design.vo.SubmitCheckVO;
 import com.yigongbao.module.order.entity.OrderItemEntity;
+import com.yigongbao.module.order.entity.OrderModificationApplyEntity;
+import com.yigongbao.module.order.enums.ApplyStatusEnum;
+import com.yigongbao.module.order.mapper.OrderModificationApplyMapper;
 import com.yigongbao.module.order.service.OrderItemService;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.mapper.OrderFileMapper;
@@ -97,6 +100,7 @@ class DesignWorkorderServiceImplTest {
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "");
         TableInfoHelper.initTableInfo(assistant, OrderMainEntity.class);
         TableInfoHelper.initTableInfo(assistant, DesignProductEntity.class);
+        TableInfoHelper.initTableInfo(assistant, OrderModificationApplyEntity.class);
     }
 
     @Mock private OrderMainService orderMainService;
@@ -117,6 +121,7 @@ class DesignWorkorderServiceImplTest {
     @Mock private FlowStatusColorResolver flowStatusColorResolver;
     @Mock private OrderFileMapper orderFileMapper;
     @Mock private OrderCancelApplyService cancelApplyService;
+    @Mock private OrderModificationApplyMapper orderModificationApplyMapper;
     @Mock private DesignFileService designFileService;
     @Mock private DesignDocService designDocService;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
@@ -212,6 +217,50 @@ class DesignWorkorderServiceImplTest {
 
             // 验证传入 page 方法的 Page 对象 size=100
             verify(orderMainService).page(argThat(p -> ((Page<?>) p).getSize() == 100), any());
+        }
+
+        @Test
+        @DisplayName("分页列表填充最新修改审核状态")
+        void listWorkorders_fillsLatestModifyAuditStatus() {
+            DesignWorkorderQueryDTO dto = new DesignWorkorderQueryDTO();
+            dto.setPageNum(1);
+            dto.setPageSize(10);
+
+            when(designQueryHelper.getCurrentUserId()).thenReturn(1L);
+            when(designQueryHelper.getCurrentUser()).thenReturn(new UserEntity());
+            when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
+
+            OrderMainEntity approvedOrder = buildOrder(10L);
+            OrderMainEntity pendingOrder = buildOrder(11L);
+            OrderMainEntity noApplyOrder = buildOrder(12L);
+            Page<OrderMainEntity> page = new Page<>(1, 10, 3);
+            page.setRecords(List.of(approvedOrder, pendingOrder, noApplyOrder));
+            when(orderMainService.page(any(), any())).thenReturn(page);
+
+            OrderModificationApplyEntity approvedApply = new OrderModificationApplyEntity();
+            approvedApply.setOrderId(10L);
+            approvedApply.setStatus(ApplyStatusEnum.APPROVED.getCode());
+            approvedApply.setApplyTime(LocalDateTime.of(2026, 8, 26, 10, 0));
+            OrderModificationApplyEntity pendingApply = new OrderModificationApplyEntity();
+            pendingApply.setOrderId(11L);
+            pendingApply.setStatus(ApplyStatusEnum.PENDING.getCode());
+            pendingApply.setApplyTime(LocalDateTime.of(2026, 8, 26, 10, 0));
+            when(orderModificationApplyMapper.selectList(any())).thenReturn(List.of(approvedApply, pendingApply));
+            when(orderItemService.listByOrderIds(any())).thenReturn(Collections.emptyList());
+            when(designPackageMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
+            when(designReviewMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
+
+            IPage<DesignWorkorderListVO> result = service.listWorkorders(dto);
+
+            assertEquals(1, result.getRecords().get(0).getModifyAuditStatus());
+            assertEquals(2, result.getRecords().get(1).getModifyAuditStatus());
+            assertEquals(0, result.getRecords().get(2).getModifyAuditStatus());
+
+            ArgumentCaptor<LambdaQueryWrapper<OrderModificationApplyEntity>> applyQueryCaptor =
+                    ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+            verify(orderModificationApplyMapper).selectList(applyQueryCaptor.capture());
+            assertThat(applyQueryCaptor.getValue().getSqlSelect())
+                    .doesNotContain("modification_content", "modification_diff");
         }
 
         @Test

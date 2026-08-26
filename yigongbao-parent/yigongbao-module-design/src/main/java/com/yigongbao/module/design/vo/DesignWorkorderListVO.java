@@ -99,4 +99,7 @@ public class DesignWorkorderListVO {
 
     /** 驳回原因（最近一次，默认隐藏） */
     private String rejectReason;
+
+    /** 修改审核状态：0-无修改审核申请，1-审核通过，2-审核未通过（待审核/驳回/过期） */
+    private Integer modifyAuditStatus;
 }
