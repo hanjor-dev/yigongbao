@@ -78,9 +78,9 @@ spring:
       # 启用 multipart 上传
       enabled: true
       # 最大单个文件大小（全局上限 2GB，各业务类型由业务层单独校验）
-      max-file-size: 2GB
+      max-file-size: 5GB
       # 最大请求总大小（全局上限 2GB）
-      max-request-size: 2GB
+      max-request-size: 5GB
       # 文件写入磁盘的阈值
       file-size-threshold: 512KB
 
@@ -173,8 +173,8 @@ app:
 yigongbao:
   # 文件存储业务配置
   file-storage:
-    # 最大文件大小（字节），全局上限 2GB
-    max-file-size: 2147483648
+    # 最大文件大小（字节），全局上限 5GB
+    max-file-size: 5147483648
     download-url-expire-minutes: 10
 
 # 短信配置

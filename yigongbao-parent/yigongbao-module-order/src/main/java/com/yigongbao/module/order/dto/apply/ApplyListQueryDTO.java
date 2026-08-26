@@ -17,7 +17,7 @@ public class ApplyListQueryDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 状态：0=待审核，1=已通过，2=已驳回，3=已过期，null=全部
+     * 状态：1=待审核，2=已通过，3=已驳回，4=已过期，null=全部
      */
     private Integer status;
 
