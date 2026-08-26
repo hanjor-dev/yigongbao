@@ -12,6 +12,7 @@ import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.entity.OrderModificationLogEntity;
+import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.dto.modify.OrderModifyFullDTO;
 import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.order.validator.OrderDataValidator;
@@ -265,5 +266,49 @@ class OrderModifyFullServiceImplBoundaryTest {
                 .doesNotContain("订单类型=1", "业务类型=11.1");
         assertThat(log.getNewValue()).contains("订单类型=非医疗器械", "业务类型=代理")
                 .doesNotContain("订单类型=2", "业务类型=11.4");
+    }
+
+    @Test
+    void modifyOrderFull_omittedImageCategoryRemainsUnchanged() {
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(7L);
+        order.setOrderCode("ORD-7");
+        order.setPhase(10);
+        order.setVersion(0);
+        when(orderMainMapper.selectById(7L)).thenReturn(order);
+        when(orderMainMapper.updateById(order)).thenReturn(1);
+
+        OrderFileEntity dataFile = new OrderFileEntity();
+        dataFile.setId(10L);
+        dataFile.setFileId("data-old");
+        dataFile.setFileCategory("10.1");
+        OrderFileEntity reportFile = new OrderFileEntity();
+        reportFile.setId(11L);
+        reportFile.setFileId("report-old");
+        reportFile.setFileCategory("10.2");
+        when(orderFileMapper.selectList(any())).thenReturn(java.util.List.of(dataFile, reportFile));
+        when(orderFileMapper.deleteById(10L)).thenReturn(1);
+
+        OrderModifyFullDTO dto = new OrderModifyFullDTO();
+        dto.setImageDataFileIds(java.util.List.of());
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            service.modifyOrderFull(7L, dto, true, 1L, "管理员", "admin");
+        }
+
+        verify(orderFileMapper).deleteById(10L);
+        verify(orderFileMapper, never()).deleteById(11L);
+    }
+
+    @Test
+    void modifyOrderFull_rejectsBlankImageFileId() {
+        OrderModifyFullDTO dto = new OrderModifyFullDTO();
+        dto.setImageDataFileIds(java.util.Arrays.asList((String) null));
+
+        assertThatThrownBy(() -> service.modifyOrderFull(7L, dto, true, 1L, "管理员", "admin"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("影像数据文件ID不能为空");
+        verifyNoInteractions(orderMainMapper, orderFileMapper);
     }
 }

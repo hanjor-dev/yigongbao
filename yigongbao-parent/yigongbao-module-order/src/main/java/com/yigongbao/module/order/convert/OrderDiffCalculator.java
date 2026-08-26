@@ -67,7 +67,8 @@ public class OrderDiffCalculator {
         diff.setInfoFields(calculateBasicInfoDiff(currentOrder, modifyDto));
 
         // 2. 订单项差异
-        diff.setItems(calculateItemsDiff(currentItems, modifyDto.getItems()));
+        diff.setItems(modifyDto.getItems() == null
+                ? null : calculateItemsDiff(currentItems, modifyDto.getItems()));
 
         // 3. 文件差异
         calculateAndSetFilesDiff(diff, currentFiles, modifyDto);
@@ -282,9 +283,13 @@ public class OrderDiffCalculator {
      */
     private void calculateAndSetFilesDiff(OrderModificationDiff diff, List<OrderFileEntity> currentFiles, OrderModifyFullDTO dto) {
         // 影像资料差异
-        diff.setImageData(calculateImageDiff(currentFiles, dto.getImageDataFileIds(), FILE_CATEGORY_IMAGE_DATA));
+        if (dto.getImageDataFileIds() != null) {
+            diff.setImageData(calculateImageDiff(currentFiles, dto.getImageDataFileIds(), FILE_CATEGORY_IMAGE_DATA));
+        }
         // 影像报告差异
-        diff.setImageReport(calculateImageDiff(currentFiles, dto.getImageReportFileIds(), FILE_CATEGORY_IMAGE_REPORT));
+        if (dto.getImageReportFileIds() != null) {
+            diff.setImageReport(calculateImageDiff(currentFiles, dto.getImageReportFileIds(), FILE_CATEGORY_IMAGE_REPORT));
+        }
     }
 
     private ImageDiff calculateImageDiff(

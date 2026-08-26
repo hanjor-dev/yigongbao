@@ -4,6 +4,9 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.module.order.dto.diff.FieldDiff;
 import com.yigongbao.module.order.dto.modify.OrderModifyFullDTO;
 import com.yigongbao.module.order.entity.OrderDraftEntity;
+import com.yigongbao.module.order.entity.OrderFileEntity;
+import com.yigongbao.module.order.entity.OrderItemEntity;
+import com.yigongbao.module.order.dto.diff.OrderModificationDiff;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
 import org.junit.jupiter.api.BeforeEach;
@@ -196,6 +199,75 @@ class OrderDiffCalculatorTest {
         assertFieldDiff(diffs, "needsPhysicalDelivery", "是否需要实物交付", "否", "是");
         assertFieldDiff(diffs, "orderType", "订单类型", "医疗器械", "非医疗器械");
         assertFieldDiff(diffs, "businessType", "业务类型", "业务", "测试");
+    }
+
+    @Test
+    void calculateDiff_nullListsMeanNoChange() {
+        OrderDraftEntity current = createBaseOrderDraft();
+        OrderModifyFullDTO dto = createBaseModifyDTO();
+
+        OrderModificationDiff diff = diffCalculator.calculateDiff(
+                current,
+                List.of(createItem(1L, "旧项目")),
+                List.of(createFile(10L, "data-old", "10.1"), createFile(11L, "report-old", "10.2")),
+                dto);
+
+        assertNull(diff.getItems());
+        assertNull(diff.getImageData());
+        assertNull(diff.getImageReport());
+    }
+
+    @Test
+    void calculateDiff_emptyOrChangedListsOnlyAffectProvidedCategory() {
+        OrderDraftEntity current = createBaseOrderDraft();
+        OrderModifyFullDTO dto = createBaseModifyDTO();
+        dto.setItems(List.of());
+        dto.setImageDataFileIds(List.of("data-new"));
+
+        OrderModificationDiff diff = diffCalculator.calculateDiff(
+                current,
+                List.of(createItem(1L, "旧项目")),
+                List.of(createFile(10L, "data-old", "10.1"), createFile(11L, "report-old", "10.2")),
+                dto);
+
+        assertTrue(diff.getItems().isChanged());
+        assertEquals(1, diff.getItems().getDeleted().size());
+        assertEquals("旧项目", diff.getItems().getDeleted().get(0).getProjectName());
+        assertTrue(diff.getImageData().isChanged());
+        assertEquals(List.of("data-old"), diff.getImageData().getDeleted());
+        assertEquals(List.of("data-new"), diff.getImageData().getAdded());
+        assertNull(diff.getImageReport());
+    }
+
+    @Test
+    void calculateDiff_emptyImageListMeansClearThatCategory() {
+        OrderDraftEntity current = createBaseOrderDraft();
+        OrderModifyFullDTO dto = createBaseModifyDTO();
+        dto.setImageDataFileIds(List.of());
+
+        OrderModificationDiff diff = diffCalculator.calculateDiff(
+                current,
+                List.of(),
+                List.of(createFile(10L, "data-old", "10.1"), createFile(11L, "report-old", "10.2")),
+                dto);
+
+        assertEquals(List.of("data-old"), diff.getImageData().getDeleted());
+        assertNull(diff.getImageReport());
+    }
+
+    private OrderItemEntity createItem(Long id, String projectName) {
+        OrderItemEntity item = new OrderItemEntity();
+        item.setId(id);
+        item.setProjectName(projectName);
+        return item;
+    }
+
+    private OrderFileEntity createFile(Long id, String fileId, String category) {
+        OrderFileEntity file = new OrderFileEntity();
+        file.setId(id);
+        file.setFileId(fileId);
+        file.setFileCategory(category);
+        return file;
     }
 
     /**

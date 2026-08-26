@@ -32,6 +32,7 @@ import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserService;
 
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -98,6 +99,11 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     @Transactional(rollbackFor = Exception.class)
     public void modifyOrderFull(Long orderId, OrderModifyFullDTO dto, boolean skipPermissionCheck,
                                 Long modifierId, String modifierName, String modifierRoleCode, Long applyId) {
+        if (dto == null) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "修改内容不能为空");
+        }
+        validateFileIds(dto.getImageDataFileIds(), "影像数据");
+        validateFileIds(dto.getImageReportFileIds(), "影像报告");
         if (!skipPermissionCheck) {
             orderDataScopeChecker.checkOrderAccess(orderId);
         }
@@ -470,6 +476,16 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             changes.add(oldItem.getProjectName() + "→" + newItem.getProjectName());
         }
 
+        if (!Objects.equals(oldItem.getBodyPartId(), newItem.getBodyPartId())) {
+            changes.add("部位：" + formatFieldValue(oldItem.getBodyPartName())
+                    + "→" + formatFieldValue(newItem.getBodyPartName()));
+        }
+
+        if (!Objects.equals(oldItem.getProjectId(), newItem.getProjectId())
+                && Objects.equals(oldItem.getProjectName(), newItem.getProjectName())) {
+            changes.add("项目已变更");
+        }
+
         // 对比描述字段
         List<String> descChanges = new ArrayList<>();
 
@@ -537,22 +553,39 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         );
 
         // 分离数据文件和报告文件
-        long oldDataCount = oldFiles.stream()
-            .filter(f -> DictCodeConstants.ORDER_FILE_CATEGORY_DCM.equals(f.getFileCategory()))
-            .count();
-        long oldReportCount = oldFiles.stream()
-            .filter(f -> DictCodeConstants.ORDER_FILE_CATEGORY_REPORT.equals(f.getFileCategory()))
-            .count();
+        List<String> oldParts = new ArrayList<>();
+        List<String> newParts = new ArrayList<>();
 
-        int newDataCount = newDataFileIds == null ? 0 : newDataFileIds.size();
-        int newReportCount = newReportFileIds == null ? 0 : newReportFileIds.size();
+        if (newDataFileIds != null) {
+            Set<String> oldDataIds = oldFiles.stream()
+                    .filter(f -> DictCodeConstants.ORDER_FILE_CATEGORY_DCM.equals(f.getFileCategory()))
+                    .map(OrderFileEntity::getFileId)
+                    .collect(Collectors.toSet());
+            Set<String> newDataIds = new LinkedHashSet<>(newDataFileIds);
+            if (!oldDataIds.equals(newDataIds)) {
+                oldParts.add("影像数据" + oldDataIds.size() + "个");
+                newParts.add("影像数据" + newDataIds.size() + "个");
+            }
+        }
 
-        if (oldDataCount == newDataCount && oldReportCount == newReportCount) {
+        if (newReportFileIds != null) {
+            Set<String> oldReportIds = oldFiles.stream()
+                    .filter(f -> DictCodeConstants.ORDER_FILE_CATEGORY_REPORT.equals(f.getFileCategory()))
+                    .map(OrderFileEntity::getFileId)
+                    .collect(Collectors.toSet());
+            Set<String> newReportIds = new LinkedHashSet<>(newReportFileIds);
+            if (!oldReportIds.equals(newReportIds)) {
+                oldParts.add("影像报告" + oldReportIds.size() + "个");
+                newParts.add("影像报告" + newReportIds.size() + "个");
+            }
+        }
+
+        if (oldParts.isEmpty()) {
             return ObjectChange.noChange();
         }
 
-        String oldValue = String.format("影像数据%d个，影像报告%d个", oldDataCount, oldReportCount);
-        String newValue = String.format("影像数据%d个，影像报告%d个", newDataCount, newReportCount);
+        String oldValue = String.join("，", oldParts);
+        String newValue = String.join("，", newParts);
         return ObjectChange.of(OrderModifyObjectType.IMAGES, "影像文件", oldValue, newValue);
     }
 
@@ -699,13 +732,16 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             .map(OrderFileEntity::getFileId)
             .collect(Collectors.toList());
 
+        Set<String> newDataIds = newDataFileIds == null ? null : new LinkedHashSet<>(newDataFileIds);
+        Set<String> newReportIds = newReportFileIds == null ? null : new LinkedHashSet<>(newReportFileIds);
+
         // 删除不在新列表中的文件
         for (OrderFileEntity oldFile : oldFiles) {
             boolean shouldDelete = false;
             if (DictCodeConstants.ORDER_FILE_CATEGORY_DCM.equals(oldFile.getFileCategory())) {
-                shouldDelete = newDataFileIds == null || !newDataFileIds.contains(oldFile.getFileId());
+                shouldDelete = newDataIds != null && !newDataIds.contains(oldFile.getFileId());
             } else if (DictCodeConstants.ORDER_FILE_CATEGORY_REPORT.equals(oldFile.getFileCategory())) {
-                shouldDelete = newReportFileIds == null || !newReportFileIds.contains(oldFile.getFileId());
+                shouldDelete = newReportIds != null && !newReportIds.contains(oldFile.getFileId());
             }
             if (shouldDelete) {
                 if (orderFileMapper.deleteById(oldFile.getId()) <= 0) {
@@ -715,8 +751,8 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         }
 
         // 新增数据文件
-        if (newDataFileIds != null) {
-            for (String fileId : newDataFileIds) {
+        if (newDataIds != null) {
+            for (String fileId : newDataIds) {
                 if (!oldDataFileIds.contains(fileId)) {
                     OrderFileEntity entity = new OrderFileEntity();
                     entity.setOrderId(orderId);
@@ -731,8 +767,8 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         }
 
         // 新增报告文件
-        if (newReportFileIds != null) {
-            for (String fileId : newReportFileIds) {
+        if (newReportIds != null) {
+            for (String fileId : newReportIds) {
                 if (!oldReportFileIds.contains(fileId)) {
                     OrderFileEntity entity = new OrderFileEntity();
                     entity.setOrderId(orderId);
@@ -743,6 +779,18 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                         throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "影像报告文件新增失败");
                     }
                 }
+            }
+        }
+    }
+
+    private void validateFileIds(List<String> fileIds, String categoryName) {
+        if (fileIds == null) {
+            return;
+        }
+        for (String fileId : fileIds) {
+            if (StrUtil.isBlank(fileId)) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER,
+                        categoryName + "文件ID不能为空");
             }
         }
     }
