@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.*;
 import lombok.RequiredArgsConstructor;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 流转阶段/状态下拉 Controller
@@ -27,6 +29,14 @@ import java.util.List;
 @RequireSign
 @RequiredArgsConstructor
 public class FlowSelectController {
+
+    private static final Set<FlowStatusEnum> HIDDEN_SELECT_STATUSES = EnumSet.of(
+            FlowStatusEnum.DRAFT,
+            FlowStatusEnum.DATA_AUDIT_PASSED,
+            FlowStatusEnum.DATA_AUDIT_REJECTED,
+            FlowStatusEnum.QC_PASSED,
+            FlowStatusEnum.QC_FAILED,
+            FlowStatusEnum.REWORK);
 
     private final FlowStatusColorResolver flowStatusColorResolver;
 
@@ -54,7 +64,7 @@ public class FlowSelectController {
      * 返回 FlowStatusEnum 枚举值，可通过 phase 参数过滤指定阶段的状态
      *
      * @param phase 阶段值（可选，传入则只返回该阶段的状态；不传则返回全部状态）
-     * @return 状态列表（name=中文名称，value=状态数值）
+     * @return 状态列表（name=中文名称，value=状态数值，show=是否展示在前端筛选项中）
      */
     @Operation(summary = "获取流转状态下拉列表")
     @GetMapping("/statuses")
@@ -71,6 +81,7 @@ public class FlowSelectController {
             vo.setName(status.getName());
             vo.setValue(String.valueOf(status.getValue()));
             vo.setColor(flowStatusColorResolver.getColor(status.getValue()));
+            vo.setShow(!HIDDEN_SELECT_STATUSES.contains(status));
             result.add(vo);
         }
         return Result.success(result);

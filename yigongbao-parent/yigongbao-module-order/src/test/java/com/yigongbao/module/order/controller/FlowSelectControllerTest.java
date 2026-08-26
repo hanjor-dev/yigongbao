@@ -30,4 +30,18 @@ class FlowSelectControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray());
     }
+
+    @Test
+    void statuses_marksAutoTransitionStatusesAsHidden() throws Exception {
+        mockMvc.perform(get("/flow/select/statuses"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.value == '1010')].show").value(false))
+                .andExpect(jsonPath("$.data[?(@.value == '1030')].show").value(false))
+                .andExpect(jsonPath("$.data[?(@.value == '1040')].show").value(false))
+                .andExpect(jsonPath("$.data[?(@.value == '2010')].show").value(true))
+                .andExpect(jsonPath("$.data[?(@.value == '5020')].show").value(false))
+                .andExpect(jsonPath("$.data[?(@.value == '5030')].show").value(false))
+                .andExpect(jsonPath("$.data[?(@.value == '5040')].show").value(false))
+                .andExpect(jsonPath("$.data[?(@.value == '5050')].show").value(true));
+    }
 }

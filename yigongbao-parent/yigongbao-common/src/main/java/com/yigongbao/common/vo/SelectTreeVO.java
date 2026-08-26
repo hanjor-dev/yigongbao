@@ -32,6 +32,9 @@ public class SelectTreeVO {
     /** 可选的展示颜色，例如流程状态标签颜色 */
     private StatusColorVO color;
 
+    /** 是否在前端筛选项中展示 */
+    private Boolean show;
+
     /**
      * 父级ID
      */
