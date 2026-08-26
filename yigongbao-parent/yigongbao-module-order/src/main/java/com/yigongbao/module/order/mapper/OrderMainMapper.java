@@ -19,6 +19,9 @@ import java.util.List;
 @Mapper
 public interface OrderMainMapper extends BaseMapper<OrderMainEntity> {
 
+    @Select("SELECT * FROM order_main WHERE id = #{id} AND is_deleted = 0 FOR UPDATE")
+    OrderMainEntity selectByIdForUpdate(@Param("id") Long id);
+
     /**
      * 统计设计师工作量
      *

@@ -46,4 +46,16 @@ class OrderModifyTimeWindowCheckerTest {
         assertThat(checker.isWithinTimeWindow(LocalDateTime.now().minusMinutes(11))).isFalse();
         assertThat(checker.isWithinTimeWindow(LocalDateTime.now().plusMinutes(1))).isFalse();
     }
+
+    @Test
+    void exactlyConfiguredWindowIsInsideButAfterItIsOutside() {
+        when(configService.getConfigValueAsInt(
+                eq(SystemConfigKeyEnum.ORDER_MODIFY_WINDOW_MINUTES.getKey()), eq(10)))
+                .thenReturn(10);
+
+        LocalDateTime now = LocalDateTime.of(2026, 8, 26, 12, 0);
+        LocalDateTime boundary = now.minusMinutes(10);
+        assertThat(checker.isWithinTimeWindow(boundary, now)).isTrue();
+        assertThat(checker.isWithinTimeWindow(boundary.minusNanos(1), now)).isFalse();
+    }
 }

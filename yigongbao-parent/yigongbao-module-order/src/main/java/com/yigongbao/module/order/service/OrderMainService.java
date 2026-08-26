@@ -65,6 +65,7 @@ public interface OrderMainService extends IService<OrderMainEntity> {
      * @param id 订单ID
      * @param dto 更新参数
      */
+    @Deprecated
     void updateOrder(Long id, UpdateOrderDTO dto);
 
     /**

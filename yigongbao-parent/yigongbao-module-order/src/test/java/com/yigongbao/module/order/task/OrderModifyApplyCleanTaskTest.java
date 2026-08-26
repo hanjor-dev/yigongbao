@@ -34,6 +34,7 @@ class OrderModifyApplyCleanTaskTest {
 
     @Test
     void cleanExpiredApplications_onlyMarksStatusAndKeepsHistoryContent() {
+        when(applyMapper.expireApplicationsForChangedPhase()).thenReturn(2);
         when(applyMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(1);
 
         new OrderModifyApplyCleanTask(applyMapper).cleanExpiredApplications();
@@ -41,6 +42,7 @@ class OrderModifyApplyCleanTaskTest {
         ArgumentCaptor<LambdaUpdateWrapper<OrderModificationApplyEntity>> captor =
             ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
         verify(applyMapper).update(isNull(), captor.capture());
+        verify(applyMapper).expireApplicationsForChangedPhase();
         LambdaUpdateWrapper<OrderModificationApplyEntity> wrapper = captor.getValue();
 
         assertThat(wrapper.getSqlSet()).contains("status");

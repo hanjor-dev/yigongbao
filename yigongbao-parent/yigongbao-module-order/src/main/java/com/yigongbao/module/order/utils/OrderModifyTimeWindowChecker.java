@@ -28,19 +28,20 @@ public class OrderModifyTimeWindowChecker {
      * @return true=在窗口内可直接修改，false=需要申请
      */
     public boolean isWithinTimeWindow(LocalDateTime orderCreateTime) {
+        return isWithinTimeWindow(orderCreateTime, LocalDateTime.now());
+    }
+
+    boolean isWithinTimeWindow(LocalDateTime orderCreateTime, LocalDateTime now) {
         if (orderCreateTime == null) {
             return false;
         }
-        // ChronoUnit.MINUTES truncates sub-minute negative durations toward zero;
-        // compare the timestamps first so future-dated orders never enter the window.
-        if (orderCreateTime.isAfter(LocalDateTime.now())) {
+        if (orderCreateTime.isAfter(now)) {
             return false;
         }
         Integer timeWindow = configService.getConfigValueAsInt(
                 SystemConfigKeyEnum.ORDER_MODIFY_WINDOW_MINUTES.getKey(), 10
         );
-        long elapsedMinutes = ChronoUnit.MINUTES.between(orderCreateTime, LocalDateTime.now());
-        return elapsedMinutes >= 0 && elapsedMinutes <= timeWindow;
+        return !now.isAfter(orderCreateTime.plusMinutes(timeWindow));
     }
 
     /**

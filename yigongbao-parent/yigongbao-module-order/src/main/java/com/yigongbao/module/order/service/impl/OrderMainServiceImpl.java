@@ -526,6 +526,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      * @throws BusinessException 订单不存在、变更规则不满足
      */
     @Override
+    @Deprecated
     @Transactional(rollbackFor = Exception.class)
     public void updateOrder(Long id, UpdateOrderDTO dto) {
         // 数据权限校验（含存在性校验）：无权访问时抛 ORDER_NOT_FOUND

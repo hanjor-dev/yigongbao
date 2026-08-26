@@ -34,6 +34,7 @@ public class OrderModifyApplyCleanTask {
         log.info("定时任务开始: taskName=cleanExpiredApplications");
 
         try {
+            int phaseChangedCount = applyMapper.expireApplicationsForChangedPhase();
             LambdaUpdateWrapper<OrderModificationApplyEntity> wrapper = new LambdaUpdateWrapper<>();
             wrapper.set(OrderModificationApplyEntity::getStatus, ApplyStatusEnum.EXPIRED.getCode())
                    .eq(OrderModificationApplyEntity::getStatus, ApplyStatusEnum.PENDING.getCode())
@@ -41,7 +42,8 @@ public class OrderModifyApplyCleanTask {
 
             int count = applyMapper.update(null, wrapper);
             long duration = System.currentTimeMillis() - startTime;
-            log.info("定时任务完成: taskName=cleanExpiredApplications, processedCount={}, duration={}ms", count, duration);
+            log.info("定时任务完成: taskName=cleanExpiredApplications, phaseChangedCount={}, expiredCount={}, duration={}ms",
+                    phaseChangedCount, count, duration);
 
         } catch (Exception e) {
             log.error("定时任务失败: taskName=cleanExpiredApplications", e);

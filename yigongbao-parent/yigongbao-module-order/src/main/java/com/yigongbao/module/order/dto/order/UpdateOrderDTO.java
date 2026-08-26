@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
  * @date 2026-04-01
  */
 @Data
+@Deprecated
 public class UpdateOrderDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;

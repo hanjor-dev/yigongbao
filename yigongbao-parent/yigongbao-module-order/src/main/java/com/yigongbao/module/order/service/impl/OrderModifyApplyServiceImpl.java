@@ -122,13 +122,22 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         }
 
         // 查询订单是否存在
-        OrderMainEntity order = orderMainMapper.selectById(orderId);
+        OrderMainEntity order = orderMainMapper.selectByIdForUpdate(orderId);
+        if (order == null) {
+            order = orderMainMapper.selectById(orderId);
+        }
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
         orderDataScopeChecker.checkOrderAccess(orderId);
         validateApplyPhase(order, currentUser.getRoleCode());
+
+        if (BUSINESS_ROLES.contains(currentUser.getRoleCode())
+                && FlowPhaseEnum.ORDER.getValue().equals(order.getPhase())
+                && timeWindowChecker.isWithinTimeWindow(order.getCreateTime())) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_TIME_WINDOW_EXCEEDED);
+        }
 
         // 检查是否存在待审核的取消申请
         if (cancelApplyService.hasPendingCancelApply(orderId)) {
@@ -198,6 +207,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         apply.setApplyUserId(userId);
         apply.setApplyUserName(userName);
         apply.setApplyTime(LocalDateTime.now());
+        apply.setApplyPhase(order.getPhase());
 
         // 设置过期时间（从配置读取，默认10分钟）
         String expireMinutesStr = configService.getConfigValue(
@@ -274,6 +284,17 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         OrderMainEntity applyOrder = orderMainMapper.selectById(apply.getOrderId());
         if (applyOrder == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        if (apply.getApplyPhase() != null && !Objects.equals(apply.getApplyPhase(), applyOrder.getPhase())) {
+            int updated = orderModificationApplyMapper.update(null,
+                    new LambdaUpdateWrapper<OrderModificationApplyEntity>()
+                            .eq(OrderModificationApplyEntity::getId, applyId)
+                            .eq(OrderModificationApplyEntity::getStatus, ApplyStatusEnum.PENDING.getCode())
+                            .set(OrderModificationApplyEntity::getStatus, ApplyStatusEnum.EXPIRED.getCode()));
+            if (updated == 0) {
+                throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_NOT_PENDING);
+            }
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_EXPIRED);
         }
         UserEntity applyUser = userService.getById(apply.getApplyUserId());
         String applyUserRoleCode = applyUser != null ? applyUser.getRoleCode() : "";
@@ -534,8 +555,13 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                     "当前订单阶段不允许业务角色修改");
         }
 
-        if (isAdmin || (isBusinessRole && isOrderPhase
-                && timeWindowChecker.isWithinTimeWindow(order.getCreateTime()))) {
+        boolean withinWindow = isBusinessRole && isOrderPhase
+                && timeWindowChecker.isWithinTimeWindow(order.getCreateTime());
+        if (isAdmin || withinWindow) {
+            if (withinWindow && !timeWindowChecker.isWithinTimeWindow(order.getCreateTime())) {
+                log.info("订单修改窗口在执行前已超时，转为申请: orderId={}", orderId);
+                return -1;
+            }
             log.info("订单在时间窗口内，直接修改: orderId={}, createTime={}", orderId, order.getCreateTime());
             orderModifyFullService.modifyOrderFull(orderId, dto);
             return 1;

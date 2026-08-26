@@ -1943,6 +1943,7 @@ CREATE TABLE order_modification_apply (
     apply_user_id   BIGINT          NOT NULL COMMENT '申请人ID',
     apply_user_name VARCHAR(100)    COMMENT '申请人姓名（冗余）',
     apply_time      DATETIME        NOT NULL COMMENT '申请时间',
+    apply_phase     INT             COMMENT '提交申请时订单阶段',
     expire_time     DATETIME        NOT NULL COMMENT '过期时间（申请时间 + 10分钟）',
 
     -- ==================== 审核信息 ====================

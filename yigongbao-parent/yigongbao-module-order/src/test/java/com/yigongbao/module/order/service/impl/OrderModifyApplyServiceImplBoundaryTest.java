@@ -168,6 +168,11 @@ class OrderModifyApplyServiceImplBoundaryTest {
         }
 
         verify(applyMapper).insert(any(OrderModificationApplyEntity.class));
+        ArgumentCaptor<OrderModificationApplyEntity> applyCaptor =
+                ArgumentCaptor.forClass(OrderModificationApplyEntity.class);
+        verify(applyMapper).insert(applyCaptor.capture());
+        assertThat(applyCaptor.getValue().getApplyPhase())
+                .isEqualTo(com.yigongbao.flow.enums.FlowPhaseEnum.ORDER.getValue());
         verify(diffCalculator).calculateDiff(any(OrderDraftEntity.class), any(), any(), any());
         verify(eventPublisher).publishEvent(any());
     }
@@ -225,6 +230,29 @@ class OrderModifyApplyServiceImplBoundaryTest {
     }
 
     @Test
+    void submitApply_rejectsBusinessRoleWithinDirectModificationWindow() {
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+        user.setRoleCode(RoleCodeEnum.SALESMAN.getCode());
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(9L);
+        order.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.ORDER.getValue());
+        order.setOperatorId(1L);
+        when(userService.getById(1L)).thenReturn(user);
+        when(orderMainMapper.selectById(9L)).thenReturn(order);
+        when(cancelApplyService.hasPendingCancelApply(9L)).thenReturn(false);
+        when(timeWindowChecker.isWithinTimeWindow(any())).thenReturn(true);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertThatThrownBy(() -> service.submitApply(9L, new OrderModifyFullDTO()))
+                    .isInstanceOf(com.yigongbao.common.exception.BusinessException.class)
+                    .extracting("code")
+                    .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_TIME_WINDOW_EXCEEDED.getCode());
+        }
+    }
+
+    @Test
     void auditApply_rejectsApplicantApprovingOwnApplication() {
         UserEntity manager = new UserEntity();
         manager.setId(1L);
@@ -276,6 +304,26 @@ class OrderModifyApplyServiceImplBoundaryTest {
         order.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.DESIGN.getValue());
         when(userService.getById(1L)).thenReturn(user);
         when(orderMainMapper.selectById(9L)).thenReturn(order);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertThat(service.modifyOrderFullV2(9L, new OrderModifyFullDTO())).isEqualTo(-1);
+        }
+        verify(modifyFullService, org.mockito.Mockito.never())
+                .modifyOrderFull(any(), any());
+    }
+
+    @Test
+    void modifyOrderFullV2_rechecksWindowBeforeDirectModification() {
+        UserEntity user = new UserEntity();
+        user.setRoleCode(RoleCodeEnum.SALESMAN.getCode());
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(9L);
+        order.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.ORDER.getValue());
+        order.setCreateTime(java.time.LocalDateTime.now());
+        when(userService.getById(1L)).thenReturn(user);
+        when(orderMainMapper.selectById(9L)).thenReturn(order);
+        when(timeWindowChecker.isWithinTimeWindow(any())).thenReturn(true, false);
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
@@ -425,6 +473,41 @@ class OrderModifyApplyServiceImplBoundaryTest {
         }
 
         verify(modifyFullService, never()).modifyOrderFull(anyLong(), any(), eq(true), anyLong(), anyString(), anyString());
+    }
+
+    @Test
+    void auditApply_expiresApplicationWhenOrderPhaseChanged() {
+        UserEntity manager = new UserEntity();
+        manager.setId(2L);
+        manager.setRoleCode(RoleCodeEnum.DESIGNER_MANAGER.getCode());
+        UserEntity applicant = new UserEntity();
+        applicant.setId(1L);
+        applicant.setRoleCode(RoleCodeEnum.SALESMAN.getCode());
+        OrderModificationApplyEntity apply = new OrderModificationApplyEntity();
+        apply.setId(12L);
+        apply.setOrderId(19L);
+        apply.setApplyUserId(1L);
+        apply.setApplyPhase(com.yigongbao.flow.enums.FlowPhaseEnum.ORDER.getValue());
+        apply.setStatus(ApplyStatusEnum.PENDING.getCode());
+        apply.setExpireTime(java.time.LocalDateTime.now().plusHours(1));
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(19L);
+        order.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.DESIGN.getValue());
+        when(userService.getById(2L)).thenReturn(manager);
+        when(userService.getById(1L)).thenReturn(applicant);
+        when(applyMapper.selectById(12L)).thenReturn(apply);
+        when(orderMainMapper.selectById(19L)).thenReturn(order);
+        when(applyMapper.update(any(), any(LambdaUpdateWrapper.class))).thenReturn(1);
+
+        AuditApplyDTO dto = new AuditApplyDTO();
+        dto.setResult(AuditApplyDTO.RESULT_APPROVED);
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(2L);
+            assertThatThrownBy(() -> service.auditApply(12L, dto))
+                    .isInstanceOf(com.yigongbao.common.exception.BusinessException.class)
+                    .extracting("code")
+                    .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_APPLY_EXPIRED.getCode());
+        }
     }
 
     @Test

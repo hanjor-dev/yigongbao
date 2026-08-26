@@ -45,6 +45,9 @@ public class OrderModificationApplyEntity {
     @TableField("apply_time")
     private LocalDateTime applyTime;
 
+    @TableField("apply_phase")
+    private Integer applyPhase;
+
     @TableField("expire_time")
     private LocalDateTime expireTime;
 
