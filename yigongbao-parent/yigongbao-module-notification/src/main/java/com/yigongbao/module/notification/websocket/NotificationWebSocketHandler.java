@@ -109,7 +109,7 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
                 log.info("WebSocket 断开连接（旧会话）: userId={}, sessionId={}, status={}", userId, session.getId(), status);
             }
         } else {
-            log.info("WebSocket 未认证连接断开: sessionId={}, status={}", session.getId(), status);
+            log.debug("WebSocket 未认证连接断开: sessionId={}, status={}", session.getId(), status);
         }
     }
 
