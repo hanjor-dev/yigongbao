@@ -1,5 +1,6 @@
 package com.yigongbao.module.production.product.mapper;
 
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import org.apache.ibatis.annotations.Select;
 import org.junit.jupiter.api.Test;
 
@@ -174,6 +175,16 @@ class ProductionProductMapperSqlTest {
         assertTrue(detailQuery.contains("p_process.end_time &lt; p_process.start_time"));
         assertTrue(detailQuery.contains("SUM(TIMESTAMPDIFF(SECOND, p_process.start_time, p_process.end_time))"));
         assertTrue(detailQuery.contains("AS processing_duration_seconds"));
+    }
+
+    @Test
+    void detailQueryOnlyCalculatesPrintDurationFromPrintCompletedStatusOnward() {
+        String detailQuery = exportQueries().get("listProductLedgerData").replaceAll("\\s+", " ");
+        String printCompletedStatus = String.valueOf(FlowStatusEnum.PRINT_COMPLETED.getValue());
+
+        assertTrue(detailQuery.contains("CASE WHEN pr.status &gt;= " + printCompletedStatus
+                        + " AND pr.status &lt;&gt; 3040 AND pr.print_start_time IS NOT NULL"),
+                "print duration must not use the estimated finish time while the record is PRINTING");
     }
 
     @Test

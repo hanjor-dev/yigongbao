@@ -1,7 +1,10 @@
 package com.yigongbao.module.basic.device.websocket;
 
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.module.basic.device.dto.DeviceStatusPushDTO;
 import com.yigongbao.module.basic.device.service.IDeviceService;
 import com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity;
@@ -37,6 +40,7 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
 
         try {
             DeviceStatusPushDTO dto = JSONUtil.toBean(payload, DeviceStatusPushDTO.class);
+            validateDeviceStatusPush(dto);
 
             connectionManager.addSession(dto.getCenterName(), session);
 
@@ -66,6 +70,13 @@ public class DeviceWebSocketHandler extends TextWebSocketHandler {
             } catch (Exception ex) {
                 log.error("发送错误响应失败", ex);
             }
+        }
+    }
+
+    private void validateDeviceStatusPush(DeviceStatusPushDTO dto) {
+        if (dto == null || dto.getDevices() == null || dto.getDevices().isEmpty()
+                || dto.getDevices().stream().anyMatch(device -> device == null || StrUtil.isBlank(device.getId()))) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "设备状态批次不能为空且设备ID不能为空");
         }
     }
 
