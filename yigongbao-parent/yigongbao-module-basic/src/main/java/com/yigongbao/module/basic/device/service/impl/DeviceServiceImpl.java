@@ -232,6 +232,8 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean batchUpdateDeviceStatus(DeviceStatusPushDTO dto) {
+        validateDeviceStatusPush(dto);
+
         LambdaQueryWrapper<ProcessingCenterEntity> centerWrapper = new LambdaQueryWrapper<>();
         centerWrapper.eq(ProcessingCenterEntity::getCenterName, dto.getCenterName())
                      .eq(ProcessingCenterEntity::getStatus, StatusConstants.NORMAL);
@@ -350,6 +352,13 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
         log.info("批量更新设备状态: centerName={}, deviceCount={}, 新增={}, 更新={}",
             dto.getCenterName(), dto.getDevices().size(), toCreate.size(), toUpdate.size());
         return true;
+    }
+
+    private void validateDeviceStatusPush(DeviceStatusPushDTO dto) {
+        if (dto == null || dto.getDevices() == null || dto.getDevices().isEmpty()
+                || dto.getDevices().stream().anyMatch(device -> device == null || StrUtil.isBlank(device.getId()))) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "设备状态批次不能为空且设备ID不能为空");
+        }
     }
 
     private LocalDateTime parsePrintStartTime(String value) {

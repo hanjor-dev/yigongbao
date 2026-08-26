@@ -138,6 +138,48 @@ class DeviceServiceImplTest {
     }
 
     @Test
+    void batchUpdateDeviceStatus_rejectsNullDevicesBeforeAnyLookup() {
+        DeviceStatusPushDTO dto = new DeviceStatusPushDTO();
+        dto.setCenterName("武汉嘉一");
+        dto.setDevices(null);
+
+        assertThrows(BusinessException.class, () -> deviceService.batchUpdateDeviceStatus(dto));
+
+        verifyNoInteractions(processingCenterMapper, deviceMapper, deviceStateLogService, eventPublisher);
+    }
+
+    @Test
+    void batchUpdateDeviceStatus_rejectsEmptyDevicesBeforeAnyLookup() {
+        DeviceStatusPushDTO dto = new DeviceStatusPushDTO();
+        dto.setCenterName("武汉嘉一");
+        dto.setDevices(List.of());
+
+        assertThrows(BusinessException.class, () -> deviceService.batchUpdateDeviceStatus(dto));
+
+        verifyNoInteractions(processingCenterMapper, deviceMapper, deviceStateLogService, eventPublisher);
+    }
+
+    @Test
+    void batchUpdateDeviceStatus_rejectsNullDeviceElementBeforeAnyLookup() {
+        DeviceStatusPushDTO dto = new DeviceStatusPushDTO();
+        dto.setCenterName("武汉嘉一");
+        dto.setDevices(Arrays.asList((DeviceStatusPushDTO.DeviceStatus) null));
+
+        assertThrows(BusinessException.class, () -> deviceService.batchUpdateDeviceStatus(dto));
+
+        verifyNoInteractions(processingCenterMapper, deviceMapper, deviceStateLogService, eventPublisher);
+    }
+
+    @Test
+    void batchUpdateDeviceStatus_rejectsNullDeviceIdBeforeAnyLookup() {
+        DeviceStatusPushDTO dto = statusPush(deviceStatus(null, 1));
+
+        assertThrows(BusinessException.class, () -> deviceService.batchUpdateDeviceStatus(dto));
+
+        verifyNoInteractions(processingCenterMapper, deviceMapper, deviceStateLogService, eventPublisher);
+    }
+
+    @Test
     void batchUpdateDeviceStatus_publishesStateChangeAfterDeviceUpdate() {
         DeviceStatusPushDTO dto = new DeviceStatusPushDTO();
         dto.setCenterName("武汉嘉一");

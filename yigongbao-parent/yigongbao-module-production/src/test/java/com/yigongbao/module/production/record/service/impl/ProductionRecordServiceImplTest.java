@@ -70,6 +70,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -453,6 +454,89 @@ class ProductionRecordServiceImplTest {
         assertEquals("https://files/new-card.xlsx", file.getFileUrl());
         verify(flowCardExcelBuilder).build(any());
         verify(fileService).uploadBytes(any(), anyString(), anyString());
+    }
+
+    @Test
+    void getOrGenerateFlowCardExcel_regeneratesWhenFallbackDeviceSnapshotChanges() throws Exception {
+        LocalDateTime generatedAt = LocalDateTime.of(2026, 8, 25, 10, 0);
+        ProductionRecordEntity record = flowCardRecord(100L, 88L);
+        record.setOrderId(200L);
+        record.setFlowCardFileUrl("https://files/old-card.xlsx");
+        record.setFlowCardGenerateTime(generatedAt);
+        record.setContentUpdateTime(generatedAt);
+        ProductionProcessEntity process = process("wash", null, null);
+        AtomicReference<DeviceEntity> currentDevice = new AtomicReference<>(
+                device(1L, DeviceTypeEnum.WASH_CONTAINER.getCode(), 88L, "WASH-OLD"));
+        com.yigongbao.module.basic.file.vo.FileVO firstFile = uploadedFile("https://files/first-card.xlsx");
+        com.yigongbao.module.basic.file.vo.FileVO secondFile = uploadedFile("https://files/second-card.xlsx");
+
+        when(recordMapper.selectById(100L)).thenReturn(record);
+        when(productMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(processMapper.selectList(any())).thenReturn(List.of(process));
+        when(deviceMapper.selectOne(any())).thenAnswer(invocation -> currentDevice.get());
+        when(orderMainMapper.selectById(200L)).thenReturn(order(200L, ProductionConstants.ORDER_TYPE_MEDICAL));
+        when(flowCardExcelBuilder.build(any())).thenReturn(new byte[] {1}, new byte[] {2});
+        when(fileService.uploadBytes(any(), anyString(), anyString())).thenReturn(firstFile, secondFile);
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+
+        recordService.generateFlowCardExcel(100L);
+        clearInvocations(flowCardExcelBuilder, fileService);
+
+        currentDevice.set(device(2L, DeviceTypeEnum.WASH_CONTAINER.getCode(), 88L, "WASH-NEW"));
+        com.yigongbao.module.basic.file.vo.FileVO result = recordService.getOrGenerateFlowCardExcel(100L);
+
+        assertEquals("https://files/second-card.xlsx", result.getFileUrl());
+        verify(flowCardExcelBuilder).build(any());
+        verify(fileService).uploadBytes(any(), anyString(), anyString());
+    }
+
+    @Test
+    void generateFlowCardExcel_updateRequiresOriginalCacheAndContentVersion() throws Exception {
+        LocalDateTime generatedAt = LocalDateTime.of(2026, 8, 25, 10, 0);
+        ProductionRecordEntity record = flowCardRecord(101L, 88L);
+        record.setOrderId(201L);
+        record.setFlowCardFileUrl("https://files/old-card.xlsx");
+        record.setFlowCardGenerateTime(generatedAt);
+        record.setContentUpdateTime(generatedAt.plusMinutes(1));
+        when(recordMapper.selectById(101L)).thenReturn(record);
+        when(productMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(processMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(orderMainMapper.selectById(201L)).thenReturn(order(201L, ProductionConstants.ORDER_TYPE_MEDICAL));
+        when(flowCardExcelBuilder.build(any())).thenReturn(new byte[] {1});
+        when(fileService.uploadBytes(any(), anyString(), anyString()))
+                .thenReturn(uploadedFile("https://files/new-card.xlsx"));
+        when(recordMapper.update(isNull(), any())).thenReturn(1);
+
+        recordService.generateFlowCardExcel(101L);
+
+        ArgumentCaptor<LambdaUpdateWrapper<ProductionRecordEntity>> updateCaptor =
+                ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(recordMapper).update(isNull(), updateCaptor.capture());
+        LambdaUpdateWrapper<ProductionRecordEntity> update = updateCaptor.getValue();
+        assertThat(update.getSqlSegment())
+                .contains("flowCardGenerateTime");
+        assertThat(update.getSqlSet())
+                .contains("flowCardGenerateTime", "flowCardFileUrl");
+        assertThat(update.getParamNameValuePairs().values())
+                .contains(generatedAt, "https://files/new-card.xlsx");
+    }
+
+    @Test
+    void submitBatchNo_advancesContentUpdateTimeWhenCurrentTimestampIsNotOlderThanNow() {
+        LocalDateTime existingContentUpdateTime = LocalDateTime.now().plusSeconds(30).withNano(0);
+        ProductionRecordEntity record = record(102L, 202L, FlowStatusEnum.PRINT_COMPLETED.getValue());
+        record.setContentUpdateTime(existingContentUpdateTime);
+        when(recordMapper.selectById(102L)).thenReturn(record);
+        doReturn(1).when(recordMapper).updateById(any(ProductionRecordEntity.class));
+        com.yigongbao.module.production.record.dto.SubmitBatchNoDTO dto =
+                new com.yigongbao.module.production.record.dto.SubmitBatchNoDTO();
+
+        recordService.submitBatchNo(102L, dto);
+
+        ArgumentCaptor<ProductionRecordEntity> updateCaptor =
+                ArgumentCaptor.forClass(ProductionRecordEntity.class);
+        verify(recordMapper).updateById(updateCaptor.capture());
+        assertEquals(existingContentUpdateTime.plusSeconds(1), updateCaptor.getValue().getContentUpdateTime());
     }
 
     @Test
@@ -1348,6 +1432,13 @@ class ProductionRecordServiceImplTest {
         d.setCenterId(centerId);
         d.setDeviceId(deviceNo);
         return d;
+    }
+
+    private com.yigongbao.module.basic.file.vo.FileVO uploadedFile(String fileUrl) {
+        com.yigongbao.module.basic.file.vo.FileVO file =
+                new com.yigongbao.module.basic.file.vo.FileVO();
+        file.setFileUrl(fileUrl);
+        return file;
     }
 
     private TransitionResult buildResult() {

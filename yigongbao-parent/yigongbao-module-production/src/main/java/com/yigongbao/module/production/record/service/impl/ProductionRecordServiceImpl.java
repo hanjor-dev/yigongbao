@@ -216,7 +216,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         boolean needRegenerate = record.getFlowCardFileUrl() == null
                 || record.getFlowCardGenerateTime() == null
                 || record.getContentUpdateTime() == null
-                || record.getContentUpdateTime().isAfter(record.getFlowCardGenerateTime());
+                || record.getContentUpdateTime().isAfter(record.getFlowCardGenerateTime())
+                // 设备表是流转卡设备编号的动态兜底来源，设备创建/替换不会更新流转卡记录的内容时间。
+                // 存在未配置设备编号的工序时，不能复用旧 Excel。
+                || hasDynamicFlowCardDeviceNo(record);
 
         if (needRegenerate) {
             com.yigongbao.module.basic.file.vo.FileVO fileVO = generateFlowCardExcel(record.getId());
@@ -624,7 +627,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
         record.setProductionBatchNo(dto.getProductionBatchNo());
         record.setMaterialBatchNo(dto.getMaterialBatchNo());
-        record.setContentUpdateTime(java.time.LocalDateTime.now());
+        record.setContentUpdateTime(nextContentUpdateTime(record.getContentUpdateTime()));
         updateById(record);
         log.info("提交生产批号: recordId={}, batchNo={}", recordId, dto.getProductionBatchNo());
     }
@@ -762,7 +765,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (dto.getMaterial() != null) {
             record.setMaterial(dto.getMaterial());
         }
-        record.setContentUpdateTime(java.time.LocalDateTime.now());
+        record.setContentUpdateTime(nextContentUpdateTime(record.getContentUpdateTime()));
         updateById(record);
         String realName = currentUser != null ? currentUser.getRealName() : null;
         int processUpdated = processMapper.update(null,
@@ -815,7 +818,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         Long releasedDeviceId = record.getPrintDeviceId();
         String releasedDeviceCode = record.getPrintDeviceCode();
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime now = nextContentUpdateTime(record.getContentUpdateTime());
         int updated = baseMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
                 .eq(ProductionRecordEntity::getId, recordId)
                 .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PENDING_PRINT.getValue())
@@ -1029,7 +1032,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         boolean needRegenerate = record.getFlowCardFileUrl() == null
                 || record.getFlowCardGenerateTime() == null
                 || record.getContentUpdateTime() == null
-                || record.getContentUpdateTime().isAfter(record.getFlowCardGenerateTime());
+                || record.getContentUpdateTime().isAfter(record.getFlowCardGenerateTime())
+                || hasDynamicFlowCardDeviceNo(record);
 
         if (needRegenerate) {
             return generateFlowCardExcel(recordId);
@@ -1152,6 +1156,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                     .eq(ProductionRecordEntity::getId, recordId)
                     .set(ProductionRecordEntity::getFlowCardFileUrl, fileVO.getFileUrl())
                     .set(ProductionRecordEntity::getFlowCardGenerateTime, now);
+            if (record.getFlowCardGenerateTime() == null) {
+                updateWrapper.isNull(ProductionRecordEntity::getFlowCardGenerateTime);
+            } else {
+                updateWrapper.eq(ProductionRecordEntity::getFlowCardGenerateTime,
+                        record.getFlowCardGenerateTime());
+            }
             // contentUpdateTime 可能为 null 的情况：
             // 1. 新创建的流转卡尚未执行任何内容修改操作（submitBatchNo、assignDevice等）
             // 2. 数据库迁移前的旧记录（已通过 SQL UPDATE 初始化，但可能存在遗漏）
@@ -1159,7 +1169,18 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             if (record.getContentUpdateTime() == null) {
                 updateWrapper.set(ProductionRecordEntity::getContentUpdateTime, now);
             }
-            update(updateWrapper);
+            int updated = baseMapper.update(null, updateWrapper);
+            if (updated == 0) {
+                ProductionRecordEntity latestRecord = getById(recordId);
+                if (latestRecord != null
+                        && StrUtil.isNotBlank(latestRecord.getFlowCardFileUrl())
+                        && !Objects.equals(latestRecord.getFlowCardGenerateTime(),
+                        record.getFlowCardGenerateTime())) {
+                    return buildFlowCardFileVO(latestRecord);
+                }
+                // 生成文件已经成功，CAS 未更新时不再覆盖数据库中的其他结果；调用方仍可使用本次文件。
+                return fileVO;
+            }
 
             log.info("流转卡Excel生成并上传成功: recordId={}, recordNo={}, fileUrl={}",
                 recordId, record.getRecordNo(), fileVO.getFileUrl());
@@ -1168,6 +1189,36 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             log.error("流转卡Excel生成失败: recordId={}", recordId, e);
             throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR);
         }
+    }
+
+    private boolean hasDynamicFlowCardDeviceNo(ProductionRecordEntity record) {
+        List<ProductionProcessEntity> processes = processMapper.selectList(
+                new LambdaQueryWrapper<ProductionProcessEntity>()
+                        .eq(ProductionProcessEntity::getProductionRecordId, record.getId())
+                        .orderByAsc(ProductionProcessEntity::getProcessOrder));
+        return processes.stream().anyMatch(process ->
+                StrUtil.isBlank(process.getDeviceNo())
+                        || (ProcessTypeEnum.CLEAN_DRY.getCode().equals(process.getProcessType())
+                        && StrUtil.isBlank(process.getSecondaryDeviceNo())));
+    }
+
+    /** 数据库时间字段按秒保存，内容版本必须严格递增，避免同秒更新无法触发 Excel 刷新。 */
+    private LocalDateTime nextContentUpdateTime(LocalDateTime previous) {
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        if (previous == null) {
+            return now;
+        }
+        LocalDateTime normalizedPrevious = previous.withNano(0);
+        return now.isAfter(normalizedPrevious) ? now : normalizedPrevious.plusSeconds(1);
+    }
+
+    private com.yigongbao.module.basic.file.vo.FileVO buildFlowCardFileVO(ProductionRecordEntity record) {
+        OrderMainEntity order = orderMainMapper.selectById(record.getOrderId());
+        String patientName = order != null && order.getPatientName() != null ? order.getPatientName() : "";
+        com.yigongbao.module.basic.file.vo.FileVO fileVO = new com.yigongbao.module.basic.file.vo.FileVO();
+        fileVO.setFileUrl(record.getFlowCardFileUrl());
+        fileVO.setFileName(patientName + "流转卡.xlsx");
+        return fileVO;
     }
 
     private void submitFlowCardDeviceNoQuery(

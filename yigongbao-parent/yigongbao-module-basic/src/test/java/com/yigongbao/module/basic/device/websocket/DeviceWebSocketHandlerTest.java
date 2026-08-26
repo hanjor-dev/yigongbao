@@ -106,8 +106,35 @@ class DeviceWebSocketHandlerTest {
     }
 
     @Test
+    void testHandleTextMessage_RejectsNullDevicesBeforeCenterOnlineUpdate() throws Exception {
+        assertInvalidPayload("{\"center_name\":\"武汉嘉一\",\"devices\":null}");
+    }
+
+    @Test
+    void testHandleTextMessage_RejectsEmptyDevicesBeforeCenterOnlineUpdate() throws Exception {
+        assertInvalidPayload("{\"center_name\":\"武汉嘉一\",\"devices\":[]}");
+    }
+
+    @Test
+    void testHandleTextMessage_RejectsNullDeviceElementBeforeCenterOnlineUpdate() throws Exception {
+        assertInvalidPayload("{\"center_name\":\"武汉嘉一\",\"devices\":[null]}");
+    }
+
+    @Test
+    void testHandleTextMessage_RejectsNullDeviceIdBeforeCenterOnlineUpdate() throws Exception {
+        assertInvalidPayload("{\"center_name\":\"武汉嘉一\",\"devices\":[{\"id\":null,\"state\":1}]}");
+    }
+
+    @Test
     void testAfterConnectionEstablished() {
         handler.afterConnectionEstablished(session);
         verify(session, times(1)).getId();
+    }
+
+    private void assertInvalidPayload(String payload) throws Exception {
+        handler.handleTextMessage(session, new TextMessage(payload));
+
+        verifyNoInteractions(deviceService, connectionManager, processingCenterMapper, processingCenterService);
+        verify(session).sendMessage(new TextMessage("{\"code\":500,\"message\":\"error\"}"));
     }
 }

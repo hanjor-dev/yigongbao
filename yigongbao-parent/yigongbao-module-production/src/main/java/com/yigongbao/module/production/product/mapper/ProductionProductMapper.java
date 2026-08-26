@@ -43,7 +43,8 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "    pp.spec_name AS spec_name, " +
             "    pp.color_name AS color_name, " +
             "    pp.material_name AS material_name, " +
-            "    CASE WHEN pr.print_start_time IS NOT NULL AND pr.print_finish_time IS NOT NULL " +
+            "    CASE WHEN pr.status &gt;= 3030 AND pr.status &lt;&gt; 3040 " +
+            "              AND pr.print_start_time IS NOT NULL AND pr.print_finish_time IS NOT NULL " +
             "              AND pr.print_finish_time &gt;= pr.print_start_time " +
             "         THEN TIMESTAMPDIFF(SECOND, pr.print_start_time, pr.print_finish_time) " +
             "         ELSE NULL END AS print_duration_seconds, " +

@@ -128,8 +128,7 @@ public class DeviceStatusListener {
             LocalDateTime now = LocalDateTime.now().withNano(0);
             List<ProductionRecordEntity> completedRecords = new java.util.ArrayList<>();
             for (ProductionRecordEntity record : records) {
-                LocalDateTime printFinishTime = record.getPrintFinishTime() != null
-                        ? record.getPrintFinishTime() : now;
+                LocalDateTime printFinishTime = now;
                 int updated = recordMapper.update(null,
                         new LambdaUpdateWrapper<ProductionRecordEntity>()
                                 .eq(ProductionRecordEntity::getId, record.getId())

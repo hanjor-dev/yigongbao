@@ -1,6 +1,7 @@
 package com.yigongbao.module.production.product.mapper;
 
 import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.production.record.dto.ProductLedgerExportDTO;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +65,8 @@ class ProductionProductLedgerDateBoundaryTest {
                 "is_deleted INT)");
         jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS production_record (" +
                 "id BIGINT PRIMARY KEY, order_id BIGINT, record_no VARCHAR(100), order_code VARCHAR(100), " +
-                "print_start_time TIMESTAMP, print_finish_time TIMESTAMP, producer_name VARCHAR(255), is_deleted INT)");
+                "print_start_time TIMESTAMP, print_finish_time TIMESTAMP, producer_name VARCHAR(255), " +
+                "status INT, is_deleted INT)");
         jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS production_product (" +
                 "id BIGINT PRIMARY KEY, production_record_id BIGINT, product_no VARCHAR(100), file_name VARCHAR(255), " +
                 "product_name VARCHAR(255), spec_name VARCHAR(255), color_name VARCHAR(255), material_name VARCHAR(255), " +
@@ -84,9 +86,10 @@ class ProductionProductLedgerDateBoundaryTest {
 
     private void insertRecord(long id, String printStartTime) {
         jdbcTemplate.update("INSERT INTO production_record " +
-                        "(id, order_id, record_no, order_code, print_start_time, print_finish_time, producer_name, is_deleted) " +
-                        "VALUES (?, 1, ?, 'ORDER-1', ?, ?, '生产员', 0)",
-                id, "RECORD-" + id, printStartTime, printStartTime);
+                        "(id, order_id, record_no, order_code, print_start_time, print_finish_time, producer_name, status, is_deleted) " +
+                        "VALUES (?, 1, ?, 'ORDER-1', ?, ?, '生产员', ?, 0)",
+                id, "RECORD-" + id, printStartTime, printStartTime,
+                FlowStatusEnum.PRINT_COMPLETED.getValue());
         jdbcTemplate.update("INSERT INTO production_product " +
                         "(id, production_record_id, product_no, file_name, product_name, spec_name, color_name, " +
                         "material_name, weight, warehouse_out_time, status, is_deleted) " +

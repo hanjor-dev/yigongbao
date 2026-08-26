@@ -27,8 +27,8 @@ class FlowCardExcelBuilderTest {
         context.setProductionBatchNo("BATCH001");
         context.setMaterial("树脂");
         context.setMaterialBatchNo("MAT001");
-        context.setPrintStartTime(LocalDateTime.now());
-        context.setPrintFinishTime(LocalDateTime.now().plusHours(2));
+        context.setPrintStartTime(LocalDateTime.of(2026, 8, 13, 14, 15, 24));
+        context.setPrintFinishTime(LocalDateTime.of(2026, 8, 13, 16, 15, 24));
         context.setDesignerAssetNo("PC001");
 
         List<FlowCardExcelBuilder.ProcessInfo> processes = new ArrayList<>();

@@ -106,7 +106,7 @@ class DeviceStatusListenerTest {
     }
 
     @Test
-    void onDeviceStateChange_newWorking_usesExplicitPrintTimesAndUpdatesExcelContentTime() {
+    void onDeviceStateChange_newWorking_calculatesEstimatedPrintFinishTimeFromDuration() {
         LocalDateTime printStartTime = LocalDateTime.of(2026, 8, 25, 10, 20, 30);
         LocalDateTime estimatedPrintFinishTime = printStartTime.plusMinutes(45);
         when(recordMapper.selectList(any())).thenReturn(List.of(recordWithStatus(
@@ -118,7 +118,7 @@ class DeviceStatusListenerTest {
 
         listener.onDeviceStateChange(new DeviceStateChangeEvent(this, 1L,
                 PrinterDeviceStateEnum.IDLE.getCode(), PrinterDeviceStateEnum.WORKING.getCode(),
-                printStartTime, 45, estimatedPrintFinishTime));
+                printStartTime, 45, null));
 
         ArgumentCaptor<LambdaUpdateWrapper> recordUpdateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
         verify(recordMapper).update(isNull(), recordUpdateCaptor.capture());
@@ -229,22 +229,33 @@ class DeviceStatusListenerTest {
     }
 
     @Test
-    void onDeviceStateChange_finishEvent_preservesPredictedPrintFinishTimeEverywhere() {
-        LocalDateTime predictedPrintFinishTime = LocalDateTime.of(2026, 8, 25, 11, 5, 30);
+    void onDeviceStateChange_finishEvent_overwritesPredictedPrintFinishTimeWithCurrentTimeEverywhere() {
+        LocalDateTime predictedPrintFinishTime = LocalDateTime.of(2099, 1, 1, 11, 5, 30);
         ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING);
         record.setPrintFinishTime(predictedPrintFinishTime);
         stubRecordQueryByStatus(record);
         when(recordMapper.update(isNull(), any())).thenReturn(1);
         when(processMapper.update(isNull(), any())).thenReturn(1);
+        LocalDateTime before = LocalDateTime.now().withNano(0);
 
         listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
                 PrinterDeviceStateEnum.IDLE.getCode()));
 
-        verify(processService).schedulePostProcessing(1L, predictedPrintFinishTime);
-        verify(recordMapper).update(isNull(), argThat(update -> updateHasValue(update,
-                predictedPrintFinishTime) && hasContentUpdateTime(update)));
-        verify(processMapper).update(isNull(), argThat(update -> updateHasValue(update,
-                predictedPrintFinishTime)));
+        LocalDateTime after = LocalDateTime.now().withNano(0);
+        ArgumentCaptor<LocalDateTime> finishTimeCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LambdaUpdateWrapper> recordUpdateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        ArgumentCaptor<LambdaUpdateWrapper> processUpdateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(processService).schedulePostProcessing(eq(1L), finishTimeCaptor.capture());
+        verify(recordMapper).update(isNull(), recordUpdateCaptor.capture());
+        verify(processMapper).update(isNull(), processUpdateCaptor.capture());
+
+        LocalDateTime actualFinishTime = finishTimeCaptor.getValue();
+        assertTrue(!actualFinishTime.isBefore(before) && !actualFinishTime.isAfter(after),
+                "打印完成应使用完成事件处理时的当前时间");
+        assertEquals(actualFinishTime, valueForUpdateColumn(recordUpdateCaptor.getValue(), "printFinishTime"),
+                "production_record.print_finish_time 应覆盖预计结束时间并与排程时间一致");
+        assertEquals(actualFinishTime, valueForUpdateColumn(processUpdateCaptor.getValue(), "endTime"),
+                "打印工序 end_time 应与实际完成时间一致");
     }
 
     @Test
