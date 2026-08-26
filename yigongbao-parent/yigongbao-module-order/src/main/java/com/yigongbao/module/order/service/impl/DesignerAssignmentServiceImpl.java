@@ -140,7 +140,7 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         // 6. 记录分配历史（自动分配）
         saveAutoAssignmentLog(order, designer);
         // 7. 更新订单 designerId / designerName
-        updateOrderDesigner(order, designer);
+        updateOrderDesigner(order, designer, false);
         eventPublisher.publishEvent(new DesignerAssignedEvent(this, orderId, order.getOrderCode(),
                 order.getPatientName(), order.getHospitalName(), designer.getId(), oldDesignerId));
         log.info("自动分配设计师: orderId={}, designerId={}, specialty={}", orderId, designer.getId(), specialty);
@@ -148,7 +148,7 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
     }
 
     /**
-     * 手动分配设计师（仅管理员；允许在开始设计前分配，支持重新分配）
+     * 手动分配设计师（仅管理员；支持待设计及设计中状态重新分配）
      *
      * @param orderId    订单ID
      * @param designerId 设计师用户ID
@@ -156,17 +156,22 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void manualAssignDesigner(Long orderId, Long designerId) {
-        log.info("手动分配设计师，orderId={}, designerId=", orderId, designerId);
-        // 1. 校验订单存在且状态允许分配（DATA_AUDIT_PASSED 或 PENDING_DESIGN）
+        log.info("手动分配设计师，orderId={}, designerId={}", orderId, designerId);
+        // 1. 校验订单存在且状态允许分配（设计中状态允许重新分配）
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
         Integer status = order.getStatus();
         if (!FlowStatusEnum.DATA_AUDIT_PASSED.getValue().equals(status)
-                && !FlowStatusEnum.PENDING_DESIGN.getValue().equals(status)) {
+                && !FlowStatusEnum.PENDING_DESIGN.getValue().equals(status)
+                && !FlowStatusEnum.DESIGN_IN_PROGRESS.getValue().equals(status)) {
             log.warn("订单状态不允许分配，orderId={}, status={}", orderId, status);
-            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR, "仅允许在数据审核通过或待设计状态分配设计师");
+            throw new BusinessException(ErrorCodeEnum.ORDER_STATUS_ERROR, "仅允许在数据审核通过、待设计或设计中状态分配设计师");
+        }
+        if (designerId.equals(order.getDesignerId())) {
+            log.info("订单已分配给该设计师，无需重复分配，orderId={}, designerId={}", orderId, designerId);
+            return;
         }
         // 2. 校验设计师存在、拥有设计权限、状态正常
         UserEntity designer = userMapper.selectById(designerId);
@@ -194,9 +199,13 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
         }*/
         // 4. 记录分配历史（支持重新分配）
         saveAssignmentLog(order, designer);
-        // 5. 更新订单
+        // 5. 更新订单；设计中重新分配时同步变更当前处理人，确保新设计师可以接管并完成设计
         Long oldDesignerId = order.getDesignerId();
-        updateOrderDesigner(order, designer);
+        boolean updated = updateOrderDesigner(order, designer,
+                FlowStatusEnum.DESIGN_IN_PROGRESS.getValue().equals(status));
+        if (!updated) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+        }
         eventPublisher.publishEvent(new DesignerAssignedEvent(this, orderId, order.getOrderCode(),
                 order.getPatientName(), order.getHospitalName(), designerId, oldDesignerId));
         log.info("手动分配成功，orderId={}, designerId={}", orderId, designerId);
@@ -250,10 +259,14 @@ public class DesignerAssignmentServiceImpl implements DesignerAssignmentService 
     /**
      * 更新订单的设计师冗余字段
      */
-    private void updateOrderDesigner(OrderMainEntity order, UserEntity designer) {
+    private boolean updateOrderDesigner(OrderMainEntity order, UserEntity designer, boolean updateHandler) {
         order.setDesignerId(designer.getId());
         order.setDesignerName(designer.getRealName());
-        orderMainService.updateById(order);
+        if (updateHandler) {
+            order.setCurrentHandlerId(designer.getId());
+            order.setCurrentHandlerName(designer.getRealName());
+        }
+        return orderMainService.updateById(order);
     }
 
     /**

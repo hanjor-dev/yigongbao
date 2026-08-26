@@ -29,7 +29,7 @@ public interface DesignerAssignmentService {
     Long autoAssignDesigner(Long orderId);
 
     /**
-     * 手动分配设计师（仅管理员；订单必须处于 PENDING_DESIGN 状态）
+     * 手动分配设计师（仅管理员；订单必须处于数据审核通过、待设计或设计中状态）
      *
      * @param orderId    订单ID
      * @param designerId 设计师用户ID

@@ -14,6 +14,7 @@ import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +51,11 @@ class DesignerAssignmentServiceImplTest {
     @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private DesignerAssignmentServiceImpl service;
+
+    @BeforeEach
+    void setUp() {
+        when(orderMainService.updateById(any(OrderMainEntity.class))).thenReturn(true);
+    }
 
     // ==================== triggerAssignmentAfterAudit ====================
 
@@ -175,14 +181,40 @@ class DesignerAssignmentServiceImplTest {
     }
 
     @Test
-    @DisplayName("manualAssign — 订单状态非 PENDING_DESIGN，抛 ORDER_STATUS_ERROR")
-    void manualAssign_wrongStatus_shouldThrow() {
+    @DisplayName("manualAssign — 设计中状态允许重新分配，并同步当前处理人")
+    void manualAssign_designInProgress_shouldReassignAndUpdateHandler() {
         OrderMainEntity order = new OrderMainEntity();
-        order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue()); // 2020
+        order.setId(1L);
+        order.setStatus(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
+        order.setDesignerId(200L);
+        order.setDesignerName("设计师200");
+        order.setCurrentHandlerId(200L);
+        order.setCurrentHandlerName("设计师200");
         when(orderMainService.getById(1L)).thenReturn(order);
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.manualAssignDesigner(1L, 100L));
-        assertEquals(ErrorCodeEnum.ORDER_STATUS_ERROR.getCode(), ex.getCode());
+        UserEntity designer = buildDesigner(100L, "7.1");
+        when(userMapper.selectById(100L)).thenReturn(designer);
+        when(userMapper.selectAllDesignersByPermission(null)).thenReturn(List.of(designer));
+
+        service.manualAssignDesigner(1L, 100L);
+
+        verify(orderMainService).updateById(argThat(updated ->
+                Long.valueOf(100L).equals(updated.getDesignerId())
+                        && "设计师100".equals(updated.getDesignerName())
+                        && Long.valueOf(100L).equals(updated.getCurrentHandlerId())
+                        && "设计师100".equals(updated.getCurrentHandlerName())));
+    }
+
+    @Test
+    @DisplayName("manualAssign — 已是当前设计师时不重复更新")
+    void manualAssign_sameDesigner_shouldSkipUpdate() {
+        OrderMainEntity order = buildPendingDesignOrder(1L);
+        order.setDesignerId(100L);
+        when(orderMainService.getById(1L)).thenReturn(order);
+
+        service.manualAssignDesigner(1L, 100L);
+
+        verify(orderMainService, never()).updateById(any(OrderMainEntity.class));
+        verifyNoInteractions(userMapper, assignmentLogMapper, eventPublisher);
     }
 
     @Test
