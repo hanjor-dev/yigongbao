@@ -475,4 +475,16 @@ class OrderModifyApplyServiceImplBoundaryTest {
 
         verify(modifyFullService, never()).modifyOrderFull(anyLong(), any(), eq(true), anyLong(), anyString(), anyString());
     }
+
+    @Test
+    void statusDescriptionUsesApplyStatusCodes() throws Exception {
+        java.lang.reflect.Method method = OrderModifyApplyServiceImpl.class
+                .getDeclaredMethod("getStatusDesc", Integer.class);
+        method.setAccessible(true);
+
+        assertThat(method.invoke(service, 1)).isEqualTo("待审核");
+        assertThat(method.invoke(service, 2)).isEqualTo("已通过");
+        assertThat(method.invoke(service, 3)).isEqualTo("已驳回");
+        assertThat(method.invoke(service, 4)).isEqualTo("已过期");
+    }
 }

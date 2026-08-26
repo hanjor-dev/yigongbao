@@ -223,12 +223,12 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         List<String> newParts = new ArrayList<>();
 
         if (!Objects.equals(order.getOrderType(), dto.getOrderType())) {
-            oldParts.add("订单类型=" + order.getOrderType());
-            newParts.add("订单类型=" + dto.getOrderType());
+            oldParts.add("订单类型=" + getOrderTypeDisplay(order.getOrderType()));
+            newParts.add("订单类型=" + getOrderTypeDisplay(dto.getOrderType()));
         }
         if (!Objects.equals(order.getBusinessType(), dto.getBusinessType())) {
-            oldParts.add("业务类型=" + order.getBusinessType());
-            newParts.add("业务类型=" + dto.getBusinessType());
+            oldParts.add("业务类型=" + getBusinessTypeDisplay(order.getBusinessType()));
+            newParts.add("业务类型=" + getBusinessTypeDisplay(dto.getBusinessType()));
         }
         if (!Objects.equals(order.getIsPostal(), dto.getIsPostal())) {
             oldParts.add("邮寄=" + (order.getIsPostal() != null && order.getIsPostal() == 1 ? "是" : "否"));
@@ -277,6 +277,25 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             StrUtil.blankToDefault(name, "无"),
             genderText,
             age == null ? 0 : age);
+    }
+
+    private String getOrderTypeDisplay(Integer orderType) {
+        if (orderType == null) {
+            return "无";
+        }
+        com.yigongbao.module.system.dict.vo.DictVO dict =
+                dictService.getByDictCode(String.valueOf(orderType));
+        return dict != null && StrUtil.isNotBlank(dict.getDictName())
+                ? dict.getDictName() : String.valueOf(orderType);
+    }
+
+    private String getBusinessTypeDisplay(String businessType) {
+        if (StrUtil.isBlank(businessType)) {
+            return "无";
+        }
+        com.yigongbao.module.system.dict.vo.DictVO dict = dictService.getByDictCode(businessType);
+        return dict != null && StrUtil.isNotBlank(dict.getDictName())
+                ? dict.getDictName() : businessType;
     }
 
     /**

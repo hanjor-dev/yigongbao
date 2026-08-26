@@ -656,10 +656,10 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     private String getStatusDesc(Integer status) {
         if (status == null) return "未知";
         return switch (status) {
-            case 0 -> "待审核";
-            case 1 -> "已通过";
-            case 2 -> "已驳回";
-            case 3 -> "已过期";
+            case 1 -> "待审核";
+            case 2 -> "已通过";
+            case 3 -> "已驳回";
+            case 4 -> "已过期";
             default -> "未知";
         };
     }

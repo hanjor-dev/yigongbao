@@ -11,7 +11,9 @@ import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
 import com.yigongbao.module.order.entity.OrderItemEntity;
+import com.yigongbao.module.order.entity.OrderModificationLogEntity;
 import com.yigongbao.module.order.dto.modify.OrderModifyFullDTO;
+import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.order.validator.OrderDataValidator;
 import com.yigongbao.module.order.validator.OrderDataScopeChecker;
 import com.yigongbao.module.system.dict.service.DictService;
@@ -31,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -219,5 +222,48 @@ class OrderModifyFullServiceImplBoundaryTest {
                     .extracting("code")
                     .isEqualTo(ErrorCodeEnum.SYSTEM_ERROR.getCode());
         }
+    }
+
+    @Test
+    void modifyOrderFull_logsDictionaryNamesInsteadOfCodes() {
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(7L);
+        order.setOrderCode("ORD-7");
+        order.setPhase(10);
+        order.setVersion(0);
+        order.setOrderType(1);
+        order.setBusinessType("11.1");
+        when(orderMainMapper.selectById(7L)).thenReturn(order);
+        when(orderMainMapper.updateById(order)).thenReturn(1);
+
+        DictVO oldOrderType = new DictVO();
+        oldOrderType.setDictName("医疗器械");
+        DictVO newOrderType = new DictVO();
+        newOrderType.setDictName("非医疗器械");
+        DictVO oldBusinessType = new DictVO();
+        oldBusinessType.setDictName("业务");
+        DictVO newBusinessType = new DictVO();
+        newBusinessType.setDictName("代理");
+        when(dictService.getByDictCode("1")).thenReturn(oldOrderType);
+        when(dictService.getByDictCode("2")).thenReturn(newOrderType);
+        when(dictService.getByDictCode("11.1")).thenReturn(oldBusinessType);
+        when(dictService.getByDictCode("11.4")).thenReturn(newBusinessType);
+
+        OrderModifyFullDTO dto = new OrderModifyFullDTO();
+        dto.setOrderType(2);
+        dto.setBusinessType("11.4");
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            service.modifyOrderFull(7L, dto, true, 1L, "管理员", "admin");
+        }
+
+        ArgumentCaptor<OrderModificationLogEntity> captor = ArgumentCaptor.forClass(OrderModificationLogEntity.class);
+        verify(logMapper).insert(captor.capture());
+        OrderModificationLogEntity log = captor.getValue();
+        assertThat(log.getOldValue()).contains("订单类型=医疗器械", "业务类型=业务")
+                .doesNotContain("订单类型=1", "业务类型=11.1");
+        assertThat(log.getNewValue()).contains("订单类型=非医疗器械", "业务类型=代理")
+                .doesNotContain("订单类型=2", "业务类型=11.4");
     }
 }
