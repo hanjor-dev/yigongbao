@@ -4,8 +4,6 @@ import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 import java.time.LocalDateTime;
 
-import java.time.LocalDateTime;
-
 /**
  * 设备状态变更事件
  *
