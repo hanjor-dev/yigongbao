@@ -18,10 +18,12 @@ import com.yigongbao.module.order.dto.order.OrderExportQueryDTO;
 import com.yigongbao.module.order.dto.order.OrderPageDTO;
 import com.yigongbao.module.order.dto.workload.DesignerWorkloadExportDTO;
 import com.yigongbao.module.order.service.DesignerAssignmentService;
+import com.yigongbao.module.order.service.DesignFileQueryService;
 import com.yigongbao.module.order.service.OrderDraftService;
 import com.yigongbao.module.order.service.OrderExportService;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.order.DesignerVO;
+import com.yigongbao.module.order.vo.order.DesignFileDetailVO;
 import com.yigongbao.module.order.vo.draft.OrderDraftDetailVO;
 import com.yigongbao.module.order.vo.draft.OrderDraftVO;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
@@ -55,6 +57,7 @@ public class OrderController {
     private final OrderMainService orderMainService;
     private final OrderExportService orderExportService;
     private final DesignerAssignmentService designerAssignmentService;
+    private final DesignFileQueryService designFileQueryService;
 
     // ==================== 草稿接口 ====================
 
@@ -110,7 +113,17 @@ public class OrderController {
     @Operation(summary = "查询订单详情")
     @GetMapping("/{id}")
     public Result<OrderDetailVO> getOrderDetail(@PathVariable Long id) {
-        return Result.success(orderMainService.getOrderDetail(id));
+        OrderDetailVO detail = orderMainService.getOrderDetail(id);
+        DesignFileDetailVO designFiles = designFileQueryService.getDesignFiles(id);
+        if (designFiles == null) {
+            detail.setPackageList(java.util.Collections.emptyList());
+            detail.setReport(null);
+        } else {
+            detail.setPackageList(designFiles.getPackageList() == null
+                    ? java.util.Collections.emptyList() : designFiles.getPackageList());
+            detail.setReport(designFiles.getReport());
+        }
+        return Result.success(detail);
     }
 
     @Operation(summary = "提交订单")

@@ -1,6 +1,7 @@
 package com.yigongbao.module.order.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yigongbao.module.order.service.DesignFileQueryService;
 import com.yigongbao.module.order.service.DesignerAssignmentService;
 import com.yigongbao.module.order.service.OrderDraftService;
 import com.yigongbao.module.order.service.OrderExportService;
@@ -10,6 +11,8 @@ import com.yigongbao.module.order.dto.order.CancelOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
 import com.yigongbao.module.order.dto.order.ManualCompleteOrderDTO;
 import com.yigongbao.module.order.dto.order.ResubmitOrderDTO;
+import com.yigongbao.module.order.vo.order.DesignFileDetailVO;
+import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import cn.dev33.satoken.stp.StpUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +40,7 @@ class OrderControllerTest {
     @MockBean private OrderMainService orderMainService;
     @MockBean private OrderExportService orderExportService;
     @MockBean private DesignerAssignmentService designerAssignmentService;
+    @MockBean private DesignFileQueryService designFileQueryService;
 
     @Test
     void createOrder_rejectsInvalidRequestBeforeService() throws Exception {
@@ -220,9 +224,21 @@ class OrderControllerTest {
     }
 
     @Test
-    void orderDetail_delegatesPathId() throws Exception {
-        mockMvc.perform(get("/order/{id}", 33L)).andExpect(status().isOk());
+    void orderDetail_aggregatesDesignStageFiles() throws Exception {
+        OrderDetailVO detail = new OrderDetailVO();
+        DesignFileDetailVO designFiles = new DesignFileDetailVO();
+        DesignFileDetailVO.DesignPackageVO designPackage = new DesignFileDetailVO.DesignPackageVO();
+        designPackage.setPackageCode("PKG-1");
+        designFiles.setPackageList(java.util.List.of(designPackage));
+        when(orderMainService.getOrderDetail(33L)).thenReturn(detail);
+        when(designFileQueryService.getDesignFiles(33L)).thenReturn(designFiles);
+
+        mockMvc.perform(get("/order/{id}", 33L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.packageList[0].packageCode").value("PKG-1"));
+
         verify(orderMainService).getOrderDetail(33L);
+        verify(designFileQueryService).getDesignFiles(33L);
     }
 
     @Test

@@ -10,7 +10,7 @@ import com.yigongbao.module.design.vo.DesignPackageFileVO;
 import com.yigongbao.module.design.vo.DesignPackageVO;
 import com.yigongbao.module.order.service.DesignFileQueryService;
 import com.yigongbao.module.order.vo.order.DesignFileDetailVO;
-import org.springframework.context.annotation.Lazy;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -23,19 +23,12 @@ import java.util.stream.Collectors;
  * 为订单详情提供设计阶段文件信息。
  */
 @Service
+@RequiredArgsConstructor
 public class DesignFileQueryServiceImpl implements DesignFileQueryService {
 
     private final DesignFileService designFileService;
     private final DesignDocService designDocService;
     private final DesignProductMapper designProductMapper;
-
-    public DesignFileQueryServiceImpl(@Lazy DesignFileService designFileService,
-                                      DesignDocService designDocService,
-                                      DesignProductMapper designProductMapper) {
-        this.designFileService = designFileService;
-        this.designDocService = designDocService;
-        this.designProductMapper = designProductMapper;
-    }
 
     @Override
     public DesignFileDetailVO getDesignFiles(Long orderId) {

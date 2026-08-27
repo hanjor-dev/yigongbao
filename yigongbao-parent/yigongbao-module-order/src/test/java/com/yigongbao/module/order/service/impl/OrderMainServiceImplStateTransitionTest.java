@@ -30,10 +30,7 @@ import com.yigongbao.module.order.dto.order.UpdateOrderDTO;
 import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
 import com.yigongbao.module.order.service.DesignerAssignmentService;
-import com.yigongbao.module.order.service.DesignFileQueryService;
 import com.yigongbao.module.order.validator.OrderDataValidator;
-import com.yigongbao.module.order.vo.order.DesignFileDetailVO;
-import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.user.service.UserHospitalService;
@@ -94,7 +91,6 @@ class OrderMainServiceImplStateTransitionTest {
     @Mock private OrderConvert orderConvert;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private DesignerAssignmentService designerAssignmentService;
-    @Mock private DesignFileQueryService designFileQueryService;
 
     @Spy
     @InjectMocks
@@ -120,25 +116,6 @@ class OrderMainServiceImplStateTransitionTest {
 
         assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.ORDER_NOT_FOUND.getCode());
         verifyNoInteractions(orderItemMapper, flowFacade, orderFileMapper, orderConvert);
-    }
-
-    @Test
-    void getOrderDetail_includesDesignStageFiles() {
-        OrderMainEntity order = new OrderMainEntity();
-        order.setId(104L);
-        doReturn(order).when(service).getById(104L);
-        when(flowFacade.getAvailableActions(104L)).thenReturn(java.util.List.of());
-        when(orderItemMapper.selectList(any())).thenReturn(java.util.List.of());
-        when(orderFileMapper.selectList(any())).thenReturn(java.util.List.of());
-
-        DesignFileDetailVO designFiles = new DesignFileDetailVO();
-        designFiles.setPackageList(java.util.List.of(new DesignFileDetailVO.DesignPackageVO()));
-        when(designFileQueryService.getDesignFiles(104L)).thenReturn(designFiles);
-
-        OrderDetailVO result = service.getOrderDetail(104L);
-
-        assertThat(result.getPackageList()).hasSize(1);
-        verify(designFileQueryService).getDesignFiles(104L);
     }
 
     @Test
