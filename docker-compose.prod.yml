@@ -99,6 +99,7 @@ services:
       - "8082:8082"
     volumes:
       - app-files:/app/files
+      - app-logs:/app/logs
     depends_on:
       mysql:
         condition: service_healthy
@@ -127,6 +128,8 @@ volumes:
   redis-data:
     driver: local
   app-files:
+    driver: local
+  app-logs:
     driver: local
 
 # 网络

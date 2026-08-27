@@ -29,8 +29,9 @@
             <!-- 日志文件最大的大小 -->
             <fileNamePattern>${log.path}/yigongbao-info.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
             <maxFileSize>10MB</maxFileSize>
-            <!-- 日志最大的保留天数 -->
-            <maxHistory>30</maxHistory>
+            <!-- 只保留最近 7 天的归档日志 -->
+            <maxHistory>7</maxHistory>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
     </appender>
 
@@ -48,7 +49,8 @@
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <fileNamePattern>${log.path}/yigongbao-error.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
             <maxFileSize>10MB</maxFileSize>
-            <maxHistory>30</maxHistory>
+            <maxHistory>7</maxHistory>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
     </appender>
 
@@ -67,7 +69,8 @@
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <fileNamePattern>${log.path}/yigongbao-warn.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
             <maxFileSize>10MB</maxFileSize>
-            <maxHistory>30</maxHistory>
+            <maxHistory>7</maxHistory>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
     </appender>
 
