@@ -121,7 +121,8 @@ public class ProductionRecordController {
     @Operation(summary = "生成流转卡Excel")
     @GetMapping("/{id}/excel")
     public Result<FileVO> generateFlowCardExcel(@PathVariable Long id) {
-        FileVO fileVO = recordService.getOrGenerateFlowCardExcel(id);
+        // 用户显式点击生成时必须读取最新的打印/后处理时间和设备信息，不能命中旧缓存。
+        FileVO fileVO = recordService.generateFlowCardExcel(id);
         return Result.success(fileVO);
     }
 

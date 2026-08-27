@@ -302,7 +302,7 @@ class ProductionRecordControllerTest {
     void flowCardExcel_delegatesRecordId() throws Exception {
         mockMvc.perform(get("/production/record/{id}/excel", 7L))
                 .andExpect(status().isOk());
-        verify(recordService).getOrGenerateFlowCardExcel(7L);
+        verify(recordService).generateFlowCardExcel(7L);
     }
 
     @Test
