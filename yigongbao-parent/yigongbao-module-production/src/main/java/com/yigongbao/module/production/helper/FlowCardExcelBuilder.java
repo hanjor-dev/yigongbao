@@ -296,20 +296,13 @@ public class FlowCardExcelBuilder {
             lines.add("清洗模式：" + parameterValue(p, "cleanMode"));
             lines.add("加热：" + parameterValue(p, "heating"));
         } else if (ProcessTypeEnum.PACK.getCode().equals(processType)) {
-            String sealTemperature = p.getStr("sealTemperature");
-            if (StrUtil.isNotBlank(sealTemperature)) {
-                lines.add("纸塑袋热封温度：" + sealTemperature + "℃");
-            }
-            String zipBagSealTemperature = p.getStr("zipBagSealTemperature");
-            if (StrUtil.isNotBlank(zipBagSealTemperature)) {
-                lines.add("PE复合食品包装袋热封温度：" + zipBagSealTemperature + "℃");
-            }
+            lines.add("纸塑袋热封温度：" + parameterValue(p, "sealTemperature") + "℃");
+            lines.add("PE复合食品包装袋热封温度："
+                    + parameterValue(p, "zipBagSealTemperature") + "℃");
             String sealTime = p.containsKey("zipBagSealTime")
                 ? p.getStr("zipBagSealTime")
                 : p.getStr("sealTime");
-            if (StrUtil.isNotBlank(sealTime)) {
-                lines.add("热封时间：" + sealTime + "秒");
-            }
+            lines.add("热封时间：" + StrUtil.blankToDefault(sealTime, "-") + "秒");
         }
 
         // wash/cure/clean_dry 追加开始和结束时间

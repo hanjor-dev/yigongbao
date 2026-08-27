@@ -241,7 +241,8 @@ class FlowCardExcelBuilderTest {
         byte[] excelBytes = builder.build(context);
 
         assertEquals("层厚：0.05 mm\n激光器功率：- mW", readCell(excelBytes, 8, 4));
-        assertEquals("热封时间：30秒", readCell(excelBytes, 13, 4));
+        assertEquals("纸塑袋热封温度：-℃\nPE复合食品包装袋热封温度：-℃\n热封时间：30秒",
+                readCell(excelBytes, 13, 4));
     }
 
     @Test
@@ -252,7 +253,7 @@ class FlowCardExcelBuilderTest {
 
         String params = readPackParams(builder.build(context));
 
-        assertEquals("PE复合食品包装袋热封温度：130℃\n热封时间：3秒", params);
+        assertEquals("纸塑袋热封温度：-℃\nPE复合食品包装袋热封温度：130℃\n热封时间：3秒", params);
     }
 
     @Test
@@ -270,14 +271,14 @@ class FlowCardExcelBuilderTest {
     }
 
     @Test
-    void buildPackParamsSkipsBlankTemperatures() throws Exception {
+    void buildPackParamsShowsDashForBlankTemperatures() throws Exception {
         FlowCardExcelBuilder.BuildContext context = buildPackContext(
             "{\"sealTemperature\":null,\"zipBagSealTemperature\":\"\",\"zipBagSealTime\":3}"
         );
 
         String params = readPackParams(builder.build(context));
 
-        assertEquals("热封时间：3秒", params);
+        assertEquals("纸塑袋热封温度：-℃\nPE复合食品包装袋热封温度：-℃\n热封时间：3秒", params);
     }
 
     @Test
@@ -288,7 +289,19 @@ class FlowCardExcelBuilderTest {
 
         String params = readPackParams(builder.build(context));
 
-        assertEquals("纸塑袋热封温度：180℃\n热封时间：30秒", params);
+        assertEquals("纸塑袋热封温度：180℃\nPE复合食品包装袋热封温度：-℃\n热封时间：30秒", params);
+    }
+
+    @Test
+    void buildPackParamsShowsAllLabelsWhenValuesAreMissing() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = buildPackContext(null);
+
+        String params = readPackParams(builder.build(context));
+
+        assertEquals(
+            "纸塑袋热封温度：-℃\nPE复合食品包装袋热封温度：-℃\n热封时间：-秒",
+            params
+        );
     }
 
     @Test
