@@ -243,48 +243,6 @@ class DesignWorkorderServiceImplTest {
         }
 
         @Test
-        @DisplayName("分页列表填充当前用户是否可以打开修改页面")
-        void listWorkorders_fillsCanApply() {
-            DesignWorkorderQueryDTO dto = new DesignWorkorderQueryDTO();
-            dto.setPageNum(1);
-            dto.setPageSize(10);
-
-            when(designQueryHelper.getCurrentUserId()).thenReturn(1L);
-            UserEntity currentUser = new UserEntity();
-            currentUser.setRoleCode(RoleCodeEnum.DESIGNER.getCode());
-            when(designQueryHelper.getCurrentUser()).thenReturn(currentUser);
-            when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
-
-            OrderMainEntity approvedOrder = buildOrder(10L);
-            OrderMainEntity pendingOrder = buildOrder(11L);
-            OrderMainEntity noApplyOrder = buildOrder(12L);
-            Page<OrderMainEntity> page = new Page<>(1, 10, 3);
-            page.setRecords(List.of(approvedOrder, pendingOrder, noApplyOrder));
-            when(orderMainService.page(any(), any())).thenReturn(page);
-
-            OrderModificationApplyEntity pendingApply = new OrderModificationApplyEntity();
-            pendingApply.setOrderId(11L);
-            pendingApply.setStatus(ApplyStatusEnum.PENDING.getCode());
-            pendingApply.setApplyTime(LocalDateTime.of(2026, 8, 26, 10, 0));
-            when(orderModificationApplyMapper.selectList(any())).thenReturn(List.of(pendingApply));
-            when(orderItemService.listByOrderIds(any())).thenReturn(Collections.emptyList());
-            when(designPackageMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
-            when(designReviewMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
-
-            IPage<DesignWorkorderListVO> result = service.listWorkorders(dto);
-
-            assertTrue(result.getRecords().get(0).isCanApply());
-            assertFalse(result.getRecords().get(1).isCanApply());
-            assertTrue(result.getRecords().get(2).isCanApply());
-
-            ArgumentCaptor<LambdaQueryWrapper<OrderModificationApplyEntity>> applyQueryCaptor =
-                    ArgumentCaptor.forClass(LambdaQueryWrapper.class);
-            verify(orderModificationApplyMapper).selectList(applyQueryCaptor.capture());
-            assertThat(applyQueryCaptor.getValue().getSqlSelect())
-                    .doesNotContain("modification_content", "modification_diff");
-        }
-
-        @Test
         @DisplayName("结束日期使用次日零点作为排他边界")
         void listWorkorders_createTimeEndUsesNextDayExclusiveBoundary() {
             DesignWorkorderQueryDTO dto = new DesignWorkorderQueryDTO();

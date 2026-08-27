@@ -42,6 +42,7 @@ import com.yigongbao.module.order.service.OrderModifyApplyService;
 import com.yigongbao.module.order.service.OrderModifyFullService;
 import com.yigongbao.module.order.utils.OrderModifyTimeWindowChecker;
 import com.yigongbao.module.order.validator.OrderDataScopeChecker;
+import com.yigongbao.module.order.validator.OrderModifyPageAccessChecker;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.order.vo.apply.ApplyDetailVO;
@@ -697,13 +698,33 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
 
     @Override
     public boolean hasPendingApply(Long orderId) {
-        List<OrderModificationApplyEntity> pendingApplies = orderModificationApplyMapper.selectList(
+        return orderModificationApplyMapper.selectCount(
                 new LambdaQueryWrapper<OrderModificationApplyEntity>()
                         .eq(OrderModificationApplyEntity::getOrderId, orderId)
                         .eq(OrderModificationApplyEntity::getStatus, ApplyStatusEnum.PENDING.getCode())
                         .eq(OrderModificationApplyEntity::getIsDeleted, StatusConstants.NOT_DELETED)
-        );
-        return CollUtil.isNotEmpty(pendingApplies);
+        ) > 0;
+    }
+
+    @Override
+    public boolean canApply(Long orderId) {
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        UserEntity currentUser = userService.getById(currentUserId);
+        if (currentUser == null) {
+            throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+        }
+
+        OrderMainEntity order = orderMainMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+
+        orderDataScopeChecker.checkOrderAccess(orderId);
+        return OrderModifyPageAccessChecker.canApply(
+                order,
+                currentUser.getRoleCode(),
+                hasPendingApply(orderId),
+                cancelApplyService.hasPendingCancelApply(orderId));
     }
 
     // ==================== Entity → VO 转换 ====================

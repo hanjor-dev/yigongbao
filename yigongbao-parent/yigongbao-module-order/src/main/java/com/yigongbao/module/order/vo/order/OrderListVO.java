@@ -261,7 +261,6 @@ public class OrderListVO implements Serializable {
     private AuditInfo designAudit;
 
     /** 是否允许当前用户打开订单修改页面 */
-    private boolean canApply;
 
     // ==================== 时间 ====================
 

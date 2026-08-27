@@ -92,4 +92,12 @@ public interface OrderModifyApplyService {
      * @return true=存在待审核申请, false=不存在
      */
     boolean hasPendingApply(Long orderId);
+
+    /**
+     * 实时查询当前用户是否可以打开订单修改页面。
+     *
+     * @param orderId 订单ID
+     * @return true=允许打开，false=不允许打开
+     */
+    boolean canApply(Long orderId);
 }

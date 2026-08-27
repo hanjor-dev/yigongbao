@@ -100,6 +100,26 @@ class OrderModifyApplyServiceImplBoundaryTest {
     private OrderModifyApplyServiceImpl service;
 
     @Test
+    void canApply_readsPendingCancelApplicationFromLiveApplicationState() {
+        UserEntity user = new UserEntity();
+        user.setRoleCode(RoleCodeEnum.SALESMAN.getCode());
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(9L);
+        order.setIsDeleted(0);
+        order.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.ORDER.getValue());
+
+        when(orderMainMapper.selectById(9L)).thenReturn(order);
+        when(userService.getById(1L)).thenReturn(user);
+        when(applyMapper.selectList(any())).thenReturn(List.of());
+        when(cancelApplyService.hasPendingCancelApply(9L)).thenReturn(true);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertThat(service.canApply(9L)).isFalse();
+        }
+    }
+
+    @Test
     void getApplyDetail_replacesFileIdsWithOriginalNames() {
         UserEntity manager = new UserEntity();
         manager.setRoleCode(RoleCodeEnum.DESIGNER_MANAGER.getCode());

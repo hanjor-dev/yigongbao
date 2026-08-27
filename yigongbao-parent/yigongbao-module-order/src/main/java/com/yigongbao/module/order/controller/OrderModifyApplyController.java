@@ -57,6 +57,12 @@ public class OrderModifyApplyController {
         return Result.success(orderModifyApplyService.modifyOrderFullV2(orderId, dto));
     }
 
+    @Operation(summary = "实时查询是否可以打开订单修改页面")
+    @GetMapping("/{orderId}/can-apply")
+    public Result<Boolean> canApply(@PathVariable Long orderId) {
+        return Result.success(orderModifyApplyService.canApply(orderId));
+    }
+
     @Operation(summary = "查询订单的修改留痕记录（分页）")
     @PostMapping("/{orderId}/logs")
     public Result<IPage<ModificationLogVO>> listModificationLogs(@PathVariable Long orderId,

@@ -101,5 +101,4 @@ public class DesignWorkorderListVO {
     private String rejectReason;
 
     /** 是否允许当前用户打开订单修改页面 */
-    private boolean canApply;
 }

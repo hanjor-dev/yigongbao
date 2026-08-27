@@ -1,6 +1,7 @@
 package com.yigongbao.module.order.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -87,6 +88,16 @@ class OrderCancelApplyServiceImplTest {
         assertEquals(1, ApplyStatusEnum.PENDING.getCode());
         assertEquals(2, ApplyStatusEnum.APPROVED.getCode());
         assertEquals(3, ApplyStatusEnum.REJECTED.getCode());
+    }
+
+    @Test
+    void hasPendingCancelApply_readsLiveApplicationTable() {
+        when(cancelApplyMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+
+        assertTrue(cancelApplyService.hasPendingCancelApply(ORDER_ID));
+
+        verify(cancelApplyMapper).selectCount(any(LambdaQueryWrapper.class));
+        verifyNoInteractions(orderMainService);
     }
 
     @Test

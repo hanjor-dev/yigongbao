@@ -27,19 +27,15 @@ public final class OrderModifyPageAccessChecker {
     }
 
     /**
-     * 判断当前用户是否可以打开订单修改页面。
-     *
-     * @param order                  订单
-     * @param roleCode               当前用户角色
-     * @param hasPendingModifyApply  是否存在待审核修改申请
-     * @return true=允许打开，false=不允许打开
+     * 使用实时查询得到的申请状态判断是否可以打开订单修改页面。
      */
     public static boolean canApply(OrderMainEntity order, String roleCode,
-                                    boolean hasPendingModifyApply) {
+                                    boolean hasPendingModifyApply,
+                                    boolean hasPendingCancelApply) {
         if (order == null || Integer.valueOf(1).equals(order.getIsDeleted())) {
             return false;
         }
-        if (hasPendingModifyApply || Integer.valueOf(1).equals(order.getHasPendingCancelApply())) {
+        if (hasPendingModifyApply || hasPendingCancelApply) {
             return false;
         }
         if (roleCode == null) {

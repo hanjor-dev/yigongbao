@@ -269,11 +269,10 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
 
     @Override
     public boolean hasPendingCancelApply(Long orderId) {
-        OrderMainEntity order = orderMainService.getById(orderId);
-        if (order == null) {
-            return false;
-        }
-        return Integer.valueOf(StatusConstants.YES).equals(order.getHasPendingCancelApply());
+        return count(new LambdaQueryWrapper<OrderCancelApplyEntity>()
+                .eq(OrderCancelApplyEntity::getOrderId, orderId)
+                .eq(OrderCancelApplyEntity::getAuditStatus, ApplyStatusEnum.PENDING.getCode())
+                .eq(OrderCancelApplyEntity::getIsDeleted, StatusConstants.NOT_DELETED)) > 0;
     }
 
     @Override

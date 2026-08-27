@@ -39,7 +39,6 @@ import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.order.validator.OrderDataValidator;
 import com.yigongbao.module.order.validator.OrderDataScopeChecker;
-import com.yigongbao.module.order.validator.OrderModifyPageAccessChecker;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
 import com.yigongbao.module.order.dto.order.OrderPageDTO;
@@ -49,9 +48,7 @@ import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.entity.OrderModificationLogEntity;
-import com.yigongbao.module.order.entity.OrderModificationApplyEntity;
 import com.yigongbao.module.order.enums.OrderDraftStatusEnum;
-import com.yigongbao.module.order.enums.ApplyStatusEnum;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.service.DesignerAssignmentService;
 import com.yigongbao.module.order.service.OrderCancelApplyService;
@@ -62,7 +59,6 @@ import com.yigongbao.module.order.mapper.OrderItemDraftMapper;
 import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
-import com.yigongbao.module.order.mapper.OrderModificationApplyMapper;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
@@ -123,7 +119,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderItemDraftMapper orderItemDraftMapper;
     private final OrderFileMapper orderFileMapper;
     private final OrderModificationLogMapper orderModificationLogMapper;
-    private final OrderModificationApplyMapper orderModificationApplyMapper;
     private final CodeGeneratorService codeGeneratorService;
     private final FileService fileService;
     private final OrgService orgService;
@@ -348,8 +343,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             // 批量填充重建项目列表（避免 N+1）
             orderQueryHelper.fillRebuildProjectList(voList);
 
-            // 批量填充修改页面访问权限
-            fillCanApply(pageResult.getRecords(), voList);
             for (int i = 0; i < voList.size(); i++) {
                 orderConvert.fillAuditInfo(pageResult.getRecords().get(i), voList.get(i));
             }
@@ -363,47 +356,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
     private LocalDateTime toExclusiveEndTime(LocalDateTime endTime) {
         return endTime == null ? null : endTime.toLocalDate().plusDays(1).atStartOfDay();
-    }
-
-    /**
-     * 批量填充订单最新修改审核状态，避免逐条查询修改申请。
-     *
-     * @param entities 当前页订单实体
-     * @param voList   当前页订单列表 VO
-     */
-    private void fillCanApply(List<OrderMainEntity> entities, List<OrderListVO> voList) {
-        if (entities == null || entities.isEmpty()) {
-            return;
-        }
-
-        List<Long> orderIds = entities.stream()
-                .map(OrderMainEntity::getId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        if (orderIds.isEmpty()) {
-            return;
-        }
-
-        List<OrderModificationApplyEntity> applies = orderModificationApplyMapper.selectList(
-                new LambdaQueryWrapper<OrderModificationApplyEntity>()
-                        .select(OrderModificationApplyEntity::getOrderId)
-                        .in(OrderModificationApplyEntity::getOrderId, orderIds)
-                        .eq(OrderModificationApplyEntity::getStatus,
-                                ApplyStatusEnum.PENDING.getCode())
-                        .eq(OrderModificationApplyEntity::getIsDeleted, StatusConstants.NOT_DELETED)
-        );
-
-        Set<Long> pendingApplyOrderIds = new HashSet<>();
-        for (OrderModificationApplyEntity apply : applies) {
-            pendingApplyOrderIds.add(apply.getOrderId());
-        }
-
-        String roleCode = orderQueryHelper.getCurrentUserRoleCode();
-        for (int i = 0; i < entities.size(); i++) {
-            OrderMainEntity order = entities.get(i);
-            voList.get(i).setCanApply(OrderModifyPageAccessChecker.canApply(
-                    order, roleCode, pendingApplyOrderIds.contains(order.getId())));
-        }
     }
 
     /**
