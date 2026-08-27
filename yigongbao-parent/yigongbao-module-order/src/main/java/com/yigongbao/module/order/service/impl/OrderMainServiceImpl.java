@@ -365,22 +365,19 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      */
     @Override
     public OrderStatisticsVO statistics() {
-        Long currentUserId = getCurrentUserId();
-        DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
-
         OrderStatisticsVO statistics = new OrderStatisticsVO();
-        statistics.setTotal(countOrders(currentUserId, scopeType, null));
-        statistics.setPendingAudit(countOrders(currentUserId, scopeType,
-                FlowStatusEnum.PENDING_DATA_AUDIT.getValue()));
-        statistics.setDesigning(countOrders(currentUserId, scopeType,
-                FlowStatusEnum.DESIGN_IN_PROGRESS.getValue()));
+        statistics.setTotal(countOrders(null));
+        statistics.setPendingAudit(countOrders(FlowStatusEnum.PENDING_DATA_AUDIT.getValue()));
+        statistics.setDesigning(countOrders(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue()));
         return statistics;
     }
 
-    private long countOrders(Long currentUserId, DataScopeTypeEnum scopeType, Integer status) {
+    /**
+     * 统计全量订单，不套用当前用户数据权限；该接口用于展示系统级订单统计。
+     */
+    private long countOrders(Integer status) {
         LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Objects.nonNull(status), OrderMainEntity::getStatus, status);
-        orderQueryHelper.buildDataScopeCondition(wrapper, currentUserId, scopeType);
         return count(wrapper);
     }
 

@@ -562,7 +562,7 @@ class OrderMainServiceImplListOrdersTest {
     class BoundaryAndVoConversion {
 
         @Test
-        void statistics_returnsCountsWithinCurrentUserDataScope() {
+        void statistics_returnsGlobalCountsWithoutUserDataScope() {
             when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
             when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ORG);
             when(orderMainMapper.selectCount(any(LambdaQueryWrapper.class)))
@@ -575,8 +575,8 @@ class OrderMainServiceImplListOrdersTest {
             assertThat(result.getTotal()).isEqualTo(12L);
             assertThat(result.getPendingAudit()).isEqualTo(3L);
             assertThat(result.getDesigning()).isEqualTo(4L);
-            verify(orderQueryHelper, times(3))
-                    .buildDataScopeCondition(any(), eq(1L), eq(DataScopeTypeEnum.ORG));
+            verify(orderQueryHelper, never()).buildDataScopeCondition(any(), any(), any());
+            verify(userHospitalService, never()).getDataScopeType(any());
             verify(orderMainMapper, times(3)).selectCount(wrapperCaptor.capture());
             assertThat(wrapperCaptor.getAllValues().get(0).getExpression().getNormal()).hasSize(0);
             assertThat(wrapperCaptor.getAllValues().get(1).getExpression().getNormal()).hasSize(3);
