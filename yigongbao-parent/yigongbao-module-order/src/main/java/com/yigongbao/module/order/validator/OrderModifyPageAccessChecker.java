@@ -34,7 +34,7 @@ public final class OrderModifyPageAccessChecker {
      * @param hasPendingModifyApply  是否存在待审核修改申请
      * @return true=允许打开，false=不允许打开
      */
-    public static boolean canModify(OrderMainEntity order, String roleCode,
+    public static boolean canApply(OrderMainEntity order, String roleCode,
                                     boolean hasPendingModifyApply) {
         if (order == null || Integer.valueOf(1).equals(order.getIsDeleted())) {
             return false;

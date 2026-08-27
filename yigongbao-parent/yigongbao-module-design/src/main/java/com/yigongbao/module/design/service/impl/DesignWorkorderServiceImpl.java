@@ -194,7 +194,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         fillRejectReason(voList);
 
         // 批量填充修改页面访问权限
-        fillCanModify(entities, voList);
+        fillCanApply(entities, voList);
 
         // 构建返回分页对象
         IPage<DesignWorkorderListVO> resultPage = new Page<>(entityPage.getCurrent(), entityPage.getSize(), entityPage.getTotal());
@@ -665,7 +665,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
      * @param entities 当前页订单实体
      * @param voList   当前页工单列表 VO
      */
-    private void fillCanModify(List<OrderMainEntity> entities, List<DesignWorkorderListVO> voList) {
+    private void fillCanApply(List<OrderMainEntity> entities, List<DesignWorkorderListVO> voList) {
         if (CollUtil.isEmpty(entities)) {
             return;
         }
@@ -696,7 +696,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         String roleCode = currentUser != null ? currentUser.getRoleCode() : null;
         for (int i = 0; i < entities.size(); i++) {
             OrderMainEntity order = entities.get(i);
-            voList.get(i).setCanModify(OrderModifyPageAccessChecker.canModify(
+            voList.get(i).setCanApply(OrderModifyPageAccessChecker.canApply(
                     order, roleCode, pendingApplyOrderIds.contains(order.getId())));
         }
     }

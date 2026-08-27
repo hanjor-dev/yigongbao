@@ -100,7 +100,7 @@ class OrderMainServiceImplListOrdersTest {
     }
 
     @Test
-    void listOrders_shouldSetCanModifyForBusinessOrderWithoutPendingApply() {
+    void listOrders_shouldSetCanApplyForBusinessOrderWithoutPendingApply() {
         OrderMainEntity order = buildEntity(1L);
         OrderListVO vo = buildVO(1L);
         when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
@@ -113,7 +113,7 @@ class OrderMainServiceImplListOrdersTest {
 
         IPage<OrderListVO> result = orderMainService.listOrders(baseDto());
 
-        assertThat(result.getRecords().get(0).isCanModify()).isTrue();
+        assertThat(result.getRecords().get(0).isCanApply()).isTrue();
     }
 
     @Test
@@ -138,8 +138,8 @@ class OrderMainServiceImplListOrdersTest {
 
         IPage<OrderListVO> result = orderMainService.listOrders(baseDto());
 
-        assertThat(result.getRecords().get(0).isCanModify()).isTrue();
-        assertThat(result.getRecords().get(1).isCanModify()).isFalse();
+        assertThat(result.getRecords().get(0).isCanApply()).isTrue();
+        assertThat(result.getRecords().get(1).isCanApply()).isFalse();
     }
 
     // ==================== 辅助方法 ====================

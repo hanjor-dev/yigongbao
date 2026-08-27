@@ -345,7 +345,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             orderQueryHelper.fillRebuildProjectList(voList);
 
             // 批量填充修改页面访问权限
-            fillCanModify(pageResult.getRecords(), voList);
+            fillCanApply(pageResult.getRecords(), voList);
             for (int i = 0; i < voList.size(); i++) {
                 orderConvert.fillAuditInfo(pageResult.getRecords().get(i), voList.get(i));
             }
@@ -367,7 +367,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      * @param entities 当前页订单实体
      * @param voList   当前页订单列表 VO
      */
-    private void fillCanModify(List<OrderMainEntity> entities, List<OrderListVO> voList) {
+    private void fillCanApply(List<OrderMainEntity> entities, List<OrderListVO> voList) {
         if (entities == null || entities.isEmpty()) {
             return;
         }
@@ -397,7 +397,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         String roleCode = orderQueryHelper.getCurrentUserRoleCode();
         for (int i = 0; i < entities.size(); i++) {
             OrderMainEntity order = entities.get(i);
-            voList.get(i).setCanModify(OrderModifyPageAccessChecker.canModify(
+            voList.get(i).setCanApply(OrderModifyPageAccessChecker.canApply(
                     order, roleCode, pendingApplyOrderIds.contains(order.getId())));
         }
     }

@@ -11,39 +11,39 @@ class OrderModifyPageAccessCheckerTest {
 
     @Test
     void adminCanOpenInAnyPhaseWhenNoPendingApply() {
-        assertThat(OrderModifyPageAccessChecker.canModify(order(FlowPhaseEnum.PRINT.getValue()),
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.PRINT.getValue()),
                 RoleCodeEnum.ADMIN.getCode(), false)).isTrue();
-        assertThat(OrderModifyPageAccessChecker.canModify(order(FlowPhaseEnum.DESIGN.getValue()),
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.DESIGN.getValue()),
                 RoleCodeEnum.COMPANY_ADMIN.getCode(), false)).isTrue();
     }
 
     @Test
     void businessGroupCanOpenInOrderOrDesignPhase() {
-        assertThat(OrderModifyPageAccessChecker.canModify(order(FlowPhaseEnum.ORDER.getValue()),
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.ORDER.getValue()),
                 RoleCodeEnum.SALESMAN.getCode(), false)).isTrue();
-        assertThat(OrderModifyPageAccessChecker.canModify(order(FlowPhaseEnum.ORDER.getValue()),
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.ORDER.getValue()),
                 RoleCodeEnum.REGIONAL_MANAGER.getCode(), false)).isTrue();
-        assertThat(OrderModifyPageAccessChecker.canModify(order(FlowPhaseEnum.DESIGN.getValue()),
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.DESIGN.getValue()),
                 RoleCodeEnum.SALESMAN_SELF.getCode(), false)).isTrue();
-        assertThat(OrderModifyPageAccessChecker.canModify(order(FlowPhaseEnum.PRINT.getValue()),
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.PRINT.getValue()),
                 RoleCodeEnum.SALESMAN.getCode(), false)).isFalse();
     }
 
     @Test
     void designGroupCanOpenOnlyInDesignPhase() {
-        assertThat(OrderModifyPageAccessChecker.canModify(order(FlowPhaseEnum.DESIGN.getValue()),
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.DESIGN.getValue()),
                 RoleCodeEnum.DESIGNER.getCode(), false)).isTrue();
-        assertThat(OrderModifyPageAccessChecker.canModify(order(FlowPhaseEnum.DESIGN.getValue()),
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.DESIGN.getValue()),
                 RoleCodeEnum.DESIGNER_MANAGER.getCode(), false)).isTrue();
-        assertThat(OrderModifyPageAccessChecker.canModify(order(FlowPhaseEnum.ORDER.getValue()),
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.ORDER.getValue()),
                 RoleCodeEnum.DESIGNER.getCode(), false)).isFalse();
     }
 
     @Test
     void pendingModificationApplyBlocksEveryRole() {
-        assertThat(OrderModifyPageAccessChecker.canModify(order(FlowPhaseEnum.ORDER.getValue()),
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.ORDER.getValue()),
                 RoleCodeEnum.ADMIN.getCode(), true)).isFalse();
-        assertThat(OrderModifyPageAccessChecker.canModify(order(FlowPhaseEnum.DESIGN.getValue()),
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.DESIGN.getValue()),
                 RoleCodeEnum.DESIGNER_MANAGER.getCode(), true)).isFalse();
     }
 
@@ -51,13 +51,13 @@ class OrderModifyPageAccessCheckerTest {
     void pendingCancelApplyBlocksOtherwiseAllowedOrder() {
         OrderMainEntity order = order(FlowPhaseEnum.ORDER.getValue());
         order.setHasPendingCancelApply(1);
-        assertThat(OrderModifyPageAccessChecker.canModify(order,
+        assertThat(OrderModifyPageAccessChecker.canApply(order,
                 RoleCodeEnum.SALESMAN.getCode(), false)).isFalse();
     }
 
     @Test
     void missingRoleReturnsFalseWithoutException() {
-        assertThat(OrderModifyPageAccessChecker.canModify(order(FlowPhaseEnum.ORDER.getValue()), null, false))
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.ORDER.getValue()), null, false))
                 .isFalse();
     }
 

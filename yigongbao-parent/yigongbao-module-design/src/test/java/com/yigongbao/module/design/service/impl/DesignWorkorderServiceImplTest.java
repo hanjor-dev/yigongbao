@@ -222,7 +222,7 @@ class DesignWorkorderServiceImplTest {
 
         @Test
         @DisplayName("分页列表填充当前用户是否可以打开修改页面")
-        void listWorkorders_fillsCanModify() {
+        void listWorkorders_fillsCanApply() {
             DesignWorkorderQueryDTO dto = new DesignWorkorderQueryDTO();
             dto.setPageNum(1);
             dto.setPageSize(10);
@@ -251,9 +251,9 @@ class DesignWorkorderServiceImplTest {
 
             IPage<DesignWorkorderListVO> result = service.listWorkorders(dto);
 
-            assertTrue(result.getRecords().get(0).isCanModify());
-            assertFalse(result.getRecords().get(1).isCanModify());
-            assertTrue(result.getRecords().get(2).isCanModify());
+            assertTrue(result.getRecords().get(0).isCanApply());
+            assertFalse(result.getRecords().get(1).isCanApply());
+            assertTrue(result.getRecords().get(2).isCanApply());
 
             ArgumentCaptor<LambdaQueryWrapper<OrderModificationApplyEntity>> applyQueryCaptor =
                     ArgumentCaptor.forClass(LambdaQueryWrapper.class);
