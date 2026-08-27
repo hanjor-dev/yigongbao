@@ -148,14 +148,8 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         }
         // 状态筛选
         if (queryDTO.getStatus() != null) {
-            // 设计完成状态：查询设计完成及后续所有状态（排除已取消）
-            if (FlowStatusEnum.DESIGN_COMPLETED.getValue().equals(queryDTO.getStatus())) {
-                wrapper.ge(OrderMainEntity::getStatus, FlowStatusEnum.DESIGN_COMPLETED.getValue())
-                       .lt(OrderMainEntity::getStatus, FlowStatusEnum.CANCELLED.getValue());
-            } else {
-                // 其他状态：精确匹配
-                wrapper.eq(OrderMainEntity::getStatus, queryDTO.getStatus());
-            }
+            // 传入状态时始终精确匹配，不将设计完成扩展为后续状态。
+            wrapper.eq(OrderMainEntity::getStatus, queryDTO.getStatus());
         } else {
             // 未传状态：查询从待设计到后续所有状态（排除已取消）
             wrapper.ge(OrderMainEntity::getStatus, FlowStatusEnum.PENDING_DESIGN.getValue())

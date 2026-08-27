@@ -23,6 +23,7 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.FileBizTypeEnum;
+import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
@@ -53,6 +54,7 @@ import com.yigongbao.module.order.enums.OrderDraftStatusEnum;
 import com.yigongbao.module.order.enums.ApplyStatusEnum;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.service.DesignerAssignmentService;
+import com.yigongbao.module.order.service.DesignFileQueryService;
 import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
 import com.yigongbao.module.order.mapper.OrderDraftMapper;
@@ -64,6 +66,7 @@ import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
 import com.yigongbao.module.order.mapper.OrderModificationApplyMapper;
 import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
+import com.yigongbao.module.order.vo.order.DesignFileDetailVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
 import com.yigongbao.module.order.vo.order.OrderStatisticsVO;
@@ -138,6 +141,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderCancelApplyService cancelApplyService;
     private final com.yigongbao.module.order.convert.OrderConvert orderConvert;
     private final ApplicationEventPublisher eventPublisher;
+    private final DesignFileQueryService designFileQueryService;
 
     /** 打破循环依赖：DesignerAssignmentServiceImpl 反向依赖 OrderMainService */
     @Lazy
@@ -252,6 +256,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         Long currentUserId = getCurrentUserId();
         // 获取当前用户的数据权限类型（从角色表读取）
         DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+        boolean isDesigner = RoleCodeEnum.DESIGNER.getCode().equals(getCurrentUserRoleCode());
 
             LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
 
@@ -259,12 +264,14 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             wrapper.eq(Objects.nonNull(dto.getPhase()), OrderMainEntity::getPhase, dto.getPhase())
                    .eq(Objects.nonNull(dto.getStatus()), OrderMainEntity::getStatus, dto.getStatus());
 
-            // 注入数据权限过滤条件
-            orderQueryHelper.buildDataScopeCondition(wrapper, currentUserId, scopeType);
+            // 设计师查看全部订单；其他角色继续按数据范围过滤。
+            if (!isDesigner) {
+                orderQueryHelper.buildDataScopeCondition(wrapper, currentUserId, scopeType);
+            }
 
             // hospitalId 参数处理：HOSPITALS 类型需校验是否在权限范围内
             if (dto.getHospitalId() != null) {
-                if (scopeType == DataScopeTypeEnum.HOSPITALS) {
+                if (!isDesigner && scopeType == DataScopeTypeEnum.HOSPITALS) {
                     List<Long> userHospitalIds = userHospitalService.getHospitalIdsByUserId(currentUserId);
                     if (!userHospitalIds.contains(dto.getHospitalId())) {
                         // 传入的 hospitalId 超出权限范围，返回空页，不报错
@@ -459,6 +466,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         vo.setAvailableActions(flowFacade.getAvailableActions(entity.getId()));
         // 查询订单关联的影像文件列表
         fillOrderFiles(vo, id);
+        // 查询设计阶段文件（打印文件数据包、设计报告）
+        fillDesignFiles(vo, id);
         // 填充审核信息
         orderConvert.fillAuditInfo(entity, vo);
         return vo;
@@ -1372,6 +1381,22 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         vo.setImageDataFiles(imageDataFiles);
         vo.setImageReportFiles(imageReportFiles);
         vo.setApprovalFiles(approvalFiles);
+    }
+
+    /**
+     * 填充设计阶段文件。
+     * 设计模块不可被订单模块直接依赖，具体查询由设计模块提供实现。
+     */
+    private void fillDesignFiles(OrderDetailVO vo, Long orderId) {
+        DesignFileDetailVO designFiles = designFileQueryService.getDesignFiles(orderId);
+        if (designFiles == null) {
+            vo.setPackageList(java.util.Collections.emptyList());
+            vo.setReport(null);
+            return;
+        }
+        vo.setPackageList(designFiles.getPackageList() == null
+                ? java.util.Collections.emptyList() : designFiles.getPackageList());
+        vo.setReport(designFiles.getReport());
     }
 
     /**

@@ -221,6 +221,28 @@ class DesignWorkorderServiceImplTest {
         }
 
         @Test
+        @DisplayName("按状态值精确筛选，不扩展为后续状态")
+        void listWorkorders_statusFilterMatchesExactValue() {
+            DesignWorkorderQueryDTO dto = new DesignWorkorderQueryDTO();
+            dto.setPageNum(1);
+            dto.setPageSize(10);
+            dto.setStatus(FlowStatusEnum.DESIGN_COMPLETED.getValue());
+
+            when(designQueryHelper.getCurrentUserId()).thenReturn(1L);
+            when(designQueryHelper.getCurrentUser()).thenReturn(new UserEntity());
+            when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
+            when(orderMainService.page(any(), any())).thenReturn(new Page<>(1, 10, 0));
+
+            ArgumentCaptor<LambdaQueryWrapper<OrderMainEntity>> wrapperCaptor =
+                    ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+
+            service.listWorkorders(dto);
+
+            verify(orderMainService).page(any(), wrapperCaptor.capture());
+            assertThat(wrapperCaptor.getValue().getExpression().getNormal()).hasSize(3);
+        }
+
+        @Test
         @DisplayName("分页列表填充当前用户是否可以打开修改页面")
         void listWorkorders_fillsCanApply() {
             DesignWorkorderQueryDTO dto = new DesignWorkorderQueryDTO();

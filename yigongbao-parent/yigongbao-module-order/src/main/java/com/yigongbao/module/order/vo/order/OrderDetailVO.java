@@ -1,6 +1,7 @@
 package com.yigongbao.module.order.vo.order;
 
 import com.yigongbao.common.vo.StatusColorVO;
+import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.order.vo.AuditInfo;
 import lombok.Data;
 
@@ -349,6 +350,12 @@ public class OrderDetailVO implements Serializable {
      * 免费业务审批文件列表（dict_code=10.20，业务类型为测试/试用时必填）
      */
     private List<OrderFileVO> approvalFiles;
+
+    /** 设计阶段打印文件数据包列表 */
+    private List<DesignFileDetailVO.DesignPackageVO> packageList;
+
+    /** 设计报告，无报告时为 null */
+    private FileVO report;
 
     /**
      * 订单明细 VO

@@ -142,6 +142,34 @@ class OrderMainServiceImplListOrdersTest {
         assertThat(result.getRecords().get(1).isCanApply()).isFalse();
     }
 
+    @Test
+    void listOrders_shouldNotApplyDataScopeToDesigner() {
+        when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
+        when(orderQueryHelper.getCurrentUserRoleCode()).thenReturn(RoleCodeEnum.DESIGNER.getCode());
+        when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.SELF);
+        mockSelectPage(List.of(), 0L);
+
+        orderMainService.listOrders(baseDto());
+
+        verify(orderQueryHelper, never()).buildDataScopeCondition(any(), any(), any());
+    }
+
+    @Test
+    void listOrders_shouldAllowDesignerToFilterAnyHospital() {
+        when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
+        when(orderQueryHelper.getCurrentUserRoleCode()).thenReturn(RoleCodeEnum.DESIGNER.getCode());
+        when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.HOSPITALS);
+        when(userHospitalService.getHospitalIdsByUserId(1L)).thenReturn(List.of(10L));
+        mockSelectPage(List.of(), 0L);
+
+        OrderPageDTO dto = baseDto();
+        dto.setHospitalId(99L);
+        orderMainService.listOrders(dto);
+
+        verify(userHospitalService, never()).getHospitalIdsByUserId(1L);
+        verify(orderQueryHelper, never()).buildDataScopeCondition(any(), any(), any());
+    }
+
     // ==================== 辅助方法 ====================
 
     private OrderPageDTO baseDto() {
