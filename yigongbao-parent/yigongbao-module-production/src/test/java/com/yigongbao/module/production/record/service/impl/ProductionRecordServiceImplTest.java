@@ -422,6 +422,32 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
+    void generateFlowCardExcel_missingEndTime_usesActualStartAndFixedDuration() throws Exception {
+        ProductionRecordEntity record = flowCardRecord(1L, 88L);
+        record.setPrintFinishTime(LocalDateTime.of(2026, 8, 25, 14, 25));
+        ProductionProcessEntity wash = process("wash", "WASH-88", null);
+        wash.setStartTime(LocalDateTime.of(2026, 8, 25, 16, 0));
+
+        FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(wash));
+
+        assertEquals(LocalDateTime.of(2026, 8, 25, 16, 0), context.getProcesses().get(0).getStartTime());
+        assertEquals(LocalDateTime.of(2026, 8, 25, 16, 10), context.getProcesses().get(0).getEndTime());
+    }
+
+    @Test
+    void generateFlowCardExcel_missingStartTime_usesActualEndAndFixedDuration() throws Exception {
+        ProductionRecordEntity record = flowCardRecord(1L, 88L);
+        record.setPrintFinishTime(LocalDateTime.of(2026, 8, 25, 14, 25));
+        ProductionProcessEntity cure = process("cure", "CURE-88", null);
+        cure.setEndTime(LocalDateTime.of(2026, 8, 25, 17, 0));
+
+        FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(cure));
+
+        assertEquals(LocalDateTime.of(2026, 8, 25, 16, 20), context.getProcesses().get(0).getStartTime());
+        assertEquals(LocalDateTime.of(2026, 8, 25, 17, 0), context.getProcesses().get(0).getEndTime());
+    }
+
+    @Test
     void generateFlowCardExcel_medicalRecordCompletesMissingProcessesForExcelOnly() throws Exception {
         ProductionRecordEntity record = flowCardRecord(1L, 88L);
         record.setOrderType(ProductionConstants.ORDER_TYPE_MEDICAL);
@@ -450,6 +476,19 @@ class ProductionRecordServiceImplTest {
         assertEquals("AIR-88", context.getProcesses().get(3).getSecondaryDeviceNo());
         verify(processMapper, never()).insert((ProductionProcessEntity) any());
         verify(processMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void generateFlowCardExcel_missingRecordOrderType_usesOrderTypeToCompleteProcesses() throws Exception {
+        ProductionRecordEntity record = flowCardRecord(1L, 88L);
+        record.setOrderType(null);
+        ProductionProcessEntity print = process("print", "REAL-PRINTER", null);
+
+        FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(
+                record, List.of(print), ProductionConstants.ORDER_TYPE_MEDICAL);
+
+        assertEquals(List.of("print", "wash", "cure", "clean_dry", "pack"),
+                context.getProcesses().stream().map(FlowCardExcelBuilder.ProcessInfo::getProcessType).toList());
     }
 
     @Test
@@ -1358,10 +1397,16 @@ class ProductionRecordServiceImplTest {
 
     private FlowCardExcelBuilder.BuildContext generateFlowCardContext(
             ProductionRecordEntity record, List<ProductionProcessEntity> processes) throws Exception {
+        return generateFlowCardContext(record, processes, record.getOrderType());
+    }
+
+    private FlowCardExcelBuilder.BuildContext generateFlowCardContext(
+            ProductionRecordEntity record, List<ProductionProcessEntity> processes,
+            Integer orderType) throws Exception {
         when(recordMapper.selectById(record.getId())).thenReturn(record);
         when(productMapper.selectList(any())).thenReturn(Collections.emptyList());
         when(processMapper.selectList(any())).thenReturn(processes);
-        when(orderMainMapper.selectById(record.getOrderId())).thenReturn(order(record.getOrderId(), ProductionConstants.ORDER_TYPE_MEDICAL));
+        when(orderMainMapper.selectById(record.getOrderId())).thenReturn(order(record.getOrderId(), orderType));
         when(flowCardExcelBuilder.build(any())).thenReturn(new byte[] {1});
         com.yigongbao.module.basic.file.vo.FileVO uploadedFile = new com.yigongbao.module.basic.file.vo.FileVO();
         uploadedFile.setFileUrl("https://files/card.xlsx");

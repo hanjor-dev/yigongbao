@@ -52,6 +52,7 @@ import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.service.PrinterAvailabilityService;
 import com.yigongbao.module.production.helper.FlowCardExcelBuilder;
+import com.yigongbao.module.production.helper.PostProcessingScheduleCalculator;
 import com.yigongbao.common.event.ProductionCardClaimedEvent;
 import com.yigongbao.module.production.device.service.IDeviceUsageCounterService;
 import com.yigongbao.module.production.product.service.IProductNumberService;
@@ -71,6 +72,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1035,10 +1037,14 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
 
+        OrderMainEntity order = record.getOrderId() == null
+                ? null : orderMainMapper.selectById(record.getOrderId());
+        Integer orderType = record.getOrderType() != null
+                ? record.getOrderType() : order == null ? null : order.getOrderType();
         List<ProductionProductEntity> products = productsFuture.join();
         List<ProductionProcessEntity> processes = completeFlowCardProcesses(
-                record, processesFuture.join());
-        String designerAssetNo = queryDesignerAssetNo(record.getOrderId());
+                record, processesFuture.join(), orderType);
+        String designerAssetNo = queryDesignerAssetNo(order);
 
         FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
         context.setRecordNo(record.getRecordNo());
@@ -1112,7 +1118,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         try {
             byte[] excelBytes = flowCardExcelBuilder.build(context);
             // 获取订单信息，添加患者姓名前缀
-            OrderMainEntity order = orderMainMapper.selectById(record.getOrderId());
             String patientName = (order != null && order.getPatientName() != null) ? order.getPatientName() : "";
             String filename = patientName + "流转卡.xlsx";
             com.yigongbao.module.basic.file.vo.FileVO fileVO = fileService.uploadBytes(
@@ -1197,10 +1202,11 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
      * 只用于展示，不写回production_process，避免把预计信息当作真实生产记录。
      */
     private List<ProductionProcessEntity> completeFlowCardProcesses(
-            ProductionRecordEntity record, List<ProductionProcessEntity> storedProcesses) {
+            ProductionRecordEntity record, List<ProductionProcessEntity> storedProcesses,
+            Integer orderType) {
         List<ProductionProcessEntity> source = storedProcesses == null
                 ? Collections.emptyList() : storedProcesses;
-        if (record.getOrderType() == null) {
+        if (orderType == null) {
             return source;
         }
 
@@ -1213,7 +1219,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                         (first, ignored) -> first));
         List<ProcessTypeEnum> expectedTypes = new ArrayList<>();
         expectedTypes.add(ProcessTypeEnum.PRINT);
-        if (ProductionConstants.ORDER_TYPE_MEDICAL.equals(record.getOrderType())) {
+        if (ProductionConstants.ORDER_TYPE_MEDICAL.equals(orderType)) {
             expectedTypes.add(ProcessTypeEnum.WASH);
             expectedTypes.add(ProcessTypeEnum.CURE);
             expectedTypes.add(ProcessTypeEnum.CLEAN_DRY);
@@ -1240,36 +1246,26 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (printFinishTime == null) {
             return;
         }
-        LocalDateTime washStart = printFinishTime.withNano(0).plusMinutes(2);
-        LocalDateTime washEnd = washStart.plusMinutes(10);
-        LocalDateTime cureStart = washEnd.plusMinutes(1);
-        LocalDateTime cureEnd = cureStart.plusMinutes(40);
-        LocalDateTime cleanDryStart = cureEnd.plusMinutes(1);
-        LocalDateTime cleanDryEnd = cleanDryStart.plusMinutes(10);
-
-        Map<String, LocalDateTime[]> schedule = Map.of(
-                ProcessTypeEnum.WASH.getCode(), new LocalDateTime[]{washStart, washEnd},
-                ProcessTypeEnum.CURE.getCode(), new LocalDateTime[]{cureStart, cureEnd},
-                ProcessTypeEnum.CLEAN_DRY.getCode(), new LocalDateTime[]{cleanDryStart, cleanDryEnd});
+        Map<String, PostProcessingScheduleCalculator.TimeRange> schedule =
+                PostProcessingScheduleCalculator.calculate(printFinishTime);
         processes.forEach(process -> {
-            LocalDateTime[] times = schedule.get(process.getProcessType());
+            PostProcessingScheduleCalculator.TimeRange times = schedule.get(process.getProcessType());
             if (times == null) {
                 return;
             }
-            if (process.getStartTime() == null) {
-                process.setStartTime(times[0]);
-            }
-            if (process.getEndTime() == null) {
-                process.setEndTime(times[1]);
+            long durationMinutes = Duration.between(times.startTime(), times.endTime()).toMinutes();
+            if (process.getStartTime() != null && process.getEndTime() == null) {
+                process.setEndTime(process.getStartTime().plusMinutes(durationMinutes));
+            } else if (process.getStartTime() == null && process.getEndTime() != null) {
+                process.setStartTime(process.getEndTime().minusMinutes(durationMinutes));
+            } else if (process.getStartTime() == null) {
+                process.setStartTime(times.startTime());
+                process.setEndTime(times.endTime());
             }
         });
     }
 
-    private String queryDesignerAssetNo(Long orderId) {
-        if (orderId == null) {
-            return null;
-        }
-        OrderMainEntity order = orderMainMapper.selectById(orderId);
+    private String queryDesignerAssetNo(OrderMainEntity order) {
         if (order == null || order.getDesignerId() == null) {
             return null;
         }
