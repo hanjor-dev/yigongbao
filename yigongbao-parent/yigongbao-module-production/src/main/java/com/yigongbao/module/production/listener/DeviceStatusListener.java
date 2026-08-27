@@ -128,22 +128,28 @@ public class DeviceStatusListener {
             LocalDateTime now = LocalDateTime.now().withNano(0);
             List<ProductionRecordEntity> completedRecords = new java.util.ArrayList<>();
             for (ProductionRecordEntity record : records) {
-                LocalDateTime printFinishTime = now;
-                int updated = recordMapper.update(null,
+                // print_finish_time 在打印开始时已保存预计结束时间，完成事件只推进状态，不能覆盖该时间基准。
+                LocalDateTime estimatedPrintFinishTime = record.getPrintFinishTime() != null
+                        ? record.getPrintFinishTime().withNano(0) : now;
+                LambdaUpdateWrapper<ProductionRecordEntity> updateWrapper =
                         new LambdaUpdateWrapper<ProductionRecordEntity>()
                                 .eq(ProductionRecordEntity::getId, record.getId())
                                 .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINTING.getValue())
                                 .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINT_COMPLETED.getValue())
                                 .set(ProductionRecordEntity::getCurrentProcess, null)
-                                .set(ProductionRecordEntity::getPrintFinishTime, printFinishTime)
-                                .set(ProductionRecordEntity::getContentUpdateTime, now));
+                                .set(ProductionRecordEntity::getContentUpdateTime, now);
+                if (record.getPrintFinishTime() == null) {
+                    // 兼容未提供预计耗时的旧设备，至少保留一个可用于后续排程的结束时间。
+                    updateWrapper.set(ProductionRecordEntity::getPrintFinishTime, estimatedPrintFinishTime);
+                }
+                int updated = recordMapper.update(null, updateWrapper);
                 if (updated == 0) {
                     log.info("打印完成事件状态更新未生效，跳过重复处理: recordId={}, deviceId={}",
                             record.getId(), deviceId);
                     continue;
                 }
-                processService.schedulePostProcessing(record.getId(), printFinishTime);
-                updatePrintProcessEndTime(record.getId(), printFinishTime);
+                processService.schedulePostProcessing(record.getId(), estimatedPrintFinishTime);
+                updatePrintProcessEndTime(record.getId(), estimatedPrintFinishTime);
                 completedRecords.add(record);
 
                 log.info("设备状态变更触发打印完成: recordId={}, recordNo={}, deviceId={}",

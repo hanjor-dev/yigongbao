@@ -72,7 +72,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1237,10 +1236,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         })).collect(Collectors.toList());
     }
 
-    /**
-     * Excel展示用的后处理工序时间。实际工序尚未开始时，使用打印结束时间按既有排程算法补齐，
-     * 已落库的真实/排程值优先保留。
-     */
+    /** Excel展示用的后处理工序时间，始终按预计打印结束时间重新计算。 */
     private void fillMissingFlowCardProcessTimes(List<FlowCardExcelBuilder.ProcessInfo> processes,
                                                   LocalDateTime printFinishTime) {
         if (printFinishTime == null) {
@@ -1253,15 +1249,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             if (times == null) {
                 return;
             }
-            long durationMinutes = Duration.between(times.startTime(), times.endTime()).toMinutes();
-            if (process.getStartTime() != null && process.getEndTime() == null) {
-                process.setEndTime(process.getStartTime().plusMinutes(durationMinutes));
-            } else if (process.getStartTime() == null && process.getEndTime() != null) {
-                process.setStartTime(process.getEndTime().minusMinutes(durationMinutes));
-            } else if (process.getStartTime() == null) {
-                process.setStartTime(times.startTime());
-                process.setEndTime(times.endTime());
-            }
+            process.setStartTime(times.startTime());
+            process.setEndTime(times.endTime());
         });
     }
 

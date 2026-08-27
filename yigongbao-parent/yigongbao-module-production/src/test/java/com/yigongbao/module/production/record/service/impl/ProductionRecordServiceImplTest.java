@@ -422,7 +422,7 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
-    void generateFlowCardExcel_missingEndTime_usesActualStartAndFixedDuration() throws Exception {
+    void generateFlowCardExcel_ignoresExistingWashTimesAndUsesEstimatedSchedule() throws Exception {
         ProductionRecordEntity record = flowCardRecord(1L, 88L);
         record.setPrintFinishTime(LocalDateTime.of(2026, 8, 25, 14, 25));
         ProductionProcessEntity wash = process("wash", "WASH-88", null);
@@ -430,12 +430,12 @@ class ProductionRecordServiceImplTest {
 
         FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(wash));
 
-        assertEquals(LocalDateTime.of(2026, 8, 25, 16, 0), context.getProcesses().get(0).getStartTime());
-        assertEquals(LocalDateTime.of(2026, 8, 25, 16, 10), context.getProcesses().get(0).getEndTime());
+        assertEquals(LocalDateTime.of(2026, 8, 25, 14, 27), context.getProcesses().get(0).getStartTime());
+        assertEquals(LocalDateTime.of(2026, 8, 25, 14, 37), context.getProcesses().get(0).getEndTime());
     }
 
     @Test
-    void generateFlowCardExcel_missingStartTime_usesActualEndAndFixedDuration() throws Exception {
+    void generateFlowCardExcel_ignoresExistingCureTimesAndUsesEstimatedSchedule() throws Exception {
         ProductionRecordEntity record = flowCardRecord(1L, 88L);
         record.setPrintFinishTime(LocalDateTime.of(2026, 8, 25, 14, 25));
         ProductionProcessEntity cure = process("cure", "CURE-88", null);
@@ -443,8 +443,8 @@ class ProductionRecordServiceImplTest {
 
         FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(cure));
 
-        assertEquals(LocalDateTime.of(2026, 8, 25, 16, 20), context.getProcesses().get(0).getStartTime());
-        assertEquals(LocalDateTime.of(2026, 8, 25, 17, 0), context.getProcesses().get(0).getEndTime());
+        assertEquals(LocalDateTime.of(2026, 8, 25, 14, 38), context.getProcesses().get(0).getStartTime());
+        assertEquals(LocalDateTime.of(2026, 8, 25, 15, 18), context.getProcesses().get(0).getEndTime());
     }
 
     @Test

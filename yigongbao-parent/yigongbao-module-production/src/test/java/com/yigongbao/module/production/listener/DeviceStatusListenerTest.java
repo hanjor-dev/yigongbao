@@ -229,19 +229,16 @@ class DeviceStatusListenerTest {
     }
 
     @Test
-    void onDeviceStateChange_finishEvent_overwritesPredictedPrintFinishTimeWithCurrentTimeEverywhere() {
+    void onDeviceStateChange_finishEvent_keepsPredictedPrintFinishTimeAndSchedulesFromIt() {
         LocalDateTime predictedPrintFinishTime = LocalDateTime.of(2099, 1, 1, 11, 5, 30);
         ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING);
         record.setPrintFinishTime(predictedPrintFinishTime);
         stubRecordQueryByStatus(record);
         when(recordMapper.update(isNull(), any())).thenReturn(1);
         when(processMapper.update(isNull(), any())).thenReturn(1);
-        LocalDateTime before = LocalDateTime.now().withNano(0);
-
         listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
                 PrinterDeviceStateEnum.IDLE.getCode()));
 
-        LocalDateTime after = LocalDateTime.now().withNano(0);
         ArgumentCaptor<LocalDateTime> finishTimeCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         ArgumentCaptor<LambdaUpdateWrapper> recordUpdateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
         ArgumentCaptor<LambdaUpdateWrapper> processUpdateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
@@ -249,17 +246,16 @@ class DeviceStatusListenerTest {
         verify(recordMapper).update(isNull(), recordUpdateCaptor.capture());
         verify(processMapper).update(isNull(), processUpdateCaptor.capture());
 
-        LocalDateTime actualFinishTime = finishTimeCaptor.getValue();
-        assertTrue(!actualFinishTime.isBefore(before) && !actualFinishTime.isAfter(after),
-                "打印完成应使用完成事件处理时的当前时间");
-        assertEquals(actualFinishTime, valueForUpdateColumn(recordUpdateCaptor.getValue(), "printFinishTime"),
-                "production_record.print_finish_time 应覆盖预计结束时间并与排程时间一致");
-        assertEquals(actualFinishTime, valueForUpdateColumn(processUpdateCaptor.getValue(), "endTime"),
-                "打印工序 end_time 应与实际完成时间一致");
+        assertEquals(predictedPrintFinishTime, finishTimeCaptor.getValue(),
+                "后处理排程应继续使用预计打印结束时间");
+        assertTrue(!hasPrintFinishTime(recordUpdateCaptor.getValue()),
+                "打印完成不应覆盖预计打印结束时间");
+        assertEquals(predictedPrintFinishTime, valueForUpdateColumn(processUpdateCaptor.getValue(), "endTime"),
+                "打印工序 end_time 应使用预计打印结束时间");
     }
 
     @Test
-    void onDeviceStateChange_finishEvent_withoutPredictedPrintFinishTimeUsesCurrentTime() {
+    void onDeviceStateChange_finishEvent_withoutPredictedPrintFinishTimeUsesCurrentTimeFallback() {
         ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING);
         stubRecordQueryByStatus(record);
         when(recordMapper.update(isNull(), any())).thenReturn(1);
@@ -280,8 +276,10 @@ class DeviceStatusListenerTest {
         LocalDateTime actualFinishTime = finishTimeCaptor.getValue();
         assertTrue(!actualFinishTime.isBefore(before) && !actualFinishTime.isAfter(after),
                 "无预测结束时间时应使用当前时间");
+        assertTrue(hasPrintFinishTime(recordUpdateCaptor.getValue()),
+                "没有预计打印结束时间时应使用完成时刻兜底");
         assertEquals(actualFinishTime, valueForUpdateColumn(recordUpdateCaptor.getValue(), "printFinishTime"),
-                "production_record.print_finish_time 应与排程时间一致");
+                "没有预计打印结束时间时应保存完成时刻作为兜底");
         assertEquals(actualFinishTime, valueForUpdateColumn(processUpdateCaptor.getValue(), "endTime"),
                 "打印工序 end_time 应与排程时间一致");
     }
