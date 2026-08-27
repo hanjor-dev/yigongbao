@@ -138,8 +138,9 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
-        orderDataScopeChecker.checkOrderAccess(orderId);
+        orderDataScopeChecker.checkOrderAccess(orderId, currentUser.getRoleCode());
         validateApplyPhase(order, currentUser.getRoleCode());
+        validateDesignerOwnership(order, currentUser.getRoleCode());
 
         if (BUSINESS_ROLES.contains(currentUser.getRoleCode())
                 && FlowPhaseEnum.ORDER.getValue().equals(order.getPhase())
@@ -412,6 +413,21 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     }
 
     /**
+     * 设计角色可以查看全部订单，但只能对分配给自己的订单发起修改申请。
+     * 该校验必须在服务层执行，不能依赖前端 canApply 结果。
+     */
+    private void validateDesignerOwnership(OrderMainEntity order, String roleCode) {
+        if (DESIGNER_ROLES.contains(roleCode)) {
+            Long currentUserId = StpUtil.getLoginIdAsLong();
+            if (order.getDesignerId() == null || !currentUserId.equals(order.getDesignerId())) {
+                log.warn("设计角色不能修改非本人订单: orderId={}, designerId={}, currentUserId={}",
+                        order.getId(), order.getDesignerId(), currentUserId);
+                throw new BusinessException(ErrorCodeEnum.ORDER_DESIGNER_MISMATCH);
+            }
+        }
+    }
+
+    /**
      * 检查审核权限（设计管理员允许）
      */
     private void checkAuditPermission() {
@@ -599,10 +615,10 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
-        // 在做角色、阶段和时间窗口判断前先校验数据权限，避免通过返回值探测无权访问的订单。
-        orderDataScopeChecker.checkOrderAccess(orderId);
-
         String roleCode = currentUser.getRoleCode();
+        // 在做阶段和时间窗口判断前校验访问权限；设计角色采用订单列表的全量可见规则。
+        orderDataScopeChecker.checkOrderAccess(orderId, roleCode);
+
         boolean isAdmin = ADMIN_ROLES.contains(roleCode);
         boolean isBusinessRole = BUSINESS_ROLES.contains(roleCode);
         boolean isDesigner = DESIGNER_ROLES.contains(roleCode);
@@ -617,6 +633,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED,
                     "设计师仅可在设计阶段提交修改申请");
         }
+        validateDesignerOwnership(order, roleCode);
         if (isBusinessRole && !isOrderPhase && !isDesignPhase) {
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED,
                     "当前订单阶段不允许业务角色修改");
@@ -719,10 +736,11 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
-        orderDataScopeChecker.checkOrderAccess(orderId);
+        orderDataScopeChecker.checkOrderAccess(orderId, currentUser.getRoleCode());
         return OrderModifyPageAccessChecker.canApply(
                 order,
                 currentUser.getRoleCode(),
+                currentUserId,
                 hasPendingApply(orderId),
                 cancelApplyService.hasPendingCancelApply(orderId));
     }

@@ -107,7 +107,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         validateFileIds(dto.getImageReportFileIds(), "影像报告");
         validateFileIds(dto.getApprovalFileIds(), "审批");
         if (!skipPermissionCheck) {
-            orderDataScopeChecker.checkOrderAccess(orderId);
+            orderDataScopeChecker.checkOrderAccess(orderId, modifierRoleCode);
         }
         // 1. 查询当前订单
         OrderMainEntity order = orderMainMapper.selectById(orderId);

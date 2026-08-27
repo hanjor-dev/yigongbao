@@ -32,11 +32,21 @@ class OrderModifyPageAccessCheckerTest {
     @Test
     void designGroupCanOpenOnlyInDesignPhase() {
         assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.DESIGN.getValue()),
-                RoleCodeEnum.DESIGNER.getCode(), false, false)).isTrue();
+                RoleCodeEnum.DESIGNER.getCode(), 2L, false, false)).isTrue();
         assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.DESIGN.getValue()),
-                RoleCodeEnum.DESIGNER_MANAGER.getCode(), false, false)).isTrue();
+                RoleCodeEnum.DESIGNER_MANAGER.getCode(), 2L, false, false)).isTrue();
         assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.ORDER.getValue()),
-                RoleCodeEnum.DESIGNER.getCode(), false, false)).isFalse();
+                RoleCodeEnum.DESIGNER.getCode(), 2L, false, false)).isFalse();
+    }
+
+    @Test
+    void designGroupCanOpenOnlyOwnAssignedOrder() {
+        OrderMainEntity order = order(FlowPhaseEnum.DESIGN.getValue());
+        order.setDesignerId(2L);
+        assertThat(OrderModifyPageAccessChecker.canApply(order,
+                RoleCodeEnum.DESIGNER.getCode(), 2L, false, false)).isTrue();
+        assertThat(OrderModifyPageAccessChecker.canApply(order,
+                RoleCodeEnum.DESIGNER_MANAGER.getCode(), 3L, false, false)).isFalse();
     }
 
     @Test
@@ -56,7 +66,7 @@ class OrderModifyPageAccessCheckerTest {
 
     @Test
     void missingRoleReturnsFalseWithoutException() {
-        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.ORDER.getValue()), null, false, false))
+        assertThat(OrderModifyPageAccessChecker.canApply(order(FlowPhaseEnum.ORDER.getValue()), null, 1L, false, false))
                 .isFalse();
     }
 
@@ -65,6 +75,7 @@ class OrderModifyPageAccessCheckerTest {
         order.setId(1L);
         order.setIsDeleted(0);
         order.setPhase(phase);
+        order.setDesignerId(2L);
         return order;
     }
 }

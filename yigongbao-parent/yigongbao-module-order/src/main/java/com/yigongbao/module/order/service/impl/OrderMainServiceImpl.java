@@ -248,7 +248,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         Long currentUserId = getCurrentUserId();
         // 获取当前用户的数据权限类型（从角色表读取）
         DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
-        boolean isDesigner = RoleCodeEnum.DESIGNER.getCode().equals(getCurrentUserRoleCode());
+        String currentRoleCode = getCurrentUserRoleCode();
+        boolean isDesigner = RoleCodeEnum.DESIGNER.getCode().equals(currentRoleCode)
+                || RoleCodeEnum.DESIGNER_MANAGER.getCode().equals(currentRoleCode);
 
             LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
 
@@ -400,7 +402,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
         // 数据权限校验：防止横向越权
-        validateDataScope(id);
+        orderDataScopeChecker.checkOrderAccess(id, getCurrentUserRoleCode());
         // 转换为详情 VO，补充性别名称等显示字段
         OrderDetailVO vo = toOrderDetailVO(entity);
         // 查询订单明细列表，按排序字段升序

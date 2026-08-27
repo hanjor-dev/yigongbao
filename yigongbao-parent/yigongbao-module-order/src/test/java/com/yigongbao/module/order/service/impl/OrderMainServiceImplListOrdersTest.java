@@ -122,6 +122,18 @@ class OrderMainServiceImplListOrdersTest {
         verify(orderQueryHelper, never()).buildDataScopeCondition(any(), any(), any());
     }
 
+    @Test
+    void listOrders_shouldNotApplyDataScopeToDesignerManager() {
+        when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
+        when(orderQueryHelper.getCurrentUserRoleCode()).thenReturn(RoleCodeEnum.DESIGNER_MANAGER.getCode());
+        when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.SELF);
+        mockSelectPage(List.of(), 0L);
+
+        orderMainService.listOrders(baseDto());
+
+        verify(orderQueryHelper, never()).buildDataScopeCondition(any(), any(), any());
+    }
+
     // ==================== 辅助方法 ====================
 
     private OrderPageDTO baseDto() {

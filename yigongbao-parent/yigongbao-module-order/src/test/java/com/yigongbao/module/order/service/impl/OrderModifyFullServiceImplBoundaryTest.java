@@ -154,7 +154,8 @@ class OrderModifyFullServiceImplBoundaryTest {
     @Test
     void modifyOrderFull_rejectsOrderOutsideCurrentUsersDataScope() {
         doThrow(new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND))
-                .when(dataScopeChecker).checkOrderAccess(7L);
+                .when(dataScopeChecker).checkOrderAccess(7L,
+                        com.yigongbao.common.enums.RoleCodeEnum.REGIONAL_MANAGER.getCode());
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
             stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);

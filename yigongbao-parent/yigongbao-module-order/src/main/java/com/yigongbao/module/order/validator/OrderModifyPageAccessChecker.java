@@ -32,6 +32,12 @@ public final class OrderModifyPageAccessChecker {
     public static boolean canApply(OrderMainEntity order, String roleCode,
                                     boolean hasPendingModifyApply,
                                     boolean hasPendingCancelApply) {
+        return canApply(order, roleCode, null, hasPendingModifyApply, hasPendingCancelApply);
+    }
+
+    public static boolean canApply(OrderMainEntity order, String roleCode, Long currentUserId,
+                                   boolean hasPendingModifyApply,
+                                   boolean hasPendingCancelApply) {
         if (order == null || Integer.valueOf(1).equals(order.getIsDeleted())) {
             return false;
         }
@@ -49,7 +55,9 @@ public final class OrderModifyPageAccessChecker {
             return isPhase(order, FlowPhaseEnum.ORDER) || isPhase(order, FlowPhaseEnum.DESIGN);
         }
         if (containsRole(DESIGNER_ROLES, roleCode)) {
-            return isPhase(order, FlowPhaseEnum.DESIGN);
+            return isPhase(order, FlowPhaseEnum.DESIGN)
+                    && currentUserId != null
+                    && currentUserId.equals(order.getDesignerId());
         }
         return false;
     }

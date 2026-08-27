@@ -236,7 +236,7 @@ class OrderModifyApplyServiceImplBoundaryTest {
     }
 
     @Test
-    void submitApply_allowsDesignerInDesignPhaseWithoutOperatorOwnership() {
+    void submitApply_allowsAssignedDesignerInDesignPhase() {
         UserEntity designer = new UserEntity();
         designer.setId(2L);
         designer.setRealName("设计师");
@@ -246,6 +246,7 @@ class OrderModifyApplyServiceImplBoundaryTest {
         order.setOrderCode("ORD-9");
         order.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.DESIGN.getValue());
         order.setOperatorId(99L);
+        order.setDesignerId(1L);
         when(userService.getById(1L)).thenReturn(designer);
         when(orderMainMapper.selectById(9L)).thenReturn(order);
         when(cancelApplyService.hasPendingCancelApply(9L)).thenReturn(false);
@@ -354,12 +355,13 @@ class OrderModifyApplyServiceImplBoundaryTest {
     }
 
     @Test
-    void modifyOrderFullV2_returnsApprovalRequiredForDesignerInDesignPhase() {
+    void modifyOrderFullV2_returnsApprovalRequiredForAssignedDesignerInDesignPhase() {
         UserEntity user = new UserEntity();
         user.setRoleCode(RoleCodeEnum.DESIGNER.getCode());
         OrderMainEntity order = new OrderMainEntity();
         order.setId(9L);
         order.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.DESIGN.getValue());
+        order.setDesignerId(1L);
         when(userService.getById(1L)).thenReturn(user);
         when(orderMainMapper.selectById(9L)).thenReturn(order);
 
@@ -584,7 +586,7 @@ class OrderModifyApplyServiceImplBoundaryTest {
             service.modifyOrderFullV2(9L, new OrderModifyFullDTO());
         }
 
-        verify(dataScopeChecker).checkOrderAccess(9L);
+        verify(dataScopeChecker).checkOrderAccess(9L, RoleCodeEnum.SALESMAN.getCode());
     }
 
     @Test

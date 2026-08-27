@@ -12,6 +12,7 @@ import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
+import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
 import com.yigongbao.flow.enums.FlowStatusEnum;
@@ -44,6 +45,10 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Slf4j
 public class DesignQueryHelper {
+
+    private static final Set<String> FULL_DESIGN_READ_ROLES = Set.of(
+            RoleCodeEnum.ADMIN.getCode(), RoleCodeEnum.COMPANY_ADMIN.getCode(),
+            RoleCodeEnum.DESIGNER.getCode(), RoleCodeEnum.DESIGNER_MANAGER.getCode());
 
     // ==================== 排序白名单 ====================
 
@@ -134,17 +139,20 @@ public class DesignQueryHelper {
      * 用于查询类接口入口，防止越权查询他人工单数据
      *
      * @param orderId 订单ID
-     * @throws BusinessException 无权限时抛出 ORDER_NOT_FOUND
+     * @throws BusinessException 无权限时抛出 FORBIDDEN；管理员及设计角色按订单列表规则全量可读
      */
     public void checkOrderReadable(Long orderId) {
         Long currentUserId = getCurrentUserId();
         UserEntity currentUser = getCurrentUser();
+        if (currentUser != null && FULL_DESIGN_READ_ROLES.contains(currentUser.getRoleCode())) {
+            return;
+        }
         DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
         LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(OrderMainEntity::getId, orderId);
         buildDataScopeCondition(wrapper, currentUser, scopeType);
         if (orderMainMapper.selectCount(wrapper) == 0) {
-            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+            throw new BusinessException(ErrorCodeEnum.FORBIDDEN);
         }
     }
 
