@@ -1052,7 +1052,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         Map<String, java.util.concurrent.CompletableFuture<String>> fallbackDeviceNoFutures = new HashMap<>();
         processes.forEach(process -> {
-            if (StrUtil.isBlank(process.getDeviceNo())) {
+            if (StrUtil.isBlank(process.getDeviceNo())
+                    && !ProcessTypeEnum.PRINT.getCode().equals(process.getProcessType())) {
                 submitFlowCardDeviceNoQuery(fallbackDeviceNoFutures,
                         getFlowCardDeviceType(process.getProcessType()), record.getProcessingCenterId());
             }
@@ -1070,8 +1071,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             .map(p -> {
                 FlowCardExcelBuilder.ProcessInfo info = new FlowCardExcelBuilder.ProcessInfo();
                 info.setProcessType(p.getProcessType());
-                info.setDeviceNo(StrUtil.isNotBlank(p.getDeviceNo())
-                        ? p.getDeviceNo()
+                String deviceNo = p.getDeviceNo();
+                if (StrUtil.isBlank(deviceNo) && ProcessTypeEnum.PRINT.getCode().equals(p.getProcessType())) {
+                    deviceNo = record.getPrintDeviceCode();
+                }
+                info.setDeviceNo(StrUtil.isNotBlank(deviceNo)
+                        ? deviceNo
                         : fallbackDeviceNoCache.get(getFlowCardDeviceType(p.getProcessType())));
                 String secondaryDeviceNo = p.getSecondaryDeviceNo();
                 if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(p.getProcessType())
@@ -1085,6 +1090,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                 return info;
             })
             .collect(Collectors.toList());
+        fillMissingFlowCardProcessTimes(processInfos, record.getPrintFinishTime());
         context.setProcesses(processInfos);
 
         List<FlowCardExcelBuilder.ProductInfo> productInfos = products.stream()
@@ -1175,13 +1181,47 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             return null;
         }
         return switch (processType) {
-            case "print" -> DeviceTypeEnum.PRINTER_SLA.getCode();
+            case "print" -> null;
             case "wash" -> DeviceTypeEnum.WASH_CONTAINER.getCode();
             case "cure" -> DeviceTypeEnum.UV_CURING.getCode();
             case "clean_dry" -> DeviceTypeEnum.ULTRASONIC_CLEANER.getCode();
             case "pack" -> DeviceTypeEnum.SEALING_MACHINE.getCode();
             default -> null;
         };
+    }
+
+    /**
+     * Excel展示用的后处理工序时间。实际工序尚未开始时，使用打印结束时间按既有排程算法补齐，
+     * 已落库的真实/排程值优先保留。
+     */
+    private void fillMissingFlowCardProcessTimes(List<FlowCardExcelBuilder.ProcessInfo> processes,
+                                                  LocalDateTime printFinishTime) {
+        if (printFinishTime == null) {
+            return;
+        }
+        LocalDateTime washStart = printFinishTime.withNano(0).plusMinutes(2);
+        LocalDateTime washEnd = washStart.plusMinutes(10);
+        LocalDateTime cureStart = washEnd.plusMinutes(1);
+        LocalDateTime cureEnd = cureStart.plusMinutes(40);
+        LocalDateTime cleanDryStart = cureEnd.plusMinutes(1);
+        LocalDateTime cleanDryEnd = cleanDryStart.plusMinutes(10);
+
+        Map<String, LocalDateTime[]> schedule = Map.of(
+                ProcessTypeEnum.WASH.getCode(), new LocalDateTime[]{washStart, washEnd},
+                ProcessTypeEnum.CURE.getCode(), new LocalDateTime[]{cureStart, cureEnd},
+                ProcessTypeEnum.CLEAN_DRY.getCode(), new LocalDateTime[]{cleanDryStart, cleanDryEnd});
+        processes.forEach(process -> {
+            LocalDateTime[] times = schedule.get(process.getProcessType());
+            if (times == null) {
+                return;
+            }
+            if (process.getStartTime() == null) {
+                process.setStartTime(times[0]);
+            }
+            if (process.getEndTime() == null) {
+                process.setEndTime(times[1]);
+            }
+        });
     }
 
     private String queryDesignerAssetNo(Long orderId) {

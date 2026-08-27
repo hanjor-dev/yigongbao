@@ -347,7 +347,7 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
-    void generateFlowCardExcel_missingDevices_mapsAllProcessTypes_andCachesOneQueryPerType() throws Exception {
+    void generateFlowCardExcel_missingDevices_mapsNonPrintProcessTypes_andCachesOneQueryPerType() throws Exception {
         ProductionRecordEntity record = flowCardRecord(1L, 88L);
         List<ProductionProcessEntity> processes = List.of(
                 process("print", null, null),
@@ -365,16 +365,16 @@ class ProductionRecordServiceImplTest {
 
         FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, processes);
 
-        assertEquals(List.of("FALLBACK", "FALLBACK", "FALLBACK", "FALLBACK", "FALLBACK", "FALLBACK"),
+        assertEquals(java.util.Arrays.asList(null, "FALLBACK", "FALLBACK", "FALLBACK", "FALLBACK", "FALLBACK"),
                 context.getProcesses().stream().map(FlowCardExcelBuilder.ProcessInfo::getDeviceNo).toList());
         assertEquals("FALLBACK", context.getProcesses().get(3).getSecondaryDeviceNo());
-        assertEquals(6, queries.size());
+        assertEquals(5, queries.size());
         queries.forEach(query -> {
             assertThat(query.getSqlSegment()).contains("LIMIT 1");
             assertThat(query.getSqlSelect()).contains("deviceId");
             assertThat(query.getSqlSegment()).contains("centerId", "deviceType");
         });
-        assertEquals(DeviceTypeEnum.PRINTER_SLA.getCode(), ReflectionTestUtils.invokeMethod(
+        assertNull(ReflectionTestUtils.invokeMethod(
                 recordService, "getFlowCardDeviceType", "print"));
         assertEquals(DeviceTypeEnum.WASH_CONTAINER.getCode(), ReflectionTestUtils.invokeMethod(
                 recordService, "getFlowCardDeviceType", "wash"));
@@ -387,28 +387,38 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
-    void generateFlowCardExcel_deviceFallback_doesNotCrossProcessingCenter() throws Exception {
+    void generateFlowCardExcel_missingPrintDevice_doesNotQueryPrinterFallback() throws Exception {
         ProductionRecordEntity record = flowCardRecord(1L, 88L);
         ProductionProcessEntity process = process("print", null, null);
-        DeviceEntity sameCenterDevice = device(2L, DeviceTypeEnum.PRINTER_SLA.getCode(), 88L, "PRINTER-88");
-        DeviceEntity otherCenterDevice = device(3L, DeviceTypeEnum.PRINTER_SLA.getCode(), 99L, "PRINTER-99");
-        when(deviceMapper.selectOne(any())).thenAnswer(invocation -> {
-            LambdaQueryWrapper<DeviceEntity> query = invocation.getArgument(0);
-            Object centerId = queryParamByColumn(query, "centerId");
-            boolean sameCenter = record.getProcessingCenterId().equals(centerId);
-            return sameCenter ? sameCenterDevice : otherCenterDevice;
-        });
 
         FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(process));
 
-        assertEquals("PRINTER-88", context.getProcesses().get(0).getDeviceNo());
-        ArgumentCaptor<LambdaQueryWrapper<DeviceEntity>> queryCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
-        verify(deviceMapper).selectOne(queryCaptor.capture());
-        LambdaQueryWrapper<DeviceEntity> query = queryCaptor.getValue();
-        assertEquals(record.getProcessingCenterId(), queryParamByColumn(query, "centerId"));
-        assertEquals(DeviceTypeEnum.PRINTER_SLA.getCode(), queryParamByColumn(query, "deviceType"));
-        assertThat(query.getParamNameValuePairs().values()).doesNotContain(otherCenterDevice.getCenterId());
+        assertNull(context.getProcesses().get(0).getDeviceNo());
+        verify(deviceMapper, never()).selectOne(any());
         verify(processMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void generateFlowCardExcel_fillsMissingProcessTimesFromPrintFinishTime() throws Exception {
+        ProductionRecordEntity record = flowCardRecord(1L, 88L);
+        LocalDateTime printFinish = LocalDateTime.of(2026, 8, 25, 14, 25);
+        record.setPrintStartTime(LocalDateTime.of(2026, 8, 25, 11, 45));
+        record.setPrintFinishTime(printFinish);
+        List<ProductionProcessEntity> processes = List.of(
+                process("print", "PRINTER-1", null),
+                process("wash", null, null),
+                process("cure", null, null),
+                process("clean_dry", null, null));
+        when(deviceMapper.selectOne(any())).thenReturn(device(2L, DeviceTypeEnum.WASH_CONTAINER.getCode(), 88L, "WASH-88"));
+
+        FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, processes);
+
+        assertEquals(LocalDateTime.of(2026, 8, 25, 14, 27), context.getProcesses().get(1).getStartTime());
+        assertEquals(LocalDateTime.of(2026, 8, 25, 14, 37), context.getProcesses().get(1).getEndTime());
+        assertEquals(LocalDateTime.of(2026, 8, 25, 14, 38), context.getProcesses().get(2).getStartTime());
+        assertEquals(LocalDateTime.of(2026, 8, 25, 15, 18), context.getProcesses().get(2).getEndTime());
+        assertEquals(LocalDateTime.of(2026, 8, 25, 15, 19), context.getProcesses().get(3).getStartTime());
+        assertEquals(LocalDateTime.of(2026, 8, 25, 15, 29), context.getProcesses().get(3).getEndTime());
     }
 
     @Test
