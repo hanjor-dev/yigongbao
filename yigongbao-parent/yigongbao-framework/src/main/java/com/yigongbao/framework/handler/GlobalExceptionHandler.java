@@ -4,6 +4,7 @@ import cn.dev33.satoken.exception.NotLoginException;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.framework.logging.RequestLogHelper;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,6 +41,8 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private final RequestLogHelper requestLogHelper = new RequestLogHelper();
+
     /**
      * 处理业务异常 BusinessException
      * 用于业务逻辑中主动抛出的异常，如参数校验失败、业务规则不满足等
@@ -49,8 +52,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleBusinessException(BusinessException e) {
-        log.warn("业务异常：{}", e.getMessage(), e);
+    public Result<Void> handleBusinessException(BusinessException e, HttpServletRequest request) {
+        log.warn("业务异常：message={}, request={}", e.getMessage(), requestLogHelper.build(request), e);
         return Result.error(e.getCode(), e.getMessage());
     }
 
@@ -62,8 +65,8 @@ public class GlobalExceptionHandler {
      * @return 统一返回结果
      */
     @ExceptionHandler(NotLoginException.class)
-    public Result<Void> handleNotLoginException(NotLoginException e) {
-        //log.warn("未登录异常: message={}", e.getMessage(), e);
+    public Result<Void> handleNotLoginException(NotLoginException e, HttpServletRequest request) {
+        log.warn("未登录异常：message={}, request={}", e.getMessage(), requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.UNAUTHORIZED);
     }
 
@@ -76,12 +79,12 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
+    public Result<Void> handleMethodArgumentNotValidException(MethodArgumentNotValidException e, HttpServletRequest request) {
         // 获取第一个校验失败的错误信息，避免暴露内部字段名
         String errorMessage = e.getBindingResult().getFieldErrors().stream()
             .map(FieldError::getDefaultMessage)
             .collect(Collectors.joining(", "));
-        log.warn("参数校验失败：{}", errorMessage, e);
+        log.warn("参数校验失败：message={}, request={}", errorMessage, requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.PARAM_ERROR, errorMessage);
     }
 
@@ -94,11 +97,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ConstraintViolationException.class)
     @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleConstraintViolationException(ConstraintViolationException e) {
+    public Result<Void> handleConstraintViolationException(ConstraintViolationException e, HttpServletRequest request) {
         String errorMessage = e.getConstraintViolations().stream()
             .map(ConstraintViolation::getMessage)
             .collect(Collectors.joining(", "));
-        log.warn("参数校验失败：{}", errorMessage, e);
+        log.warn("参数校验失败：message={}, request={}", errorMessage, requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.PARAM_ERROR, errorMessage);
     }
 
@@ -111,11 +114,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HandlerMethodValidationException.class)
     @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleHandlerMethodValidationException(HandlerMethodValidationException e) {
+    public Result<Void> handleHandlerMethodValidationException(HandlerMethodValidationException e, HttpServletRequest request) {
         String errorMessage = e.getAllErrors().stream()
             .map(error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : error.toString())
             .collect(Collectors.joining(", "));
-        log.warn("参数校验失败：{}", errorMessage, e);
+        log.warn("参数校验失败：message={}, request={}", errorMessage, requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.PARAM_ERROR, errorMessage);
     }
 
@@ -127,11 +130,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BindException.class)
     @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleBindException(BindException e) {
+    public Result<Void> handleBindException(BindException e, HttpServletRequest request) {
         String errorMessage = e.getBindingResult().getFieldErrors().stream()
             .map(FieldError::getDefaultMessage)
             .collect(Collectors.joining(", "));
-        log.warn("参数绑定失败：{}", errorMessage, e);
+        log.warn("参数绑定失败：message={}, request={}", errorMessage, requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.PARAM_ERROR.getCode(), errorMessage);
     }
 
@@ -143,8 +146,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MissingServletRequestParameterException.class)
     @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleMissingServletRequestParameterException(MissingServletRequestParameterException e) {
-        log.warn("缺少请求参数：{}", e.getParameterName(), e);
+    public Result<Void> handleMissingServletRequestParameterException(MissingServletRequestParameterException e, HttpServletRequest request) {
+        log.warn("缺少请求参数：name={}, request={}", e.getParameterName(), requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.MISSING_PARAMETER,
             ErrorCodeEnum.MISSING_PARAMETER.getMessage(e.getParameterName()));
     }
@@ -158,8 +161,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MissingPathVariableException.class)
     @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleMissingPathVariableException(MissingPathVariableException e) {
-        log.warn("路径变量缺失：参数名={}", e.getVariableName(), e);
+    public Result<Void> handleMissingPathVariableException(MissingPathVariableException e, HttpServletRequest request) {
+        log.warn("路径变量缺失：参数名={}, request={}", e.getVariableName(), requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.PARAM_ERROR, "请求的路径参数不完整，请检查URL是否正确");
     }
 
@@ -172,10 +175,10 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e) {
+    public Result<Void> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e, HttpServletRequest request) {
         String paramName = e.getName();
-        String paramValue = e.getValue() != null ? e.getValue().toString() : "空";
-        log.warn("参数类型不匹配：参数名={}, 传入值={}, 期望类型={}", paramName, paramValue, e.getRequiredType(), e);
+        log.warn("参数类型不匹配：参数名={}, 传入值={}, 期望类型={}, request={}",
+                paramName, "[已隐藏]", e.getRequiredType(), requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.INVALID_PARAMETER,
             ErrorCodeEnum.INVALID_PARAMETER.getMessage(paramName));
     }
@@ -189,7 +192,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
+    public Result<Void> handleHttpMessageNotReadableException(HttpMessageNotReadableException e, HttpServletRequest request) {
         String message = e.getMessage();
         String userMessage;
         if (message != null && message.contains("Required request body is missing")) {
@@ -197,7 +200,7 @@ public class GlobalExceptionHandler {
         } else {
             userMessage = "请求参数格式错误，请检查数据格式后重试";
         }
-        log.warn("参数格式错误：{}", message, e);
+        log.warn("参数格式错误：message={}, request={}", message, requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.PARAM_ERROR, userMessage);
     }
 
@@ -211,8 +214,8 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public Result<Void> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e,
                                                                       HttpServletRequest request) {
-        log.warn("请求方法不支持：接口={}, 请求方法={}, 支持方法={}",
-                request.getRequestURI(), e.getMethod(), e.getSupportedHttpMethods(), e);
+        log.warn("请求方法不支持：接口={}, 请求方法={}, 支持方法={}, request={}",
+                request.getRequestURI(), e.getMethod(), e.getSupportedHttpMethods(), requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.METHOD_NOT_ALLOWED);
     }
 
@@ -224,8 +227,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(NoHandlerFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public Result<Void> handleNoHandlerFoundException(NoHandlerFoundException e) {
-        log.warn("请求路径不存在：{}", e.getRequestURL(), e);
+    public Result<Void> handleNoHandlerFoundException(NoHandlerFoundException e, HttpServletRequest request) {
+        log.warn("请求路径不存在：url={}, request={}", e.getRequestURL(), requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.REQUEST_NOT_FOUND);
     }
 
@@ -239,8 +242,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
-        log.warn("文件大小超出系统限制：{}", e.getMessage(), e);
+    public Result<Void> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e, HttpServletRequest request) {
+        log.warn("文件大小超出系统限制：message={}, request={}", e.getMessage(), requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.ATTACHMENT_SIZE_EXCEEDED);
     }
 
@@ -253,8 +256,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MultipartException.class)
     @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleMultipartException(MultipartException e) {
-        log.warn("文件上传请求解析失败：{}", e.getMessage(), e);
+    public Result<Void> handleMultipartException(MultipartException e, HttpServletRequest request) {
+        log.warn("文件上传请求解析失败：message={}, request={}", e.getMessage(), requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.ATTACHMENT_UPLOAD_FAILED);
     }
 
@@ -267,16 +270,16 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     @ResponseStatus(HttpStatus.OK)
-    public Result<Void> handleDataIntegrityViolationException(DataIntegrityViolationException e) {
+    public Result<Void> handleDataIntegrityViolationException(DataIntegrityViolationException e, HttpServletRequest request) {
         Throwable cause = e.getCause();
         if (cause instanceof SQLIntegrityConstraintViolationException sqlEx) {
             String message = sqlEx.getMessage();
             if (message != null && message.contains("Duplicate entry")) {
-                log.warn("唯一键冲突：{}", message, e);
+                log.warn("唯一键冲突：message={}, request={}", message, requestLogHelper.build(request), e);
                 return Result.error(ErrorCodeEnum.DATA_EXISTS);
             }
         }
-        log.error("数据完整性异常：", e);
+        log.error("数据完整性异常：request={}", requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.SERVER_ERROR);
     }
 
@@ -289,8 +292,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Result<Void> handleException(Exception e) {
-        log.error("系统异常：", e);
+    public Result<Void> handleException(Exception e, HttpServletRequest request) {
+        log.error("系统异常：request={}", requestLogHelper.build(request), e);
         return Result.error(ErrorCodeEnum.SERVER_ERROR);
     }
 
