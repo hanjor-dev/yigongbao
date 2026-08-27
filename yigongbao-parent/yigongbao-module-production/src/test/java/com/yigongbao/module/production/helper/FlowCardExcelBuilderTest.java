@@ -119,10 +119,10 @@ class FlowCardExcelBuilderTest {
         context.setProcesses(processes);
 
         byte[] excelBytes = builder.build(context);
-        String expected = "开始：2026-08-13 15:01\n结束：2026-08-13 15:11";
-        assertEquals(expected, readCell(excelBytes, 9, 4));
-        assertEquals(expected, readCell(excelBytes, 10, 4));
-        assertEquals(expected, readCell(excelBytes, 11, 4));
+        String times = "开始：2026-08-13 15:01\n结束：2026-08-13 15:11";
+        assertEquals("酒精批号：-\n浸泡程度：-\n" + times, readCell(excelBytes, 9, 4));
+        assertEquals("固化模式：-\n" + times, readCell(excelBytes, 10, 4));
+        assertEquals("酒精批号：-\n清洗模式：-\n加热：-\n" + times, readCell(excelBytes, 11, 4));
     }
 
     @Test
@@ -137,11 +137,11 @@ class FlowCardExcelBuilderTest {
         context.setProcesses(processes);
 
         byte[] excelBytes = builder.build(context);
-        String expected = "开始：-\n结束：-";
+        String times = "开始：-\n结束：-";
 
-        assertEquals(expected, readCell(excelBytes, 9, 4));
-        assertEquals(expected, readCell(excelBytes, 10, 4));
-        assertEquals(expected, readCell(excelBytes, 11, 4));
+        assertEquals("酒精批号：-\n浸泡程度：-\n" + times, readCell(excelBytes, 9, 4));
+        assertEquals("固化模式：-\n" + times, readCell(excelBytes, 10, 4));
+        assertEquals("酒精批号：-\n清洗模式：-\n加热：-\n" + times, readCell(excelBytes, 11, 4));
     }
 
     @Test
@@ -167,6 +167,60 @@ class FlowCardExcelBuilderTest {
 
         assertEquals("-", readCell(excelBytes, 11, 3));
         assertEquals("-", readCell(excelBytes, 12, 3));
+    }
+
+    @Test
+    void buildClearsTemplatePlaceholdersWhenProcessAndProductDataAreMissing() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+
+        byte[] excelBytes = builder.build(context);
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excelBytes))) {
+            var sheet = workbook.getSheetAt(0);
+            for (int rowIndex = 8; rowIndex <= 13; rowIndex++) {
+                assertNotEquals("xxx", sheet.getRow(rowIndex).getCell(3).getStringCellValue());
+                assertNotEquals("xxx", sheet.getRow(rowIndex).getCell(4).getStringCellValue());
+            }
+            assertEquals("", sheet.getRow(16).getCell(0).getStringCellValue());
+            assertEquals("", sheet.getRow(16).getCell(2).getStringCellValue());
+            assertEquals("", sheet.getRow(16).getCell(4).getStringCellValue());
+        }
+    }
+
+    @Test
+    void buildAlwaysShowsDefinedParameterLabelsAndUsesDashForMissingValues() throws Exception {
+        FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
+        LocalDateTime start = LocalDateTime.of(2026, 8, 25, 14, 27);
+        LocalDateTime end = LocalDateTime.of(2026, 8, 25, 14, 37);
+
+        FlowCardExcelBuilder.ProcessInfo print = new FlowCardExcelBuilder.ProcessInfo();
+        print.setProcessType("print");
+        FlowCardExcelBuilder.ProcessInfo wash = new FlowCardExcelBuilder.ProcessInfo();
+        wash.setProcessType("wash");
+        wash.setStartTime(start);
+        wash.setEndTime(end);
+        FlowCardExcelBuilder.ProcessInfo cure = new FlowCardExcelBuilder.ProcessInfo();
+        cure.setProcessType("cure");
+        cure.setProcessParams("{\"cureMode\":\"快速\"}");
+        cure.setStartTime(start);
+        cure.setEndTime(end);
+        FlowCardExcelBuilder.ProcessInfo cleanDry = new FlowCardExcelBuilder.ProcessInfo();
+        cleanDry.setProcessType("clean_dry");
+        cleanDry.setProcessParams("{\"cleanMode\":\"标准\"}");
+        cleanDry.setStartTime(start);
+        cleanDry.setEndTime(end);
+        context.setProcesses(List.of(print, wash, cure, cleanDry));
+
+        byte[] excelBytes = builder.build(context);
+
+        assertEquals("层厚：- mm\n激光器功率：- mW", readCell(excelBytes, 8, 4));
+        assertEquals("酒精批号：-\n浸泡程度：-\n开始：2026-08-25 14:27\n结束：2026-08-25 14:37",
+                readCell(excelBytes, 9, 4));
+        assertEquals("固化模式：快速\n开始：2026-08-25 14:27\n结束：2026-08-25 14:37",
+                readCell(excelBytes, 10, 4));
+        assertEquals("酒精批号：-\n清洗模式：标准\n加热：-\n开始：2026-08-25 14:27\n结束：2026-08-25 14:37",
+                readCell(excelBytes, 11, 4));
+        assertEquals("", readCell(excelBytes, 12, 4));
     }
 
     @Test

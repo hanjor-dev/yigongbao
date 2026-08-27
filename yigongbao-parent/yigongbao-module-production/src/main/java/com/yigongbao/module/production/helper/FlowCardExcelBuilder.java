@@ -81,6 +81,7 @@ public class FlowCardExcelBuilder {
             fillHeader(sheet, context);
             fillProcesses(sheet, context);
             fillProducts(sheet, context);
+            clearTemplatePlaceholders(sheet);
 
             workbook.write(out);
             return out.toByteArray();
@@ -107,6 +108,12 @@ public class FlowCardExcelBuilder {
         setCellValue(sheet, 7, 3, StrUtil.blankToDefault(context.getDesignerAssetNo(), "-"));
         setCellValue(sheet, 7, 4, "/");
 
+        // 模板中的 xxx 只是设计占位符。无论业务数据是否存在，都必须先清空，避免原样输出。
+        for (int rowIndex = 8; rowIndex <= 13; rowIndex++) {
+            clearCellValue(sheet, rowIndex, 3);
+            clearCellValue(sheet, rowIndex, 4);
+        }
+
         List<ProcessInfo> processes = context.getProcesses();
         if (processes == null || processes.isEmpty()) return;
 
@@ -119,16 +126,16 @@ public class FlowCardExcelBuilder {
             if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(processType)) {
                 setCellValue(sheet, 11, 3, StrUtil.blankToDefault(process.getDeviceNo(), "-"));
                 String params = convertProcessParams(process, processType, process.getProcessParams(), context);
-                setCellValue(sheet, 11, 4, params);
+                setOptionalCellValue(sheet, 11, 4, params);
                 setCellValue(sheet, 12, 3, StrUtil.blankToDefault(process.getSecondaryDeviceNo(), "-"));
-                setCellValue(sheet, 12, 4, "-");
+                clearCellValue(sheet, 12, 4);
             } else {
                 int rowIndex = getProcessRowIndex(processType);
                 if (rowIndex == -1) continue;
 
                 setCellValue(sheet, rowIndex, 3, StrUtil.blankToDefault(process.getDeviceNo(), "-"));
                 String params = convertProcessParams(process, processType, process.getProcessParams(), context);
-                setCellValue(sheet, rowIndex, 4, params);
+                setOptionalCellValue(sheet, rowIndex, 4, params);
             }
         }
     }
@@ -266,42 +273,43 @@ public class FlowCardExcelBuilder {
      */
     private String convertProcessParams(ProcessInfo process, String processType, String processParams, BuildContext context) {
         List<String> lines = new ArrayList<>();
+        JSONObject p = new JSONObject();
         try {
             if (StrUtil.isNotBlank(processParams)) {
-                JSONObject p = JSONUtil.parseObj(processParams);
-                if (ProcessTypeEnum.PRINT.getCode().equals(processType)) {
-                    // 数据字段映射：layerThickness=层厚、laserPower=激光器功率；Excel 固定按层厚、激光器功率顺序展示
-                    lines.add("层厚：" + p.getStr("layerThickness", "-") + " mm");
-                    lines.add("激光器功率：" + p.getStr("laserPower", "-") + " mW");
-                } else if (ProcessTypeEnum.WASH.getCode().equals(processType)) {
-                    lines.add("酒精批号：" + p.getStr("alcoholBatchNo", "-"));
-                    lines.add("浸泡程度：" + p.getStr("soakLevel", "-"));
-                } else if (ProcessTypeEnum.CURE.getCode().equals(processType)) {
-                    lines.add("固化模式：" + p.getStr("cureMode", "-"));
-                } else if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(processType)) {
-                    lines.add("酒精批号：" + p.getStr("alcoholBatchNo", "-"));
-                    lines.add("清洗模式：" + p.getStr("cleanMode", "-"));
-                    lines.add("加热：" + p.getStr("heating", "-"));
-                } else if (ProcessTypeEnum.PACK.getCode().equals(processType)) {
-                    String sealTemperature = p.getStr("sealTemperature");
-                    if (StrUtil.isNotBlank(sealTemperature)) {
-                        lines.add("纸塑袋热封温度：" + sealTemperature + "℃");
-                    }
-                    String zipBagSealTemperature = p.getStr("zipBagSealTemperature");
-                    if (StrUtil.isNotBlank(zipBagSealTemperature)) {
-                        lines.add("PE复合食品包装袋热封温度：" + zipBagSealTemperature + "℃");
-                    }
-                    String sealTime = p.containsKey("zipBagSealTime")
-                        ? p.getStr("zipBagSealTime")
-                        : p.getStr("sealTime");
-                    if (StrUtil.isNotBlank(sealTime)) {
-                        lines.add("热封时间：" + sealTime + "秒");
-                    }
-                }
+                p = JSONUtil.parseObj(processParams);
             }
         } catch (Exception e) {
             log.warn("解析工序参数失败: recordNo={}, processType={}, processParams={}",
                 context.getRecordNo(), processType, processParams, e);
+        }
+
+        if (ProcessTypeEnum.PRINT.getCode().equals(processType)) {
+            lines.add("层厚：" + parameterValue(p, "layerThickness") + " mm");
+            lines.add("激光器功率：" + parameterValue(p, "laserPower") + " mW");
+        } else if (ProcessTypeEnum.WASH.getCode().equals(processType)) {
+            lines.add("酒精批号：" + parameterValue(p, "alcoholBatchNo"));
+            lines.add("浸泡程度：" + parameterValue(p, "soakLevel"));
+        } else if (ProcessTypeEnum.CURE.getCode().equals(processType)) {
+            lines.add("固化模式：" + parameterValue(p, "cureMode"));
+        } else if (ProcessTypeEnum.CLEAN_DRY.getCode().equals(processType)) {
+            lines.add("酒精批号：" + parameterValue(p, "alcoholBatchNo"));
+            lines.add("清洗模式：" + parameterValue(p, "cleanMode"));
+            lines.add("加热：" + parameterValue(p, "heating"));
+        } else if (ProcessTypeEnum.PACK.getCode().equals(processType)) {
+            String sealTemperature = p.getStr("sealTemperature");
+            if (StrUtil.isNotBlank(sealTemperature)) {
+                lines.add("纸塑袋热封温度：" + sealTemperature + "℃");
+            }
+            String zipBagSealTemperature = p.getStr("zipBagSealTemperature");
+            if (StrUtil.isNotBlank(zipBagSealTemperature)) {
+                lines.add("PE复合食品包装袋热封温度：" + zipBagSealTemperature + "℃");
+            }
+            String sealTime = p.containsKey("zipBagSealTime")
+                ? p.getStr("zipBagSealTime")
+                : p.getStr("sealTime");
+            if (StrUtil.isNotBlank(sealTime)) {
+                lines.add("热封时间：" + sealTime + "秒");
+            }
         }
 
         // wash/cure/clean_dry 追加开始和结束时间
@@ -312,7 +320,42 @@ public class FlowCardExcelBuilder {
             lines.add("结束：" + formatMinuteDateTime(process.getEndTime()));
         }
 
-        return lines.isEmpty() ? "-" : String.join("\n", lines);
+        return String.join("\n", lines);
+    }
+
+    private String parameterValue(JSONObject params, String key) {
+        return StrUtil.blankToDefault(params.getStr(key), "-");
+    }
+
+    private void setOptionalCellValue(Sheet sheet, int rowIndex, int colIndex, String value) {
+        if (StrUtil.isBlank(value)) {
+            clearCellValue(sheet, rowIndex, colIndex);
+            return;
+        }
+        setCellValue(sheet, rowIndex, colIndex, value);
+    }
+
+    private void clearCellValue(Sheet sheet, int rowIndex, int colIndex) {
+        Row row = sheet.getRow(rowIndex);
+        if (row == null) {
+            row = sheet.createRow(rowIndex);
+        }
+        Cell cell = row.getCell(colIndex);
+        if (cell == null) {
+            cell = row.createCell(colIndex);
+        }
+        cell.setCellValue("");
+    }
+
+    private void clearTemplatePlaceholders(Sheet sheet) {
+        for (Row row : sheet) {
+            for (Cell cell : row) {
+                if (cell.getCellType() == CellType.STRING
+                        && "xxx".equalsIgnoreCase(StrUtil.trim(cell.getStringCellValue()))) {
+                    cell.setCellValue("");
+                }
+            }
+        }
     }
 
     private void setCellValue(Sheet sheet, int rowIndex, int colIndex, String value) {

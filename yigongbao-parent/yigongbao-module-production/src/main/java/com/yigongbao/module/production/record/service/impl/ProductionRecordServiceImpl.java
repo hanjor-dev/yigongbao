@@ -72,6 +72,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -1035,7 +1036,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
 
         List<ProductionProductEntity> products = productsFuture.join();
-        List<ProductionProcessEntity> processes = processesFuture.join();
+        List<ProductionProcessEntity> processes = completeFlowCardProcesses(
+                record, processesFuture.join());
         String designerAssetNo = queryDesignerAssetNo(record.getOrderId());
 
         FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
@@ -1188,6 +1190,45 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             case "pack" -> DeviceTypeEnum.SEALING_MACHINE.getCode();
             default -> null;
         };
+    }
+
+    /**
+     * 旧数据或异常数据可能缺少尚未执行的工序记录。生成Excel时补齐临时工序骨架，
+     * 只用于展示，不写回production_process，避免把预计信息当作真实生产记录。
+     */
+    private List<ProductionProcessEntity> completeFlowCardProcesses(
+            ProductionRecordEntity record, List<ProductionProcessEntity> storedProcesses) {
+        List<ProductionProcessEntity> source = storedProcesses == null
+                ? Collections.emptyList() : storedProcesses;
+        if (record.getOrderType() == null) {
+            return source;
+        }
+
+        Map<String, ProductionProcessEntity> processByType = source.stream()
+                .filter(Objects::nonNull)
+                .filter(process -> StrUtil.isNotBlank(process.getProcessType()))
+                .collect(Collectors.toMap(
+                        ProductionProcessEntity::getProcessType,
+                        process -> process,
+                        (first, ignored) -> first));
+        List<ProcessTypeEnum> expectedTypes = new ArrayList<>();
+        expectedTypes.add(ProcessTypeEnum.PRINT);
+        if (ProductionConstants.ORDER_TYPE_MEDICAL.equals(record.getOrderType())) {
+            expectedTypes.add(ProcessTypeEnum.WASH);
+            expectedTypes.add(ProcessTypeEnum.CURE);
+            expectedTypes.add(ProcessTypeEnum.CLEAN_DRY);
+        }
+        expectedTypes.add(ProcessTypeEnum.PACK);
+
+        return expectedTypes.stream().map(type -> processByType.computeIfAbsent(type.getCode(), code -> {
+            ProductionProcessEntity process = new ProductionProcessEntity();
+            process.setProductionRecordId(record.getId());
+            process.setProcessType(code);
+            process.setProcessName(type.getDesc());
+            process.setProcessOrder(type.getOrder());
+            process.setStatus(ProcessStatusEnum.PENDING.getCode());
+            return process;
+        })).collect(Collectors.toList());
     }
 
     /**

@@ -422,6 +422,37 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
+    void generateFlowCardExcel_medicalRecordCompletesMissingProcessesForExcelOnly() throws Exception {
+        ProductionRecordEntity record = flowCardRecord(1L, 88L);
+        record.setOrderType(ProductionConstants.ORDER_TYPE_MEDICAL);
+        record.setPrintDeviceCode("REAL-PRINTER");
+        record.setPrintFinishTime(LocalDateTime.of(2026, 8, 25, 14, 25));
+        ProductionProcessEntity print = process("print", null, null);
+        when(deviceMapper.selectOne(any())).thenAnswer(invocation -> {
+            LambdaQueryWrapper<DeviceEntity> query = invocation.getArgument(0);
+            String deviceType = (String) queryParamByColumn(query, "deviceType");
+            return switch (deviceType) {
+                case "WASH_CONTAINER" -> device(2L, deviceType, 88L, "WASH-88");
+                case "UV_CURING" -> device(3L, deviceType, 88L, "CURE-88");
+                case "ULTRASONIC_CLEANER" -> device(4L, deviceType, 88L, "CLEAN-88");
+                case "AIR_COMPRESSOR" -> device(5L, deviceType, 88L, "AIR-88");
+                case "SEALING_MACHINE" -> device(6L, deviceType, 88L, "PACK-88");
+                default -> fail("不应查询打印设备或未知设备类型: " + deviceType);
+            };
+        });
+
+        FlowCardExcelBuilder.BuildContext context = generateFlowCardContext(record, List.of(print));
+
+        assertEquals(List.of("print", "wash", "cure", "clean_dry", "pack"),
+                context.getProcesses().stream().map(FlowCardExcelBuilder.ProcessInfo::getProcessType).toList());
+        assertEquals(List.of("REAL-PRINTER", "WASH-88", "CURE-88", "CLEAN-88", "PACK-88"),
+                context.getProcesses().stream().map(FlowCardExcelBuilder.ProcessInfo::getDeviceNo).toList());
+        assertEquals("AIR-88", context.getProcesses().get(3).getSecondaryDeviceNo());
+        verify(processMapper, never()).insert((ProductionProcessEntity) any());
+        verify(processMapper, never()).update(any(), any());
+    }
+
+    @Test
     void generateFlowCardExcel_deviceFallback_missingDevice_doesNotWriteDeviceBack() throws Exception {
         ProductionRecordEntity record = flowCardRecord(1L, 88L);
         ProductionProcessEntity process = process("clean_dry", null, null);
