@@ -54,12 +54,13 @@ import com.yigongbao.module.design.vo.SubmitCheckVO;
 import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.entity.OrderModificationApplyEntity;
+import com.yigongbao.module.order.enums.ApplyStatusEnum;
 import com.yigongbao.module.order.mapper.OrderFileMapper;
 import com.yigongbao.module.order.mapper.OrderModificationApplyMapper;
-import com.yigongbao.module.order.enums.ApplyStatusEnum;
 import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.service.OrderItemService;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.order.validator.OrderModifyPageAccessChecker;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.entity.UserEntity;
@@ -73,7 +74,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -192,8 +193,8 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         // 批量填充驳回原因
         fillRejectReason(voList);
 
-        // 批量填充最新修改审核状态
-        fillModifyAuditStatus(entities, voList);
+        // 批量填充修改页面访问权限
+        fillCanModify(entities, voList);
 
         // 构建返回分页对象
         IPage<DesignWorkorderListVO> resultPage = new Page<>(entityPage.getCurrent(), entityPage.getSize(), entityPage.getTotal());
@@ -664,7 +665,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
      * @param entities 当前页订单实体
      * @param voList   当前页工单列表 VO
      */
-    private void fillModifyAuditStatus(List<OrderMainEntity> entities, List<DesignWorkorderListVO> voList) {
+    private void fillCanModify(List<OrderMainEntity> entities, List<DesignWorkorderListVO> voList) {
         if (CollUtil.isEmpty(entities)) {
             return;
         }
@@ -679,23 +680,24 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
 
         List<OrderModificationApplyEntity> applies = orderModificationApplyMapper.selectList(
                 new LambdaQueryWrapper<OrderModificationApplyEntity>()
-                        .select(OrderModificationApplyEntity::getId,
-                                OrderModificationApplyEntity::getOrderId,
-                                OrderModificationApplyEntity::getStatus,
-                                OrderModificationApplyEntity::getApplyTime)
+                        .select(OrderModificationApplyEntity::getOrderId)
                         .in(OrderModificationApplyEntity::getOrderId, orderIds)
+                        .eq(OrderModificationApplyEntity::getStatus,
+                                ApplyStatusEnum.PENDING.getCode())
                         .eq(OrderModificationApplyEntity::getIsDeleted, StatusConstants.NOT_DELETED)
-                        .orderByDesc(OrderModificationApplyEntity::getApplyTime)
-                        .orderByDesc(OrderModificationApplyEntity::getId));
+        );
 
-        Map<Long, Integer> latestStatusMap = new HashMap<>();
+        Set<Long> pendingApplyOrderIds = new HashSet<>();
         for (OrderModificationApplyEntity apply : applies) {
-            latestStatusMap.putIfAbsent(apply.getOrderId(),
-                    ApplyStatusEnum.APPROVED.getCode().equals(apply.getStatus()) ? 1 : 2);
+            pendingApplyOrderIds.add(apply.getOrderId());
         }
 
+        UserEntity currentUser = designQueryHelper.getCurrentUser();
+        String roleCode = currentUser != null ? currentUser.getRoleCode() : null;
         for (int i = 0; i < entities.size(); i++) {
-            voList.get(i).setModifyAuditStatus(latestStatusMap.getOrDefault(entities.get(i).getId(), 0));
+            OrderMainEntity order = entities.get(i);
+            voList.get(i).setCanModify(OrderModifyPageAccessChecker.canModify(
+                    order, roleCode, pendingApplyOrderIds.contains(order.getId())));
         }
     }
 

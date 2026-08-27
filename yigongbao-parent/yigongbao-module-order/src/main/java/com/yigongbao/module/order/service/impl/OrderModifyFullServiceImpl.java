@@ -59,7 +59,8 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     private static final int MAX_FIELD_VALUE_LENGTH = 20;
     private static final Set<String> ADMIN_ROLES = Set.of(RoleCodeEnum.ADMIN.getCode(), RoleCodeEnum.COMPANY_ADMIN.getCode());
     private static final Set<String> DESIGNER_ROLES = Set.of(RoleCodeEnum.DESIGNER.getCode(), RoleCodeEnum.DESIGNER_MANAGER.getCode());
-    private static final Set<String> BUSINESS_ROLES = Set.of(RoleCodeEnum.SALESMAN.getCode(), RoleCodeEnum.SALESMAN_SELF.getCode());
+    private static final Set<String> BUSINESS_ROLES = Set.of(RoleCodeEnum.SALESMAN.getCode(),
+            RoleCodeEnum.SALESMAN_SELF.getCode(), RoleCodeEnum.REGIONAL_MANAGER.getCode());
 
     private final OrderMainMapper orderMainMapper;
     private final OrderItemMapper orderItemMapper;

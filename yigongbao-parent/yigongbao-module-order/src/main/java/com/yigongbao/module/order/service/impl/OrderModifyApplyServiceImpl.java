@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.constant.AuditStatusConstants;
+import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.RoleCodeEnum;
@@ -80,9 +81,10 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     private static final Set<String> ADMIN_ROLES = Set.of(
             RoleCodeEnum.ADMIN.getCode(), RoleCodeEnum.COMPANY_ADMIN.getCode());
     private static final Set<String> BUSINESS_ROLES = Set.of(
-            RoleCodeEnum.SALESMAN.getCode(), RoleCodeEnum.SALESMAN_SELF.getCode());
+            RoleCodeEnum.SALESMAN.getCode(), RoleCodeEnum.SALESMAN_SELF.getCode(),
+            RoleCodeEnum.REGIONAL_MANAGER.getCode());
     private static final Set<String> DESIGNER_ROLES = Set.of(
-            RoleCodeEnum.DESIGNER.getCode());
+            RoleCodeEnum.DESIGNER.getCode(), RoleCodeEnum.DESIGNER_MANAGER.getCode());
 
     private final OrderModificationLogMapper orderModificationLogMapper;
     private final OrderMainMapper orderMainMapper;
@@ -157,6 +159,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 new LambdaQueryWrapper<OrderModificationApplyEntity>()
                         .eq(OrderModificationApplyEntity::getOrderId, orderId)
                         .eq(OrderModificationApplyEntity::getStatus, ApplyStatusEnum.PENDING.getCode())
+                        .eq(OrderModificationApplyEntity::getIsDeleted, StatusConstants.NOT_DELETED)
         );
         if (CollUtil.isNotEmpty(pendingApplies)) {
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_PENDING);
@@ -367,6 +370,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 new LambdaUpdateWrapper<OrderModificationApplyEntity>()
                         .eq(OrderModificationApplyEntity::getId, applyId)
                         .eq(OrderModificationApplyEntity::getStatus, ApplyStatusEnum.PENDING.getCode())
+                        .eq(OrderModificationApplyEntity::getIsDeleted, StatusConstants.NOT_DELETED)
                         .set(OrderModificationApplyEntity::getStatus, result)) > 0;
         if (!claimed) {
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_NOT_PENDING,
@@ -635,6 +639,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                 new LambdaQueryWrapper<OrderModificationApplyEntity>()
                         .eq(OrderModificationApplyEntity::getOrderId, orderId)
                         .eq(OrderModificationApplyEntity::getStatus, ApplyStatusEnum.PENDING.getCode())
+                        .eq(OrderModificationApplyEntity::getIsDeleted, StatusConstants.NOT_DELETED)
         );
         return CollUtil.isNotEmpty(pendingApplies);
     }

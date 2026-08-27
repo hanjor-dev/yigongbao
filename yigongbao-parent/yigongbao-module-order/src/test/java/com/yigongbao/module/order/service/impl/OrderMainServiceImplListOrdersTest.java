@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
+import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.module.order.dto.order.OrderPageDTO;
 import com.yigongbao.module.order.helper.OrderQueryHelper;
 import com.yigongbao.module.order.mapper.OrderDraftMapper;
@@ -19,6 +20,7 @@ import com.yigongbao.module.order.vo.order.OrderListVO;
 import com.yigongbao.module.order.vo.order.OrderStatisticsVO;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -34,6 +36,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.apache.ibatis.session.Configuration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,6 +57,13 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class OrderMainServiceImplListOrdersTest {
+
+    @BeforeAll
+    static void initLambdaMetadata() {
+        Configuration configuration = new Configuration();
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "");
+        TableInfoHelper.initTableInfo(assistant, OrderModificationApplyEntity.class);
+    }
 
     // ── 被测类所有依赖，@InjectMocks 会注入 ──────────────────────────
     @Mock private OrderMainMapper orderMainMapper;
@@ -87,27 +100,24 @@ class OrderMainServiceImplListOrdersTest {
     }
 
     @Test
-    void listOrders_shouldReturnLatestModifyAuditStatus() {
+    void listOrders_shouldSetCanModifyForBusinessOrderWithoutPendingApply() {
         OrderMainEntity order = buildEntity(1L);
         OrderListVO vo = buildVO(1L);
-        OrderModificationApplyEntity latestApply = new OrderModificationApplyEntity();
-        latestApply.setOrderId(1L);
-        latestApply.setStatus(ApplyStatusEnum.APPROVED.getCode());
-
         when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
+        when(orderQueryHelper.getCurrentUserRoleCode()).thenReturn(RoleCodeEnum.SALESMAN.getCode());
         when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
         mockSelectPage(List.of(order), 1L);
         when(orderQueryHelper.toOrderListVO(order)).thenReturn(vo);
         when(orderModificationApplyMapper.selectList(any(LambdaQueryWrapper.class)))
-                .thenReturn(List.of(latestApply));
+                .thenReturn(List.of());
 
         IPage<OrderListVO> result = orderMainService.listOrders(baseDto());
 
-        assertThat(result.getRecords().get(0).getModifyAuditStatus()).isEqualTo(1);
+        assertThat(result.getRecords().get(0).isCanModify()).isTrue();
     }
 
     @Test
-    void listOrders_shouldMapMissingAndNotApprovedModifyAuditStatus() {
+    void listOrders_shouldBlockPendingApplyAndAllowHistoricalOrMissingApply() {
         OrderMainEntity orderWithoutApply = buildEntity(1L);
         OrderMainEntity orderWithPendingApply = buildEntity(2L);
         OrderListVO voWithoutApply = buildVO(1L);
@@ -118,6 +128,7 @@ class OrderMainServiceImplListOrdersTest {
         pendingApply.setStatus(ApplyStatusEnum.PENDING.getCode());
 
         when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
+        when(orderQueryHelper.getCurrentUserRoleCode()).thenReturn(RoleCodeEnum.SALESMAN.getCode());
         when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
         mockSelectPage(List.of(orderWithoutApply, orderWithPendingApply), 2L);
         when(orderQueryHelper.toOrderListVO(orderWithoutApply)).thenReturn(voWithoutApply);
@@ -127,8 +138,8 @@ class OrderMainServiceImplListOrdersTest {
 
         IPage<OrderListVO> result = orderMainService.listOrders(baseDto());
 
-        assertThat(result.getRecords().get(0).getModifyAuditStatus()).isZero();
-        assertThat(result.getRecords().get(1).getModifyAuditStatus()).isEqualTo(2);
+        assertThat(result.getRecords().get(0).isCanModify()).isTrue();
+        assertThat(result.getRecords().get(1).isCanModify()).isFalse();
     }
 
     // ==================== 辅助方法 ====================

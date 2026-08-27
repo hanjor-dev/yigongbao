@@ -38,6 +38,7 @@ import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.order.validator.OrderDataValidator;
 import com.yigongbao.module.order.validator.OrderDataScopeChecker;
+import com.yigongbao.module.order.validator.OrderModifyPageAccessChecker;
 import com.yigongbao.module.order.dto.order.AuditOrderDTO;
 import com.yigongbao.module.order.dto.order.CreateOrderDTO;
 import com.yigongbao.module.order.dto.order.OrderPageDTO;
@@ -82,7 +83,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -344,8 +344,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             // 批量填充重建项目列表（避免 N+1）
             orderQueryHelper.fillRebuildProjectList(voList);
 
-            // 批量填充审核信息
-            fillModifyAuditStatus(pageResult.getRecords(), voList);
+            // 批量填充修改页面访问权限
+            fillCanModify(pageResult.getRecords(), voList);
             for (int i = 0; i < voList.size(); i++) {
                 orderConvert.fillAuditInfo(pageResult.getRecords().get(i), voList.get(i));
             }
@@ -367,7 +367,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
      * @param entities 当前页订单实体
      * @param voList   当前页订单列表 VO
      */
-    private void fillModifyAuditStatus(List<OrderMainEntity> entities, List<OrderListVO> voList) {
+    private void fillCanModify(List<OrderMainEntity> entities, List<OrderListVO> voList) {
         if (entities == null || entities.isEmpty()) {
             return;
         }
@@ -382,19 +382,23 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
         List<OrderModificationApplyEntity> applies = orderModificationApplyMapper.selectList(
                 new LambdaQueryWrapper<OrderModificationApplyEntity>()
+                        .select(OrderModificationApplyEntity::getOrderId)
                         .in(OrderModificationApplyEntity::getOrderId, orderIds)
+                        .eq(OrderModificationApplyEntity::getStatus,
+                                ApplyStatusEnum.PENDING.getCode())
                         .eq(OrderModificationApplyEntity::getIsDeleted, StatusConstants.NOT_DELETED)
-                        .orderByDesc(OrderModificationApplyEntity::getApplyTime)
-                        .orderByDesc(OrderModificationApplyEntity::getId));
+        );
 
-        Map<Long, Integer> latestStatusMap = new HashMap<>();
+        Set<Long> pendingApplyOrderIds = new HashSet<>();
         for (OrderModificationApplyEntity apply : applies) {
-            latestStatusMap.putIfAbsent(apply.getOrderId(),
-                    ApplyStatusEnum.APPROVED.getCode().equals(apply.getStatus()) ? 1 : 2);
+            pendingApplyOrderIds.add(apply.getOrderId());
         }
 
+        String roleCode = orderQueryHelper.getCurrentUserRoleCode();
         for (int i = 0; i < entities.size(); i++) {
-            voList.get(i).setModifyAuditStatus(latestStatusMap.getOrDefault(entities.get(i).getId(), 0));
+            OrderMainEntity order = entities.get(i);
+            voList.get(i).setCanModify(OrderModifyPageAccessChecker.canModify(
+                    order, roleCode, pendingApplyOrderIds.contains(order.getId())));
         }
     }
 

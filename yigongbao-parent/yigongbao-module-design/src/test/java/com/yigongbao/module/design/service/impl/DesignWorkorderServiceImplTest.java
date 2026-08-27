@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
+import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.module.basic.file.service.FileService;
@@ -220,14 +221,16 @@ class DesignWorkorderServiceImplTest {
         }
 
         @Test
-        @DisplayName("分页列表填充最新修改审核状态")
-        void listWorkorders_fillsLatestModifyAuditStatus() {
+        @DisplayName("分页列表填充当前用户是否可以打开修改页面")
+        void listWorkorders_fillsCanModify() {
             DesignWorkorderQueryDTO dto = new DesignWorkorderQueryDTO();
             dto.setPageNum(1);
             dto.setPageSize(10);
 
             when(designQueryHelper.getCurrentUserId()).thenReturn(1L);
-            when(designQueryHelper.getCurrentUser()).thenReturn(new UserEntity());
+            UserEntity currentUser = new UserEntity();
+            currentUser.setRoleCode(RoleCodeEnum.DESIGNER.getCode());
+            when(designQueryHelper.getCurrentUser()).thenReturn(currentUser);
             when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
 
             OrderMainEntity approvedOrder = buildOrder(10L);
@@ -237,24 +240,20 @@ class DesignWorkorderServiceImplTest {
             page.setRecords(List.of(approvedOrder, pendingOrder, noApplyOrder));
             when(orderMainService.page(any(), any())).thenReturn(page);
 
-            OrderModificationApplyEntity approvedApply = new OrderModificationApplyEntity();
-            approvedApply.setOrderId(10L);
-            approvedApply.setStatus(ApplyStatusEnum.APPROVED.getCode());
-            approvedApply.setApplyTime(LocalDateTime.of(2026, 8, 26, 10, 0));
             OrderModificationApplyEntity pendingApply = new OrderModificationApplyEntity();
             pendingApply.setOrderId(11L);
             pendingApply.setStatus(ApplyStatusEnum.PENDING.getCode());
             pendingApply.setApplyTime(LocalDateTime.of(2026, 8, 26, 10, 0));
-            when(orderModificationApplyMapper.selectList(any())).thenReturn(List.of(approvedApply, pendingApply));
+            when(orderModificationApplyMapper.selectList(any())).thenReturn(List.of(pendingApply));
             when(orderItemService.listByOrderIds(any())).thenReturn(Collections.emptyList());
             when(designPackageMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
             when(designReviewMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
 
             IPage<DesignWorkorderListVO> result = service.listWorkorders(dto);
 
-            assertEquals(1, result.getRecords().get(0).getModifyAuditStatus());
-            assertEquals(2, result.getRecords().get(1).getModifyAuditStatus());
-            assertEquals(0, result.getRecords().get(2).getModifyAuditStatus());
+            assertTrue(result.getRecords().get(0).isCanModify());
+            assertFalse(result.getRecords().get(1).isCanModify());
+            assertTrue(result.getRecords().get(2).isCanModify());
 
             ArgumentCaptor<LambdaQueryWrapper<OrderModificationApplyEntity>> applyQueryCaptor =
                     ArgumentCaptor.forClass(LambdaQueryWrapper.class);
