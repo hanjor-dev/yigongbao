@@ -404,6 +404,18 @@ class DesignFileServiceImplTest {
 
             assertTrue(result.isEmpty());
         }
+
+        @Test
+        @DisplayName("订单详情内部查询不重复执行设计师权限校验")
+        void orderDetailQueryShouldSkipDesignScopeCheck() {
+            when(packageService.list(any(Wrapper.class)))
+                    .thenReturn(Collections.emptyList());
+
+            List<DesignPackageVO> result = designFileService.listPackagesForOrderDetail(orderId);
+
+            assertTrue(result.isEmpty());
+            verifyNoInteractions(designQueryHelper);
+        }
     }
 
     /**

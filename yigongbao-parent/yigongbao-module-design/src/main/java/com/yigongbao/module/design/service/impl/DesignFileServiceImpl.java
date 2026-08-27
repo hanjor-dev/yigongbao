@@ -305,6 +305,15 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Override
     public List<DesignPackageVO> listPackages(Long orderId) {
         designQueryHelper.checkOrderReadable(orderId);
+        return listPackagesInternal(orderId);
+    }
+
+    @Override
+    public List<DesignPackageVO> listPackagesForOrderDetail(Long orderId) {
+        return listPackagesInternal(orderId);
+    }
+
+    private List<DesignPackageVO> listPackagesInternal(Long orderId) {
         // 1. 查询数据包列表
         List<DesignPackageEntity> packages = packageService.list(
                 new LambdaQueryWrapper<DesignPackageEntity>()

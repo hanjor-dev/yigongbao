@@ -32,7 +32,8 @@ public class DesignFileQueryServiceImpl implements DesignFileQueryService {
 
     @Override
     public DesignFileDetailVO getDesignFiles(Long orderId) {
-        List<DesignPackageVO> packages = designFileService.listPackages(orderId);
+        // 订单详情入口已由订单模块完成订单数据权限校验，避免按 designer_id 重复校验。
+        List<DesignPackageVO> packages = designFileService.listPackagesForOrderDetail(orderId);
         enrichLatestDocuments(packages);
 
         DesignFileDetailVO result = new DesignFileDetailVO();

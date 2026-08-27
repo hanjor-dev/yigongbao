@@ -46,6 +46,14 @@ public interface DesignFileService {
     List<DesignPackageVO> listPackages(Long orderId);
 
     /**
+     * 供已完成订单权限校验的订单详情聚合查询数据包列表。
+     *
+     * @param orderId 订单ID
+     * @return 数据包列表
+     */
+    List<DesignPackageVO> listPackagesForOrderDetail(Long orderId);
+
+    /**
      * 获取数据包的包内文件列表
      *
      * @param orderId   订单ID（校验数据包归属）
