@@ -8,6 +8,8 @@ import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.module.basic.hospitalDept.entity.HospitalDeptEntity;
 import com.yigongbao.module.basic.hospitalDept.service.HospitalDeptService;
 import com.yigongbao.module.basic.hospitalDept.vo.HospitalDeptVO;
+import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
+import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
 import com.yigongbao.module.system.doctor.entity.DoctorEntity;
 import com.yigongbao.module.system.doctor.service.DoctorService;
 import com.yigongbao.module.system.doctor.vo.DoctorVO;
@@ -46,6 +48,7 @@ public class OrderDiffCalculator {
     private final HospitalDeptService hospitalDeptService;
     private final DoctorService doctorService;
     private final DictService dictService;
+    private final RebuildProjectService rebuildProjectService;
 
     /**
      * 计算订单修改差异
@@ -275,7 +278,12 @@ public class OrderDiffCalculator {
         ItemsDiff.OrderItemSummary summary = new ItemsDiff.OrderItemSummary();
         summary.setProjectName(item.getProjectName());
         summary.setBodyPartName(item.getBodyPartName());
-        summary.setCategoryName(null);
+        if (item.getProjectId() != null && rebuildProjectService != null) {
+            RebuildProjectDetailVO project = rebuildProjectService.getDetailById(item.getProjectId());
+            if (project != null) {
+                summary.setCategoryName(project.getCategoryName());
+            }
+        }
         return summary;
     }
 

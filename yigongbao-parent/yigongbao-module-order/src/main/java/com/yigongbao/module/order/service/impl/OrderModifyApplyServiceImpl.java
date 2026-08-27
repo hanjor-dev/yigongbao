@@ -42,6 +42,8 @@ import com.yigongbao.module.order.service.OrderModifyApplyService;
 import com.yigongbao.module.order.service.OrderModifyFullService;
 import com.yigongbao.module.order.utils.OrderModifyTimeWindowChecker;
 import com.yigongbao.module.order.validator.OrderDataScopeChecker;
+import com.yigongbao.module.basic.file.service.FileService;
+import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.order.vo.apply.ApplyDetailVO;
 import com.yigongbao.module.order.vo.apply.ApplyListItemVO;
 import com.yigongbao.module.order.vo.modify.ModificationLogVO;
@@ -59,7 +61,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -102,6 +106,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     private final OrderCancelApplyService cancelApplyService;
     private final com.yigongbao.module.order.validator.OrderDataValidator orderDataValidator;
     private final OrderDataScopeChecker orderDataScopeChecker;
+    private final FileService fileService;
 
     // ==================== 申请审核流程方法 ====================
 
@@ -474,13 +479,70 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         vo.setStatusDesc(getStatusDesc(apply.getStatus()));
 
         try {
-            vo.setDiff(JSONUtil.toBean(apply.getModificationDiff(), OrderModificationDiff.class));
+            OrderModificationDiff diff = JSONUtil.toBean(apply.getModificationDiff(), OrderModificationDiff.class);
+            enrichFileDiffNames(diff);
+            vo.setDiff(diff);
         } catch (Exception e) {
             log.error("申请差异JSON解析失败: applyId={}, diff={}", applyId, apply.getModificationDiff(), e);
             throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "申请数据格式错误");
         }
 
         return vo;
+    }
+
+    /** 将差异中的文件ID转换为文件原始名称，文件不存在时保留ID便于追溯。 */
+    private void enrichFileDiffNames(OrderModificationDiff diff) {
+        if (diff == null || fileService == null) {
+            return;
+        }
+        List<String> fileIds = new ArrayList<>();
+        addFileIds(fileIds, diff.getImageData());
+        addFileIds(fileIds, diff.getImageReport());
+        addFileIds(fileIds, diff.getApprovalFile());
+        if (fileIds.isEmpty()) {
+            return;
+        }
+        Map<String, String> fileNameMap = new HashMap<>();
+        for (FileVO file : fileService.listByIds(fileIds)) {
+            if (file != null && file.getId() != null && StrUtil.isNotBlank(file.getFileName())) {
+                fileNameMap.put(file.getId(), file.getFileName());
+            }
+        }
+        replaceFileNames(diff.getImageData(), fileNameMap);
+        replaceFileNames(diff.getImageReport(), fileNameMap);
+        replaceFileNames(diff.getApprovalFile(), fileNameMap);
+    }
+
+    private void addFileIds(List<String> fileIds, com.yigongbao.module.order.dto.diff.ImageDiff imageDiff) {
+        if (imageDiff == null) {
+            return;
+        }
+        if (imageDiff.getAdded() != null) {
+            fileIds.addAll(imageDiff.getAdded());
+        }
+        if (imageDiff.getDeleted() != null) {
+            fileIds.addAll(imageDiff.getDeleted());
+        }
+    }
+
+    private void replaceFileNames(com.yigongbao.module.order.dto.diff.ImageDiff imageDiff,
+                                  Map<String, String> fileNameMap) {
+        if (imageDiff == null) {
+            return;
+        }
+        imageDiff.setAdded(replaceFileNames(imageDiff.getAdded(), fileNameMap));
+        imageDiff.setDeleted(replaceFileNames(imageDiff.getDeleted(), fileNameMap));
+    }
+
+    private List<String> replaceFileNames(List<String> fileIds, Map<String, String> fileNameMap) {
+        if (fileIds == null) {
+            return null;
+        }
+        List<String> names = new ArrayList<>(fileIds.size());
+        for (String fileId : fileIds) {
+            names.add(fileNameMap.getOrDefault(fileId, fileId));
+        }
+        return names;
     }
 
     /**

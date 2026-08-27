@@ -9,6 +9,9 @@ import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.dto.diff.OrderModificationDiff;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
+import com.yigongbao.module.basic.rebuildProject.service.RebuildProjectService;
+import com.yigongbao.module.basic.rebuildProject.vo.RebuildProjectDetailVO;
+import com.yigongbao.module.order.dto.draft.OrderItemDraftItemDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +40,9 @@ class OrderDiffCalculatorTest {
 
     @Mock
     private DictService dictService;
+
+    @Mock
+    private RebuildProjectService rebuildProjectService;
 
     @InjectMocks
     private OrderDiffCalculator diffCalculator;
@@ -253,6 +259,25 @@ class OrderDiffCalculatorTest {
 
         assertEquals(List.of("data-old"), diff.getImageData().getDeleted());
         assertNull(diff.getImageReport());
+    }
+
+    @Test
+    void calculateDiff_addedItemIncludesProjectCategoryName() {
+        RebuildProjectDetailVO project = new RebuildProjectDetailVO();
+        project.setCategoryName("模型");
+        when(rebuildProjectService.getDetailById(13L)).thenReturn(project);
+
+        OrderItemDraftItemDTO item = new OrderItemDraftItemDTO();
+        item.setProjectId(13L);
+        item.setProjectName("新项目");
+        item.setBodyPartName("头部");
+        OrderModifyFullDTO dto = createBaseModifyDTO();
+        dto.setItems(List.of(item));
+
+        OrderModificationDiff diff = diffCalculator.calculateDiff(
+                createBaseOrderDraft(), List.of(), List.of(), dto);
+
+        assertEquals("模型", diff.getItems().getAdded().get(0).getCategoryName());
     }
 
     @Test

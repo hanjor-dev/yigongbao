@@ -1,6 +1,7 @@
 package com.yigongbao.module.order.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.json.JSONUtil;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.entity.OrderMainEntity;
@@ -23,6 +24,10 @@ import com.yigongbao.module.order.service.OrderModifyFullService;
 import com.yigongbao.module.order.utils.OrderModifyTimeWindowChecker;
 import com.yigongbao.module.order.validator.OrderDataValidator;
 import com.yigongbao.module.order.validator.OrderDataScopeChecker;
+import com.yigongbao.module.basic.file.service.FileService;
+import com.yigongbao.module.basic.file.vo.FileVO;
+import com.yigongbao.module.order.dto.diff.ImageDiff;
+import com.yigongbao.module.order.dto.diff.OrderModificationDiff;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserService;
@@ -55,6 +60,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
+import java.util.List;
 import org.mockito.ArgumentCaptor;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
@@ -88,9 +94,41 @@ class OrderModifyApplyServiceImplBoundaryTest {
     @Mock private OrderCancelApplyService cancelApplyService;
     @Mock private OrderDataValidator validator;
     @Mock private OrderDataScopeChecker dataScopeChecker;
+    @Mock private FileService fileService;
 
     @InjectMocks
     private OrderModifyApplyServiceImpl service;
+
+    @Test
+    void getApplyDetail_replacesFileIdsWithOriginalNames() {
+        UserEntity manager = new UserEntity();
+        manager.setRoleCode(RoleCodeEnum.DESIGNER_MANAGER.getCode());
+        OrderModificationApplyEntity apply = new OrderModificationApplyEntity();
+        apply.setId(3L);
+        apply.setModificationDiff(JSONUtil.toJsonStr(diffWithFileId("file-1")));
+        FileVO file = new FileVO();
+        file.setId("file-1");
+        file.setFileName("影像报告.zip");
+
+        when(userService.getById(1L)).thenReturn(manager);
+        when(applyMapper.selectById(3L)).thenReturn(apply);
+        when(fileService.listByIds(List.of("file-1"))).thenReturn(List.of(file));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+
+            assertThat(service.getApplyDetail(3L).getDiff().getImageReport().getAdded())
+                    .containsExactly("影像报告.zip");
+        }
+    }
+
+    private OrderModificationDiff diffWithFileId(String fileId) {
+        ImageDiff imageDiff = new ImageDiff();
+        imageDiff.setAdded(List.of(fileId));
+        OrderModificationDiff diff = new OrderModificationDiff();
+        diff.setImageReport(imageDiff);
+        return diff;
+    }
 
     @Test
     void submitApply_rejectsNullPayload() {
