@@ -23,7 +23,7 @@ import static org.mockito.Mockito.mock;
     "com.yigongbao.module.order",
     "com.yigongbao.module.basic",
     "com.yigongbao.module.system",
-    "com.yigongbao.module.flow",
+    "com.yigongbao.flow",
     "com.yigongbao.common",
     "com.yigongbao.framework"
 })
@@ -32,7 +32,8 @@ import static org.mockito.Mockito.mock;
     "com.yigongbao.module.design.**.mapper",
     "com.yigongbao.module.order.mapper",
     "com.yigongbao.module.basic.**.mapper",
-    "com.yigongbao.module.system.**.mapper"
+    "com.yigongbao.module.system.**.mapper",
+    "com.yigongbao.flow.**.mapper"
 })
 public class ProductionTestConfiguration {
 

@@ -48,7 +48,7 @@ public class ProductNumberServiceImpl extends ServiceImpl<ProductionProductMappe
 
     // 编号格式
     private static final String DEVICE_NO_FORMAT = "%03d";
-    private static final String USAGE_COUNT_FORMAT = "%03d";
+    private static final String USAGE_COUNT_FORMAT = "%02d";
     private static final String SEQUENCE_NO_FORMAT = "%02d";
 
     private final ProductionRecordMapper recordMapper;
@@ -58,7 +58,7 @@ public class ProductNumberServiceImpl extends ServiceImpl<ProductionProductMappe
 
     /**
      * 为流转卡下的所有产品生成正式编号
-     * 编号格式：生产批号(6位) + 产品代码(1位) + 设备编号(3位) + 上机次数(3位) + 产品流水号(2位)
+     * 编号格式：生产批号(6位) + 产品代码(1位) + 设备编号(3位) + 上机次数(2位) + 产品流水号(2位)
      *
      * @param recordId 流转卡ID
      * @param deviceId 设备ID
@@ -147,20 +147,23 @@ public class ProductNumberServiceImpl extends ServiceImpl<ProductionProductMappe
 
     /**
      * 生成单个产品的正式编号
-     * 编号格式：生产批号(6位) + 产品代码(1位) + 设备编号(3位) + 上机次数(3位) + 产品流水号(2位)
+     * 编号格式：生产批号(6位) + 产品代码(1位) + 设备编号(3位) + 上机次数(2位) + 产品流水号(2位)
      *
      * @param batchNo 生产批号（YYMMDD）
      * @param productName 产品名称
      * @param deviceNo 设备编号（已补齐3位）
      * @param usageCount 上机次数
      * @param sequenceNo 产品流水号
-     * @return 正式产品编号（15位）
+     * @return 正式产品编号（14位）
      */
     @Override
     public String generateSingleNumber(String batchNo, String productName,
                                        String deviceNo, Integer usageCount,
                                        Integer sequenceNo) {
         String productCode = getProductTypeCode(productName);
+        if (usageCount == null || usageCount < 0 || usageCount > 99) {
+            throw new BusinessException("设备当日上机次数超出产品编号两位长度限制: " + usageCount);
+        }
         String usageCountStr = String.format(USAGE_COUNT_FORMAT, usageCount);
         String sequenceNoStr = String.format(SEQUENCE_NO_FORMAT, sequenceNo);
         return batchNo + productCode + deviceNo + usageCountStr + sequenceNoStr;

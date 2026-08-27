@@ -116,12 +116,12 @@ class ProductNumberIntegrationTest {
                                           String expectedProductCode, String expectedDeviceNo,
                                           int expectedUsageCount, int expectedSequence) {
         assertNotNull(productNo);
-        assertEquals(15, productNo.length(), "产品编号应为15位");
+        assertEquals(14, productNo.length(), "产品编号应为14位");
         assertEquals(expectedBatchNo, productNo.substring(0, 6), "生产批号不匹配");
         assertEquals(expectedProductCode, productNo.substring(6, 7), "产品代码不匹配");
         assertEquals(expectedDeviceNo, productNo.substring(7, 10), "设备编号不匹配");
-        assertEquals(String.format("%03d", expectedUsageCount), productNo.substring(10, 13), "上机次数不匹配");
-        assertEquals(String.format("%02d", expectedSequence), productNo.substring(13, 15), "产品流水号不匹配");
+        assertEquals(String.format("%02d", expectedUsageCount), productNo.substring(10, 12), "上机次数不匹配");
+        assertEquals(String.format("%02d", expectedSequence), productNo.substring(12, 14), "产品流水号不匹配");
     }
 
     @Test
@@ -201,7 +201,7 @@ class ProductNumberIntegrationTest {
         assertEquals(flowCardCount, counter.getUsageCount());
 
         Set<Integer> usageCounts = allProducts.stream()
-            .map(p -> Integer.parseInt(p.getProductNo().substring(10, 13)))
+            .map(p -> Integer.parseInt(p.getProductNo().substring(10, 12)))
             .collect(Collectors.toSet());
         assertEquals(flowCardCount, usageCounts.size());
         for (int i = 1; i <= flowCardCount; i++) {
@@ -257,10 +257,8 @@ class ProductNumberIntegrationTest {
         Long recordId999 = createTestFlowCard(batchNo, List.of("定制式3D打印骨模型"));
         Integer usageCount999 = deviceUsageCounterService.incrementAndGet(deviceId);
         assertEquals(999, usageCount999);
-        productNumberService.generateFormalNumbers(recordId999, deviceId, usageCount999);
-        ProductionProductEntity product999 = productMapper.selectOne(
-            new LambdaQueryWrapper<ProductionProductEntity>().eq(ProductionProductEntity::getProductionRecordId, recordId999));
-        assertProductNumberFormat(product999.getProductNo(), batchNo, "B", "100", 999, 1);
+        assertThrows(BusinessException.class,
+            () -> productNumberService.generateFormalNumbers(recordId999, deviceId, usageCount999));
     }
 
     @Test

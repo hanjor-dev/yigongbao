@@ -112,23 +112,23 @@ class ProductNumberServiceImplTest {
 
     /**
      * 测试单个产品编号生成 - 格式正确性
-     * 验证生成的编号格式为15位数字
+     * 验证生成的编号格式为14位
      */
     @Test
     void testGenerateSingleNumber_格式正确() {
         String result = productNumberService.generateSingleNumber(
                 "260630", "定制式3D打印骨模型", "037", 2, 1);
 
-        // 验证编号格式：260630B03700201
-        assertEquals("260630B03700201", result);
-        assertEquals(15, result.length());
+        // 验证编号格式：260630B0370201
+        assertEquals("260630B0370201", result);
+        assertEquals(14, result.length());
 
         // 验证编号组成部分
         assertEquals("260630", result.substring(0, 6));  // 批号
         assertEquals("B", result.substring(6, 7));       // 产品代码
         assertEquals("037", result.substring(7, 10));    // 设备编号
-        assertEquals("002", result.substring(10, 13));   // 上机次数
-        assertEquals("01", result.substring(13, 15));    // 流水号
+        assertEquals("02", result.substring(10, 12));    // 上机次数
+        assertEquals("01", result.substring(12, 14));    // 流水号
     }
 
     /**
@@ -140,13 +140,13 @@ class ProductNumberServiceImplTest {
         // 设备编号最小值：1 → 001
         String result1 = productNumberService.generateSingleNumber(
                 "260630", "定制式3D打印骨模型", "001", 1, 1);
-        assertEquals("260630B00100101", result1);
+        assertEquals("260630B0010101", result1);
         assertEquals("001", result1.substring(7, 10));
 
         // 设备编号最大值：999 → 999
         String result999 = productNumberService.generateSingleNumber(
                 "260630", "定制式3D打印骨模型", "999", 1, 1);
-        assertEquals("260630B99900101", result999);
+        assertEquals("260630B9990101", result999);
         assertEquals("999", result999.substring(7, 10));
     }
 
@@ -156,17 +156,20 @@ class ProductNumberServiceImplTest {
      */
     @Test
     void testGenerateSingleNumber_上机次数边界值() {
-        // 上机次数最小值：0 → 000
+        // 上机次数最小值：0 → 00
         String result0 = productNumberService.generateSingleNumber(
                 "260630", "定制式3D打印骨模型", "037", 0, 1);
-        assertEquals("260630B03700001", result0);
-        assertEquals("000", result0.substring(10, 13));
+        assertEquals("260630B0370001", result0);
+        assertEquals("00", result0.substring(10, 12));
 
-        // 上机次数最大值：999 → 999
+        // 上机次数最大值：99 → 99
         String result999 = productNumberService.generateSingleNumber(
-                "260630", "定制式3D打印骨模型", "037", 999, 1);
-        assertEquals("260630B03799901", result999);
-        assertEquals("999", result999.substring(10, 13));
+                "260630", "定制式3D打印骨模型", "037", 99, 1);
+        assertEquals("260630B0379901", result999);
+        assertEquals("99", result999.substring(10, 12));
+
+        assertThrows(BusinessException.class, () -> productNumberService.generateSingleNumber(
+                "260630", "定制式3D打印骨模型", "037", 100, 1));
     }
 
     /**
@@ -178,14 +181,14 @@ class ProductNumberServiceImplTest {
         // 流水号最小值：1 → 01
         String result1 = productNumberService.generateSingleNumber(
                 "260630", "定制式3D打印骨模型", "037", 2, 1);
-        assertEquals("260630B03700201", result1);
-        assertEquals("01", result1.substring(13, 15));
+        assertEquals("260630B0370201", result1);
+        assertEquals("01", result1.substring(12, 14));
 
         // 流水号最大值：99 → 99
         String result99 = productNumberService.generateSingleNumber(
                 "260630", "定制式3D打印骨模型", "037", 2, 99);
-        assertEquals("260630B03700299", result99);
-        assertEquals("99", result99.substring(13, 15));
+        assertEquals("260630B0370299", result99);
+        assertEquals("99", result99.substring(12, 14));
     }
 
     /**
@@ -197,27 +200,27 @@ class ProductNumberServiceImplTest {
         // 类型A
         String resultA = productNumberService.generateSingleNumber(
                 "260630", "医用个性化手术导板", "037", 2, 1);
-        assertEquals("260630A03700201", resultA);
+        assertEquals("260630A0370201", resultA);
 
         // 类型B
         String resultB = productNumberService.generateSingleNumber(
                 "260630", "定制式3D打印骨模型", "037", 2, 1);
-        assertEquals("260630B03700201", resultB);
+        assertEquals("260630B0370201", resultB);
 
         // 类型C
         String resultC = productNumberService.generateSingleNumber(
                 "260630", "定制式神经外科手术导板", "037", 2, 1);
-        assertEquals("260630C03700201", resultC);
+        assertEquals("260630C0370201", resultC);
 
         // 类型D
         String resultD = productNumberService.generateSingleNumber(
                 "260630", "定制式放射粒子手术导板", "037", 2, 1);
-        assertEquals("260630D03700201", resultD);
+        assertEquals("260630D0370201", resultD);
 
         // 类型X
         String resultX = productNumberService.generateSingleNumber(
                 "260630", "未知产品", "037", 2, 1);
-        assertEquals("260630X03700201", resultX);
+        assertEquals("260630X0370201", resultX);
     }
 
     // ========== checkUniqueness 测试 ==========
@@ -346,9 +349,9 @@ class ProductNumberServiceImplTest {
         verify(productMapper, times(3)).selectCount(any(LambdaQueryWrapper.class));
 
         // 验证生成的编号格式
-        assertEquals("260630B03700201", product1.getProductNo());
-        assertEquals("260630B03700202", product2.getProductNo());
-        assertEquals("260630B03700203", product3.getProductNo());
+        assertEquals("260630B0370201", product1.getProductNo());
+        assertEquals("260630B0370202", product2.getProductNo());
+        assertEquals("260630B0370203", product3.getProductNo());
     }
 
     /**
@@ -540,8 +543,8 @@ class ProductNumberServiceImplTest {
         productNumberService.generateFormalNumbers(recordId, deviceId, usageCount);
 
         // 验证生成的编号（不同产品类型代码）
-        assertEquals("260630A03700201", productA.getProductNo());  // 类型A
-        assertEquals("260630B03700202", productB.getProductNo());  // 类型B
+        assertEquals("260630A0370201", productA.getProductNo());  // 类型A
+        assertEquals("260630B0370202", productB.getProductNo());  // 类型B
 
         verify(productMapper, never()).updateById(ArgumentMatchers.<ProductionProductEntity>any());
     }
