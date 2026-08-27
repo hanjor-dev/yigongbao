@@ -1,5 +1,6 @@
 package com.yigongbao.module.system.doctor.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -189,6 +191,29 @@ class DoctorServiceImplTest {
         DoctorVO vo = doctorService.quickAdd(dto);
         assertNotNull(vo);
         assertEquals("张三", vo.getDoctorName());
+    }
+
+    @Test
+    @DisplayName("quickAdd: 已删除同名医生释放唯一键后创建")
+    void quickAdd_whenDeletedSameName_shouldPhysicallyDeleteAndCreate() {
+        QuickAddDoctorDTO dto = new QuickAddDoctorDTO();
+        dto.setDoctorName("张三");
+        dto.setHospitalId(1L);
+
+        OrgEntity org = new OrgEntity();
+        org.setOrgType("1.3");
+        when(orgService.getById(1L)).thenReturn(org);
+        when(doctorMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(doctorMapper.selectDeletedByHospitalAndName(1L, "张三")).thenReturn(testEntity);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::isLogin).thenReturn(false);
+            DoctorVO vo = doctorService.quickAdd(dto);
+
+            assertNotNull(vo);
+            verify(doctorMapper).physicallyDeleteDeletedById(1L);
+            verify(doctorMapper).insert(any(DoctorEntity.class));
+        }
     }
 
     @Test

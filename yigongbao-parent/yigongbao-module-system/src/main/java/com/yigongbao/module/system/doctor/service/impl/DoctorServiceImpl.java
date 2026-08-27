@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> implements DoctorService {
 
+    private final DoctorMapper doctorMapper;
     private final OrgService orgService;
 
     /**
@@ -247,8 +248,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             // 查询是否已存在同名医生（在同一医院内，未删除）
             LambdaQueryWrapper<DoctorEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(DoctorEntity::getDoctorName, dto.getDoctorName())
-                    .eq(DoctorEntity::getHospitalId, dto.getHospitalId())
-                    .eq(creatorId != null, DoctorEntity::getCreatorId, creatorId);
+                    .eq(DoctorEntity::getHospitalId, dto.getHospitalId());
             DoctorEntity existing = getOne(wrapper);
             if (existing != null) {
                 log.info("医生已存在，返回现有医生，id={}", existing.getId());
@@ -258,14 +258,11 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             }
 
             // 检查是否存在已删除的同名医生记录，如有则物理删除，避免历史垃圾数据残留
-            LambdaQueryWrapper<DoctorEntity> deletedWrapper = new LambdaQueryWrapper<>();
-            deletedWrapper.eq(DoctorEntity::getDoctorName, dto.getDoctorName())
-                    .eq(DoctorEntity::getHospitalId, dto.getHospitalId())
-                    .eq(DoctorEntity::getIsDeleted, StatusConstants.DELETED);
-            DoctorEntity deletedDoctor = getOne(deletedWrapper, false);
+            DoctorEntity deletedDoctor = doctorMapper.selectDeletedByHospitalAndName(
+                    dto.getHospitalId(), dto.getDoctorName());
             if (deletedDoctor != null) {
                 log.info("发现已删除的医生记录，物理删除后重新创建，deletedId={}", deletedDoctor.getId());
-                baseMapper.deleteById(deletedDoctor.getId());
+                doctorMapper.physicallyDeleteDeletedById(deletedDoctor.getId());
             }
 
             // 创建新医生
