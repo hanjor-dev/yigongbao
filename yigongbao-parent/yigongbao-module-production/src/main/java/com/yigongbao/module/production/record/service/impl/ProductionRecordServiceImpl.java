@@ -214,30 +214,12 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
     }
 
-    /** 填充流转卡Excel文件，使用缓存机制避免重复生成 */
+    /** 填充最近一次生成的流转卡Excel文件；Excel只在用户显式点击生成时重新生成。 */
     private void fillFlowCardFile(ProductionRecordVO vo, ProductionRecordEntity record) {
-        boolean needRegenerate = record.getFlowCardFileUrl() == null
-                || record.getFlowCardGenerateTime() == null
-                || record.getContentUpdateTime() == null
-                || record.getContentUpdateTime().isAfter(record.getFlowCardGenerateTime())
-                // 设备表是流转卡设备编号的动态兜底来源，设备创建/替换不会更新流转卡记录的内容时间。
-                // 存在未配置设备编号的工序时，不能复用旧 Excel。
-                || hasDynamicFlowCardDeviceNo(record);
-
-        if (needRegenerate) {
-            com.yigongbao.module.basic.file.vo.FileVO fileVO = generateFlowCardExcel(record.getId());
-            vo.setFlowCardFile(fileVO);
-        } else {
-            // 获取订单信息，添加患者姓名前缀
-            OrderMainEntity order = orderMainMapper.selectById(record.getOrderId());
-            String patientName = (order != null && order.getPatientName() != null) ? order.getPatientName() : "";
-            com.yigongbao.module.basic.file.vo.FileVO fileVO = new com.yigongbao.module.basic.file.vo.FileVO();
-            fileVO.setFileUrl(record.getFlowCardFileUrl());
-            fileVO.setFileName(patientName + "流转卡.xlsx");
-            fileVO.setDownloadUrl(fileService.generateDownloadUrl(
-                    record.getFlowCardFileUrl(), fileVO.getFileName()));
-            vo.setFlowCardFile(fileVO);
+        if (StrUtil.isBlank(record.getFlowCardFileUrl())) {
+            return;
         }
+        vo.setFlowCardFile(buildFlowCardFileVO(record));
     }
 
     /** 通过流转卡编号查询详情（扫码入口） */
@@ -1028,34 +1010,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     }
 
     @Override
-    public com.yigongbao.module.basic.file.vo.FileVO getOrGenerateFlowCardExcel(Long recordId) {
-        ProductionRecordEntity record = getById(recordId);
-        if (record == null) {
-            throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
-        }
-
-        boolean needRegenerate = record.getFlowCardFileUrl() == null
-                || record.getFlowCardGenerateTime() == null
-                || record.getContentUpdateTime() == null
-                || record.getContentUpdateTime().isAfter(record.getFlowCardGenerateTime())
-                || hasDynamicFlowCardDeviceNo(record);
-
-        if (needRegenerate) {
-            return generateFlowCardExcel(recordId);
-        } else {
-            // 获取订单信息，添加患者姓名前缀
-            OrderMainEntity order = orderMainMapper.selectById(record.getOrderId());
-            String patientName = (order != null && order.getPatientName() != null) ? order.getPatientName() : "";
-            com.yigongbao.module.basic.file.vo.FileVO fileVO = new com.yigongbao.module.basic.file.vo.FileVO();
-            fileVO.setFileUrl(record.getFlowCardFileUrl());
-            fileVO.setFileName(patientName + "流转卡.xlsx");
-            fileVO.setDownloadUrl(fileService.generateDownloadUrl(
-                    record.getFlowCardFileUrl(), fileVO.getFileName()));
-            return fileVO;
-        }
-    }
-
-    @Override
     public com.yigongbao.module.basic.file.vo.FileVO generateFlowCardExcel(Long recordId) {
         log.info("生成流转卡Excel: recordId={}", recordId);
 
@@ -1156,38 +1110,14 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             com.yigongbao.module.basic.file.vo.FileVO fileVO = fileService.uploadBytes(
                 excelBytes, filename, com.yigongbao.common.enums.FileBizTypeEnum.INSTRUCTION_FILE.getDictCode());
 
-            // 保存生成时间和URL到数据库
+            // 保存最近一次生成的文件地址和生成时间；仅用于详情展示和审计，不参与缓存判断。
             java.time.LocalDateTime now = java.time.LocalDateTime.now();
             com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity> updateWrapper =
                 new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductionRecordEntity>()
                     .eq(ProductionRecordEntity::getId, recordId)
                     .set(ProductionRecordEntity::getFlowCardFileUrl, fileVO.getFileUrl())
                     .set(ProductionRecordEntity::getFlowCardGenerateTime, now);
-            if (record.getFlowCardGenerateTime() == null) {
-                updateWrapper.isNull(ProductionRecordEntity::getFlowCardGenerateTime);
-            } else {
-                updateWrapper.eq(ProductionRecordEntity::getFlowCardGenerateTime,
-                        record.getFlowCardGenerateTime());
-            }
-            // contentUpdateTime 可能为 null 的情况：
-            // 1. 新创建的流转卡尚未执行任何内容修改操作（submitBatchNo、assignDevice等）
-            // 2. 数据库迁移前的旧记录（已通过 SQL UPDATE 初始化，但可能存在遗漏）
-            // 初始化为当前时间，避免后续每次查询都重新生成 Excel
-            if (record.getContentUpdateTime() == null) {
-                updateWrapper.set(ProductionRecordEntity::getContentUpdateTime, now);
-            }
-            int updated = baseMapper.update(null, updateWrapper);
-            if (updated == 0) {
-                ProductionRecordEntity latestRecord = getById(recordId);
-                if (latestRecord != null
-                        && StrUtil.isNotBlank(latestRecord.getFlowCardFileUrl())
-                        && !Objects.equals(latestRecord.getFlowCardGenerateTime(),
-                        record.getFlowCardGenerateTime())) {
-                    return buildFlowCardFileVO(latestRecord);
-                }
-                // 生成文件已经成功，CAS 未更新时不再覆盖数据库中的其他结果；调用方仍可使用本次文件。
-                return fileVO;
-            }
+            baseMapper.update(null, updateWrapper);
 
             log.info("流转卡Excel生成并上传成功: recordId={}, recordNo={}, fileUrl={}",
                 recordId, record.getRecordNo(), fileVO.getFileUrl());
@@ -1196,17 +1126,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             log.error("流转卡Excel生成失败: recordId={}", recordId, e);
             throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR);
         }
-    }
-
-    private boolean hasDynamicFlowCardDeviceNo(ProductionRecordEntity record) {
-        List<ProductionProcessEntity> processes = processMapper.selectList(
-                new LambdaQueryWrapper<ProductionProcessEntity>()
-                        .eq(ProductionProcessEntity::getProductionRecordId, record.getId())
-                        .orderByAsc(ProductionProcessEntity::getProcessOrder));
-        return processes.stream().anyMatch(process ->
-                StrUtil.isBlank(process.getDeviceNo())
-                        || (ProcessTypeEnum.CLEAN_DRY.getCode().equals(process.getProcessType())
-                        && StrUtil.isBlank(process.getSecondaryDeviceNo())));
     }
 
     /** 数据库时间字段按秒保存，内容版本必须严格递增，避免同秒更新无法触发 Excel 刷新。 */
@@ -1225,6 +1144,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         com.yigongbao.module.basic.file.vo.FileVO fileVO = new com.yigongbao.module.basic.file.vo.FileVO();
         fileVO.setFileUrl(record.getFlowCardFileUrl());
         fileVO.setFileName(patientName + "流转卡.xlsx");
+        fileVO.setDownloadUrl(fileService.generateDownloadUrl(
+                record.getFlowCardFileUrl(), fileVO.getFileName()));
         return fileVO;
     }
 

@@ -70,7 +70,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -168,6 +167,23 @@ class ProductionRecordServiceImplTest {
         assertEquals("REC-001", vo.getRecordNo());
         assertEquals(1, vo.getProducts().size());
         assertEquals(new BigDecimal("12.35"), vo.getProducts().get(0).getWeight());
+    }
+
+    @Test
+    void getRecordDetail_returnsLatestStoredFlowCardWithoutGenerating() {
+        ProductionRecordEntity record = new ProductionRecordEntity();
+        record.setId(2L);
+        record.setOrderId(20L);
+        record.setFlowCardFileUrl("/latest-flow-card.xlsx");
+        when(recordMapper.selectById(2L)).thenReturn(record);
+        when(productMapper.selectList(any())).thenReturn(Collections.emptyList());
+
+        ProductionRecordVO vo = recordService.getRecordDetail(2L);
+
+        assertNotNull(vo.getFlowCardFile());
+        assertEquals("/latest-flow-card.xlsx", vo.getFlowCardFile().getFileUrl());
+        verifyNoInteractions(flowCardExcelBuilder);
+        verify(fileService).generateDownloadUrl("/latest-flow-card.xlsx", "流转卡.xlsx");
     }
 
     // ---- pageRecords ----
@@ -416,83 +432,7 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
-    void getOrGenerateFlowCardExcel_reusesFreshCachedFileWithPatientPrefix() {
-        ProductionRecordEntity record = record(100L, 200L, FlowStatusEnum.PRINT_COMPLETED.getValue());
-        record.setFlowCardFileUrl("https://files/card.xlsx");
-        record.setFlowCardGenerateTime(java.time.LocalDateTime.now().minusMinutes(5));
-        record.setContentUpdateTime(java.time.LocalDateTime.now().minusMinutes(10));
-        OrderMainEntity order = order(200L, ProductionConstants.ORDER_TYPE_MEDICAL);
-        order.setPatientName("患者甲");
-        when(recordMapper.selectById(100L)).thenReturn(record);
-        when(orderMainMapper.selectById(200L)).thenReturn(order);
-
-        var file = recordService.getOrGenerateFlowCardExcel(100L);
-
-        assertEquals("https://files/card.xlsx", file.getFileUrl());
-        assertEquals("患者甲流转卡.xlsx", file.getFileName());
-        verifyNoInteractions(flowCardExcelBuilder);
-        verify(fileService).generateDownloadUrl("https://files/card.xlsx", "患者甲流转卡.xlsx");
-    }
-
-    @Test
-    void getOrGenerateFlowCardExcel_regeneratesWhenContentWasUpdatedAfterGeneration() throws Exception {
-        LocalDateTime generatedAt = LocalDateTime.of(2026, 8, 25, 10, 0);
-        ProductionRecordEntity record = record(100L, 200L, FlowStatusEnum.PRINT_COMPLETED.getValue());
-        record.setFlowCardFileUrl("https://files/old-card.xlsx");
-        record.setFlowCardGenerateTime(generatedAt);
-        record.setContentUpdateTime(generatedAt.plusMinutes(1));
-        when(recordMapper.selectById(100L)).thenReturn(record);
-        when(productMapper.selectList(any())).thenReturn(Collections.emptyList());
-        when(processMapper.selectList(any())).thenReturn(Collections.emptyList());
-        when(orderMainMapper.selectById(200L)).thenReturn(order(200L, ProductionConstants.ORDER_TYPE_MEDICAL));
-        when(flowCardExcelBuilder.build(any())).thenReturn(new byte[] {1});
-        com.yigongbao.module.basic.file.vo.FileVO uploadedFile = new com.yigongbao.module.basic.file.vo.FileVO();
-        uploadedFile.setFileUrl("https://files/new-card.xlsx");
-        when(fileService.uploadBytes(any(), anyString(), anyString())).thenReturn(uploadedFile);
-
-        var file = recordService.getOrGenerateFlowCardExcel(100L);
-
-        assertEquals("https://files/new-card.xlsx", file.getFileUrl());
-        verify(flowCardExcelBuilder).build(any());
-        verify(fileService).uploadBytes(any(), anyString(), anyString());
-    }
-
-    @Test
-    void getOrGenerateFlowCardExcel_regeneratesWhenFallbackDeviceSnapshotChanges() throws Exception {
-        LocalDateTime generatedAt = LocalDateTime.of(2026, 8, 25, 10, 0);
-        ProductionRecordEntity record = flowCardRecord(100L, 88L);
-        record.setOrderId(200L);
-        record.setFlowCardFileUrl("https://files/old-card.xlsx");
-        record.setFlowCardGenerateTime(generatedAt);
-        record.setContentUpdateTime(generatedAt);
-        ProductionProcessEntity process = process("wash", null, null);
-        AtomicReference<DeviceEntity> currentDevice = new AtomicReference<>(
-                device(1L, DeviceTypeEnum.WASH_CONTAINER.getCode(), 88L, "WASH-OLD"));
-        com.yigongbao.module.basic.file.vo.FileVO firstFile = uploadedFile("https://files/first-card.xlsx");
-        com.yigongbao.module.basic.file.vo.FileVO secondFile = uploadedFile("https://files/second-card.xlsx");
-
-        when(recordMapper.selectById(100L)).thenReturn(record);
-        when(productMapper.selectList(any())).thenReturn(Collections.emptyList());
-        when(processMapper.selectList(any())).thenReturn(List.of(process));
-        when(deviceMapper.selectOne(any())).thenAnswer(invocation -> currentDevice.get());
-        when(orderMainMapper.selectById(200L)).thenReturn(order(200L, ProductionConstants.ORDER_TYPE_MEDICAL));
-        when(flowCardExcelBuilder.build(any())).thenReturn(new byte[] {1}, new byte[] {2});
-        when(fileService.uploadBytes(any(), anyString(), anyString())).thenReturn(firstFile, secondFile);
-        when(recordMapper.update(isNull(), any())).thenReturn(1);
-
-        recordService.generateFlowCardExcel(100L);
-        clearInvocations(flowCardExcelBuilder, fileService);
-
-        currentDevice.set(device(2L, DeviceTypeEnum.WASH_CONTAINER.getCode(), 88L, "WASH-NEW"));
-        com.yigongbao.module.basic.file.vo.FileVO result = recordService.getOrGenerateFlowCardExcel(100L);
-
-        assertEquals("https://files/second-card.xlsx", result.getFileUrl());
-        verify(flowCardExcelBuilder).build(any());
-        verify(fileService).uploadBytes(any(), anyString(), anyString());
-    }
-
-    @Test
-    void generateFlowCardExcel_updateRequiresOriginalCacheAndContentVersion() throws Exception {
+    void generateFlowCardExcel_updatesLatestFileWithoutCacheCondition() throws Exception {
         LocalDateTime generatedAt = LocalDateTime.of(2026, 8, 25, 10, 0);
         ProductionRecordEntity record = flowCardRecord(101L, 88L);
         record.setOrderId(201L);
@@ -514,12 +454,11 @@ class ProductionRecordServiceImplTest {
                 ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
         verify(recordMapper).update(isNull(), updateCaptor.capture());
         LambdaUpdateWrapper<ProductionRecordEntity> update = updateCaptor.getValue();
-        assertThat(update.getSqlSegment())
-                .contains("flowCardGenerateTime");
         assertThat(update.getSqlSet())
                 .contains("flowCardGenerateTime", "flowCardFileUrl");
         assertThat(update.getParamNameValuePairs().values())
-                .contains(generatedAt, "https://files/new-card.xlsx");
+                .contains("https://files/new-card.xlsx")
+                .doesNotContain(generatedAt);
     }
 
     @Test
