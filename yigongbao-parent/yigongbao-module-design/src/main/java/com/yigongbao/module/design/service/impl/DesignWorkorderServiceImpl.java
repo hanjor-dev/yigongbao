@@ -282,6 +282,26 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     }
 
     /**
+     * 更新订单影像数据评估意见
+     *
+     * @param orderId 订单ID
+     * @param opinion 评估意见
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateEvaluationOpinion(Long orderId, String opinion) {
+        OrderMainEntity order = orderMainService.getById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+
+        OrderMainEntity update = new OrderMainEntity();
+        update.setId(orderId);
+        update.setDataEvaluationOpinion(opinion);
+        orderMainService.updateById(update);
+    }
+
+    /**
      * 获取当前用户列配置
      *
      * @return 列配置 VO
