@@ -82,7 +82,7 @@ public class DesignerDashboardStrategy implements DashboardStrategy {
                 newWrapper.select("HOUR(design_start_time) as hour, COUNT(*) as count").groupBy("HOUR(design_start_time)");
                 break;
             case WEEK:
-                newWrapper.select("DAYOFWEEK(design_start_time) as weekday, COUNT(*) as count").groupBy("DAYOFWEEK(design_start_time)");
+                newWrapper.select("WEEKDAY(design_start_time) as weekday, COUNT(*) as count").groupBy("WEEKDAY(design_start_time)");
                 break;
             case MONTH:
                 newWrapper.select("DAY(design_start_time) as day, COUNT(*) as count").groupBy("DAY(design_start_time)");
@@ -101,7 +101,7 @@ public class DesignerDashboardStrategy implements DashboardStrategy {
                 int index = hour / 2;
                 if (index < newOrders.size()) newOrders.set(index, newOrders.get(index) + count);
             } else if (effectiveRange == TimeRangeEnum.WEEK) {
-                int weekday = ((Number) row.get("weekday")).intValue() - 1;
+                int weekday = ((Number) row.get("weekday")).intValue();
                 if (weekday >= 0 && weekday < newOrders.size()) newOrders.set(weekday, count);
             } else if (effectiveRange == TimeRangeEnum.MONTH) {
                 int day = ((Number) row.get("day")).intValue();
@@ -124,7 +124,7 @@ public class DesignerDashboardStrategy implements DashboardStrategy {
                 completedWrapper.select("HOUR(design_submit_time) as hour, COUNT(*) as count").groupBy("HOUR(design_submit_time)");
                 break;
             case WEEK:
-                completedWrapper.select("DAYOFWEEK(design_submit_time) as weekday, COUNT(*) as count").groupBy("DAYOFWEEK(design_submit_time)");
+                completedWrapper.select("WEEKDAY(design_submit_time) as weekday, COUNT(*) as count").groupBy("WEEKDAY(design_submit_time)");
                 break;
             case MONTH:
                 completedWrapper.select("DAY(design_submit_time) as day, COUNT(*) as count").groupBy("DAY(design_submit_time)");
@@ -143,7 +143,7 @@ public class DesignerDashboardStrategy implements DashboardStrategy {
                 int index = hour / 2;
                 if (index < completedOrders.size()) completedOrders.set(index, completedOrders.get(index) + count);
             } else if (effectiveRange == TimeRangeEnum.WEEK) {
-                int weekday = ((Number) row.get("weekday")).intValue() - 1;
+                int weekday = ((Number) row.get("weekday")).intValue();
                 if (weekday >= 0 && weekday < completedOrders.size()) completedOrders.set(weekday, count);
             } else if (effectiveRange == TimeRangeEnum.MONTH) {
                 int day = ((Number) row.get("day")).intValue();
@@ -265,7 +265,7 @@ public class DesignerDashboardStrategy implements DashboardStrategy {
                 newWrapper.select("HOUR(design_start_time) as hour, COUNT(*) as count").groupBy("HOUR(design_start_time)");
                 break;
             case WEEK:
-                newWrapper.select("DAYOFWEEK(design_start_time) as weekday, COUNT(*) as count").groupBy("DAYOFWEEK(design_start_time)");
+                newWrapper.select("WEEKDAY(design_start_time) as weekday, COUNT(*) as count").groupBy("WEEKDAY(design_start_time)");
                 break;
             case MONTH:
                 newWrapper.select("DAY(design_start_time) as day, COUNT(*) as count").groupBy("DAY(design_start_time)");
@@ -284,7 +284,7 @@ public class DesignerDashboardStrategy implements DashboardStrategy {
                 int index = hour / 2;
                 if (index < newOrders.size()) newOrders.set(index, newOrders.get(index) + count);
             } else if (timeRange == TimeRangeEnum.WEEK) {
-                int weekday = ((Number) row.get("weekday")).intValue() - 1;
+                int weekday = ((Number) row.get("weekday")).intValue();
                 if (weekday >= 0 && weekday < newOrders.size()) newOrders.set(weekday, count);
             } else if (timeRange == TimeRangeEnum.MONTH) {
                 int day = ((Number) row.get("day")).intValue();
@@ -307,7 +307,7 @@ public class DesignerDashboardStrategy implements DashboardStrategy {
                 completedWrapper.select("HOUR(design_submit_time) as hour, COUNT(*) as count").groupBy("HOUR(design_submit_time)");
                 break;
             case WEEK:
-                completedWrapper.select("DAYOFWEEK(design_submit_time) as weekday, COUNT(*) as count").groupBy("DAYOFWEEK(design_submit_time)");
+                completedWrapper.select("WEEKDAY(design_submit_time) as weekday, COUNT(*) as count").groupBy("WEEKDAY(design_submit_time)");
                 break;
             case MONTH:
                 completedWrapper.select("DAY(design_submit_time) as day, COUNT(*) as count").groupBy("DAY(design_submit_time)");
@@ -326,7 +326,7 @@ public class DesignerDashboardStrategy implements DashboardStrategy {
                 int index = hour / 2;
                 if (index < completedOrders.size()) completedOrders.set(index, completedOrders.get(index) + count);
             } else if (timeRange == TimeRangeEnum.WEEK) {
-                int weekday = ((Number) row.get("weekday")).intValue() - 1;
+                int weekday = ((Number) row.get("weekday")).intValue();
                 if (weekday >= 0 && weekday < completedOrders.size()) completedOrders.set(weekday, count);
             } else if (timeRange == TimeRangeEnum.MONTH) {
                 int day = ((Number) row.get("day")).intValue();

@@ -156,7 +156,7 @@ public class SalesmanSelfDashboardStrategy implements DashboardStrategy {
                 wrapper.select("HOUR(create_time) as hour, COUNT(*) as count").groupBy("HOUR(create_time)");
                 break;
             case WEEK:
-                wrapper.select("DAYOFWEEK(create_time) as weekday, COUNT(*) as count").groupBy("DAYOFWEEK(create_time)");
+                wrapper.select("WEEKDAY(create_time) as weekday, COUNT(*) as count").groupBy("WEEKDAY(create_time)");
                 break;
             case MONTH:
                 wrapper.select("DAY(create_time) as day, COUNT(*) as count").groupBy("DAY(create_time)");
@@ -176,7 +176,7 @@ public class SalesmanSelfDashboardStrategy implements DashboardStrategy {
                 int index = hour / 2;
                 if (index < data.size()) data.set(index, data.get(index) + count);
             } else if (effectiveRange == TimeRangeEnum.WEEK) {
-                int weekday = ((Number) row.get("weekday")).intValue() - 1;
+                int weekday = ((Number) row.get("weekday")).intValue();
                 if (weekday >= 0 && weekday < data.size()) data.set(weekday, count);
             } else if (effectiveRange == TimeRangeEnum.MONTH) {
                 int day = ((Number) row.get("day")).intValue();

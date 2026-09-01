@@ -152,7 +152,7 @@ public class QcManagerDashboardStrategy implements DashboardStrategy {
     private void addGroupByClause(QueryWrapper<ProductionProductEntity> wrapper, DashboardQueryDTO query, LocalDateTime[] range) {
         switch (query.getTimeRangeEnum()) {
             case TODAY: wrapper.select("HOUR(qc_time) as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
-            case WEEK: wrapper.select("DAYOFWEEK(qc_time) as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
+            case WEEK: wrapper.select("WEEKDAY(qc_time) as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
             case MONTH: wrapper.select("DAY(qc_time) as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
             case QUARTER:
             case YEAR: wrapper.select("MONTH(qc_time) as time_unit, COUNT(*) as count").groupBy("time_unit"); break;
@@ -178,7 +178,7 @@ public class QcManagerDashboardStrategy implements DashboardStrategy {
             int index = -1;
             switch (query.getTimeRangeEnum()) {
                 case TODAY: index = timeUnit / 2; break;
-                case WEEK: index = timeUnit - 1; break;
+                case WEEK: index = timeUnit; break;
                 case MONTH: index = (timeUnit - 1) / 5; break;
                 case QUARTER:
                 case YEAR: index = timeUnit - range[0].getMonthValue(); break;
