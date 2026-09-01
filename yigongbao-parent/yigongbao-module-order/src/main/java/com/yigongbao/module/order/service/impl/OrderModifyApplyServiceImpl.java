@@ -16,6 +16,7 @@ import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.flow.facade.FlowFacade;
 import com.yigongbao.flow.service.FlowOrderService;
 import com.yigongbao.framework.annotation.RequirePermission;
@@ -291,7 +292,11 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_EXPIRED);
         }
 
-        OrderMainEntity applyOrder = orderMainMapper.selectById(apply.getOrderId());
+        // 审核与直接修改统一先锁订单，避免申请状态已变更但订单内容尚未落库时发生并发修改。
+        OrderMainEntity applyOrder = orderMainMapper.selectByIdForUpdate(apply.getOrderId());
+        if (applyOrder == null) {
+            applyOrder = orderMainMapper.selectById(apply.getOrderId());
+        }
         if (applyOrder == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
@@ -603,6 +608,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
      * 全量修改订单（带时间窗口检查）
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Integer modifyOrderFullV2(Long orderId, OrderModifyFullDTO dto) {
         Long currentUserId = StpUtil.getLoginIdAsLong();
         UserEntity currentUser = userService.getById(currentUserId);
@@ -624,6 +630,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         boolean isDesigner = DESIGNER_ROLES.contains(roleCode);
         boolean isOrderPhase = FlowPhaseEnum.ORDER.getValue().equals(order.getPhase());
         boolean isDesignPhase = FlowPhaseEnum.DESIGN.getValue().equals(order.getPhase());
+        boolean isDataAuditRejected = isOrderPhase
+                && FlowStatusEnum.DATA_AUDIT_REJECTED.getValue().equals(order.getStatus());
 
         if (!isAdmin && !isBusinessRole && !isDesigner) {
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_FIELD_NOT_ALLOWED,
@@ -639,14 +647,39 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                     "当前订单阶段不允许业务角色修改");
         }
 
+        // 仅对新增的“审核驳回后绕过时间窗口”场景校验业务员归属，避免改变既有窗口内直接修改规则。
+        if (isDataAuditRejected && isBusinessRole
+                && !Objects.equals(currentUserId, order.getOperatorId())) {
+            log.warn("审核驳回订单只能由负责业务员直接修改: orderId={}, operatorId={}, currentUserId={}",
+                    orderId, order.getOperatorId(), currentUserId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_BELONG_TO_USER);
+        }
+
+        // 修改申请和取消申请不能与直接修改并行，避免申请内容与订单当前数据互相覆盖。
+        if (!isAdmin && hasPendingApply(orderId)) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_PENDING,
+                    "订单存在待审核修改申请，不允许直接修改");
+        }
+        if (!isAdmin && cancelApplyService.hasPendingCancelApply(orderId)) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING,
+                    "订单存在待审核取消申请，不允许直接修改");
+        }
+
         boolean withinWindow = isBusinessRole && isOrderPhase
                 && timeWindowChecker.isWithinTimeWindow(order.getCreateTime());
-        if (isAdmin || withinWindow) {
-            if (withinWindow && !timeWindowChecker.isWithinTimeWindow(order.getCreateTime())) {
+        boolean directModifyAfterAuditReject = isBusinessRole && isDataAuditRejected;
+        if (isAdmin || withinWindow || directModifyAfterAuditReject) {
+            if (withinWindow && !directModifyAfterAuditReject
+                    && !timeWindowChecker.isWithinTimeWindow(order.getCreateTime())) {
                 log.info("订单修改窗口在执行前已超时，转为申请: orderId={}", orderId);
                 return -1;
             }
-            log.info("订单在时间窗口内，直接修改: orderId={}, createTime={}", orderId, order.getCreateTime());
+            if (directModifyAfterAuditReject) {
+                log.info("订单数据审核驳回，允许业务员绕过时间窗口直接修改: orderId={}, userId={}",
+                        orderId, currentUserId);
+            } else {
+                log.info("订单在时间窗口内，直接修改: orderId={}, createTime={}", orderId, order.getCreateTime());
+            }
             orderModifyFullService.modifyOrderFull(orderId, dto);
             return 1;
         } else {
@@ -715,6 +748,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
 
     @Override
     public boolean hasPendingApply(Long orderId) {
+        // 定时任务存在执行间隔，查询前实时回收已过期/阶段已变化的申请，避免陈旧 PENDING 阻塞后续操作。
+        orderModificationApplyMapper.expireApplicationsForOrder(orderId, LocalDateTime.now());
         return orderModificationApplyMapper.selectCount(
                 new LambdaQueryWrapper<OrderModificationApplyEntity>()
                         .eq(OrderModificationApplyEntity::getOrderId, orderId)
@@ -731,7 +766,11 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
             throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
         }
 
-        OrderMainEntity order = orderMainMapper.selectById(orderId);
+        // 锁定订单，使待审核申请检查与后续订单修改处于同一事务内，避免并发提交申请和直接修改。
+        OrderMainEntity order = orderMainMapper.selectByIdForUpdate(orderId);
+        if (order == null) {
+            order = orderMainMapper.selectById(orderId);
+        }
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }

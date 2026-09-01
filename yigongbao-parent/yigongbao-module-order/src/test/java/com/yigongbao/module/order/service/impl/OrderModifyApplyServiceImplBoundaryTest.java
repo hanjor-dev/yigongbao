@@ -394,6 +394,52 @@ class OrderModifyApplyServiceImplBoundaryTest {
     }
 
     @Test
+    void modifyOrderFullV2_allowsOwnerToModifyDataAuditRejectedOrderOutsideWindow() {
+        UserEntity user = new UserEntity();
+        user.setRoleCode(RoleCodeEnum.SALESMAN.getCode());
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(9L);
+        order.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.ORDER.getValue());
+        order.setStatus(com.yigongbao.flow.enums.FlowStatusEnum.DATA_AUDIT_REJECTED.getValue());
+        order.setOperatorId(1L);
+        order.setCreateTime(java.time.LocalDateTime.now().minusDays(1));
+        when(userService.getById(1L)).thenReturn(user);
+        when(orderMainMapper.selectById(9L)).thenReturn(order);
+        when(applyMapper.selectCount(any())).thenReturn(0L);
+        when(cancelApplyService.hasPendingCancelApply(9L)).thenReturn(false);
+        when(timeWindowChecker.isWithinTimeWindow(any())).thenReturn(false);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertThat(service.modifyOrderFullV2(9L, new OrderModifyFullDTO())).isEqualTo(1);
+        }
+        verify(modifyFullService).modifyOrderFull(eq(9L), any(OrderModifyFullDTO.class));
+    }
+
+    @Test
+    void modifyOrderFullV2_rejectsNonOwnerFromDirectlyModifyingDataAuditRejectedOrder() {
+        UserEntity user = new UserEntity();
+        user.setRoleCode(RoleCodeEnum.SALESMAN.getCode());
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(9L);
+        order.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.ORDER.getValue());
+        order.setStatus(com.yigongbao.flow.enums.FlowStatusEnum.DATA_AUDIT_REJECTED.getValue());
+        order.setOperatorId(2L);
+        when(userService.getById(1L)).thenReturn(user);
+        when(orderMainMapper.selectById(9L)).thenReturn(order);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertThatThrownBy(() -> service.modifyOrderFullV2(9L, new OrderModifyFullDTO()))
+                    .isInstanceOf(com.yigongbao.common.exception.BusinessException.class)
+                    .extracting("code")
+                    .isEqualTo(ErrorCodeEnum.ORDER_NOT_BELONG_TO_USER.getCode());
+        }
+        verify(modifyFullService, org.mockito.Mockito.never())
+                .modifyOrderFull(any(), any());
+    }
+
+    @Test
     void modifyOrderFullV2_allowsAdminDirectlyOutsideTimeWindow() {
         UserEntity user = new UserEntity();
         user.setRoleCode(RoleCodeEnum.ADMIN.getCode());
