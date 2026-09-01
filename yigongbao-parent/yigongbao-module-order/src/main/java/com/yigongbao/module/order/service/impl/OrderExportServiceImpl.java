@@ -349,6 +349,22 @@ public class OrderExportServiceImpl implements OrderExportService {
             case "designerName":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getDesignerName()));
                 break;
+            case "designStartTime":
+                cell.setCellValue(order.getDesignStartTime() != null
+                        ? order.getDesignStartTime().format(DATE_TIME_FORMATTER) : "");
+                break;
+            case "designSubmitTime":
+                cell.setCellValue(order.getDesignSubmitTime() != null
+                        ? order.getDesignSubmitTime().format(DATE_TIME_FORMATTER) : "");
+                break;
+            case "productionStartTime":
+                cell.setCellValue(order.getProductionStartTime() != null
+                        ? order.getProductionStartTime().format(DATE_TIME_FORMATTER) : "");
+                break;
+            case "productionEndTime":
+                cell.setCellValue(order.getProductionEndTime() != null
+                        ? order.getProductionEndTime().format(DATE_TIME_FORMATTER) : "");
+                break;
             case "phase":
             case "phaseName":
                 cell.setCellValue(StrUtil.nullToEmpty(orderQueryHelper.getPhaseName(order.getPhase())));
@@ -530,6 +546,10 @@ public class OrderExportServiceImpl implements OrderExportService {
         labels.put("estimatedCost", "预计费用");
         labels.put("dataEvaluationOpinion", "影像评估意见");
         labels.put("designerName", "设计师");
+        labels.put("designStartTime", "设计开始时间");
+        labels.put("designSubmitTime", "设计提交时间");
+        labels.put("productionStartTime", "生产开始时间");
+        labels.put("productionEndTime", "生产结束时间");
         labels.put("phase", "阶段");
         labels.put("phaseName", "阶段");
         labels.put("statusName", "状态");
@@ -572,6 +592,10 @@ public class OrderExportServiceImpl implements OrderExportService {
         fields.add(new OrderExportFieldVO("estimatedCost", "预计费用"));
         fields.add(new OrderExportFieldVO("dataEvaluationOpinion", "影像评估意见"));
         fields.add(new OrderExportFieldVO("designerName", "设计师"));
+        fields.add(new OrderExportFieldVO("designStartTime", "设计开始时间"));
+        fields.add(new OrderExportFieldVO("designSubmitTime", "设计提交时间"));
+        fields.add(new OrderExportFieldVO("productionStartTime", "生产开始时间"));
+        fields.add(new OrderExportFieldVO("productionEndTime", "生产结束时间"));
         fields.add(new OrderExportFieldVO("phaseName", "阶段"));
         fields.add(new OrderExportFieldVO("statusName", "状态"));
         fields.add(new OrderExportFieldVO("operatorName", "业务员"));
