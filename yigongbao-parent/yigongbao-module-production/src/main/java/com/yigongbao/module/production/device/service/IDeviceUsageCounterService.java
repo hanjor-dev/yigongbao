@@ -1,5 +1,7 @@
 package com.yigongbao.module.production.device.service;
 
+import java.time.LocalDate;
+
 /**
  * 设备每日使用次数计数器服务接口
  * <p>
@@ -24,6 +26,11 @@ public interface IDeviceUsageCounterService {
      * @throws com.yigongbao.common.exception.BusinessException 当重试3次后仍然更新失败时抛出
      */
     Integer incrementAndGet(Long deviceId);
+
+    /**
+     * 按指定业务日期累加设备使用次数，保证批号日期与计数日期一致。
+     */
+    Integer incrementAndGet(Long deviceId, LocalDate usageDate);
 
     /**
      * 查询设备当日使用次数（不累加）

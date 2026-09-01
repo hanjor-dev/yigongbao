@@ -216,7 +216,7 @@ class ProductionRecordAssignDeviceTest {
         when(deviceMapper.selectByIdForUpdate(2L)).thenReturn(device);
         when(userMapper.selectById(7L)).thenReturn(user);
         when(processMapper.update(isNull(), any())).thenReturn(1);
-        when(deviceUsageCounterService.incrementAndGet(2L)).thenReturn(3);
+        when(deviceUsageCounterService.incrementAndGet(eq(2L), any(java.time.LocalDate.class))).thenReturn(3);
         when(productMapper.selectList(any())).thenReturn(List.of(product1, product2));
         when(productMapper.updateById(any(ProductionProductEntity.class))).thenReturn(1);
 
@@ -232,7 +232,7 @@ class ProductionRecordAssignDeviceTest {
         verify(productMapper).updateById(product1);
         verify(productMapper).updateById(product2);
         verify(processMapper).update(isNull(), any());
-        verify(deviceUsageCounterService).incrementAndGet(2L);
+        verify(deviceUsageCounterService).incrementAndGet(eq(2L), any(java.time.LocalDate.class));
         verify(productNumberService).generateFormalNumbers(1L, 2L, 3);
         InOrder lockOrder = inOrder(deviceMapper, availabilityService, recordMapper, userMapper, usageChecker, service);
         lockOrder.verify(deviceMapper).selectByIdForUpdate(2L);
@@ -310,7 +310,7 @@ class ProductionRecordAssignDeviceTest {
         when(productMapper.selectList(any())).thenReturn(List.of(product(11L)));
         when(productMapper.updateById(any(ProductionProductEntity.class))).thenReturn(1);
         when(processMapper.update(isNull(), any())).thenReturn(1);
-        when(deviceUsageCounterService.incrementAndGet(2L)).thenReturn(2);
+        when(deviceUsageCounterService.incrementAndGet(eq(2L), any(java.time.LocalDate.class))).thenReturn(2);
         doReturn(true).when(service).updateById(record);
 
         runAsAdmin(() -> service.assignDevice(1L, dto));
@@ -329,7 +329,7 @@ class ProductionRecordAssignDeviceTest {
         when(productMapper.selectList(any())).thenReturn(List.of(product(11L)));
         when(productMapper.updateById(any(ProductionProductEntity.class))).thenReturn(1);
         when(processMapper.update(isNull(), any())).thenReturn(1);
-        when(deviceUsageCounterService.incrementAndGet(2L)).thenReturn(1);
+        when(deviceUsageCounterService.incrementAndGet(eq(2L), any(java.time.LocalDate.class))).thenReturn(1);
         doReturn(true).when(service).updateById(record);
 
         runAsAdmin(() -> service.assignDevice(1L, dto));

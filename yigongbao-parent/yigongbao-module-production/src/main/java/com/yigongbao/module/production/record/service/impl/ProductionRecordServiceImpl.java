@@ -73,6 +73,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -614,11 +616,11 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
         }
-        record.setProductionBatchNo(dto.getProductionBatchNo());
         record.setMaterialBatchNo(dto.getMaterialBatchNo());
         record.setContentUpdateTime(nextContentUpdateTime(record.getContentUpdateTime()));
         updateById(record);
-        log.info("提交生产批号: recordId={}, batchNo={}", recordId, dto.getProductionBatchNo());
+        log.info("提交原材料批号: recordId={}, productionBatchNoIgnored={}, materialBatchNo={}",
+                recordId, dto.getProductionBatchNo(), dto.getMaterialBatchNo());
     }
 
     /** 获取流转卡的设备配置信息（已分配的打印机编号、名称等） */
@@ -747,6 +749,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         saveProductWeights(recordId, dto.getProductWeights());
 
+        LocalDate assignmentDate = LocalDate.now();
+        String productionBatchNo = assignmentDate.format(DateTimeFormatter.ofPattern("yyMMdd"));
+        record.setProductionBatchNo(productionBatchNo);
         record.setPrintDeviceId(device.getId());
         record.setPrintDeviceCode(device.getDeviceId());
         record.setPrintDeviceName(device.getDeviceName());
@@ -774,7 +779,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
 
         // 累加设备当日上机次数并生成正式产品编号
-        Integer usageCount = deviceUsageCounterService.incrementAndGet(device.getId());
+        Integer usageCount = deviceUsageCounterService.incrementAndGet(device.getId(), assignmentDate);
         productNumberService.generateFormalNumbers(recordId, device.getId(), usageCount);
 
         log.info("分配打印设备并生成产品编号: recordId={}, deviceId={}, deviceNo={}, usageCount={}",

@@ -41,6 +41,10 @@ import com.yigongbao.module.production.record.dto.SaveProductionColumnConfigDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.PrinterAvailabilityService;
+import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
+import com.yigongbao.module.production.record.dto.AssignProductWeightDTO;
+import com.yigongbao.module.production.device.service.IDeviceUsageCounterService;
+import com.yigongbao.module.production.product.service.IProductNumberService;
 import com.yigongbao.module.production.record.vo.ProductionColumnConfigVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import com.yigongbao.module.system.config.service.ConfigService;
@@ -65,6 +69,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -101,6 +107,8 @@ class ProductionRecordServiceImplTest {
     @Mock private com.yigongbao.module.basic.file.service.FileService fileService;
     @Mock private PrinterRecordUsageChecker usageChecker;
     @Mock private PrinterAvailabilityService availabilityService;
+    @Mock private IDeviceUsageCounterService deviceUsageCounterService;
+    @Mock private IProductNumberService productNumberService;
 
     @InjectMocks
     private ProductionRecordServiceImpl recordService;
@@ -635,9 +643,10 @@ class ProductionRecordServiceImplTest {
     }
 
     @Test
-    void submitBatchNo_updatesProductionAndMaterialBatch() {
+    void submitBatchNo_doesNotAllowClientToOverwriteProductionBatch() {
         ProductionRecordEntity record = new ProductionRecordEntity();
         record.setId(21L);
+        record.setProductionBatchNo("260901");
         when(recordMapper.selectById(21L)).thenReturn(record);
         doReturn(1).when(recordMapper).updateById(
                 org.mockito.ArgumentMatchers.<ProductionRecordEntity>any());
@@ -650,8 +659,48 @@ class ProductionRecordServiceImplTest {
 
         var captor = org.mockito.ArgumentCaptor.forClass(ProductionRecordEntity.class);
         verify(recordMapper).updateById(captor.capture());
-        assertEquals("260717", captor.getValue().getProductionBatchNo());
+        assertEquals("260901", captor.getValue().getProductionBatchNo());
         assertEquals("MAT-01", captor.getValue().getMaterialBatchNo());
+    }
+
+    @Test
+    void assignDevice_generatesBatchFromAssignmentDateAndUsesItForProductNumbers() {
+        ProductionRecordEntity record = record(30L, 10L, FlowStatusEnum.PENDING_PRINT.getValue());
+        record.setProductionBatchNo("260831");
+        record.setPrintDeviceId(null);
+        DeviceEntity printer = device(7L, DeviceTypeEnum.PRINTER_SLA.getCode(), 88L, "SLA-007");
+        ProductionProductEntity product = new ProductionProductEntity();
+        product.setId(301L);
+        product.setProductionRecordId(30L);
+        product.setProductName("定制式3D打印骨模型");
+        AssignDeviceDTO dto = new AssignDeviceDTO();
+        dto.setDeviceId(7L);
+        AssignProductWeightDTO weight = new AssignProductWeightDTO();
+        weight.setProductId(301L);
+        weight.setWeight(new BigDecimal("1.20"));
+        dto.setProductWeights(List.of(weight));
+
+        when(deviceMapper.selectByIdForUpdate(7L)).thenReturn(printer);
+        when(recordMapper.selectByIdForUpdate(30L)).thenReturn(record);
+        OrderMainEntity assignedOrder = order(10L, ProductionConstants.ORDER_TYPE_MEDICAL);
+        assignedOrder.setCenterId(88L);
+        when(orderMainMapper.selectById(10L)).thenReturn(assignedOrder);
+        when(productMapper.selectList(any())).thenReturn(List.of(product));
+        when(productMapper.updateById(any(ProductionProductEntity.class))).thenReturn(1);
+        when(processMapper.update(any(), any())).thenReturn(1);
+        when(recordMapper.updateById(any(ProductionRecordEntity.class))).thenReturn(1);
+        when(deviceUsageCounterService.incrementAndGet(eq(7L), any(LocalDate.class))).thenReturn(1);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            recordService.assignDevice(30L, dto);
+        }
+
+        ArgumentCaptor<ProductionRecordEntity> recordCaptor = ArgumentCaptor.forClass(ProductionRecordEntity.class);
+        verify(recordMapper).updateById(recordCaptor.capture());
+        assertEquals(LocalDate.now().format(DateTimeFormatter.ofPattern("yyMMdd")),
+                recordCaptor.getValue().getProductionBatchNo());
+        verify(productNumberService).generateFormalNumbers(30L, 7L, 1);
     }
 
     @Test
@@ -1436,6 +1485,7 @@ class ProductionRecordServiceImplTest {
         UserEntity user = new UserEntity();
         user.setId(id);
         user.setRealName("生产员A");
+        user.setRoleCode(RoleCodeEnum.PRODUCTION_WORKER.getCode());
         user.setCenterId(centerId);
         user.setCenterName(centerName);
         return user;

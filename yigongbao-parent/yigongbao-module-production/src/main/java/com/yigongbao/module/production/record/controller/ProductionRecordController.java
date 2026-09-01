@@ -62,13 +62,13 @@ public class ProductionRecordController {
         return Result.success(recordService.downloadDataPackage(id));
     }
 
-    @Operation(summary = "自动生成生产批号（预览，不写库）")
+    @Operation(summary = "自动生成生产批号（兼容接口，设备提交时以后台生成值为准）", deprecated = true)
     @GetMapping("/{id}/generate-batch-no")
     public Result<String> generateBatchNo(@PathVariable Long id) {
         return Result.success(recordService.generateBatchNo(id));
     }
 
-    @Operation(summary = "提交生产批号")
+    @Operation(summary = "提交原材料批号（生产批号由设备提交时后台生成）")
     @OperationLog(module = "生产管理", businessType = OperationTypeEnum.SUBMIT, operation = "提交生产批号")
     @PostMapping("/{id}/submit-batch-no")
     public Result<Void> submitBatchNo(@PathVariable Long id, @Valid @RequestBody SubmitBatchNoDTO dto) {

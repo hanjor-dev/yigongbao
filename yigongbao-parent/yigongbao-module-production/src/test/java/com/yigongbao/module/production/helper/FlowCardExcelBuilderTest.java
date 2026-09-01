@@ -56,12 +56,12 @@ class FlowCardExcelBuilderTest {
     }
 
     @Test
-    void buildHeaderUsesPrintStartDateAsProductionBatchNo() throws Exception {
+    void buildHeaderUsesPersistedProductionBatchNoEvenWhenPrintStartsOnAnotherDate() throws Exception {
         FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
-        context.setProductionBatchNo("OLD-BATCH");
-        context.setPrintStartTime(LocalDateTime.of(2026, 8, 13, 14, 15, 24));
+        context.setProductionBatchNo("20260901");
+        context.setPrintStartTime(LocalDateTime.of(2026, 9, 2, 14, 15, 24));
 
-        assertEquals("20260813", readCell(builder.build(context), 3, 2));
+        assertEquals("20260901", readCell(builder.build(context), 3, 2));
     }
 
     @Test

@@ -41,7 +41,13 @@ public class DeviceUsageCounterServiceImpl extends ServiceImpl<DeviceUsageCounte
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Integer incrementAndGet(Long deviceId) {
-        LocalDate today = LocalDate.now();
+        return incrementAndGet(deviceId, LocalDate.now());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Integer incrementAndGet(Long deviceId, LocalDate usageDate) {
+        LocalDate today = usageDate;
 
         // 乐观锁重试机制
         int maxRetries = MAX_RETRY_ATTEMPTS;

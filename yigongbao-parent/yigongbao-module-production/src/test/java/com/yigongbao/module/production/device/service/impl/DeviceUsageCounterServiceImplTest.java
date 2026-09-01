@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.session.Configuration;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -53,6 +54,18 @@ class DeviceUsageCounterServiceImplTest {
         assertThat(inserted.getDeviceId()).isEqualTo(7L);
         assertThat(inserted.getUsageCount()).isEqualTo(1);
         assertThat(inserted.getVersion()).isEqualTo(0);
+    }
+
+    @Test
+    void incrementAndGetAtDate_usesProvidedDateForDailyCounter() {
+        when(counterMapper.selectOne(any())).thenReturn(null);
+        LocalDate assignmentDate = LocalDate.of(2026, 9, 1);
+
+        assertThat(service.incrementAndGet(7L, assignmentDate)).isEqualTo(1);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(DeviceUsageCounterEntity.class);
+        verify(counterMapper).insert(captor.capture());
+        assertThat(captor.getValue().getUsageDate()).isEqualTo(assignmentDate);
     }
 
     @Test

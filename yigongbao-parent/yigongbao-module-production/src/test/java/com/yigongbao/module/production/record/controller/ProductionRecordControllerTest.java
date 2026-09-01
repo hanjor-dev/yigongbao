@@ -203,13 +203,13 @@ class ProductionRecordControllerTest {
     }
 
     @Test
-    void submitBatchNo_rejectsBlankBatchNo() throws Exception {
+    void submitBatchNo_acceptsLegacyBlankBatchNoAndDelegatesMaterialBatch() throws Exception {
         mockMvc.perform(post("/production/record/{id}/submit-batch-no", 7L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"productionBatchNo\":\" \"}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk());
 
-        verifyNoInteractions(recordService);
+        verify(recordService).submitBatchNo(eq(7L), any(SubmitBatchNoDTO.class));
     }
 
     @Test

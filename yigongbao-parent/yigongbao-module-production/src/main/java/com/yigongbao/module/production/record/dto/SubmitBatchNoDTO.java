@@ -1,17 +1,18 @@
 package com.yigongbao.module.production.record.dto;
 
 import lombok.Data;
-import jakarta.validation.constraints.NotBlank;
 
 /**
- * 提交生产批号 DTO
+ * 提交原材料批号 DTO。
+ * productionBatchNo 仅为旧客户端兼容字段，服务端不再使用。
  *
  * @author hanjor
  * @date 2026-05-27
  */
 @Data
 public class SubmitBatchNoDTO {
-    @NotBlank(message = "生产批号不能为空")
+    /** @deprecated 生产批号由提交打印设备时后台生成。 */
+    @Deprecated
     private String productionBatchNo;
     /** 原材料批号 */
     private String materialBatchNo;

@@ -32,7 +32,6 @@ public class FlowCardExcelBuilder {
 
     private static final String TEMPLATE_PATH = "template/流转卡模板.xlsx";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DateTimeFormatter BATCH_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter MINUTE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     @Data
@@ -93,10 +92,7 @@ public class FlowCardExcelBuilder {
         setCellValue(sheet, 2, 2, context.getDesignPackageCode());
         setCellValue(sheet, 2, 5, context.getTotalProductCount() != null ?
             String.valueOf(context.getTotalProductCount()) : "-");
-        String productionBatchNo = context.getPrintStartTime() == null
-            ? context.getProductionBatchNo()
-            : context.getPrintStartTime().format(BATCH_DATE_FORMATTER);
-        setCellValue(sheet, 3, 2, productionBatchNo);
+        setCellValue(sheet, 3, 2, context.getProductionBatchNo());
         setCellValue(sheet, 3, 5, context.getMaterial());
         setCellValue(sheet, 4, 2, "开始时间: " + formatDateTime(context.getPrintStartTime()));
         setCellValue(sheet, 4, 5, context.getMaterialBatchNo());
