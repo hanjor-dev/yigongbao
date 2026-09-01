@@ -279,13 +279,14 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             }
 
             // 追加其他过滤条件
-            // orderCode 参数：多字段模糊搜索（订单编号/机构名称/业务员姓名/医院名称/患者名字）
+            // orderCode 参数：多字段模糊搜索（订单编号/机构名称/业务员姓名/医院名称/患者姓名/医生姓名）
             if (StrUtil.isNotBlank(dto.getOrderCode())) {
                 wrapper.and(w -> w.like(OrderMainEntity::getOrderCode, dto.getOrderCode())
                         .or().like(OrderMainEntity::getOrgName, dto.getOrderCode())
                         .or().like(OrderMainEntity::getOperatorName, dto.getOrderCode())
                         .or().like(OrderMainEntity::getHospitalName, dto.getOrderCode())
-                        .or().like(OrderMainEntity::getPatientName, dto.getOrderCode()));
+                        .or().like(OrderMainEntity::getPatientName, dto.getOrderCode())
+                        .or().like(OrderMainEntity::getDoctorName, dto.getOrderCode()));
             }
             wrapper.eq(Objects.nonNull(dto.getAreaId()), OrderMainEntity::getAreaId, dto.getAreaId())
                     .like(StrUtil.isNotBlank(dto.getPatientName()), OrderMainEntity::getPatientName, dto.getPatientName())

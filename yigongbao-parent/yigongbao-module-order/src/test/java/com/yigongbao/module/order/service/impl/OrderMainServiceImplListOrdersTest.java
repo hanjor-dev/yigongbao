@@ -59,6 +59,7 @@ class OrderMainServiceImplListOrdersTest {
     static void initLambdaMetadata() {
         Configuration configuration = new Configuration();
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "");
+        TableInfoHelper.initTableInfo(assistant, OrderMainEntity.class);
     }
 
     // ── 被测类所有依赖，@InjectMocks 会注入 ──────────────────────────
@@ -352,6 +353,21 @@ class OrderMainServiceImplListOrdersTest {
             int withFilter = executeAndGetSegmentCount(dto);
 
             assertThat(withFilter).isGreaterThan(baseline);
+        }
+
+        @Test
+        void filterByOrderCode_alsoMatchesDoctorName() {
+            when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
+            when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
+            mockSelectPage(List.of(), 0L);
+            ArgumentCaptor<LambdaQueryWrapper> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+
+            OrderPageDTO dto = baseDto();
+            dto.setOrderCode("张");
+            orderMainService.listOrders(dto);
+
+            verify(orderMainMapper).selectPage(any(), captor.capture());
+            assertThat(captor.getValue().getSqlSegment()).contains("doctorName");
         }
 
         @Test
