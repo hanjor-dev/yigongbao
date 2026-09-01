@@ -6,6 +6,7 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
+import com.yigongbao.module.design.dto.UpdateEvaluationOpinionDTO;
 import com.yigongbao.module.design.service.DesignWorkorderService;
 import com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO;
 import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
@@ -53,6 +54,18 @@ public class DesignWorkorderController {
     @GetMapping("/{orderId}")
     public Result<DesignWorkorderDetailVO> getWorkorderDetail(@PathVariable Long orderId) {
         return Result.success(designWorkorderService.getWorkorderDetail(orderId));
+    }
+
+    /**
+     * 更新订单影像数据评估意见
+     */
+    @Operation(summary = "更新订单评估意见")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "更新评估意见")
+    @PostMapping("/{orderId}/evaluation-opinion")
+    public Result<Void> updateEvaluationOpinion(@PathVariable Long orderId,
+                                                @Valid @RequestBody UpdateEvaluationOpinionDTO dto) {
+        designWorkorderService.updateEvaluationOpinion(orderId, dto.getDataEvaluationOpinion());
+        return Result.success();
     }
 
     /**

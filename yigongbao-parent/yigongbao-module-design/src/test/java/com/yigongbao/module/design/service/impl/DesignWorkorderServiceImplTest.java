@@ -774,6 +774,36 @@ class DesignWorkorderServiceImplTest {
         }
     }
 
+    @Nested
+    @DisplayName("updateEvaluationOpinion")
+    class UpdateEvaluationOpinion {
+
+        @Test
+        @DisplayName("订单存在时仅更新评估意见")
+        void success_updatesOpinionOnly() {
+            when(orderMainService.getById(1L)).thenReturn(buildOrder(1L));
+
+            service.updateEvaluationOpinion(1L, "影像数据清晰，可以进行设计");
+
+            verify(orderMainService).updateById(argThat(order ->
+                    order.getId().equals(1L)
+                            && "影像数据清晰，可以进行设计".equals(order.getDataEvaluationOpinion())
+                            && order.getOrderCode() == null));
+        }
+
+        @Test
+        @DisplayName("订单不存在时抛出 ORDER_NOT_FOUND")
+        void orderNotFound() {
+            when(orderMainService.getById(999L)).thenReturn(null);
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> service.updateEvaluationOpinion(999L, "评估意见"));
+
+            assertEquals(ErrorCodeEnum.ORDER_NOT_FOUND.getCode(), ex.getCode());
+            verify(orderMainService, never()).updateById(any());
+        }
+    }
+
 
     @Nested
     @DisplayName("completeDesign")

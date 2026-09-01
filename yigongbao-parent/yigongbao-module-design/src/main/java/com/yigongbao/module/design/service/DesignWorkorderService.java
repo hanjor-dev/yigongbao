@@ -34,6 +34,14 @@ public interface DesignWorkorderService {
     DesignWorkorderDetailVO getWorkorderDetail(Long orderId);
 
     /**
+     * 更新订单影像数据评估意见
+     *
+     * @param orderId 订单ID
+     * @param opinion 评估意见
+     */
+    void updateEvaluationOpinion(Long orderId, String opinion);
+
+    /**
      * 获取当前用户的列配置
      * 优先返回用户个人配置，无则返回系统默认配置
      *
