@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -578,25 +579,35 @@ class OrderMainServiceImplListOrdersTest {
     class BoundaryAndVoConversion {
 
         @Test
-        void statistics_returnsGlobalCountsWithoutUserDataScope() {
+        void statistics_appliesCurrentUserDataScopeToEveryCount() {
             when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
             when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ORG);
             when(orderMainMapper.selectCount(any(LambdaQueryWrapper.class)))
                     .thenReturn(12L, 3L, 4L);
-            ArgumentCaptor<LambdaQueryWrapper> wrapperCaptor =
-                    ArgumentCaptor.forClass(LambdaQueryWrapper.class);
 
             OrderStatisticsVO result = orderMainService.statistics();
 
             assertThat(result.getTotal()).isEqualTo(12L);
             assertThat(result.getPendingAudit()).isEqualTo(3L);
             assertThat(result.getDesigning()).isEqualTo(4L);
-            verify(orderQueryHelper, never()).buildDataScopeCondition(any(), any(), any());
-            verify(userHospitalService, never()).getDataScopeType(any());
-            verify(orderMainMapper, times(3)).selectCount(wrapperCaptor.capture());
-            assertThat(wrapperCaptor.getAllValues().get(0).getExpression().getNormal()).hasSize(0);
-            assertThat(wrapperCaptor.getAllValues().get(1).getExpression().getNormal()).hasSize(3);
-            assertThat(wrapperCaptor.getAllValues().get(2).getExpression().getNormal()).hasSize(3);
+            verify(userHospitalService).getDataScopeType(1L);
+            verify(orderQueryHelper, times(3)).buildDataScopeCondition(
+                    any(LambdaQueryWrapper.class), eq(1L), eq(DataScopeTypeEnum.ORG));
+            verify(orderMainMapper, times(3)).selectCount(any(LambdaQueryWrapper.class));
+        }
+
+        @ParameterizedTest
+        @EnumSource(DataScopeTypeEnum.class)
+        void statistics_forwardsEveryDataScopeType(DataScopeTypeEnum scopeType) {
+            when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
+            when(userHospitalService.getDataScopeType(1L)).thenReturn(scopeType);
+            when(orderMainMapper.selectCount(any(LambdaQueryWrapper.class)))
+                    .thenReturn(1L, 2L, 3L);
+
+            orderMainService.statistics();
+
+            verify(orderQueryHelper, times(3)).buildDataScopeCondition(
+                    any(LambdaQueryWrapper.class), eq(1L), eq(scopeType));
         }
 
         @Test
