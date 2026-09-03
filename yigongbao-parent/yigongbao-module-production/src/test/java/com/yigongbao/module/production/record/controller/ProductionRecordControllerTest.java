@@ -6,7 +6,9 @@ import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.AssignProductWeightDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
+import com.yigongbao.module.production.record.dto.ForceCompletePrintDTO;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
+import com.yigongbao.module.production.record.service.ProductionPrintLifecycleService;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import com.yigongbao.module.production.record.vo.PrinterOccupationVO;
 import org.junit.jupiter.api.Test;
@@ -40,6 +42,7 @@ class ProductionRecordControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @MockBean private IProductionRecordService recordService;
+    @MockBean private ProductionPrintLifecycleService printLifecycleService;
 
     @Test
     void printerOccupation_returnsOccupiedStatusAndBindsParameters() throws Exception {
@@ -107,6 +110,42 @@ class ProductionRecordControllerTest {
         assertThat(operationLog).isNotNull();
         assertThat(operationLog.businessType()).isEqualTo(OperationTypeEnum.CANCEL);
         assertThat(operationLog.operation()).isEqualTo("强制释放打印设备配置");
+    }
+
+    @Test
+    void forceCompletePrint_bindsReasonAndDelegates() throws Exception {
+        mockMvc.perform(post("/production/record/{id}/force-complete-print", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"设备完成消息丢失\"}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<ForceCompletePrintDTO> captor = ArgumentCaptor.forClass(ForceCompletePrintDTO.class);
+        verify(printLifecycleService).forceCompletePrint(eq(7L), captor.capture());
+        assertThat(captor.getValue().getReason()).isEqualTo("设备完成消息丢失");
+    }
+
+    @Test
+    void forceCompletePrint_rejectsMissingReason() throws Exception {
+        mockMvc.perform(post("/production/record/{id}/force-complete-print", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(recordService);
+    }
+
+    @Test
+    void forceCompletePrint_requiresPermissionAndOperationLog() throws Exception {
+        var method = ProductionRecordController.class
+                .getDeclaredMethod("forceCompletePrint", Long.class, ForceCompletePrintDTO.class);
+        var permission = method.getAnnotation(com.yigongbao.framework.annotation.RequirePermission.class);
+        var operationLog = method.getAnnotation(OperationLog.class);
+
+        assertThat(permission).isNotNull();
+        assertThat(permission.value()).isEqualTo("manufacture:ForceCompletePrint");
+        assertThat(operationLog).isNotNull();
+        assertThat(operationLog.businessType()).isEqualTo(OperationTypeEnum.UPDATE);
+        assertThat(operationLog.operation()).isEqualTo("强制完成打印");
     }
 
     @Test

@@ -6,11 +6,14 @@ import com.yigongbao.common.enums.OperationTypeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
+import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.ProductLedgerExportDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
+import com.yigongbao.module.production.record.service.ProductionPrintLifecycleService;
+import com.yigongbao.module.production.record.dto.ForceCompletePrintDTO;
 import com.yigongbao.module.production.record.vo.CancelPreviewVO;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
@@ -42,6 +45,7 @@ import java.util.List;
 public class ProductionRecordController {
 
     private final IProductionRecordService recordService;
+    private final ProductionPrintLifecycleService printLifecycleService;
 
     @Operation(summary = "分页查询生产列表")
     @PostMapping("/list")
@@ -109,6 +113,16 @@ public class ProductionRecordController {
     @PostMapping("/{id}/release-device")
     public Result<Void> releaseDevice(@PathVariable Long id) {
         recordService.releaseDevice(id);
+        return Result.success();
+    }
+
+    @Operation(summary = "强制完成打印")
+    @RequirePermission("manufacture:ForceCompletePrint")
+    @OperationLog(module = "生产管理", businessType = OperationTypeEnum.UPDATE, operation = "强制完成打印")
+    @PostMapping("/{id}/force-complete-print")
+    public Result<Void> forceCompletePrint(@PathVariable Long id,
+                                            @Valid @RequestBody ForceCompletePrintDTO dto) {
+        printLifecycleService.forceCompletePrint(id, dto);
         return Result.success();
     }
 
