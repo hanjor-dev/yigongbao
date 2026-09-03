@@ -109,6 +109,7 @@ CREATE TABLE order_main (
     design_review_remark VARCHAR(512) COMMENT '设计审核备注',
     estimated_cost DECIMAL(10,2) COMMENT '预估费用',
     data_evaluation_opinion TEXT COMMENT '影像数据评估意见',
+    designer_remark TEXT COMMENT '设计师备注',
     regional_audit_status INT,
     regional_audit_remark VARCHAR(512),
     regional_audit_time TIMESTAMP,

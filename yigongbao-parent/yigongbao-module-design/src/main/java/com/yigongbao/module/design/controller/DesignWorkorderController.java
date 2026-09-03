@@ -64,7 +64,7 @@ public class DesignWorkorderController {
     @PostMapping("/{orderId}/evaluation-opinion")
     public Result<Void> updateEvaluationOpinion(@PathVariable Long orderId,
                                                 @Valid @RequestBody UpdateEvaluationOpinionDTO dto) {
-        designWorkorderService.updateEvaluationOpinion(orderId, dto.getDataEvaluationOpinion());
+        designWorkorderService.updateEvaluationOpinion(orderId, dto.getDesignerRemark());
         return Result.success();
     }
 

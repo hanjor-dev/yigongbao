@@ -5,15 +5,15 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
- * 更新影像数据评估意见 DTO
+ * 更新设计师备注 DTO
  */
 @Data
 public class UpdateEvaluationOpinionDTO {
 
     /**
-     * 影像数据评估意见
+     * 设计师备注
      */
-    @NotBlank(message = "评估意见不能为空")
-    @Size(max = 2000, message = "评估意见长度不能超过2000个字符")
-    private String dataEvaluationOpinion;
+    @NotBlank(message = "设计师备注不能为空")
+    @Size(max = 2000, message = "设计师备注长度不能超过2000个字符")
+    private String designerRemark;
 }

@@ -279,6 +279,11 @@ public class OrderMainEntity extends BaseEntity implements Serializable {
      */
     private String dataEvaluationOpinion;
 
+    /**
+     * 设计师备注
+     */
+    private String designerRemark;
+
     // ==================== 审核信息（区域字段仅兼容历史订单） ====================
     /**
      * 历史区域审核状态：0-待审核，1-通过，2-驳回；新订单不再使用

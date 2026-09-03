@@ -71,7 +71,7 @@ class DesignWorkorderControllerTest {
     @Test
     void updateEvaluationOpinion_passesOrderIdAndOpinion() throws Exception {
         UpdateEvaluationOpinionDTO dto = new UpdateEvaluationOpinionDTO();
-        dto.setDataEvaluationOpinion("影像数据清晰，可以进行设计");
+        dto.setDesignerRemark("影像数据清晰，可以进行设计");
 
         mockMvc.perform(post("/design/workorder/{id}/evaluation-opinion", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -85,7 +85,7 @@ class DesignWorkorderControllerTest {
     void updateEvaluationOpinion_rejectsBlankOpinion() throws Exception {
         mockMvc.perform(post("/design/workorder/{id}/evaluation-opinion", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"dataEvaluationOpinion\":\" \"}"))
+                        .content("{\"designerRemark\":\" \"}"))
                 .andExpect(status().isBadRequest());
 
         org.mockito.Mockito.verifyNoInteractions(designWorkorderService);

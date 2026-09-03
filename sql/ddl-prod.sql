@@ -1115,6 +1115,7 @@ CREATE TABLE order_main (
     design_review_remark TEXT        COMMENT '设计审核备注',
     estimated_cost  DECIMAL(10,2)   COMMENT '预估费用',
     data_evaluation_opinion TEXT     COMMENT '影像数据评估意见',
+    designer_remark TEXT             COMMENT '设计师备注',
 
     -- ==================== 两级审核字段 ====================
     regional_audit_status TINYINT DEFAULT NULL COMMENT '区域管理员审核状态：0-未审核，1-已通过，2-已驳回（仅试用订单）',

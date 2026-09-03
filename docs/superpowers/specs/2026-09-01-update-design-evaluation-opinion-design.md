@@ -2,7 +2,7 @@
 
 ## 背景
 
-设计工单详情已读取 `order_main.data_evaluation_opinion`，但设计模块缺少更新该字段的接口。需要提供一个面向设计工单的接口，支持按订单 ID 更新影像数据评估意见。
+设计工单需要提供一个独立的备注更新入口。该接口不使用已有的 `order_main.data_evaluation_opinion` 字段，而是将内容保存到新增的 `order_main.designer_remark` 字段，避免与原有影像数据评估意见语义混用。
 
 ## 接口设计
 
@@ -13,7 +13,7 @@
 
 ```json
 {
-  "dataEvaluationOpinion": "评估意见内容"
+  "designerRemark": "设计师备注内容"
 }
 ```
 
@@ -22,9 +22,9 @@
 
 ## 分层实现
 
-1. 在设计模块新增 `UpdateEvaluationOpinionDTO`，承载并校验 `dataEvaluationOpinion`。
+1. 在设计模块新增 `UpdateEvaluationOpinionDTO`，承载并校验 `designerRemark`。
 2. 在 `DesignWorkorderService` 增加 `updateEvaluationOpinion(Long orderId, String opinion)`。
-3. 在 `DesignWorkorderServiceImpl` 中校验订单存在，使用已有 `OrderMainService` 更新 `OrderMainEntity.dataEvaluationOpinion`，订单不存在时抛出既有 `ORDER_NOT_FOUND` 异常。
+3. 在 `DesignWorkorderServiceImpl` 中校验订单存在，使用已有 `OrderMainService` 更新 `OrderMainEntity.designerRemark`，订单不存在时抛出既有 `ORDER_NOT_FOUND` 异常。
 4. 在 `DesignWorkorderController` 新增接口，并记录“更新评估意见”操作日志。
 
 ## 数据流
@@ -34,12 +34,12 @@ HTTP 请求
   -> Controller 参数校验
   -> DesignWorkorderService
   -> OrderMainService.updateById
-  -> order_main.data_evaluation_opinion
+  -> order_main.designer_remark
 ```
 
 ## 错误处理
 
-- `dataEvaluationOpinion` 为空或超过约定长度：由 Jakarta Validation 返回参数错误。
+- `designerRemark` 为空或超过约定长度：由 Jakarta Validation 返回参数错误。
 - `orderId` 对应订单不存在：由服务层抛出 `ErrorCodeEnum.ORDER_NOT_FOUND`。
 - 更新失败：沿用现有全局异常处理和事务边界。
 
@@ -52,4 +52,5 @@ HTTP 请求
 ## 非目标
 
 - 不改变订单状态、阶段、版本号或其他订单字段。
+- 不修改 `order_main.data_evaluation_opinion`。
 - 不新增独立的订单 Mapper，复用已有订单服务能力。

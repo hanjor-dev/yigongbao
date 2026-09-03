@@ -285,11 +285,11 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
      * 更新订单影像数据评估意见
      *
      * @param orderId 订单ID
-     * @param opinion 评估意见
+     * @param remark 设计师备注
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateEvaluationOpinion(Long orderId, String opinion) {
+    public void updateEvaluationOpinion(Long orderId, String remark) {
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
@@ -297,7 +297,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
 
         OrderMainEntity update = new OrderMainEntity();
         update.setId(orderId);
-        update.setDataEvaluationOpinion(opinion);
+        update.setDesignerRemark(remark);
         orderMainService.updateById(update);
     }
 

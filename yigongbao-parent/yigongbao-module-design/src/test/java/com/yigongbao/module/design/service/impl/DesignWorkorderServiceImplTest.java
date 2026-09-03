@@ -787,7 +787,8 @@ class DesignWorkorderServiceImplTest {
 
             verify(orderMainService).updateById(argThat(order ->
                     order.getId().equals(1L)
-                            && "影像数据清晰，可以进行设计".equals(order.getDataEvaluationOpinion())
+                            && "影像数据清晰，可以进行设计".equals(order.getDesignerRemark())
+                            && order.getDataEvaluationOpinion() == null
                             && order.getOrderCode() == null));
         }
 

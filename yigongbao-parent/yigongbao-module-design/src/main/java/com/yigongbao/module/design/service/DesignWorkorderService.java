@@ -37,9 +37,9 @@ public interface DesignWorkorderService {
      * 更新订单影像数据评估意见
      *
      * @param orderId 订单ID
-     * @param opinion 评估意见
+     * @param remark 设计师备注
      */
-    void updateEvaluationOpinion(Long orderId, String opinion);
+    void updateEvaluationOpinion(Long orderId, String remark);
 
     /**
      * 获取当前用户的列配置
