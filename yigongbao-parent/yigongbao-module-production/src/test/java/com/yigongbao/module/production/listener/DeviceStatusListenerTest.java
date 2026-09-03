@@ -17,6 +17,7 @@ import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
+import com.yigongbao.module.production.record.service.ProductionPrintLifecycleService;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,7 @@ class DeviceStatusListenerTest {
     @Mock private OrderMainMapper orderMainMapper;
     @Mock private ProductionProductMapper productMapper;
     @Mock private IProductionProcessService processService;
+    @Mock private ProductionPrintLifecycleService printLifecycleService;
 
     @InjectMocks
     private DeviceStatusListener listener;
@@ -77,6 +79,18 @@ class DeviceStatusListenerTest {
 
         verify(recordMapper, never()).updateById((ProductionRecordEntity) any());
         verify(recordService, never()).triggerFlowIfAllReach(any(), any(), any());
+    }
+
+    @Test
+    void onDeviceStateChange_finishEvent_delegatesToPrintLifecycleService() {
+        ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING);
+        when(recordMapper.selectList(any())).thenReturn(List.of(record));
+        when(printLifecycleService.completePrint(1L, "device-state")).thenReturn(true);
+
+        listener.onDeviceStateChange(event(1L,
+                PrinterDeviceStateEnum.WORKING.getCode(), PrinterDeviceStateEnum.IDLE.getCode()));
+
+        verify(printLifecycleService).completePrint(1L, "device-state");
     }
 
     @ParameterizedTest
@@ -210,22 +224,14 @@ class DeviceStatusListenerTest {
     void onDeviceStateChange_finishPreviousStateToIdle_completesPrintingRecord(int oldState) {
         ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING);
         stubRecordQueryByStatus(record);
-        when(recordMapper.update(isNull(), any())).thenReturn(1);
-        when(processMapper.update(isNull(), any())).thenReturn(1);
+        when(printLifecycleService.completePrint(1L, "device-state")).thenReturn(true);
 
         listener.onDeviceStateChange(event(1L, oldState, PrinterDeviceStateEnum.IDLE.getCode()));
 
         verify(recordMapper).selectList(argThat(query -> queryHasStatus(query,
                 FlowStatusEnum.PRINTING)));
-        verify(recordMapper).update(isNull(), argThat(update -> updateHasStatus(update,
-                FlowStatusEnum.PRINTING)));
-        verify(processService).schedulePostProcessing(eq(1L), argThat(time ->
-                time != null && time.getNano() == 0));
-        verify(processMapper).update(isNull(), any());
+        verify(printLifecycleService).completePrint(1L, "device-state");
         verifyNoInteractions(productMapper, orderMainMapper);
-        verify(recordService).triggerFlowIfAllReach(10L,
-                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-        verify(recordService).reconcileOrderProductionStatus(10L);
     }
 
     @Test
@@ -234,54 +240,23 @@ class DeviceStatusListenerTest {
         ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING);
         record.setPrintFinishTime(predictedPrintFinishTime);
         stubRecordQueryByStatus(record);
-        when(recordMapper.update(isNull(), any())).thenReturn(1);
-        when(processMapper.update(isNull(), any())).thenReturn(1);
+        when(printLifecycleService.completePrint(1L, "device-state")).thenReturn(true);
         listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
                 PrinterDeviceStateEnum.IDLE.getCode()));
 
-        ArgumentCaptor<LocalDateTime> finishTimeCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-        ArgumentCaptor<LambdaUpdateWrapper> recordUpdateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
-        ArgumentCaptor<LambdaUpdateWrapper> processUpdateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
-        verify(processService).schedulePostProcessing(eq(1L), finishTimeCaptor.capture());
-        verify(recordMapper).update(isNull(), recordUpdateCaptor.capture());
-        verify(processMapper).update(isNull(), processUpdateCaptor.capture());
-
-        assertEquals(predictedPrintFinishTime, finishTimeCaptor.getValue(),
-                "后处理排程应继续使用预计打印结束时间");
-        assertTrue(!hasPrintFinishTime(recordUpdateCaptor.getValue()),
-                "打印完成不应覆盖预计打印结束时间");
-        assertEquals(predictedPrintFinishTime, valueForUpdateColumn(processUpdateCaptor.getValue(), "endTime"),
-                "打印工序 end_time 应使用预计打印结束时间");
+        verify(printLifecycleService).completePrint(1L, "device-state");
     }
 
     @Test
     void onDeviceStateChange_finishEvent_withoutPredictedPrintFinishTimeUsesCurrentTimeFallback() {
         ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING);
         stubRecordQueryByStatus(record);
-        when(recordMapper.update(isNull(), any())).thenReturn(1);
-        when(processMapper.update(isNull(), any())).thenReturn(1);
-        LocalDateTime before = LocalDateTime.now().withNano(0);
+        when(printLifecycleService.completePrint(1L, "device-state")).thenReturn(true);
 
         listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
                 PrinterDeviceStateEnum.IDLE.getCode()));
 
-        LocalDateTime after = LocalDateTime.now().withNano(0);
-        ArgumentCaptor<LambdaUpdateWrapper> recordUpdateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
-        ArgumentCaptor<LambdaUpdateWrapper> processUpdateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
-        ArgumentCaptor<LocalDateTime> finishTimeCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(recordMapper).update(isNull(), recordUpdateCaptor.capture());
-        verify(processMapper).update(isNull(), processUpdateCaptor.capture());
-        verify(processService).schedulePostProcessing(eq(1L), finishTimeCaptor.capture());
-
-        LocalDateTime actualFinishTime = finishTimeCaptor.getValue();
-        assertTrue(!actualFinishTime.isBefore(before) && !actualFinishTime.isAfter(after),
-                "无预测结束时间时应使用当前时间");
-        assertTrue(hasPrintFinishTime(recordUpdateCaptor.getValue()),
-                "没有预计打印结束时间时应使用完成时刻兜底");
-        assertEquals(actualFinishTime, valueForUpdateColumn(recordUpdateCaptor.getValue(), "printFinishTime"),
-                "没有预计打印结束时间时应保存完成时刻作为兜底");
-        assertEquals(actualFinishTime, valueForUpdateColumn(processUpdateCaptor.getValue(), "endTime"),
-                "打印工序 end_time 应与排程时间一致");
+        verify(printLifecycleService).completePrint(1L, "device-state");
     }
 
     @ParameterizedTest
@@ -313,7 +288,7 @@ class DeviceStatusListenerTest {
                 FlowStatusEnum.PRINTING)));
         verify(recordMapper, never()).update(isNull(), any());
         verifyNoInteractions(processMapper, productMapper, orderMainMapper, processService,
-                recordService);
+                recordService, printLifecycleService);
     }
 
     @Test
@@ -323,18 +298,13 @@ class DeviceStatusListenerTest {
         ProductionRecordEntity second = record(2L, 20L);
         second.setStatus(FlowStatusEnum.PRINTING.getValue());
         when(recordMapper.selectList(any())).thenReturn(List.of(first, second));
-        when(recordMapper.update(isNull(), any())).thenReturn(1);
-        when(processMapper.update(isNull(), any())).thenReturn(1);
+        when(printLifecycleService.completePrint(anyLong(), eq("device-state"))).thenReturn(true);
 
         listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
                 PrinterDeviceStateEnum.IDLE.getCode()));
 
-        verify(recordService).triggerFlowIfAllReach(10L,
-                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-        verify(recordService).triggerFlowIfAllReach(20L,
-                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-        verify(recordService).reconcileOrderProductionStatus(10L);
-        verify(recordService).reconcileOrderProductionStatus(20L);
+        verify(printLifecycleService).completePrint(1L, "device-state");
+        verify(printLifecycleService).completePrint(2L, "device-state");
     }
 
     @Test
@@ -342,8 +312,9 @@ class DeviceStatusListenerTest {
         ProductionRecordEntity record = record(1L, 10L);
         record.setStatus(FlowStatusEnum.PRINTING.getValue());
         when(recordMapper.selectList(any())).thenReturn(List.of(record));
-        when(recordMapper.update(isNull(), any())).thenReturn(1);
-        when(processMapper.update(isNull(), any())).thenReturn(0);
+        doThrow(new com.yigongbao.common.exception.BusinessException(
+                com.yigongbao.common.enums.ErrorCodeEnum.RECORD_STATUS_ABNORMAL))
+                .when(printLifecycleService).completePrint(1L, "device-state");
 
         assertThrows(com.yigongbao.common.exception.BusinessException.class,
                 () -> listener.onDeviceStateChange(event(1L, PrinterDeviceStateEnum.WORKING.getCode(),
@@ -483,8 +454,7 @@ class DeviceStatusListenerTest {
     void onDeviceStateChange_duplicatePrintFinishedToIdleEvent_runsCompletionSideEffectsOnce() {
         ProductionRecordEntity record = recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING);
         stubRecordQueryByStatus(record);
-        when(recordMapper.update(isNull(), any())).thenReturn(1, 0);
-        when(processMapper.update(isNull(), any())).thenReturn(1);
+        when(printLifecycleService.completePrint(1L, "device-state")).thenReturn(true, false);
 
         DeviceStateChangeEvent event = event(1L, PrinterDeviceStateEnum.PRINT_FINISHED.getCode(),
                 PrinterDeviceStateEnum.IDLE.getCode());
@@ -493,12 +463,8 @@ class DeviceStatusListenerTest {
 
         verify(recordMapper, times(2)).selectList(argThat(query -> queryHasStatus(query,
                 FlowStatusEnum.PRINTING)));
-        verify(recordMapper, times(2)).update(isNull(), any());
-        verify(processService, times(1)).schedulePostProcessing(eq(1L), any(LocalDateTime.class));
-        verify(processMapper, times(1)).update(isNull(), any());
-        verify(recordService, times(1)).triggerFlowIfAllReach(10L,
-                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-        verify(recordService, times(1)).reconcileOrderProductionStatus(10L);
+        verify(printLifecycleService, times(2)).completePrint(1L, "device-state");
+        verifyNoInteractions(processService, processMapper, recordService);
         verifyNoInteractions(productMapper, orderMainMapper);
     }
 
@@ -605,19 +571,14 @@ class DeviceStatusListenerTest {
 
     private void stubSuccessfulFinish() {
         stubRecordQueryByStatus(recordWithStatus(1L, 10L, FlowStatusEnum.PRINTING));
-        when(recordMapper.update(isNull(), any())).thenReturn(1);
-        when(processMapper.update(isNull(), any())).thenReturn(1);
+        when(printLifecycleService.completePrint(1L, "device-state")).thenReturn(true);
     }
 
     private void verifySingleCompletion() {
         verify(recordMapper, times(1)).selectList(argThat(query -> queryHasStatus(query,
                 FlowStatusEnum.PRINTING)));
-        verify(recordMapper, times(1)).update(isNull(), any());
-        verify(processService, times(1)).schedulePostProcessing(eq(1L), any(LocalDateTime.class));
-        verify(processMapper, times(1)).update(isNull(), any());
-        verify(recordService, times(1)).triggerFlowIfAllReach(10L,
-                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-        verify(recordService, times(1)).reconcileOrderProductionStatus(10L);
+        verify(printLifecycleService, times(1)).completePrint(1L, "device-state");
+        verifyNoInteractions(processService, processMapper, recordService);
         verifyNoInteractions(productMapper, orderMainMapper);
     }
 

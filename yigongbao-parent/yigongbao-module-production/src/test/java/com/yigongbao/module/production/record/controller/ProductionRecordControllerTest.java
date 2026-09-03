@@ -6,7 +6,6 @@ import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.AssignProductWeightDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
-import com.yigongbao.module.production.record.dto.ForceCompletePrintDTO;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.service.ProductionPrintLifecycleService;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
@@ -113,31 +112,17 @@ class ProductionRecordControllerTest {
     }
 
     @Test
-    void forceCompletePrint_bindsReasonAndDelegates() throws Exception {
-        mockMvc.perform(post("/production/record/{id}/force-complete-print", 7L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"设备完成消息丢失\"}"))
+    void forceCompletePrint_delegatesRecordId() throws Exception {
+        mockMvc.perform(post("/production/record/{id}/force-complete-print", 7L))
                 .andExpect(status().isOk());
 
-        ArgumentCaptor<ForceCompletePrintDTO> captor = ArgumentCaptor.forClass(ForceCompletePrintDTO.class);
-        verify(printLifecycleService).forceCompletePrint(eq(7L), captor.capture());
-        assertThat(captor.getValue().getReason()).isEqualTo("设备完成消息丢失");
-    }
-
-    @Test
-    void forceCompletePrint_rejectsMissingReason() throws Exception {
-        mockMvc.perform(post("/production/record/{id}/force-complete-print", 7L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest());
-
-        verifyNoInteractions(recordService);
+        verify(printLifecycleService).forceCompletePrint(7L);
     }
 
     @Test
     void forceCompletePrint_requiresPermissionAndOperationLog() throws Exception {
         var method = ProductionRecordController.class
-                .getDeclaredMethod("forceCompletePrint", Long.class, ForceCompletePrintDTO.class);
+                .getDeclaredMethod("forceCompletePrint", Long.class);
         var permission = method.getAnnotation(com.yigongbao.framework.annotation.RequirePermission.class);
         var operationLog = method.getAnnotation(OperationLog.class);
 

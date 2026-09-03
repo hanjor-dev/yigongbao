@@ -16,6 +16,7 @@ import com.yigongbao.module.production.process.service.IProductionProcessService
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
+import com.yigongbao.module.production.record.service.ProductionPrintLifecycleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -49,6 +50,7 @@ public class DeviceStatusListener {
     private final ProductionProcessMapper processMapper;
     private final IProductionRecordService recordService;
     private final IProductionProcessService processService;
+    private final ProductionPrintLifecycleService printLifecycleService;
     private final OrderMainMapper orderMainMapper;
     private final com.yigongbao.module.production.product.mapper.ProductionProductMapper productMapper;
 
@@ -125,48 +127,9 @@ public class DeviceStatusListener {
                 log.debug("设备变为空闲，未找到打印中的流转卡: deviceId={}", deviceId);
                 return;
             }
-            LocalDateTime now = LocalDateTime.now().withNano(0);
-            List<ProductionRecordEntity> completedRecords = new java.util.ArrayList<>();
             for (ProductionRecordEntity record : records) {
-                // print_finish_time 在打印开始时已保存预计结束时间，完成事件只推进状态，不能覆盖该时间基准。
-                LocalDateTime estimatedPrintFinishTime = record.getPrintFinishTime() != null
-                        ? record.getPrintFinishTime().withNano(0) : now;
-                LambdaUpdateWrapper<ProductionRecordEntity> updateWrapper =
-                        new LambdaUpdateWrapper<ProductionRecordEntity>()
-                                .eq(ProductionRecordEntity::getId, record.getId())
-                                .eq(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINTING.getValue())
-                                .set(ProductionRecordEntity::getStatus, FlowStatusEnum.PRINT_COMPLETED.getValue())
-                                .set(ProductionRecordEntity::getCurrentProcess, null)
-                                .set(ProductionRecordEntity::getContentUpdateTime, now);
-                if (record.getPrintFinishTime() == null) {
-                    // 兼容未提供预计耗时的旧设备，至少保留一个可用于后续排程的结束时间。
-                    updateWrapper.set(ProductionRecordEntity::getPrintFinishTime, estimatedPrintFinishTime);
-                }
-                int updated = recordMapper.update(null, updateWrapper);
-                if (updated == 0) {
-                    log.info("打印完成事件状态更新未生效，跳过重复处理: recordId={}, deviceId={}",
-                            record.getId(), deviceId);
-                    continue;
-                }
-                processService.schedulePostProcessing(record.getId(), estimatedPrintFinishTime);
-                updatePrintProcessEndTime(record.getId(), estimatedPrintFinishTime);
-                completedRecords.add(record);
-
-                log.info("设备状态变更触发打印完成: recordId={}, recordNo={}, deviceId={}",
-                        record.getId(), record.getRecordNo(), deviceId);
+                printLifecycleService.completePrint(record.getId(), "device-state");
             }
-            if (completedRecords.isEmpty()) {
-                return;
-            }
-            completedRecords.stream()
-                    .map(ProductionRecordEntity::getOrderId)
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .forEach(orderId -> {
-                        recordService.triggerFlowIfAllReach(orderId,
-                                FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-                        recordService.reconcileOrderProductionStatus(orderId);
-                    });
         }
     }
 
@@ -211,22 +174,6 @@ public class DeviceStatusListener {
         if (updated != 1) {
             throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
                     "打印工序记录缺失或重复，无法开始打印");
-        }
-    }
-
-    /** 更新打印工序结束时间 */
-    private void updatePrintProcessEndTime(Long recordId, LocalDateTime endTime) {
-        int updated = processMapper.update(null,
-                new LambdaUpdateWrapper<com.yigongbao.module.production.process.entity.ProductionProcessEntity>()
-                        .eq(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getProductionRecordId, recordId)
-                        .eq(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getProcessType,
-                                com.yigongbao.module.production.enums.ProcessTypeEnum.PRINT.getCode())
-                        .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getStatus,
-                                ProcessStatusEnum.COMPLETED.getCode())
-                        .set(com.yigongbao.module.production.process.entity.ProductionProcessEntity::getEndTime, endTime));
-        if (updated != 1) {
-            throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
-                    "打印工序记录缺失或重复，无法完成打印");
         }
     }
 

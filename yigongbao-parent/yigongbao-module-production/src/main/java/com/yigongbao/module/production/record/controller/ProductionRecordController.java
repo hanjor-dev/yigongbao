@@ -13,7 +13,6 @@ import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.service.ProductionPrintLifecycleService;
-import com.yigongbao.module.production.record.dto.ForceCompletePrintDTO;
 import com.yigongbao.module.production.record.vo.CancelPreviewVO;
 import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
@@ -120,9 +119,8 @@ public class ProductionRecordController {
     @RequirePermission("manufacture:ForceCompletePrint")
     @OperationLog(module = "生产管理", businessType = OperationTypeEnum.UPDATE, operation = "强制完成打印")
     @PostMapping("/{id}/force-complete-print")
-    public Result<Void> forceCompletePrint(@PathVariable Long id,
-                                            @Valid @RequestBody ForceCompletePrintDTO dto) {
-        printLifecycleService.forceCompletePrint(id, dto);
+    public Result<Void> forceCompletePrint(@PathVariable Long id) {
+        printLifecycleService.forceCompletePrint(id);
         return Result.success();
     }
 

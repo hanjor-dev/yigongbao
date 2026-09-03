@@ -12,7 +12,6 @@ import com.yigongbao.module.production.enums.ProcessStatusEnum;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.process.service.IProductionProcessService;
-import com.yigongbao.module.production.record.dto.ForceCompletePrintDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
@@ -40,7 +39,7 @@ public class ProductionPrintLifecycleServiceImpl implements ProductionPrintLifec
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void forceCompletePrint(Long recordId, ForceCompletePrintDTO dto) {
+    public void forceCompletePrint(Long recordId) {
         ProductionRecordEntity record = recordMapper.selectByIdForUpdate(recordId);
         if (record == null) {
             throw new BusinessException(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND);
@@ -59,7 +58,7 @@ public class ProductionPrintLifecycleServiceImpl implements ProductionPrintLifec
             throw new BusinessException(ErrorCodeEnum.RECORD_STATUS_ABNORMAL,
                     "只有打印中的流转卡才能强制完成打印");
         }
-        completePrint(recordId, "manual-force:" + dto.getReason());
+        completePrint(recordId, "manual-force");
     }
 
     @Override
