@@ -11,6 +11,12 @@ BEGIN
     DECLARE v_resource_id BIGINT DEFAULT NULL;
     DECLARE v_count INT DEFAULT 0;
 
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
     SELECT COUNT(*) INTO v_count FROM sys_role
      WHERE role_code = 'production-manager' AND is_deleted = 0;
     IF v_count <> 1 THEN
@@ -56,7 +62,7 @@ BEGIN
 
     SELECT COUNT(*) INTO v_count
       FROM sys_role_resource rr
-      INNER JOIN sys_role r ON r.id = rr.role_id
+      INNER JOIN sys_role r ON r.id = rr.role_id AND r.is_deleted = 0
      WHERE rr.resource_id = v_resource_id
        AND r.role_code <> 'production-manager';
     IF v_count > 0 THEN

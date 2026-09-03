@@ -5,7 +5,6 @@ import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowStatusEnum;
-import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.process.mapper.ProductionProcessMapper;
 import com.yigongbao.module.production.process.entity.ProductionProcessEntity;
 import com.yigongbao.module.production.process.service.IProductionProcessService;
@@ -38,7 +37,6 @@ class ProductionPrintLifecycleServiceImplTest {
     @Mock private ProductionProcessMapper processMapper;
     @Mock private IProductionProcessService processService;
     @Mock private IProductionRecordService recordService;
-    @Mock private OrderMainMapper orderMainMapper;
     @Mock private UserMapper userMapper;
 
     @InjectMocks
@@ -82,6 +80,42 @@ class ProductionPrintLifecycleServiceImplTest {
         ProductionRecordEntity record = printingRecord();
         UserEntity user = productionManager();
         user.setRoleCode(RoleCodeEnum.PRODUCTION_WORKER.getCode());
+        ForceCompletePrintDTO dto = new ForceCompletePrintDTO();
+        dto.setReason("设备完成消息丢失");
+        when(recordMapper.selectByIdForUpdate(1L)).thenReturn(record);
+        when(userMapper.selectById(9L)).thenReturn(user);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(9L);
+            assertThrows(BusinessException.class, () -> service.forceCompletePrint(1L, dto));
+        }
+
+        verifyNoInteractions(processService, processMapper, recordService);
+    }
+
+    @Test
+    void forceCompletePrint_rejectsManagerFromAnotherCenter() {
+        ProductionRecordEntity record = printingRecord();
+        UserEntity user = productionManager();
+        user.setCenterId(31L);
+        ForceCompletePrintDTO dto = new ForceCompletePrintDTO();
+        dto.setReason("设备完成消息丢失");
+        when(recordMapper.selectByIdForUpdate(1L)).thenReturn(record);
+        when(userMapper.selectById(9L)).thenReturn(user);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(9L);
+            assertThrows(BusinessException.class, () -> service.forceCompletePrint(1L, dto));
+        }
+
+        verifyNoInteractions(processService, processMapper, recordService);
+    }
+
+    @Test
+    void forceCompletePrint_rejectsRecordNotInPrintingState() {
+        ProductionRecordEntity record = printingRecord();
+        record.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
+        UserEntity user = productionManager();
         ForceCompletePrintDTO dto = new ForceCompletePrintDTO();
         dto.setReason("设备完成消息丢失");
         when(recordMapper.selectByIdForUpdate(1L)).thenReturn(record);
