@@ -281,6 +281,9 @@ public class OrderDetailVO implements Serializable {
      */
     private String dataEvaluationOpinion;
 
+    /** 设计师备注 */
+    private String designerRemark;
+
     /**
      * 审核进度描述（前端直接展示）
      * 如："等待设计管理员审核" / "设计管理员驳回"

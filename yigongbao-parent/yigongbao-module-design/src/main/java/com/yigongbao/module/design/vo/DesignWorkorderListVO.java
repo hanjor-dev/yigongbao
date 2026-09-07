@@ -76,6 +76,9 @@ public class DesignWorkorderListVO {
     /** 设计师姓名 */
     private String designerName;
 
+    /** 设计师备注 */
+    private String designerRemark;
+
     /** 数据包数量 */
     private Integer packageCount;
 

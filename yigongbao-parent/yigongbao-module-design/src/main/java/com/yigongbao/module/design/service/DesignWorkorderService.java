@@ -34,12 +34,12 @@ public interface DesignWorkorderService {
     DesignWorkorderDetailVO getWorkorderDetail(Long orderId);
 
     /**
-     * 更新订单影像数据评估意见
+     * 保存设计师备注
      *
      * @param orderId 订单ID
      * @param remark 设计师备注
      */
-    void updateEvaluationOpinion(Long orderId, String remark);
+    void saveDesignerRemark(Long orderId, String remark);
 
     /**
      * 获取当前用户的列配置

@@ -223,6 +223,9 @@ public class OrderListVO implements Serializable {
      */
     private String dataEvaluationOpinion;
 
+    /** 设计师备注 */
+    private String designerRemark;
+
     // ==================== 阶段与状态 ====================
 
     /**

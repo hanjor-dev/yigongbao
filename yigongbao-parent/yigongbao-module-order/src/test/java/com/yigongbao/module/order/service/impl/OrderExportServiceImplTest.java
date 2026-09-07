@@ -45,7 +45,7 @@ class OrderExportServiceImplTest {
         assertThat(fields).extracting("field").contains(
                 "orderCode", "patientName", "projectName",
                 "designStartTime", "designSubmitTime",
-                "productionStartTime", "productionEndTime");
+                "productionStartTime", "productionEndTime", "designerRemark");
     }
 
     @Test

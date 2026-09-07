@@ -155,6 +155,7 @@ class DesignWorkorderServiceImplTest {
         order.setHospitalName("测试医院");
         order.setDesignerId(1L);
         order.setDesignerName("设计师A");
+        order.setDesignerRemark("设计师备注内容");
         order.setCreateTime(LocalDateTime.now());
         return order;
     }
@@ -197,6 +198,7 @@ class DesignWorkorderServiceImplTest {
             assertEquals(1, result.getTotal());
             assertEquals(1, result.getRecords().size());
             assertEquals(10L, result.getRecords().get(0).getId());
+            assertEquals("设计师备注内容", result.getRecords().get(0).getDesignerRemark());
         }
 
         @Test
@@ -322,6 +324,7 @@ class DesignWorkorderServiceImplTest {
             assertNotNull(vo);
             assertEquals(10L, vo.getId());
             assertEquals("ORD-10", vo.getOrderCode());
+            assertEquals("设计师备注内容", vo.getDesignerRemark());
         }
 
         @Test
@@ -775,21 +778,25 @@ class DesignWorkorderServiceImplTest {
     }
 
     @Nested
-    @DisplayName("updateEvaluationOpinion")
-    class UpdateEvaluationOpinion {
+    @DisplayName("saveDesignerRemark")
+    class SaveDesignerRemark {
 
         @Test
-        @DisplayName("订单存在时仅更新评估意见")
-        void success_updatesOpinionOnly() {
-            when(orderMainService.getById(1L)).thenReturn(buildOrder(1L));
+        @DisplayName("订单存在时仅更新设计师备注")
+        void success_updatesDesignerRemarkOnly() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+                when(orderMainService.getById(1L)).thenReturn(buildOrder(1L));
+                when(orderMainService.updateById(any())).thenReturn(true);
 
-            service.updateEvaluationOpinion(1L, "影像数据清晰，可以进行设计");
+                service.saveDesignerRemark(1L, "设计师备注内容");
 
-            verify(orderMainService).updateById(argThat(order ->
-                    order.getId().equals(1L)
-                            && "影像数据清晰，可以进行设计".equals(order.getDesignerRemark())
-                            && order.getDataEvaluationOpinion() == null
-                            && order.getOrderCode() == null));
+                verify(orderMainService).updateById(argThat(order ->
+                        order.getId().equals(1L)
+                                && "设计师备注内容".equals(order.getDesignerRemark())
+                                && order.getDataEvaluationOpinion() == null
+                                && order.getOrderCode() == null));
+            }
         }
 
         @Test
@@ -798,10 +805,40 @@ class DesignWorkorderServiceImplTest {
             when(orderMainService.getById(999L)).thenReturn(null);
 
             BusinessException ex = assertThrows(BusinessException.class,
-                    () -> service.updateEvaluationOpinion(999L, "评估意见"));
+                    () -> service.saveDesignerRemark(999L, "设计师备注"));
 
             assertEquals(ErrorCodeEnum.ORDER_NOT_FOUND.getCode(), ex.getCode());
             verify(orderMainService, never()).updateById(any());
+        }
+
+        @Test
+        @DisplayName("非分配设计师不能保存备注")
+        void notAssignedDesigner() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(999L);
+                when(orderMainService.getById(1L)).thenReturn(buildOrder(1L));
+
+                BusinessException ex = assertThrows(BusinessException.class,
+                        () -> service.saveDesignerRemark(1L, "设计师备注"));
+
+                assertEquals(ErrorCodeEnum.ORDER_DESIGNER_MISMATCH.getCode(), ex.getCode());
+                verify(orderMainService, never()).updateById(any());
+            }
+        }
+
+        @Test
+        @DisplayName("订单更新失败时抛出系统异常")
+        void updateFailed() {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+                when(orderMainService.getById(1L)).thenReturn(buildOrder(1L));
+                when(orderMainService.updateById(any())).thenReturn(false);
+
+                BusinessException ex = assertThrows(BusinessException.class,
+                        () -> service.saveDesignerRemark(1L, "设计师备注"));
+
+                assertEquals(ErrorCodeEnum.SYSTEM_ERROR.getCode(), ex.getCode());
+            }
         }
     }
 

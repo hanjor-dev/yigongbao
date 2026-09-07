@@ -311,6 +311,7 @@ public class OrderQueryHelper {
         // 基础字段复制
         vo.setId(entity.getId());
         vo.setOrderCode(entity.getOrderCode());
+        vo.setDesignerRemark(entity.getDesignerRemark());
         // 订单类型翻译：1=医疗器械，2=非医疗器械
         vo.setOrderType(entity.getOrderType());
         vo.setOrderTypeName(getOrderTypeName(entity.getOrderType()));

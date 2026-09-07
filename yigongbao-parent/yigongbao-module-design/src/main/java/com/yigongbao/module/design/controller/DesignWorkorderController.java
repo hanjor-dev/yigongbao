@@ -6,7 +6,7 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
-import com.yigongbao.module.design.dto.UpdateEvaluationOpinionDTO;
+import com.yigongbao.module.design.dto.SaveDesignerRemarkDTO;
 import com.yigongbao.module.design.service.DesignWorkorderService;
 import com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO;
 import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
@@ -57,14 +57,14 @@ public class DesignWorkorderController {
     }
 
     /**
-     * 更新订单影像数据评估意见
+     * 保存设计师备注
      */
-    @Operation(summary = "更新订单评估意见")
-    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "更新评估意见")
-    @PostMapping("/{orderId}/evaluation-opinion")
-    public Result<Void> updateEvaluationOpinion(@PathVariable Long orderId,
-                                                @Valid @RequestBody UpdateEvaluationOpinionDTO dto) {
-        designWorkorderService.updateEvaluationOpinion(orderId, dto.getDesignerRemark());
+    @Operation(summary = "保存设计师备注")
+    @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPDATE, operation = "保存设计师备注")
+    @PostMapping("/{orderId}/designer-remark")
+    public Result<Void> saveDesignerRemark(@PathVariable Long orderId,
+                                           @Valid @RequestBody SaveDesignerRemarkDTO dto) {
+        designWorkorderService.saveDesignerRemark(orderId, dto.getDesignerRemark());
         return Result.success();
     }
 

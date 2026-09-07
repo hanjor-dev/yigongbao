@@ -217,6 +217,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         vo.setStatusColor(flowStatusColorResolver.getColor(order.getStatus()));
         vo.setPhase(order.getPhase());
         vo.setPhaseName(designQueryHelper.getPhaseName(order.getPhase()));
+        vo.setDesignerRemark(order.getDesignerRemark());
 
         // 订单类型
         vo.setOrderType(order.getOrderType());
@@ -281,24 +282,28 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         return vo;
     }
 
-    /**
-     * 更新订单影像数据评估意见
-     *
-     * @param orderId 订单ID
-     * @param remark 设计师备注
-     */
+    /** 保存设计师备注。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateEvaluationOpinion(Long orderId, String remark) {
+    public void saveDesignerRemark(Long orderId, String remark) {
         OrderMainEntity order = orderMainService.getById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
 
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (!currentUserId.equals(order.getDesignerId())) {
+            log.warn("非分配设计师，无权保存设计师备注: orderId={}, designerId={}, currentUserId={}",
+                    orderId, order.getDesignerId(), currentUserId);
+            throw new BusinessException(ErrorCodeEnum.ORDER_DESIGNER_MISMATCH);
+        }
+
         OrderMainEntity update = new OrderMainEntity();
         update.setId(orderId);
         update.setDesignerRemark(remark);
-        orderMainService.updateById(update);
+        if (!orderMainService.updateById(update)) {
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "设计师备注保存失败");
+        }
     }
 
     /**
@@ -559,6 +564,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         vo.setAreaName(entity.getAreaName());
         vo.setDesignerId(entity.getDesignerId());
         vo.setDesignerName(entity.getDesignerName());
+        vo.setDesignerRemark(entity.getDesignerRemark());
         vo.setDesignStartTime(entity.getDesignStartTime());
         vo.setDesignSubmitTime(entity.getDesignSubmitTime());
         vo.setExpectedDeliveryDate(entity.getExpectedDeliveryDate());

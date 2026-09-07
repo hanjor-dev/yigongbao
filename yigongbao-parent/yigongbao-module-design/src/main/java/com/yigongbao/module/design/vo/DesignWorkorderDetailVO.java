@@ -110,6 +110,9 @@ public class DesignWorkorderDetailVO {
     /** 设计提交时间 */
     private LocalDateTime designSubmitTime;
 
+    /** 设计师备注 */
+    private String designerRemark;
+
     /** 版本号（乐观锁） */
     private Integer version;
 

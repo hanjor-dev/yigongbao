@@ -10,17 +10,17 @@
 
 ---
 
-### Task 1: 增加评估意见请求 DTO
+### Task 1: 增加设计师备注请求 DTO
 
 **Files:**
-- Create: `yigongbao-parent/yigongbao-module-design/src/main/java/com/yigongbao/module/design/dto/UpdateEvaluationOpinionDTO.java`
+- Create: `yigongbao-parent/yigongbao-module-design/src/main/java/com/yigongbao/module/design/dto/SaveDesignerRemarkDTO.java`
 - Test: `yigongbao-parent/yigongbao-module-design/src/test/java/com/yigongbao/module/design/controller/DesignWorkorderControllerTest.java`
 
 - [ ] **Step 1: Write the failing controller test**
-  增加测试，构造 DTO，调用新增 Controller 方法，断言服务层收到订单 ID 和意见内容，并返回成功结果。
+  增加测试，构造 DTO，调用新增 Controller 方法，断言服务层收到订单 ID 和备注内容，并返回成功结果。
 
 - [ ] **Step 2: Run the focused test to verify it fails**
-  运行 `mvn -pl yigongbao-module-design -am -Dtest=DesignWorkorderControllerTest test`；预期因 DTO 或 Controller 方法不存在而失败。
+  运行 `mvn -pl yigongbao-module-design -am -Dtest=DesignWorkorderControllerTest test`；预期因新 DTO 或 Controller 方法不存在而失败。
 
 - [ ] **Step 3: Write the minimal DTO**
   新增 `designerRemark` 字段，使用 `@NotBlank` 和 `@Size(max = 2000)`，与数据库 TEXT 字段和项目 DTO 校验风格保持一致。
@@ -33,13 +33,13 @@
 - Test: `yigongbao-parent/yigongbao-module-design/src/test/java/com/yigongbao/module/design/service/impl/DesignWorkorderServiceImplTest.java`
 
 - [ ] **Step 1: Write failing service tests**
-  增加“订单存在时只更新评估意见”和“订单不存在时抛出 `ORDER_NOT_FOUND`”测试。
+  增加“订单存在时只更新设计师备注”和“订单不存在时抛出 `ORDER_NOT_FOUND`”测试。
 
 - [ ] **Step 2: Run the focused tests to verify they fail**
   运行 `mvn -pl yigongbao-module-design -am -Dtest=DesignWorkorderServiceImplTest test`；预期因服务方法不存在而失败。
 
 - [ ] **Step 3: Implement the service method**
-  在接口声明 `updateEvaluationOpinion(Long orderId, String remark)`；实现类先调用 `orderMainService.getById`，不存在则抛出既有异常；构造仅设置 ID 和 `designerRemark` 字段的 `OrderMainEntity`，调用 `updateById`，必要时加事务注解。
+  在接口声明 `saveDesignerRemark(Long orderId, String remark)`；实现类先调用 `orderMainService.getById`，不存在则抛出既有异常；构造仅设置 ID 和 `designerRemark` 字段的 `OrderMainEntity`，调用 `updateById`，必要时加事务注解。
 
 - [ ] **Step 4: Run service tests**
   重跑上述命令，预期新增测试通过。
@@ -51,7 +51,7 @@
 - Test: `yigongbao-parent/yigongbao-module-design/src/test/java/com/yigongbao/module/design/controller/DesignWorkorderControllerTest.java`
 
 - [ ] **Step 1: Add the endpoint**
-  新增 `POST /{orderId}/evaluation-opinion`，使用 `@Valid @RequestBody UpdateEvaluationOpinionDTO`，调用服务方法并返回 `Result.success()`；添加 Swagger 描述和“更新评估意见”操作日志。
+  新增 `POST /{orderId}/designer-remark`，使用 `@Valid @RequestBody SaveDesignerRemarkDTO`，调用服务方法并返回 `Result.success()`；添加 Swagger 描述和“保存设计师备注”操作日志。
 
 - [ ] **Step 2: Run controller tests**
   重跑 Controller 测试，预期通过。

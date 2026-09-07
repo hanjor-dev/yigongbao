@@ -107,6 +107,7 @@ class OrderQueryHelperTest {
         e.setExpectedDeliveryDate(LocalDateTime.of(2026, 5, 1, 0, 0));
         e.setEstimatedCost(new BigDecimal("1500.00"));
         e.setDataEvaluationOpinion("数据质量良好");
+        e.setDesignerRemark("设计师备注内容");
         e.setPhase(10);
         e.setStatus(2010);
         e.setCreateTime(LocalDateTime.of(2026, 4, 1, 10, 0));
@@ -407,6 +408,7 @@ class OrderQueryHelperTest {
             assertThat(vo.getOrderCode()).isEqualTo("ORD-2026-001");
             assertThat(vo.getHospitalId()).isEqualTo(200L);
             assertThat(vo.getHospitalName()).isEqualTo("测试医院");
+            assertThat(vo.getDesignerRemark()).isEqualTo("设计师备注内容");
             assertThat(vo.getAreaId()).isEqualTo(300L);
             assertThat(vo.getAreaName()).isEqualTo("朝阳区");
             assertThat(vo.getFullAreaName()).isEqualTo("中国,北京,北京市,朝阳区");
