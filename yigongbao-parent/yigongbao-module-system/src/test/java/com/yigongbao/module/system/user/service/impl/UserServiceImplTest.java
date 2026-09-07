@@ -240,6 +240,27 @@ class UserServiceImplTest {
     }
 
     @Test
+    @DisplayName("listUser: 按角色ID筛选")
+    void listUser_withRoleId_shouldAddRoleCondition() {
+        Page<UserEntity> page = new Page<>(1, 10);
+        page.setTotal(0);
+        page.setRecords(Collections.emptyList());
+        ArgumentCaptor<LambdaQueryWrapper<UserEntity>> wrapperCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        when(userMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+
+        UserPageDTO withoutRole = new UserPageDTO();
+        userService.listUser(withoutRole);
+
+        UserPageDTO withRole = new UserPageDTO();
+        withRole.setRoleId(2L);
+        userService.listUser(withRole);
+
+        verify(userMapper, times(2)).selectPage(any(Page.class), wrapperCaptor.capture());
+        assertTrue(wrapperCaptor.getAllValues().get(1).getExpression().getNormal().size()
+                > wrapperCaptor.getAllValues().get(0).getExpression().getNormal().size());
+    }
+
+    @Test
     @DisplayName("listUser: 区域管理员应使用一次机构范围快照")
     void listUser_regionalManager_shouldUseSingleManagedOrgScopeSnapshot() {
         testEntity.setOrgId(10L);

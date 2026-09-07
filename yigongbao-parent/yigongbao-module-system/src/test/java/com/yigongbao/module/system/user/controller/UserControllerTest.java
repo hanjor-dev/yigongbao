@@ -79,10 +79,15 @@ class UserControllerTest {
     @Test
     @DisplayName("list: 按通用关键词模糊查询用户名或真实姓名")
     void list_withKeyword_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/system/user/list")
-                        .param("pageNum", "1")
-                        .param("pageSize", "10")
-                        .param("keyword", "管理员"))
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("pageNum", 1);
+        requestBody.put("pageSize", 10);
+        requestBody.put("keyword", "管理员");
+        requestBody.put("roleId", 1);
+
+        mockMvc.perform(post("/system/user/list")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestBody)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.records").isArray());

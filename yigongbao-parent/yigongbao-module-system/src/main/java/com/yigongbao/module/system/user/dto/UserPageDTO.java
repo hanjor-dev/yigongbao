@@ -24,6 +24,9 @@ public class UserPageDTO implements Serializable {
     /** 用户名或真实姓名（模糊查询） */
     private String keyword;
 
+    /** 角色ID */
+    private Long roleId;
+
     /** 所属机构ID */
     private Long orgId;
 

@@ -124,6 +124,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
                         .like(UserEntity::getUsername, dto.getKeyword())
                         .or()
                         .like(UserEntity::getRealName, dto.getKeyword()))
+                .eq(Objects.nonNull(dto.getRoleId()), UserEntity::getRoleId, dto.getRoleId())
                 .eq(Objects.nonNull(dto.getOrgId()), UserEntity::getOrgId, dto.getOrgId())
                 .eq(Objects.nonNull(dto.getDeptId()), UserEntity::getDeptId, dto.getDeptId())
                 .eq(StrUtil.isNotBlank(dto.getAccountType()), UserEntity::getAccountType, dto.getAccountType())
