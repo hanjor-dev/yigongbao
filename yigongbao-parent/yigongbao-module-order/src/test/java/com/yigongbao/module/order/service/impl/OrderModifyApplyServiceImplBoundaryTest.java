@@ -120,6 +120,30 @@ class OrderModifyApplyServiceImplBoundaryTest {
     }
 
     @Test
+    void modifyOrderFullV2_rejectsAdministratorWhenPendingModificationApplyExists() {
+        UserEntity user = new UserEntity();
+        user.setRoleCode(RoleCodeEnum.ADMIN.getCode());
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(9L);
+        order.setIsDeleted(0);
+        order.setPhase(com.yigongbao.flow.enums.FlowPhaseEnum.ORDER.getValue());
+
+        when(orderMainMapper.selectById(9L)).thenReturn(order);
+        when(userService.getById(1L)).thenReturn(user);
+        when(applyMapper.selectCount(any())).thenReturn(1L);
+        when(cancelApplyService.hasPendingCancelApply(9L)).thenReturn(false);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            assertThatThrownBy(() -> service.modifyOrderFullV2(9L, new OrderModifyFullDTO()))
+                    .isInstanceOf(com.yigongbao.common.exception.BusinessException.class)
+                    .extracting("code")
+                    .isEqualTo(ErrorCodeEnum.ORDER_MODIFY_APPLY_PENDING.getCode());
+        }
+        verify(modifyFullService, never()).modifyOrderFull(anyLong(), any(OrderModifyFullDTO.class));
+    }
+
+    @Test
     void getApplyDetail_replacesFileIdsWithOriginalNames() {
         UserEntity manager = new UserEntity();
         manager.setRoleCode(RoleCodeEnum.DESIGNER_MANAGER.getCode());

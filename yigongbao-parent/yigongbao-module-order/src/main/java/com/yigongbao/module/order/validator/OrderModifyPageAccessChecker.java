@@ -3,6 +3,7 @@ package com.yigongbao.module.order.validator;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 
 import java.util.Set;
 
@@ -52,6 +53,10 @@ public final class OrderModifyPageAccessChecker {
             return true;
         }
         if (containsRole(BUSINESS_ROLES, roleCode)) {
+            if (isDataAuditRejected(order)
+                    && (currentUserId == null || !currentUserId.equals(order.getOperatorId()))) {
+                return false;
+            }
             return isPhase(order, FlowPhaseEnum.ORDER) || isPhase(order, FlowPhaseEnum.DESIGN);
         }
         if (containsRole(DESIGNER_ROLES, roleCode)) {
@@ -68,5 +73,10 @@ public final class OrderModifyPageAccessChecker {
 
     private static boolean isPhase(OrderMainEntity order, FlowPhaseEnum phase) {
         return phase.getValue().equals(order.getPhase());
+    }
+
+    private static boolean isDataAuditRejected(OrderMainEntity order) {
+        return isPhase(order, FlowPhaseEnum.ORDER)
+                && FlowStatusEnum.DATA_AUDIT_REJECTED.getValue().equals(order.getStatus());
     }
 }

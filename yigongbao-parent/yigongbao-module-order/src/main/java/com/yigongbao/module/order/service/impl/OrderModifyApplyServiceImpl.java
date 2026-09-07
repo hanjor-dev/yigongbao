@@ -656,11 +656,11 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         }
 
         // 修改申请和取消申请不能与直接修改并行，避免申请内容与订单当前数据互相覆盖。
-        if (!isAdmin && hasPendingApply(orderId)) {
+        if (hasPendingApply(orderId)) {
             throw new BusinessException(ErrorCodeEnum.ORDER_MODIFY_APPLY_PENDING,
                     "订单存在待审核修改申请，不允许直接修改");
         }
-        if (!isAdmin && cancelApplyService.hasPendingCancelApply(orderId)) {
+        if (cancelApplyService.hasPendingCancelApply(orderId)) {
             throw new BusinessException(ErrorCodeEnum.ORDER_CANCEL_APPLY_PENDING,
                     "订单存在待审核取消申请，不允许直接修改");
         }

@@ -3,6 +3,7 @@ package com.yigongbao.module.order.validator;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,6 +63,18 @@ class OrderModifyPageAccessCheckerTest {
         OrderMainEntity order = order(FlowPhaseEnum.ORDER.getValue());
         assertThat(OrderModifyPageAccessChecker.canApply(order,
                 RoleCodeEnum.SALESMAN.getCode(), false, true)).isFalse();
+    }
+
+    @Test
+    void dataAuditRejectedOrderCanOpenOnlyForResponsibleSalesman() {
+        OrderMainEntity order = order(FlowPhaseEnum.ORDER.getValue());
+        order.setStatus(FlowStatusEnum.DATA_AUDIT_REJECTED.getValue());
+        order.setOperatorId(2L);
+
+        assertThat(OrderModifyPageAccessChecker.canApply(order,
+                RoleCodeEnum.SALESMAN.getCode(), 2L, false, false)).isTrue();
+        assertThat(OrderModifyPageAccessChecker.canApply(order,
+                RoleCodeEnum.SALESMAN.getCode(), 3L, false, false)).isFalse();
     }
 
     @Test
