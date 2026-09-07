@@ -77,24 +77,12 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("list: 按用户名模糊查询")
-    void list_withUsername_shouldReturnFilteredData() throws Exception {
+    @DisplayName("list: 按通用关键词模糊查询用户名或真实姓名")
+    void list_withKeyword_shouldReturnFilteredData() throws Exception {
         mockMvc.perform(get("/system/user/list")
                         .param("pageNum", "1")
                         .param("pageSize", "10")
-                        .param("username", "admin"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.records").isArray());
-    }
-
-    @Test
-    @DisplayName("list: 按真实姓名模糊查询")
-    void list_withRealName_shouldReturnFilteredData() throws Exception {
-        mockMvc.perform(get("/system/user/list")
-                        .param("pageNum", "1")
-                        .param("pageSize", "10")
-                        .param("realName", "管理员"))
+                        .param("keyword", "管理员"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.records").isArray());

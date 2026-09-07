@@ -21,11 +21,8 @@ public class UserPageDTO implements Serializable {
     /** 每页条数，默认10条 */
     private Integer pageSize = 10;
 
-    /** 用户名（模糊查询） */
-    private String username;
-
-    /** 真实姓名（模糊查询） */
-    private String realName;
+    /** 用户名或真实姓名（模糊查询） */
+    private String keyword;
 
     /** 所属机构ID */
     private Long orgId;

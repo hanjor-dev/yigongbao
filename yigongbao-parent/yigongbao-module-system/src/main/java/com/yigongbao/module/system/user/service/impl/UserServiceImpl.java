@@ -120,8 +120,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         int pageSize = dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 10;
         Page<UserEntity> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<UserEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.like(StrUtil.isNotBlank(dto.getUsername()), UserEntity::getUsername, dto.getUsername())
-                .like(StrUtil.isNotBlank(dto.getRealName()), UserEntity::getRealName, dto.getRealName())
+        wrapper.and(StrUtil.isNotBlank(dto.getKeyword()), query -> query
+                        .like(UserEntity::getUsername, dto.getKeyword())
+                        .or()
+                        .like(UserEntity::getRealName, dto.getKeyword()))
                 .eq(Objects.nonNull(dto.getOrgId()), UserEntity::getOrgId, dto.getOrgId())
                 .eq(Objects.nonNull(dto.getDeptId()), UserEntity::getDeptId, dto.getDeptId())
                 .eq(StrUtil.isNotBlank(dto.getAccountType()), UserEntity::getAccountType, dto.getAccountType())

@@ -220,6 +220,26 @@ class UserServiceImplTest {
     }
 
     @Test
+    @DisplayName("listUser: 通用关键词应匹配用户名或真实姓名")
+    void listUser_withKeyword_shouldMatchUsernameOrRealName() {
+        Page<UserEntity> page = new Page<>(1, 10);
+        page.setTotal(0);
+        page.setRecords(Collections.emptyList());
+        ArgumentCaptor<LambdaQueryWrapper<UserEntity>> wrapperCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        when(userMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+
+        UserPageDTO pageDTO = new UserPageDTO();
+        pageDTO.setPageNum(1);
+        pageDTO.setPageSize(10);
+        pageDTO.setKeyword("管理员");
+
+        userService.listUser(pageDTO);
+
+        verify(userMapper).selectPage(any(Page.class), wrapperCaptor.capture());
+        assertFalse(wrapperCaptor.getValue().getExpression().getNormal().isEmpty());
+    }
+
+    @Test
     @DisplayName("listUser: 区域管理员应使用一次机构范围快照")
     void listUser_regionalManager_shouldUseSingleManagedOrgScopeSnapshot() {
         testEntity.setOrgId(10L);
