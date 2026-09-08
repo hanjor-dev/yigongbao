@@ -1,6 +1,6 @@
 -- 订单虚拟单号一体化迁移脚本
 -- 执行顺序：配置迁移 -> 表结构迁移 -> 历史数据回填 -> 数据校验 -> 设置非空约束
--- 规则：YG + 10 位字符，总长度 12 位；可用字符共 31 个，排除易混淆字符 0/O/1/I/L。
+-- 新生成规则：12 位字符，其中 8 位数字 + 4 位字母，位置随机；可用字符共 31 个，排除易混淆字符 0/O/1/I/L。
 -- 说明：本脚本可重复执行；不删除、不修改原 order_code/orderNo 配置。
 
 -- 1. 默认列表配置：仅追加 publicOrderCode，保留原有订单流水号字段。
@@ -99,6 +99,8 @@ BEGIN
     DECLARE v_code VARCHAR(12) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     DECLARE v_exists INT DEFAULT 0;
     DECLARE v_i INT DEFAULT 0;
+    DECLARE v_j INT DEFAULT 0;
+    DECLARE v_char CHAR(1);
     DECLARE v_attempts INT DEFAULT 0;
     DECLARE cur CURSOR FOR
         SELECT id
@@ -107,7 +109,7 @@ BEGIN
           AND (
               public_order_code IS NULL
               OR public_order_code = ''
-              OR public_order_code NOT REGEXP '^YG[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$'
+              OR public_order_code NOT REGEXP '^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{12}$'
           )
         ORDER BY id;
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
@@ -127,18 +129,32 @@ BEGIN
                     SET MESSAGE_TEXT = '补齐中止：单个订单虚拟单号生成连续冲突超过 1000 次';
             END IF;
 
-            SET v_code = 'YG';
+            SET v_code = '';
             SET v_i = 0;
-            WHILE v_i < 10 DO
+            WHILE v_i < 8 DO
                 SET v_code = CONCAT(
                     v_code,
-                    SUBSTRING(
-                        '23456789ABCDEFGHJKMNPQRSTUVWXYZ',
-                        FLOOR(RAND() * 31) + 1,
-                        1
-                    )
+                    SUBSTRING('23456789', FLOOR(RAND() * 8) + 1, 1)
                 );
                 SET v_i = v_i + 1;
+            END WHILE;
+
+            SET v_i = 0;
+            WHILE v_i < 4 DO
+                SET v_code = CONCAT(
+                    v_code,
+                    SUBSTRING('ABCDEFGHJKMNPQRSTUVWXYZ', FLOOR(RAND() * 15) + 1, 1)
+                );
+                SET v_i = v_i + 1;
+            END WHILE;
+
+            SET v_i = 12;
+            WHILE v_i > 1 DO
+                SET v_j = FLOOR(RAND() * v_i) + 1;
+                SET v_char = SUBSTRING(v_code, v_i, 1);
+                SET v_code = INSERT(v_code, v_i, 1, SUBSTRING(v_code, v_j, 1));
+                SET v_code = INSERT(v_code, v_j, 1, v_char);
+                SET v_i = v_i - 1;
             END WHILE;
 
             SET v_exists = (
@@ -159,7 +175,7 @@ BEGIN
           AND (
               public_order_code IS NULL
               OR public_order_code = ''
-              OR public_order_code NOT REGEXP '^YG[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$'
+              OR public_order_code NOT REGEXP '^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{12}$'
           );
     END LOOP;
     CLOSE cur;
@@ -202,7 +218,7 @@ BEGIN
         SELECT 1
         FROM order_main
         WHERE is_deleted = 0
-          AND public_order_code NOT REGEXP '^YG[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$'
+          AND public_order_code NOT REGEXP '^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{12}$'
     ) THEN
         SET @order_public_code_validation_failed = 1;
         SIGNAL SQLSTATE '45000'
@@ -245,4 +261,4 @@ WHERE is_deleted = 0;
 SELECT COUNT(*) AS invalid_public_order_code
 FROM order_main
 WHERE is_deleted = 0
-  AND public_order_code NOT REGEXP '^YG[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$';
+  AND public_order_code NOT REGEXP '^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{12}$';

@@ -11,14 +11,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PublicOrderCodeGeneratorTest {
 
     @Test
-    void generate_returnsTwelveUppercaseLettersAndDigitsWithBusinessPrefix() {
+    void generate_returnsTwelveCharactersWithEightDigitsAndFourLetters() {
         PublicOrderCodeGenerator generator = new PublicOrderCodeGenerator();
 
         String code = generator.generate();
 
         assertEquals(12, code.length());
-        assertTrue(code.startsWith("YG"));
-        assertTrue(code.matches("YG[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}"));
+        assertTrue(code.matches("[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{12}"));
+        assertEquals(8, code.replaceAll("[^23456789]", "").length());
+        assertEquals(4, code.replaceAll("[^ABCDEFGHJKMNPQRSTUVWXYZ]", "").length());
     }
 
     @Test
