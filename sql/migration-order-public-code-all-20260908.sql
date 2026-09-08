@@ -96,7 +96,7 @@ CREATE PROCEDURE backfill_order_public_code()
 BEGIN
     DECLARE v_done INT DEFAULT 0;
     DECLARE v_order_id BIGINT;
-    DECLARE v_code VARCHAR(12);
+    DECLARE v_code VARCHAR(12) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     DECLARE v_exists INT DEFAULT 0;
     DECLARE v_i INT DEFAULT 0;
     DECLARE v_attempts INT DEFAULT 0;
@@ -162,6 +162,7 @@ DROP PROCEDURE backfill_order_public_code $$
 DELIMITER ;
 
 -- 5. 严格校验回填结果；任一校验失败都会中止后续 NOT NULL 变更。
+SET @order_public_code_validation_failed = 0;
 DELIMITER $$
 DROP PROCEDURE IF EXISTS validate_order_public_code $$
 CREATE PROCEDURE validate_order_public_code()
@@ -172,6 +173,7 @@ BEGIN
         WHERE is_deleted = 0
           AND (public_order_code IS NULL OR public_order_code = '')
     ) THEN
+        SET @order_public_code_validation_failed = 1;
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = '校验失败：存在未补齐虚拟单号的活跃订单';
     END IF;
@@ -183,6 +185,7 @@ BEGIN
         GROUP BY public_order_code
         HAVING COUNT(*) > 1
     ) THEN
+        SET @order_public_code_validation_failed = 1;
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = '校验失败：活跃订单存在重复虚拟单号';
     END IF;
@@ -193,6 +196,7 @@ BEGIN
         WHERE is_deleted = 0
           AND public_order_code NOT REGEXP '^YG[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$'
     ) THEN
+        SET @order_public_code_validation_failed = 1;
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = '校验失败：存在格式不正确的虚拟单号';
     END IF;
@@ -205,7 +209,9 @@ DELIMITER ;
 -- 6. 历史数据校验通过后，将字段设为必填；已为 NOT NULL 时跳过。
 SET @make_public_order_code_not_null_sql = (
     SELECT IF(
-        COUNT(*) = 0 OR MAX(is_nullable) = 'NO',
+        @order_public_code_validation_failed = 1
+            OR COUNT(*) = 0
+            OR MAX(is_nullable) = 'NO',
         'SELECT 1',
         'ALTER TABLE order_main MODIFY COLUMN public_order_code VARCHAR(12) NOT NULL COMMENT ''订单虚拟单号'''
     )
