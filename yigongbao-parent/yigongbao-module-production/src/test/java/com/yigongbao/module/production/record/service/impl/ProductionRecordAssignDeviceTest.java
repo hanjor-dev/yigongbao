@@ -153,7 +153,7 @@ class ProductionRecordAssignDeviceTest {
     }
 
     @Test
-    void assignDevice_rejectsOfflineDevice() {
+    void assignDevice_offlineDeviceReachesRecordValidation() {
         ProductionRecordEntity record = pendingRecord(1L);
         DeviceEntity device = new DeviceEntity();
         device.setId(2L);
@@ -168,8 +168,8 @@ class ProductionRecordAssignDeviceTest {
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> service.assignDevice(1L, dto));
 
-        assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.DEVICE_NOT_AVAILABLE.getCode());
-        verify(recordMapper, never()).selectByIdForUpdate(any());
+        assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.PRODUCTION_RECORD_NOT_FOUND.getCode());
+        verify(recordMapper).selectByIdForUpdate(1L);
         verifyNoInteractions(processMapper, productNumberService);
     }
 
@@ -200,7 +200,7 @@ class ProductionRecordAssignDeviceTest {
         device.setDeviceId("SLA-002");
         device.setDeviceName("打印机2");
         device.setState(0);
-        device.setConnectionStatus(1);
+        device.setConnectionStatus(0);
         AssignDeviceDTO dto = new AssignDeviceDTO();
         dto.setDeviceId(2L);
         dto.setMaterial("树脂");

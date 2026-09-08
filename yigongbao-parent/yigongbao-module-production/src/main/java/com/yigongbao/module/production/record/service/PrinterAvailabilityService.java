@@ -18,7 +18,6 @@ public class PrinterAvailabilityService {
     public boolean isAvailable(DeviceEntity device) {
         return device != null
                 && DeviceTypeEnum.PRINTER_SLA.getCode().equals(device.getDeviceType())
-                && Integer.valueOf(1).equals(device.getConnectionStatus())
                 && PrinterDeviceStateEnum.IDLE.getCode().equals(device.getState());
     }
 

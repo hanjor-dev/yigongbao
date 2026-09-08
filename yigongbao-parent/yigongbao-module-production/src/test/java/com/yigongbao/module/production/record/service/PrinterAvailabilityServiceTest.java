@@ -17,24 +17,29 @@ class PrinterAvailabilityServiceTest {
     private final PrinterAvailabilityService service = new PrinterAvailabilityService();
 
     @Test
-    void isAvailable_onlyForOnlineIdleSlaPrinter() {
+    void isAvailable_onlyForIdleSlaPrinter_regardlessOfConnection() {
         DeviceEntity device = device(1L, 1, 0);
 
         assertThat(service.isAvailable(device)).isTrue();
         device.setConnectionStatus(0);
-        assertThat(service.isAvailable(device)).isFalse();
+        assertThat(service.isAvailable(device)).isTrue();
         device.setConnectionStatus(null);
-        assertThat(service.isAvailable(device)).isFalse();
+        assertThat(service.isAvailable(device)).isTrue();
         device.setDeviceType(DeviceTypeEnum.WASH_CONTAINER.getCode());
         assertThat(service.isAvailable(device)).isFalse();
     }
 
     @Test
-    void isAvailable_rejectsOfflineUnknownConnectionAndNullState() {
-        assertThat(service.isAvailable(device(1L, 0, 0))).isFalse();
-        assertThat(service.isAvailable(device(2L, null, 0))).isFalse();
+    void isAvailable_rejectsNullStateButAllowsOfflineOrUnknownConnection() {
+        assertThat(service.isAvailable(device(1L, 0, 0))).isTrue();
+        assertThat(service.isAvailable(device(2L, null, 0))).isTrue();
         assertThat(service.isAvailable(device(3L, 1, null))).isFalse();
         assertThat(service.isAvailable(null)).isFalse();
+    }
+
+    @Test
+    void requireAvailable_allowsOfflineIdleSlaPrinter() {
+        service.requireAvailable(device(1L, 0, 0));
     }
 
     @Test
