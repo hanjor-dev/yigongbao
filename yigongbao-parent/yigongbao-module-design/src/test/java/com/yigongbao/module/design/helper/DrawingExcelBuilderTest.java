@@ -56,6 +56,34 @@ class DrawingExcelBuilderTest {
     }
 
     @Test
+    void build_withScreenshotsAcrossPages_shouldOnlyContainCurrentPagePictures() throws Exception {
+        DrawingExcelBuilder builder = new DrawingExcelBuilder();
+
+        DrawingExcelBuilder.BuildContext ctx = new DrawingExcelBuilder.BuildContext();
+        ctx.setOrderCode("ORD-001");
+        ctx.setPackageCode("PKG-001");
+        ctx.setRows(buildRowsWithScreenshots(13));
+
+        byte[] result = builder.build(ctx);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(result))) {
+            assertEquals(2, wb.getNumberOfSheets());
+            assertEquals(11, countPictures(wb.getSheetAt(0)));
+            assertEquals(2, countPictures(wb.getSheetAt(1)));
+            assertEquals("第一页/共二页", wb.getSheetAt(0)
+                    .getRow(38).getCell(12).getStringCellValue());
+            assertEquals("第二页/共二页", wb.getSheetAt(1)
+                    .getRow(38).getCell(12).getStringCellValue());
+            assertEquals("文件12", wb.getSheetAt(1)
+                    .getRow(0).getCell(3).getStringCellValue());
+            assertEquals("文件13", wb.getSheetAt(1)
+                    .getRow(0).getCell(7).getStringCellValue());
+            assertEquals("", wb.getSheetAt(1)
+                    .getRow(0).getCell(11).getStringCellValue());
+        }
+    }
+
+    @Test
     void build_withWideScreenshot_shouldPreserveAspectRatioInsideSlot() throws Exception {
         DrawingExcelBuilder builder = new DrawingExcelBuilder();
 
@@ -275,5 +303,23 @@ class DrawingExcelBuilderTest {
             list.add(row);
         }
         return list;
+    }
+
+    private List<DrawingExcelBuilder.ProductRow> buildRowsWithScreenshots(int count) throws Exception {
+        List<DrawingExcelBuilder.ProductRow> list = new ArrayList<>();
+        for (int i = 1; i <= count; i++) {
+            DrawingExcelBuilder.ProductRow row = new DrawingExcelBuilder.ProductRow();
+            row.setPackageFileName("文件" + i + ".stl");
+            row.setProductName("产品" + i);
+            row.setScreenshotBytes(createPng(20 + i, 20 + i));
+            list.add(row);
+        }
+        return list;
+    }
+
+    private long countPictures(XSSFSheet sheet) {
+        return sheet.getDrawingPatriarch().getShapes().stream()
+                .filter(XSSFPicture.class::isInstance)
+                .count();
     }
 }

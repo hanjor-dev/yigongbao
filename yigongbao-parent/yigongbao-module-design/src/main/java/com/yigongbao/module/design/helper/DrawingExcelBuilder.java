@@ -143,14 +143,20 @@ public class DrawingExcelBuilder {
         try (InputStream is = new ClassPathResource(TEMPLATE_PATH).getInputStream();
              Workbook wb = new XSSFWorkbook(is)) {
 
+            // 多页时保留一个永不参与填充的干净模板，避免后续页面继承
+            // 前一页已经插入的截图、二维码和动态字段。单页继续直接使用原模板。
             Sheet templateSheet = wb.getSheetAt(0);
+            Sheet cleanTemplateSheet = totalPages > 1 ? wb.cloneSheet(0) : null;
+            if (cleanTemplateSheet != null) {
+                wb.setSheetName(wb.getSheetIndex(cleanTemplateSheet), "__drawing_template__");
+            }
 
             for (int page = 0; page < totalPages; page++) {
                 Sheet sheet;
                 if (page == 0) {
                     sheet = templateSheet;
                 } else {
-                    sheet = wb.cloneSheet(0);
+                    sheet = wb.cloneSheet(wb.getSheetIndex(cleanTemplateSheet));
                     wb.setSheetName(wb.getSheetIndex(sheet), "图纸-" + (page + 1));
                 }
 
@@ -202,6 +208,11 @@ public class DrawingExcelBuilder {
 
                 // 更新文本框中的页码水印（如果存在）
                 updatePageWatermark((XSSFSheet) sheet, page + 1, totalPages);
+            }
+
+            // 干净模板只用于复制，不作为最终输出页保留。
+            if (cleanTemplateSheet != null) {
+                wb.removeSheetAt(wb.getSheetIndex(cleanTemplateSheet));
             }
 
             // 写出
