@@ -62,6 +62,7 @@ CREATE TABLE order_item_draft (
 CREATE TABLE order_main (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_code VARCHAR(64) COMMENT '订单编号',
+    public_order_code VARCHAR(12) COMMENT '订单虚拟单号',
     order_type INT COMMENT '订单类型：1-医疗器械，2-非医疗器械',
     needs_physical_delivery INT NOT NULL DEFAULT 1 COMMENT '是否需要实体交付：0-不需要，1-需要，2-异地打印',
     business_type VARCHAR(50) COMMENT '业务类型（字典 dict_code）',

@@ -227,7 +227,7 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             com.yigongbao.module.system.user.entity.UserEntity user = userService.getById(currentUserId);
             if (user != null && StrUtil.isNotBlank(user.getQualityColumnSettings())) {
                 try {
-                    return objectMapper.readValue(user.getQualityColumnSettings(), QcColumnConfigVO.class);
+                    return ensurePublicOrderCodeColumn(objectMapper.readValue(user.getQualityColumnSettings(), QcColumnConfigVO.class));
                 } catch (JsonProcessingException e) {
                     log.warn("解析用户质检列配置失败，降级为系统默认，userId={}", currentUserId, e);
                 }
@@ -242,11 +242,33 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             return new QcColumnConfigVO();
         }
         try {
-            return objectMapper.readValue(configJson, QcColumnConfigVO.class);
+            return ensurePublicOrderCodeColumn(objectMapper.readValue(configJson, QcColumnConfigVO.class));
         } catch (JsonProcessingException e) {
             log.error("解析系统质检列配置失败", e);
             return new QcColumnConfigVO();
         }
+    }
+
+    private QcColumnConfigVO ensurePublicOrderCodeColumn(QcColumnConfigVO config) {
+        if (config == null || config.getColumns() == null
+                || config.getColumns().stream().anyMatch(column -> "publicOrderCode".equals(column.getField()))) {
+            return config;
+        }
+        QcColumnConfigVO.ColumnItemVO column = new QcColumnConfigVO.ColumnItemVO();
+        column.setField("publicOrderCode");
+        column.setLabel("虚拟单号");
+        column.setVisible(true);
+        column.setSort(config.getColumns().stream()
+                .map(QcColumnConfigVO.ColumnItemVO::getSort)
+                .filter(java.util.Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0) + 1);
+        column.setWidth(160);
+        column.setFixed(null);
+        List<QcColumnConfigVO.ColumnItemVO> columns = new java.util.ArrayList<>(config.getColumns());
+        columns.add(column);
+        config.setColumns(columns);
+        return config;
     }
 
     @Override

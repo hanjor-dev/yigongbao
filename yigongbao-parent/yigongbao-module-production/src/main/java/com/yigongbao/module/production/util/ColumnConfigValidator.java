@@ -15,7 +15,7 @@ public final class ColumnConfigValidator {
 
     private static final Map<String, Set<String>> ALLOWED_FIELDS = Map.of(
             "quality", Set.of(
-                    "recordNo", "designPackageCode", "productionBatchNo", "orderCode",
+                    "recordNo", "designPackageCode", "productionBatchNo", "orderCode", "publicOrderCode",
                     "hospitalName", "hospitalDeptName", "doctorName", "patientName",
                     "isUrgent", "isPostal", "expectedDeliveryDate", "orgName",
                     "totalProductCount", "qualifiedCount", "unqualifiedCount", "pendingCount",

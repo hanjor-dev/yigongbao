@@ -1045,6 +1045,7 @@ CREATE TABLE order_main (
     -- ==================== 主键与编码 ====================
     id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     order_code     VARCHAR(50)     NOT NULL COMMENT '订单编号',
+    public_order_code VARCHAR(12)  NOT NULL COMMENT '订单虚拟单号',
 
     -- ==================== 订单类型 ====================
     order_type      TINYINT         NOT NULL COMMENT '订单类型：1-医疗器械，2-非医疗器械',
@@ -1158,6 +1159,7 @@ CREATE TABLE order_main (
     KEY idx_order_main_has_pending_cancel_apply (has_pending_cancel_apply)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单主表';
 CREATE UNIQUE INDEX uk_order_main_code ON order_main ((CASE WHEN is_deleted = 0 THEN order_code ELSE NULL END));
+CREATE UNIQUE INDEX uk_order_main_public_code ON order_main ((CASE WHEN is_deleted = 0 THEN public_order_code ELSE NULL END));
 ALTER TABLE order_main ADD FULLTEXT INDEX ft_order_search (order_code, org_name, operator_name, hospital_name, patient_name);
 CREATE INDEX idx_order_classic_case ON order_main(is_classic_case, create_time DESC);
 

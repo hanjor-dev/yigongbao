@@ -30,6 +30,7 @@ import com.yigongbao.module.order.dto.order.UpdateOrderDTO;
 import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
 import com.yigongbao.module.order.service.DesignerAssignmentService;
+import com.yigongbao.module.order.service.PublicOrderCodeGenerator;
 import com.yigongbao.module.order.validator.OrderDataValidator;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.org.service.OrgService;
@@ -76,6 +77,7 @@ class OrderMainServiceImplStateTransitionTest {
     @Mock private OrderFileMapper orderFileMapper;
     @Mock private OrderModificationLogMapper orderModificationLogMapper;
     @Mock private CodeGeneratorService codeGeneratorService;
+    @Mock private PublicOrderCodeGenerator publicOrderCodeGenerator;
     @Mock private FileService fileService;
     @Mock private OrgService orgService;
     @Mock private FlowFacade flowFacade;
@@ -569,6 +571,7 @@ class OrderMainServiceImplStateTransitionTest {
 
         when(orderQueryHelper.getCurrentUserId()).thenReturn(userId);
         when(codeGeneratorService.generate(any())).thenReturn("ORD-100");
+        when(publicOrderCodeGenerator.generate()).thenReturn("YG23456789AB");
         when(configService.getConfigValue(any())).thenReturn("false");
         when(userService.getById(userId)).thenReturn(user);
         doAnswer(invocation -> {
@@ -582,6 +585,7 @@ class OrderMainServiceImplStateTransitionTest {
         org.junit.jupiter.api.Assertions.assertEquals(100L, orderId);
         verify(service).save(argThat(order ->
                 "ORD-100".equals(order.getOrderCode())
+                        && "YG23456789AB".equals(order.getPublicOrderCode())
                         && FlowPhaseEnum.ORDER.getValue().equals(order.getPhase())
                         && FlowStatusEnum.PENDING_DATA_AUDIT.getValue().equals(order.getStatus())
                         && userId.equals(order.getOperatorId())

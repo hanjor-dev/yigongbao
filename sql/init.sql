@@ -1649,3 +1649,18 @@ INSERT INTO part_colors (id, part_detail, color_code, opacity) VALUES (572, 'S5'
 INSERT INTO part_colors (id, part_detail, color_code, opacity) VALUES (573, 'S6', '255,200,200', 1.00);
 INSERT INTO part_colors (id, part_detail, color_code, opacity) VALUES (574, 'S7', '255,200,255', 1.00);
 INSERT INTO part_colors (id, part_detail, color_code, opacity) VALUES (575, 'S8', '200,255,180', 1.00);
+
+-- 追加订单虚拟单号列，保留原订单流水号列。
+UPDATE sys_config
+SET config_value = JSON_SET(
+    config_value,
+    '$.columns',
+    JSON_ARRAY_APPEND(
+        JSON_EXTRACT(config_value, '$.columns'), '$',
+        JSON_OBJECT('field', 'publicOrderCode', 'label', '虚拟单号', 'visible', TRUE,
+                    'sort', JSON_LENGTH(JSON_EXTRACT(config_value, '$.columns')) + 1,
+                    'width', 160, 'fixed', NULL)
+    )
+WHERE config_key IN ('order.column.config', 'design.column.config', 'production.column.config',
+                     'quality.column.config', 'warehouse.column.config')
+  AND JSON_SEARCH(config_value, 'one', 'publicOrderCode', NULL, '$.columns[*].field') IS NULL;

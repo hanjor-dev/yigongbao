@@ -60,6 +60,7 @@ import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.module.order.service.PublicOrderCodeGenerator;
 import com.yigongbao.module.order.vo.order.OrderColumnConfigVO;
 import com.yigongbao.module.order.vo.order.OrderDetailVO;
 import com.yigongbao.module.order.vo.order.OrderListVO;
@@ -120,6 +121,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     private final OrderFileMapper orderFileMapper;
     private final OrderModificationLogMapper orderModificationLogMapper;
     private final CodeGeneratorService codeGeneratorService;
+    private final PublicOrderCodeGenerator publicOrderCodeGenerator;
     private final FileService fileService;
     private final OrgService orgService;
     private final FlowFacade flowFacade;
@@ -282,6 +284,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             // orderCode 参数：多字段模糊搜索（订单编号/机构名称/业务员姓名/医院名称/患者姓名/医生姓名）
             if (StrUtil.isNotBlank(dto.getOrderCode())) {
                 wrapper.and(w -> w.like(OrderMainEntity::getOrderCode, dto.getOrderCode())
+                        .or().like(OrderMainEntity::getPublicOrderCode, dto.getOrderCode())
                         .or().like(OrderMainEntity::getOrgName, dto.getOrderCode())
                         .or().like(OrderMainEntity::getOperatorName, dto.getOrderCode())
                         .or().like(OrderMainEntity::getHospitalName, dto.getOrderCode())
@@ -991,11 +994,13 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         try {
             // Step 1：生成订单编号
             String orderCode = codeGeneratorService.generate(CodeRuleConstants.ORDER_NO);
+            String publicOrderCode = publicOrderCodeGenerator.generate();
 
             // Step 2：构建订单主表，从草稿复制字段，排除不可复用字段
             OrderMainEntity order = new OrderMainEntity();
             BeanUtils.copyProperties(draft, order, "id", "expiresAt", "status");
             order.setOrderCode(orderCode);
+            order.setPublicOrderCode(publicOrderCode);
             order.setPhase(FlowPhaseEnum.ORDER.getValue());
             order.setStatus(FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
             order.setVersion(0);
@@ -1110,6 +1115,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
         // Step 1：生成订单编号
         String orderCode = codeGeneratorService.generate(CodeRuleConstants.ORDER_NO);
+        String publicOrderCode = publicOrderCodeGenerator.generate();
 
         // Step 2：校验影像文件（根据系统配置判断是否必须上传）
         validateOrderFiles(dto);
@@ -1118,6 +1124,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         OrderMainEntity order = new OrderMainEntity();
         BeanUtils.copyProperties(dto, order, "id");
         order.setOrderCode(orderCode);
+        order.setPublicOrderCode(publicOrderCode);
         order.setPhase(FlowPhaseEnum.ORDER.getValue());
         order.setStatus(FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
         order.setVersion(0);

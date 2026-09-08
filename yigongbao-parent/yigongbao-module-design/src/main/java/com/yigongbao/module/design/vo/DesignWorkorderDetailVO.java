@@ -22,6 +22,8 @@ public class DesignWorkorderDetailVO {
     private Long id;
     /** 订单编号 */
     private String orderCode;
+    /** 对外展示的虚拟单号 */
+    private String publicOrderCode;
     /** 订单状态码 */
     private Integer status;
     /** 订单状态名称 */

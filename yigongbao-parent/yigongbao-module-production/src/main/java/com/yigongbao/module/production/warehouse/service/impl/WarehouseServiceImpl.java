@@ -21,6 +21,8 @@ import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
+import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.warehouse.dto.ListWarehouseDTO;
 import com.yigongbao.module.production.warehouse.dto.ListWarehouseProductDTO;
 import com.yigongbao.module.production.warehouse.dto.WarehouseInProductDTO;
@@ -62,6 +64,7 @@ public class WarehouseServiceImpl implements IWarehouseService {
     private final ConfigService configService;
     private final ObjectMapper objectMapper;
     private final FlowStatusColorResolver flowStatusColorResolver;
+    private final OrderMainMapper orderMainMapper;
 
     @Override
     public IPage<WarehouseRecordVO> listWarehouse(ListWarehouseDTO dto) {
@@ -85,7 +88,7 @@ public class WarehouseServiceImpl implements IWarehouseService {
             UserEntity user = userService.getById(currentUserId);
             if (user != null && StrUtil.isNotBlank(user.getWarehouseColumnSettings())) {
                 try {
-                    return objectMapper.readValue(user.getWarehouseColumnSettings(), WarehouseColumnConfigVO.class);
+                    return ensurePublicOrderCodeColumn(objectMapper.readValue(user.getWarehouseColumnSettings(), WarehouseColumnConfigVO.class));
                 } catch (JsonProcessingException e) {
                     log.warn("解析用户仓储列配置失败，降级为系统默认，userId={}", currentUserId, e);
                 }
@@ -100,7 +103,7 @@ public class WarehouseServiceImpl implements IWarehouseService {
             return new WarehouseColumnConfigVO();
         }
         try {
-            return objectMapper.readValue(configJson, WarehouseColumnConfigVO.class);
+            return ensurePublicOrderCodeColumn(objectMapper.readValue(configJson, WarehouseColumnConfigVO.class));
         } catch (JsonProcessingException e) {
             log.error("解析系统仓储列配置失败", e);
             return new WarehouseColumnConfigVO();
@@ -161,6 +164,10 @@ public class WarehouseServiceImpl implements IWarehouseService {
         vo.setStatusColor(flowStatusColorResolver.getColor(record.getStatus()));
         vo.setRecordId(record.getId());
         vo.setOrderNo(record.getOrderCode());
+        OrderMainEntity order = orderMainMapper.selectById(record.getOrderId());
+        if (order != null) {
+            vo.setPublicOrderCode(order.getPublicOrderCode());
+        }
 
         List<ProductionProductEntity> products = productMapper.selectList(
             new LambdaQueryWrapper<ProductionProductEntity>()
@@ -191,6 +198,28 @@ public class WarehouseServiceImpl implements IWarehouseService {
         dto.setWarehouseOutTimeEnd(toExclusiveEndTime(dto.getWarehouseOutTimeEnd()));
         Page<WarehouseProductVO> page = new Page<>(dto.getPage(), dto.getSize());
         return recordMapper.listWarehouseProducts(page, dto);
+    }
+
+    private WarehouseColumnConfigVO ensurePublicOrderCodeColumn(WarehouseColumnConfigVO config) {
+        if (config == null || config.getColumns() == null
+                || config.getColumns().stream().anyMatch(column -> "publicOrderCode".equals(column.getField()))) {
+            return config;
+        }
+        WarehouseColumnConfigVO.ColumnItemVO column = new WarehouseColumnConfigVO.ColumnItemVO();
+        column.setField("publicOrderCode");
+        column.setLabel("虚拟单号");
+        column.setVisible(true);
+        column.setSort(config.getColumns().stream()
+                .map(WarehouseColumnConfigVO.ColumnItemVO::getSort)
+                .filter(java.util.Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0) + 1);
+        column.setWidth(160);
+        column.setFixed(null);
+        List<WarehouseColumnConfigVO.ColumnItemVO> columns = new java.util.ArrayList<>(config.getColumns());
+        columns.add(column);
+        config.setColumns(columns);
+        return config;
     }
 
     @Override

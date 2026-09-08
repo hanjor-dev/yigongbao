@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.yigongbao.common.vo.SelectTreeVO;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -401,17 +402,21 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, ConfigEntity> i
         }
         // 2. 动态构建字段名：configKey 转驼峰加 config 前缀
         String fieldName = toFieldName(configKey);
-        // 3. 通过反射从 DefaultConfigProperties 获取字段值
+        // 3. 优先通过 getter 获取兜底值；部分 getter 会对旧配置做兼容补齐
         try {
-            Field field = DefaultConfigProperties.class.getDeclaredField(fieldName);
-            field.setAccessible(true);
-            Object value = field.get(defaultConfigProperties);
+            Method getter = DefaultConfigProperties.class.getMethod(
+                    "get" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1));
+            Object value = getter.invoke(defaultConfigProperties);
             return value != null ? String.valueOf(value) : null;
-        } catch (NoSuchFieldException e) {
-            log.warn("DefaultConfigProperties 中未找到字段 fieldName={}, configKey={}", fieldName, configKey);
-            return null;
-        } catch (IllegalAccessException e) {
-            log.error("反射访问 DefaultConfigProperties 字段异常 fieldName={}", fieldName, e);
+        } catch (ReflectiveOperationException e) {
+            try {
+                Field field = DefaultConfigProperties.class.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                Object value = field.get(defaultConfigProperties);
+                return value != null ? String.valueOf(value) : null;
+            } catch (ReflectiveOperationException fallbackException) {
+                log.error("反射访问 DefaultConfigProperties 异常 fieldName={}", fieldName, fallbackException);
+            }
             return null;
         }
     }

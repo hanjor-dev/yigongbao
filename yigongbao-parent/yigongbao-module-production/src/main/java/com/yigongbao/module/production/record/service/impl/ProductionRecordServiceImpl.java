@@ -164,6 +164,10 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
         ProductionRecordVO vo = new ProductionRecordVO();
         BeanUtil.copyProperties(record, vo);
+        OrderMainEntity detailOrder = orderMainMapper.selectById(record.getOrderId());
+        if (detailOrder != null) {
+            vo.setPublicOrderCode(detailOrder.getPublicOrderCode());
+        }
         fillCurrentProcessName(vo);
         fillStatusColors(vo);
         List<ProductionProductEntity> products = productMapper.selectList(
@@ -339,6 +343,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             vo.setProducts(productMap.getOrDefault(e.getId(), java.util.Collections.emptyList()));
             OrderMainEntity order = orderMap.get(e.getOrderId());
             if (order != null) {
+                vo.setPublicOrderCode(order.getPublicOrderCode());
                 vo.setOrderStatus(order.getStatus());
                 vo.setOrderPhase(order.getPhase());
                 vo.setOrgName(order.getOrgName());
@@ -1274,7 +1279,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             UserEntity user = userService.getById(currentUserId);
             if (user != null && StrUtil.isNotBlank(user.getProductionColumnSettings())) {
                 try {
-                    return objectMapper.readValue(user.getProductionColumnSettings(), ProductionColumnConfigVO.class);
+                    return ensurePublicOrderCodeColumn(objectMapper.readValue(user.getProductionColumnSettings(), ProductionColumnConfigVO.class));
                 } catch (JsonProcessingException e) {
                     log.warn("解析用户生产列配置失败，降级为系统默认，userId={}", currentUserId, e);
                 }
@@ -1289,11 +1294,33 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             return new ProductionColumnConfigVO();
         }
         try {
-            return objectMapper.readValue(configJson, ProductionColumnConfigVO.class);
+            return ensurePublicOrderCodeColumn(objectMapper.readValue(configJson, ProductionColumnConfigVO.class));
         } catch (JsonProcessingException e) {
             log.error("解析系统生产列配置失败", e);
             return new ProductionColumnConfigVO();
         }
+    }
+
+    private ProductionColumnConfigVO ensurePublicOrderCodeColumn(ProductionColumnConfigVO config) {
+        if (config == null || config.getColumns() == null
+                || config.getColumns().stream().anyMatch(column -> "publicOrderCode".equals(column.getField()))) {
+            return config;
+        }
+        ProductionColumnConfigVO.ColumnItemVO column = new ProductionColumnConfigVO.ColumnItemVO();
+        column.setField("publicOrderCode");
+        column.setLabel("虚拟单号");
+        column.setVisible(true);
+        column.setSort(config.getColumns().stream()
+                .map(ProductionColumnConfigVO.ColumnItemVO::getSort)
+                .filter(java.util.Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0) + 1);
+        column.setWidth(160);
+        column.setFixed(null);
+        List<ProductionColumnConfigVO.ColumnItemVO> columns = new java.util.ArrayList<>(config.getColumns());
+        columns.add(column);
+        config.setColumns(columns);
+        return config;
     }
 
     @Override

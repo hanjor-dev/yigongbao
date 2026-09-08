@@ -26,7 +26,7 @@ public interface ProductionRecordMapper extends BaseMapper<ProductionRecordEntit
     ProductionRecordEntity selectByIdForUpdate(@Param("id") Long id);
 
     @Select("<script>" +
-            "SELECT r.id AS recordId, r.record_no AS recordNo, r.order_code AS orderNo, " +
+            "SELECT r.id AS recordId, r.record_no AS recordNo, r.order_code AS orderNo, om.public_order_code AS publicOrderCode, " +
             "r.hospital_name AS hospitalName, r.hospital_dept_name AS hospitalDeptName, " +
             "r.doctor_name AS doctorName, r.patient_name AS patientName, " +
             "r.is_urgent AS isUrgent, r.is_postal AS isPostal, r.expected_delivery_date AS expectedDeliveryDate, " +
@@ -39,10 +39,12 @@ public interface ProductionRecordMapper extends BaseMapper<ProductionRecordEntit
             "MIN(p.warehouse_in_time) AS earliestInTime, MAX(p.warehouse_out_time) AS latestOutTime " +
             "FROM production_record r " +
             "INNER JOIN production_product p ON r.id = p.production_record_id AND p.is_deleted = 0 " +
+            "LEFT JOIN order_main om ON r.order_id = om.id AND om.is_deleted = 0 " +
             "WHERE r.is_deleted = 0 " +
             "<if test='dto.keyword != null and dto.keyword != \"\"'>" +
             "AND (r.record_no LIKE CONCAT('%', #{dto.keyword}, '%') " +
             "OR r.order_code LIKE CONCAT('%', #{dto.keyword}, '%') " +
+            "OR om.public_order_code LIKE CONCAT('%', #{dto.keyword}, '%') " +
             "OR p.product_name LIKE CONCAT('%', #{dto.keyword}, '%') " +
             "OR p.product_no LIKE CONCAT('%', #{dto.keyword}, '%')) " +
             "</if>" +
@@ -51,7 +53,7 @@ public interface ProductionRecordMapper extends BaseMapper<ProductionRecordEntit
             "<if test='dto.warehouseInTimeEnd != null'>AND p.warehouse_in_time &lt; #{dto.warehouseInTimeEnd}</if>" +
             "<if test='dto.warehouseOutTimeStart != null'>AND p.warehouse_out_time &gt;= #{dto.warehouseOutTimeStart}</if>" +
             "<if test='dto.warehouseOutTimeEnd != null'>AND p.warehouse_out_time &lt; #{dto.warehouseOutTimeEnd}</if>" +
-            "GROUP BY r.id, r.record_no, r.order_code, r.hospital_name, r.hospital_dept_name, " +
+            "GROUP BY r.id, r.record_no, r.order_code, om.public_order_code, r.hospital_name, r.hospital_dept_name, " +
             "r.doctor_name, r.patient_name, r.is_urgent, r.is_postal, r.expected_delivery_date, " +
             "r.processing_center_name, r.design_package_code, r.production_batch_no, r.material_batch_no, r.status " +
             "ORDER BY r.create_time DESC" +
@@ -61,17 +63,19 @@ public interface ProductionRecordMapper extends BaseMapper<ProductionRecordEntit
     @Select("<script>" +
             "SELECT p.id AS productId, p.product_no AS productNo, p.product_name AS productName, " +
             "p.spec_name AS specName, p.material_name AS materialName, p.color_name AS colorName, p.status, " +
-            "r.record_no AS recordNo, r.order_code AS orderNo, r.hospital_name AS hospitalName, r.patient_name AS patientName, " +
+            "r.record_no AS recordNo, r.order_code AS orderNo, om.public_order_code AS publicOrderCode, r.hospital_name AS hospitalName, r.patient_name AS patientName, " +
             "p.warehouse_in_time AS warehouseInTime, p.warehouse_in_remark AS warehouseInRemark, " +
             "p.warehouse_out_time AS warehouseOutTime, p.warehouse_out_remark AS warehouseOutRemark " +
             "FROM production_product p " +
             "INNER JOIN production_record r ON p.production_record_id = r.id AND r.is_deleted = 0 " +
+            "LEFT JOIN order_main om ON r.order_id = om.id AND om.is_deleted = 0 " +
             "WHERE p.is_deleted = 0 " +
             "<if test='dto.keyword != null and dto.keyword != \"\"'>" +
             "AND (p.product_no LIKE CONCAT('%', #{dto.keyword}, '%') " +
             "OR p.product_name LIKE CONCAT('%', #{dto.keyword}, '%') " +
             "OR r.record_no LIKE CONCAT('%', #{dto.keyword}, '%') " +
-            "OR r.order_code LIKE CONCAT('%', #{dto.keyword}, '%')) " +
+            "OR r.order_code LIKE CONCAT('%', #{dto.keyword}, '%') " +
+            "OR om.public_order_code LIKE CONCAT('%', #{dto.keyword}, '%')) " +
             "</if>" +
             "<if test='dto.status != null and dto.status != \"\"'>AND p.status = #{dto.status}</if>" +
             "<if test='dto.warehouseInTimeStart != null'>AND p.warehouse_in_time &gt;= #{dto.warehouseInTimeStart}</if>" +

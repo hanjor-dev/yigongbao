@@ -17,6 +17,7 @@ public class WarehouseDetailVO {
     private Long recordId;
     private String recordNo;
     private String orderNo;
+    private String publicOrderCode;
     private String hospitalName;
     private String hospitalDeptName;
     private String doctorName;

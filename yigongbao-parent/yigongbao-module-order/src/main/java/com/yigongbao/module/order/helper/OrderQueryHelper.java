@@ -31,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +64,7 @@ public class OrderQueryHelper {
         map.put("createTime",           OrderMainEntity::getCreateTime);
         map.put("updateTime",           OrderMainEntity::getUpdateTime);
         map.put("orderCode",            OrderMainEntity::getOrderCode);
+        map.put("publicOrderCode",      OrderMainEntity::getPublicOrderCode);
         map.put("patientName",          OrderMainEntity::getPatientName);
         map.put("doctorName",           OrderMainEntity::getDoctorName);
         map.put("hospitalName",         OrderMainEntity::getHospitalName);
@@ -311,6 +313,7 @@ public class OrderQueryHelper {
         // 基础字段复制
         vo.setId(entity.getId());
         vo.setOrderCode(entity.getOrderCode());
+        vo.setPublicOrderCode(entity.getPublicOrderCode());
         vo.setDesignerRemark(entity.getDesignerRemark());
         // 订单类型翻译：1=医疗器械，2=非医疗器械
         vo.setOrderType(entity.getOrderType());
@@ -452,7 +455,8 @@ public class OrderQueryHelper {
         // 用户已配置个人列设置，优先使用
         if (StrUtil.isNotBlank(user.getOrderColumnSettings())) {
             try {
-                return objectMapper.readValue(user.getOrderColumnSettings(), OrderColumnConfigVO.class);
+                OrderColumnConfigVO config = objectMapper.readValue(user.getOrderColumnSettings(), OrderColumnConfigVO.class);
+                return ensurePublicOrderCodeColumn(config);
             } catch (JsonProcessingException e) {
                 // JSON 解析失败时降级为系统默认，记录警告
                 log.warn("解析用户列配置失败，使用系统默认配置，userId={}", currentUserId, e);
@@ -474,11 +478,33 @@ public class OrderQueryHelper {
             return null;
         }
         try {
-            return objectMapper.readValue(configJson, OrderColumnConfigVO.class);
+            return ensurePublicOrderCodeColumn(objectMapper.readValue(configJson, OrderColumnConfigVO.class));
         } catch (JsonProcessingException e) {
             log.error("解析系统列配置失败", e);
             return null;
         }
+    }
+
+    private OrderColumnConfigVO ensurePublicOrderCodeColumn(OrderColumnConfigVO config) {
+        if (config == null || config.getColumns() == null
+                || config.getColumns().stream().anyMatch(column -> "publicOrderCode".equals(column.getField()))) {
+            return config;
+        }
+        OrderColumnConfigVO.ColumnItemVO column = new OrderColumnConfigVO.ColumnItemVO();
+        column.setField("publicOrderCode");
+        column.setLabel("虚拟单号");
+        column.setVisible(true);
+        column.setSort(config.getColumns().stream()
+                .map(OrderColumnConfigVO.ColumnItemVO::getSort)
+                .filter(java.util.Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0) + 1);
+        column.setWidth(160);
+        column.setFixed(null);
+        List<OrderColumnConfigVO.ColumnItemVO> columns = new ArrayList<>(config.getColumns());
+        columns.add(column);
+        config.setColumns(columns);
+        return config;
     }
 
     // ==================== 展示字段辅助方法 ====================

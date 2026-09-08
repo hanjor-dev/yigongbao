@@ -319,6 +319,8 @@ class OrderQueryHelperTest {
 
                 OrderColumnConfigVO result = orderQueryHelper.getColumnConfig();
                 assertThat(result).isSameAs(userConfig);
+                assertThat(result.getColumns())
+                        .anyMatch(column -> "publicOrderCode".equals(column.getField()));
                 // 系统配置不应被查询
                 verify(configService, never()).getConfigValue(any());
             }

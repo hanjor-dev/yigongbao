@@ -117,8 +117,11 @@ public class OrderExportServiceImpl implements OrderExportService {
         }
 
         // 其他查询条件
-        wrapper.like(StrUtil.isNotBlank(dto.getOrderCode()), OrderMainEntity::getOrderCode, dto.getOrderCode())
-                .eq(Objects.nonNull(dto.getPhase()), OrderMainEntity::getPhase, dto.getPhase())
+        if (StrUtil.isNotBlank(dto.getOrderCode())) {
+            wrapper.and(w -> w.like(OrderMainEntity::getOrderCode, dto.getOrderCode())
+                    .or().like(OrderMainEntity::getPublicOrderCode, dto.getOrderCode()));
+        }
+        wrapper.eq(Objects.nonNull(dto.getPhase()), OrderMainEntity::getPhase, dto.getPhase())
                 .eq(Objects.nonNull(dto.getStatus()), OrderMainEntity::getStatus, dto.getStatus());
 
         orderQueryHelper.applySort(wrapper, dto.getSortField(), dto.getSortOrder());
@@ -285,6 +288,9 @@ public class OrderExportServiceImpl implements OrderExportService {
         switch (field) {
             case "orderCode":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getOrderCode()));
+                break;
+            case "publicOrderCode":
+                cell.setCellValue(StrUtil.nullToEmpty(order.getPublicOrderCode()));
                 break;
             case "orderType":
             case "orderTypeName":
@@ -529,6 +535,7 @@ public class OrderExportServiceImpl implements OrderExportService {
     private java.util.Map<String, String> getDefaultFieldLabels() {
         java.util.Map<String, String> labels = new java.util.HashMap<>();
         labels.put("orderCode", "订单编号");
+        labels.put("publicOrderCode", "虚拟单号");
         labels.put("orderTypeName", "订单类型");
         labels.put("needsPhysicalDeliveryName", "是否需要实体交付");
         labels.put("hospitalName", "医院名称");
@@ -576,6 +583,7 @@ public class OrderExportServiceImpl implements OrderExportService {
     public List<OrderExportFieldVO> getAvailableExportFields() {
         List<OrderExportFieldVO> fields = new java.util.ArrayList<>();
         fields.add(new OrderExportFieldVO("orderCode", "订单编号"));
+        fields.add(new OrderExportFieldVO("publicOrderCode", "虚拟单号"));
         fields.add(new OrderExportFieldVO("orderTypeName", "订单类型"));
         fields.add(new OrderExportFieldVO("needsPhysicalDeliveryName", "是否需要实体交付"));
         fields.add(new OrderExportFieldVO("hospitalName", "医院名称"));

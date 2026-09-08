@@ -29,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +64,7 @@ public class DesignQueryHelper {
         map.put("createTime",           OrderMainEntity::getCreateTime);
         map.put("updateTime",           OrderMainEntity::getUpdateTime);
         map.put("orderCode",            OrderMainEntity::getOrderCode);
+        map.put("publicOrderCode",      OrderMainEntity::getPublicOrderCode);
         map.put("patientName",          OrderMainEntity::getPatientName);
         map.put("hospitalName",         OrderMainEntity::getHospitalName);
         map.put("status",               OrderMainEntity::getStatus);
@@ -280,7 +282,8 @@ public class DesignQueryHelper {
             UserEntity user = userService.getById(currentUserId);
             if (user != null && StrUtil.isNotBlank(user.getDesignColumnSettings())) {
                 try {
-                    return objectMapper.readValue(user.getDesignColumnSettings(), DesignColumnConfigVO.class);
+                    DesignColumnConfigVO config = objectMapper.readValue(user.getDesignColumnSettings(), DesignColumnConfigVO.class);
+                    return ensurePublicOrderCodeColumn(config);
                 } catch (JsonProcessingException e) {
                     log.warn("解析用户设计列配置失败，降级为系统默认，userId={}", currentUserId, e);
                 }
@@ -301,11 +304,33 @@ public class DesignQueryHelper {
             return null;
         }
         try {
-            return objectMapper.readValue(configJson, DesignColumnConfigVO.class);
+            return ensurePublicOrderCodeColumn(objectMapper.readValue(configJson, DesignColumnConfigVO.class));
         } catch (JsonProcessingException e) {
             log.error("解析系统设计列配置失败", e);
             return null;
         }
+    }
+
+    private DesignColumnConfigVO ensurePublicOrderCodeColumn(DesignColumnConfigVO config) {
+        if (config == null || config.getColumns() == null
+                || config.getColumns().stream().anyMatch(column -> "publicOrderCode".equals(column.getField()))) {
+            return config;
+        }
+        DesignColumnConfigVO.ColumnItemVO column = new DesignColumnConfigVO.ColumnItemVO();
+        column.setField("publicOrderCode");
+        column.setLabel("虚拟单号");
+        column.setVisible(true);
+        column.setSort(config.getColumns().stream()
+                .map(DesignColumnConfigVO.ColumnItemVO::getSort)
+                .filter(java.util.Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0) + 1);
+        column.setWidth(160);
+        column.setFixed(null);
+        List<DesignColumnConfigVO.ColumnItemVO> columns = new ArrayList<>(config.getColumns());
+        columns.add(column);
+        config.setColumns(columns);
+        return config;
     }
 
     // ==================== 展示字段翻译 ====================

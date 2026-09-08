@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.config.DefaultConfigProperties;
+import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.vo.SelectTreeVO;
 import com.yigongbao.module.system.config.dto.ConfigPageDTO;
 import com.yigongbao.module.system.config.dto.CreateConfigDTO;
@@ -76,6 +78,20 @@ class ConfigServiceImplTest {
         createDTO.setConfigValue("newValue");
         createDTO.setConfigType("string");
         createDTO.setConfigGroup("security");
+    }
+
+    @Test
+    @DisplayName("getConfigValue: 订单列配置兜底包含虚拟单号")
+    void getConfigValue_orderColumnConfigFallback_containsPublicOrderCode() throws Exception {
+        Field defaultConfigField = ConfigServiceImpl.class.getDeclaredField("defaultConfigProperties");
+        defaultConfigField.setAccessible(true);
+        defaultConfigField.set(configService, new DefaultConfigProperties());
+        when(configMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+
+        String result = configService.getConfigValue(SystemConfigKeyEnum.ORDER_COLUMN_CONFIG.getKey());
+
+        assertNotNull(result);
+        assertTrue(result.contains("publicOrderCode"));
     }
 
     // ==================== pageConfig 测试 ====================

@@ -21,6 +21,7 @@ public class ProductionRecordVO {
     private String recordNo;
     private Long orderId;
     private String orderCode;
+    private String publicOrderCode;
     private Integer orderType;
     private Long designPackageId;
     private String designPackageCode;

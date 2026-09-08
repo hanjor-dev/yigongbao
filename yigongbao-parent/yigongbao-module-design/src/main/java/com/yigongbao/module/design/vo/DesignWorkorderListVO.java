@@ -22,6 +22,9 @@ public class DesignWorkorderListVO {
     /** 订单编号 */
     private String orderCode;
 
+    /** 对外展示的虚拟单号 */
+    private String publicOrderCode;
+
     /** 当前状态值 */
     private Integer status;
 

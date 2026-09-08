@@ -20,6 +20,7 @@ public class WarehouseProductVO {
     private String status;
     private String recordNo;
     private String orderNo;
+    private String publicOrderCode;
     private String hospitalName;
     private String patientName;
     private LocalDateTime warehouseInTime;

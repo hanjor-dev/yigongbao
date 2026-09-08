@@ -136,6 +136,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         // orderCode 参数：多字段模糊搜索（订单编号/机构名称/业务员姓名/医院名称/患者名字）
         if (StrUtil.isNotBlank(queryDTO.getOrderCode())) {
             wrapper.and(w -> w.like(OrderMainEntity::getOrderCode, queryDTO.getOrderCode())
+                    .or().like(OrderMainEntity::getPublicOrderCode, queryDTO.getOrderCode())
                     .or().like(OrderMainEntity::getOrgName, queryDTO.getOrderCode())
                     .or().like(OrderMainEntity::getOperatorName, queryDTO.getOrderCode())
                     .or().like(OrderMainEntity::getHospitalName, queryDTO.getOrderCode())
@@ -212,6 +213,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         // 基本信息
         vo.setId(order.getId());
         vo.setOrderCode(order.getOrderCode());
+        vo.setPublicOrderCode(order.getPublicOrderCode());
         vo.setStatus(order.getStatus());
         vo.setStatusName(designQueryHelper.getStatusName(order.getStatus()));
         vo.setStatusColor(flowStatusColorResolver.getColor(order.getStatus()));
@@ -547,6 +549,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         vo.setId(entity.getId());
         vo.setIsUrgent(entity.getIsUrgent());
         vo.setOrderCode(entity.getOrderCode());
+        vo.setPublicOrderCode(entity.getPublicOrderCode());
         vo.setStatus(entity.getStatus());
         vo.setStatusName(designQueryHelper.getStatusName(entity.getStatus()));
         vo.setStatusColor(flowStatusColorResolver.getColor(entity.getStatus()));

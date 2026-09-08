@@ -206,4 +206,24 @@ public class DefaultConfigProperties {
      * 字段命名规则：design.column.config → configDesignColumnConfig
      */
     private String configDesignColumnConfig = "{\"module\":\"design\",\"columns\":[{\"field\":\"isUrgent\",\"label\":\"加急\",\"visible\":true,\"sort\":1,\"width\":70,\"fixed\":null},{\"field\":\"orderCode\",\"label\":\"订单编号\",\"visible\":true,\"sort\":2,\"width\":160,\"fixed\":null},{\"field\":\"statusName\",\"label\":\"当前状态\",\"visible\":true,\"sort\":3,\"width\":120,\"fixed\":null},{\"field\":\"businessTypeName\",\"label\":\"业务类型\",\"visible\":true,\"sort\":4,\"width\":100,\"fixed\":null},{\"field\":\"orderTypeName\",\"label\":\"订单类型\",\"visible\":true,\"sort\":5,\"width\":110,\"fixed\":null},{\"field\":\"needsPhysicalDeliveryName\",\"label\":\"实体交付\",\"visible\":true,\"sort\":6,\"width\":90,\"fixed\":null},{\"field\":\"patientName\",\"label\":\"患者姓名\",\"visible\":true,\"sort\":7,\"width\":100,\"fixed\":null},{\"field\":\"hospitalName\",\"label\":\"医院\",\"visible\":true,\"sort\":8,\"width\":180,\"fixed\":null},{\"field\":\"hospitalDeptName\",\"label\":\"科室\",\"visible\":true,\"sort\":9,\"width\":100,\"fixed\":null},{\"field\":\"doctorName\",\"label\":\"医生姓名\",\"visible\":true,\"sort\":10,\"width\":100,\"fixed\":null},{\"field\":\"areaName\",\"label\":\"地区\",\"visible\":true,\"sort\":11,\"width\":100,\"fixed\":null},{\"field\":\"rebuildProjectSummary\",\"label\":\"重建项目\",\"visible\":true,\"sort\":12,\"width\":200,\"fixed\":null},{\"field\":\"designerName\",\"label\":\"设计师\",\"visible\":true,\"sort\":13,\"width\":100,\"fixed\":null},{\"field\":\"designerRemark\",\"label\":\"设计师备注\",\"visible\":true,\"sort\":14,\"width\":200,\"fixed\":null},{\"field\":\"packageCount\",\"label\":\"数据包数\",\"visible\":true,\"sort\":15,\"width\":90,\"fixed\":null},{\"field\":\"designStartTime\",\"label\":\"开始设计时间\",\"visible\":true,\"sort\":16,\"width\":160,\"fixed\":null},{\"field\":\"expectedDeliveryDate\",\"label\":\"期望交付\",\"visible\":true,\"sort\":17,\"width\":120,\"fixed\":null},{\"field\":\"createTime\",\"label\":\"创建时间\",\"visible\":true,\"sort\":18,\"width\":160,\"fixed\":null},{\"field\":\"rejectReason\",\"label\":\"驳回原因\",\"visible\":false,\"sort\":19,\"width\":160,\"fixed\":null},{\"field\":\"action\",\"label\":\"操作\",\"visible\":true,\"sort\":20,\"width\":150,\"fixed\":\"right\"}]}";
+    public String getConfigOrderColumnConfig() {
+        return appendPublicOrderCodeColumn(configOrderColumnConfig);
+    }
+
+    public String getConfigDesignColumnConfig() {
+        return appendPublicOrderCodeColumn(configDesignColumnConfig);
+    }
+
+    private String appendPublicOrderCodeColumn(String config) {
+        if (config.contains("publicOrderCode")) {
+            return config;
+        }
+        int endIndex = config.lastIndexOf("]}");
+        if (endIndex < 0) {
+            return config;
+        }
+        return config.substring(0, endIndex)
+                + ", {\"field\":\"publicOrderCode\",\"label\":\"虚拟单号\",\"visible\":true,\"sort\":999,\"width\":160,\"fixed\":null}]}"
+                + config.substring(endIndex + 2);
+    }
 }

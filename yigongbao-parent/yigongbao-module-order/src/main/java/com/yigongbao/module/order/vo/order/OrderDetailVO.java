@@ -33,6 +33,9 @@ public class OrderDetailVO implements Serializable {
      */
     private String orderCode;
 
+    /** 对外展示的虚拟单号 */
+    private String publicOrderCode;
+
     // ==================== 订单类型 ====================
     /**
      * 订单类型：1-医疗器械，2-非医疗器械
