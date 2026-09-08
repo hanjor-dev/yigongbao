@@ -25,7 +25,6 @@ BEGIN
         FROM order_main
         WHERE is_deleted = 0
           AND public_order_code IS NOT NULL
-          AND public_order_code <> ''
         GROUP BY public_order_code
         HAVING COUNT(*) > 1
     ) THEN

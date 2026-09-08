@@ -28,6 +28,7 @@ BEGIN
             LEAVE read_loop;
         END IF;
 
+        SET v_attempts = 0;
         code_loop: LOOP
             SET v_attempts = v_attempts + 1;
             IF v_attempts > 1000 THEN
