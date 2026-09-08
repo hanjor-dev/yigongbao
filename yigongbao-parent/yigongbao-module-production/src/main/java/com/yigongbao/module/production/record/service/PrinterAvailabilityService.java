@@ -34,17 +34,28 @@ public class PrinterAvailabilityService {
         }
     }
 
+    public List<PrinterVO> toPrinterVOsIgnoringConnection(Collection<DeviceEntity> devices) {
+        return toPrinterVOs(devices, false);
+    }
+
     public List<PrinterVO> toPrinterVOs(Collection<DeviceEntity> devices) {
+        return toPrinterVOs(devices, true);
+    }
+
+    private List<PrinterVO> toPrinterVOs(Collection<DeviceEntity> devices, boolean requireConnection) {
         List<DeviceEntity> deviceList = devices == null
                 ? List.of()
                 : devices.stream().filter(Objects::nonNull).toList();
         return deviceList.stream()
-                .map(this::toPrinterVO)
+                .map(device -> toPrinterVO(device, requireConnection))
                 .toList();
     }
 
-    private PrinterVO toPrinterVO(DeviceEntity device) {
-        boolean available = isAvailable(device);
+    private PrinterVO toPrinterVO(DeviceEntity device, boolean requireConnection) {
+        boolean available = device != null
+                && DeviceTypeEnum.PRINTER_SLA.getCode().equals(device.getDeviceType())
+                && (!requireConnection || Integer.valueOf(1).equals(device.getConnectionStatus()))
+                && PrinterDeviceStateEnum.IDLE.getCode().equals(device.getState());
         PrinterDeviceStateEnum deviceState = PrinterDeviceStateEnum.fromCode(device.getState());
         PrinterVO vo = new PrinterVO();
         vo.setId(device.getId());

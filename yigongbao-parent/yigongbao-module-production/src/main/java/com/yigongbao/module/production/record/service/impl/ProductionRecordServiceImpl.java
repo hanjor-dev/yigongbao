@@ -675,7 +675,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         }
 
         // 3. 按打印机物理状态统一转换为 PrinterVO
-        Map<Long, PrinterVO> printerById = printerAvailabilityService.toPrinterVOs(devices).stream()
+        Map<Long, PrinterVO> printerById = printerAvailabilityService.toPrinterVOsIgnoringConnection(devices).stream()
             .collect(Collectors.toMap(PrinterVO::getId, vo -> vo));
         Map<Long, List<PrinterVO>> centerPrintersMap = devices.stream()
             .collect(Collectors.groupingBy(

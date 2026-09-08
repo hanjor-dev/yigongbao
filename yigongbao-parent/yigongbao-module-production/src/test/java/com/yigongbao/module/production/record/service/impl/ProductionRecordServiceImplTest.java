@@ -121,6 +121,8 @@ class ProductionRecordServiceImplTest {
         PrinterAvailabilityService realAvailabilityService = new PrinterAvailabilityService();
         lenient().when(availabilityService.toPrinterVOs(any())).thenAnswer(invocation ->
                 realAvailabilityService.toPrinterVOs(invocation.getArgument(0)));
+        lenient().when(availabilityService.toPrinterVOsIgnoringConnection(any())).thenAnswer(invocation ->
+                realAvailabilityService.toPrinterVOsIgnoringConnection(invocation.getArgument(0)));
 
         if (TableInfoHelper.getTableInfo(ProductionRecordEntity.class) == null) {
             MapperBuilderAssistant assistant = new MapperBuilderAssistant(
@@ -789,10 +791,10 @@ class ProductionRecordServiceImplTest {
 
             assertEquals(1, result.size());
             var printers = result.get(0).getPrinters();
-            assertEquals(List.of(0, 0, 1, 1), printers.stream().map(p -> p.getStatus()).toList());
-            assertEquals(List.of("空闲", "空闲", "不可用", "不可用"),
+            assertEquals(List.of(0, 0, 1, 0), printers.stream().map(p -> p.getStatus()).toList());
+            assertEquals(List.of("空闲", "空闲", "不可用", "空闲"),
                     printers.stream().map(p -> p.getStatusName()).toList());
-            assertEquals(List.of(true, true, false, false),
+            assertEquals(List.of(true, true, false, true),
                     printers.stream().map(p -> p.getAvailable()).toList());
             assertEquals("工作中", printers.get(2).getDeviceStateName());
             assertEquals(0, printers.get(3).getConnectionStatus());

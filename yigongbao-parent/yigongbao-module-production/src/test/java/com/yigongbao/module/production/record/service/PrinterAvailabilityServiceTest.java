@@ -21,6 +21,10 @@ class PrinterAvailabilityServiceTest {
         DeviceEntity device = device(1L, 1, 0);
 
         assertThat(service.isAvailable(device)).isTrue();
+        device.setConnectionStatus(0);
+        assertThat(service.isAvailable(device)).isFalse();
+        device.setConnectionStatus(null);
+        assertThat(service.isAvailable(device)).isFalse();
         device.setDeviceType(DeviceTypeEnum.WASH_CONTAINER.getCode());
         assertThat(service.isAvailable(device)).isFalse();
     }
@@ -31,6 +35,17 @@ class PrinterAvailabilityServiceTest {
         assertThat(service.isAvailable(device(2L, null, 0))).isFalse();
         assertThat(service.isAvailable(device(3L, 1, null))).isFalse();
         assertThat(service.isAvailable(null)).isFalse();
+    }
+
+    @Test
+    void toPrinterVOsIgnoringConnection_marksOfflineIdlePrinterAvailable() {
+        DeviceEntity device = device(1L, 0, 0);
+
+        List<PrinterVO> result = service.toPrinterVOsIgnoringConnection(List.of(device));
+
+        assertThat(result).extracting(PrinterVO::getAvailable).containsExactly(true);
+        assertThat(result).extracting(PrinterVO::getStatusName).containsExactly("空闲");
+        assertThat(result).extracting(PrinterVO::getConnectionStatus).containsExactly(0);
     }
 
     @Test
