@@ -12,6 +12,7 @@ SET config_value = JSON_SET(
                     'sort', JSON_LENGTH(JSON_EXTRACT(config_value, '$.columns')) + 1,
                     'width', 160, 'fixed', NULL)
     )
+)
 WHERE config_key IN (
     'order.column.config',
     'design.column.config',
