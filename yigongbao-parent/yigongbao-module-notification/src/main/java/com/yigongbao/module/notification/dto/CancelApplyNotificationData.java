@@ -9,6 +9,7 @@ import lombok.Data;
 public class CancelApplyNotificationData {
 
     private String orderCode;
+    private String publicOrderCode;
     private String applyReason;
     private String auditReason;
 }

@@ -323,6 +323,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         if (CollUtil.isEmpty(packages)) {
             return Collections.emptyList();
         }
+        OrderMainEntity order = orderMainService.getById(orderId);
 
         // 2. 批量查询包内文件
         List<Long> packageIds = packages.stream()
@@ -342,7 +343,8 @@ public class DesignFileServiceImpl implements DesignFileService {
 
         // 5. 构建返回结果
         return packages.stream()
-                .map(pkg -> buildPackageVO(pkg, fileMap.getOrDefault(pkg.getId(), Collections.emptyList()), filledFileIds))
+                .map(pkg -> buildPackageVO(pkg, fileMap.getOrDefault(pkg.getId(), Collections.emptyList()), filledFileIds,
+                        order == null ? null : order.getPublicOrderCode()))
                 .collect(Collectors.toList());
     }
 
@@ -603,7 +605,8 @@ public class DesignFileServiceImpl implements DesignFileService {
      * 构建数据包 VO
      */
     private DesignPackageVO buildPackageVO(DesignPackageEntity entity, List<DesignPackageFileEntity> files) {
-        return buildPackageVO(entity, files, Collections.emptySet());
+        OrderMainEntity order = orderMainService.getById(entity.getOrderId());
+        return buildPackageVO(entity, files, Collections.emptySet(), order == null ? null : order.getPublicOrderCode());
     }
 
     /**
@@ -611,10 +614,17 @@ public class DesignFileServiceImpl implements DesignFileService {
      */
     private DesignPackageVO buildPackageVO(DesignPackageEntity entity, List<DesignPackageFileEntity> files,
                                            Set<Long> filledFileIds) {
+        OrderMainEntity order = orderMainService.getById(entity.getOrderId());
+        return buildPackageVO(entity, files, filledFileIds, order == null ? null : order.getPublicOrderCode());
+    }
+
+    private DesignPackageVO buildPackageVO(DesignPackageEntity entity, List<DesignPackageFileEntity> files,
+                                           Set<Long> filledFileIds, String publicOrderCode) {
         DesignPackageVO vo = new DesignPackageVO();
         vo.setId(entity.getId());
         vo.setOrderId(entity.getOrderId());
         vo.setOrderCode(entity.getOrderCode());
+        vo.setPublicOrderCode(publicOrderCode);
         vo.setPackageCode(entity.getPackageCode());
         vo.setPackageSeq(entity.getPackageSeq());
         vo.setFileId(entity.getFileId());

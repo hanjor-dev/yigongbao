@@ -25,6 +25,9 @@ public class DesignerAssignmentHistoryVO {
     @Schema(description = "订单编号")
     private String orderCode;
 
+    @Schema(description = "虚拟单号")
+    private String publicOrderCode;
+
     @Schema(description = "原设计师ID")
     private Long oldDesignerId;
 

@@ -11,7 +11,7 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface CancelApplyQueryMapper {
 
-    @Select("SELECT om.order_code AS orderCode, oca.apply_reason AS applyReason, "
+    @Select("SELECT om.order_code AS orderCode, om.public_order_code AS publicOrderCode, oca.apply_reason AS applyReason, "
             + "oca.audit_reason AS auditReason "
             + "FROM order_cancel_apply oca "
             + "LEFT JOIN order_main om ON om.id = oca.order_id AND om.is_deleted = 0 "

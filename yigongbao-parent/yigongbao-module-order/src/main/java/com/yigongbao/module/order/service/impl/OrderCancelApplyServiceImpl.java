@@ -323,8 +323,9 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
 
         OrderMainEntity order = orderMainService.getById(entity.getOrderId());
         String orderCode = order != null ? order.getOrderCode() : null;
+        String publicOrderCode = order != null ? order.getPublicOrderCode() : null;
 
-        return cancelApplyConvert.toVO(entity, applyByName, auditByName, orderCode);
+        return cancelApplyConvert.toVO(entity, applyByName, auditByName, orderCode, publicOrderCode);
     }
 
     /**

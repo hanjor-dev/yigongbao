@@ -33,6 +33,11 @@ public class ApplyDetailVO implements Serializable {
     private String orderCode;
 
     /**
+     * 虚拟单号
+     */
+    private String publicOrderCode;
+
+    /**
      * 申请人姓名
      */
     private String applyUserName;

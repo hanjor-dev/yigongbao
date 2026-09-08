@@ -41,11 +41,17 @@ public class OrderCancelApplyConvert {
      */
     public CancelApplyVO toVO(OrderCancelApplyEntity entity, String applyByName,
                               String auditByName, String orderCode) {
+        return toVO(entity, applyByName, auditByName, orderCode, null);
+    }
+
+    public CancelApplyVO toVO(OrderCancelApplyEntity entity, String applyByName,
+                              String auditByName, String orderCode, String publicOrderCode) {
         CancelApplyVO vo = toVO(entity);
         if (vo != null) {
             vo.setApplyByName(applyByName);
             vo.setAuditByName(auditByName);
             vo.setOrderCode(orderCode);
+            vo.setPublicOrderCode(publicOrderCode);
         }
         return vo;
     }

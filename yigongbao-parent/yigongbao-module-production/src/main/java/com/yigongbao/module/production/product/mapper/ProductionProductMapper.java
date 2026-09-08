@@ -78,7 +78,8 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "  AND pr.record_no LIKE CONCAT('%', #{dto.recordNo}, '%') " +
             "</if>" +
             "<if test='dto.orderCode != null and dto.orderCode != \"\"'>" +
-            "  AND pr.order_code LIKE CONCAT('%', #{dto.orderCode}, '%') " +
+            "  AND (pr.order_code LIKE CONCAT('%', #{dto.orderCode}, '%') " +
+            "       OR om.public_order_code LIKE CONCAT('%', #{dto.orderCode}, '%')) " +
             "</if>" +
             "<if test='dto.productNo != null and dto.productNo != \"\"'>" +
             "  AND pp.product_no LIKE CONCAT('%', #{dto.productNo}, '%') " +
@@ -128,7 +129,8 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "  AND pr.record_no LIKE CONCAT('%', #{dto.recordNo}, '%') " +
             "</if>" +
             "<if test='dto.orderCode != null and dto.orderCode != \"\"'>" +
-            "  AND pr.order_code LIKE CONCAT('%', #{dto.orderCode}, '%') " +
+            "  AND (pr.order_code LIKE CONCAT('%', #{dto.orderCode}, '%') " +
+            "       OR om.public_order_code LIKE CONCAT('%', #{dto.orderCode}, '%')) " +
             "</if>" +
             "<if test='dto.productNo != null and dto.productNo != \"\"'>" +
             "  AND pp.product_no LIKE CONCAT('%', #{dto.productNo}, '%') " +

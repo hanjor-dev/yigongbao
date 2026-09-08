@@ -15,6 +15,7 @@ import com.yigongbao.module.design.service.DesignModelService;
 import com.yigongbao.module.design.service.DesignPackageFileService;
 import com.yigongbao.module.design.service.DesignPackageService;
 import com.yigongbao.module.design.service.DesignProductService;
+import com.yigongbao.module.design.service.DesignProductFileService;
 import com.yigongbao.module.design.helper.DesignQueryHelper;
 import com.yigongbao.module.design.vo.DesignModelVO;
 import com.yigongbao.module.design.vo.DesignPackageVO;
@@ -70,6 +71,9 @@ class DesignFileServiceImplTest {
 
     @Mock
     private DesignProductService productService;
+
+    @Mock
+    private DesignProductFileService productFileService;
 
     @Mock
     private FileService fileService;
@@ -415,6 +419,27 @@ class DesignFileServiceImplTest {
 
             assertTrue(result.isEmpty());
             verifyNoInteractions(designQueryHelper);
+        }
+
+        @Test
+        @DisplayName("数据包返回虚拟单号并保留原订单流水号")
+        void packageListContainsPublicOrderCode() {
+            designingOrder.setPublicOrderCode("YGABC123456");
+            DesignPackageEntity entity = new DesignPackageEntity();
+            entity.setId(10L);
+            entity.setOrderId(orderId);
+            entity.setOrderCode("ORD-001");
+            entity.setPackageSeq(1);
+            when(orderMainService.getById(orderId)).thenReturn(designingOrder);
+            when(packageService.list(any(Wrapper.class))).thenReturn(List.of(entity));
+            when(packageFileService.list(any(Wrapper.class))).thenReturn(Collections.emptyList());
+            when(productFileService.getFilledPackageFileIds(anyList())).thenReturn(Collections.emptySet());
+            when(fileService.generateDownloadUrls(anyList())).thenReturn(Collections.emptyList());
+
+            List<DesignPackageVO> result = designFileService.listPackagesForOrderDetail(orderId);
+
+            assertEquals("ORD-001", result.get(0).getOrderCode());
+            assertEquals("YGABC123456", result.get(0).getPublicOrderCode());
         }
     }
 

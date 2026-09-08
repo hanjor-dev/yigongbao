@@ -5,7 +5,8 @@
     <sql id="cancelApplyPageConditions">
         AND oca.is_deleted = 0
         <if test="query.orderCode != null and query.orderCode != ''">
-            AND om.order_code LIKE CONCAT('%', #{query.orderCode}, '%')
+            AND (om.order_code LIKE CONCAT('%', #{query.orderCode}, '%')
+                 OR om.public_order_code LIKE CONCAT('%', #{query.orderCode}, '%'))
         </if>
         <if test="query.applyByName != null and query.applyByName != ''">
             AND applicant.real_name LIKE CONCAT('%', #{query.applyByName}, '%')

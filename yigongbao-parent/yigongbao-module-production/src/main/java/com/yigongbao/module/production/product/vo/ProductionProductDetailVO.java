@@ -50,6 +50,7 @@ public class ProductionProductDetailVO {
     // ===== 订单信息（来自 production_record 冗余字段）=====
     private Long orderId;
     private String orderCode;
+    private String publicOrderCode;
     /** 订单类型（1=医疗器械，2=非医疗器械） */
     private Integer orderType;
     private String designPackageCode;

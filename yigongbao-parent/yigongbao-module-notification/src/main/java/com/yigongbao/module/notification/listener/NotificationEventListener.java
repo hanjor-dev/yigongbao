@@ -258,6 +258,7 @@ public class NotificationEventListener {
                     .title("有新的订单取消申请待审核")
                     .content(content(
                             f("orderCode", "订单号", data.getOrderCode()),
+                            f("publicOrderCode", "虚拟单号", data.getPublicOrderCode()),
                             f("applicant", "申请人", applicantName),
                             f("applyReason", "取消原因", data.getApplyReason())))
                     .messageType(MessageTypeEnum.POPUP)
@@ -304,6 +305,7 @@ public class NotificationEventListener {
                     .title(title)
                     .content(content(
                             f("orderCode", "订单号", data.getOrderCode()),
+                            f("publicOrderCode", "虚拟单号", data.getPublicOrderCode()),
                             f("auditor", "审核人", auditorName),
                             f("result", "审核结果", result),
                             f("auditReason", "审核意见", data.getAuditReason())))

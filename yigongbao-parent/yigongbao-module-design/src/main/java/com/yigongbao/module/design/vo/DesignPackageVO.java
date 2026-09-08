@@ -35,6 +35,11 @@ public class DesignPackageVO implements Serializable {
     private String orderCode;
 
     /**
+     * 虚拟单号
+     */
+    private String publicOrderCode;
+
+    /**
      * 数据包编号
      */
     private String packageCode;

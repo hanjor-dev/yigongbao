@@ -21,6 +21,7 @@ public class DesignFileDetailVO implements Serializable {
         private Long id;
         private Long orderId;
         private String orderCode;
+        private String publicOrderCode;
         private String packageCode;
         private Integer packageSeq;
         private String fileId;

@@ -15,6 +15,8 @@ public class CancelPreviewVO {
 
     /** 订单编号 */
     private String orderCode;
+    /** 虚拟单号 */
+    private String publicOrderCode;
 
     /** 订单下流转卡总数（未取消） */
     private Integer totalRecordCount;

@@ -19,6 +19,7 @@ public class ModificationLogVO implements Serializable {
     private Long id;
     private Long orderId;
     private String orderCode;
+    private String publicOrderCode;
     private Long applyId;
     private String fieldName;
     private String fieldLabel;

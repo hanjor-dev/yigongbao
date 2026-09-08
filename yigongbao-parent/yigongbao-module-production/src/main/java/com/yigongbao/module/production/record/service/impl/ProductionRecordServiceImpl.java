@@ -972,6 +972,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         CancelPreviewVO vo = new CancelPreviewVO();
         vo.setOrderId(order.getId());
         vo.setOrderCode(order.getOrderCode());
+        vo.setPublicOrderCode(order.getPublicOrderCode());
         vo.setTotalRecordCount((int) totalRecordCount);
         vo.setMessage(String.format("订单 %s 共有 %d 张流转卡，取消后将全部作废", order.getOrderCode(), totalRecordCount));
         return vo;

@@ -67,6 +67,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Collections;
+import java.util.stream.Collectors;
 import java.util.Set;
 
 /**
@@ -461,7 +463,9 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         Page<OrderModificationApplyEntity> page = new Page<>(dto.getPageNum(), dto.getPageSize());
         LambdaQueryWrapper<OrderModificationApplyEntity> wrapper = new LambdaQueryWrapper<OrderModificationApplyEntity>()
                 .eq(dto.getStatus() != null, OrderModificationApplyEntity::getStatus, dto.getStatus())
-                .like(StrUtil.isNotBlank(dto.getOrderCode()), OrderModificationApplyEntity::getOrderCode, dto.getOrderCode())
+                .and(StrUtil.isNotBlank(dto.getOrderCode()), w -> w
+                        .like(OrderModificationApplyEntity::getOrderCode, dto.getOrderCode())
+                        .or().apply("order_id IN (SELECT id FROM order_main WHERE public_order_code LIKE CONCAT('%', {0}, '%'))", dto.getOrderCode()))
                 .like(StrUtil.isNotBlank(dto.getApplyUserName()), OrderModificationApplyEntity::getApplyUserName, dto.getApplyUserName())
                 .ge(dto.getApplyTimeStart() != null, OrderModificationApplyEntity::getApplyTime, dto.getApplyTimeStart())
                 .le(dto.getApplyTimeEnd() != null, OrderModificationApplyEntity::getApplyTime, dto.getApplyTimeEnd())
@@ -469,7 +473,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
 
         // 执行查询并转换为VO
         IPage<OrderModificationApplyEntity> entityPage = orderModificationApplyMapper.selectPage(page, wrapper);
-        return entityPage.convert(this::toApplyListItemVO);
+        Map<Long, String> publicOrderCodes = loadPublicOrderCodes(entityPage.getRecords());
+        return entityPage.convert(entity -> toApplyListItemVO(entity, publicOrderCodes.get(entity.getOrderId())));
     }
 
     /**
@@ -494,6 +499,7 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         vo.setApplyId(apply.getId());
         vo.setOrderId(apply.getOrderId());
         vo.setOrderCode(apply.getOrderCode());
+        vo.setPublicOrderCode(loadPublicOrderCodes(List.of(apply)).get(apply.getOrderId()));
         vo.setApplyUserName(apply.getApplyUserName());
         vo.setApplyTime(apply.getApplyTime());
         vo.setExpireTime(apply.getExpireTime());
@@ -583,14 +589,17 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         LambdaQueryWrapper<OrderModificationApplyEntity> wrapper = new LambdaQueryWrapper<OrderModificationApplyEntity>()
                 .eq(OrderModificationApplyEntity::getApplyUserId, userId)
                 .eq(dto.getStatus() != null, OrderModificationApplyEntity::getStatus, dto.getStatus())
-                .like(StrUtil.isNotBlank(dto.getOrderCode()), OrderModificationApplyEntity::getOrderCode, dto.getOrderCode())
+                .and(StrUtil.isNotBlank(dto.getOrderCode()), w -> w
+                        .like(OrderModificationApplyEntity::getOrderCode, dto.getOrderCode())
+                        .or().apply("order_id IN (SELECT id FROM order_main WHERE public_order_code LIKE CONCAT('%', {0}, '%'))", dto.getOrderCode()))
                 .ge(dto.getApplyTimeStart() != null, OrderModificationApplyEntity::getApplyTime, dto.getApplyTimeStart())
                 .le(dto.getApplyTimeEnd() != null, OrderModificationApplyEntity::getApplyTime, dto.getApplyTimeEnd())
                 .orderByDesc(OrderModificationApplyEntity::getApplyTime);
 
         // 执行查询并转换为VO
         IPage<OrderModificationApplyEntity> entityPage = orderModificationApplyMapper.selectPage(page, wrapper);
-        return entityPage.convert(this::toApplyListItemVO);
+        Map<Long, String> publicOrderCodes = loadPublicOrderCodes(entityPage.getRecords());
+        return entityPage.convert(entity -> toApplyListItemVO(entity, publicOrderCodes.get(entity.getOrderId())));
     }
 
     /**
@@ -705,7 +714,8 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
                                 OrderModificationLogEntity::getFieldName, dto.getFieldName())
                         .orderByDesc(OrderModificationLogEntity::getCreateTime);
         IPage<OrderModificationLogEntity> entityPage = orderModificationLogMapper.selectPage(page, wrapper);
-        return entityPage.convert(this::toLogVO);
+        Map<Long, String> publicOrderCodes = loadPublicOrderCodesFromLogs(entityPage.getRecords());
+        return entityPage.convert(entity -> toLogVO(entity, publicOrderCodes.get(entity.getOrderId())));
     }
 
     // ==================== 通用辅助方法 ====================
@@ -787,16 +797,39 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
     // ==================== Entity → VO 转换 ====================
 
     private ModificationLogVO toLogVO(OrderModificationLogEntity entity) {
+        return toLogVO(entity, loadPublicOrderCodesFromLogs(List.of(entity)).get(entity.getOrderId()));
+    }
+
+    private ModificationLogVO toLogVO(OrderModificationLogEntity entity, String publicOrderCode) {
         ModificationLogVO vo = new ModificationLogVO();
         BeanUtils.copyProperties(entity, vo);
+        vo.setPublicOrderCode(publicOrderCode);
         return vo;
     }
 
+    private Map<Long, String> loadPublicOrderCodesFromLogs(List<OrderModificationLogEntity> logs) {
+        List<Long> orderIds = logs.stream()
+                .map(OrderModificationLogEntity::getOrderId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (orderIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return orderMainMapper.selectBatchIds(orderIds).stream()
+                .collect(Collectors.toMap(OrderMainEntity::getId, OrderMainEntity::getPublicOrderCode, (a, b) -> a));
+    }
+
     private ApplyListItemVO toApplyListItemVO(OrderModificationApplyEntity entity) {
+        return toApplyListItemVO(entity, loadPublicOrderCodes(List.of(entity)).get(entity.getOrderId()));
+    }
+
+    private ApplyListItemVO toApplyListItemVO(OrderModificationApplyEntity entity, String publicOrderCode) {
         ApplyListItemVO vo = new ApplyListItemVO();
         vo.setApplyId(entity.getId());
         vo.setOrderId(entity.getOrderId());
         vo.setOrderCode(entity.getOrderCode());
+        vo.setPublicOrderCode(publicOrderCode);
         vo.setApplyUserName(entity.getApplyUserName());
         vo.setApplyTime(entity.getApplyTime());
         vo.setExpireTime(entity.getExpireTime());
@@ -823,6 +856,19 @@ public class OrderModifyApplyServiceImpl implements OrderModifyApplyService {
         }
 
         return vo;
+    }
+
+    private Map<Long, String> loadPublicOrderCodes(List<OrderModificationApplyEntity> applies) {
+        List<Long> orderIds = applies.stream()
+                .map(OrderModificationApplyEntity::getOrderId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (orderIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return orderMainMapper.selectBatchIds(orderIds).stream()
+                .collect(Collectors.toMap(OrderMainEntity::getId, OrderMainEntity::getPublicOrderCode, (a, b) -> a));
     }
 
     private String getStatusDesc(Integer status) {

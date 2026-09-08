@@ -18,6 +18,8 @@ import com.yigongbao.module.production.product.vo.ProductionProductDetailVO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.flow.service.FlowStatusColorResolver;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
+import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.module.order.service.OrderMainService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserHospitalService;
@@ -45,6 +47,7 @@ public class ProductionProductServiceImpl extends ServiceImpl<ProductionProductM
         implements IProductionProductService {
 
     private final ProductionRecordMapper recordMapper;
+    private final OrderMainService orderMainService;
     private final UserMapper userMapper;
     private final UserHospitalService userHospitalService;
     private final FlowStatusColorResolver flowStatusColorResolver;
@@ -124,6 +127,15 @@ public class ProductionProductServiceImpl extends ServiceImpl<ProductionProductM
                 new LambdaQueryWrapper<ProductionRecordEntity>()
                         .in(ProductionRecordEntity::getId, relatedRecordIds))
                 .stream().collect(Collectors.toMap(ProductionRecordEntity::getId, r -> r, (a, b) -> a));
+        List<Long> relatedOrderIds = recordMap.values().stream()
+                        .map(ProductionRecordEntity::getOrderId)
+                        .filter(java.util.Objects::nonNull)
+                        .distinct()
+                        .collect(Collectors.toList());
+        Map<Long, OrderMainEntity> orderMap = relatedOrderIds.isEmpty()
+                ? Collections.emptyMap()
+                : orderMainService.listByIds(relatedOrderIds).stream()
+                        .collect(Collectors.toMap(OrderMainEntity::getId, o -> o, (a, b) -> a));
 
         // 组装 VO
         return result.convert(p -> {
@@ -138,6 +150,8 @@ public class ProductionProductServiceImpl extends ServiceImpl<ProductionProductM
                 vo.setRecordStatusColor(flowStatusColorResolver.getColor(record.getStatus()));
                 vo.setOrderId(record.getOrderId());
                 vo.setOrderCode(record.getOrderCode());
+                OrderMainEntity order = orderMap.get(record.getOrderId());
+                vo.setPublicOrderCode(order == null ? null : order.getPublicOrderCode());
                 vo.setOrderType(record.getOrderType());
                 vo.setDesignPackageCode(record.getDesignPackageCode());
                 vo.setHospitalName(record.getHospitalName());
@@ -205,13 +219,25 @@ public class ProductionProductServiceImpl extends ServiceImpl<ProductionProductM
                 break;
         }
 
+        List<Long> publicCodeOrderIds = Collections.emptyList();
+        if (StrUtil.isNotBlank(keyword)) {
+            publicCodeOrderIds = orderMainService.list(
+                            new LambdaQueryWrapper<OrderMainEntity>()
+                                    .like(OrderMainEntity::getPublicOrderCode, keyword)
+                                    .select(OrderMainEntity::getId))
+                    .stream().map(OrderMainEntity::getId).collect(Collectors.toList());
+        }
+
         // keyword 过滤
         if (StrUtil.isNotBlank(keyword)) {
+            final List<Long> matchedPublicCodeOrderIds = publicCodeOrderIds;
             wrapper.and(w -> w
                     .like(ProductionRecordEntity::getOrderCode, keyword)
                     .or().like(ProductionRecordEntity::getDesignPackageCode, keyword)
                     .or().like(ProductionRecordEntity::getRecordNo, keyword)
-                    .or().like(ProductionRecordEntity::getPatientName, keyword));
+                    .or().like(ProductionRecordEntity::getPatientName, keyword)
+                    .or(!matchedPublicCodeOrderIds.isEmpty(), publicIdWrapper ->
+                            publicIdWrapper.in(ProductionRecordEntity::getOrderId, matchedPublicCodeOrderIds)));
         }
 
         List<ProductionRecordEntity> records = recordMapper.selectList(wrapper.select(ProductionRecordEntity::getId));

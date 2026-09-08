@@ -887,9 +887,12 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
                         .eq(com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity::getOrderId, orderId)
                         .orderByDesc(com.yigongbao.module.order.entity.OrderDesignerAssignmentLogEntity::getAssignTime));
         // 转换为 VO
+        OrderMainEntity order = orderMainService.getById(orderId);
+        String publicOrderCode = order == null ? null : order.getPublicOrderCode();
         return logs.stream().map(log -> {
             com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO vo = new com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO();
             cn.hutool.core.bean.BeanUtil.copyProperties(log, vo);
+            vo.setPublicOrderCode(publicOrderCode);
             return vo;
         }).collect(Collectors.toList());
     }

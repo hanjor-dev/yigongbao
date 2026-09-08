@@ -166,6 +166,33 @@ class OrderModifyApplyServiceImplBoundaryTest {
         }
     }
 
+    @Test
+    void getApplyDetail_returnsPublicOrderCodeAndOriginalOrderCode() {
+        UserEntity manager = new UserEntity();
+        manager.setRoleCode(RoleCodeEnum.DESIGNER_MANAGER.getCode());
+        OrderModificationApplyEntity apply = new OrderModificationApplyEntity();
+        apply.setId(4L);
+        apply.setOrderId(9L);
+        apply.setOrderCode("ORD-9");
+        apply.setModificationDiff("{}");
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(9L);
+        order.setPublicOrderCode("YGABC123456");
+
+        when(userService.getById(1L)).thenReturn(manager);
+        when(applyMapper.selectById(4L)).thenReturn(apply);
+        when(orderMainMapper.selectBatchIds(List.of(9L))).thenReturn(List.of(order));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+
+            var result = service.getApplyDetail(4L);
+
+            assertThat(result.getOrderCode()).isEqualTo("ORD-9");
+            assertThat(result.getPublicOrderCode()).isEqualTo("YGABC123456");
+        }
+    }
+
     private OrderModificationDiff diffWithFileId(String fileId) {
         ImageDiff imageDiff = new ImageDiff();
         imageDiff.setAdded(List.of(fileId));

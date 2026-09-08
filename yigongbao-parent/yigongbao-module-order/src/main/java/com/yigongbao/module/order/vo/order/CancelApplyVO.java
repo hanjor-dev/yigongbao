@@ -23,6 +23,9 @@ public class CancelApplyVO {
     @Schema(description = "订单编号")
     private String orderCode;
 
+    @Schema(description = "虚拟单号")
+    private String publicOrderCode;
+
     @Schema(description = "申请人ID")
     private Long applyBy;
 

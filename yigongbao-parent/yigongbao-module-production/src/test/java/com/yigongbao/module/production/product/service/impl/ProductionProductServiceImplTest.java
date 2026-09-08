@@ -14,9 +14,12 @@ import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.vo.ProductionProductDetailVO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
+import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserHospitalService;
+import com.yigongbao.flow.service.FlowStatusColorResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,8 +44,10 @@ class ProductionProductServiceImplTest {
 
     @Mock private ProductionProductMapper productMapper;
     @Mock private ProductionRecordMapper recordMapper;
+    @Mock private OrderMainService orderMainService;
     @Mock private UserMapper userMapper;
     @Mock private UserHospitalService userHospitalService;
+    @Mock private FlowStatusColorResolver flowStatusColorResolver;
 
     @InjectMocks
     private ProductionProductServiceImpl productService;
@@ -111,6 +116,22 @@ class ProductionProductServiceImplTest {
     }
 
     @Test
+    void pageProductDetails_mapsPublicOrderCodeFromOrder() {
+        ProductionRecordEntity record = record(10L, "printer-a");
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(100L);
+        order.setPublicOrderCode("YGABC123456");
+        record.setOrderId(100L);
+        record.setOrderCode("ORD-001");
+        when(orderMainService.listByIds(anyCollection())).thenReturn(List.of(order));
+
+        IPage<ProductionProductDetailVO> result = pageProductDetails(
+                List.of(p(1L, 10L, "P-001")), List.of(record), List.of(record));
+
+        assertEquals("YGABC123456", result.getRecords().get(0).getPublicOrderCode());
+    }
+
+    @Test
     void pageProductDetails_keepsPrinterCodeNullWhenRecordCodeIsNull() {
         ProductionRecordEntity record = record(10L, null);
         IPage<ProductionProductDetailVO> result = pageProductDetails(
@@ -143,6 +164,10 @@ class ProductionProductServiceImplTest {
         when(userMapper.selectById(1L)).thenReturn(user);
         when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
         when(recordMapper.selectList(any())).thenReturn(accessibleRecords, hydratedRecords);
+        OrderMainEntity defaultOrder = new OrderMainEntity();
+        defaultOrder.setId(100L);
+        defaultOrder.setPublicOrderCode("YGABC123456");
+        when(orderMainService.listByIds(anyCollection())).thenReturn(List.of(defaultOrder));
         when(productMapper.selectPage(any(Page.class), any())).thenReturn(productPage);
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {

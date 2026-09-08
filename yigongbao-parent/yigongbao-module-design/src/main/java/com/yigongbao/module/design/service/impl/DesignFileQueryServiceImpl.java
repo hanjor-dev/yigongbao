@@ -49,6 +49,7 @@ public class DesignFileQueryServiceImpl implements DesignFileQueryService {
         target.setId(source.getId());
         target.setOrderId(source.getOrderId());
         target.setOrderCode(source.getOrderCode());
+        target.setPublicOrderCode(source.getPublicOrderCode());
         target.setPackageCode(source.getPackageCode());
         target.setPackageSeq(source.getPackageSeq());
         target.setFileId(source.getFileId());
