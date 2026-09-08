@@ -565,6 +565,35 @@ class OrderMainServiceImplStateTransitionTest {
     }
 
     @Test
+    void resubmit_persistsFlowTargetAndPublishesSubmittedEvent() {
+        Long orderId = 35L;
+        Long userId = 11L;
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(orderId);
+        order.setCreateBy(userId);
+        order.setOrderCode("ORD-35");
+        order.setBusinessType("business");
+        order.setPatientName("患者");
+        order.setOrgName("机构");
+        order.setHospitalId(501L);
+        order.setOrgId(101L);
+        order.setOperatorDeptId(201L);
+        TransitionResult transition = TransitionResult.of(FlowPhaseEnum.ORDER.getValue(),
+                FlowStatusEnum.PENDING_DATA_AUDIT.getValue());
+
+        when(orderQueryHelper.getCurrentUserId()).thenReturn(userId);
+        when(userService.getById(userId)).thenReturn(null);
+        doReturn(order).when(service).getById(orderId);
+        when(flowFacade.executeFlow(eq(orderId), eq(FlowActionEnum.RESUBMIT), any(), eq(3)))
+                .thenReturn(transition);
+        doReturn(true).when(service).update(any(LambdaUpdateWrapper.class));
+
+        service.resubmit(orderId, 3);
+
+        verify(eventPublisher).publishEvent(any(com.yigongbao.common.event.OrderSubmittedEvent.class));
+    }
+
+    @Test
     void createOrder_rejectsWhenCurrentUserDoesNotExist() {
         com.yigongbao.module.order.dto.order.CreateOrderDTO dto = new com.yigongbao.module.order.dto.order.CreateOrderDTO();
         when(orderQueryHelper.getCurrentUserId()).thenReturn(11L);

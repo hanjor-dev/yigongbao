@@ -858,6 +858,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (!updated) {
             throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
         }
+        eventPublisher.publishEvent(new OrderSubmittedEvent(this, entity.getId(), entity.getOrderCode(),
+                entity.getBusinessType(), entity.getPatientName(), entity.getOrgName(), entity.getOperatorName(),
+                entity.getHospitalId(), entity.getOrgId(), entity.getOperatorDeptId(), entity.getCreateBy()));
         log.info("重新提交订单: orderId={}, {} -> {}", id, entity.getStatus(), result.getFinalStatus());
     }
 
