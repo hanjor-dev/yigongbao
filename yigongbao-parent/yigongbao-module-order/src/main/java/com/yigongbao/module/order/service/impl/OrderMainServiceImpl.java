@@ -1049,11 +1049,17 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                             .eq(OrderItemDraftEntity::getDraftId, draft.getId())
                             .eq(OrderItemDraftEntity::getIsDeleted, 0)
                             .orderByAsc(OrderItemDraftEntity::getSortOrder));
+            List<OrderItemEntity> items = new ArrayList<>();
             for (OrderItemDraftEntity draftItem : draftItems) {
                 OrderItemEntity item = new OrderItemEntity();
                 BeanUtils.copyProperties(draftItem, item, "id", "draftId");
                 item.setOrderId(orderId);
                 item.setOrderCode(orderCode);
+                items.add(item);
+            }
+            // 正式订单不得直接信任草稿快照，提交时以重建项目主数据重新填充所有冗余字段
+            orderDataValidator.validateAndFillItemsForOrder(items, OrderDataValidator.ValidateMode.SUBMIT);
+            for (OrderItemEntity item : items) {
                 orderItemMapper.insert(item);
             }
 

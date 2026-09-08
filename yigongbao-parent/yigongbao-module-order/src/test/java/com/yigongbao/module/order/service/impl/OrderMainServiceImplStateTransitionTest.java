@@ -26,6 +26,8 @@ import com.yigongbao.module.order.mapper.OrderItemMapper;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.order.mapper.OrderModificationLogMapper;
 import com.yigongbao.module.order.entity.OrderDraftEntity;
+import com.yigongbao.module.order.entity.OrderItemDraftEntity;
+import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.order.dto.order.UpdateOrderDTO;
 import com.yigongbao.module.order.service.OrderCancelApplyService;
 import com.yigongbao.module.order.service.OrderModifyApplyService;
@@ -406,6 +408,56 @@ class OrderMainServiceImplStateTransitionTest {
                         && FlowPhaseEnum.ORDER.getValue().equals(order.getPhase())
                         && FlowStatusEnum.PENDING_DATA_AUDIT.getValue().equals(order.getStatus())));
         verify(flowFacade).executeFlow(eq(300L), eq(FlowActionEnum.CREATE), any());
+    }
+
+    @Test
+    void createFromDraft_rehydratesItemCategoryBeforeInsert() {
+        OrderDraftEntity draft = new OrderDraftEntity();
+        draft.setId(34L);
+        draft.setOperatorId(11L);
+        draft.setOrgId(101L);
+        draft.setOrderType(1);
+        draft.setBusinessType("business");
+
+        OrderItemDraftEntity draftItem = new OrderItemDraftEntity();
+        draftItem.setId(340L);
+        draftItem.setDraftId(34L);
+        draftItem.setBodyPartId(1L);
+        draftItem.setProjectId(2L);
+        draftItem.setCategoryCode(null);
+        draftItem.setCategoryName(null);
+
+        when(codeGeneratorService.generate(any())).thenReturn("ORD-34");
+        UserEntity user = new UserEntity();
+        user.setId(11L);
+        user.setOrgId(101L);
+        user.setRealName("草稿操作员");
+        when(userService.getById(11L)).thenReturn(user);
+        when(orderItemDraftMapper.selectList(any())).thenReturn(java.util.List.of(draftItem));
+        when(fileService.listByBiz(anyString(), anyLong())).thenReturn(java.util.List.of());
+        doNothing().when(orderDataValidator).validateOrderType(eq(11L), eq(1));
+        doAnswer(invocation -> {
+            java.util.List<OrderItemEntity> items = invocation.getArgument(0);
+            items.get(0).setCategoryCode("13.1");
+            items.get(0).setCategoryName("模型");
+            return null;
+        }).when(orderDataValidator).validateAndFillItemsForOrder(anyList(), eq(OrderDataValidator.ValidateMode.SUBMIT));
+        doAnswer(invocation -> {
+            OrderMainEntity created = invocation.getArgument(0);
+            created.setId(304L);
+            return true;
+        }).when(service).save(any(OrderMainEntity.class));
+        when(flowFacade.executeFlow(eq(304L), eq(FlowActionEnum.CREATE), any()))
+                .thenReturn(TransitionResult.of(FlowPhaseEnum.ORDER.getValue(),
+                        FlowStatusEnum.PENDING_DATA_AUDIT.getValue()));
+
+        service.createFromDraft(draft);
+
+        verify(orderDataValidator).validateAndFillItemsForOrder(anyList(), eq(OrderDataValidator.ValidateMode.SUBMIT));
+        ArgumentCaptor<OrderItemEntity> itemCaptor = ArgumentCaptor.forClass(OrderItemEntity.class);
+        verify(orderItemMapper).insert(itemCaptor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("13.1", itemCaptor.getValue().getCategoryCode());
+        org.junit.jupiter.api.Assertions.assertEquals("模型", itemCaptor.getValue().getCategoryName());
     }
 
     @Test

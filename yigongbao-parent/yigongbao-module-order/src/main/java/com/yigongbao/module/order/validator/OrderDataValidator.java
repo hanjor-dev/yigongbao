@@ -232,6 +232,11 @@ public class OrderDataValidator {
             log.warn("重建项目已禁用，projectId={}", item.getProjectId());
             throw new BusinessException(ErrorCodeEnum.ORDER_PROJECT_DISABLED);
         }
+        if (StrUtil.isBlank(project.getCategoryCode()) || StrUtil.isBlank(project.getCategoryName())) {
+            log.error("重建项目分类数据不完整，projectId={}, categoryCode={}, categoryName={}",
+                    item.getProjectId(), project.getCategoryCode(), project.getCategoryName());
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "重建项目分类配置异常");
+        }
         // 强制覆盖，不信任前端传入值
         item.setProjectName(project.getName());
         item.setCategoryCode(project.getCategoryCode());

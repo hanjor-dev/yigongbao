@@ -3,7 +3,6 @@ package com.yigongbao.module.basic.rebuildProject.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.constant.CodeRuleConstants;
-import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -505,22 +504,20 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
     }
 
     /**
-     * 根据分类编码解析分类名称（硬编码映射，避免查库）
+     * 根据分类编码解析分类名称。
      *
      * @param categoryCode 分类编码（字典 dict_code=13）
-     * @return 分类名称，未匹配则返回 null
+     * @return 分类名称
      */
     private String resolveCategoryName(String categoryCode) {
         if (StrUtil.isBlank(categoryCode)) {
-            return null;
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "重建项目分类不能为空");
         }
-        return switch (categoryCode) {
-            case DictCodeConstants.PROJECT_CATEGORY_MODEL   -> "模型";
-            case DictCodeConstants.PROJECT_CATEGORY_GUIDE   -> "导板";
-            case DictCodeConstants.PROJECT_CATEGORY_IMPLANT -> "假体";
-            case DictCodeConstants.PROJECT_CATEGORY_OTHER   -> "其他";
-            default -> null;
-        };
+        String categoryName = baseMapper.selectCategoryName(categoryCode);
+        if (categoryName == null) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "重建项目分类编码无效");
+        }
+        return categoryName;
     }
 
     @Override

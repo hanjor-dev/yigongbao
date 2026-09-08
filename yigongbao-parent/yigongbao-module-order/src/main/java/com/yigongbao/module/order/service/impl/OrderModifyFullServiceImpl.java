@@ -674,6 +674,9 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
      * 应用重建项目变更
      */
     private void applyItemsChange(Long orderId, String orderCode, List<OrderItemDraftItemDTO> newItems) {
+        List<OrderItemEntity> validatedItems = newItems.stream().map(this::toOrderItemEntity).collect(Collectors.toList());
+        orderDataValidator.validateAndFillItemsForOrder(validatedItems, OrderDataValidator.ValidateMode.DIRECT);
+
         // 查询当前项目
         List<OrderItemEntity> oldItems = orderItemMapper.selectList(
             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderItemEntity>()
@@ -698,18 +701,23 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
         }
 
         // 更新或新增项目
-        for (OrderItemDraftItemDTO newItem : newItems) {
+        for (int i = 0; i < newItems.size(); i++) {
+            OrderItemDraftItemDTO newItem = newItems.get(i);
+            OrderItemEntity validatedItem = validatedItems.get(i);
             if (newItem.getId() != null) {
                 // 更新
                 OrderItemEntity entity = oldItemMap.get(newItem.getId());
                 if (entity != null) {
-                    entity.setBodyPartId(newItem.getBodyPartId());
-                    entity.setBodyPartName(newItem.getBodyPartName());
-                    entity.setProjectId(newItem.getProjectId());
-                    entity.setProjectName(newItem.getProjectName());
-                    entity.setProjectDesc(newItem.getProjectDesc());
-                    entity.setFormingRequirement(newItem.getFormingRequirement());
-                    entity.setOtherRequirement(newItem.getOtherRequirement());
+                    entity.setBodyPartId(validatedItem.getBodyPartId());
+                    entity.setBodyPartName(validatedItem.getBodyPartName());
+                    entity.setProjectId(validatedItem.getProjectId());
+                    entity.setProjectName(validatedItem.getProjectName());
+                    entity.setCategoryCode(validatedItem.getCategoryCode());
+                    entity.setCategoryName(validatedItem.getCategoryName());
+                    entity.setProjectEstimatedHours(validatedItem.getProjectEstimatedHours());
+                    entity.setProjectDesc(validatedItem.getProjectDesc());
+                    entity.setFormingRequirement(validatedItem.getFormingRequirement());
+                    entity.setOtherRequirement(validatedItem.getOtherRequirement());
                     if (orderItemMapper.updateById(entity) <= 0) {
                         throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "订单项目更新失败");
                     }
@@ -719,13 +727,16 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                 OrderItemEntity entity = new OrderItemEntity();
                 entity.setOrderId(orderId);
                 entity.setOrderCode(orderCode);
-                entity.setBodyPartId(newItem.getBodyPartId());
-                entity.setBodyPartName(newItem.getBodyPartName());
-                entity.setProjectId(newItem.getProjectId());
-                entity.setProjectName(newItem.getProjectName());
-                entity.setProjectDesc(newItem.getProjectDesc());
-                entity.setFormingRequirement(newItem.getFormingRequirement());
-                entity.setOtherRequirement(newItem.getOtherRequirement());
+                entity.setBodyPartId(validatedItem.getBodyPartId());
+                entity.setBodyPartName(validatedItem.getBodyPartName());
+                entity.setProjectId(validatedItem.getProjectId());
+                entity.setProjectName(validatedItem.getProjectName());
+                entity.setCategoryCode(validatedItem.getCategoryCode());
+                entity.setCategoryName(validatedItem.getCategoryName());
+                entity.setProjectEstimatedHours(validatedItem.getProjectEstimatedHours());
+                entity.setProjectDesc(validatedItem.getProjectDesc());
+                entity.setFormingRequirement(validatedItem.getFormingRequirement());
+                entity.setOtherRequirement(validatedItem.getOtherRequirement());
                 if (orderItemMapper.insert(entity) <= 0) {
                     throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "订单项目新增失败");
                 }
@@ -827,6 +838,16 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
                 }
             }
         }
+    }
+
+    private OrderItemEntity toOrderItemEntity(OrderItemDraftItemDTO item) {
+        OrderItemEntity entity = new OrderItemEntity();
+        entity.setBodyPartId(item.getBodyPartId());
+        entity.setProjectId(item.getProjectId());
+        entity.setProjectDesc(item.getProjectDesc());
+        entity.setFormingRequirement(item.getFormingRequirement());
+        entity.setOtherRequirement(item.getOtherRequirement());
+        return entity;
     }
 
     private void validateFileIds(List<String> fileIds, String categoryName) {
