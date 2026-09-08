@@ -1,6 +1,6 @@
 -- 订单虚拟单号一体化迁移脚本
 -- 执行顺序：配置迁移 -> 表结构迁移 -> 历史数据回填 -> 数据校验 -> 设置非空约束
--- 规则：YG + 10 位字符，总长度 12 位；排除易混淆字符 0/O/1/I/L。
+-- 规则：YG + 10 位字符，总长度 12 位；可用字符共 31 个，排除易混淆字符 0/O/1/I/L。
 -- 说明：本脚本可重复执行；不删除、不修改原 order_code/orderNo 配置。
 
 -- 1. 默认列表配置：仅追加 publicOrderCode，保留原有订单流水号字段。
@@ -104,7 +104,11 @@ BEGIN
         SELECT id
         FROM order_main
         WHERE is_deleted = 0
-          AND (public_order_code IS NULL OR public_order_code = '')
+          AND (
+              public_order_code IS NULL
+              OR public_order_code = ''
+              OR public_order_code NOT REGEXP '^YG[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$'
+          )
         ORDER BY id;
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
 
@@ -130,7 +134,7 @@ BEGIN
                     v_code,
                     SUBSTRING(
                         '23456789ABCDEFGHJKMNPQRSTUVWXYZ',
-                        FLOOR(RAND() * 32) + 1,
+                        FLOOR(RAND() * 31) + 1,
                         1
                     )
                 );
@@ -152,7 +156,11 @@ BEGIN
         SET public_order_code = v_code
         WHERE id = v_order_id
           AND is_deleted = 0
-          AND (public_order_code IS NULL OR public_order_code = '');
+          AND (
+              public_order_code IS NULL
+              OR public_order_code = ''
+              OR public_order_code NOT REGEXP '^YG[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$'
+          );
     END LOOP;
     CLOSE cur;
 END $$
