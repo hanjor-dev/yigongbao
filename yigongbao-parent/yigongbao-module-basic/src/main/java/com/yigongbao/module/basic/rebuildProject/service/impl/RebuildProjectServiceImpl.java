@@ -521,6 +521,14 @@ public class RebuildProjectServiceImpl extends ServiceImpl<RebuildProjectMapper,
     }
 
     @Override
+    public String getCategoryNameByCode(String categoryCode) {
+        if (StrUtil.isBlank(categoryCode)) {
+            return null;
+        }
+        return baseMapper.selectCategoryName(categoryCode);
+    }
+
+    @Override
     public void exportProjects(HttpServletResponse response) {
         List<RebuildProjectVO> tree = listTree(null, null);
         List<RebuildProjectVO> flatList = tree.stream()

@@ -232,15 +232,31 @@ public class OrderDataValidator {
             log.warn("重建项目已禁用，projectId={}", item.getProjectId());
             throw new BusinessException(ErrorCodeEnum.ORDER_PROJECT_DISABLED);
         }
-        if (StrUtil.isBlank(project.getCategoryCode()) || StrUtil.isBlank(project.getCategoryName())) {
-            log.error("重建项目分类数据不完整，projectId={}, categoryCode={}, categoryName={}",
-                    item.getProjectId(), project.getCategoryCode(), project.getCategoryName());
+        if (StrUtil.isBlank(project.getCategoryCode())) {
+            log.error("重建项目分类编码为空，projectId={}", item.getProjectId());
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "重建项目分类不能为空");
+        }
+        String categoryName = project.getCategoryName();
+        String dictionaryCategoryName;
+        try {
+            dictionaryCategoryName = rebuildProjectService.getCategoryNameByCode(project.getCategoryCode());
+        } catch (Exception e) {
+            log.error("查询重建项目分类名称异常，projectId={}, categoryCode={}",
+                    item.getProjectId(), project.getCategoryCode(), e);
             throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "重建项目分类配置异常");
+        }
+        if (StrUtil.isBlank(dictionaryCategoryName)) {
+            log.error("重建项目分类编码无有效字典项，projectId={}, categoryCode={}",
+                    item.getProjectId(), project.getCategoryCode());
+            throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "重建项目分类配置异常");
+        }
+        if (StrUtil.isBlank(categoryName)) {
+            categoryName = dictionaryCategoryName;
         }
         // 强制覆盖，不信任前端传入值
         item.setProjectName(project.getName());
         item.setCategoryCode(project.getCategoryCode());
-        item.setCategoryName(project.getCategoryName());
+        item.setCategoryName(categoryName);
         item.setProjectEstimatedHours(project.getEstimatedHours());
         // projectDesc 是可编辑字段：用户未填写时才使用主数据默认值
         if (item.getProjectDesc() == null) {

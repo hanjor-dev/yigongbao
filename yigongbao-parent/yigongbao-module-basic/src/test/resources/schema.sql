@@ -473,3 +473,22 @@ CREATE TABLE IF NOT EXISTS sys_dept_org (
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_dept_org (dept_id, org_id)
 );
+
+-- ------------------------------------------------------------
+-- 字典表（重建项目分类 Mapper 测试）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS sys_dict;
+CREATE TABLE sys_dict (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    parent_id   BIGINT NOT NULL DEFAULT 0,
+    dict_code   VARCHAR(64) NOT NULL,
+    dict_name   VARCHAR(128),
+    status      TINYINT NOT NULL DEFAULT 1,
+    is_deleted  TINYINT NOT NULL DEFAULT 0
+);
+
+INSERT INTO sys_dict (id, parent_id, dict_code, dict_name, status, is_deleted) VALUES
+(1, 76, '13.2', '', 1, 0),
+(2, 76, '13.2', '已禁用导板', 0, 0),
+(3, 76, '13.2', '已删除导板', 1, 1),
+(4, 76, '13.2', '导板', 1, 0);

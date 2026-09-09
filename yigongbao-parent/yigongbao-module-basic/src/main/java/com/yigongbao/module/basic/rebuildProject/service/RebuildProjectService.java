@@ -48,6 +48,14 @@ public interface RebuildProjectService extends IService<RebuildProjectEntity> {
     RebuildProjectDetailVO getDetailById(Long id);
 
     /**
+     * 根据分类编码查询有效的分类名称。
+     *
+     * @param categoryCode 分类编码
+     * @return 分类名称，不存在有效字典项时返回 null
+     */
+    String getCategoryNameByCode(String categoryCode);
+
+    /**
      * 创建项目
      *
      * @param dto 创建参数

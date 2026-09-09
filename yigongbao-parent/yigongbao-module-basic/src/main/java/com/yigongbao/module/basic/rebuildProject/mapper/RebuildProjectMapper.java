@@ -29,6 +29,9 @@ public interface RebuildProjectMapper extends BaseMapper<RebuildProjectEntity> {
      * 根据分类编码读取字典名称，避免分类名称与字典配置脱节。
      */
     @Select("SELECT dict_name FROM sys_dict " +
-            "WHERE dict_code = #{categoryCode} AND status = 1 AND is_deleted = 0 LIMIT 1")
+            "WHERE dict_code = #{categoryCode} " +
+            "AND status = 1 AND is_deleted = 0 " +
+            "AND dict_name IS NOT NULL AND TRIM(dict_name) <> '' " +
+            "LIMIT 1")
     String selectCategoryName(@Param("categoryCode") String categoryCode);
 }
