@@ -195,6 +195,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         OrderMainEntity detailOrder = orderMainMapper.selectById(record.getOrderId());
         if (detailOrder != null) {
             vo.setPublicOrderCode(detailOrder.getPublicOrderCode());
+            vo.setDesignerRemark(detailOrder.getDesignerRemark());
         }
         fillCurrentProcessName(vo);
         fillStatusColors(vo);

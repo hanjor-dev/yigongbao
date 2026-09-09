@@ -22,6 +22,8 @@ public class ProductionRecordVO {
     private Long orderId;
     private String orderCode;
     private String publicOrderCode;
+    /** 设计师备注（来自订单） */
+    private String designerRemark;
     private Integer orderType;
     private Long designPackageId;
     private String designPackageCode;
