@@ -31,7 +31,6 @@ public class OrderModifyApplyCleanTask {
     @Scheduled(cron = "0 */5 * * * ?")
     public void cleanExpiredApplications() {
         long startTime = System.currentTimeMillis();
-        log.info("定时任务开始: taskName=cleanExpiredApplications");
 
         try {
             int phaseChangedCount = applyMapper.expireApplicationsForChangedPhase();
