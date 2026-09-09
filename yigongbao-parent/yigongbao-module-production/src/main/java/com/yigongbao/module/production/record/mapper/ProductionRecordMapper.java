@@ -74,10 +74,10 @@ public interface ProductionRecordMapper extends BaseMapper<ProductionRecordEntit
 
     @Select("""
         <script>
-        SELECT COUNT(p.id) AS total,
-               COALESCE(SUM(CASE WHEN p.status = 'pending_warehouse_in' THEN 1 ELSE 0 END), 0) AS pendingWarehouseIn,
-               COALESCE(SUM(CASE WHEN p.status = 'warehoused' THEN 1 ELSE 0 END), 0) AS warehoused,
-               COALESCE(SUM(CASE WHEN p.status = 'warehouse_out' THEN 1 ELSE 0 END), 0) AS warehouseOut
+        SELECT COUNT(DISTINCT r.id) AS total,
+               COUNT(DISTINCT CASE WHEN r.status = 6010 THEN r.id END) AS pendingWarehouseIn,
+               COUNT(DISTINCT CASE WHEN r.status = 6020 THEN r.id END) AS warehoused,
+               COUNT(DISTINCT CASE WHEN r.status = 6030 THEN r.id END) AS warehouseOut
         FROM production_product p
         INNER JOIN production_record r ON p.production_record_id = r.id AND r.is_deleted = 0
         LEFT JOIN order_main om ON r.order_id = om.id AND om.is_deleted = 0
