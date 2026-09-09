@@ -596,6 +596,21 @@ class OrderMainServiceImplListOrdersTest {
             verify(orderMainMapper, times(3)).selectCount(any(LambdaQueryWrapper.class));
         }
 
+        @Test
+        void statistics_allowsDesignerToQueryAllCounts() {
+            when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
+            when(orderQueryHelper.getCurrentUserRoleCode()).thenReturn(RoleCodeEnum.DESIGNER.getCode());
+            when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.CENTER);
+            when(orderMainMapper.selectCount(any(LambdaQueryWrapper.class)))
+                    .thenReturn(20L, 5L, 7L);
+
+            OrderStatisticsVO result = orderMainService.statistics();
+
+            assertThat(result.getTotal()).isEqualTo(20L);
+            verify(orderQueryHelper, times(3)).buildDataScopeCondition(
+                    any(LambdaQueryWrapper.class), eq(1L), eq(DataScopeTypeEnum.ALL));
+        }
+
         @ParameterizedTest
         @EnumSource(DataScopeTypeEnum.class)
         void statistics_forwardsEveryDataScopeType(DataScopeTypeEnum scopeType) {

@@ -50,6 +50,7 @@ import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
+import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.service.UserService;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
@@ -99,6 +100,7 @@ class ProductionRecordServiceImplTest {
     @Mock private FlowFacade flowFacade;
     @Mock private FlowStatusColorResolver flowStatusColorResolver;
     @Mock private UserMapper userMapper;
+    @Mock private UserHospitalService userHospitalService;
     @Mock private ConfigService configService;
     @Mock private UserService userService;
     @Mock private ObjectMapper objectMapper;
@@ -224,6 +226,28 @@ class ProductionRecordServiceImplTest {
             assertEquals(printFinishTime, result.getRecords().get(0).getPrintFinishTime());
             assertEquals(printFinishTime, result.getRecords().get(0).getPostProcessingEndTime());
         }
+    }
+
+    @Test
+    void pageRecords_allowsDesignerToQueryAllRecords() {
+        UserEntity designer = new UserEntity();
+        designer.setRoleCode(RoleCodeEnum.DESIGNER.getCode());
+        designer.setCenterId(null);
+        when(userMapper.selectById(1L)).thenReturn(designer);
+        when(userHospitalService.getDataScopeType(1L)).thenReturn(
+                com.yigongbao.common.enums.DataScopeTypeEnum.ORG);
+        Page<ProductionRecordEntity> entityPage = new Page<>(1, 10);
+        entityPage.setRecords(Collections.emptyList());
+        when(recordMapper.selectPage(any(Page.class), any())).thenReturn(entityPage);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+
+            recordService.pageRecords(new ProductionRecordPageDTO());
+        }
+
+        verify(recordMapper).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
+        verify(orderMainMapper, never()).selectList(any());
     }
 
     @Test

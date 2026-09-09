@@ -371,6 +371,9 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
     public OrderStatisticsVO statistics() {
         Long currentUserId = getCurrentUserId();
         DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+        if (RoleCodeEnum.DESIGNER.getCode().equals(orderQueryHelper.getCurrentUserRoleCode())) {
+            scopeType = DataScopeTypeEnum.ALL;
+        }
 
         OrderStatisticsVO statistics = new OrderStatisticsVO();
         statistics.setTotal(countOrders(null, currentUserId, scopeType));

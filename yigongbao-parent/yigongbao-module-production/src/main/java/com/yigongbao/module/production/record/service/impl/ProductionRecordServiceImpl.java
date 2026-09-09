@@ -152,9 +152,14 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (query.getProcessingCenterId() == null) {
             Long userId = StpUtil.getLoginIdAsLong();
             DataScopeTypeEnum scope = userHospitalService.getDataScopeType(userId);
-            scopeType = scope == DataScopeTypeEnum.ALL ? "ALL" : "CENTER";
             UserEntity user = userMapper.selectById(userId);
             centerId = user == null ? null : user.getCenterId();
+            if (user != null && RoleCodeEnum.DESIGNER.getCode().equals(user.getRoleCode())) {
+                scopeType = "ALL";
+                centerId = null;
+            } else {
+                scopeType = scope == DataScopeTypeEnum.ALL ? "ALL" : "CENTER";
+            }
         }
         ProductionRecordStatisticsVO result = baseMapper.selectStatistics(query, scopeType, centerId);
         return result == null ? new ProductionRecordStatisticsVO() : result;
@@ -303,6 +308,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         } else {
             // 使用统一数据权限机制
             DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+            if (currentUser != null && RoleCodeEnum.DESIGNER.getCode().equals(currentUser.getRoleCode())) {
+                scopeType = DataScopeTypeEnum.ALL;
+            }
             buildDataScopeCondition(wrapper, currentUser, scopeType);
         }
         if (dto.getKeyword() != null && !dto.getKeyword().isBlank()) {
