@@ -15,8 +15,7 @@ public interface DesignWorkorderStatisticsMapper extends BaseMapper<OrderMainEnt
     @Select("""
         SELECT COUNT(*) AS total,
                COALESCE(SUM(CASE WHEN status = 2010 THEN 1 ELSE 0 END), 0) AS pendingDesign,
-               COALESCE(SUM(CASE WHEN status = 2020 THEN 1 ELSE 0 END), 0) AS designing,
-               COALESCE(SUM(CASE WHEN status = 2030 THEN 1 ELSE 0 END), 0) AS designCompleted
+               COALESCE(SUM(CASE WHEN status = 2020 THEN 1 ELSE 0 END), 0) AS designing
         FROM order_main ${ew.customSqlSegment}
         """)
     DesignWorkorderStatisticsVO selectStatistics(@Param(Constants.WRAPPER) Wrapper<OrderMainEntity> wrapper);

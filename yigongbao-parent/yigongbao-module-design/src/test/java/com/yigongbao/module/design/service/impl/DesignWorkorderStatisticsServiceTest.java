@@ -43,7 +43,6 @@ class DesignWorkorderStatisticsServiceTest {
         expected.setTotal(10L);
         expected.setPendingDesign(2L);
         expected.setDesigning(3L);
-        expected.setDesignCompleted(1L);
         when(statisticsMapper.selectStatistics(any(Wrapper.class))).thenReturn(expected);
 
         DesignWorkorderStatisticsVO actual = service.getStatistics(new DesignWorkorderStatisticsQueryDTO());
@@ -51,6 +50,5 @@ class DesignWorkorderStatisticsServiceTest {
         assertEquals(10L, actual.getTotal());
         assertEquals(2L, actual.getPendingDesign());
         assertEquals(3L, actual.getDesigning());
-        assertEquals(1L, actual.getDesignCompleted());
     }
 }

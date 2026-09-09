@@ -8,5 +8,4 @@ public class DesignWorkorderStatisticsVO {
     private Long total = 0L;
     private Long pendingDesign = 0L;
     private Long designing = 0L;
-    private Long designCompleted = 0L;
 }
