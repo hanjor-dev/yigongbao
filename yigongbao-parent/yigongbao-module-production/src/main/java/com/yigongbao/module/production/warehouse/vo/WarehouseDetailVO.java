@@ -16,7 +16,7 @@ import java.util.List;
 public class WarehouseDetailVO {
     private Long recordId;
     private String recordNo;
-    private String orderNo;
+    private String orderCode;
     private String publicOrderCode;
     private String hospitalName;
     private String hospitalDeptName;

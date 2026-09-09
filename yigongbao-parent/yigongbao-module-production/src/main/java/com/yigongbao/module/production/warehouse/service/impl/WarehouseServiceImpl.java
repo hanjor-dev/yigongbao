@@ -186,7 +186,7 @@ public class WarehouseServiceImpl implements IWarehouseService {
         WarehouseDetailVO vo = BeanUtil.copyProperties(record, WarehouseDetailVO.class);
         vo.setStatusColor(flowStatusColorResolver.getColor(record.getStatus()));
         vo.setRecordId(record.getId());
-        vo.setOrderNo(record.getOrderCode());
+        vo.setOrderCode(record.getOrderCode());
         OrderMainEntity order = orderMainMapper.selectById(record.getOrderId());
         if (order != null) {
             vo.setPublicOrderCode(order.getPublicOrderCode());
