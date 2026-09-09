@@ -10,6 +10,9 @@ import java.util.List;
 @Data
 public class WarehouseColumnConfigVO {
 
+    /** 后端列配置结构版本，前端无需参与维护。 */
+    private Integer version;
+
     private String module = "warehouse";
 
     private List<ColumnItemVO> columns;

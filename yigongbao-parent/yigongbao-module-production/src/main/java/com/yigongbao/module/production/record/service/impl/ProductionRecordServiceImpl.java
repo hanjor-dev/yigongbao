@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.constant.ColumnConfigConstants;
+import com.yigongbao.common.util.ColumnConfigMergeUtil;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.RoleCodeEnum;
 import com.yigongbao.common.constant.StatusConstants;
@@ -1280,7 +1282,11 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             UserEntity user = userService.getById(currentUserId);
             if (user != null && StrUtil.isNotBlank(user.getProductionColumnSettings())) {
                 try {
-                    return ensurePublicOrderCodeColumn(objectMapper.readValue(user.getProductionColumnSettings(), ProductionColumnConfigVO.class));
+                    ProductionColumnConfigVO config = objectMapper.readValue(user.getProductionColumnSettings(), ProductionColumnConfigVO.class);
+                    if (config != null && Integer.valueOf(ColumnConfigConstants.CURRENT_VERSION).equals(config.getVersion())) return config;
+                    ProductionColumnConfigVO merged = mergeWithDefault(config, getSystemDefaultColumnConfig());
+                    persistMigratedConfig(user.getId(), user.getProductionColumnSettings(), merged);
+                    return merged;
                 } catch (JsonProcessingException e) {
                     log.warn("解析用户生产列配置失败，降级为系统默认，userId={}", currentUserId, e);
                 }
@@ -1295,33 +1301,51 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             return new ProductionColumnConfigVO();
         }
         try {
-            return ensurePublicOrderCodeColumn(objectMapper.readValue(configJson, ProductionColumnConfigVO.class));
+            ProductionColumnConfigVO config = objectMapper.readValue(configJson, ProductionColumnConfigVO.class);
+            return config;
         } catch (JsonProcessingException e) {
             log.error("解析系统生产列配置失败", e);
             return new ProductionColumnConfigVO();
         }
     }
 
-    private ProductionColumnConfigVO ensurePublicOrderCodeColumn(ProductionColumnConfigVO config) {
-        if (config == null || config.getColumns() == null
-                || config.getColumns().stream().anyMatch(column -> "publicOrderCode".equals(column.getField()))) {
+    private ProductionColumnConfigVO getSystemDefaultColumnConfig() {
+        String configJson = configService.getConfigValue(SystemConfigKeyEnum.PRODUCTION_COLUMN_CONFIG.getKey());
+        if (StrUtil.isBlank(configJson)) return new ProductionColumnConfigVO();
+        try {
+            ProductionColumnConfigVO config = objectMapper.readValue(configJson, ProductionColumnConfigVO.class);
             return config;
+        } catch (JsonProcessingException e) {
+            log.error("解析系统生产列配置失败", e);
+            return new ProductionColumnConfigVO();
         }
-        ProductionColumnConfigVO.ColumnItemVO column = new ProductionColumnConfigVO.ColumnItemVO();
-        column.setField("publicOrderCode");
-        column.setLabel("虚拟单号");
-        column.setVisible(true);
-        column.setSort(config.getColumns().stream()
-                .map(ProductionColumnConfigVO.ColumnItemVO::getSort)
-                .filter(java.util.Objects::nonNull)
-                .max(Integer::compareTo)
-                .orElse(0) + 1);
-        column.setWidth(160);
-        column.setFixed(null);
-        List<ProductionColumnConfigVO.ColumnItemVO> columns = new java.util.ArrayList<>(config.getColumns());
-        columns.add(column);
-        config.setColumns(columns);
-        return config;
+    }
+
+    private ProductionColumnConfigVO mergeWithDefault(ProductionColumnConfigVO userConfig, ProductionColumnConfigVO defaultConfig) {
+        if (defaultConfig == null) return userConfig;
+        if (userConfig == null) return defaultConfig;
+        userConfig.setColumns(ColumnConfigMergeUtil.mergeMissingColumns(userConfig.getColumns(), defaultConfig.getColumns(),
+                ProductionColumnConfigVO.ColumnItemVO::getField,
+                column -> { ProductionColumnConfigVO.ColumnItemVO copy = new ProductionColumnConfigVO.ColumnItemVO();
+                    copy.setField(column.getField()); copy.setLabel(column.getLabel()); copy.setVisible(column.getVisible());
+                    copy.setSort(column.getSort()); copy.setWidth(column.getWidth()); copy.setFixed(column.getFixed()); return copy; },
+                ProductionColumnConfigVO.ColumnItemVO::getSort,
+                (column, sort) -> { column.setSort(sort); return column; }));
+        userConfig.setVersion(ColumnConfigConstants.CURRENT_VERSION);
+        return userConfig;
+    }
+
+    private void persistMigratedConfig(Long userId, String originalJson, ProductionColumnConfigVO config) {
+        if (userId == null || config == null) return;
+        try {
+            String migratedJson = objectMapper.writeValueAsString(config);
+            userService.update(new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UserEntity>()
+                    .eq(UserEntity::getId, userId)
+                    .eq(UserEntity::getProductionColumnSettings, originalJson)
+                    .set(UserEntity::getProductionColumnSettings, migratedJson));
+        } catch (Exception e) {
+            log.warn("回写升级后的生产列配置失败，userId={}", userId, e);
+        }
     }
 
     @Override
@@ -1356,6 +1380,8 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
                     }).collect(Collectors.toList());
             configVO.setColumns(columnItems);
         }
+        configVO = mergeWithDefault(configVO, getSystemDefaultColumnConfig());
+        configVO.setVersion(ColumnConfigConstants.CURRENT_VERSION);
 
         try {
             String configJson = objectMapper.writeValueAsString(configVO);

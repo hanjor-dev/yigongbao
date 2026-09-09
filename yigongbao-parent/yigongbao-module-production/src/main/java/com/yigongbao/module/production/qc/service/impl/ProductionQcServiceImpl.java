@@ -9,6 +9,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.constant.ColumnConfigConstants;
+import com.yigongbao.common.util.ColumnConfigMergeUtil;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
@@ -227,7 +229,11 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             com.yigongbao.module.system.user.entity.UserEntity user = userService.getById(currentUserId);
             if (user != null && StrUtil.isNotBlank(user.getQualityColumnSettings())) {
                 try {
-                    return ensurePublicOrderCodeColumn(objectMapper.readValue(user.getQualityColumnSettings(), QcColumnConfigVO.class));
+                    QcColumnConfigVO config = objectMapper.readValue(user.getQualityColumnSettings(), QcColumnConfigVO.class);
+                    if (config != null && Integer.valueOf(ColumnConfigConstants.CURRENT_VERSION).equals(config.getVersion())) return config;
+                    QcColumnConfigVO merged = mergeWithDefault(config, getSystemDefaultColumnConfig());
+                    persistMigratedConfig(user.getId(), user.getQualityColumnSettings(), merged);
+                    return merged;
                 } catch (JsonProcessingException e) {
                     log.warn("解析用户质检列配置失败，降级为系统默认，userId={}", currentUserId, e);
                 }
@@ -242,33 +248,47 @@ public class ProductionQcServiceImpl implements IProductionQcService {
             return new QcColumnConfigVO();
         }
         try {
-            return ensurePublicOrderCodeColumn(objectMapper.readValue(configJson, QcColumnConfigVO.class));
+            QcColumnConfigVO config = objectMapper.readValue(configJson, QcColumnConfigVO.class);
+            if (config != null) config.setVersion(ColumnConfigConstants.CURRENT_VERSION);
+            return config;
         } catch (JsonProcessingException e) {
             log.error("解析系统质检列配置失败", e);
             return new QcColumnConfigVO();
         }
     }
 
-    private QcColumnConfigVO ensurePublicOrderCodeColumn(QcColumnConfigVO config) {
-        if (config == null || config.getColumns() == null
-                || config.getColumns().stream().anyMatch(column -> "publicOrderCode".equals(column.getField()))) {
+    private QcColumnConfigVO getSystemDefaultColumnConfig() {
+        String configJson = configService.getConfigValue(SystemConfigKeyEnum.QUALITY_COLUMN_CONFIG.getKey());
+        if (StrUtil.isBlank(configJson)) return new QcColumnConfigVO();
+        try { QcColumnConfigVO config = objectMapper.readValue(configJson, QcColumnConfigVO.class);
             return config;
+        } catch (JsonProcessingException e) { log.error("解析系统质检列配置失败", e); return new QcColumnConfigVO(); }
+    }
+
+    private QcColumnConfigVO mergeWithDefault(QcColumnConfigVO userConfig, QcColumnConfigVO defaultConfig) {
+        if (defaultConfig == null) return userConfig;
+        if (userConfig == null) return defaultConfig;
+        userConfig.setColumns(ColumnConfigMergeUtil.mergeMissingColumns(userConfig.getColumns(), defaultConfig.getColumns(),
+                QcColumnConfigVO.ColumnItemVO::getField,
+                column -> { QcColumnConfigVO.ColumnItemVO copy = new QcColumnConfigVO.ColumnItemVO();
+                    copy.setField(column.getField()); copy.setLabel(column.getLabel()); copy.setVisible(column.getVisible());
+                    copy.setSort(column.getSort()); copy.setWidth(column.getWidth()); copy.setFixed(column.getFixed()); return copy; },
+                QcColumnConfigVO.ColumnItemVO::getSort,
+                (column, sort) -> { column.setSort(sort); return column; }));
+        userConfig.setVersion(ColumnConfigConstants.CURRENT_VERSION); return userConfig;
+    }
+
+    private void persistMigratedConfig(Long userId, String originalJson, QcColumnConfigVO config) {
+        if (userId == null || config == null) return;
+        try {
+            String migratedJson = objectMapper.writeValueAsString(config);
+            userService.update(new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<com.yigongbao.module.system.user.entity.UserEntity>()
+                    .eq(com.yigongbao.module.system.user.entity.UserEntity::getId, userId)
+                    .eq(com.yigongbao.module.system.user.entity.UserEntity::getQualityColumnSettings, originalJson)
+                    .set(com.yigongbao.module.system.user.entity.UserEntity::getQualityColumnSettings, migratedJson));
+        } catch (Exception e) {
+            log.warn("回写升级后的质检列配置失败，userId={}", userId, e);
         }
-        QcColumnConfigVO.ColumnItemVO column = new QcColumnConfigVO.ColumnItemVO();
-        column.setField("publicOrderCode");
-        column.setLabel("虚拟单号");
-        column.setVisible(true);
-        column.setSort(config.getColumns().stream()
-                .map(QcColumnConfigVO.ColumnItemVO::getSort)
-                .filter(java.util.Objects::nonNull)
-                .max(Integer::compareTo)
-                .orElse(0) + 1);
-        column.setWidth(160);
-        column.setFixed(null);
-        List<QcColumnConfigVO.ColumnItemVO> columns = new java.util.ArrayList<>(config.getColumns());
-        columns.add(column);
-        config.setColumns(columns);
-        return config;
     }
 
     @Override
@@ -303,6 +323,8 @@ public class ProductionQcServiceImpl implements IProductionQcService {
                     }).collect(Collectors.toList());
             configVO.setColumns(columnItems);
         }
+        configVO = mergeWithDefault(configVO, getSystemDefaultColumnConfig());
+        configVO.setVersion(ColumnConfigConstants.CURRENT_VERSION);
 
         try {
             user.setQualityColumnSettings(objectMapper.writeValueAsString(configVO));

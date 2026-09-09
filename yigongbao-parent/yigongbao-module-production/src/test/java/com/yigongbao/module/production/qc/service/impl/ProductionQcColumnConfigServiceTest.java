@@ -52,6 +52,7 @@ class ProductionQcColumnConfigServiceTest {
         UserEntity user = new UserEntity();
         user.setQualityColumnSettings("user-json");
         QcColumnConfigVO expected = config("recordNo");
+        expected.setVersion(com.yigongbao.common.constant.ColumnConfigConstants.CURRENT_VERSION);
         when(userService.getById(1L)).thenReturn(user);
         when(objectMapper.readValue("user-json", QcColumnConfigVO.class)).thenReturn(expected);
 

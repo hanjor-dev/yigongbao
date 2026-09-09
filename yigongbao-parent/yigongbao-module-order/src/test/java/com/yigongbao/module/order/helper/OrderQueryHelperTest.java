@@ -270,7 +270,12 @@ class OrderQueryHelperTest {
             col.setLabel("订单编号");
             col.setVisible(true);
             col.setSort(1);
-            config.setColumns(List.of(col));
+            OrderColumnConfigVO.ColumnItemVO publicCode = new OrderColumnConfigVO.ColumnItemVO();
+            publicCode.setField("publicOrderCode");
+            publicCode.setLabel("虚拟单号");
+            publicCode.setVisible(true);
+            publicCode.setSort(2);
+            config.setColumns(List.of(col, publicCode));
             return config;
         }
 
@@ -314,6 +319,7 @@ class OrderQueryHelperTest {
                 when(userService.getById(100L)).thenReturn(user);
 
                 OrderColumnConfigVO userConfig = buildDummyConfig();
+                userConfig.setVersion(com.yigongbao.common.constant.ColumnConfigConstants.CURRENT_VERSION);
                 when(objectMapper.readValue(eq(user.getOrderColumnSettings()), eq(OrderColumnConfigVO.class)))
                         .thenReturn(userConfig);
 

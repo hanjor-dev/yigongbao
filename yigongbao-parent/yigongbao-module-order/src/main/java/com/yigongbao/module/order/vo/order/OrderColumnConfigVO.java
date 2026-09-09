@@ -17,6 +17,9 @@ public class OrderColumnConfigVO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    /** 后端列配置结构版本，前端无需参与维护。 */
+    private Integer version;
+
     /**
      * 模块标识
      */

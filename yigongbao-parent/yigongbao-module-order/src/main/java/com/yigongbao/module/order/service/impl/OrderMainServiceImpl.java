@@ -1440,6 +1440,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             throw new BusinessException(ErrorCodeEnum.UNAUTHORIZED);
         }
         try {
+            config = orderQueryHelper.mergeWithDefault(config, orderQueryHelper.getSystemDefaultColumnConfig());
+            config.setVersion(com.yigongbao.common.constant.ColumnConfigConstants.CURRENT_VERSION);
             // 序列化为 JSON 字符串
             String json = objectMapper.writeValueAsString(config);
             // 更新 UserEntity.orderColumnSettings 字段

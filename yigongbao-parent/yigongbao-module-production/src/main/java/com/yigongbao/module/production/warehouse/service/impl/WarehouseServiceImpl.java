@@ -9,6 +9,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.constant.ColumnConfigConstants;
+import com.yigongbao.common.util.ColumnConfigMergeUtil;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
 import com.yigongbao.flow.enums.FlowActionEnum;
@@ -88,7 +90,11 @@ public class WarehouseServiceImpl implements IWarehouseService {
             UserEntity user = userService.getById(currentUserId);
             if (user != null && StrUtil.isNotBlank(user.getWarehouseColumnSettings())) {
                 try {
-                    return ensurePublicOrderCodeColumn(objectMapper.readValue(user.getWarehouseColumnSettings(), WarehouseColumnConfigVO.class));
+                    WarehouseColumnConfigVO config = objectMapper.readValue(user.getWarehouseColumnSettings(), WarehouseColumnConfigVO.class);
+                    if (config != null && Integer.valueOf(ColumnConfigConstants.CURRENT_VERSION).equals(config.getVersion())) return config;
+                    WarehouseColumnConfigVO merged = mergeWithDefault(config, getSystemDefaultColumnConfig());
+                    persistMigratedConfig(user.getId(), user.getWarehouseColumnSettings(), merged);
+                    return merged;
                 } catch (JsonProcessingException e) {
                     log.warn("解析用户仓储列配置失败，降级为系统默认，userId={}", currentUserId, e);
                 }
@@ -103,7 +109,9 @@ public class WarehouseServiceImpl implements IWarehouseService {
             return new WarehouseColumnConfigVO();
         }
         try {
-            return ensurePublicOrderCodeColumn(objectMapper.readValue(configJson, WarehouseColumnConfigVO.class));
+            WarehouseColumnConfigVO config = objectMapper.readValue(configJson, WarehouseColumnConfigVO.class);
+            if (config != null) config.setVersion(ColumnConfigConstants.CURRENT_VERSION);
+            return config;
         } catch (JsonProcessingException e) {
             log.error("解析系统仓储列配置失败", e);
             return new WarehouseColumnConfigVO();
@@ -142,6 +150,8 @@ public class WarehouseServiceImpl implements IWarehouseService {
                     }).collect(Collectors.toList());
             configVO.setColumns(columnItems);
         }
+        configVO = mergeWithDefault(configVO, getSystemDefaultColumnConfig());
+        configVO.setVersion(ColumnConfigConstants.CURRENT_VERSION);
 
         try {
             user.setWarehouseColumnSettings(objectMapper.writeValueAsString(configVO));
@@ -200,26 +210,38 @@ public class WarehouseServiceImpl implements IWarehouseService {
         return recordMapper.listWarehouseProducts(page, dto);
     }
 
-    private WarehouseColumnConfigVO ensurePublicOrderCodeColumn(WarehouseColumnConfigVO config) {
-        if (config == null || config.getColumns() == null
-                || config.getColumns().stream().anyMatch(column -> "publicOrderCode".equals(column.getField()))) {
+    private WarehouseColumnConfigVO getSystemDefaultColumnConfig() {
+        String configJson = configService.getConfigValue(SystemConfigKeyEnum.WAREHOUSE_COLUMN_CONFIG.getKey());
+        if (StrUtil.isBlank(configJson)) return new WarehouseColumnConfigVO();
+        try { WarehouseColumnConfigVO config = objectMapper.readValue(configJson, WarehouseColumnConfigVO.class);
             return config;
+        } catch (JsonProcessingException e) { log.error("解析系统仓储列配置失败", e); return new WarehouseColumnConfigVO(); }
+    }
+
+    private WarehouseColumnConfigVO mergeWithDefault(WarehouseColumnConfigVO userConfig, WarehouseColumnConfigVO defaultConfig) {
+        if (defaultConfig == null) return userConfig;
+        if (userConfig == null) return defaultConfig;
+        userConfig.setColumns(ColumnConfigMergeUtil.mergeMissingColumns(userConfig.getColumns(), defaultConfig.getColumns(),
+                WarehouseColumnConfigVO.ColumnItemVO::getField,
+                column -> { WarehouseColumnConfigVO.ColumnItemVO copy = new WarehouseColumnConfigVO.ColumnItemVO();
+                    copy.setField(column.getField()); copy.setLabel(column.getLabel()); copy.setVisible(column.getVisible());
+                    copy.setSort(column.getSort()); copy.setWidth(column.getWidth()); copy.setFixed(column.getFixed()); return copy; },
+                WarehouseColumnConfigVO.ColumnItemVO::getSort,
+                (column, sort) -> { column.setSort(sort); return column; }));
+        userConfig.setVersion(ColumnConfigConstants.CURRENT_VERSION); return userConfig;
+    }
+
+    private void persistMigratedConfig(Long userId, String originalJson, WarehouseColumnConfigVO config) {
+        if (userId == null || config == null) return;
+        try {
+            String migratedJson = objectMapper.writeValueAsString(config);
+            userService.update(new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UserEntity>()
+                    .eq(UserEntity::getId, userId)
+                    .eq(UserEntity::getWarehouseColumnSettings, originalJson)
+                    .set(UserEntity::getWarehouseColumnSettings, migratedJson));
+        } catch (Exception e) {
+            log.warn("回写升级后的仓储列配置失败，userId={}", userId, e);
         }
-        WarehouseColumnConfigVO.ColumnItemVO column = new WarehouseColumnConfigVO.ColumnItemVO();
-        column.setField("publicOrderCode");
-        column.setLabel("虚拟单号");
-        column.setVisible(true);
-        column.setSort(config.getColumns().stream()
-                .map(WarehouseColumnConfigVO.ColumnItemVO::getSort)
-                .filter(java.util.Objects::nonNull)
-                .max(Integer::compareTo)
-                .orElse(0) + 1);
-        column.setWidth(160);
-        column.setFixed(null);
-        List<WarehouseColumnConfigVO.ColumnItemVO> columns = new java.util.ArrayList<>(config.getColumns());
-        columns.add(column);
-        config.setColumns(columns);
-        return config;
     }
 
     @Override

@@ -8,6 +8,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.constant.DictCodeConstants;
 import com.yigongbao.common.constant.PhysicalDeliveryConstants;
+import com.yigongbao.common.constant.ColumnConfigConstants;
+import com.yigongbao.common.util.ColumnConfigMergeUtil;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -283,7 +285,12 @@ public class DesignQueryHelper {
             if (user != null && StrUtil.isNotBlank(user.getDesignColumnSettings())) {
                 try {
                     DesignColumnConfigVO config = objectMapper.readValue(user.getDesignColumnSettings(), DesignColumnConfigVO.class);
-                    return ensurePublicOrderCodeColumn(config);
+                    if (config != null && Integer.valueOf(ColumnConfigConstants.CURRENT_VERSION).equals(config.getVersion())) {
+                        return config;
+                    }
+                    DesignColumnConfigVO merged = mergeWithDefault(config, getSystemDefaultColumnConfig());
+                    persistMigratedConfig(user.getId(), user.getDesignColumnSettings(), merged);
+                    return merged;
                 } catch (JsonProcessingException e) {
                     log.warn("解析用户设计列配置失败，降级为系统默认，userId={}", currentUserId, e);
                 }
@@ -304,33 +311,47 @@ public class DesignQueryHelper {
             return null;
         }
         try {
-            return ensurePublicOrderCodeColumn(objectMapper.readValue(configJson, DesignColumnConfigVO.class));
+            DesignColumnConfigVO config = objectMapper.readValue(configJson, DesignColumnConfigVO.class);
+            return config;
         } catch (JsonProcessingException e) {
             log.error("解析系统设计列配置失败", e);
             return null;
         }
     }
 
-    private DesignColumnConfigVO ensurePublicOrderCodeColumn(DesignColumnConfigVO config) {
-        if (config == null || config.getColumns() == null
-                || config.getColumns().stream().anyMatch(column -> "publicOrderCode".equals(column.getField()))) {
-            return config;
+    public DesignColumnConfigVO mergeWithDefault(DesignColumnConfigVO userConfig, DesignColumnConfigVO defaultConfig) {
+        if (defaultConfig == null) return userConfig;
+        if (userConfig == null) return defaultConfig;
+        userConfig.setColumns(ColumnConfigMergeUtil.mergeMissingColumns(
+                userConfig.getColumns(), defaultConfig.getColumns(),
+                DesignColumnConfigVO.ColumnItemVO::getField,
+                column -> {
+                    DesignColumnConfigVO.ColumnItemVO copy = new DesignColumnConfigVO.ColumnItemVO();
+                    copy.setField(column.getField());
+                    copy.setLabel(column.getLabel());
+                    copy.setVisible(column.getVisible());
+                    copy.setSort(column.getSort());
+                    copy.setWidth(column.getWidth());
+                    copy.setFixed(column.getFixed());
+                    return copy;
+                },
+                DesignColumnConfigVO.ColumnItemVO::getSort,
+                (column, sort) -> { column.setSort(sort); return column; }));
+        userConfig.setVersion(ColumnConfigConstants.CURRENT_VERSION);
+        return userConfig;
+    }
+
+    private void persistMigratedConfig(Long userId, String originalJson, DesignColumnConfigVO config) {
+        if (userId == null || config == null) return;
+        try {
+            String migratedJson = objectMapper.writeValueAsString(config);
+            userService.update(new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UserEntity>()
+                    .eq(UserEntity::getId, userId)
+                    .eq(UserEntity::getDesignColumnSettings, originalJson)
+                    .set(UserEntity::getDesignColumnSettings, migratedJson));
+        } catch (Exception e) {
+            log.warn("回写升级后的设计列配置失败，userId={}", userId, e);
         }
-        DesignColumnConfigVO.ColumnItemVO column = new DesignColumnConfigVO.ColumnItemVO();
-        column.setField("publicOrderCode");
-        column.setLabel("虚拟单号");
-        column.setVisible(true);
-        column.setSort(config.getColumns().stream()
-                .map(DesignColumnConfigVO.ColumnItemVO::getSort)
-                .filter(java.util.Objects::nonNull)
-                .max(Integer::compareTo)
-                .orElse(0) + 1);
-        column.setWidth(160);
-        column.setFixed(null);
-        List<DesignColumnConfigVO.ColumnItemVO> columns = new ArrayList<>(config.getColumns());
-        columns.add(column);
-        config.setColumns(columns);
-        return config;
     }
 
     // ==================== 展示字段翻译 ====================

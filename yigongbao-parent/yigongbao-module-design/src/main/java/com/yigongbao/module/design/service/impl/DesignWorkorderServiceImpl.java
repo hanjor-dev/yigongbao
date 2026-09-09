@@ -349,6 +349,8 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
                     .collect(Collectors.toList());
             configVO.setColumns(columnItems);
         }
+        configVO = designQueryHelper.mergeWithDefault(configVO, designQueryHelper.getSystemDefaultColumnConfig());
+        configVO.setVersion(com.yigongbao.common.constant.ColumnConfigConstants.CURRENT_VERSION);
 
         try {
             String configJson = objectMapper.writeValueAsString(configVO);

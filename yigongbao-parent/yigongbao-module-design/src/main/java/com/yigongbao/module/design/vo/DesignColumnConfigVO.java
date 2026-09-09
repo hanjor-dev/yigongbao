@@ -13,6 +13,9 @@ import java.util.List;
 @Data
 public class DesignColumnConfigVO {
 
+    /** 后端列配置结构版本，前端无需参与维护。 */
+    private Integer version;
+
     private String module = "design";
 
     private List<ColumnItemVO> columns;

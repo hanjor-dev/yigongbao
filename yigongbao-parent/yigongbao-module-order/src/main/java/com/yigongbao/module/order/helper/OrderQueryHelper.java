@@ -7,9 +7,11 @@ import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.constant.DictCodeConstants;
+import com.yigongbao.common.constant.ColumnConfigConstants;
 import com.yigongbao.common.constant.PhysicalDeliveryConstants;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.util.ColumnConfigMergeUtil;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.flow.enums.FlowPhaseEnum;
@@ -456,7 +458,12 @@ public class OrderQueryHelper {
         if (StrUtil.isNotBlank(user.getOrderColumnSettings())) {
             try {
                 OrderColumnConfigVO config = objectMapper.readValue(user.getOrderColumnSettings(), OrderColumnConfigVO.class);
-                return ensurePublicOrderCodeColumn(config);
+                if (config != null && Integer.valueOf(ColumnConfigConstants.CURRENT_VERSION).equals(config.getVersion())) {
+                    return config;
+                }
+                OrderColumnConfigVO merged = mergeWithDefault(config, getSystemDefaultColumnConfig());
+                persistMigratedConfig(user.getId(), user.getOrderColumnSettings(), merged);
+                return merged;
             } catch (JsonProcessingException e) {
                 // JSON 解析失败时降级为系统默认，记录警告
                 log.warn("解析用户列配置失败，使用系统默认配置，userId={}", currentUserId, e);
@@ -478,33 +485,54 @@ public class OrderQueryHelper {
             return null;
         }
         try {
-            return ensurePublicOrderCodeColumn(objectMapper.readValue(configJson, OrderColumnConfigVO.class));
+            OrderColumnConfigVO config = objectMapper.readValue(configJson, OrderColumnConfigVO.class);
+            return config;
         } catch (JsonProcessingException e) {
             log.error("解析系统列配置失败", e);
             return null;
         }
     }
 
-    private OrderColumnConfigVO ensurePublicOrderCodeColumn(OrderColumnConfigVO config) {
-        if (config == null || config.getColumns() == null
-                || config.getColumns().stream().anyMatch(column -> "publicOrderCode".equals(column.getField()))) {
-            return config;
+    public OrderColumnConfigVO mergeWithDefault(OrderColumnConfigVO userConfig, OrderColumnConfigVO defaultConfig) {
+        if (defaultConfig == null) {
+            return userConfig;
         }
-        OrderColumnConfigVO.ColumnItemVO column = new OrderColumnConfigVO.ColumnItemVO();
-        column.setField("publicOrderCode");
-        column.setLabel("虚拟单号");
-        column.setVisible(true);
-        column.setSort(config.getColumns().stream()
-                .map(OrderColumnConfigVO.ColumnItemVO::getSort)
-                .filter(java.util.Objects::nonNull)
-                .max(Integer::compareTo)
-                .orElse(0) + 1);
-        column.setWidth(160);
-        column.setFixed(null);
-        List<OrderColumnConfigVO.ColumnItemVO> columns = new ArrayList<>(config.getColumns());
-        columns.add(column);
-        config.setColumns(columns);
-        return config;
+        if (userConfig == null) {
+            return defaultConfig;
+        }
+        userConfig.setColumns(ColumnConfigMergeUtil.mergeMissingColumns(
+                userConfig.getColumns(), defaultConfig.getColumns(),
+                OrderColumnConfigVO.ColumnItemVO::getField,
+                column -> {
+                    OrderColumnConfigVO.ColumnItemVO copy = new OrderColumnConfigVO.ColumnItemVO();
+                    copy.setField(column.getField());
+                    copy.setLabel(column.getLabel());
+                    copy.setVisible(column.getVisible());
+                    copy.setSort(column.getSort());
+                    copy.setWidth(column.getWidth());
+                    copy.setFixed(column.getFixed());
+                    return copy;
+                },
+                OrderColumnConfigVO.ColumnItemVO::getSort,
+                (column, sort) -> {
+                    column.setSort(sort);
+                    return column;
+                }));
+        userConfig.setVersion(ColumnConfigConstants.CURRENT_VERSION);
+        return userConfig;
+    }
+
+    private void persistMigratedConfig(Long userId, String originalJson, OrderColumnConfigVO config) {
+        if (userId == null || config == null) return;
+        try {
+            String migratedJson = objectMapper.writeValueAsString(config);
+            userService.update(new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UserEntity>()
+                    .eq(UserEntity::getId, userId)
+                    .eq(UserEntity::getOrderColumnSettings, originalJson)
+                    .set(UserEntity::getOrderColumnSettings, migratedJson));
+        } catch (Exception e) {
+            log.warn("回写升级后的订单列配置失败，userId={}", userId, e);
+        }
     }
 
     // ==================== 展示字段辅助方法 ====================

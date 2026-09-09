@@ -13,6 +13,9 @@ import java.util.List;
 @Data
 public class ProductionColumnConfigVO {
 
+    /** 后端列配置结构版本，前端无需参与维护。 */
+    private Integer version;
+
     private String module = "production";
 
     private List<ColumnItemVO> columns;

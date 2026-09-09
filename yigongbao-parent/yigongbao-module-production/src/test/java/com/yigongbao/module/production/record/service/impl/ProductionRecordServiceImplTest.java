@@ -1218,6 +1218,7 @@ class ProductionRecordServiceImplTest {
         user.setProductionColumnSettings("{\"columns\":[{\"field\":\"recordNo\",\"visible\":true}]}");
 
         ProductionColumnConfigVO expectedConfig = new ProductionColumnConfigVO();
+        expectedConfig.setVersion(com.yigongbao.common.constant.ColumnConfigConstants.CURRENT_VERSION);
         ProductionColumnConfigVO.ColumnItemVO item = new ProductionColumnConfigVO.ColumnItemVO();
         item.setField("recordNo");
         item.setVisible(true);
