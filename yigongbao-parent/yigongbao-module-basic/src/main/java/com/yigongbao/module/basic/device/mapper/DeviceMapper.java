@@ -15,7 +15,7 @@ public interface DeviceMapper extends BaseMapper<DeviceEntity> {
     @Select("""
         SELECT COUNT(*) AS total,
                COALESCE(SUM(CASE WHEN state = 0 THEN 1 ELSE 0 END), 0) AS idle,
-               COALESCE(SUM(CASE WHEN state &lt;&gt; 0 THEN 1 ELSE 0 END), 0) AS occupied
+               COALESCE(SUM(CASE WHEN state != 0 THEN 1 ELSE 0 END), 0) AS occupied
         FROM device ${ew.customSqlSegment}
         """)
     DeviceStatisticsVO selectStatistics(@Param(Constants.WRAPPER) Wrapper<DeviceEntity> wrapper);
