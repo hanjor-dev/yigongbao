@@ -6,11 +6,13 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
+import com.yigongbao.module.design.dto.DesignWorkorderStatisticsQueryDTO;
 import com.yigongbao.module.design.dto.SaveDesignerRemarkDTO;
 import com.yigongbao.module.design.service.DesignWorkorderService;
 import com.yigongbao.module.design.vo.DesignerAssignmentHistoryVO;
 import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
 import com.yigongbao.module.design.vo.DesignWorkorderListVO;
+import com.yigongbao.module.design.vo.DesignWorkorderStatisticsVO;
 import com.yigongbao.module.order.dto.workload.DesignerWorkloadExportDTO;
 import com.yigongbao.module.order.service.OrderExportService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +39,12 @@ public class DesignWorkorderController {
 
     private final DesignWorkorderService designWorkorderService;
     private final OrderExportService orderExportService;
+
+    @Operation(summary = "设计工单统计")
+    @GetMapping("/statistics")
+    public Result<DesignWorkorderStatisticsVO> statistics(DesignWorkorderStatisticsQueryDTO queryDTO) {
+        return Result.success(designWorkorderService.getStatistics(queryDTO));
+    }
 
     /**
      * 分页查询设计工单列表

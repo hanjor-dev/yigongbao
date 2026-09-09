@@ -46,6 +46,7 @@ import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.AssignProductWeightDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
+import com.yigongbao.module.production.record.dto.ProductionRecordStatisticsQueryDTO;
 import com.yigongbao.module.production.record.dto.ProductLedgerExportDTO;
 import com.yigongbao.module.production.record.dto.SaveProductionColumnConfigDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
@@ -124,7 +125,6 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     private final PrinterRecordUsageChecker printerDeviceUsageChecker;
     private final PrinterAvailabilityService printerAvailabilityService;
     private final FlowStatusColorResolver flowStatusColorResolver;
-
     private static final List<Integer> NORMAL_PRODUCTION_STATUSES = List.of(
             FlowStatusEnum.DESIGN_COMPLETED.getValue(),
             FlowStatusEnum.PENDING_PRINT.getValue(),
@@ -138,6 +138,27 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             FlowStatusEnum.WAREHOUSE_OUT.getValue(),
             FlowStatusEnum.COMPLETED.getValue()
     );
+
+    @Override
+    public ProductionRecordStatisticsVO getStatistics(ProductionRecordStatisticsQueryDTO query) {
+        if (query == null) {
+            query = new ProductionRecordStatisticsQueryDTO();
+        }
+        if (query.getOrderCreateTimeEnd() != null) {
+            query.setOrderCreateTimeEnd(toExclusiveEndTime(query.getOrderCreateTimeEnd()));
+        }
+        String scopeType = "ALL";
+        Long centerId = null;
+        if (query.getProcessingCenterId() == null) {
+            Long userId = StpUtil.getLoginIdAsLong();
+            DataScopeTypeEnum scope = userHospitalService.getDataScopeType(userId);
+            scopeType = scope == DataScopeTypeEnum.ALL ? "ALL" : "CENTER";
+            UserEntity user = userMapper.selectById(userId);
+            centerId = user == null ? null : user.getCenterId();
+        }
+        ProductionRecordStatisticsVO result = baseMapper.selectStatistics(query, scopeType, centerId);
+        return result == null ? new ProductionRecordStatisticsVO() : result;
+    }
 
     private static final Set<String> DEVICE_OPERATION_ROLES = Set.of(
             RoleCodeEnum.ADMIN.getCode(),

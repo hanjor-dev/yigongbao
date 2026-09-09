@@ -26,6 +26,7 @@ import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.basic.device.service.IDeviceService;
 import com.yigongbao.module.basic.device.service.IDeviceStateLogService;
 import com.yigongbao.module.basic.device.vo.DeviceVO;
+import com.yigongbao.module.basic.device.vo.DeviceStatisticsVO;
 import com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity;
 import com.yigongbao.module.basic.processingCenter.mapper.ProcessingCenterMapper;
 import lombok.RequiredArgsConstructor;
@@ -88,17 +89,33 @@ public class DeviceServiceImpl extends ServiceImpl<DeviceMapper, DeviceEntity> i
                 ? DEFAULT_PAGE_SIZE : Math.min(dto.getPageSize(), MAX_PAGE_SIZE);
 
         // 构建查询条件
-        LambdaQueryWrapper<DeviceEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(dto.getCenterId() != null, DeviceEntity::getCenterId, dto.getCenterId())
-               .eq(StrUtil.isNotBlank(dto.getDeviceType()), DeviceEntity::getDeviceType, dto.getDeviceType())
-               .eq(dto.getState() != null, DeviceEntity::getState, dto.getState())
-               .eq(dto.getConnectionStatus() != null, DeviceEntity::getConnectionStatus, dto.getConnectionStatus())
-               .like(StrUtil.isNotBlank(dto.getDeviceId()), DeviceEntity::getDeviceId, dto.getDeviceId())
-               .orderByDesc(DeviceEntity::getUpdateTime)
+        LambdaQueryWrapper<DeviceEntity> wrapper = buildDeviceQueryWrapper(dto);
+        wrapper.orderByDesc(DeviceEntity::getUpdateTime)
                .orderByDesc(DeviceEntity::getId);
 
         IPage<DeviceEntity> page = page(new Page<>(pageNum, pageSize), wrapper);
         return page.convert(DeviceConvert::toVO);
+    }
+
+    @Override
+    public DeviceStatisticsVO getStatistics(DevicePageDTO dto) {
+        DeviceStatisticsVO result = getBaseMapper().selectStatistics(buildDeviceQueryWrapper(dto));
+        return result == null ? new DeviceStatisticsVO() : result;
+    }
+
+    private LambdaQueryWrapper<DeviceEntity> buildDeviceQueryWrapper(DevicePageDTO dto) {
+        return new LambdaQueryWrapper<DeviceEntity>()
+                .eq(DeviceEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                .eq(dto != null && dto.getCenterId() != null, DeviceEntity::getCenterId,
+                        dto == null ? null : dto.getCenterId())
+                .eq(dto != null && StrUtil.isNotBlank(dto.getDeviceType()), DeviceEntity::getDeviceType,
+                        dto == null ? null : dto.getDeviceType())
+                .eq(dto != null && dto.getState() != null, DeviceEntity::getState,
+                        dto == null ? null : dto.getState())
+                .eq(dto != null && dto.getConnectionStatus() != null, DeviceEntity::getConnectionStatus,
+                        dto == null ? null : dto.getConnectionStatus())
+                .like(dto != null && StrUtil.isNotBlank(dto.getDeviceId()), DeviceEntity::getDeviceId,
+                        dto == null ? null : dto.getDeviceId());
     }
 
     /**

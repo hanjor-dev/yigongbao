@@ -24,15 +24,19 @@ import com.yigongbao.module.production.product.mapper.ProductionProductMapper;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.qc.dto.BatchUpdateUdiDTO;
 import com.yigongbao.module.production.qc.dto.ProductionQcPageDTO;
+import com.yigongbao.module.production.qc.dto.ProductionQcStatisticsQueryDTO;
 import com.yigongbao.module.production.qc.dto.SaveQcColumnConfigDTO;
 import com.yigongbao.module.production.qc.service.IProductionQcService;
 import com.yigongbao.module.production.qc.vo.QcColumnConfigVO;
+import com.yigongbao.module.production.qc.vo.ProductionQcStatisticsVO;
 import com.yigongbao.module.production.util.ColumnConfigValidator;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
+import com.yigongbao.module.production.record.dto.ProductionRecordStatisticsQueryDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
 import com.yigongbao.module.production.record.mapper.ProductionRecordMapper;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
+import com.yigongbao.module.production.record.vo.ProductionRecordStatisticsVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.user.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -67,6 +71,25 @@ public class ProductionQcServiceImpl implements IProductionQcService {
     private final UserService userService;
     private final ConfigService configService;
     private final ObjectMapper objectMapper;
+
+    @Override
+    public ProductionQcStatisticsVO getStatistics(ProductionQcStatisticsQueryDTO dto) {
+        ProductionRecordStatisticsQueryDTO query = new ProductionRecordStatisticsQueryDTO();
+        if (dto != null) {
+            query.setKeyword(dto.getKeyword());
+        }
+        ProductionRecordStatisticsVO recordStatistics = recordService.getStatistics(query);
+        ProductionQcStatisticsVO result = new ProductionQcStatisticsVO();
+        if (recordStatistics != null) {
+            result.setQcInProgress(defaultZero(recordStatistics.getQcInProgress()));
+            result.setQcCompleted(defaultZero(recordStatistics.getQcCompleted()));
+        }
+        return result;
+    }
+
+    private long defaultZero(Long value) {
+        return value == null ? 0L : value;
+    }
 
     /**
      * 标记产品质检合格，回写流转卡合格计数

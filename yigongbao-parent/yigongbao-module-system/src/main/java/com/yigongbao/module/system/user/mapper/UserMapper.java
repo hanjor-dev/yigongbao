@@ -1,7 +1,10 @@
 package com.yigongbao.module.system.user.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.toolkit.Constants;
 import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.vo.UserStatisticsVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -16,6 +19,14 @@ import java.util.List;
  */
 @Mapper
 public interface UserMapper extends BaseMapper<UserEntity> {
+
+    @Select("""
+        SELECT COUNT(*) AS total,
+               COALESCE(SUM(CASE WHEN account_type = '6.1' THEN 1 ELSE 0 END), 0) AS enterprise,
+               COALESCE(SUM(CASE WHEN account_type = '6.2' THEN 1 ELSE 0 END), 0) AS business
+        FROM sys_user ${ew.customSqlSegment}
+        """)
+    UserStatisticsVO selectStatistics(@Param(Constants.WRAPPER) Wrapper<UserEntity> wrapper);
 
     /**
      * 统计部门下的用户数量

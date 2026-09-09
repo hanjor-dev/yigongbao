@@ -8,10 +8,12 @@ import com.yigongbao.module.basic.device.dto.DeviceStatusPushDTO;
 import com.yigongbao.module.basic.device.dto.UpdateDeviceDTO;
 import com.yigongbao.module.basic.device.entity.DeviceEntity;
 import com.yigongbao.module.basic.device.vo.DeviceVO;
+import com.yigongbao.module.basic.device.vo.DeviceStatisticsVO;
 import java.util.List;
 
 public interface IDeviceService extends IService<DeviceEntity> {
     IPage<DeviceVO> listDevices(DevicePageDTO dto);
+    DeviceStatisticsVO getStatistics(DevicePageDTO dto);
     DeviceVO getDeviceById(Long id);
     Long createDevice(CreateDeviceDTO dto);
     void updateDeviceState(Long id, Integer state);

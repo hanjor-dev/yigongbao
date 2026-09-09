@@ -10,9 +10,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.org.dto.CreateOrgDTO;
 import com.yigongbao.module.system.org.dto.OrgPageDTO;
+import com.yigongbao.module.system.org.dto.OrgStatisticsQueryDTO;
 import com.yigongbao.module.system.org.dto.UpdateOrgDTO;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.org.vo.OrgVO;
+import com.yigongbao.module.system.org.vo.OrgStatisticsVO;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,12 @@ import java.util.List;
 public class OrgController {
 
     private final OrgService orgService;
+
+    @Operation(summary = "机构统计")
+    @GetMapping("/statistics")
+    public Result<OrgStatisticsVO> statistics(OrgStatisticsQueryDTO query) {
+        return Result.success(orgService.getStatistics(query));
+    }
 
     /**
      * 分页查询机构列表

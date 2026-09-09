@@ -6,12 +6,14 @@ import com.yigongbao.common.result.Result;
 import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.production.warehouse.dto.ListWarehouseDTO;
 import com.yigongbao.module.production.warehouse.dto.ListWarehouseProductDTO;
+import com.yigongbao.module.production.warehouse.dto.WarehouseStatisticsQueryDTO;
 import com.yigongbao.module.production.warehouse.dto.WarehouseInProductDTO;
 import com.yigongbao.module.production.warehouse.dto.WarehouseOutProductDTO;
 import com.yigongbao.module.production.warehouse.service.IWarehouseService;
 import com.yigongbao.module.production.warehouse.vo.WarehouseDetailVO;
 import com.yigongbao.module.production.warehouse.vo.WarehouseProductVO;
 import com.yigongbao.module.production.warehouse.vo.WarehouseRecordVO;
+import com.yigongbao.module.production.warehouse.vo.WarehouseStatisticsVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,12 @@ import org.springframework.web.bind.annotation.*;
 public class WarehouseController {
 
     private final IWarehouseService warehouseService;
+
+    @Operation(summary = "仓储统计")
+    @GetMapping("/statistics")
+    public Result<WarehouseStatisticsVO> statistics(WarehouseStatisticsQueryDTO query) {
+        return Result.success(warehouseService.getStatistics(query));
+    }
 
     @Operation(summary = "仓储列表")
     @PostMapping("/list")

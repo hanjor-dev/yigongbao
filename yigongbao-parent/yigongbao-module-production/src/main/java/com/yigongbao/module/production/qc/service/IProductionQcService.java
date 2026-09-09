@@ -4,13 +4,16 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.qc.dto.BatchUpdateUdiDTO;
 import com.yigongbao.module.production.qc.dto.ProductionQcPageDTO;
+import com.yigongbao.module.production.qc.dto.ProductionQcStatisticsQueryDTO;
 import com.yigongbao.module.production.qc.dto.SaveQcColumnConfigDTO;
 import com.yigongbao.module.production.qc.vo.QcColumnConfigVO;
+import com.yigongbao.module.production.qc.vo.ProductionQcStatisticsVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
 
 import java.util.List;
 
 public interface IProductionQcService {
+    ProductionQcStatisticsVO getStatistics(ProductionQcStatisticsQueryDTO dto);
     void markProductPass(Long productId);
     void markProductFail(Long productId, String reason);
     void transferToPacking(Long recordId);

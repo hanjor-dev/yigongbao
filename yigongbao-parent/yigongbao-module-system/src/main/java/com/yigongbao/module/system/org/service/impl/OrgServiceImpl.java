@@ -21,6 +21,7 @@ import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.system.org.convert.OrgConvert;
 import com.yigongbao.module.system.org.dto.CreateOrgDTO;
 import com.yigongbao.module.system.org.dto.OrgPageDTO;
+import com.yigongbao.module.system.org.dto.OrgStatisticsQueryDTO;
 import com.yigongbao.module.system.org.dto.UpdateOrgDTO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.entity.OrgHospitalEntity;
@@ -30,6 +31,7 @@ import com.yigongbao.module.system.hospitalGroupTemplate.mapper.HospitalGroupTem
 import com.yigongbao.module.system.hospitalGroupTemplate.entity.HospitalGroupTemplateDetailEntity;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.org.vo.OrgVO;
+import com.yigongbao.module.system.org.vo.OrgStatisticsVO;
 import com.yigongbao.module.system.org.vo.OrgHospitalChangeCheckVO;
 import com.yigongbao.module.system.org.vo.OrgOperationCheckVO;
 import com.yigongbao.module.system.doctor.service.DoctorService;
@@ -77,6 +79,25 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 @Slf4j
 public class OrgServiceImpl extends ServiceImpl<OrgMapper, OrgEntity> implements OrgService {
+
+    @Override
+    public OrgStatisticsVO getStatistics(OrgStatisticsQueryDTO dto) {
+        LambdaQueryWrapper<OrgEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(OrgEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                .ne(OrgEntity::getOrgType, DictCodeConstants.ORG_TYPE_PRODUCER)
+                .like(dto != null && StrUtil.isNotBlank(dto.getOrgName()), OrgEntity::getOrgName,
+                        dto == null ? null : dto.getOrgName())
+                .eq(dto != null && dto.getAreaId() != null, OrgEntity::getAreaId,
+                        dto == null ? null : dto.getAreaId())
+                .eq(dto != null && dto.getStatus() != null, OrgEntity::getStatus,
+                        dto == null ? null : dto.getStatus());
+        String unknownId = configService.getConfigValue(SystemConfigKeyEnum.UNKNOWN_HOSPITAL_ORG_ID.getKey());
+        if (StrUtil.isNotBlank(unknownId)) {
+            wrapper.ne(OrgEntity::getId, Long.parseLong(unknownId));
+        }
+        OrgStatisticsVO result = getBaseMapper().selectStatistics(wrapper);
+        return result == null ? new OrgStatisticsVO() : result;
+    }
 
     private final DictService dictService;
     private final UserMapper userMapper;

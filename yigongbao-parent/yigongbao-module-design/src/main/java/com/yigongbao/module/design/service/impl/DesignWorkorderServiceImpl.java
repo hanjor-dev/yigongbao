@@ -27,6 +27,7 @@ import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.module.basic.file.service.FileService;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.design.dto.DesignWorkorderQueryDTO;
+import com.yigongbao.module.design.dto.DesignWorkorderStatisticsQueryDTO;
 import com.yigongbao.module.design.dto.SaveDesignColumnConfigDTO;
 import com.yigongbao.module.design.entity.DesignDrawingEntity;
 import com.yigongbao.module.design.entity.DesignInstructionEntity;
@@ -41,6 +42,7 @@ import com.yigongbao.module.design.mapper.DesignModelMapper;
 import com.yigongbao.module.design.mapper.DesignPackageMapper;
 import com.yigongbao.module.design.mapper.DesignProductMapper;
 import com.yigongbao.module.design.mapper.DesignReviewMapper;
+import com.yigongbao.module.design.mapper.DesignWorkorderStatisticsMapper;
 import com.yigongbao.module.design.service.DesignDocService;
 import com.yigongbao.module.design.service.DesignFileService;
 import com.yigongbao.module.design.service.DesignWorkorderService;
@@ -50,6 +52,7 @@ import com.yigongbao.module.design.vo.DesignModelVO;
 import com.yigongbao.module.design.vo.DesignPackageVO;
 import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
 import com.yigongbao.module.design.vo.DesignWorkorderListVO;
+import com.yigongbao.module.design.vo.DesignWorkorderStatisticsVO;
 import com.yigongbao.module.design.vo.SubmitCheckVO;
 import com.yigongbao.module.order.entity.OrderFileEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
@@ -98,6 +101,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     private final DesignDrawingMapper designDrawingMapper;
     private final DesignModelMapper designModelMapper;
     private final DesignReviewMapper designReviewMapper;
+    private final DesignWorkorderStatisticsMapper designWorkorderStatisticsMapper;
     private final UserService userService;
     private final UserHospitalService userHospitalService;
     private final DesignQueryHelper designQueryHelper;
@@ -111,6 +115,34 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     private final com.yigongbao.module.order.service.OrderCancelApplyService cancelApplyService;
     private final FlowStatusColorResolver flowStatusColorResolver;
+
+    @Override
+    public DesignWorkorderStatisticsVO getStatistics(DesignWorkorderStatisticsQueryDTO dto) {
+        Long currentUserId = designQueryHelper.getCurrentUserId();
+        UserEntity currentUser = designQueryHelper.getCurrentUser();
+        DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
+        LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(OrderMainEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                .ge(OrderMainEntity::getStatus, FlowStatusEnum.PENDING_DESIGN.getValue())
+                .lt(OrderMainEntity::getStatus, FlowStatusEnum.CANCELLED.getValue());
+        designQueryHelper.buildDataScopeCondition(wrapper, currentUser, scopeType);
+        if (StrUtil.isNotBlank(dto.getOrderCode())) {
+            wrapper.and(w -> w.like(OrderMainEntity::getOrderCode, dto.getOrderCode())
+                    .or().like(OrderMainEntity::getPublicOrderCode, dto.getOrderCode())
+                    .or().like(OrderMainEntity::getOrgName, dto.getOrderCode())
+                    .or().like(OrderMainEntity::getOperatorName, dto.getOrderCode())
+                    .or().like(OrderMainEntity::getHospitalName, dto.getOrderCode())
+                    .or().like(OrderMainEntity::getPatientName, dto.getOrderCode()));
+        }
+        wrapper.eq(dto.getIsUrgent() != null, OrderMainEntity::getIsUrgent, dto.getIsUrgent())
+                .eq(dto.getHospitalId() != null, OrderMainEntity::getHospitalId, dto.getHospitalId())
+                .eq(StrUtil.isNotBlank(dto.getBusinessType()), OrderMainEntity::getBusinessType, dto.getBusinessType())
+                .ge(dto.getCreateTimeStart() != null, OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
+                .lt(dto.getCreateTimeEnd() != null, OrderMainEntity::getCreateTime,
+                        toExclusiveEndTime(dto.getCreateTimeEnd()));
+        DesignWorkorderStatisticsVO result = designWorkorderStatisticsMapper.selectStatistics(wrapper);
+        return result == null ? new DesignWorkorderStatisticsVO() : result;
+    }
 
     /**
      * 分页查询设计工单列表

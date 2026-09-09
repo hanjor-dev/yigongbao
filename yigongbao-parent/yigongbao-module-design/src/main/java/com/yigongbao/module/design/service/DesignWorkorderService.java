@@ -6,6 +6,8 @@ import com.yigongbao.module.design.dto.SaveDesignColumnConfigDTO;
 import com.yigongbao.module.design.vo.DesignColumnConfigVO;
 import com.yigongbao.module.design.vo.DesignWorkorderDetailVO;
 import com.yigongbao.module.design.vo.DesignWorkorderListVO;
+import com.yigongbao.module.design.dto.DesignWorkorderStatisticsQueryDTO;
+import com.yigongbao.module.design.vo.DesignWorkorderStatisticsVO;
 
 /**
  * 设计工单查询服务接口
@@ -14,6 +16,8 @@ import com.yigongbao.module.design.vo.DesignWorkorderListVO;
  * @date 2026-04-16
  */
 public interface DesignWorkorderService {
+
+    DesignWorkorderStatisticsVO getStatistics(DesignWorkorderStatisticsQueryDTO queryDTO);
 
     /**
      * 分页查询设计工单列表

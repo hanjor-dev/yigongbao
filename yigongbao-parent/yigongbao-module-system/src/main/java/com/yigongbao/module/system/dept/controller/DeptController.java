@@ -10,9 +10,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.yigongbao.module.system.dept.dto.CreateDeptDTO;
 import com.yigongbao.module.system.dept.dto.DeptPageDTO;
+import com.yigongbao.module.system.dept.dto.DeptStatisticsQueryDTO;
 import com.yigongbao.module.system.dept.dto.UpdateDeptDTO;
 import com.yigongbao.module.system.dept.service.DeptService;
 import com.yigongbao.module.system.dept.vo.DeptVO;
+import com.yigongbao.module.system.dept.vo.DeptStatisticsVO;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,12 @@ import java.util.List;
 public class DeptController {
 
     private final DeptService deptService;
+
+    @Operation(summary = "部门统计")
+    @GetMapping("/statistics")
+    public Result<DeptStatisticsVO> statistics(DeptStatisticsQueryDTO query) {
+        return Result.success(deptService.getStatistics(query));
+    }
 
     /**
      * 分页查询部门列表

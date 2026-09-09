@@ -13,6 +13,7 @@ import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import com.yigongbao.module.system.dept.convert.DeptConvert;
 import com.yigongbao.module.system.dept.dto.CreateDeptDTO;
 import com.yigongbao.module.system.dept.dto.DeptPageDTO;
+import com.yigongbao.module.system.dept.dto.DeptStatisticsQueryDTO;
 import com.yigongbao.module.system.dept.dto.UpdateDeptDTO;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.entity.DeptOrgEntity;
@@ -20,6 +21,7 @@ import com.yigongbao.module.system.dept.mapper.DeptOrgMapper;
 import com.yigongbao.module.system.dept.mapper.DeptMapper;
 import com.yigongbao.module.system.dept.service.DeptService;
 import com.yigongbao.module.system.dept.vo.DeptVO;
+import com.yigongbao.module.system.dept.vo.DeptStatisticsVO;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.dict.vo.DictVO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
@@ -55,6 +57,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class DeptServiceImpl extends ServiceImpl<DeptMapper, DeptEntity> implements DeptService {
+
+    @Override
+    public DeptStatisticsVO getStatistics(DeptStatisticsQueryDTO dto) {
+        LambdaQueryWrapper<DeptEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DeptEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                .like(dto != null && StrUtil.isNotBlank(dto.getDeptName()), DeptEntity::getDeptName,
+                        dto == null ? null : dto.getDeptName())
+                .eq(dto != null && dto.getStatus() != null, DeptEntity::getStatus,
+                        dto == null ? null : dto.getStatus());
+        DeptStatisticsVO result = getBaseMapper().selectStatistics(wrapper);
+        return result == null ? new DeptStatisticsVO() : result;
+    }
 
     private final OrgService orgService;
     private final DictService dictService;

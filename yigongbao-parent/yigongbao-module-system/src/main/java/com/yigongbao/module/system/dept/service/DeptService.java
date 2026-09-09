@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.system.dept.dto.CreateDeptDTO;
 import com.yigongbao.module.system.dept.dto.DeptPageDTO;
+import com.yigongbao.module.system.dept.dto.DeptStatisticsQueryDTO;
 import com.yigongbao.module.system.dept.dto.UpdateDeptDTO;
 import com.yigongbao.module.system.dept.entity.DeptEntity;
 import com.yigongbao.module.system.dept.vo.DeptVO;
+import com.yigongbao.module.system.dept.vo.DeptStatisticsVO;
 
 import java.util.List;
 
@@ -17,6 +19,7 @@ import java.util.List;
  * @date 2026-03-17
  */
 public interface DeptService extends IService<DeptEntity> {
+    DeptStatisticsVO getStatistics(DeptStatisticsQueryDTO dto);
 
     /**
      * 分页查询部门列表

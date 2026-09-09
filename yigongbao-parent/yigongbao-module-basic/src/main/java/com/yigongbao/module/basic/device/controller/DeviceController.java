@@ -12,6 +12,7 @@ import com.yigongbao.module.basic.device.dto.UpdateDeviceDTO;
 import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.service.IDeviceService;
 import com.yigongbao.module.basic.device.vo.DeviceVO;
+import com.yigongbao.module.basic.device.vo.DeviceStatisticsVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -47,6 +48,12 @@ public class DeviceController {
     @PostMapping("/list")
     public Result<IPage<DeviceVO>> list(@Validated @RequestBody DevicePageDTO dto) {
         return Result.success(deviceService.listDevices(dto));
+    }
+
+    @Operation(summary = "查询设备统计数据")
+    @GetMapping("/statistics")
+    public Result<DeviceStatisticsVO> statistics(@Validated DevicePageDTO dto) {
+        return Result.success(deviceService.getStatistics(dto));
     }
 
     /**

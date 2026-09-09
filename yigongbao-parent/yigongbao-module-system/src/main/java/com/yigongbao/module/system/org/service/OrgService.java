@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yigongbao.module.system.org.dto.CreateOrgDTO;
 import com.yigongbao.module.system.org.dto.OrgPageDTO;
+import com.yigongbao.module.system.org.dto.OrgStatisticsQueryDTO;
 import com.yigongbao.module.system.org.dto.UpdateOrgDTO;
 import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.org.vo.OrgVO;
+import com.yigongbao.module.system.org.vo.OrgStatisticsVO;
 
 import com.yigongbao.module.system.org.vo.OrgHospitalChangeCheckVO;
 import com.yigongbao.module.system.org.vo.OrgOperationCheckVO;
@@ -21,6 +23,7 @@ import java.util.List;
  * @date 2026-03-16
  */
 public interface OrgService extends IService<OrgEntity> {
+    OrgStatisticsVO getStatistics(OrgStatisticsQueryDTO dto);
 
     /**
      * 分页查询机构列表

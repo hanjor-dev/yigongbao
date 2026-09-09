@@ -37,6 +37,7 @@ import com.yigongbao.module.system.user.dto.ChangePasswordDTO;
 import com.yigongbao.module.system.user.dto.CreateUserDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserDTO;
 import com.yigongbao.module.system.user.dto.UserPageDTO;
+import com.yigongbao.module.system.user.dto.UserStatisticsQueryDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.mapper.UserMapper;
 import com.yigongbao.module.system.user.service.UserHospitalService;
@@ -44,6 +45,7 @@ import com.yigongbao.module.system.user.service.UserManagedOrgService;
 import com.yigongbao.module.system.user.service.UserService;
 import com.yigongbao.module.system.user.vo.ManagedOrgScopeVO;
 import com.yigongbao.module.system.user.vo.UserVO;
+import com.yigongbao.module.system.user.vo.UserStatisticsVO;
 import com.yigongbao.module.basic.code.service.CodeGeneratorService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -85,6 +87,25 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> implements UserService {
+
+    @Override
+    public UserStatisticsVO getStatistics(UserStatisticsQueryDTO dto) {
+        LambdaQueryWrapper<UserEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                .and(dto != null && StrUtil.isNotBlank(dto.getKeyword()), query -> query
+                        .like(UserEntity::getUsername, dto.getKeyword())
+                        .or().like(UserEntity::getRealName, dto.getKeyword()))
+                .eq(dto != null && dto.getRoleId() != null, UserEntity::getRoleId,
+                        dto == null ? null : dto.getRoleId())
+                .eq(dto != null && dto.getOrgId() != null, UserEntity::getOrgId,
+                        dto == null ? null : dto.getOrgId())
+                .eq(dto != null && dto.getDeptId() != null, UserEntity::getDeptId,
+                        dto == null ? null : dto.getDeptId())
+                .eq(dto != null && dto.getStatus() != null, UserEntity::getStatus,
+                        dto == null ? null : dto.getStatus());
+        UserStatisticsVO result = getBaseMapper().selectStatistics(wrapper);
+        return result == null ? new UserStatisticsVO() : result;
+    }
 
     /** 需要填写专业方向的角色编码 */
     private static final List<String> SPECIALTY_REQUIRED_ROLES = List.of(RoleCodeEnum.DESIGNER.getCode(), RoleCodeEnum.DESIGNER_MANAGER.getCode());

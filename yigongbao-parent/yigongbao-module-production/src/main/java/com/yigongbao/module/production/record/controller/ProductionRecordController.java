@@ -10,6 +10,7 @@ import com.yigongbao.framework.annotation.RequirePermission;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.ProductLedgerExportDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
+import com.yigongbao.module.production.record.dto.ProductionRecordStatisticsQueryDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.module.production.record.service.ProductionPrintLifecycleService;
@@ -18,6 +19,7 @@ import com.yigongbao.module.production.record.vo.DeviceConfigVO;
 import com.yigongbao.module.production.record.vo.ProcessingCenterPrintersVO;
 import com.yigongbao.module.production.record.vo.PrinterOccupationVO;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
+import com.yigongbao.module.production.record.vo.ProductionRecordStatisticsVO;
 import com.yigongbao.module.basic.file.vo.FileVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,6 +47,12 @@ public class ProductionRecordController {
 
     private final IProductionRecordService recordService;
     private final ProductionPrintLifecycleService printLifecycleService;
+
+    @Operation(summary = "生产流转卡统计")
+    @GetMapping("/statistics")
+    public Result<ProductionRecordStatisticsVO> statistics(ProductionRecordStatisticsQueryDTO query) {
+        return Result.success(recordService.getStatistics(query));
+    }
 
     @Operation(summary = "分页查询生产列表")
     @PostMapping("/list")

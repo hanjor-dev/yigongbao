@@ -1,5 +1,6 @@
 package com.yigongbao.module.basic.device.service;
 
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yigongbao.common.exception.BusinessException;
@@ -15,6 +16,7 @@ import com.yigongbao.module.basic.device.enums.DeviceTypeEnum;
 import com.yigongbao.module.basic.device.mapper.DeviceMapper;
 import com.yigongbao.module.basic.device.service.impl.DeviceServiceImpl;
 import com.yigongbao.module.basic.device.vo.DeviceVO;
+import com.yigongbao.module.basic.device.vo.DeviceStatisticsVO;
 import com.yigongbao.module.basic.processingCenter.entity.ProcessingCenterEntity;
 import com.yigongbao.module.basic.processingCenter.mapper.ProcessingCenterMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -863,6 +865,45 @@ class DeviceServiceImplTest {
         ArgumentCaptor<Page> pageCaptor = ArgumentCaptor.forClass(Page.class);
         verify(deviceMapper).selectPage(pageCaptor.capture(), any());
         assertEquals(100L, pageCaptor.getValue().getSize());
+    }
+
+    @Test
+    void getStatistics_reusesListFiltersAndExcludesDeletedDevices() {
+        DevicePageDTO dto = new DevicePageDTO();
+        dto.setCenterId(7L);
+        dto.setDeviceType(DeviceTypeEnum.PRINTER_SLA.getCode());
+        dto.setState(1);
+        dto.setConnectionStatus(1);
+        dto.setDeviceId("SLA");
+
+        DeviceStatisticsVO expected = new DeviceStatisticsVO();
+        expected.setTotal(3L);
+        expected.setIdle(1L);
+        expected.setOccupied(2L);
+        when(deviceMapper.selectStatistics(any(Wrapper.class))).thenReturn(expected);
+
+        DeviceStatisticsVO actual = deviceService.getStatistics(dto);
+
+        assertEquals(3L, actual.getTotal());
+        assertEquals(1L, actual.getIdle());
+        assertEquals(2L, actual.getOccupied());
+
+        ArgumentCaptor<LambdaQueryWrapper<DeviceEntity>> wrapperCaptor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(deviceMapper).selectStatistics(wrapperCaptor.capture());
+        assertNotNull(wrapperCaptor.getValue());
+        assertFalse(wrapperCaptor.getValue().getExpression().getNormal().isEmpty());
+        verify(deviceMapper, never()).selectCount(any());
+    }
+
+    @Test
+    void getStatistics_returnsZeroCountsWhenMapperReturnsNoResult() {
+        when(deviceMapper.selectStatistics(any(Wrapper.class))).thenReturn(null);
+
+        DeviceStatisticsVO actual = deviceService.getStatistics(null);
+
+        assertEquals(0L, actual.getTotal());
+        assertEquals(0L, actual.getIdle());
+        assertEquals(0L, actual.getOccupied());
     }
 
 }

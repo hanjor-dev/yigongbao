@@ -6,6 +6,7 @@ import com.yigongbao.flow.enums.FlowActionEnum;
 import com.yigongbao.module.production.record.dto.AssignDeviceDTO;
 import com.yigongbao.module.production.record.dto.ProductLedgerExportDTO;
 import com.yigongbao.module.production.record.dto.ProductionRecordPageDTO;
+import com.yigongbao.module.production.record.dto.ProductionRecordStatisticsQueryDTO;
 import com.yigongbao.module.production.record.dto.SaveProductionColumnConfigDTO;
 import com.yigongbao.module.production.record.dto.SubmitBatchNoDTO;
 import com.yigongbao.module.production.record.entity.ProductionRecordEntity;
@@ -20,6 +21,8 @@ import java.util.List;
  * @date 2026-05-27
  */
 public interface IProductionRecordService extends IService<ProductionRecordEntity> {
+
+    ProductionRecordStatisticsVO getStatistics(ProductionRecordStatisticsQueryDTO query);
 
     ProductionRecordVO getRecordDetail(Long id);
 

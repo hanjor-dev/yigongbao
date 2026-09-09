@@ -26,6 +26,7 @@ import com.yigongbao.module.production.record.service.IProductionRecordService;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.module.order.mapper.OrderMainMapper;
 import com.yigongbao.module.production.warehouse.dto.ListWarehouseDTO;
+import com.yigongbao.module.production.warehouse.dto.WarehouseStatisticsQueryDTO;
 import com.yigongbao.module.production.warehouse.dto.ListWarehouseProductDTO;
 import com.yigongbao.module.production.warehouse.dto.WarehouseInProductDTO;
 import com.yigongbao.module.production.warehouse.dto.WarehouseOutProductDTO;
@@ -34,6 +35,7 @@ import com.yigongbao.module.production.warehouse.service.IWarehouseService;
 import com.yigongbao.module.production.warehouse.vo.WarehouseDetailVO;
 import com.yigongbao.module.production.warehouse.vo.WarehouseProductVO;
 import com.yigongbao.module.production.warehouse.vo.WarehouseRecordVO;
+import com.yigongbao.module.production.warehouse.vo.WarehouseStatisticsVO;
 import com.yigongbao.module.production.warehouse.vo.WarehouseColumnConfigVO;
 import com.yigongbao.module.production.util.ColumnConfigValidator;
 import com.yigongbao.module.system.config.service.ConfigService;
@@ -67,6 +69,17 @@ public class WarehouseServiceImpl implements IWarehouseService {
     private final ObjectMapper objectMapper;
     private final FlowStatusColorResolver flowStatusColorResolver;
     private final OrderMainMapper orderMainMapper;
+
+    @Override
+    public WarehouseStatisticsVO getStatistics(WarehouseStatisticsQueryDTO dto) {
+        if (dto == null) {
+            dto = new WarehouseStatisticsQueryDTO();
+        }
+        dto.setWarehouseInTimeEnd(toExclusiveEndTime(dto.getWarehouseInTimeEnd()));
+        dto.setWarehouseOutTimeEnd(toExclusiveEndTime(dto.getWarehouseOutTimeEnd()));
+        WarehouseStatisticsVO result = recordMapper.selectWarehouseStatistics(dto);
+        return result == null ? new WarehouseStatisticsVO() : result;
+    }
 
     @Override
     public IPage<WarehouseRecordVO> listWarehouse(ListWarehouseDTO dto) {

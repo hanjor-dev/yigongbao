@@ -13,8 +13,10 @@ import com.yigongbao.module.system.user.dto.CreateUserDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO;
 import com.yigongbao.module.system.user.dto.UserPageDTO;
+import com.yigongbao.module.system.user.dto.UserStatisticsQueryDTO;
 import com.yigongbao.module.system.user.service.UserService;
 import com.yigongbao.module.system.user.vo.UserVO;
+import com.yigongbao.module.system.user.vo.UserStatisticsVO;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -37,6 +39,12 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+
+    @Operation(summary = "账户统计")
+    @GetMapping("/statistics")
+    public Result<UserStatisticsVO> statistics(UserStatisticsQueryDTO query) {
+        return Result.success(userService.getStatistics(query));
+    }
 
     /**
      * 分页查询用户列表

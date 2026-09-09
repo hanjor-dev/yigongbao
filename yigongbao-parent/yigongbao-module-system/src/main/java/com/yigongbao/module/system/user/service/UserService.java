@@ -7,8 +7,10 @@ import com.yigongbao.module.system.user.dto.CreateUserDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserDTO;
 import com.yigongbao.module.system.user.dto.UpdateUserBySelfDTO;
 import com.yigongbao.module.system.user.dto.UserPageDTO;
+import com.yigongbao.module.system.user.dto.UserStatisticsQueryDTO;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.vo.UserVO;
+import com.yigongbao.module.system.user.vo.UserStatisticsVO;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.List;
@@ -20,6 +22,7 @@ import java.util.List;
  * @date 2026-03-17
  */
 public interface UserService extends IService<UserEntity> {
+    UserStatisticsVO getStatistics(UserStatisticsQueryDTO dto);
 
     /**
      * 分页查询用户列表

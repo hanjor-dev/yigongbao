@@ -7,8 +7,10 @@ import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.production.product.vo.ProductionProductVO;
 import com.yigongbao.module.production.qc.dto.BatchUpdateUdiDTO;
 import com.yigongbao.module.production.qc.dto.ProductionQcPageDTO;
+import com.yigongbao.module.production.qc.dto.ProductionQcStatisticsQueryDTO;
 import com.yigongbao.module.production.qc.service.IProductionQcService;
 import com.yigongbao.module.production.record.vo.ProductionRecordVO;
+import com.yigongbao.module.production.qc.vo.ProductionQcStatisticsVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -30,6 +32,12 @@ import java.util.List;
 public class ProductionQcController {
 
     private final IProductionQcService qcService;
+
+    @Operation(summary = "质检统计")
+    @GetMapping("/statistics")
+    public Result<ProductionQcStatisticsVO> statistics(ProductionQcStatisticsQueryDTO query) {
+        return Result.success(qcService.getStatistics(query));
+    }
 
     @Operation(summary = "质检列表")
     @PostMapping("/list")

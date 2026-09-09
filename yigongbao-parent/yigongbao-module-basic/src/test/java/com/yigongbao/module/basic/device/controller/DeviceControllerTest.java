@@ -1,6 +1,9 @@
 package com.yigongbao.module.basic.device.controller;
 
+import com.yigongbao.module.basic.device.dto.DevicePageDTO;
 import com.yigongbao.module.basic.device.service.IDeviceService;
+import com.yigongbao.module.basic.device.vo.DeviceStatisticsVO;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -9,9 +12,11 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -24,6 +29,37 @@ class DeviceControllerTest {
 
     @MockBean
     private IDeviceService deviceService;
+
+    @Test
+    void statistics_returnsDeviceStatistics() throws Exception {
+        DeviceStatisticsVO expected = new DeviceStatisticsVO();
+        expected.setTotal(3L);
+        expected.setIdle(1L);
+        expected.setOccupied(2L);
+        when(deviceService.getStatistics(org.mockito.ArgumentMatchers.any(DevicePageDTO.class)))
+                .thenReturn(expected);
+
+        mockMvc.perform(get("/basic/device/statistics")
+                        .param("centerId", "7")
+                        .param("deviceType", "PRINTER_SLA")
+                        .param("state", "1")
+                        .param("connectionStatus", "1")
+                        .param("deviceId", "SLA"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.total").value(3))
+                .andExpect(jsonPath("$.data.idle").value(1))
+                .andExpect(jsonPath("$.data.occupied").value(2));
+
+        ArgumentCaptor<DevicePageDTO> dtoCaptor = ArgumentCaptor.forClass(DevicePageDTO.class);
+        verify(deviceService).getStatistics(dtoCaptor.capture());
+        DevicePageDTO actual = dtoCaptor.getValue();
+        org.junit.jupiter.api.Assertions.assertEquals(7L, actual.getCenterId());
+        org.junit.jupiter.api.Assertions.assertEquals("PRINTER_SLA", actual.getDeviceType());
+        org.junit.jupiter.api.Assertions.assertEquals(1, actual.getState());
+        org.junit.jupiter.api.Assertions.assertEquals(1, actual.getConnectionStatus());
+        org.junit.jupiter.api.Assertions.assertEquals("SLA", actual.getDeviceId());
+    }
 
     @Test
     void updateState_acceptsPrinterStateSixAndDelegatesToService() throws Exception {

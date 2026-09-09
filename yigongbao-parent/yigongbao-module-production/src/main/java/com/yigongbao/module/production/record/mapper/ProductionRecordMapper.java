@@ -8,6 +8,10 @@ import com.yigongbao.module.production.warehouse.dto.ListWarehouseDTO;
 import com.yigongbao.module.production.warehouse.dto.ListWarehouseProductDTO;
 import com.yigongbao.module.production.warehouse.vo.WarehouseProductVO;
 import com.yigongbao.module.production.warehouse.vo.WarehouseRecordVO;
+import com.yigongbao.module.production.warehouse.dto.WarehouseStatisticsQueryDTO;
+import com.yigongbao.module.production.warehouse.vo.WarehouseStatisticsVO;
+import com.yigongbao.module.production.record.dto.ProductionRecordStatisticsQueryDTO;
+import com.yigongbao.module.production.record.vo.ProductionRecordStatisticsVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -20,6 +24,78 @@ import org.apache.ibatis.annotations.Select;
  */
 @Mapper
 public interface ProductionRecordMapper extends BaseMapper<ProductionRecordEntity> {
+
+    @Select("""
+        <script>
+        SELECT COUNT(*) AS total,
+               COALESCE(SUM(CASE WHEN r.status = 2030 THEN 1 ELSE 0 END), 0) AS designCompleted,
+               COALESCE(SUM(CASE WHEN r.status = 3010 THEN 1 ELSE 0 END), 0) AS pendingPrint,
+               COALESCE(SUM(CASE WHEN r.status = 3020 THEN 1 ELSE 0 END), 0) AS printing,
+               COALESCE(SUM(CASE WHEN r.status = 3030 THEN 1 ELSE 0 END), 0) AS printCompleted,
+               COALESCE(SUM(CASE WHEN r.status = 3040 THEN 1 ELSE 0 END), 0) AS printFailed,
+               COALESCE(SUM(CASE WHEN r.status = 4010 THEN 1 ELSE 0 END), 0) AS postProcessing,
+               COALESCE(SUM(CASE WHEN r.status = 5010 THEN 1 ELSE 0 END), 0) AS qcInProgress,
+               COALESCE(SUM(CASE WHEN r.status > 5010 AND r.status <> 9010 THEN 1 ELSE 0 END), 0) AS qcCompleted,
+               COALESCE(SUM(CASE WHEN r.status = 5020 THEN 1 ELSE 0 END), 0) AS qcPassed,
+               COALESCE(SUM(CASE WHEN r.status = 5030 THEN 1 ELSE 0 END), 0) AS qcFailed,
+               COALESCE(SUM(CASE WHEN r.status = 5040 THEN 1 ELSE 0 END), 0) AS rework,
+               COALESCE(SUM(CASE WHEN r.status = 5050 THEN 1 ELSE 0 END), 0) AS packing,
+               COALESCE(SUM(CASE WHEN r.status = 6010 THEN 1 ELSE 0 END), 0) AS pendingWarehouseIn,
+               COALESCE(SUM(CASE WHEN r.status = 6020 THEN 1 ELSE 0 END), 0) AS warehoused,
+               COALESCE(SUM(CASE WHEN r.status = 6030 THEN 1 ELSE 0 END), 0) AS warehouseOut,
+               COALESCE(SUM(CASE WHEN r.status = 8010 THEN 1 ELSE 0 END), 0) AS completed
+        FROM production_record r
+        WHERE r.is_deleted = 0
+          <if test="query.processingCenterId != null">
+            AND r.processing_center_id = #{query.processingCenterId}
+          </if>
+          <if test="query.processingCenterId == null and scopeType == 'CENTER'">
+            AND (r.processing_center_id IS NULL OR r.order_id IN
+                 (SELECT om.id FROM order_main om WHERE om.is_deleted = 0 AND om.center_id = #{centerId}))
+          </if>
+          <if test="query.keyword != null and query.keyword != ''">
+            AND (r.order_code LIKE CONCAT('%', #{query.keyword}, '%')
+              OR r.design_package_code LIKE CONCAT('%', #{query.keyword}, '%')
+              OR r.patient_name LIKE CONCAT('%', #{query.keyword}, '%'))
+          </if>
+          <if test="query.orderCreateTimeStart != null">
+            AND EXISTS (SELECT 1 FROM order_main om1 WHERE om1.id = r.order_id AND om1.is_deleted = 0
+                        AND om1.create_time &gt;= #{query.orderCreateTimeStart})
+          </if>
+          <if test="query.orderCreateTimeEnd != null">
+            AND EXISTS (SELECT 1 FROM order_main om2 WHERE om2.id = r.order_id AND om2.is_deleted = 0
+                        AND om2.create_time &lt; #{query.orderCreateTimeEnd})
+          </if>
+        </script>
+        """)
+    ProductionRecordStatisticsVO selectStatistics(@Param("query") ProductionRecordStatisticsQueryDTO query,
+                                                   @Param("scopeType") String scopeType,
+                                                   @Param("centerId") Long centerId);
+
+    @Select("""
+        <script>
+        SELECT COUNT(p.id) AS total,
+               COALESCE(SUM(CASE WHEN p.status = 'pending_warehouse_in' THEN 1 ELSE 0 END), 0) AS pendingWarehouseIn,
+               COALESCE(SUM(CASE WHEN p.status = 'warehoused' THEN 1 ELSE 0 END), 0) AS warehoused,
+               COALESCE(SUM(CASE WHEN p.status = 'warehouse_out' THEN 1 ELSE 0 END), 0) AS warehouseOut
+        FROM production_product p
+        INNER JOIN production_record r ON p.production_record_id = r.id AND r.is_deleted = 0
+        LEFT JOIN order_main om ON r.order_id = om.id AND om.is_deleted = 0
+        WHERE p.is_deleted = 0
+          <if test="query.keyword != null and query.keyword != ''">
+            AND (r.record_no LIKE CONCAT('%', #{query.keyword}, '%')
+              OR r.order_code LIKE CONCAT('%', #{query.keyword}, '%')
+              OR om.public_order_code LIKE CONCAT('%', #{query.keyword}, '%')
+              OR p.product_name LIKE CONCAT('%', #{query.keyword}, '%')
+              OR p.product_no LIKE CONCAT('%', #{query.keyword}, '%'))
+          </if>
+          <if test="query.warehouseInTimeStart != null">AND p.warehouse_in_time &gt;= #{query.warehouseInTimeStart}</if>
+          <if test="query.warehouseInTimeEnd != null">AND p.warehouse_in_time &lt; #{query.warehouseInTimeEnd}</if>
+          <if test="query.warehouseOutTimeStart != null">AND p.warehouse_out_time &gt;= #{query.warehouseOutTimeStart}</if>
+          <if test="query.warehouseOutTimeEnd != null">AND p.warehouse_out_time &lt; #{query.warehouseOutTimeEnd}</if>
+        </script>
+        """)
+    WarehouseStatisticsVO selectWarehouseStatistics(@Param("query") WarehouseStatisticsQueryDTO query);
 
     /** 按主键锁定流转卡，串行化设备分配与释放操作。 */
     @Select("SELECT * FROM production_record WHERE id = #{id} AND is_deleted = 0 FOR UPDATE")
