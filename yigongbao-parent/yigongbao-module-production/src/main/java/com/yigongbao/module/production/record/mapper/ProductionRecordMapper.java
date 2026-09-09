@@ -35,7 +35,7 @@ public interface ProductionRecordMapper extends BaseMapper<ProductionRecordEntit
                COALESCE(SUM(CASE WHEN r.status = 3040 THEN 1 ELSE 0 END), 0) AS printFailed,
                COALESCE(SUM(CASE WHEN r.status = 4010 THEN 1 ELSE 0 END), 0) AS postProcessing,
                COALESCE(SUM(CASE WHEN r.status = 5010 THEN 1 ELSE 0 END), 0) AS qcInProgress,
-               COALESCE(SUM(CASE WHEN r.status > 5010 AND r.status <> 9010 THEN 1 ELSE 0 END), 0) AS qcCompleted,
+               COALESCE(SUM(CASE WHEN r.status &gt; 5010 AND r.status &lt;&gt; 9010 THEN 1 ELSE 0 END), 0) AS qcCompleted,
                COALESCE(SUM(CASE WHEN r.status = 5020 THEN 1 ELSE 0 END), 0) AS qcPassed,
                COALESCE(SUM(CASE WHEN r.status = 5030 THEN 1 ELSE 0 END), 0) AS qcFailed,
                COALESCE(SUM(CASE WHEN r.status = 5040 THEN 1 ELSE 0 END), 0) AS rework,
