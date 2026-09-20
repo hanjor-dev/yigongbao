@@ -372,6 +372,26 @@ class OrderMainServiceImplListOrdersTest {
         }
 
         @Test
+        void filterByOrderCode_alsoMatchesRebuildProjectNameWithCorrelatedExists() {
+            when(orderQueryHelper.getCurrentUserId()).thenReturn(1L);
+            when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
+            mockSelectPage(List.of(), 0L);
+            ArgumentCaptor<LambdaQueryWrapper> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+
+            OrderPageDTO dto = baseDto();
+            dto.setOrderCode("颅骨");
+            orderMainService.listOrders(dto);
+
+            verify(orderMainMapper).selectPage(any(), captor.capture());
+            assertThat(captor.getValue().getSqlSegment())
+                    .contains("EXISTS (SELECT 1 FROM order_item oi")
+                    .contains("oi.order_id = order_main.id")
+                    .contains("oi.project_name LIKE CONCAT('%'")
+                    .contains("oi.is_deleted = 0");
+            verify(orderItemMapper, never()).selectList(any());
+        }
+
+        @Test
         void filterByAreaId_addsMoreSegments() {
             int baseline = getBaselineSegmentCount();
             clearInvocations(orderMainMapper);

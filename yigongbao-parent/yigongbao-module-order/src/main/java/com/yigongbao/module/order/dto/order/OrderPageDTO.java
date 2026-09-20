@@ -34,7 +34,7 @@ public class OrderPageDTO implements Serializable {
     private Integer pageSize = 10;
 
     /**
-     * 订单编号（可选，模糊查询）
+     * 统一搜索关键词（可选，模糊匹配订单编号、机构、人员、医院、患者、医生及重建项目名称）
      */
     private String orderCode;
 

@@ -281,7 +281,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             }
 
             // 追加其他过滤条件
-            // orderCode 参数：多字段模糊搜索（订单编号/机构名称/业务员姓名/医院名称/患者姓名/医生姓名）
+            // orderCode 参数：多字段模糊搜索（含重建项目名称）
             if (StrUtil.isNotBlank(dto.getOrderCode())) {
                 wrapper.and(w -> w.like(OrderMainEntity::getOrderCode, dto.getOrderCode())
                         .or().like(OrderMainEntity::getPublicOrderCode, dto.getOrderCode())
@@ -289,7 +289,13 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
                         .or().like(OrderMainEntity::getOperatorName, dto.getOrderCode())
                         .or().like(OrderMainEntity::getHospitalName, dto.getOrderCode())
                         .or().like(OrderMainEntity::getPatientName, dto.getOrderCode())
-                        .or().like(OrderMainEntity::getDoctorName, dto.getOrderCode()));
+                        .or().like(OrderMainEntity::getDoctorName, dto.getOrderCode())
+                        // 关联子查询可利用 order_item(order_id) 索引，避免预查 ID 列表或 JOIN 导致分页重复。
+                        .or().exists("SELECT 1 FROM order_item oi "
+                                        + "WHERE oi.order_id = order_main.id "
+                                        + "AND oi.project_name LIKE CONCAT('%', {0}, '%') "
+                                        + "AND oi.is_deleted = 0",
+                                dto.getOrderCode()));
             }
             wrapper.eq(Objects.nonNull(dto.getAreaId()), OrderMainEntity::getAreaId, dto.getAreaId())
                     .like(StrUtil.isNotBlank(dto.getPatientName()), OrderMainEntity::getPatientName, dto.getPatientName())
