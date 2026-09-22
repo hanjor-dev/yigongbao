@@ -461,6 +461,57 @@ class OrderMainServiceImplStateTransitionTest {
     }
 
     @Test
+    void createFromDraft_preservesDuplicateOrderItems() {
+        OrderDraftEntity draft = new OrderDraftEntity();
+        draft.setId(35L);
+        draft.setOperatorId(11L);
+        draft.setOrgId(101L);
+        draft.setOrderType(1);
+        draft.setBusinessType("business");
+
+        OrderItemDraftEntity first = new OrderItemDraftEntity();
+        first.setId(351L);
+        first.setDraftId(35L);
+        first.setBodyPartId(7L);
+        first.setProjectId(8L);
+        first.setSortOrder(1);
+        OrderItemDraftEntity second = new OrderItemDraftEntity();
+        second.setId(352L);
+        second.setDraftId(35L);
+        second.setBodyPartId(7L);
+        second.setProjectId(8L);
+        second.setSortOrder(2);
+
+        when(codeGeneratorService.generate(any())).thenReturn("ORD-35");
+        UserEntity user = new UserEntity();
+        user.setId(11L);
+        user.setOrgId(101L);
+        user.setRealName("草稿操作员");
+        when(userService.getById(11L)).thenReturn(user);
+        when(orderItemDraftMapper.selectList(any())).thenReturn(java.util.List.of(first, second));
+        when(fileService.listByBiz(anyString(), anyLong())).thenReturn(java.util.List.of());
+        doNothing().when(orderDataValidator).validateOrderType(eq(11L), eq(1));
+        doAnswer(invocation -> {
+            OrderMainEntity created = invocation.getArgument(0);
+            created.setId(305L);
+            return true;
+        }).when(service).save(any(OrderMainEntity.class));
+        when(flowFacade.executeFlow(eq(305L), eq(FlowActionEnum.CREATE), any()))
+                .thenReturn(TransitionResult.of(FlowPhaseEnum.ORDER.getValue(),
+                        FlowStatusEnum.PENDING_DATA_AUDIT.getValue()));
+
+        service.createFromDraft(draft);
+
+        ArgumentCaptor<OrderItemEntity> itemCaptor = ArgumentCaptor.forClass(OrderItemEntity.class);
+        verify(orderItemMapper, times(2)).insert(itemCaptor.capture());
+        assertThat(itemCaptor.getAllValues())
+                .extracting(OrderItemEntity::getBodyPartId, OrderItemEntity::getProjectId)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(7L, 8L),
+                        org.assertj.core.groups.Tuple.tuple(7L, 8L));
+    }
+
+    @Test
     void createFromDraft_trialOrderDoesNotInitializeRegionalAudit() {
         OrderDraftEntity draft = new OrderDraftEntity();
         draft.setId(31L);
@@ -675,6 +726,59 @@ class OrderMainServiceImplStateTransitionTest {
                 isNull(), isNull(), isNull(), eq(userId), eq(OrderDataValidator.ValidateMode.DIRECT));
         verify(flowFacade).executeFlow(eq(100L), eq(FlowActionEnum.CREATE), any());
         verify(eventPublisher).publishEvent(any());
+    }
+
+    @Test
+    void createOrder_allowsDuplicateBodyPartAndProjectItems() {
+        Long userId = 11L;
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.setRealName("操作员");
+        user.setPhone("13800000000");
+        user.setOrgId(101L);
+        user.setDeptId(21L);
+        user.setDeptName("影像科");
+
+        com.yigongbao.module.order.dto.order.CreateOrderDTO dto = new com.yigongbao.module.order.dto.order.CreateOrderDTO();
+        dto.setOrderType(1);
+        dto.setNeedsPhysicalDelivery(0);
+        dto.setBusinessType("11.1");
+        dto.setOrgId(101L);
+        dto.setHospitalId(201L);
+        dto.setHospitalDeptId(301L);
+        dto.setPatientName("患者甲");
+
+        var first = new com.yigongbao.module.order.dto.draft.OrderItemDraftItemDTO();
+        first.setBodyPartId(7L);
+        first.setProjectId(8L);
+        first.setSortOrder(1);
+        var second = new com.yigongbao.module.order.dto.draft.OrderItemDraftItemDTO();
+        second.setBodyPartId(7L);
+        second.setProjectId(8L);
+        second.setSortOrder(2);
+        dto.setItems(java.util.List.of(first, second));
+
+        when(orderQueryHelper.getCurrentUserId()).thenReturn(userId);
+        when(codeGeneratorService.generate(any())).thenReturn("ORD-DUPLICATE");
+        when(publicOrderCodeGenerator.generate()).thenReturn("YG-DUPLICATE");
+        when(configService.getConfigValue(any())).thenReturn("false");
+        when(userService.getById(userId)).thenReturn(user);
+        doAnswer(invocation -> {
+            OrderMainEntity order = invocation.getArgument(0);
+            order.setId(110L);
+            return true;
+        }).when(service).save(any(OrderMainEntity.class));
+
+        Long orderId = service.createOrder(dto);
+
+        assertThat(orderId).isEqualTo(110L);
+        ArgumentCaptor<OrderItemEntity> itemCaptor = ArgumentCaptor.forClass(OrderItemEntity.class);
+        verify(orderItemMapper, times(2)).insert(itemCaptor.capture());
+        assertThat(itemCaptor.getAllValues())
+                .extracting(OrderItemEntity::getBodyPartId, OrderItemEntity::getProjectId)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(7L, 8L),
+                        org.assertj.core.groups.Tuple.tuple(7L, 8L));
     }
 
     @Test

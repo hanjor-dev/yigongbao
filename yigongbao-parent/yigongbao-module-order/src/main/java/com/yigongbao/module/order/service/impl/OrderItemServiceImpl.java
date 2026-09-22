@@ -32,7 +32,9 @@ public class OrderItemServiceImpl extends ServiceImpl<OrderItemMapper, OrderItem
     public List<OrderItemEntity> listByOrderId(Long orderId) {
         return list(new LambdaQueryWrapper<OrderItemEntity>()
                 .eq(OrderItemEntity::getOrderId, orderId)
-                .eq(OrderItemEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+                .eq(OrderItemEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                .orderByAsc(OrderItemEntity::getSortOrder)
+                .orderByAsc(OrderItemEntity::getId));
     }
 
     /**
@@ -48,6 +50,9 @@ public class OrderItemServiceImpl extends ServiceImpl<OrderItemMapper, OrderItem
         }
         return list(new LambdaQueryWrapper<OrderItemEntity>()
                 .in(OrderItemEntity::getOrderId, orderIds)
-                .eq(OrderItemEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+                .eq(OrderItemEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                .orderByAsc(OrderItemEntity::getOrderId)
+                .orderByAsc(OrderItemEntity::getSortOrder)
+                .orderByAsc(OrderItemEntity::getId));
     }
 }

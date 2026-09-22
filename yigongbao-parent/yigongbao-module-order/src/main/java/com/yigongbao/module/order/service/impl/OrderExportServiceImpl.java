@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
@@ -47,7 +48,10 @@ import java.util.stream.Collectors;
 @Slf4j
 public class OrderExportServiceImpl implements OrderExportService {
 
-    private static final int MAX_EXPORT_COUNT = 10000;
+    /** 单次查询的订单数，避免一次性加载大量订单及明细。 */
+    private static final int EXPORT_BATCH_SIZE = 500;
+    /** 单个工作表允许导出的最大数据行数，不含表头。 */
+    private static final int MAX_EXPORT_ROWS = 100000;
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -76,16 +80,11 @@ public class OrderExportServiceImpl implements OrderExportService {
             throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "列配置无可见列");
         }
 
-        // Step 2：按数据权限查询订单（最多10000条）
-        List<OrderListVO> orderList = queryOrdersForExport(dto);
-
-        // Step 3：构建 Excel（SXSSF 流式写入）
+        // Step 2：构建 Excel，并按主键游标分批读取订单
         try {
-            buildExcel(visibleColumns, orderList, response);
-            // 在响应头中标注实际导出数量及是否被截断，前端可据此提示用户
-            response.setHeader("X-Export-Total", String.valueOf(orderList.size()));
-            response.setHeader("X-Export-Truncated", String.valueOf(orderList.size() >= MAX_EXPORT_COUNT));
-            log.info("导出订单: 总数={}, 截断={}", orderList.size(), orderList.size() >= MAX_EXPORT_COUNT);
+            ExportResult result = buildExcel(visibleColumns, dto, response);
+            log.info("导出订单: 订单数={}, 导出行数={}, 截断={}",
+                    result.orderCount(), result.rowCount(), result.truncated());
         } catch (Exception e) {
             log.error("导出订单异常", e);
             throw new BusinessException(ErrorCodeEnum.ORDER_EXPORT_FAILED);
@@ -95,7 +94,7 @@ public class OrderExportServiceImpl implements OrderExportService {
     /**
      * 按数据权限查询订单列表
      */
-    private List<OrderListVO> queryOrdersForExport(OrderExportQueryDTO dto) {
+    private List<OrderListVO> queryOrdersForExport(OrderExportQueryDTO dto, OrderExportCursor cursor) {
         Long currentUserId = orderQueryHelper.getCurrentUserId();
         DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
 
@@ -124,8 +123,11 @@ public class OrderExportServiceImpl implements OrderExportService {
         wrapper.eq(Objects.nonNull(dto.getPhase()), OrderMainEntity::getPhase, dto.getPhase())
                 .eq(Objects.nonNull(dto.getStatus()), OrderMainEntity::getStatus, dto.getStatus());
 
-        orderQueryHelper.applySort(wrapper, dto.getSortField(), dto.getSortOrder());
-        wrapper.last("LIMIT " + MAX_EXPORT_COUNT);
+        // 导出按创建时间倒序，使用 id 作为同一时间的唯一 tie-breaker。
+        applyCursor(wrapper, cursor);
+        wrapper.orderByDesc(OrderMainEntity::getCreateTime)
+                .orderByDesc(OrderMainEntity::getId)
+                .last("LIMIT " + EXPORT_BATCH_SIZE);
 
         // 执行查询并转换为 VO
         List<OrderListVO> voList = orderMainMapper.selectList(wrapper).stream()
@@ -141,9 +143,9 @@ public class OrderExportServiceImpl implements OrderExportService {
     /**
      * 构建 Excel 文件
      */
-    private void buildExcel(List<OrderColumnConfigVO.ColumnItemVO> columns,
-                            List<OrderListVO> orderList,
-                            HttpServletResponse response) throws IOException {
+    private ExportResult buildExcel(List<OrderColumnConfigVO.ColumnItemVO> columns,
+                                    OrderExportQueryDTO dto,
+                                    HttpServletResponse response) throws IOException {
         // 使用 SXSSFWorkbook，流式写入避免 OOM
         try (SXSSFWorkbook workbook = new SXSSFWorkbook(100)) {
             workbook.setCompressTempFiles(true);
@@ -169,17 +171,55 @@ public class OrderExportServiceImpl implements OrderExportService {
                 cell.setCellStyle(headerStyle);
             }
 
-            // 填充数据行
+            // 按批次填充数据行：有项目时按订单明细拆行，并保留重复项目；无项目时保留一条订单行
             int rowNum = 1;
-            for (OrderListVO order : orderList) {
-                Row row = sheet.createRow(rowNum++);
-                for (int i = 0; i < columns.size(); i++) {
-                    OrderColumnConfigVO.ColumnItemVO col = columns.get(i);
-                    Cell cell = row.createCell(i);
-                    if (!setCellValue(cell, order, col.getField())) {
-                        unsupportedColumnCount++;
-                    }
+            int orderCount = 0;
+            boolean truncated = false;
+            OrderExportCursor cursor = null;
+            while (true) {
+                List<OrderListVO> orderList = queryOrdersForExport(dto, cursor);
+                if (orderList.isEmpty()) {
+                    break;
                 }
+                orderCount += orderList.size();
+                for (OrderListVO order : orderList) {
+                    List<OrderListVO.RebuildProjectItemVO> projects = order.getRebuildProjectList();
+                    if (projects == null || projects.isEmpty()) {
+                        if (rowNum > MAX_EXPORT_ROWS) {
+                            truncated = true;
+                            break;
+                        }
+                        Row row = sheet.createRow(rowNum++);
+                        for (int i = 0; i < columns.size(); i++) {
+                            OrderColumnConfigVO.ColumnItemVO col = columns.get(i);
+                            Cell cell = row.createCell(i);
+                            if (!setCellValue(cell, order, null, col.getField())) {
+                                unsupportedColumnCount++;
+                            }
+                        }
+                    } else {
+                        for (OrderListVO.RebuildProjectItemVO project : projects) {
+                            if (rowNum > MAX_EXPORT_ROWS) {
+                                truncated = true;
+                                break;
+                            }
+                            Row row = sheet.createRow(rowNum++);
+                            for (int i = 0; i < columns.size(); i++) {
+                                OrderColumnConfigVO.ColumnItemVO col = columns.get(i);
+                                Cell cell = row.createCell(i);
+                                if (!setCellValue(cell, order, project, col.getField())) {
+                                    unsupportedColumnCount++;
+                                }
+                            }
+                        }
+                    }
+                    if (truncated) break;
+                }
+                if (truncated || orderList.size() < EXPORT_BATCH_SIZE) {
+                    break;
+                }
+                OrderListVO lastOrder = orderList.get(orderList.size() - 1);
+                cursor = new OrderExportCursor(lastOrder.getCreateTime(), lastOrder.getId());
             }
 
             // 检测并记录未匹配到的列（辅助定位 Excel 导出字段遗漏问题）
@@ -193,10 +233,34 @@ public class OrderExportServiceImpl implements OrderExportService {
             response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
             response.setHeader("Content-Disposition",
                     "attachment;filename=" + URLEncoder.encode(fileName, StandardCharsets.UTF_8));
+            int exportRowCount = rowNum - 1;
+            response.setHeader("X-Export-Total", String.valueOf(exportRowCount));
+            response.setHeader("X-Export-Truncated", String.valueOf(truncated));
 
             workbook.write(response.getOutputStream());
             workbook.dispose();
+            return new ExportResult(orderCount, exportRowCount, truncated);
         }
+    }
+
+    private record ExportResult(int orderCount, int rowCount, boolean truncated) {
+    }
+
+    private record OrderExportCursor(LocalDateTime createTime, Long id) {
+    }
+
+    private void applyCursor(LambdaQueryWrapper<OrderMainEntity> wrapper, OrderExportCursor cursor) {
+        if (cursor == null) {
+            return;
+        }
+        if (cursor.createTime() == null) {
+            wrapper.isNull(OrderMainEntity::getCreateTime)
+                    .lt(OrderMainEntity::getId, cursor.id());
+            return;
+        }
+        wrapper.and(w -> w.lt(OrderMainEntity::getCreateTime, cursor.createTime())
+                .or(x -> x.eq(OrderMainEntity::getCreateTime, cursor.createTime())
+                        .lt(OrderMainEntity::getId, cursor.id())));
     }
 
     /**
@@ -451,23 +515,6 @@ public class OrderExportServiceImpl implements OrderExportService {
         Long currentUserId = orderQueryHelper.getCurrentUserId();
         DataScopeTypeEnum scopeType = userHospitalService.getDataScopeType(currentUserId);
 
-        // 先注入统一数据权限条件，再叠加自定义导出的时间范围和数量限制
-        LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
-        orderQueryHelper.buildDataScopeCondition(wrapper, currentUserId, scopeType);
-        wrapper
-                .ge(dto.getCreateTimeStart() != null, OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
-                .le(dto.getCreateTimeEnd() != null, OrderMainEntity::getCreateTime, dto.getCreateTimeEnd())
-                .orderByDesc(OrderMainEntity::getCreateTime)
-                .last("LIMIT " + MAX_EXPORT_COUNT);
-
-        List<OrderMainEntity> orderEntities = orderMainMapper.selectList(wrapper);
-        List<OrderListVO> orderList = orderEntities.stream()
-                .map(orderQueryHelper::toOrderListVO)
-                .collect(Collectors.toList());
-
-        // 填充重建项目列表
-        orderQueryHelper.fillRebuildProjectList(orderList);
-
         // 构建字段标签映射
         java.util.Map<String, String> fieldLabels = dto.getFieldLabels() != null
                 ? dto.getFieldLabels()
@@ -475,15 +522,17 @@ public class OrderExportServiceImpl implements OrderExportService {
 
         // 构建Excel
         try {
-            buildCustomExcel(dto.getExportFields(), fieldLabels, orderList, response);
+            buildCustomExcel(dto, fieldLabels, currentUserId, scopeType, response);
         } catch (IOException e) {
             log.error("自定义导出订单失败", e);
             throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR);
         }
     }
 
-    private void buildCustomExcel(List<String> exportFields, java.util.Map<String, String> fieldLabels,
-                                   List<OrderListVO> orderList, HttpServletResponse response) throws IOException {
+    private void buildCustomExcel(OrderCustomExportDTO dto, java.util.Map<String, String> fieldLabels,
+                                  Long currentUserId, DataScopeTypeEnum scopeType,
+                                  HttpServletResponse response) throws IOException {
+        List<String> exportFields = dto.getExportFields();
         try (SXSSFWorkbook workbook = new SXSSFWorkbook(100)) {
             workbook.setCompressTempFiles(true);
             SXSSFSheet sheet = workbook.createSheet("订单列表");
@@ -503,22 +552,35 @@ public class OrderExportServiceImpl implements OrderExportService {
 
             // 填充数据（按重建项目拆分行）
             int rowNum = 1;
-            for (OrderListVO order : orderList) {
-                if (order.getRebuildProjectList() == null || order.getRebuildProjectList().isEmpty()) {
-                    Row row = sheet.createRow(rowNum++);
-                    for (int i = 0; i < exportFields.size(); i++) {
-                        Cell cell = row.createCell(i);
-                        setCellValue(cell, order, null, exportFields.get(i));
-                    }
-                } else {
-                    for (OrderListVO.RebuildProjectItemVO project : order.getRebuildProjectList()) {
-                        Row row = sheet.createRow(rowNum++);
-                        for (int i = 0; i < exportFields.size(); i++) {
-                            Cell cell = row.createCell(i);
-                            setCellValue(cell, order, project, exportFields.get(i));
+            boolean truncated = false;
+            OrderExportCursor cursor = null;
+            while (!truncated) {
+                List<OrderListVO> orderList = queryCustomExportOrders(dto, currentUserId, scopeType, cursor);
+                if (orderList.isEmpty()) {
+                    break;
+                }
+                for (OrderListVO order : orderList) {
+                    List<OrderListVO.RebuildProjectItemVO> projects = order.getRebuildProjectList();
+                    if (projects == null || projects.isEmpty()) {
+                        if (rowNum > MAX_EXPORT_ROWS) {
+                            truncated = true;
+                            break;
+                        }
+                        writeCustomRow(sheet, rowNum++, exportFields, order, null);
+                    } else {
+                        for (OrderListVO.RebuildProjectItemVO project : projects) {
+                            if (rowNum > MAX_EXPORT_ROWS) {
+                                truncated = true;
+                                break;
+                            }
+                            writeCustomRow(sheet, rowNum++, exportFields, order, project);
                         }
                     }
+                    if (truncated) break;
                 }
+                if (truncated || orderList.size() < EXPORT_BATCH_SIZE) break;
+                OrderListVO lastOrder = orderList.get(orderList.size() - 1);
+                cursor = new OrderExportCursor(lastOrder.getCreateTime(), lastOrder.getId());
             }
 
             // 设置响应头
@@ -526,9 +588,37 @@ public class OrderExportServiceImpl implements OrderExportService {
             response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
             response.setHeader("Content-Disposition",
                     "attachment;filename=" + URLEncoder.encode(fileName, StandardCharsets.UTF_8));
+            response.setHeader("X-Export-Total", String.valueOf(rowNum - 1));
+            response.setHeader("X-Export-Truncated", String.valueOf(truncated));
 
             workbook.write(response.getOutputStream());
             workbook.dispose();
+        }
+    }
+
+    private List<OrderListVO> queryCustomExportOrders(OrderCustomExportDTO dto, Long currentUserId,
+                                                       DataScopeTypeEnum scopeType, OrderExportCursor cursor) {
+        LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
+        orderQueryHelper.buildDataScopeCondition(wrapper, currentUserId, scopeType);
+        wrapper.ge(dto.getCreateTimeStart() != null, OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
+                .le(dto.getCreateTimeEnd() != null, OrderMainEntity::getCreateTime, dto.getCreateTimeEnd());
+        applyCursor(wrapper, cursor);
+        wrapper.orderByDesc(OrderMainEntity::getCreateTime)
+                .orderByDesc(OrderMainEntity::getId)
+                .last("LIMIT " + EXPORT_BATCH_SIZE);
+        List<OrderListVO> orderList = orderMainMapper.selectList(wrapper).stream()
+                .map(orderQueryHelper::toOrderListVO)
+                .collect(Collectors.toList());
+        orderQueryHelper.fillRebuildProjectList(orderList);
+        return orderList;
+    }
+
+    private void writeCustomRow(SXSSFSheet sheet, int rowNum, List<String> exportFields,
+                                OrderListVO order, OrderListVO.RebuildProjectItemVO project) {
+        Row row = sheet.createRow(rowNum);
+        for (int i = 0; i < exportFields.size(); i++) {
+            Cell cell = row.createCell(i);
+            setCellValue(cell, order, project, exportFields.get(i));
         }
     }
 

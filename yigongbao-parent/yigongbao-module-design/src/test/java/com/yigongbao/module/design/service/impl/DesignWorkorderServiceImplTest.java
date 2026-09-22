@@ -297,6 +297,39 @@ class DesignWorkorderServiceImplTest {
 
             assertEquals("左髋骨导板", result.getRecords().get(0).getRebuildProjectSummary());
         }
+
+        @Test
+        @DisplayName("重复重建项目在摘要中保留两次")
+        void listWorkorders_duplicateRebuildProjectsRemainVisible() {
+            DesignWorkorderQueryDTO dto = new DesignWorkorderQueryDTO();
+            dto.setPageNum(1);
+            dto.setPageSize(10);
+
+            when(designQueryHelper.getCurrentUserId()).thenReturn(1L);
+            when(designQueryHelper.getCurrentUser()).thenReturn(new UserEntity());
+            when(userHospitalService.getDataScopeType(any())).thenReturn(DataScopeTypeEnum.ALL);
+
+            OrderMainEntity order = buildOrder(10L);
+            Page<OrderMainEntity> page = new Page<>(1, 10, 1);
+            page.setRecords(List.of(order));
+            when(orderMainService.page(any(), any())).thenReturn(page);
+
+            OrderItemEntity first = new OrderItemEntity();
+            first.setOrderId(10L);
+            first.setBodyPartName("骨头");
+            first.setProjectName("3D打印");
+            OrderItemEntity second = new OrderItemEntity();
+            second.setOrderId(10L);
+            second.setBodyPartName("骨头");
+            second.setProjectName("3D打印");
+            when(orderItemService.listByOrderIds(any())).thenReturn(List.of(first, second));
+            when(designPackageMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
+            when(designReviewMapper.selectList(any(Wrapper.class))).thenReturn(Collections.emptyList());
+
+            IPage<DesignWorkorderListVO> result = service.listWorkorders(dto);
+
+            assertEquals("骨头3D打印, 骨头3D打印", result.getRecords().get(0).getRebuildProjectSummary());
+        }
     }
 
     @Nested
@@ -325,6 +358,26 @@ class DesignWorkorderServiceImplTest {
             assertEquals(10L, vo.getId());
             assertEquals("ORD-10", vo.getOrderCode());
             assertEquals("设计师备注内容", vo.getDesignerRemark());
+        }
+
+        @Test
+        @DisplayName("重复重建项目在详情中保留两条")
+        void getWorkorderDetail_duplicateRebuildProjectsRemainVisible() {
+            when(orderMainService.getById(10L)).thenReturn(buildOrder(10L));
+            OrderItemEntity first = new OrderItemEntity();
+            first.setProjectName("3D打印");
+            first.setBodyPartName("骨头");
+            OrderItemEntity second = new OrderItemEntity();
+            second.setProjectName("3D打印");
+            second.setBodyPartName("骨头");
+            when(orderItemService.listByOrderId(10L)).thenReturn(List.of(first, second));
+
+            DesignWorkorderDetailVO vo = service.getWorkorderDetail(10L);
+
+            assertThat(vo.getRebuildProjectList()).hasSize(2);
+            assertThat(vo.getRebuildProjectList())
+                    .extracting(DesignWorkorderDetailVO.RebuildProjectItemVO::getProjectName)
+                    .containsExactly("3D打印", "3D打印");
         }
 
         @Test

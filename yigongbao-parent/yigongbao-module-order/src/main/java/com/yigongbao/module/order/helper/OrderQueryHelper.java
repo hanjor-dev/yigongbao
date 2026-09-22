@@ -401,7 +401,10 @@ public class OrderQueryHelper {
         List<OrderItemEntity> allItems = orderItemMapper.selectList(
                 new LambdaQueryWrapper<OrderItemEntity>()
                         .in(OrderItemEntity::getOrderId, orderIds)
-                        .eq(OrderItemEntity::getIsDeleted, StatusConstants.NOT_DELETED));
+                        .eq(OrderItemEntity::getIsDeleted, StatusConstants.NOT_DELETED)
+                        .orderByAsc(OrderItemEntity::getOrderId)
+                        .orderByAsc(OrderItemEntity::getSortOrder)
+                        .orderByAsc(OrderItemEntity::getId));
         if (allItems.isEmpty()) {
             return;
         }

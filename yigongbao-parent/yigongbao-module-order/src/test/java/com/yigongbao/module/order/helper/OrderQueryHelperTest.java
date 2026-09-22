@@ -573,6 +573,21 @@ class OrderQueryHelperTest {
         }
 
         @Test
+        void singleOrder_duplicateItemsRemainAsSeparateRows() {
+            OrderListVO vo = buildVO(1L);
+            OrderItemEntity first = buildItem(1L, 10L, "3D打印骨头", "骨头", "模型");
+            OrderItemEntity second = buildItem(1L, 11L, "3D打印骨头", "骨头", "模型");
+            when(orderItemMapper.selectList(any())).thenReturn(List.of(first, second));
+
+            orderQueryHelper.fillRebuildProjectList(List.of(vo));
+
+            assertThat(vo.getRebuildProjectList()).hasSize(2);
+            assertThat(vo.getRebuildProjectList())
+                    .extracting(OrderListVO.RebuildProjectItemVO::getProjectName)
+                    .containsExactly("3D打印骨头", "3D打印骨头");
+        }
+
+        @Test
         void multipleOrders_itemsGroupedCorrectly() {
             OrderListVO vo1 = buildVO(1L);
             OrderListVO vo2 = buildVO(2L);

@@ -80,7 +80,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -1188,8 +1187,6 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
         // Step 4：保存重建项目列表，校验并覆盖 bodyPartName/projectName/estimatedHours/projectDesc
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
-            // 校验重建项目去重：同一订单中不允许出现相同的（部位+项目）组合
-            validateDuplicateItems(dto.getItems());
             List<OrderItemEntity> items = new ArrayList<>();
             for (int i = 0; i < dto.getItems().size(); i++) {
                 var itemDTO = dto.getItems().get(i);
@@ -1499,20 +1496,4 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         }
     }
 
-    /**
-     * 校验重建项目去重：同一订单中不允许出现相同的（部位+项目）组合
-     *
-     * @param items 重建项目列表
-     * @throws BusinessException 存在重复项目时抛出
-     */
-    private void validateDuplicateItems(List<com.yigongbao.module.order.dto.draft.OrderItemDraftItemDTO> items) {
-        Set<Integer> seen = new HashSet<>();
-        for (var item : items) {
-            int key = Objects.hash(item.getBodyPartId(), item.getProjectId());
-            if (!seen.add(key)) {
-                log.warn("订单中存在重复的重建项目: bodyPartId={}, projectId={}", item.getBodyPartId(), item.getProjectId());
-                throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "同一订单中不允许重复添加相同的部位和项目组合");
-            }
-        }
-    }
 }
