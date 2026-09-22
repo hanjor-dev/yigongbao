@@ -102,7 +102,7 @@ public interface UserMapper extends BaseMapper<UserEntity> {
         SELECT u.*,
                (SELECT COUNT(*) FROM order_main om
                 WHERE om.designer_id = u.id
-                  AND om.status BETWEEN 2010 AND 2090
+                  AND om.status IN (2010, 2020)
                   AND om.is_deleted = 0) AS current_load
         FROM sys_user u
         WHERE u.role_code = 'designer'
@@ -126,7 +126,7 @@ public interface UserMapper extends BaseMapper<UserEntity> {
         SELECT u.*,
                (SELECT COUNT(*) FROM order_main om
                 WHERE om.designer_id = u.id
-                  AND om.status BETWEEN 2010 AND 2090
+                  AND om.status IN (2010, 2020)
                   AND om.is_deleted = 0) AS current_load
         FROM sys_user u
         WHERE u.role_code = 'designer'
@@ -151,7 +151,7 @@ public interface UserMapper extends BaseMapper<UserEntity> {
         SELECT DISTINCT u.*,
                (SELECT COUNT(*) FROM order_main om
                 WHERE om.designer_id = u.id
-                  AND om.status BETWEEN 2010 AND 2090
+                  AND om.status IN (2010, 2020)
                   AND om.is_deleted = 0) AS current_load
         FROM sys_user u
         INNER JOIN sys_role r ON u.role_id = r.id AND r.is_deleted = 0
