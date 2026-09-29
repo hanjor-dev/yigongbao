@@ -171,6 +171,16 @@ app:
 
 # 医工宝系统配置
 yigongbao:
+  legacy-datasource:
+    enabled: ${LEGACY_DB_ENABLED:false}
+    driver-class-name: ${LEGACY_DB_DRIVER:com.mysql.cj.jdbc.Driver}
+    url: ${LEGACY_DB_URL:}
+    username: ${LEGACY_DB_USERNAME:}
+    password: ${LEGACY_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 3
+      connection-timeout: 10000
+      read-only: true
   # 文件存储业务配置
   file-storage:
     # 最大文件大小（字节），全局上限 5GB

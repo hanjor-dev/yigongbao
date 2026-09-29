@@ -165,7 +165,7 @@ public class AuthServiceImpl implements AuthService {
         StpUtil.login(user.getId());
         StpUtil.getSession().set("username", user.getUsername());
         StpUtil.getSession().set("realName", user.getRealName());
-        StpUtil.getSession().set("permissions", resourceService.getUserPermissions(user.getId()));
+        StpUtil.getSession().set("permissions", resourceService.getUserAuthorizationCodes(user.getId()));
 
         // 存储用户信息到会话，避免审核时查库（提升性能）
         if (user.getRoleCode() != null) {
@@ -215,7 +215,11 @@ public class AuthServiceImpl implements AuthService {
         vo.setToken(StpUtil.getTokenValue());
         vo.setUser(UserConvert.toVO(user));
         vo.setMenus(resourceService.getUserMenuTree(userId));
-        vo.setPermissions(resourceService.getUserPermissions(userId));
+        List<String> permissions = resourceService.getUserPermissions(userId);
+        vo.setPermissions(permissions);
+        // 权限资源可能在用户登录后发生变更，登录会话中的权限快照必须与本次
+        // 实时查询结果同步，否则页面虽然能拿到新权限，后续接口鉴权仍会使用旧缓存。
+        StpUtil.getSession().set("permissions", resourceService.getUserAuthorizationCodes(userId));
         return vo;
     }
 

@@ -341,13 +341,24 @@ fileCount（若迁移阶段已统计，可选）
 
 ### 阶段六：开发前端历史订单列表页
 
+前端项目根目录固定为：
+
+```text
+D:\01_Project\02_Personal\医工宝\frontend\med-tech
+```
+
 1. 新增菜单，例如“历史订单”或“旧系统订单”。
 2. 页面独立路由、独立 API 客户端，不复用新订单列表的编辑/流程按钮。
-3. 第一版建议列：订单编号、旧状态、业务类型、打印要求、所属部门、医院、地区、科室、医生、患者、性别、设计师、预估交付、预估费用、创建时间、项目摘要。
-4. 对列表 27 字段按列配置决定显示，不要求与新订单列表完全一致。
+3. 页面必须优先复用现有项目组件、Element Plus 组件、页面容器、表格密度、间距、颜色和交互方式，不另起一套视觉规范。
+4. 实现时以以下现有页面为主要参考：
+   - `frontend/med-tech/src/views/business/order.vue`：业务页面外层布局、页签/工具栏、权限控制和刷新方式；
+   - `frontend/med-tech/src/views/business/orderComponents/orderList.vue`：`el-card`、`el-table`、动态列、表头排序、空值显示、状态标签、横向滚动、加载状态和高级筛选；
+   - `frontend/med-tech/src/api/order.ts`：分页参数、接口调用、列配置和统一请求封装方式。
+5. 第一版建议列：订单编号、旧状态、业务类型、打印要求、所属部门、医院、地区、科室、医生、患者、性别、设计师、预估交付、预估费用、创建时间、项目摘要。
+6. 对列表 27 字段按列配置决定显示，不要求与新订单列表字段完全一致，但列宽、表头排序和拖拽行为应遵循现有订单列表实现。
 5. 异常值显示：
    - 空值：`-`；
-   - 状态：直接显示旧库原文，例如“已完成”“生产完成”“设计完成”；空值显示 `-`，不追加新版状态名称；
+   - 状态：直接显示旧库原文，例如“已完成”“生产完成”“设计完成”；空值显示 `-`，不追加新版状态名称；建议复用 `el-tag` 的中性样式，不使用新版 `statusColor`；
    - 金额非数值：原文；
    - 时间解析失败：原文或异常图标；
    - 项目数组不一致：摘要后显示警告标记。
@@ -357,12 +368,23 @@ fileCount（若迁移阶段已统计，可选）
 
 **产出物及位置**：
 
-- API：`frontend/med-tech/src/api/legacyOrder.ts`；
+- 前端项目：`D:\01_Project\02_Personal\医工宝\frontend\med-tech`；
+- API：`frontend/med-tech/src/api/legacyOrder.ts`，复用 `src/utils` 中现有 `$axios`/请求封装；
 - 页面：`frontend/med-tech/src/views/business/legacyOrder.vue`；
 - 类型：`frontend/med-tech/src/views/business/legacyOrder.types.ts`；
-- 路由/菜单注册：按现有路由组织方式修改 `frontend/med-tech/src/router/` 下的业务路由文件；
-- 权限指令/按钮控制：沿用现有权限工具，使用实际资源编码 `legacyOrder:Migrate`；
+- 路由：菜单由后端 `sys_resource` 动态下发，组件路径使用 `business/legacyOrder.vue`，无需在 `src/router/index.ts` 中硬编码业务菜单；
+- 参考实现：`frontend/med-tech/src/views/business/orderComponents/orderList.vue`、`frontend/med-tech/src/views/business/order.vue`；
+- 样式：优先复用订单列表中的 `page-body-panel`、`list-card`、`card-header`、`header-actions`、`table-scroll-container` 等现有类；
+- 权限指令/按钮控制：沿用现有 `v-permission`，迁移按钮使用 `v-permission="'legacyOrder:Migrate'"`；
 - 页面测试：`frontend/med-tech/src/views/business/__tests__/legacyOrder.spec.ts`。
+
+前端实现约束：
+
+- 使用现有 `el-card`、`el-table`、`el-table-column`、`el-form`、`el-form-item`、`el-button`、`el-tag`、`el-pagination`、`el-empty`、`v-loading` 等组件；
+- 复用订单列表的分页、排序、筛选重置、加载和错误提示习惯；
+- 增量迁移按钮放在页面卡片头部操作区，样式参考订单列表的 `header-actions` 和 `el-button link type="primary" size="small"`；
+- 不新增独立颜色变量、按钮风格、弹窗风格或状态组件；
+- 页面只显示历史查询和增量迁移，不显示新订单的编辑、审核、取消、流程操作按钮。
 
 ### 阶段六补充：菜单资源和角色权限配置
 

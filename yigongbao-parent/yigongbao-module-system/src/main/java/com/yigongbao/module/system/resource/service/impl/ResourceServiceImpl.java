@@ -430,6 +430,28 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<String> getUserAuthorizationCodes(Long userId) {
+        UserEntity user = userMapper.selectById(userId);
+        if (user == null || user.getRoleId() == null) {
+            return new ArrayList<>();
+        }
+        List<Long> resourceIds = roleResourceMapper.selectResourceIdsByRoleId(user.getRoleId());
+        if (resourceIds == null || resourceIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<ResourceEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(ResourceEntity::getId, resourceIds)
+                .in(ResourceEntity::getResourceType,
+                        ResourceTypeEnum.MENU_FIRST.getCode(),
+                        ResourceTypeEnum.MENU_SECOND.getCode(),
+                        ResourceTypeEnum.BUTTON.getCode())
+                .eq(ResourceEntity::getStatus, StatusConstants.NORMAL);
+        return baseMapper.selectList(wrapper).stream()
+                .map(ResourceEntity::getResourceCode)
+                .collect(Collectors.toList());
+    }
+
     /**
      * 获取带分配状态的资源树（用于角色分配资源场景）
      */
@@ -487,7 +509,10 @@ public class ResourceServiceImpl extends ServiceImpl<ResourceMapper, ResourceEnt
         } else {
             LambdaQueryWrapper<ResourceEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.in(ResourceEntity::getId, resourceIds)
-                    .eq(ResourceEntity::getResourceType, com.yigongbao.common.enums.ResourceTypeEnum.BUTTON.getCode())
+                    .in(ResourceEntity::getResourceType,
+                            com.yigongbao.common.enums.ResourceTypeEnum.MENU_FIRST.getCode(),
+                            com.yigongbao.common.enums.ResourceTypeEnum.MENU_SECOND.getCode(),
+                            com.yigongbao.common.enums.ResourceTypeEnum.BUTTON.getCode())
                     .eq(ResourceEntity::getStatus, StatusConstants.NORMAL);
             newPermissions = baseMapper.selectList(wrapper).stream()
                     .map(ResourceEntity::getResourceCode)

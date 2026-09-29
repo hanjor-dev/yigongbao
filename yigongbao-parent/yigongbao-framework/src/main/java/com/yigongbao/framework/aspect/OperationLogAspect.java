@@ -131,7 +131,7 @@ public class OperationLogAspect {
     /**
      * 异步保存日志
      */
-    @Async
+    @Async("taskExecutor")
     public void saveLogAsync(OperationLog annotation, String requestUrl,
             String requestMethod, String requestIp, String ipLocation,
             Long userId, String username, String realName,

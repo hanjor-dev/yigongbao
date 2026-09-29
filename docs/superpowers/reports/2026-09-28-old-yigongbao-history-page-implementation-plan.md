@@ -1,5 +1,7 @@
 # 旧版医工宝历史订单只读页实施方案
 
+> 当前列表阶段的执行计划以 `docs/plans/2026-09-28-legacy-order-list-implementation-plan.md` 为准；本文保留详情/文件阶段的整体方案背景。
+
 > 日期：2026-09-28  
 > 依据：旧库 DDL、`sql/old/` 实际数据导出抽样与流式统计、本地新版 `yigongbao` 数据库结构  
 > 目标：新增独立菜单页，查询旧版历史订单、详情和关联文件；不恢复旧流程，不让历史数据参与新版业务
@@ -241,12 +243,12 @@ legacy/vo
 
 不提供创建、编辑、删除、审核、分配设计师、生产、质检、仓储等写接口。历史服务不得注入或调用新版状态机服务。
 
-权限建议新增：
+当前列表阶段只配置两个资源：
 
-- `legacy:order:query`
-- `legacy:order:detail`
-- `legacy:order:file`
-- `legacy:order:export`（可选）
+- 二级菜单：`LegacyOrder`；
+- 增量迁移按钮：`legacyOrder:Migrate`。
+
+两项资源均只授权 `admin`、`company-admin`、`designer-manager`。详情、文件、导出等权限不在当前列表阶段配置。
 
 当前未定义历史数据的行级归属规则。第一版建议仅授予指定管理角色查看全量历史数据；若必须按旧业务员/区域隔离，再单独建立“旧人员/区域到新版用户或机构”的人工映射表，不能按姓名自动授权。
 
@@ -255,6 +257,14 @@ legacy/vo
 新增独立菜单“历史订单”，不复用新版订单的流程操作区。
 
 ### 7.1 列表字段
+
+前端项目根目录为 `D:\01_Project\02_Personal\医工宝\frontend\med-tech`。页面必须复用现有订单列表的组件、样式和交互，主要参考：
+
+- `frontend/med-tech/src/views/business/order.vue`；
+- `frontend/med-tech/src/views/business/orderComponents/orderList.vue`；
+- `frontend/med-tech/src/api/order.ts`。
+
+建议新增页面 `frontend/med-tech/src/views/business/legacyOrder.vue`，API 放在 `frontend/med-tech/src/api/legacyOrder.ts`，使用现有 `el-card`、`el-table`、`el-form`、`el-pagination`、`el-tag`、`v-loading` 和 `v-permission`，不新增独立视觉规范。
 
 - 旧订单号；
 - 创建时间；

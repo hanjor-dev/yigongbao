@@ -173,6 +173,8 @@ app:
 
 # 医工宝系统配置
 yigongbao:
+  legacy-datasource:
+    enabled: false
   # 文件存储业务配置
   file-storage:
     # 最大文件大小（字节），全局上限 2GB

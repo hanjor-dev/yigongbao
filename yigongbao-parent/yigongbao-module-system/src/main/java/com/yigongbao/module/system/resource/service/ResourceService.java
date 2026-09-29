@@ -96,6 +96,14 @@ public interface ResourceService extends IService<ResourceEntity> {
     List<String> getUserPermissions(Long userId);
 
     /**
+     * 获取用户用于后端接口鉴权的资源编码（菜单和按钮）。
+     *
+     * @param userId 用户ID
+     * @return 菜单、按钮资源编码列表
+     */
+    List<String> getUserAuthorizationCodes(Long userId);
+
+    /**
      * 获取带分配状态的资源树（用于角色分配资源场景）
      *
      * @param roleId 角色ID（为null时返回全部，checked=false）

@@ -227,6 +227,16 @@ captcha:
 
 # 医工宝系统配置
 yigongbao:
+  legacy-datasource:
+    enabled: ${LEGACY_DB_ENABLED:false}
+    driver-class-name: ${LEGACY_DB_DRIVER:com.mysql.cj.jdbc.Driver}
+    url: ${LEGACY_DB_URL:}
+    username: ${LEGACY_DB_USERNAME:}
+    password: ${LEGACY_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 3
+      connection-timeout: 10000
+      read-only: true
   # 系统配置兜底默认值（当数据库配置不存在或已禁用时使用）
   config:
     # ==================== 安全配置 ====================
