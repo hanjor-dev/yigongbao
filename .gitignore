@@ -80,5 +80,8 @@ DEPLOYMENT_CHECKLIST.md
 
 /frontend
 
+# 本地旧系统数据库导出文件，不提交到代码仓库
+/sql/old/
+
 # Git worktrees
 /.worktrees/
