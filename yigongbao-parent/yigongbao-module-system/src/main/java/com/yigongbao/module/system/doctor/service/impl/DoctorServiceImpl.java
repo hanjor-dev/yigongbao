@@ -24,6 +24,7 @@ import com.yigongbao.module.system.org.service.OrgService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.dev33.satoken.stp.StpUtil;
@@ -243,8 +244,6 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
                 }
             }
 
-            // 从 Sa-Token 会话获取当前登录用户ID
-            Long creatorId = StpUtil.isLogin() ? StpUtil.getLoginIdAsLong() : null;
             // 查询是否已存在同名医生（在同一医院内，未删除）
             LambdaQueryWrapper<DoctorEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(DoctorEntity::getDoctorName, dto.getDoctorName())
@@ -252,9 +251,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             DoctorEntity existing = getOne(wrapper);
             if (existing != null) {
                 log.info("医生已存在，返回现有医生，id={}", existing.getId());
-                DoctorVO vo = DoctorConvert.toVO(existing);
-                fillExtraFields(vo, existing);
-                return vo;
+                return syncPhoneAndConvert(existing, dto.getDoctorPhone());
             }
 
             // 检查是否存在已删除的同名医生记录，如有则物理删除，避免历史垃圾数据残留
@@ -265,6 +262,9 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
                 doctorMapper.physicallyDeleteDeletedById(deletedDoctor.getId());
             }
 
+            // 仅在创建新医生时读取当前登录用户，复用已有医生无需依赖会话上下文
+            Long creatorId = StpUtil.isLogin() ? StpUtil.getLoginIdAsLong() : null;
+
             // 创建新医生
             DoctorEntity entity = new DoctorEntity();
             entity.setDoctorName(dto.getDoctorName());
@@ -274,7 +274,19 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             entity.setStatus(StatusConstants.NORMAL);
             entity.setOrderCount(0);
 
-            save(entity);
+            try {
+                save(entity);
+            } catch (DuplicateKeyException e) {
+                // 并发请求可能同时通过前置查询，唯一索引决定最终获胜记录，随后回查复用。
+                DoctorEntity concurrentExisting = getOne(new LambdaQueryWrapper<DoctorEntity>()
+                        .eq(DoctorEntity::getDoctorName, dto.getDoctorName())
+                        .eq(DoctorEntity::getHospitalId, dto.getHospitalId()));
+                if (concurrentExisting == null) {
+                    throw e;
+                }
+                log.info("并发创建医生冲突，复用现有医生，id={}", concurrentExisting.getId());
+                return syncPhoneAndConvert(concurrentExisting, dto.getDoctorPhone());
+            }
             log.info("快速添加医生: id={}", entity.getId());
 
             DoctorVO vo = DoctorConvert.toVO(entity);
@@ -284,6 +296,19 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, DoctorEntity> i
             log.error("快速添加医生异常，doctorName={}", dto.getDoctorName(), e);
             throw e;
         }
+    }
+
+    private DoctorVO syncPhoneAndConvert(DoctorEntity entity, String submittedPhone) {
+        if (submittedPhone != null && !Objects.equals(entity.getDoctorPhone(), submittedPhone)) {
+            entity.setDoctorPhone(submittedPhone);
+            if (!updateById(entity)) {
+                throw new BusinessException(ErrorCodeEnum.SYSTEM_ERROR, "医生手机号更新失败");
+            }
+            log.info("更新医生手机号: id={}", entity.getId());
+        }
+        DoctorVO vo = DoctorConvert.toVO(entity);
+        fillExtraFields(vo, entity);
+        return vo;
     }
 
     /**

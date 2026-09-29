@@ -11,7 +11,6 @@ import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.basic.bodyPart.service.BodyPartService;
 import com.yigongbao.module.basic.bodyPart.vo.BodyPartDetailVO;
 import com.yigongbao.module.system.doctor.dto.QuickAddDoctorDTO;
-import com.yigongbao.module.system.doctor.dto.UpdateDoctorDTO;
 import com.yigongbao.module.system.doctor.service.DoctorService;
 import com.yigongbao.module.system.doctor.vo.DoctorVO;
 import com.yigongbao.module.system.user.service.UserService;
@@ -498,41 +497,8 @@ public class OrderDataValidator {
             java.util.function.Consumer<String> setDoctorPhone,
             Long doctorId, String doctorName, String doctorPhone,
             Long hospitalId, Long creatorId) {
-        if (doctorId != null) {
-            // 场景 A：已选择医生（从历史联想列表选择），校验后检查是否需要更新历史记录
-            DoctorVO doctor = doctorService.getById(doctorId);
-            if (doctor == null) {
-                log.warn("医生不存在，doctorId={}", doctorId);
-                throw new BusinessException(ErrorCodeEnum.DOCTOR_NOT_FOUND);
-            }
-            if (doctor.getStatus() != null && doctor.getStatus().equals(StatusConstants.DISABLED)) {
-                log.warn("医生已禁用，doctorId={}", doctorId);
-                throw new BusinessException(ErrorCodeEnum.DOCTOR_DISABLED);
-            }
-
-            // 检查前端传入的名字/电话是否与数据库不一致，如果不一致则更新历史记录
-            boolean nameChanged = StrUtil.isNotBlank(doctorName) && !doctorName.equals(doctor.getDoctorName());
-            boolean phoneChanged = StrUtil.isNotBlank(doctorPhone) && !doctorPhone.equals(doctor.getDoctorPhone());
-
-            if (nameChanged || phoneChanged) {
-                log.info("医生信息变更，更新历史记录: doctorId={}, oldName={}, newName={}, oldPhone={}, newPhone={}",
-                    doctorId, doctor.getDoctorName(), doctorName, doctor.getDoctorPhone(), doctorPhone);
-                UpdateDoctorDTO updateDto = new UpdateDoctorDTO();
-                updateDto.setDoctorName(nameChanged ? doctorName : doctor.getDoctorName());
-                updateDto.setDoctorPhone(phoneChanged ? doctorPhone : doctor.getDoctorPhone());
-                doctorService.update(doctorId, updateDto);
-
-                // 使用更新后的值
-                setDoctorName.accept(updateDto.getDoctorName());
-                setDoctorPhone.accept(updateDto.getDoctorPhone());
-            } else {
-                // 使用数据库原值
-                setDoctorName.accept(doctor.getDoctorName());
-                setDoctorPhone.accept(doctor.getDoctorPhone());
-            }
-        } else if (StrUtil.isNotBlank(doctorName)) {
-            // 场景 B：手动输入了医生姓名，快速创建/获取医生并关联操作员
-            // hospitalId 为必填（QuickAddDoctorDTO @NotNull），若未选医院则跳过
+        if (StrUtil.isNotBlank(doctorName)) {
+            // 医生业务唯一键为医院+姓名。doctorId 仅是前端选择提示，可能因手工改名而过期。
             if (hospitalId == null) {
                 log.debug("快速创建医生跳过：hospitalId 为空，doctorName={}", doctorName);
                 return;
@@ -542,12 +508,39 @@ public class OrderDataValidator {
             dto.setDoctorPhone(doctorPhone);
             dto.setHospitalId(hospitalId);
             DoctorVO doctor = doctorService.quickAdd(dto);
-            log.info("快速创建/获取医生，doctorName={}, hospitalId={}, doctorId={}",
-                    doctorName, hospitalId, doctor.getId());
-            // 使用数据库保存后的值填充
+            if (doctor.getStatus() != null && doctor.getStatus().equals(StatusConstants.DISABLED)) {
+                log.warn("医生已禁用，doctorId={}", doctor.getId());
+                throw new BusinessException(ErrorCodeEnum.DOCTOR_DISABLED);
+            }
+            if (doctorId != null && !doctorId.equals(doctor.getId())) {
+                log.warn("医生ID与医院姓名不一致，已重新关联: submittedDoctorId={}, resolvedDoctorId={}, hospitalId={}, doctorName={}",
+                        doctorId, doctor.getId(), hospitalId, doctorName);
+            }
             setDoctorId.accept(doctor.getId());
             setDoctorName.accept(doctor.getDoctorName());
             setDoctorPhone.accept(doctor.getDoctorPhone());
+        } else if (doctorName == null && doctorId != null) {
+            // 兼容未提交 doctorName、仅提交 doctorId 的旧调用方；显式空字符串表示清空医生。
+            DoctorVO doctor = doctorService.getById(doctorId);
+            if (doctor == null) {
+                log.warn("医生不存在，doctorId={}", doctorId);
+                throw new BusinessException(ErrorCodeEnum.DOCTOR_NOT_FOUND);
+            }
+            if (doctor.getStatus() != null && doctor.getStatus().equals(StatusConstants.DISABLED)) {
+                log.warn("医生已禁用，doctorId={}", doctorId);
+                throw new BusinessException(ErrorCodeEnum.DOCTOR_DISABLED);
+            }
+            if (hospitalId != null && !hospitalId.equals(doctor.getHospitalId())) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "所选医生不属于当前医院");
+            }
+            setDoctorId.accept(doctor.getId());
+            setDoctorName.accept(doctor.getDoctorName());
+            setDoctorPhone.accept(doctor.getDoctorPhone());
+        } else {
+            // 医生为可选信息；修改申请明确清空时，不能保留订单上的旧关联。
+            setDoctorId.accept(null);
+            setDoctorName.accept(null);
+            setDoctorPhone.accept(null);
         }
         // 场景 C：医生字段全空，跳过（医生非必填）
     }

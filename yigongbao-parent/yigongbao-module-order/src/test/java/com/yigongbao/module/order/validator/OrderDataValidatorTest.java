@@ -2,6 +2,7 @@ package com.yigongbao.module.order.validator;
 
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.module.basic.bodyPart.service.BodyPartService;
 import com.yigongbao.module.basic.bodyPart.vo.BodyPartDetailVO;
 import com.yigongbao.module.basic.hospitalDept.service.HospitalDeptService;
@@ -11,6 +12,9 @@ import com.yigongbao.module.order.entity.OrderItemDraftEntity;
 import com.yigongbao.module.order.entity.OrderItemEntity;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.doctor.service.DoctorService;
+import com.yigongbao.module.system.doctor.dto.QuickAddDoctorDTO;
+import com.yigongbao.module.system.doctor.dto.UpdateDoctorDTO;
+import com.yigongbao.module.system.doctor.vo.DoctorVO;
 import com.yigongbao.module.system.org.service.OrgService;
 import com.yigongbao.module.system.user.service.UserHospitalService;
 import com.yigongbao.module.system.user.service.UserService;
@@ -26,8 +30,13 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 
 @ExtendWith(MockitoExtension.class)
 class OrderDataValidatorTest {
@@ -153,6 +162,45 @@ class OrderDataValidatorTest {
         item.setProjectId(196L);
 
         assertDoesNotThrow(() -> validator.validateAndFillItems(List.of(item), OrderDataValidator.ValidateMode.DRAFT));
+    }
+
+    @Test
+    void modifyResolvesDoctorByHospitalAndNameWhenSubmittedIdIsStale() {
+        DoctorVO resolved = new DoctorVO();
+        resolved.setId(76L);
+        resolved.setDoctorName("罗政强");
+        resolved.setDoctorPhone("18674131702");
+        resolved.setHospitalId(189L);
+        resolved.setStatus(1);
+        when(doctorService.quickAdd(any(QuickAddDoctorDTO.class))).thenReturn(resolved);
+
+        OrderMainEntity order = new OrderMainEntity();
+        order.setHospitalId(189L);
+        order.setDoctorId(38L);
+        order.setDoctorName("郭风劲");
+
+        validator.validateAndFillForModify(order, null, 38L,
+                "罗政强", "18674131702");
+
+        assertEquals(76L, order.getDoctorId());
+        assertEquals("罗政强", order.getDoctorName());
+        assertEquals("18674131702", order.getDoctorPhone());
+        verify(doctorService, never()).update(anyLong(), any(UpdateDoctorDTO.class));
+    }
+
+    @Test
+    void modifyClearsDoctorWhenDoctorFieldsAreCleared() {
+        OrderMainEntity order = new OrderMainEntity();
+        order.setHospitalId(189L);
+        order.setDoctorId(38L);
+        order.setDoctorName("郭风劲");
+        order.setDoctorPhone("18674131702");
+
+        validator.validateAndFillForModify(order, null, 38L, "", "");
+
+        assertNull(order.getDoctorId());
+        assertNull(order.getDoctorName());
+        assertNull(order.getDoctorPhone());
     }
 
     private static OrderItemEntity item(Long projectId, String categoryName) {

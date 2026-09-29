@@ -149,8 +149,8 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
 
         changes.add(diffOrderInfo(order, dto));
         changes.add(diffPatient(order, dto));
-        changes.add(diffDoctor(order, dto));
         changes.add(diffHospital(order, dto));
+        changes.add(diffDoctor(order, dto));
         changes.add(diffDelivery(order, dto));
         if (dto.getItems() != null) {
             changes.add(diffItems(orderId, dto.getItems()));
@@ -320,8 +320,12 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
     private ObjectChange diffDoctor(OrderMainEntity order, OrderModifyFullDTO dto) {
         String oldValue = formatDoctor(order.getDoctorName(), order.getDoctorPhone());
         String newValue = formatDoctor(dto.getDoctorName(), dto.getDoctorPhone());
+        boolean doctorIdChanged = !Objects.equals(order.getDoctorId(), dto.getDoctorId());
+        boolean hospitalContextChanged = !Objects.equals(order.getHospitalId(), dto.getHospitalId())
+                && (order.getDoctorId() != null || dto.getDoctorId() != null
+                || StrUtil.isNotBlank(order.getDoctorName()) || StrUtil.isNotBlank(dto.getDoctorName()));
 
-        if (oldValue.equals(newValue)) {
+        if (oldValue.equals(newValue) && !doctorIdChanged && !hospitalContextChanged) {
             return ObjectChange.noChange();
         }
 
@@ -631,7 +635,7 @@ public class OrderModifyFullServiceImpl implements OrderModifyFullService {
             case OrderModifyObjectType.DOCTOR:
                 log.info("修改医生信息: orderId={}, {} -> {}", order.getId(), change.getOldValue(), change.getNewValue());
                 // 使用 OrderDataValidator 处理医生信息（支持 quickAdd 和历史记录更新）
-                orderDataValidator.validateAndFillForModify(order, null,
+                orderDataValidator.validateAndFillForModify(order, dto.getHospitalId(),
                     dto.getDoctorId(), dto.getDoctorName(), dto.getDoctorPhone());
                 break;
             case OrderModifyObjectType.HOSPITAL:

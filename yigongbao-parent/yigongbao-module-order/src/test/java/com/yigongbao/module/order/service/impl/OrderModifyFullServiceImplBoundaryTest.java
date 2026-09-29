@@ -19,6 +19,7 @@ import com.yigongbao.module.order.validator.OrderDataValidator;
 import com.yigongbao.module.order.validator.OrderDataScopeChecker;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.org.service.OrgService;
+import com.yigongbao.module.system.org.entity.OrgEntity;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserService;
 import org.junit.jupiter.api.Test;
@@ -165,6 +166,40 @@ class OrderModifyFullServiceImplBoundaryTest {
             assertThat(exception.getCode()).isEqualTo(ErrorCodeEnum.ORDER_NOT_FOUND.getCode());
         }
         verify(orderMainMapper, never()).selectById(anyLong());
+    }
+
+    @Test
+    void modifyOrderFull_whenHospitalChanges_shouldResolveDoctorInNewHospital() {
+        OrderMainEntity order = new OrderMainEntity();
+        order.setId(7L);
+        order.setOrderCode("ORD-7");
+        order.setPhase(20);
+        order.setVersion(0);
+        order.setHospitalId(1L);
+        order.setHospitalName("旧医院");
+        order.setDoctorId(10L);
+        order.setDoctorName("张三");
+        order.setDoctorPhone("13800138000");
+        when(orderMainMapper.selectById(7L)).thenReturn(order);
+        when(orderMainMapper.updateById(order)).thenReturn(1);
+        OrgEntity newHospital = new OrgEntity();
+        newHospital.setId(2L);
+        newHospital.setOrgName("新医院");
+        when(orgService.getById(2L)).thenReturn(newHospital);
+
+        OrderModifyFullDTO dto = new OrderModifyFullDTO();
+        dto.setHospitalId(2L);
+        dto.setDoctorId(10L);
+        dto.setDoctorName("张三");
+        dto.setDoctorPhone("13800138000");
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(99L);
+            service.modifyOrderFull(7L, dto, true, 1L, "设计师", "designer");
+        }
+
+        verify(validator).validateAndFillForModify(order, 2L, 10L,
+                "张三", "13800138000");
     }
 
     @Test

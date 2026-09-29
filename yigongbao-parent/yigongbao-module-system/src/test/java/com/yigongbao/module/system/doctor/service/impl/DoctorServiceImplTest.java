@@ -28,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
@@ -108,8 +109,11 @@ class DoctorServiceImplTest {
         org.setOrgType("1.3");
         when(orgService.getById(1L)).thenReturn(org);
 
-        doctorService.create(dto);
-        verify(doctorMapper, times(1)).insert(any(DoctorEntity.class));
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::isLogin).thenReturn(false);
+            doctorService.create(dto);
+            verify(doctorMapper, times(1)).insert(any(DoctorEntity.class));
+        }
     }
 
     @Test
@@ -171,9 +175,12 @@ class DoctorServiceImplTest {
         when(orgService.getById(1L)).thenReturn(org);
         when(doctorMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
-        DoctorVO vo = doctorService.quickAdd(dto);
-        assertNotNull(vo);
-        verify(doctorMapper, times(1)).insert(any(DoctorEntity.class));
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::isLogin).thenReturn(false);
+            DoctorVO vo = doctorService.quickAdd(dto);
+            assertNotNull(vo);
+            verify(doctorMapper, times(1)).insert(any(DoctorEntity.class));
+        }
     }
 
     @Test
@@ -186,11 +193,62 @@ class DoctorServiceImplTest {
         OrgEntity org = new OrgEntity();
         org.setOrgType("1.3");
         when(orgService.getById(1L)).thenReturn(org);
-        when(doctorMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(testEntity);
+        when(doctorMapper.selectOne(any(LambdaQueryWrapper.class), eq(true))).thenReturn(testEntity);
 
         DoctorVO vo = doctorService.quickAdd(dto);
         assertNotNull(vo);
         assertEquals("张三", vo.getDoctorName());
+    }
+
+    @Test
+    @DisplayName("quickAdd: 医生已存在且手机号变化时更新手机号")
+    void quickAdd_whenPhoneChanged_shouldUpdateExistingDoctor() {
+        QuickAddDoctorDTO dto = new QuickAddDoctorDTO();
+        dto.setDoctorName("张三");
+        dto.setDoctorPhone("13900139000");
+        dto.setHospitalId(1L);
+
+        OrgEntity org = new OrgEntity();
+        org.setOrgType("1.3");
+        when(orgService.getById(1L)).thenReturn(org);
+        when(doctorMapper.selectOne(any(LambdaQueryWrapper.class), eq(true))).thenReturn(testEntity);
+        when(doctorMapper.updateById(testEntity)).thenReturn(1);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::isLogin).thenReturn(false);
+
+            DoctorVO vo = doctorService.quickAdd(dto);
+
+            assertEquals("13900139000", vo.getDoctorPhone());
+            verify(doctorMapper).updateById(testEntity);
+        }
+    }
+
+    @Test
+    @DisplayName("quickAdd: 并发创建唯一键冲突时复用已创建医生")
+    void quickAdd_whenConcurrentInsertConflicts_shouldReuseWinner() {
+        QuickAddDoctorDTO dto = new QuickAddDoctorDTO();
+        dto.setDoctorName("张三");
+        dto.setDoctorPhone("13800138000");
+        dto.setHospitalId(1L);
+
+        OrgEntity org = new OrgEntity();
+        org.setOrgType("1.3");
+        when(orgService.getById(1L)).thenReturn(org);
+        when(doctorMapper.selectOne(any(LambdaQueryWrapper.class), eq(true)))
+                .thenReturn(null, testEntity);
+        when(doctorMapper.insert(any(DoctorEntity.class)))
+                .thenThrow(new DuplicateKeyException("duplicate doctor"));
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::isLogin).thenReturn(false);
+
+            DoctorVO vo = doctorService.quickAdd(dto);
+
+            assertEquals(testEntity.getId(), vo.getId());
+            assertEquals(testEntity.getDoctorName(), vo.getDoctorName());
+            verify(doctorMapper, times(2)).selectOne(any(LambdaQueryWrapper.class), eq(true));
+        }
     }
 
     @Test
