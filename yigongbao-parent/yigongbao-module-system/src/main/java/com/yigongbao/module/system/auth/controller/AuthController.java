@@ -114,6 +114,7 @@ public class AuthController {
      * 忘记密码：校验验证码并重置密码
      */
     @Operation(summary = "忘记密码重置")
+    @OperationLog(module = "系统管理", businessType = OperationTypeEnum.UPDATE, operation = "重置密码", logParams = false)
     @PostMapping("/forgot-password/reset")
     public Result<Void> resetPassword(@Validated @RequestBody ForgotPasswordResetDTO dto) {
         authService.resetPassword(dto);

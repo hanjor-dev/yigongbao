@@ -2,6 +2,8 @@ package com.yigongbao.module.basic.chargingTemplate.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yigongbao.common.result.Result;
+import com.yigongbao.common.enums.OperationTypeEnum;
+import com.yigongbao.framework.annotation.OperationLog;
 import com.yigongbao.module.basic.chargingTemplate.dto.CreateChargingTemplateDTO;
 import com.yigongbao.module.basic.chargingTemplate.dto.UpdateChargingTemplateDTO;
 import com.yigongbao.module.basic.chargingTemplate.service.ChargingTemplateService;
@@ -79,6 +81,7 @@ public class ChargingTemplateController {
      * @return 模板ID
      */
     @Operation(summary = "创建收费模板")
+    @OperationLog(module = "基础管理", businessType = OperationTypeEnum.CREATE, operation = "创建收费模板")
     @PostMapping
     public Result<Long> create(@Validated @RequestBody CreateChargingTemplateDTO dto) {
         Long id = chargingTemplateService.create(dto);
@@ -93,6 +96,7 @@ public class ChargingTemplateController {
      * @return 操作结果
      */
     @Operation(summary = "更新收费模板")
+    @OperationLog(module = "基础管理", businessType = OperationTypeEnum.UPDATE, operation = "更新收费模板")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id,
                                @Validated @RequestBody UpdateChargingTemplateDTO dto) {
@@ -107,6 +111,7 @@ public class ChargingTemplateController {
      * @return 操作结果
      */
     @Operation(summary = "删除收费模板")
+    @OperationLog(module = "基础管理", businessType = OperationTypeEnum.DELETE, operation = "删除收费模板")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         chargingTemplateService.remove(id);
