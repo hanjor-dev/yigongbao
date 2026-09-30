@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
+import java.time.LocalDateTime;
 
 /**
  * WebSocket 推送服务
@@ -73,6 +74,39 @@ public class NotificationPushService {
                     userId, message.getId(), message.getCategory(), message.getTitle());
         } catch (Exception e) {
             log.warn("WebSocket 推送失败: userId={}, messageId={}, error={}", userId, message.getId(), e.getMessage());
+        }
+    }
+
+    /** 向在线用户发送系统公告发布事件，正文由前端通过 pending 接口拉取。 */
+    public void pushAnnouncementPublished(Long userId, Long announcementId, LocalDateTime publishedAt) {
+        sendAnnouncementEvent(userId, "ANNOUNCEMENT_PUBLISHED", announcementId, publishedAt);
+    }
+
+    /** 向在线用户发送系统公告撤回事件，前端收到后立即关闭当前弹窗并清理队列。 */
+    public void pushAnnouncementRevoked(Long userId, Long announcementId) {
+        sendAnnouncementEvent(userId, "ANNOUNCEMENT_REVOKED", announcementId, null);
+    }
+
+    private void sendAnnouncementEvent(Long userId, String type, Long announcementId, LocalDateTime publishedAt) {
+        WebSocketSession session = sessionManager.get(userId);
+        if (session == null || !session.isOpen()) {
+            return;
+        }
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("announcementId", announcementId);
+            if (publishedAt != null) {
+                data.put("publishedAt", publishedAt.toString());
+            }
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("type", type);
+            payload.put("data", data);
+            session.sendMessage(new TextMessage(JSONUtil.toJsonStr(payload)));
+            log.info("系统公告WebSocket事件发送成功: userId={}, type={}, announcementId={}",
+                    userId, type, announcementId);
+        } catch (Exception e) {
+            log.warn("系统公告WebSocket事件发送失败: userId={}, type={}, announcementId={}, error={}",
+                    userId, type, announcementId, e.getMessage());
         }
     }
 }
