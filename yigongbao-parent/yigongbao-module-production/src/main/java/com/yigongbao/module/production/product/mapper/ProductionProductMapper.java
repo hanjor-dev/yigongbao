@@ -36,7 +36,7 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
     @Select("<script>" +
             "SELECT " +
             "    om.order_code AS order_code, " +
-            "    om.create_time AS order_create_time, " +
+            "    pr.print_start_time AS print_start_time, " +
             "    pp.product_no AS product_no, " +
             "    pp.file_name AS file_name, " +
             "    pp.product_name AS product_name, " +
@@ -85,10 +85,10 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "  AND pp.product_no LIKE CONCAT('%', #{dto.productNo}, '%') " +
             "</if>" +
             "<if test='dto.startTime != null'>" +
-            "  AND pr.print_start_time &gt;= #{dto.startTime} " +
+            "  AND pr.print_start_time &gt;= #{dto.queryStartTime} " +
             "</if>" +
             "<if test='dto.endTime != null'>" +
-            "  AND pr.print_start_time &lt; #{dto.endTime} " +
+            "  AND pr.print_start_time &lt; #{dto.queryEndTime} " +
             "</if>" +
             "<if test='dto.hospitalIds != null and dto.hospitalIds.size() > 0'>" +
             "  AND om.hospital_id IN " +
@@ -102,7 +102,7 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "    #{centerId}" +
             "  </foreach>" +
             "</if>" +
-            "ORDER BY om.create_time DESC, pp.id DESC " +
+            "ORDER BY pr.print_start_time DESC, pp.id DESC " +
             "LIMIT 10000" +
             "</script>")
     List<Map<String, Object>> listProductLedgerData(@Param("dto") ProductLedgerExportDTO dto);
@@ -136,10 +136,10 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
             "  AND pp.product_no LIKE CONCAT('%', #{dto.productNo}, '%') " +
             "</if>" +
             "<if test='dto.startTime != null'>" +
-            "  AND pr.print_start_time &gt;= #{dto.startTime} " +
+            "  AND pr.print_start_time &gt;= #{dto.queryStartTime} " +
             "</if>" +
             "<if test='dto.endTime != null'>" +
-            "  AND pr.print_start_time &lt; #{dto.endTime} " +
+            "  AND pr.print_start_time &lt; #{dto.queryEndTime} " +
             "</if>" +
             "<if test='dto.hospitalIds != null and dto.hospitalIds.size() > 0'>" +
             "  AND om.hospital_id IN " +

@@ -97,7 +97,7 @@ public class ProductLedgerExcelBuilder {
                 Row row = sheet.createRow(rowIndex++);
                 setNumericCell(row, 0, sequence++, dataStyle);
                 setStringCell(row, 1, data.get("order_code"), dataStyle);
-                setStringCell(row, 2, formatOrderDate(data.get("order_create_time")), dataStyle);
+                setStringCell(row, 2, formatPrintDate(data.get("print_start_time")), dataStyle);
                 setStringCell(row, 3, data.get("product_no"), dataStyle);
                 setStringCell(row, 4, formatFileName(data.get("file_name")), dataStyle);
                 setStringCell(row, 5, data.get("product_name"), dataStyle);
@@ -218,7 +218,7 @@ public class ProductLedgerExcelBuilder {
         return Double.isFinite(numericValue) ? numericValue : null;
     }
 
-    private String formatOrderDate(Object value) {
+    private String formatPrintDate(Object value) {
         if (value == null) {
             return "";
         }

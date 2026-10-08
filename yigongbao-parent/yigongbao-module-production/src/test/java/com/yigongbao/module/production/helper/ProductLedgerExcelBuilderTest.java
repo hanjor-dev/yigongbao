@@ -29,7 +29,8 @@ class ProductLedgerExcelBuilderTest {
     void buildWritesExactTwentyTwoColumnLedgerContract() throws Exception {
         Map<String, Object> data = emptyLedgerData();
         data.put("order_code", "ORD-20260807-001");
-        data.put("order_create_time", LocalDateTime.of(2026, 8, 7, 14, 35, 20));
+        data.put("order_create_time", LocalDateTime.of(2026, 1, 1, 9, 0));
+        data.put("print_start_time", LocalDateTime.of(2026, 8, 7, 14, 35, 20));
         data.put("product_no", "P-001");
         data.put("file_name", "patient.v2.stl");
         data.put("product_name", "导板");
@@ -109,7 +110,7 @@ class ProductLedgerExcelBuilderTest {
     @Test
     void buildFormatsEdgeValuesAndKeepsNullableCellsBlank() throws Exception {
         Map<String, Object> zeroMinutes = emptyLedgerData();
-        zeroMinutes.put("order_create_time", "2026-08-07 09:30:00");
+        zeroMinutes.put("print_start_time", "2026-08-07 09:30:00");
         zeroMinutes.put("file_name", "model");
         zeroMinutes.put("processing_duration_seconds", 0L);
         zeroMinutes.put("patient_gender", "其他");
@@ -119,7 +120,7 @@ class ProductLedgerExcelBuilderTest {
         zeroMinutes.put("product_name", "x".repeat(32768));
 
         Map<String, Object> oneHour = emptyLedgerData();
-        oneHour.put("order_create_time", LocalDate.of(2026, 8, 8));
+        oneHour.put("print_start_time", LocalDate.of(2026, 8, 8));
         oneHour.put("file_name", ".gitignore");
         oneHour.put("print_duration_seconds", -1L);
         oneHour.put("processing_duration_seconds", 3600L);
@@ -133,7 +134,7 @@ class ProductLedgerExcelBuilderTest {
         oneHourOneMinute.put("material_name", " 钛合金 ");
 
         Map<String, Object> flooredMinutes = emptyLedgerData();
-        flooredMinutes.put("order_create_time", Timestamp.valueOf("2026-08-09 10:11:12.123456789"));
+        flooredMinutes.put("print_start_time", Timestamp.valueOf("2026-08-09 10:11:12.123456789"));
         flooredMinutes.put("file_name", ".patient.v2.stl");
         flooredMinutes.put("processing_duration_seconds", 2428L);
         flooredMinutes.put("color_name", " ");
@@ -206,7 +207,7 @@ class ProductLedgerExcelBuilderTest {
     private static Map<String, Object> emptyLedgerData() {
         Map<String, Object> data = new HashMap<>();
         List.of(
-                "order_code", "order_create_time", "product_no", "file_name", "product_name", "spec_name",
+                "order_code", "print_start_time", "product_no", "file_name", "product_name", "spec_name",
                 "color_name", "material_name", "print_duration_seconds", "weight",
                 "processing_duration_seconds", "hospital_name", "patient_name", "patient_gender", "patient_age",
                 "producer_name", "doctor_name", "hospital_dept_name", "business_operator", "warehouse_out_time"

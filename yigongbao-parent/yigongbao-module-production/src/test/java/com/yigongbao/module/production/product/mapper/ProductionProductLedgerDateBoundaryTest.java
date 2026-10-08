@@ -10,7 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import javax.sql.DataSource;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -41,20 +41,25 @@ class ProductionProductLedgerDateBoundaryTest {
     }
 
     @Test
-    void exclusiveEndTimeIncludesSelectedDateAndExcludesNextDayMidnight() {
+    void printStartDateRangeIncludesOnlySelectedDate() {
         insertOrder();
         insertRecord(1, "2026-08-13 20:00:00");
         insertRecord(2, "2026-08-14 00:00:00");
         insertRecord(3, "2026-08-14 15:00:00");
 
         ProductLedgerExportDTO dto = new ProductLedgerExportDTO();
-        dto.setEndTime(LocalDateTime.of(2026, 8, 14, 0, 0));
+        dto.setStartTime(LocalDate.of(2026, 8, 14));
+        dto.setEndTime(LocalDate.of(2026, 8, 14));
 
         List<Map<String, Object>> rows = mapper.listProductLedgerData(dto);
 
-        assertEquals(1, rows.size());
-        assertTrue(rows.getFirst().containsValue("P-1"));
-        assertEquals(1L, mapper.countProductLedgerData(dto));
+        assertEquals(2, rows.size());
+        assertTrue(rows.stream().noneMatch(row -> row.containsValue("P-1")));
+        assertTrue(rows.stream().anyMatch(row -> row.containsValue("P-2")));
+        assertTrue(rows.stream().anyMatch(row -> row.containsValue("P-3")));
+        assertTrue(rows.stream().allMatch(row -> row.keySet().stream()
+                .anyMatch(key -> "print_start_time".equalsIgnoreCase(String.valueOf(key)))));
+        assertEquals(2L, mapper.countProductLedgerData(dto));
     }
 
     private void createSchema() {

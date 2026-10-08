@@ -1,6 +1,8 @@
 package com.yigongbao.module.production.record.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -25,11 +27,23 @@ public class ProductLedgerExportDTO {
     /** 产品编号（模糊查询） */
     private String productNo;
 
-    /** 打印开始时间起 */
-    private LocalDateTime startTime;
+    /** 打印开始日期起 */
+    private LocalDate startTime;
 
-    /** 打印开始时间止 */
-    private LocalDateTime endTime;
+    /** 打印开始日期止 */
+    private LocalDate endTime;
+
+    /** Mapper 查询用的开始边界（开始日期当天零点）。 */
+    @JsonIgnore
+    public LocalDateTime getQueryStartTime() {
+        return startTime == null ? null : startTime.atStartOfDay();
+    }
+
+    /** Mapper 查询用的结束边界（结束日期次日零点，作为排他上界）。 */
+    @JsonIgnore
+    public LocalDateTime getQueryEndTime() {
+        return endTime == null ? null : endTime.plusDays(1).atStartOfDay();
+    }
 
     /**
      * 医院ID列表（数据权限过滤，由Service层根据用户权限自动填充，前端无需传递）

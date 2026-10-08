@@ -27,7 +27,7 @@ class ProductionProductMapperSqlTest {
             "pp.status IN ('in_process', 'fail', 'pass', 'pending_warehouse_in', 'warehoused', 'warehouse_out', 'completed', 'cancelled')";
     private static final List<String> LEDGER_KEYS = List.of(
             "order_code",
-            "order_create_time",
+            "print_start_time",
             "product_no",
             "file_name",
             "product_name",
@@ -48,7 +48,7 @@ class ProductionProductMapperSqlTest {
             "warehouse_out_time");
     private static final List<String> DIRECT_LEDGER_PROJECTIONS = List.of(
             "om.order_code AS order_code",
-            "om.create_time AS order_create_time",
+            "pr.print_start_time AS print_start_time",
             "pp.product_no AS product_no",
             "pp.file_name AS file_name",
             "pp.product_name AS product_name",
@@ -75,15 +75,15 @@ class ProductionProductMapperSqlTest {
             String query = entry.getValue();
             assertTrue(query.contains("INNER JOIN order_main om ON pr.order_id = om.id AND om.is_deleted = 0"),
                     () -> entry.getKey() + " must require a non-deleted order");
-            assertTrue(query.contains("AND pr.print_start_time &gt;= #{dto.startTime}"),
+            assertTrue(query.contains("AND pr.print_start_time &gt;= #{dto.queryStartTime}"),
                     () -> entry.getKey() + " must apply startTime to the print start time");
-            assertTrue(query.contains("AND pr.print_start_time &lt; #{dto.endTime}"),
+            assertTrue(query.contains("AND pr.print_start_time &lt; #{dto.queryEndTime}"),
                     () -> entry.getKey() + " must treat endTime as an exclusive print-start upper bound");
-            assertFalse(query.contains("AND pr.print_start_time &lt;= #{dto.endTime}"),
+            assertFalse(query.contains("AND pr.print_start_time &lt;= #{dto.queryEndTime}"),
                     () -> entry.getKey() + " must not include the next-day midnight boundary");
-            assertFalse(query.contains("AND om.create_time &gt;= #{dto.startTime}"),
+            assertFalse(query.contains("AND om.create_time &gt;= #{dto.queryStartTime}"),
                     () -> entry.getKey() + " must not apply startTime to the order creation time");
-            assertFalse(query.contains("AND om.create_time &lt;= #{dto.endTime}"),
+            assertFalse(query.contains("AND om.create_time &lt;= #{dto.queryEndTime}"),
                     () -> entry.getKey() + " must not apply endTime to the order creation time");
             assertFalse(query.contains("pp.create_time &gt;="),
                     () -> entry.getKey() + " must not apply startTime to the product creation time");
@@ -224,7 +224,7 @@ class ProductionProductMapperSqlTest {
             assertFalse(detailQuery.contains(legacyProjection),
                     () -> "detail query must not retain legacy projection: " + legacyProjection);
         }
-        assertTrue(detailQuery.contains("ORDER BY om.create_time DESC, pp.id DESC"));
+        assertTrue(detailQuery.contains("ORDER BY pr.print_start_time DESC, pp.id DESC"));
         assertTrue(detailQuery.contains("LIMIT 10000"));
     }
 

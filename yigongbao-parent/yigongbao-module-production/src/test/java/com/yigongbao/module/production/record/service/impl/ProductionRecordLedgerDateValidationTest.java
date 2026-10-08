@@ -33,6 +33,7 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -76,10 +77,10 @@ class ProductionRecordLedgerDateValidationTest {
     private ProductionRecordServiceImpl service;
 
     @Test
-    void exportNormalizesNonMidnightEndTimeToNextDayMidnight() throws Exception {
+    void exportUsesInclusiveDateRangeForCountAndListQueries() throws Exception {
         ProductLedgerExportDTO dto = new ProductLedgerExportDTO();
-        dto.setStartTime(LocalDateTime.of(2026, 8, 13, 15, 0));
-        dto.setEndTime(LocalDateTime.of(2026, 8, 13, 18, 30));
+        dto.setStartTime(LocalDate.of(2026, 8, 13));
+        dto.setEndTime(LocalDate.of(2026, 8, 13));
         when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
         when(productMapper.countProductLedgerData(any())).thenReturn(1L);
         when(productMapper.listProductLedgerData(any())).thenReturn(List.of(Map.of("product_no", "P-1")));
@@ -96,16 +97,16 @@ class ProductionRecordLedgerDateValidationTest {
         ArgumentCaptor<ProductLedgerExportDTO> listCaptor = ArgumentCaptor.forClass(ProductLedgerExportDTO.class);
         verify(productMapper).countProductLedgerData(countCaptor.capture());
         verify(productMapper).listProductLedgerData(listCaptor.capture());
-        LocalDateTime expectedExclusiveEnd = LocalDateTime.of(2026, 8, 14, 0, 0);
-        assertEquals(expectedExclusiveEnd, countCaptor.getValue().getEndTime());
-        assertEquals(expectedExclusiveEnd, listCaptor.getValue().getEndTime());
+        LocalDateTime expectedEnd = LocalDateTime.of(2026, 8, 14, 0, 0);
+        assertEquals(expectedEnd, countCaptor.getValue().getQueryEndTime());
+        assertEquals(expectedEnd, listCaptor.getValue().getQueryEndTime());
     }
 
     @Test
     void repeatedExportDoesNotMutateOrExpandTheOriginalDateRange() throws Exception {
         ProductLedgerExportDTO dto = new ProductLedgerExportDTO();
-        dto.setStartTime(LocalDateTime.of(2026, 8, 13, 0, 0));
-        LocalDateTime originalEndTime = LocalDateTime.of(2026, 8, 13, 18, 30);
+        dto.setStartTime(LocalDate.of(2026, 8, 13));
+        LocalDate originalEndTime = LocalDate.of(2026, 8, 13);
         dto.setEndTime(originalEndTime);
         when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
         when(productMapper.countProductLedgerData(any())).thenReturn(1L);
@@ -122,17 +123,17 @@ class ProductionRecordLedgerDateValidationTest {
 
         ArgumentCaptor<ProductLedgerExportDTO> queryCaptor = ArgumentCaptor.forClass(ProductLedgerExportDTO.class);
         verify(productMapper, times(2)).countProductLedgerData(queryCaptor.capture());
-        LocalDateTime expectedExclusiveEnd = LocalDateTime.of(2026, 8, 14, 0, 0);
-        assertEquals(List.of(expectedExclusiveEnd, expectedExclusiveEnd),
-                queryCaptor.getAllValues().stream().map(ProductLedgerExportDTO::getEndTime).toList());
+        LocalDateTime expectedEnd = LocalDateTime.of(2026, 8, 14, 0, 0);
+        assertEquals(List.of(expectedEnd, expectedEnd),
+                queryCaptor.getAllValues().stream().map(ProductLedgerExportDTO::getQueryEndTime).toList());
         assertEquals(originalEndTime, dto.getEndTime());
     }
 
     @Test
     void exportRejectsStartAtNextDayMidnight() {
         ProductLedgerExportDTO dto = new ProductLedgerExportDTO();
-        dto.setStartTime(LocalDateTime.of(2026, 8, 14, 0, 0));
-        dto.setEndTime(LocalDateTime.of(2026, 8, 13, 15, 0));
+        dto.setStartTime(LocalDate.of(2026, 8, 14));
+        dto.setEndTime(LocalDate.of(2026, 8, 13));
         when(userHospitalService.getDataScopeType(1L)).thenReturn(DataScopeTypeEnum.ALL);
 
         try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {

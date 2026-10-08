@@ -1488,11 +1488,9 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         // 应用数据权限：根据用户角色自动注入 hospitalIds 或 centerIds
         applyDataScopeForExport(queryDto);
 
-        // 结束日期按整天处理：规范化为次日零点，并作为排他上界
+        // 日期范围按闭区间处理，Mapper 会将结束日期扩展到次日零点之前
         if (queryDto.getEndTime() != null) {
-            LocalDateTime exclusiveEnd = queryDto.getEndTime().toLocalDate().plusDays(1).atStartOfDay();
-            queryDto.setEndTime(exclusiveEnd);
-            if (queryDto.getStartTime() != null && !queryDto.getStartTime().isBefore(exclusiveEnd)) {
+            if (queryDto.getStartTime() != null && queryDto.getStartTime().isAfter(queryDto.getEndTime())) {
                 throw new BusinessException(ErrorCodeEnum.PARAM_ERROR.getCode(), "开始时间不能晚于结束时间");
             }
         }
