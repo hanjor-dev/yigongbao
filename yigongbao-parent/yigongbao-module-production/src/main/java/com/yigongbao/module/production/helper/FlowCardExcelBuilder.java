@@ -88,7 +88,7 @@ public class FlowCardExcelBuilder {
     }
 
     private void fillHeader(Sheet sheet, BuildContext context) {
-        setCellValue(sheet, 1, 0, "编号：QR-SC-002   版本号：" + StrUtil.blankToDefault(context.getVersionNo(), "A/0"));
+        setCellValue(sheet, 1, 0, "编号：QR-SC-002   版本号：" + StrUtil.blankToDefault(context.getVersionNo(), "A/1"));
         setCellValue(sheet, 2, 2, context.getDesignPackageCode());
         setCellValue(sheet, 2, 5, context.getTotalProductCount() != null ?
             String.valueOf(context.getTotalProductCount()) : "-");
@@ -293,7 +293,7 @@ public class FlowCardExcelBuilder {
             lines.add("加热：" + parameterValue(p, "heating"));
         } else if (ProcessTypeEnum.PACK.getCode().equals(processType)) {
             lines.add("纸塑袋热封温度：" + parameterValue(p, "sealTemperature") + "℃");
-            lines.add("PE复合食品包装袋热封温度："
+            lines.add("三边封拉链袋热封温度："
                     + parameterValue(p, "zipBagSealTemperature") + "℃");
             String sealTime = p.containsKey("zipBagSealTime")
                 ? p.getStr("zipBagSealTime")

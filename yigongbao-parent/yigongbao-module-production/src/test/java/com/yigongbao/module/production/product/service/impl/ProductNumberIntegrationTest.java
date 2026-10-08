@@ -90,7 +90,7 @@ class ProductNumberIntegrationTest {
         record.setProductId(1L);
         record.setProductName("测试产品");
         record.setProductionBatchNo(batchNo);
-        record.setVersionNo("A/0");
+        record.setVersionNo("A/1");
         record.setTotalProductCount(productNames.size());
         record.setStatus(10);
         recordMapper.insert(record);

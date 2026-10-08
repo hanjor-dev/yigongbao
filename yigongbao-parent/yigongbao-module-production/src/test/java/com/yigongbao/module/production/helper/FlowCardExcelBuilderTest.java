@@ -21,7 +21,7 @@ class FlowCardExcelBuilderTest {
     void testBuild() throws Exception {
         FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
         context.setRecordNo("LC202605290001");
-        context.setVersionNo("A/0");
+        context.setVersionNo("A/1");
         context.setDesignPackageCode("PKG001");
         context.setTotalProductCount(2);
         context.setProductionBatchNo("BATCH001");
@@ -241,7 +241,7 @@ class FlowCardExcelBuilderTest {
         byte[] excelBytes = builder.build(context);
 
         assertEquals("层厚：0.05 mm\n激光器功率：- mW", readCell(excelBytes, 8, 4));
-        assertEquals("纸塑袋热封温度：-℃\nPE复合食品包装袋热封温度：-℃\n热封时间：30秒",
+        assertEquals("纸塑袋热封温度：-℃\n三边封拉链袋热封温度：-℃\n热封时间：30秒",
                 readCell(excelBytes, 13, 4));
     }
 
@@ -253,7 +253,7 @@ class FlowCardExcelBuilderTest {
 
         String params = readPackParams(builder.build(context));
 
-        assertEquals("纸塑袋热封温度：-℃\nPE复合食品包装袋热封温度：130℃\n热封时间：3秒", params);
+        assertEquals("纸塑袋热封温度：-℃\n三边封拉链袋热封温度：130℃\n热封时间：3秒", params);
     }
 
     @Test
@@ -265,7 +265,7 @@ class FlowCardExcelBuilderTest {
         String params = readPackParams(builder.build(context));
 
         assertEquals(
-            "纸塑袋热封温度：123℃\nPE复合食品包装袋热封温度：1301℃\n热封时间：31秒",
+            "纸塑袋热封温度：123℃\n三边封拉链袋热封温度：1301℃\n热封时间：31秒",
             params
         );
     }
@@ -278,7 +278,7 @@ class FlowCardExcelBuilderTest {
 
         String params = readPackParams(builder.build(context));
 
-        assertEquals("纸塑袋热封温度：-℃\nPE复合食品包装袋热封温度：-℃\n热封时间：3秒", params);
+        assertEquals("纸塑袋热封温度：-℃\n三边封拉链袋热封温度：-℃\n热封时间：3秒", params);
     }
 
     @Test
@@ -289,7 +289,7 @@ class FlowCardExcelBuilderTest {
 
         String params = readPackParams(builder.build(context));
 
-        assertEquals("纸塑袋热封温度：180℃\nPE复合食品包装袋热封温度：-℃\n热封时间：30秒", params);
+        assertEquals("纸塑袋热封温度：180℃\n三边封拉链袋热封温度：-℃\n热封时间：30秒", params);
     }
 
     @Test
@@ -299,7 +299,7 @@ class FlowCardExcelBuilderTest {
         String params = readPackParams(builder.build(context));
 
         assertEquals(
-            "纸塑袋热封温度：-℃\nPE复合食品包装袋热封温度：-℃\n热封时间：-秒",
+            "纸塑袋热封温度：-℃\n三边封拉链袋热封温度：-℃\n热封时间：-秒",
             params
         );
     }

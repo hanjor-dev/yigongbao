@@ -1090,7 +1090,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         FlowCardExcelBuilder.BuildContext context = new FlowCardExcelBuilder.BuildContext();
         context.setRecordNo(record.getRecordNo());
-        context.setVersionNo("A/0");
+        context.setVersionNo("A/1");
         context.setDesignPackageCode(record.getDesignPackageCode());
         context.setTotalProductCount(record.getTotalProductCount());
         context.setProductionBatchNo(record.getProductionBatchNo());
