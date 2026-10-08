@@ -31,6 +31,8 @@ import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
@@ -600,8 +602,10 @@ public class OrderExportServiceImpl implements OrderExportService {
                                                        DataScopeTypeEnum scopeType, OrderExportCursor cursor) {
         LambdaQueryWrapper<OrderMainEntity> wrapper = new LambdaQueryWrapper<>();
         orderQueryHelper.buildDataScopeCondition(wrapper, currentUserId, scopeType);
-        wrapper.ge(dto.getCreateTimeStart() != null, OrderMainEntity::getCreateTime, dto.getCreateTimeStart())
-                .le(dto.getCreateTimeEnd() != null, OrderMainEntity::getCreateTime, dto.getCreateTimeEnd());
+        wrapper.ge(dto.getCreateTimeStart() != null, OrderMainEntity::getCreateTime,
+                        toStartDateTime(dto.getCreateTimeStart()))
+                .le(dto.getCreateTimeEnd() != null, OrderMainEntity::getCreateTime,
+                        toEndDateTime(dto.getCreateTimeEnd()));
         applyCursor(wrapper, cursor);
         wrapper.orderByDesc(OrderMainEntity::getCreateTime)
                 .orderByDesc(OrderMainEntity::getId)
@@ -611,6 +615,14 @@ public class OrderExportServiceImpl implements OrderExportService {
                 .collect(Collectors.toList());
         orderQueryHelper.fillRebuildProjectList(orderList);
         return orderList;
+    }
+
+    static LocalDateTime toStartDateTime(LocalDate date) {
+        return date == null ? null : date.atStartOfDay();
+    }
+
+    static LocalDateTime toEndDateTime(LocalDate date) {
+        return date == null ? null : date.atTime(LocalTime.MAX);
     }
 
     private void writeCustomRow(SXSSFSheet sheet, int rowNum, List<String> exportFields,

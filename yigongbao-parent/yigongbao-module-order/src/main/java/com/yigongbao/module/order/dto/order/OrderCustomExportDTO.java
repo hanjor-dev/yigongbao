@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -21,14 +21,14 @@ public class OrderCustomExportDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 创建时间起始（选填，不填则导出所有时间）
+     * 创建日期起始（选填，不填则导出所有时间）
      */
-    private LocalDateTime createTimeStart;
+    private LocalDate createTimeStart;
 
     /**
-     * 创建时间结束（选填，不填则导出所有时间）
+     * 创建日期结束（选填，不填则导出所有时间）
      */
-    private LocalDateTime createTimeEnd;
+    private LocalDate createTimeEnd;
 
     /**
      * 导出字段列表（必填，至少1个字段）

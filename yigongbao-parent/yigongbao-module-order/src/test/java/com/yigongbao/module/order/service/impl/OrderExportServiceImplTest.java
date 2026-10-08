@@ -21,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
@@ -76,6 +77,14 @@ class OrderExportServiceImplTest {
             assertThat(sheet.getRow(1).getCell(2).getStringCellValue()).isEqualTo("2026-08-03 11:00:00");
             assertThat(sheet.getRow(1).getCell(3).getStringCellValue()).isEqualTo("2026-08-04 12:00:00");
         }
+    }
+
+    @Test
+    void customExportOrders_includesTheWholeEndDate() {
+        assertThat(OrderExportServiceImpl.toStartDateTime(LocalDate.of(2026, 8, 1)))
+                .isEqualTo(LocalDateTime.of(2026, 8, 1, 0, 0));
+        assertThat(OrderExportServiceImpl.toEndDateTime(LocalDate.of(2026, 8, 31)))
+                .isEqualTo(LocalDateTime.of(2026, 8, 31, 23, 59, 59, 999_999_999));
     }
 
     @Test
