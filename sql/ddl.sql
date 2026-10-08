@@ -2028,33 +2028,94 @@ CREATE TABLE order_cancel_apply (
     KEY idx_order_cancel_apply_apply_by (apply_by)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单取消申请表';
 
--- 系统公告表（详见 migration-system-announcement-20260930.sql）
+-- ============================================================
+-- 系统公告表
+-- ============================================================
 CREATE TABLE system_announcement (
- id BIGINT NOT NULL AUTO_INCREMENT, title VARCHAR(200) NOT NULL, content_html MEDIUMTEXT NOT NULL,
- content_text TEXT NOT NULL, status VARCHAR(20) NOT NULL, target_type VARCHAR(20) NOT NULL,
- target_role_ids JSON NULL, target_user_ids JSON NULL, force_confirm TINYINT NOT NULL DEFAULT 1,
- target_count INT NOT NULL DEFAULT 0, acknowledged_count INT NOT NULL DEFAULT 0, revoked_count INT NOT NULL DEFAULT 0,
- published_at DATETIME NULL, published_by BIGINT NULL, revoked_at DATETIME NULL, revoked_by BIGINT NULL,
- create_time DATETIME NOT NULL, create_by BIGINT NOT NULL, update_time DATETIME NOT NULL, update_by BIGINT NULL,
- is_deleted TINYINT NOT NULL DEFAULT 0, PRIMARY KEY (id), KEY idx_sa_status_time (status, published_at), KEY idx_sa_creator (create_by, create_time)
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    title VARCHAR(200) NOT NULL,
+    content_html MEDIUMTEXT NOT NULL,
+    content_text TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    target_type VARCHAR(20) NOT NULL,
+    target_role_ids JSON NULL,
+    target_user_ids JSON NULL,
+    force_confirm TINYINT NOT NULL DEFAULT 1,
+    target_count INT NOT NULL DEFAULT 0,
+    acknowledged_count INT NOT NULL DEFAULT 0,
+    revoked_count INT NOT NULL DEFAULT 0,
+    published_at DATETIME NULL,
+    published_by BIGINT NULL,
+    revoked_at DATETIME NULL,
+    revoked_by BIGINT NULL,
+    create_time DATETIME NOT NULL,
+    create_by BIGINT NOT NULL,
+    update_time DATETIME NOT NULL,
+    update_by BIGINT NULL,
+    is_deleted TINYINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_sa_status_time (status, published_at),
+    KEY idx_sa_creator (create_by, create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统公告主表';
+
 CREATE TABLE system_announcement_recipient (
- id BIGINT NOT NULL AUTO_INCREMENT, announcement_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
- user_name_snapshot VARCHAR(100) NULL, username_snapshot VARCHAR(100) NULL, role_snapshot VARCHAR(500) NULL,
- delivery_status VARCHAR(20) NOT NULL, acknowledged_at DATETIME NULL, revoked_at DATETIME NULL,
- create_time DATETIME NOT NULL, update_time DATETIME NULL, is_deleted TINYINT NOT NULL DEFAULT 0,
- PRIMARY KEY (id), UNIQUE KEY uk_sa_recipient (announcement_id, user_id), KEY idx_sar_user_status (user_id, delivery_status, announcement_id), KEY idx_sar_announcement_status (announcement_id, delivery_status)
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    announcement_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    user_name_snapshot VARCHAR(100) NULL,
+    username_snapshot VARCHAR(100) NULL,
+    role_snapshot VARCHAR(500) NULL,
+    delivery_status VARCHAR(20) NOT NULL,
+    acknowledged_at DATETIME NULL,
+    revoked_at DATETIME NULL,
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NULL,
+    create_by BIGINT NULL,
+    update_by BIGINT NULL,
+    is_deleted TINYINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_sa_recipient (announcement_id, user_id),
+    KEY idx_sar_user_status (user_id, delivery_status, announcement_id),
+    KEY idx_sar_announcement_status (announcement_id, delivery_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统公告接收记录';
+
 CREATE TABLE system_announcement_attachment (
- id BIGINT NOT NULL AUTO_INCREMENT, announcement_id BIGINT NOT NULL, file_id VARCHAR(64) NULL, file_name VARCHAR(255) NOT NULL,
- file_url VARCHAR(1000) NOT NULL, file_type VARCHAR(100) NULL, file_size BIGINT NULL, sort INT NOT NULL DEFAULT 0,
- create_time DATETIME NOT NULL, create_by BIGINT NOT NULL, is_deleted TINYINT NOT NULL DEFAULT 0,
- PRIMARY KEY (id), KEY idx_saa_announcement (announcement_id, sort)
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    announcement_id BIGINT NOT NULL,
+    file_id VARCHAR(64) NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_url VARCHAR(1000) NOT NULL,
+    file_type VARCHAR(100) NULL,
+    file_size BIGINT NULL,
+    sort INT NOT NULL DEFAULT 0,
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NULL,
+    create_by BIGINT NOT NULL,
+    update_by BIGINT NULL,
+    is_deleted TINYINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_saa_announcement (announcement_id, sort)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统公告附件';
+
 CREATE TABLE system_announcement_audit_log (
- id BIGINT NOT NULL AUTO_INCREMENT, announcement_id BIGINT NOT NULL, operation_type VARCHAR(20) NOT NULL,
- operator_id BIGINT NOT NULL, operator_name VARCHAR(100) NULL, before_status VARCHAR(20) NULL,
- after_status VARCHAR(20) NOT NULL, target_type VARCHAR(20) NULL, target_count INT NULL, client_ip VARCHAR(64) NULL,
- remark VARCHAR(500) NULL, operation_time DATETIME NOT NULL, PRIMARY KEY (id),
- KEY idx_saal_announcement_time (announcement_id, operation_time), KEY idx_saal_operator_time (operator_id, operation_time)
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    announcement_id BIGINT NOT NULL,
+    operation_type VARCHAR(20) NOT NULL,
+    operator_id BIGINT NOT NULL,
+    operator_name VARCHAR(100) NULL,
+    before_status VARCHAR(20) NULL,
+    after_status VARCHAR(20) NOT NULL,
+    target_type VARCHAR(20) NULL,
+    target_count INT NULL,
+    client_ip VARCHAR(64) NULL,
+    remark VARCHAR(500) NULL,
+    operation_time DATETIME NOT NULL,
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NULL,
+    create_by BIGINT NULL,
+    update_by BIGINT NULL,
+    is_deleted TINYINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_saal_announcement_time (announcement_id, operation_time),
+    KEY idx_saal_operator_time (operator_id, operation_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统公告审计日志';

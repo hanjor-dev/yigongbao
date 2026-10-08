@@ -153,6 +153,8 @@ CREATE TABLE system_announcement_recipient
     revoked_at         DATETIME,
     create_time        DATETIME    NOT NULL,
     update_time        DATETIME,
+    create_by          BIGINT,
+    update_by          BIGINT,
     is_deleted          TINYINT     NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
     UNIQUE KEY uk_sa_recipient (announcement_id, user_id),
@@ -177,7 +179,9 @@ CREATE TABLE system_announcement_attachment
     file_size       BIGINT,
     sort            INT          NOT NULL DEFAULT 0,
     create_time     DATETIME     NOT NULL,
+    update_time     DATETIME,
     create_by       BIGINT       NOT NULL,
+    update_by       BIGINT,
     is_deleted      TINYINT      NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
     KEY idx_saa_announcement (announcement_id, sort)
@@ -203,6 +207,11 @@ CREATE TABLE system_announcement_audit_log
     client_ip       VARCHAR(64),
     remark          VARCHAR(500),
     operation_time  DATETIME    NOT NULL,
+    create_time     DATETIME    NOT NULL,
+    update_time     DATETIME,
+    create_by       BIGINT,
+    update_by       BIGINT,
+    is_deleted      TINYINT     NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
     KEY idx_saal_announcement_time (announcement_id, operation_time),
     KEY idx_saal_operator_time (operator_id, operation_time)
@@ -323,7 +332,7 @@ WHERE announcement_id = #{announcementId}
 {
   "title": "系统维护通知",
   "contentHtml": "<p>系统将于今晚进行维护。</p>",
-  "attachments": [{"fileId": "1892345678901234567", "fileName": "维护说明.pdf"}],
+  "attachments": [{"fileId": 123, "fileName": "维护说明.pdf"}],
   "target": {"targetType": "ROLE", "roleIds": [2, 5], "userIds": []}
 }
 ```
@@ -418,9 +427,9 @@ const current = ref<AnnouncementPendingVO | null>(null)
 - 后端使用 HTML 白名单清洗；禁止 `script`、事件属性、危险协议和任意 iframe。
 - 预览和正式发布使用同一清洗逻辑。
 - `content_text` 从清洗结果生成。
-- 图片和附件复用统一上传接口；当前阶段不增加公告业务侧 MIME、扩展名、大小和数量限制，沿用现有文件服务的通用安全策略。
+- 图片和附件复用统一上传接口，限制 MIME、扩展名、大小和数量。
 - 下载时再次校验公告访问权限。
-- 附件地址只允许 `http`、`https` 或站内绝对路径；新窗口链接添加 `rel="noopener noreferrer"`。文件 ID 按字符串处理，避免雪花 ID 在浏览器中发生数值精度丢失。
+- 链接只允许 `http`、`https`；新窗口链接添加 `rel="noopener noreferrer"`。
 - 前端展示富文本时不能把数据库内容视为天然安全。
 
 ## 12. 权限、日志和统计
@@ -448,7 +457,7 @@ notification:announcement:statistics
 - 接收表以 `(announcement_id, user_id)` 唯一约束防重。
 - 全员解析、接收插入分批执行，避免超大 SQL。
 - pending 查询使用用户、状态、公告 ID 索引。
-- WebSocket 只传 ID，不发送正文和附件；当前阶段不记录推送数量、成功率和失败率指标，保留 pending 查询作为离线和推送失败兜底。
+- WebSocket 只传 ID，不发送正文和附件。
 - 统计不在普通列表查询中扫描全部接收记录。
 
 后端测试至少覆盖：目标解析、超级管理员纳入、禁用用户排除、角色快照、状态流转、重复确认、撤回并发、XSS 清洗、权限越权和事务回滚。

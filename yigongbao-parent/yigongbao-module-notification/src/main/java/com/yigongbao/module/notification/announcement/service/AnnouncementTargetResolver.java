@@ -21,6 +21,20 @@ public class AnnouncementTargetResolver {
     private final AnnouncementTargetMapper targetMapper;
 
     public List<AnnouncementTargetUserVO> resolve(AnnouncementTargetDTO target) {
+        return resolveUsers(target, true);
+    }
+
+    /**
+     * 估算目标人数；允许当前规则暂时匹配不到有效账户，返回 0 供草稿展示。
+     *
+     * @param target 全员、角色或指定账户目标规则
+     * @return 去重后的有效账户数量
+     */
+    public int estimate(AnnouncementTargetDTO target) {
+        return resolveUsers(target, false).size();
+    }
+
+    private List<AnnouncementTargetUserVO> resolveUsers(AnnouncementTargetDTO target, boolean requireNonEmpty) {
         if (target == null || target.getTargetType() == null) {
             throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "公告目标不能为空");
         }
@@ -39,7 +53,7 @@ public class AnnouncementTargetResolver {
                 yield targetMapper.selectActiveUsersByIds(target.getUserIds());
             }
         };
-        if (CollectionUtils.isEmpty(users)) {
+        if (requireNonEmpty && CollectionUtils.isEmpty(users)) {
             throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "公告目标用户为空");
         }
         return users.stream()
