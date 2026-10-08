@@ -353,7 +353,8 @@ public class OrderExportServiceImpl implements OrderExportService {
         }
         switch (field) {
             case "orderCode":
-                cell.setCellValue(StrUtil.nullToEmpty(order.getOrderCode()));
+                // 兼容历史列配置，但不再向导出文件暴露内部订单流水号。
+                cell.setCellValue(StrUtil.nullToEmpty(order.getPublicOrderCode()));
                 break;
             case "publicOrderCode":
                 cell.setCellValue(StrUtil.nullToEmpty(order.getPublicOrderCode()));
@@ -636,8 +637,8 @@ public class OrderExportServiceImpl implements OrderExportService {
 
     private java.util.Map<String, String> getDefaultFieldLabels() {
         java.util.Map<String, String> labels = new java.util.HashMap<>();
-        labels.put("orderCode", "订单编号");
-        labels.put("publicOrderCode", "虚拟单号");
+        labels.put("orderCode", "订单号");
+        labels.put("publicOrderCode", "订单号");
         labels.put("orderTypeName", "订单类型");
         labels.put("needsPhysicalDeliveryName", "是否需要实体交付");
         labels.put("hospitalName", "医院名称");
@@ -684,8 +685,7 @@ public class OrderExportServiceImpl implements OrderExportService {
     @Override
     public List<OrderExportFieldVO> getAvailableExportFields() {
         List<OrderExportFieldVO> fields = new java.util.ArrayList<>();
-        fields.add(new OrderExportFieldVO("orderCode", "订单编号"));
-        fields.add(new OrderExportFieldVO("publicOrderCode", "虚拟单号"));
+        fields.add(new OrderExportFieldVO("publicOrderCode", "订单号"));
         fields.add(new OrderExportFieldVO("orderTypeName", "订单类型"));
         fields.add(new OrderExportFieldVO("needsPhysicalDeliveryName", "是否需要实体交付"));
         fields.add(new OrderExportFieldVO("hospitalName", "医院名称"));

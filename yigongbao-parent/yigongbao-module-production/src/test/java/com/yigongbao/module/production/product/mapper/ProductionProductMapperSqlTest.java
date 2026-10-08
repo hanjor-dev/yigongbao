@@ -26,7 +26,7 @@ class ProductionProductMapperSqlTest {
     private static final String EXPORT_STATUS_PREDICATE =
             "pp.status IN ('in_process', 'fail', 'pass', 'pending_warehouse_in', 'warehoused', 'warehouse_out', 'completed', 'cancelled')";
     private static final List<String> LEDGER_KEYS = List.of(
-            "order_code",
+            "public_order_code",
             "print_start_time",
             "product_no",
             "file_name",
@@ -47,7 +47,7 @@ class ProductionProductMapperSqlTest {
             "business_operator",
             "warehouse_out_time");
     private static final List<String> DIRECT_LEDGER_PROJECTIONS = List.of(
-            "om.order_code AS order_code",
+            "om.public_order_code AS public_order_code",
             "pr.print_start_time AS print_start_time",
             "pp.product_no AS product_no",
             "pp.file_name AS file_name",

@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class ProductLedgerExcelBuilderTest {
 
     private static final List<String> EXPECTED_HEADERS = List.of(
-            "序号", "订单流水号", "时间", "产品编号", "数据文件名称", "产品名称", "型号/规格", "材质",
+            "序号", "订单号", "时间", "产品编号", "数据文件名称", "产品名称", "型号/规格", "材质",
             "打印时长", "总重量（g）", "处理时长", "数量", "医院", "患者", "性别", "年龄", "操作人员", "医生",
             "科室", "业务员", "出库情况", "备注");
 

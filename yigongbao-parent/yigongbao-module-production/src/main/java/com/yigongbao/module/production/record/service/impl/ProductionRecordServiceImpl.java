@@ -1352,8 +1352,20 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
     }
 
     private ProductionColumnConfigVO mergeWithDefault(ProductionColumnConfigVO userConfig, ProductionColumnConfigVO defaultConfig) {
+        if (defaultConfig != null) {
+            defaultConfig.setColumns(ColumnConfigMergeUtil.normalizeOrderCodeColumns(
+                    defaultConfig.getColumns(),
+                    ProductionColumnConfigVO.ColumnItemVO::getField,
+                    ProductionColumnConfigVO.ColumnItemVO::setField,
+                    ProductionColumnConfigVO.ColumnItemVO::setLabel));
+        }
         if (defaultConfig == null) return userConfig;
         if (userConfig == null) return defaultConfig;
+        userConfig.setColumns(ColumnConfigMergeUtil.normalizeOrderCodeColumns(
+                userConfig.getColumns(),
+                ProductionColumnConfigVO.ColumnItemVO::getField,
+                ProductionColumnConfigVO.ColumnItemVO::setField,
+                ProductionColumnConfigVO.ColumnItemVO::setLabel));
         userConfig.setColumns(ColumnConfigMergeUtil.mergeMissingColumns(userConfig.getColumns(), defaultConfig.getColumns(),
                 ProductionColumnConfigVO.ColumnItemVO::getField,
                 column -> { ProductionColumnConfigVO.ColumnItemVO copy = new ProductionColumnConfigVO.ColumnItemVO();

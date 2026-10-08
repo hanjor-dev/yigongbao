@@ -232,8 +232,20 @@ public class WarehouseServiceImpl implements IWarehouseService {
     }
 
     private WarehouseColumnConfigVO mergeWithDefault(WarehouseColumnConfigVO userConfig, WarehouseColumnConfigVO defaultConfig) {
+        if (defaultConfig != null) {
+            defaultConfig.setColumns(ColumnConfigMergeUtil.normalizeOrderCodeColumns(
+                    defaultConfig.getColumns(),
+                    WarehouseColumnConfigVO.ColumnItemVO::getField,
+                    WarehouseColumnConfigVO.ColumnItemVO::setField,
+                    WarehouseColumnConfigVO.ColumnItemVO::setLabel));
+        }
         if (defaultConfig == null) return userConfig;
         if (userConfig == null) return defaultConfig;
+        userConfig.setColumns(ColumnConfigMergeUtil.normalizeOrderCodeColumns(
+                userConfig.getColumns(),
+                WarehouseColumnConfigVO.ColumnItemVO::getField,
+                WarehouseColumnConfigVO.ColumnItemVO::setField,
+                WarehouseColumnConfigVO.ColumnItemVO::setLabel));
         userConfig.setColumns(ColumnConfigMergeUtil.mergeMissingColumns(userConfig.getColumns(), defaultConfig.getColumns(),
                 WarehouseColumnConfigVO.ColumnItemVO::getField,
                 column -> { WarehouseColumnConfigVO.ColumnItemVO copy = new WarehouseColumnConfigVO.ColumnItemVO();

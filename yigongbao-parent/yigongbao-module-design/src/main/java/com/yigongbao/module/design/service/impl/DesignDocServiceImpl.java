@@ -1048,7 +1048,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             OrderMainEntity order, DesignPackageEntity pkg,
             List<InstructionExcelBuilder.ProductRow> rows, String version, LocalDateTime generateTime) {
         InstructionExcelBuilder.BuildContext ctx = new InstructionExcelBuilder.BuildContext();
-        ctx.setOrderCode(order.getOrderCode());
+        ctx.setOrderCode(order.getPublicOrderCode());
         ctx.setPatientName(order.getPatientName());
         ctx.setOrgName(order.getOrgName());
         ctx.setHospitalName(order.getHospitalName());
@@ -1082,7 +1082,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             OrderMainEntity order, DesignPackageEntity pkg,
             List<DrawingExcelBuilder.ProductRow> rows, LocalDateTime generateTime, FileVO qrFile) {
         DrawingExcelBuilder.BuildContext ctx = new DrawingExcelBuilder.BuildContext();
-        ctx.setOrderCode(order.getOrderCode());
+        ctx.setOrderCode(order.getPublicOrderCode());
         ctx.setPackageCode(pkg.getPackageCode());
         ctx.setRemark(pkg.getRemark());
         ctx.setRows(rows);

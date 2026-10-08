@@ -497,12 +497,24 @@ public class OrderQueryHelper {
     }
 
     public OrderColumnConfigVO mergeWithDefault(OrderColumnConfigVO userConfig, OrderColumnConfigVO defaultConfig) {
+        if (defaultConfig != null) {
+            defaultConfig.setColumns(ColumnConfigMergeUtil.normalizeOrderCodeColumns(
+                    defaultConfig.getColumns(),
+                    OrderColumnConfigVO.ColumnItemVO::getField,
+                    OrderColumnConfigVO.ColumnItemVO::setField,
+                    OrderColumnConfigVO.ColumnItemVO::setLabel));
+        }
         if (defaultConfig == null) {
             return userConfig;
         }
         if (userConfig == null) {
             return defaultConfig;
         }
+        userConfig.setColumns(ColumnConfigMergeUtil.normalizeOrderCodeColumns(
+                userConfig.getColumns(),
+                OrderColumnConfigVO.ColumnItemVO::getField,
+                OrderColumnConfigVO.ColumnItemVO::setField,
+                OrderColumnConfigVO.ColumnItemVO::setLabel));
         userConfig.setColumns(ColumnConfigMergeUtil.mergeMissingColumns(
                 userConfig.getColumns(), defaultConfig.getColumns(),
                 OrderColumnConfigVO.ColumnItemVO::getField,
