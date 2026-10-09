@@ -320,20 +320,8 @@ public class DesignQueryHelper {
     }
 
     public DesignColumnConfigVO mergeWithDefault(DesignColumnConfigVO userConfig, DesignColumnConfigVO defaultConfig) {
-        if (defaultConfig != null) {
-            defaultConfig.setColumns(ColumnConfigMergeUtil.normalizeOrderCodeColumns(
-                    defaultConfig.getColumns(),
-                    DesignColumnConfigVO.ColumnItemVO::getField,
-                    DesignColumnConfigVO.ColumnItemVO::setField,
-                    DesignColumnConfigVO.ColumnItemVO::setLabel));
-        }
         if (defaultConfig == null) return userConfig;
         if (userConfig == null) return defaultConfig;
-        userConfig.setColumns(ColumnConfigMergeUtil.normalizeOrderCodeColumns(
-                userConfig.getColumns(),
-                DesignColumnConfigVO.ColumnItemVO::getField,
-                DesignColumnConfigVO.ColumnItemVO::setField,
-                DesignColumnConfigVO.ColumnItemVO::setLabel));
         userConfig.setColumns(ColumnConfigMergeUtil.mergeMissingColumns(
                 userConfig.getColumns(), defaultConfig.getColumns(),
                 DesignColumnConfigVO.ColumnItemVO::getField,

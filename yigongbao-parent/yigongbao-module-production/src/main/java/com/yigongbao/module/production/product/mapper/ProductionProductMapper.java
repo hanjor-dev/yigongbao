@@ -35,7 +35,7 @@ public interface ProductionProductMapper extends BaseMapper<ProductionProductEnt
      */
     @Select("<script>" +
             "SELECT " +
-            "    om.public_order_code AS public_order_code, " +
+            "    om.order_code AS order_code, " +
             "    pr.print_start_time AS print_start_time, " +
             "    pp.product_no AS product_no, " +
             "    pp.file_name AS file_name, " +

@@ -289,20 +289,8 @@ public class ProductionQcServiceImpl implements IProductionQcService {
     }
 
     private QcColumnConfigVO mergeWithDefault(QcColumnConfigVO userConfig, QcColumnConfigVO defaultConfig) {
-        if (defaultConfig != null) {
-            defaultConfig.setColumns(ColumnConfigMergeUtil.normalizeOrderCodeColumns(
-                    defaultConfig.getColumns(),
-                    QcColumnConfigVO.ColumnItemVO::getField,
-                    QcColumnConfigVO.ColumnItemVO::setField,
-                    QcColumnConfigVO.ColumnItemVO::setLabel));
-        }
         if (defaultConfig == null) return userConfig;
         if (userConfig == null) return defaultConfig;
-        userConfig.setColumns(ColumnConfigMergeUtil.normalizeOrderCodeColumns(
-                userConfig.getColumns(),
-                QcColumnConfigVO.ColumnItemVO::getField,
-                QcColumnConfigVO.ColumnItemVO::setField,
-                QcColumnConfigVO.ColumnItemVO::setLabel));
         userConfig.setColumns(ColumnConfigMergeUtil.mergeMissingColumns(userConfig.getColumns(), defaultConfig.getColumns(),
                 QcColumnConfigVO.ColumnItemVO::getField,
                 column -> { QcColumnConfigVO.ColumnItemVO copy = new QcColumnConfigVO.ColumnItemVO();

@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
@@ -14,33 +13,6 @@ import java.util.function.Function;
 public final class ColumnConfigMergeUtil {
 
     private ColumnConfigMergeUtil() {
-    }
-
-    /** 将旧订单流水号列原位迁移为虚拟单号列，并删除重复的虚拟单号列。 */
-    public static <T> List<T> normalizeOrderCodeColumns(
-            List<T> columns,
-            Function<T, String> fieldGetter,
-            BiConsumer<T, String> fieldSetter,
-            BiConsumer<T, String> labelSetter) {
-        List<T> result = new ArrayList<>();
-        boolean hasOrderDisplayColumn = false;
-        if (columns == null) return result;
-        for (T column : columns) {
-            if (column == null) continue;
-            String field = fieldGetter.apply(column);
-            if ("publicOrderCode".equals(field)) {
-                if (hasOrderDisplayColumn) continue;
-                labelSetter.accept(column, "订单号");
-                hasOrderDisplayColumn = true;
-            } else if ("orderCode".equals(field)) {
-                if (hasOrderDisplayColumn) continue;
-                fieldSetter.accept(column, "publicOrderCode");
-                labelSetter.accept(column, "订单号");
-                hasOrderDisplayColumn = true;
-            }
-            result.add(column);
-        }
-        return result;
     }
 
     /**

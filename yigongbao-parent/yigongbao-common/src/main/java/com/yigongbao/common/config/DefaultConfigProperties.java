@@ -215,9 +215,15 @@ public class DefaultConfigProperties {
     }
 
     private String appendPublicOrderCodeColumn(String config) {
-        if (config == null || config.contains("publicOrderCode")) return config;
-        // 订单号对外统一展示虚拟单号；不要追加第二列，否则旧用户配置会同时出现两列。
-        return config.replace("\"field\":\"orderCode\",\"label\":\"订单编号\"",
-                "\"field\":\"publicOrderCode\",\"label\":\"订单号\"");
+        if (config.contains("publicOrderCode")) {
+            return config;
+        }
+        int endIndex = config.lastIndexOf("]}");
+        if (endIndex < 0) {
+            return config;
+        }
+        return config.substring(0, endIndex)
+                + ", {\"field\":\"publicOrderCode\",\"label\":\"虚拟单号\",\"visible\":true,\"sort\":999,\"width\":160,\"fixed\":null}]}"
+                + config.substring(endIndex + 2);
     }
 }

@@ -38,23 +38,6 @@ class ColumnConfigMergeUtilTest {
         assertEquals(6, result.get(1).sort());
     }
 
-    @Test
-    void normalizeOrderCodeColumns_replacesOldColumnAndRemovesDuplicate() {
-        MutableColumn oldColumn = new MutableColumn("orderCode", "订单编号");
-        MutableColumn publicColumn = new MutableColumn("publicOrderCode", "虚拟单号");
-        MutableColumn other = new MutableColumn("recordNo", "记录号");
-
-        List<MutableColumn> result = ColumnConfigMergeUtil.normalizeOrderCodeColumns(
-                List.of(other, oldColumn, publicColumn),
-                MutableColumn::field,
-                MutableColumn::setField,
-                MutableColumn::setLabel);
-
-        assertEquals(2, result.size());
-        assertEquals("publicOrderCode", result.get(1).field());
-        assertEquals("订单号", result.get(1).label());
-    }
-
     private record Column(String field, Boolean visible, Integer sort, Integer width) {
         private Column copy() {
             return new Column(field, visible, sort, width);
@@ -62,32 +45,6 @@ class ColumnConfigMergeUtilTest {
 
         private Column withSort(Integer newSort) {
             return new Column(field, visible, newSort, width);
-        }
-    }
-
-    private static final class MutableColumn {
-        private String field;
-        private String label;
-
-        private MutableColumn(String field, String label) {
-            this.field = field;
-            this.label = label;
-        }
-
-        private String field() {
-            return field;
-        }
-
-        private String label() {
-            return label;
-        }
-
-        private void setField(String field) {
-            this.field = field;
-        }
-
-        private void setLabel(String label) {
-            this.label = label;
         }
     }
 }

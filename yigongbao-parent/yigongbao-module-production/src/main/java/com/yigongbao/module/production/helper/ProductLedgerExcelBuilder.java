@@ -50,7 +50,7 @@ public class ProductLedgerExcelBuilder {
             DateTimeFormatter.ISO_LOCAL_DATE,
             DateTimeFormatter.ofPattern("yyyy/MM/dd"));
     private static final String[] HEADERS = {
-        "序号", "订单号", "时间", "产品编号", "数据文件名称", "产品名称", "型号/规格", "材质",
+        "序号", "订单流水号", "时间", "产品编号", "数据文件名称", "产品名称", "型号/规格", "材质",
         "打印时长", "总重量（g）", "处理时长", "数量", "医院", "患者", "性别", "年龄", "操作人员", "医生",
         "科室", "业务员", "出库情况", "备注"
     };
@@ -96,8 +96,7 @@ public class ProductLedgerExcelBuilder {
             for (Map<String, Object> data : dataList) {
                 Row row = sheet.createRow(rowIndex++);
                 setNumericCell(row, 0, sequence++, dataStyle);
-                Object publicOrderCode = data.get("public_order_code");
-                setStringCell(row, 1, publicOrderCode != null ? publicOrderCode : data.get("order_code"), dataStyle);
+                setStringCell(row, 1, data.get("order_code"), dataStyle);
                 setStringCell(row, 2, formatPrintDate(data.get("print_start_time")), dataStyle);
                 setStringCell(row, 3, data.get("product_no"), dataStyle);
                 setStringCell(row, 4, formatFileName(data.get("file_name")), dataStyle);
