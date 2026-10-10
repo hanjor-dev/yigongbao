@@ -40,6 +40,22 @@ public interface FlowOrderService {
     void updatePhaseAndStatus(Long id, Integer phase, Integer status);
 
     /**
+     * 按订单版本条件更新阶段、状态并递增版本号。
+     *
+     * @return 实际更新行数
+     */
+    int updatePhaseAndStatusIfVersion(Long id, Integer expectedVersion, Integer phase, Integer status);
+
+    /**
+     * 按订单版本条件更新阶段、状态、当前处理人并递增版本号。
+     *
+     * @return 实际更新行数
+     */
+    int updatePhaseAndStatusWithHandlerIfVersion(Long id, Integer expectedVersion, Integer phase,
+                                                 Integer status, Long currentHandlerId,
+                                                 String currentHandlerName);
+
+    /**
      * 更新订单阶段、状态和当前处理人
      *
      * @param id 订单ID

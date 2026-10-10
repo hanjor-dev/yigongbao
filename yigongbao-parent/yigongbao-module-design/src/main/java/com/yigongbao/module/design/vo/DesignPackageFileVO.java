@@ -57,6 +57,9 @@ public class DesignPackageFileVO implements Serializable {
      */
     private Boolean hasPrintInfo;
 
+    /** 是否允许在当前上下文选择填写打印信息 */
+    private Boolean selectableForPrint;
+
     /**
      * 包内文件独立 OSS 访问地址（可直接用于 3D 模型渲染）
      */

@@ -322,12 +322,15 @@ public class WarehouseServiceImpl implements IWarehouseService {
             recordId, record.getRecordNo(), warehousedCount, cancelledCount);
 
         // 触发订单聚合：检查所有流转卡是否都已入库
-        recordService.triggerFlowIfAllReach(
-            record.getOrderId(),
-            FlowStatusEnum.WAREHOUSED.getValue(),
-            FlowActionEnum.COMPLETE_WAREHOUSE_IN
-        );
-        recordService.reconcileOrderProductionStatus(record.getOrderId());
+        if (record.getBatchId() == null) {
+            recordService.triggerFlowIfAllReach(record.getOrderId(),
+                FlowStatusEnum.WAREHOUSED.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_IN);
+            recordService.reconcileOrderProductionStatus(record.getOrderId());
+        } else {
+            recordService.triggerFlowIfAllReach(record.getOrderId(), record.getBatchId(),
+                FlowStatusEnum.WAREHOUSED.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_IN);
+            recordService.reconcileOrderProductionStatus(record.getOrderId(), record.getBatchId());
+        }
     }
 
     @Override
@@ -394,11 +397,14 @@ public class WarehouseServiceImpl implements IWarehouseService {
         log.info("流转卡全部产品已出库: recordId={}, recordNo={}, warehouseOutCount={}, cancelledCount={}",
             recordId, record.getRecordNo(), warehouseOutCount, cancelledCount);
 
-        recordService.triggerFlowIfAllReach(
-            record.getOrderId(),
-            FlowStatusEnum.WAREHOUSE_OUT.getValue(),
-            FlowActionEnum.COMPLETE_WAREHOUSE_OUT
-        );
-        recordService.reconcileOrderProductionStatus(record.getOrderId());
+        if (record.getBatchId() == null) {
+            recordService.triggerFlowIfAllReach(record.getOrderId(),
+                FlowStatusEnum.WAREHOUSE_OUT.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_OUT);
+            recordService.reconcileOrderProductionStatus(record.getOrderId());
+        } else {
+            recordService.triggerFlowIfAllReach(record.getOrderId(), record.getBatchId(),
+                FlowStatusEnum.WAREHOUSE_OUT.getValue(), FlowActionEnum.COMPLETE_WAREHOUSE_OUT);
+            recordService.reconcileOrderProductionStatus(record.getOrderId(), record.getBatchId());
+        }
     }
 }

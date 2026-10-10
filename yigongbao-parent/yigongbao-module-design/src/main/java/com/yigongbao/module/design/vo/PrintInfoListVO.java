@@ -14,6 +14,14 @@ import java.util.List;
 @Data
 public class PrintInfoListVO {
 
+    private Long batchId;
+    private Long packageId;
+    private String batchStatus;
+    private Boolean editable;
+    private Boolean canSave;
+    private Boolean canDelete;
+    private Boolean printInfoCompleted;
+
     /**
      * 产品标识（数据包级别）
      */

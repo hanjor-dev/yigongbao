@@ -26,8 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.DateTimeException;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 设备状态监听器
@@ -106,15 +107,23 @@ public class DeviceStatusListener {
             if (startedRecords.isEmpty()) {
                 return;
             }
-            startedRecords.stream()
-                    .map(ProductionRecordEntity::getOrderId)
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .forEach(orderId -> {
+            Map<String, List<ProductionRecordEntity>> startedGroups = startedRecords.stream()
+                    .filter(record -> record.getOrderId() != null)
+                    .collect(Collectors.groupingBy(record -> record.getOrderId() + ":" + record.getBatchId()));
+            startedGroups.values().forEach(group -> {
+                        ProductionRecordEntity representative = group.get(0);
+                        Long orderId = representative.getOrderId();
+                        Long batchId = representative.getBatchId();
                         updateOrderProductionStartTime(orderId, now);
-                        recordService.triggerFlowIfAllReach(orderId,
-                                FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
-                        recordService.reconcileOrderProductionStatus(orderId);
+                        if (batchId == null) {
+                            recordService.triggerFlowIfAllReach(orderId,
+                                    FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
+                            recordService.reconcileOrderProductionStatus(orderId);
+                        } else {
+                            recordService.triggerFlowIfAllReach(orderId, batchId,
+                                    FlowStatusEnum.PRINTING.getValue(), FlowActionEnum.START_PRINT);
+                            recordService.reconcileOrderProductionStatus(orderId, batchId);
+                        }
                     });
         }
         // 工作中/打印完成/离线 → 空闲：打印完成，只查询打印中的流转卡

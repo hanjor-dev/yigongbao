@@ -53,11 +53,17 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
      */
     void triggerFlowIfAllReach(Long orderId, Integer requiredStatus, FlowActionEnum action);
 
+    /** 按订单和追加批次聚合触发流程；batchId 为 null 时仅统计原始设计记录。 */
+    void triggerFlowIfAllReach(Long orderId, Long batchId, Integer requiredStatus, FlowActionEnum action);
+
     /**
      * 聚合触发（精确匹配）：同订单所有活跃流转卡状态均精确等于 exactStatus 时触发 Flow
      * 用于回退场景（REWORK_TO_PRINT），不能用 ≥ 判断
      */
     void triggerFlowIfAllExact(Long orderId, Integer exactStatus, FlowActionEnum action);
+
+    /** 按订单和追加批次精确聚合触发流程；batchId 为 null 时仅统计原始设计记录。 */
+    void triggerFlowIfAllExact(Long orderId, Long batchId, Integer exactStatus, FlowActionEnum action);
 
     /**
      * 直接触发 Flow 状态流转并回写 order_main（无聚合条件）
@@ -69,6 +75,9 @@ public interface IProductionRecordService extends IService<ProductionRecordEntit
      * 仅通过 Flow 状态机推进父订单，不直接改写 order_main 状态。
      */
     void reconcileOrderProductionStatus(Long orderId);
+
+    /** 按订单和追加批次补偿推进订单状态；batchId 为 null 时仅统计原始设计记录。 */
+    void reconcileOrderProductionStatus(Long orderId, Long batchId);
 
     /**
      * 获取流转卡取消预查询信息

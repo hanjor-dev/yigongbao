@@ -13,6 +13,14 @@ import java.util.List;
 @Data
 public class PrintInfoOptionsVO {
 
+    private Long batchId;
+    private Long packageId;
+    private String batchStatus;
+    private Boolean editable;
+    private Boolean canSave;
+    private Boolean canDelete;
+    private List<Long> allowedPackageFileIds;
+
     /**
      * 设计模式（来自 order_main.design_mode，暂未存储于该表则为 null）
      */

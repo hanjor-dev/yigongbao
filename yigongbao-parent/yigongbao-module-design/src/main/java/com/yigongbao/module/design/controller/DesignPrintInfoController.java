@@ -34,8 +34,11 @@ public class DesignPrintInfoController {
     @Operation(summary = "获取打印信息选项")
     @GetMapping("/{orderId}/package/{packageId}/print-info/options")
     public Result<PrintInfoOptionsVO> getOptions(@PathVariable Long orderId,
-                                                  @PathVariable Long packageId) {
-        return Result.success(printInfoService.getOptions(orderId, packageId));
+                                                  @PathVariable Long packageId,
+                                                  @RequestParam(required = false) Long batchId) {
+        return Result.success(batchId == null
+                ? printInfoService.getOptions(orderId, packageId)
+                : printInfoService.getOptions(orderId, packageId, batchId));
     }
 
     /**
@@ -44,8 +47,11 @@ public class DesignPrintInfoController {
     @Operation(summary = "查询打印信息列表")
     @GetMapping("/{orderId}/package/{packageId}/print-info")
     public Result<PrintInfoListVO> listPrintInfo(@PathVariable Long orderId,
-                                                @PathVariable Long packageId) {
-        return Result.success(printInfoService.listPrintInfo(orderId, packageId));
+                                                @PathVariable Long packageId,
+                                                @RequestParam(required = false) Long batchId) {
+        return Result.success(batchId == null
+                ? printInfoService.listPrintInfo(orderId, packageId)
+                : printInfoService.listPrintInfo(orderId, packageId, batchId));
     }
 
     /**
@@ -56,8 +62,13 @@ public class DesignPrintInfoController {
     @PostMapping("/{orderId}/package/{packageId}/print-info")
     public Result<Void> savePrintInfo(@PathVariable Long orderId,
                                       @PathVariable Long packageId,
+                                      @RequestParam(required = false) Long batchId,
                                       @Validated @RequestBody SavePrintInfoDTO dto) {
-        printInfoService.savePrintInfo(orderId, packageId, dto);
+        if (batchId == null) {
+            printInfoService.savePrintInfo(orderId, packageId, dto);
+        } else {
+            printInfoService.savePrintInfo(orderId, packageId, batchId, dto);
+        }
         return Result.success();
     }
 
@@ -69,8 +80,13 @@ public class DesignPrintInfoController {
     @DeleteMapping("/{orderId}/package/{packageId}/print-info/{printInfoId}")
     public Result<Void> deletePrintInfo(@PathVariable Long orderId,
                                          @PathVariable Long packageId,
-                                         @PathVariable Long printInfoId) {
-        printInfoService.deletePrintInfo(orderId, packageId, printInfoId);
+                                         @PathVariable Long printInfoId,
+                                         @RequestParam(required = false) Long batchId) {
+        if (batchId == null) {
+            printInfoService.deletePrintInfo(orderId, packageId, printInfoId);
+        } else {
+            printInfoService.deletePrintInfo(orderId, packageId, batchId, printInfoId);
+        }
         return Result.success();
     }
 }

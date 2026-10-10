@@ -69,8 +69,10 @@ public class DesignDocController {
     @GetMapping("/{orderId}/package/{packageId}/instruction/download")
     public void downloadInstruction(@PathVariable Long orderId,
                                     @PathVariable Long packageId,
+                                    @RequestParam(required = false) Long batchId,
                                     HttpServletResponse response) {
-        docService.downloadInstruction(orderId, packageId, response);
+        if (batchId == null) docService.downloadInstruction(orderId, packageId, response);
+        else docService.downloadInstruction(orderId, packageId, batchId, response);
     }
 
     /**
@@ -82,11 +84,14 @@ public class DesignDocController {
     public void downloadDrawing(@PathVariable Long orderId,
                                 @PathVariable Long packageId,
                                 @RequestParam(required = false) String productCategory,
+                                @RequestParam(required = false) Long batchId,
                                 HttpServletResponse response) {
         if (productCategory == null || productCategory.isBlank()) {
-            docService.downloadDrawing(orderId, packageId, response);
+            if (batchId == null) docService.downloadDrawing(orderId, packageId, response);
+            else docService.downloadDrawing(orderId, packageId, batchId, response);
         } else {
-            docService.downloadDrawing(orderId, packageId, productCategory, response);
+            if (batchId == null) docService.downloadDrawing(orderId, packageId, productCategory, response);
+            else docService.downloadDrawing(orderId, packageId, batchId, productCategory, response);
         }
     }
 
@@ -97,8 +102,10 @@ public class DesignDocController {
     @Operation(summary = "获取指令单预览 URL（在线模式，按需自动生成）")
     @GetMapping("/{orderId}/package/{packageId}/instruction/preview-url")
     public Result<DocItemVO> getInstructionPreviewUrl(@PathVariable Long orderId,
-                                                       @PathVariable Long packageId) {
-        return Result.success(docService.getInstructionPreviewUrl(orderId, packageId));
+                                                       @PathVariable Long packageId,
+                                                       @RequestParam(required = false) Long batchId) {
+        return Result.success(batchId == null ? docService.getInstructionPreviewUrl(orderId, packageId)
+                : docService.getInstructionPreviewUrl(orderId, packageId, batchId));
     }
 
     /**
@@ -109,10 +116,16 @@ public class DesignDocController {
     @GetMapping("/{orderId}/package/{packageId}/drawing/preview-url")
     public Result<DocItemVO> getDrawingPreviewUrl(@PathVariable Long orderId,
                                                    @PathVariable Long packageId,
-                                                   @RequestParam(required = false) String productCategory) {
+                                                   @RequestParam(required = false) String productCategory,
+                                                   @RequestParam(required = false) Long batchId) {
+        if (batchId == null) {
+            return Result.success(productCategory == null || productCategory.isBlank()
+                    ? docService.getDrawingPreviewUrl(orderId, packageId)
+                    : docService.getDrawingPreviewUrl(orderId, packageId, productCategory));
+        }
         return Result.success(productCategory == null || productCategory.isBlank()
-                ? docService.getDrawingPreviewUrl(orderId, packageId)
-                : docService.getDrawingPreviewUrl(orderId, packageId, productCategory));
+                ? docService.getDrawingPreviewUrl(orderId, packageId, batchId)
+                : docService.getDrawingPreviewUrl(orderId, packageId, batchId, productCategory));
     }
 
     /**
@@ -121,8 +134,10 @@ public class DesignDocController {
     @Operation(summary = "查询指令单版本列表")
     @GetMapping("/{orderId}/package/{packageId}/instruction/versions")
     public Result<List<DesignDocVersionVO>> listInstructionVersions(@PathVariable Long orderId,
-                                                                     @PathVariable Long packageId) {
-        return Result.success(docService.listInstructionVersions(orderId, packageId));
+                                                                     @PathVariable Long packageId,
+                                                                     @RequestParam(required = false) Long batchId) {
+        return Result.success(batchId == null ? docService.listInstructionVersions(orderId, packageId)
+                : docService.listInstructionVersions(orderId, packageId, batchId));
     }
 
     /**
@@ -132,10 +147,16 @@ public class DesignDocController {
     @GetMapping("/{orderId}/package/{packageId}/drawing/versions")
     public Result<List<DesignDocVersionVO>> listDrawingVersions(@PathVariable Long orderId,
                                                                  @PathVariable Long packageId,
-                                                                 @RequestParam(required = false) String productCategory) {
+                                                                 @RequestParam(required = false) String productCategory,
+                                                                 @RequestParam(required = false) Long batchId) {
+        if (batchId == null) {
+            return Result.success(productCategory == null || productCategory.isBlank()
+                    ? docService.listDrawingVersions(orderId, packageId)
+                    : docService.listDrawingVersions(orderId, packageId, productCategory));
+        }
         return Result.success(productCategory == null || productCategory.isBlank()
-                ? docService.listDrawingVersions(orderId, packageId)
-                : docService.listDrawingVersions(orderId, packageId, productCategory));
+                ? docService.listDrawingVersions(orderId, packageId, batchId)
+                : docService.listDrawingVersions(orderId, packageId, batchId, productCategory));
     }
 
     /**
@@ -147,8 +168,10 @@ public class DesignDocController {
     public Result<Void> uploadRevisedInstruction(@PathVariable Long orderId,
                                                   @PathVariable Long packageId,
                                                   @PathVariable Long id,
+                                                  @RequestParam(required = false) Long batchId,
                                                   @RequestParam("file") MultipartFile file) {
-        docService.uploadRevisedInstruction(orderId, packageId, id, file);
+        if (batchId == null) docService.uploadRevisedInstruction(orderId, packageId, id, file);
+        else docService.uploadRevisedInstruction(orderId, packageId, batchId, id, file);
         return Result.success();
     }
 
@@ -162,11 +185,14 @@ public class DesignDocController {
                                               @PathVariable Long packageId,
                                               @PathVariable Long id,
                                               @RequestParam(required = false) String productCategory,
+                                              @RequestParam(required = false) Long batchId,
                                               @RequestParam("file") MultipartFile file) {
         if (productCategory == null || productCategory.isBlank()) {
-            docService.uploadRevisedDrawing(orderId, packageId, id, file);
+            if (batchId == null) docService.uploadRevisedDrawing(orderId, packageId, id, file);
+            else docService.uploadRevisedDrawing(orderId, packageId, batchId, id, file);
         } else {
-            docService.uploadRevisedDrawing(orderId, packageId, productCategory, id, file);
+            if (batchId == null) docService.uploadRevisedDrawing(orderId, packageId, productCategory, id, file);
+            else docService.uploadRevisedDrawing(orderId, packageId, batchId, productCategory, id, file);
         }
         return Result.success();
     }
@@ -182,11 +208,14 @@ public class DesignDocController {
     public Result<Void> confirmDrawing(@PathVariable Long orderId,
                                        @PathVariable Long packageId,
                                        @PathVariable Long id,
-                                       @RequestParam(required = false) String productCategory) {
+                                       @RequestParam(required = false) String productCategory,
+                                       @RequestParam(required = false) Long batchId) {
         if (productCategory == null || productCategory.isBlank()) {
-            docService.confirmDrawing(orderId, packageId, id);
+            if (batchId == null) docService.confirmDrawing(orderId, packageId, id);
+            else docService.confirmDrawing(orderId, packageId, batchId, id);
         } else {
-            docService.confirmDrawing(orderId, packageId, productCategory, id);
+            if (batchId == null) docService.confirmDrawing(orderId, packageId, productCategory, id);
+            else docService.confirmDrawing(orderId, packageId, batchId, productCategory, id);
         }
         return Result.success();
     }
@@ -201,8 +230,10 @@ public class DesignDocController {
     @PostMapping("/{orderId}/package/{packageId}/instruction/confirm/{id}")
     public Result<Void> confirmInstruction(@PathVariable Long orderId,
                                             @PathVariable Long packageId,
-                                            @PathVariable Long id) {
-        docService.confirmInstruction(orderId, packageId, id);
+                                            @PathVariable Long id,
+                                            @RequestParam(required = false) Long batchId) {
+        if (batchId == null) docService.confirmInstruction(orderId, packageId, id);
+        else docService.confirmInstruction(orderId, packageId, batchId, id);
         return Result.success();
     }
 

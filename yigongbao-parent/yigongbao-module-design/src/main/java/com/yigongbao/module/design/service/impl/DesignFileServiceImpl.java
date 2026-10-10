@@ -24,6 +24,8 @@ import com.yigongbao.module.design.service.DesignModelService;
 import com.yigongbao.module.design.service.DesignPackageFileService;
 import com.yigongbao.module.design.service.DesignPackageService;
 import com.yigongbao.module.design.entity.DesignPackageFileScreenshotEntity;
+import com.yigongbao.module.design.entity.DesignPackageBatchEntity;
+import com.yigongbao.module.design.enums.DesignPackageBatchStatus;
 import com.yigongbao.module.design.service.DesignProductFileService;
 import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.service.DesignScreenshotService;
@@ -72,12 +74,23 @@ public class DesignFileServiceImpl implements DesignFileService {
     private final CodeGeneratorService codeGeneratorService;
     private final ConfigService configService;
     private final com.yigongbao.module.design.helper.DesignQueryHelper designQueryHelper;
+    private final com.yigongbao.module.design.service.DesignPackageBatchService batchService;
 
     // ==================== 数据包 ====================
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public DesignPackageVO uploadPackage(Long orderId, MultipartFile file) {
+        return uploadPackageInternal(orderId, null, file);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DesignPackageVO uploadPackage(Long orderId, Long batchId, MultipartFile file) {
+        return uploadPackageInternal(orderId, batchId, file);
+    }
+
+    private DesignPackageVO uploadPackageInternal(Long orderId, Long batchId, MultipartFile file) {
         // 0. 校验文件非空
         if (file.isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "上传文件不能为空");
@@ -86,7 +99,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         // 1. 校验工单状态和操作权限
         // 经典案例保护：经典案例订单不允许上传新的设计数据包
         orderMainService.checkNotClassicCase(orderId, "上传设计数据包");
-        OrderMainEntity order = checkDesignPhase(orderId);
+        OrderMainEntity order = batchId == null ? checkDesignPhase(orderId) : checkAdditionalBatch(orderId, batchId);
         checkIsAssignedDesigner(order);
 
         // 2. 校验压缩包容器格式（由配置决定允许的格式）
@@ -176,6 +189,7 @@ public class DesignFileServiceImpl implements DesignFileService {
             // 10. 保存数据包记录
             DesignPackageEntity packageEntity = new DesignPackageEntity();
             packageEntity.setOrderId(orderId);
+            packageEntity.setBatchId(batchId);
             packageEntity.setOrderCode(order.getOrderCode());
             packageEntity.setPackageCode(packageCode);
             packageEntity.setPackageSeq(packageSeq);
@@ -225,14 +239,26 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deletePackage(Long orderId, Long packageId) {
+        deletePackageInternal(orderId, null, packageId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deletePackage(Long orderId, Long batchId, Long packageId) {
+        deletePackageInternal(orderId, batchId, packageId);
+    }
+
+    private void deletePackageInternal(Long orderId, Long batchId, Long packageId) {
         // 1. 校验工单状态和操作权限
         // 经典案例保护：经典案例订单不允许删除设计数据包
         orderMainService.checkNotClassicCase(orderId, "删除设计数据包");
-        checkIsAssignedDesigner(checkDesignPhase(orderId));
+        OrderMainEntity order = batchId == null ? checkDesignPhase(orderId) : checkAdditionalBatch(orderId, batchId);
+        checkIsAssignedDesigner(order);
 
         // 2. 查询数据包
         DesignPackageEntity packageEntity = packageService.getById(packageId);
-        if (packageEntity == null || !packageEntity.getOrderId().equals(orderId)) {
+        if (packageEntity == null || !packageEntity.getOrderId().equals(orderId)
+                || (batchId != null && !batchId.equals(packageEntity.getBatchId()))) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
         }
 
@@ -311,15 +337,29 @@ public class DesignFileServiceImpl implements DesignFileService {
     }
 
     @Override
+    public List<DesignPackageVO> listPackages(Long orderId, Long batchId) {
+        designQueryHelper.checkOrderReadable(orderId);
+        if (batchId != null) {
+            checkAdditionalBatch(orderId, batchId);
+        }
+        return listPackagesInternal(orderId, batchId);
+    }
+
+    @Override
     public List<DesignPackageVO> listPackagesForOrderDetail(Long orderId) {
         return listPackagesInternal(orderId);
     }
 
     private List<DesignPackageVO> listPackagesInternal(Long orderId) {
+        return listPackagesInternal(orderId, null);
+    }
+
+    private List<DesignPackageVO> listPackagesInternal(Long orderId, Long currentBatchId) {
         // 1. 查询数据包列表
         List<DesignPackageEntity> packages = packageService.list(
                 new LambdaQueryWrapper<DesignPackageEntity>()
                         .eq(DesignPackageEntity::getOrderId, orderId)
+                        .eq(currentBatchId != null, DesignPackageEntity::getBatchId, currentBatchId)
                         .orderByAsc(DesignPackageEntity::getPackageSeq));
 
         if (CollUtil.isEmpty(packages)) {
@@ -345,8 +385,28 @@ public class DesignFileServiceImpl implements DesignFileService {
 
         // 5. 构建返回结果
         return packages.stream()
-                .map(pkg -> buildPackageVO(pkg, fileMap.getOrDefault(pkg.getId(), Collections.emptyList()), filledFileIds,
-                        order == null ? null : order.getPublicOrderCode()))
+                .map(pkg -> {
+                    DesignPackageVO vo = buildPackageVO(pkg, fileMap.getOrDefault(pkg.getId(), Collections.emptyList()), filledFileIds,
+                            order == null ? null : order.getPublicOrderCode());
+                    if (currentBatchId != null) {
+                        boolean current = currentBatchId.equals(pkg.getBatchId());
+                        vo.setIsCurrentBatch(current);
+                        if (current) {
+                            boolean editable = !DesignPackageBatchStatus.COMPLETED.name().equals(vo.getBatchStatus())
+                                    && !DesignPackageBatchStatus.CANCELLED.name().equals(vo.getBatchStatus());
+                            vo.setEditable(editable);
+                            vo.setCanDelete(editable);
+                            vo.setCanEditPrintInfo(editable);
+                            vo.setCanEditDocuments(editable);
+                        } else {
+                            vo.setEditable(false);
+                            vo.setCanDelete(false);
+                            vo.setCanEditPrintInfo(false);
+                            vo.setCanEditDocuments(false);
+                        }
+                    }
+                    return vo;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -396,6 +456,9 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Transactional(rollbackFor = Exception.class)
     public List<DesignModelVO> linkModels(Long orderId, List<String> fileIds) {
         log.info("批量关联可视化模型, orderId={}, fileIds={}", orderId, fileIds);
+        if (CollUtil.isEmpty(fileIds)) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "至少选择一个可视化模型文件");
+        }
         List<String> requestedFileIds = fileIds.stream().distinct().toList();
 
         // 1. 校验工单状态和操作权限
@@ -529,6 +592,9 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public List<FileVO> linkReport(Long orderId, List<String> fileIds) {
+        if (CollUtil.isEmpty(fileIds)) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "至少选择一个设计报告文件");
+        }
         // 1. 校验工单状态和操作权限
         // 经典案例保护：经典案例订单不允许关联新的设计报告文件
         orderMainService.checkNotClassicCase(orderId, "关联设计报告");
@@ -605,7 +671,15 @@ public class DesignFileServiceImpl implements DesignFileService {
     // ==================== 私有方法 ====================
 
     private OrderMainEntity checkDesignPhase(Long orderId) {
-        return designQueryHelper.checkDesignPhase(orderId);
+        OrderMainEntity order = designQueryHelper.checkDesignPhase(orderId);
+        ensureOriginalDesignMutation(order);
+        return order;
+    }
+
+    private void ensureOriginalDesignMutation(OrderMainEntity order) {
+        if (order == null || !Set.of(1030, 2010, 2020).contains(order.getStatus())) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+        }
     }
 
     private OrderMainEntity checkDesignAttachmentMutation(Long orderId) {
@@ -727,6 +801,28 @@ public class DesignFileServiceImpl implements DesignFileService {
         DesignPackageVO vo = new DesignPackageVO();
         vo.setId(entity.getId());
         vo.setOrderId(entity.getOrderId());
+        vo.setBatchId(entity.getBatchId());
+        if (entity.getBatchId() != null) {
+            DesignPackageBatchEntity batch = batchService.getById(entity.getBatchId());
+            if (batch != null) {
+                vo.setBatchNo(batch.getBatchNo());
+                vo.setBatchStatus(batch.getStatus());
+                boolean editable = DesignPackageBatchStatus.COMPLETED.name().equals(batch.getStatus())
+                        || DesignPackageBatchStatus.CANCELLED.name().equals(batch.getStatus());
+                vo.setEditable(!editable);
+                vo.setCanDelete(!editable);
+                vo.setCanEditPrintInfo(!editable);
+                vo.setCanEditDocuments(!editable);
+            }
+        }
+        if (vo.getEditable() == null) {
+            OrderMainEntity order = orderMainService.getById(entity.getOrderId());
+            boolean designPhase = order != null && Set.of(1030, 2010, 2020).contains(order.getStatus());
+            vo.setEditable(designPhase);
+            vo.setCanDelete(designPhase);
+            vo.setCanEditPrintInfo(designPhase);
+            vo.setCanEditDocuments(designPhase);
+        }
         vo.setOrderCode(entity.getOrderCode());
         vo.setPublicOrderCode(publicOrderCode);
         vo.setPackageCode(entity.getPackageCode());
@@ -738,6 +834,9 @@ public class DesignFileServiceImpl implements DesignFileService {
         vo.setFileSize(entity.getFileSize());
         vo.setFileCount(entity.getFileCount());
         vo.setUploadTime(entity.getUploadTime());
+        long printInfoCount = productService.countByPackageId(entity.getId());
+        vo.setPrintInfoCount((int) printInfoCount);
+        vo.setPrintInfoCompleted(printInfoCount > 0);
 
         // 包内文件列表
         List<FileDownloadUrlByUrlRequest> requests = files.stream()
@@ -756,6 +855,9 @@ public class DesignFileServiceImpl implements DesignFileService {
                     fileVO.setFileSize(f.getFileSize());
                     fileVO.setSortOrder(f.getSortOrder());
                     fileVO.setHasPrintInfo(filledFileIds.contains(f.getId()));
+                    // 历史数据包的文件仍可查看，但不能被追加打印信息操作选中。
+                    fileVO.setSelectableForPrint(Boolean.TRUE.equals(vo.getCanEditPrintInfo())
+                            && !filledFileIds.contains(f.getId()));
                     fileVO.setFileUrl(f.getFileUrl());
             fileVO.setDownloadUrl(i < packageDownloadUrls.size() ? packageDownloadUrls.get(i) : null);
             fileVOs.add(fileVO);
@@ -763,6 +865,31 @@ public class DesignFileServiceImpl implements DesignFileService {
         vo.setFiles(fileVOs);
 
         return vo;
+    }
+
+    private OrderMainEntity checkAdditionalBatch(Long orderId, Long batchId) {
+        orderMainService.checkNotClassicCase(orderId, "操作追加设计批次");
+        OrderMainEntity order = orderMainService.getById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        Set<Integer> allowed = Set.of(2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020,
+                5030, 5040, 5050, 6010, 6020, 6030, 8010);
+        if (!allowed.contains(order.getStatus())) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+        }
+        DesignPackageBatchEntity batch = batchService.getOne(new LambdaQueryWrapper<DesignPackageBatchEntity>()
+                .eq(DesignPackageBatchEntity::getId, batchId)
+                .eq(DesignPackageBatchEntity::getOrderId, orderId)
+                .last("FOR UPDATE"), false);
+        if (batch == null || !orderId.equals(batch.getOrderId())) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
+        }
+        if (DesignPackageBatchStatus.COMPLETED.name().equals(batch.getStatus())
+                || DesignPackageBatchStatus.CANCELLED.name().equals(batch.getStatus())) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED, "追加设计批次已锁定");
+        }
+        return order;
     }
 
     /**

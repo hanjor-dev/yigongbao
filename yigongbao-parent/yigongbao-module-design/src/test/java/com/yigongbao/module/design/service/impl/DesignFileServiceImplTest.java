@@ -273,6 +273,16 @@ class DesignFileServiceImplTest {
                 assertEquals(ErrorCodeEnum.ATTACHMENT_NOT_FOUND.getCode(), exception.getCode());
             }
         }
+
+        @Test
+        @DisplayName("空模型文件列表抛出参数异常")
+        void shouldRejectEmptyModelFileList() {
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> designFileService.linkModels(orderId, Collections.emptyList()));
+
+            assertEquals(ErrorCodeEnum.INVALID_PARAMETER.getCode(), exception.getCode());
+            verifyNoInteractions(orderMainService, fileService, modelService);
+        }
     }
 
     @Nested
@@ -438,6 +448,16 @@ class DesignFileServiceImplTest {
 
                 assertEquals(ErrorCodeEnum.ATTACHMENT_NOT_FOUND.getCode(), exception.getCode());
             }
+        }
+
+        @Test
+        @DisplayName("空报告文件列表抛出参数异常")
+        void shouldRejectEmptyReportFileList() {
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> designFileService.linkReport(orderId, null));
+
+            assertEquals(ErrorCodeEnum.INVALID_PARAMETER.getCode(), exception.getCode());
+            verifyNoInteractions(orderMainService, fileService);
         }
     }
 

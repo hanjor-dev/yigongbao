@@ -29,6 +29,17 @@ public class DesignPackageVO implements Serializable {
      */
     private Long orderId;
 
+    private Long batchId;
+    private String batchNo;
+    private String batchStatus;
+    private Boolean isCurrentBatch;
+    private Boolean editable;
+    private Boolean canDelete;
+    private Boolean canEditPrintInfo;
+    private Boolean canEditDocuments;
+    private Boolean printInfoCompleted;
+    private Integer printInfoCount;
+
     /**
      * 订单编号
      */

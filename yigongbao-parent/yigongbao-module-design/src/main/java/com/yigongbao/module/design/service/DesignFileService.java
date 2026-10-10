@@ -29,6 +29,8 @@ public interface DesignFileService {
      */
     DesignPackageVO uploadPackage(Long orderId, MultipartFile file);
 
+    DesignPackageVO uploadPackage(Long orderId, Long batchId, MultipartFile file);
+
     /**
      * 删除数据包
      *
@@ -37,6 +39,8 @@ public interface DesignFileService {
      */
     void deletePackage(Long orderId, Long packageId);
 
+    void deletePackage(Long orderId, Long batchId, Long packageId);
+
     /**
      * 获取订单的数据包列表
      *
@@ -44,6 +48,8 @@ public interface DesignFileService {
      * @return 数据包列表
      */
     List<DesignPackageVO> listPackages(Long orderId);
+
+    List<DesignPackageVO> listPackages(Long orderId, Long batchId);
 
     /**
      * 供已完成订单权限校验的订单详情聚合查询数据包列表。

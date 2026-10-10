@@ -72,6 +72,7 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
     private final DesignInstructionMapper instructionMapper;
     private final DesignDrawingMapper drawingMapper;
     private final com.yigongbao.module.design.helper.DesignQueryHelper designQueryHelper;
+    private final com.yigongbao.module.design.service.DesignPackageBatchService packageBatchService;
 
     /**
      * 获取打印信息选项数据以及包级已保存回显字段
@@ -155,8 +156,19 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
             vo.setProductMark(pkg.getProductMark());
             vo.setPackQuantity(pkg.getPackQuantity());
             vo.setRemark(pkg.getRemark());
+            applyCapabilities(vo, pkg, null, order);
         }
 
+        return vo;
+    }
+
+    @Override
+    public PrintInfoOptionsVO getOptions(Long orderId, Long packageId, Long batchId) {
+        DesignPackageEntity pkg = checkPrintInfoAccess(orderId, packageId, batchId, false);
+        PrintInfoOptionsVO vo = getOptions(orderId, packageId);
+        if (batchId != null) {
+            applyCapabilities(vo, pkg, batchId);
+        }
         return vo;
     }
 
@@ -169,17 +181,28 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
      */
     @Override
     public PrintInfoListVO listPrintInfo(Long orderId, Long packageId) {
+        return listPrintInfoInternal(orderId, packageId, null);
+    }
+
+    @Override
+    public PrintInfoListVO listPrintInfo(Long orderId, Long packageId, Long batchId) {
+        return listPrintInfoInternal(orderId, packageId, batchId);
+    }
+
+    private PrintInfoListVO listPrintInfoInternal(Long orderId, Long packageId, Long batchId) {
         // 1. 校验 packageId 属于 orderId，并回填包级字段（checkDesignPhase 含数据权限校验）
-        checkDesignPhase(orderId);
-        DesignPackageEntity pkg = packageService.getById(packageId);
-        if (pkg == null || !pkg.getOrderId().equals(orderId)) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
-        }
+        DesignPackageEntity pkg = checkPrintInfoAccess(orderId, packageId, batchId, false);
+        OrderMainEntity order = orderMainService.getById(orderId);
 
         PrintInfoListVO result = new PrintInfoListVO();
         result.setProductMark(pkg.getProductMark());
         result.setPackQuantity(pkg.getPackQuantity());
         result.setRemark(pkg.getRemark());
+        if (batchId == null) {
+            applyCapabilities(result, pkg, null, order);
+        } else {
+            applyCapabilities(result, pkg, batchId);
+        }
 
         // 2. 查询产品列表
         List<DesignProductEntity> entities = designProductService.list(
@@ -243,15 +266,16 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void savePrintInfo(Long orderId, Long packageId, SavePrintInfoDTO dto) {
+        savePrintInfo(orderId, packageId, null, dto);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void savePrintInfo(Long orderId, Long packageId, Long batchId, SavePrintInfoDTO dto) {
         // 1. 校验订单状态和操作人
-        OrderMainEntity order = checkDesignPhase(orderId);
-        checkIsAssignedDesigner(order);
+        checkPrintInfoAccess(orderId, packageId, batchId, true);
 
         // 2. 校验 packageId 属于 orderId
-        DesignPackageEntity pkg = packageService.getById(packageId);
-        if (pkg == null || !pkg.getOrderId().equals(orderId)) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
-        }
 
         List<SavePrintInfoItemDTO> items = dto.getItems();
 
@@ -380,9 +404,14 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deletePrintInfo(Long orderId, Long packageId, Long printInfoId) {
+        deletePrintInfo(orderId, packageId, null, printInfoId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deletePrintInfo(Long orderId, Long packageId, Long batchId, Long printInfoId) {
         // 1. 校验订单状态和操作人
-        OrderMainEntity order = checkDesignPhase(orderId);
-        checkIsAssignedDesigner(order);
+        checkPrintInfoAccess(orderId, packageId, batchId, true);
 
         // 2. 查询并验证 orderId 和 packageId 匹配
         DesignProductEntity entity = designProductService.getById(printInfoId);
@@ -427,7 +456,126 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
      * 校验订单存在且处于可操作的设计阶段（委托 DesignQueryHelper）
      */
     private OrderMainEntity checkDesignPhase(Long orderId) {
-        return designQueryHelper.checkDesignPhase(orderId);
+        OrderMainEntity order = designQueryHelper.checkDesignPhase(orderId);
+        if (order == null || !Set.of(1030, 2010, 2020).contains(order.getStatus())) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+        }
+        return order;
+    }
+
+    private DesignPackageEntity checkPrintInfoAccess(Long orderId, Long packageId, Long batchId, boolean mutation) {
+        OrderMainEntity order = batchId == null && mutation ? checkDesignPhase(orderId)
+                : orderMainService.getById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        if (mutation) {
+            // 先校验操作人，避免无权限用户通过不存在的数据包探测订单数据。
+            checkIsAssignedDesigner(order);
+        }
+        DesignPackageEntity pkg = packageService.getById(packageId);
+        if (pkg == null || !orderId.equals(pkg.getOrderId())) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
+        }
+        if (batchId != null) {
+            if (!batchId.equals(pkg.getBatchId())) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
+            }
+        }
+        if (batchId != null) {
+            var batchQuery = new LambdaQueryWrapper<com.yigongbao.module.design.entity.DesignPackageBatchEntity>()
+                    .eq(com.yigongbao.module.design.entity.DesignPackageBatchEntity::getId, batchId)
+                    .eq(com.yigongbao.module.design.entity.DesignPackageBatchEntity::getOrderId, orderId);
+            if (mutation) {
+                batchQuery.last("FOR UPDATE");
+            }
+            com.yigongbao.module.design.entity.DesignPackageBatchEntity batch = packageBatchService.getOne(batchQuery, false);
+            if (batch == null || "CANCELLED".equals(batch.getStatus())
+                    || (mutation && "COMPLETED".equals(batch.getStatus()))) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+            }
+            OrderMainEntity currentOrder = orderMainService.getById(orderId);
+            if (mutation && !Set.of(2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020, 5030, 5040, 5050, 6010, 6020, 6030, 8010)
+                    .contains(currentOrder.getStatus())) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+            }
+        }
+        return pkg;
+    }
+
+
+    private void applyCapabilities(PrintInfoOptionsVO vo, DesignPackageEntity pkg, Long batchId) {
+        vo.setPackageId(pkg.getId());
+        vo.setBatchId(batchId == null ? pkg.getBatchId() : batchId);
+        if (batchId != null) {
+            var batch = packageBatchService.getById(batchId);
+            vo.setBatchStatus(batch == null ? null : batch.getStatus());
+            boolean editable = batch != null && !"COMPLETED".equals(batch.getStatus())
+                    && !"CANCELLED".equals(batch.getStatus());
+            vo.setEditable(editable);
+            vo.setCanSave(editable);
+            vo.setCanDelete(editable);
+        } else {
+            vo.setEditable(true);
+            vo.setCanSave(true);
+            vo.setCanDelete(true);
+        }
+        Set<Long> filledFileIds = productFileService.getFilledPackageFileIds(List.of(pkg.getId()));
+        vo.setAllowedPackageFileIds(packageFileService.list(new LambdaQueryWrapper<DesignPackageFileEntity>()
+                .eq(DesignPackageFileEntity::getPackageId, pkg.getId())
+                .select(DesignPackageFileEntity::getId)).stream()
+                .map(DesignPackageFileEntity::getId)
+                .filter(id -> !filledFileIds.contains(id)).toList());
+    }
+
+    private void applyCapabilities(PrintInfoOptionsVO vo, DesignPackageEntity pkg, Long batchId,
+                                   OrderMainEntity order) {
+        vo.setPackageId(pkg.getId());
+        vo.setBatchId(pkg.getBatchId());
+        boolean editable = pkg.getBatchId() == null && order != null
+                && Set.of(1030, 2010, 2020).contains(order.getStatus());
+        vo.setBatchStatus(null);
+        vo.setEditable(editable);
+        vo.setCanSave(editable);
+        vo.setCanDelete(editable);
+        Set<Long> filledFileIds = productFileService.getFilledPackageFileIds(List.of(pkg.getId()));
+        vo.setAllowedPackageFileIds(editable
+                ? packageFileService.list(new LambdaQueryWrapper<DesignPackageFileEntity>()
+                        .eq(DesignPackageFileEntity::getPackageId, pkg.getId())
+                        .select(DesignPackageFileEntity::getId)).stream()
+                        .map(DesignPackageFileEntity::getId)
+                        .filter(id -> !filledFileIds.contains(id)).toList()
+                : List.of());
+    }
+
+    private void applyCapabilities(PrintInfoListVO vo, DesignPackageEntity pkg, Long batchId) {
+        vo.setPackageId(pkg.getId());
+        vo.setBatchId(batchId == null ? pkg.getBatchId() : batchId);
+        var batch = batchId == null || pkg.getBatchId() == null ? null : packageBatchService.getById(batchId);
+        vo.setBatchStatus(batch == null ? null : batch.getStatus());
+        boolean editable = batch == null || (!"COMPLETED".equals(batch.getStatus())
+                && !"CANCELLED".equals(batch.getStatus()));
+        vo.setEditable(editable);
+        vo.setCanSave(editable);
+        vo.setCanDelete(editable);
+        vo.setPrintInfoCompleted(designProductService.count(
+                new LambdaQueryWrapper<DesignProductEntity>()
+                        .eq(DesignProductEntity::getPackageId, pkg.getId())) > 0);
+    }
+
+    private void applyCapabilities(PrintInfoListVO vo, DesignPackageEntity pkg, Long batchId,
+                                   OrderMainEntity order) {
+        vo.setPackageId(pkg.getId());
+        vo.setBatchId(pkg.getBatchId());
+        vo.setBatchStatus(null);
+        boolean editable = pkg.getBatchId() == null && order != null
+                && Set.of(1030, 2010, 2020).contains(order.getStatus());
+        vo.setEditable(editable);
+        vo.setCanSave(editable);
+        vo.setCanDelete(editable);
+        vo.setPrintInfoCompleted(designProductService.count(
+                new LambdaQueryWrapper<DesignProductEntity>()
+                        .eq(DesignProductEntity::getPackageId, pkg.getId())) > 0);
     }
 
     /**

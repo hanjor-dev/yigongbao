@@ -25,6 +25,9 @@ public class DesignPackageEntity extends BaseEntity {
      */
     private Long orderId;
 
+    /** 追加批次ID，历史普通设计数据包为空。 */
+    private Long batchId;
+
     /**
      * 订单编号（冗余）
      */

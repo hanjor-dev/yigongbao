@@ -42,8 +42,11 @@ public class DesignPackageController {
     @PostMapping("/package/upload")
     public Result<DesignPackageVO> uploadPackage(
             @Parameter(description = "订单ID") @RequestParam Long orderId,
+            @Parameter(description = "追加批次ID，追加模式必填") @RequestParam(required = false) Long batchId,
             @Parameter(description = "压缩包文件") @RequestParam("file") MultipartFile file) {
-        return Result.success(designFileService.uploadPackage(orderId, file));
+        return Result.success(batchId == null
+                ? designFileService.uploadPackage(orderId, file)
+                : designFileService.uploadPackage(orderId, batchId, file));
     }
 
     /**
@@ -54,8 +57,13 @@ public class DesignPackageController {
     @DeleteMapping("/package/{packageId}")
     public Result<Void> deletePackage(
             @Parameter(description = "订单ID") @RequestParam Long orderId,
+            @Parameter(description = "追加批次ID") @RequestParam(required = false) Long batchId,
             @Parameter(description = "数据包ID") @PathVariable Long packageId) {
-        designFileService.deletePackage(orderId, packageId);
+        if (batchId == null) {
+            designFileService.deletePackage(orderId, packageId);
+        } else {
+            designFileService.deletePackage(orderId, batchId, packageId);
+        }
         return Result.success();
     }
 
@@ -65,8 +73,11 @@ public class DesignPackageController {
     @Operation(summary = "获取数据包列表")
     @GetMapping("/packages")
     public Result<List<DesignPackageVO>> listPackages(
-            @Parameter(description = "订单ID") @RequestParam Long orderId) {
-        return Result.success(designFileService.listPackages(orderId));
+            @Parameter(description = "订单ID") @RequestParam Long orderId,
+            @Parameter(description = "追加批次ID") @RequestParam(required = false) Long batchId) {
+        return Result.success(batchId == null
+                ? designFileService.listPackages(orderId)
+                : designFileService.listPackages(orderId, batchId));
     }
 
     /**

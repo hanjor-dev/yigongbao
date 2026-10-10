@@ -59,6 +59,36 @@ public class FlowOrderServiceImpl implements FlowOrderService {
         log.info("更新订单阶段和状态: orderId={}, phase={}, status={}", id, phase, status);
     }
 
+    @Override
+    public int updatePhaseAndStatusIfVersion(Long id, Integer expectedVersion, Integer phase, Integer status) {
+        int expected = expectedVersion == null ? 0 : expectedVersion;
+        LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(OrderMainEntity::getId, id)
+                .and(w -> w.eq(OrderMainEntity::getVersion, expected)
+                        .or().isNull(OrderMainEntity::getVersion))
+                .set(OrderMainEntity::getPhase, phase)
+                .set(OrderMainEntity::getStatus, status)
+                .set(OrderMainEntity::getVersion, expected + 1);
+        return flowOrderMapper.update(null, wrapper);
+    }
+
+    @Override
+    public int updatePhaseAndStatusWithHandlerIfVersion(Long id, Integer expectedVersion, Integer phase,
+                                                        Integer status, Long currentHandlerId,
+                                                        String currentHandlerName) {
+        int expected = expectedVersion == null ? 0 : expectedVersion;
+        LambdaUpdateWrapper<OrderMainEntity> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(OrderMainEntity::getId, id)
+                .and(w -> w.eq(OrderMainEntity::getVersion, expected)
+                        .or().isNull(OrderMainEntity::getVersion))
+                .set(OrderMainEntity::getPhase, phase)
+                .set(OrderMainEntity::getStatus, status)
+                .set(OrderMainEntity::getCurrentHandlerId, currentHandlerId)
+                .set(OrderMainEntity::getCurrentHandlerName, currentHandlerName)
+                .set(OrderMainEntity::getVersion, expected + 1);
+        return flowOrderMapper.update(null, wrapper);
+    }
+
     /**
      * 更新订单阶段、状态和当前处理人
      *

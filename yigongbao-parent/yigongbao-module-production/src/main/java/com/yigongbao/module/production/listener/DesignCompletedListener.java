@@ -32,6 +32,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -85,10 +87,17 @@ public class DesignCompletedListener {
         log.info("监听到设计完成事件: orderId={}, orderCode={}, orderType={}",
             orderId, order.getOrderCode(), order.getOrderType());
 
-        // 查询订单下的所有数据包
-        List<DesignPackageEntity> packages = designPackageMapper.selectList(
-                new LambdaQueryWrapper<DesignPackageEntity>()
-                        .eq(DesignPackageEntity::getOrderId, orderId));
+        // 普通完成设计事件 packageIds=null 表示订单级全量处理；追加批次事件必须显式携带非空包集合。
+        if (event.getPackageIds() != null && event.getPackageIds().isEmpty()) {
+            log.warn("追加设计完成事件未携带数据包，跳过流转卡创建: orderId={}", orderId);
+            return;
+        }
+        LambdaQueryWrapper<DesignPackageEntity> packageQuery = new LambdaQueryWrapper<DesignPackageEntity>()
+                .eq(DesignPackageEntity::getOrderId, orderId);
+        if (event.getPackageIds() != null) {
+            packageQuery.in(DesignPackageEntity::getId, event.getPackageIds());
+        }
+        List<DesignPackageEntity> packages = designPackageMapper.selectList(packageQuery);
 
         if (packages.isEmpty()) {
             log.warn("订单无数据包，跳过流转卡创建: orderId={}", orderId);
@@ -162,8 +171,21 @@ public class DesignCompletedListener {
             orderId, packages.size(), createdRecordIds.size());
 
         if (!createdRecordIds.isEmpty()) {
-            eventPublisher.publishEvent(new ProductionCardsCreatedEvent(this, createdRecordIds));
+            publishAfterCommit(new ProductionCardsCreatedEvent(this, createdRecordIds));
         }
+    }
+
+    private void publishAfterCommit(ProductionCardsCreatedEvent event) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            eventPublisher.publishEvent(event);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                eventPublisher.publishEvent(event);
+            }
+        });
     }
 
     /**
@@ -202,6 +224,7 @@ public class DesignCompletedListener {
         record.setOrderCode(order.getOrderCode());
         record.setOrderType(order.getOrderType());
         record.setDesignPackageId(pkg.getId());
+        record.setBatchId(pkg.getBatchId());
         record.setDesignPackageCode(pkg.getPackageCode());
         record.setProductionBatchNo(batchNo);
         record.setHospitalName(order.getHospitalName());

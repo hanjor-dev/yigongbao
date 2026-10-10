@@ -506,8 +506,13 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
         // 聚合逻辑：检查是否所有流转卡都已下载，如果是则通过状态机推进订单状态
         if (order.getStatus().equals(FlowStatusEnum.DESIGN_COMPLETED.getValue())) {
-            triggerFlowIfAllReach(order.getId(), FlowStatusEnum.PENDING_PRINT.getValue(),
-                    FlowActionEnum.DOWNLOAD_DATA_PACKAGE);
+            if (record.getBatchId() == null) {
+                triggerFlowIfAllReach(order.getId(), FlowStatusEnum.PENDING_PRINT.getValue(),
+                        FlowActionEnum.DOWNLOAD_DATA_PACKAGE);
+            } else {
+                triggerFlowIfAllReach(order.getId(), record.getBatchId(), FlowStatusEnum.PENDING_PRINT.getValue(),
+                        FlowActionEnum.DOWNLOAD_DATA_PACKAGE);
+            }
         }
 
         return designPackage.getFileUrl();
@@ -515,8 +520,16 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
     @Override
     public void triggerFlowIfAllReach(Long orderId, Integer requiredStatus, FlowActionEnum action) {
-        long totalActive = count(new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getOrderId, orderId)
+        triggerFlowIfAllReach(orderId, null, requiredStatus, action);
+    }
+
+    @Override
+    public void triggerFlowIfAllReach(Long orderId, Long batchId, Integer requiredStatus, FlowActionEnum action) {
+        if (batchId == null && hasAdditionalDesignPackages(orderId)) {
+            log.info("订单存在追加设计数据包，跳过原始流转卡聚合推进: orderId={}", orderId);
+            return;
+        }
+        long totalActive = count(scope(orderId, batchId)
                 .notIn(ProductionRecordEntity::getStatus,
                         FlowStatusEnum.PRINT_FAILED.getValue(),
                         FlowStatusEnum.REWORK.getValue(),
@@ -525,8 +538,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             return;
         }
         List<Integer> reachedStatuses = getReachedOrBeyondStatuses(requiredStatus);
-        long reachedCount = count(new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getOrderId, orderId)
+        long reachedCount = count(scope(orderId, batchId)
                 .in(ProductionRecordEntity::getStatus, reachedStatuses));
         if (totalActive == reachedCount) {
             try {
@@ -543,8 +555,16 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
     @Override
     public void triggerFlowIfAllExact(Long orderId, Integer exactStatus, FlowActionEnum action) {
-        long totalActive = count(new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getOrderId, orderId)
+        triggerFlowIfAllExact(orderId, null, exactStatus, action);
+    }
+
+    @Override
+    public void triggerFlowIfAllExact(Long orderId, Long batchId, Integer exactStatus, FlowActionEnum action) {
+        if (batchId == null && hasAdditionalDesignPackages(orderId)) {
+            log.info("订单存在追加设计数据包，跳过原始流转卡精确聚合推进: orderId={}", orderId);
+            return;
+        }
+        long totalActive = count(scope(orderId, batchId)
                 .notIn(ProductionRecordEntity::getStatus,
                         FlowStatusEnum.PRINT_FAILED.getValue(),
                         FlowStatusEnum.REWORK.getValue(),
@@ -552,8 +572,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
         if (totalActive == 0) {
             return;
         }
-        long matchCount = count(new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getOrderId, orderId)
+        long matchCount = count(scope(orderId, batchId)
                 .eq(ProductionRecordEntity::getStatus, exactStatus));
         if (totalActive == matchCount) {
             try {
@@ -570,7 +589,16 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
 
     @Override
     public void reconcileOrderProductionStatus(Long orderId) {
+        reconcileOrderProductionStatus(orderId, null);
+    }
+
+    @Override
+    public void reconcileOrderProductionStatus(Long orderId, Long batchId) {
         if (orderId == null) {
+            return;
+        }
+        if (batchId == null && hasAdditionalDesignPackages(orderId)) {
+            log.info("订单存在追加设计数据包，跳过原始流转卡状态补偿: orderId={}", orderId);
             return;
         }
         OrderMainEntity order = orderMainMapper.selectById(orderId);
@@ -578,8 +606,7 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             return;
         }
 
-        List<ProductionRecordEntity> records = list(new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getOrderId, orderId));
+        List<ProductionRecordEntity> records = list(scope(orderId, batchId));
         Integer targetStatus = records.stream()
                 .map(ProductionRecordEntity::getStatus)
                 .filter(this::isActiveNormalProductionStatus)
@@ -612,6 +639,26 @@ public class ProductionRecordServiceImpl extends ServiceImpl<ProductionRecordMap
             log.info("订单状态补偿触发Flow成功: orderId={}, action={}, nextStatus={}, aggregateTargetStatus={}",
                     orderId, action, nextStatus, targetStatus);
         }
+    }
+
+    private LambdaQueryWrapper<ProductionRecordEntity> scope(Long orderId, Long batchId) {
+        LambdaQueryWrapper<ProductionRecordEntity> wrapper = new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getOrderId, orderId);
+        if (batchId == null) {
+            wrapper.isNull(ProductionRecordEntity::getBatchId);
+        } else {
+            wrapper.eq(ProductionRecordEntity::getBatchId, batchId);
+        }
+        return wrapper;
+    }
+
+    private boolean hasAdditionalDesignPackages(Long orderId) {
+        if (orderId == null) {
+            return false;
+        }
+        return designPackageMapper.selectCount(new LambdaQueryWrapper<DesignPackageEntity>()
+                .eq(DesignPackageEntity::getOrderId, orderId)
+                .isNotNull(DesignPackageEntity::getBatchId)) > 0;
     }
 
     /** 返回已达到或超过指定状态的所有状态码（状态机单向推进） */

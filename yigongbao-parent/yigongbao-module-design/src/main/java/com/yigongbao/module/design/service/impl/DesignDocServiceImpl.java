@@ -29,6 +29,7 @@ import com.yigongbao.module.design.service.DesignDocService;
 import com.yigongbao.module.design.service.DesignDrawingService;
 import com.yigongbao.module.design.service.DesignInstructionService;
 import com.yigongbao.module.design.service.DesignPackageService;
+import com.yigongbao.module.design.service.DesignPackageBatchService;
 import com.yigongbao.module.design.service.DesignProductFileService;
 import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.service.DesignScreenshotService;
@@ -66,6 +67,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.function.Supplier;
 
 /**
  * 指令单/图纸管理服务实现类
@@ -91,6 +93,7 @@ public class DesignDocServiceImpl implements DesignDocService {
 
     private final OrderMainService orderMainService;
     private final DesignPackageService packageService;
+    private final DesignPackageBatchService packageBatchService;
     private final DesignProductService productService;
     private final DesignProductMapper designProductMapper;
     private final DesignProductFileService productFileService;
@@ -107,6 +110,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     private final TransactionTemplate transactionTemplate;
     /** 进程内按数据包串行生成，避免 preview/download 并发产生重复版本和文件。 */
     private static final ConcurrentHashMap<String, Object> DRAWING_LOCKS = new ConcurrentHashMap<>();
+    private final ThreadLocal<Long> activeBatchId = new ThreadLocal<>();
 
     // ==================== 线下模式：下载接口 ====================
 
@@ -139,7 +143,7 @@ public class DesignDocServiceImpl implements DesignDocService {
      */
     @Override
     public void downloadDrawing(Long orderId, Long packageId, HttpServletResponse response) {
-        downloadDrawing(orderId, packageId, null, response);
+        downloadDrawing(orderId, packageId, (String) null, response);
     }
 
     @Override
@@ -195,7 +199,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId) {
-        return getDrawingPreviewUrl(orderId, packageId, null);
+        return getDrawingPreviewUrl(orderId, packageId, (String) null);
     }
 
     @Override
@@ -233,7 +237,7 @@ public class DesignDocServiceImpl implements DesignDocService {
      */
     @Override
     public List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId) {
-        return listDrawingVersions(orderId, packageId, null);
+        return listDrawingVersions(orderId, packageId, (String) null);
     }
 
     @Override
@@ -261,7 +265,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         log.info("上传修订版指令单，orderId={}, packageId={}, id={}", orderId, packageId, id);
         // 经典案例保护：经典案例订单不允许上传新的指令单文件
         orderMainService.checkNotClassicCase(orderId, "上传指令单");
-        checkDesignPhase(orderId);
+        checkDesignMutationPhase(orderId);
         validatePackage(orderId, packageId);
 
         // 查询当前最新版本
@@ -305,7 +309,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void uploadRevisedDrawing(Long orderId, Long packageId, Long id, MultipartFile file) {
-        uploadRevisedDrawing(orderId, packageId, null, id, file);
+        uploadRevisedDrawing(orderId, packageId, (String) null, id, file);
     }
 
     @Override
@@ -316,7 +320,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         lockPackageForDrawingMutation(orderId, packageId);
         // 经典案例保护：经典案例订单不允许上传新的图纸文件
         orderMainService.checkNotClassicCase(orderId, "上传图纸");
-        checkDesignPhase(orderId);
+        checkDesignMutationPhase(orderId);
 
         // 查询当前最新版本
         String category = resolveCategory(packageId, productCategory);
@@ -365,7 +369,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void confirmDrawing(Long orderId, Long packageId, Long id) {
-        confirmDrawing(orderId, packageId, null, id);
+        confirmDrawing(orderId, packageId, (String) null, id);
     }
 
     @Override
@@ -374,7 +378,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         log.info("确认图纸，orderId={}, packageId={}, id={}", orderId, packageId, id);
         // 必须在事务内其他数据库读取之前加锁，等待后再建立一致性读快照。
         lockPackageForDrawingMutation(orderId, packageId);
-        checkDesignPhase(orderId);
+        checkDesignMutationPhase(orderId);
         String category = resolveCategory(packageId, productCategory);
         DesignDrawingEntity latest = category == null ? drawingService.getLatestVersion(packageId)
                 : drawingService.getLatestVersion(packageId, category);
@@ -400,7 +404,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public void confirmInstruction(Long orderId, Long packageId, Long id) {
         log.info("确认指令单，orderId={}, packageId={}, id={}", orderId, packageId, id);
-        checkDesignPhase(orderId);
+        checkDesignMutationPhase(orderId);
         validatePackage(orderId, packageId);
         DesignInstructionEntity entity = instructionService.getById(id);
         if (entity == null || !entity.getPackageId().equals(packageId)) {
@@ -413,6 +417,93 @@ public class DesignDocServiceImpl implements DesignDocService {
     }
 
     // ==================== 批量查询（供工单详情页使用） ====================
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void downloadInstruction(Long orderId, Long packageId, Long batchId, HttpServletResponse response) {
+        runWithBatch(batchId, () -> downloadInstruction(orderId, packageId, response));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void downloadDrawing(Long orderId, Long packageId, Long batchId, HttpServletResponse response) {
+        runWithBatch(batchId, () -> downloadDrawing(orderId, packageId, response));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void downloadDrawing(Long orderId, Long packageId, Long batchId, String productCategory, HttpServletResponse response) {
+        runWithBatch(batchId, () -> downloadDrawing(orderId, packageId, productCategory, response));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocItemVO getInstructionPreviewUrl(Long orderId, Long packageId, Long batchId) {
+        return callWithBatch(batchId, () -> getInstructionPreviewUrl(orderId, packageId));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId, Long batchId) {
+        return callWithBatch(batchId, () -> getDrawingPreviewUrl(orderId, packageId));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId, Long batchId, String productCategory) {
+        return callWithBatch(batchId, () -> getDrawingPreviewUrl(orderId, packageId, productCategory));
+    }
+
+    @Override
+    public List<DesignDocVersionVO> listInstructionVersions(Long orderId, Long packageId, Long batchId) {
+        return callWithBatch(batchId, () -> listInstructionVersions(orderId, packageId));
+    }
+
+    @Override
+    public List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId, Long batchId) {
+        return callWithBatch(batchId, () -> listDrawingVersions(orderId, packageId));
+    }
+
+    @Override
+    public List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId, Long batchId, String productCategory) {
+        return callWithBatch(batchId, () -> listDrawingVersions(orderId, packageId, productCategory));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void uploadRevisedInstruction(Long orderId, Long packageId, Long batchId, Long id, MultipartFile file) {
+        runWithBatch(batchId, () -> uploadRevisedInstruction(orderId, packageId, id, file));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void uploadRevisedDrawing(Long orderId, Long packageId, Long batchId, Long id, MultipartFile file) {
+        runWithBatch(batchId, () -> uploadRevisedDrawing(orderId, packageId, id, file));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void uploadRevisedDrawing(Long orderId, Long packageId, Long batchId, String productCategory, Long id, MultipartFile file) {
+        runWithBatch(batchId, () -> uploadRevisedDrawing(orderId, packageId, productCategory, id, file));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void confirmDrawing(Long orderId, Long packageId, Long batchId, Long id) {
+        runWithBatch(batchId, () -> confirmDrawing(orderId, packageId, id));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void confirmDrawing(Long orderId, Long packageId, Long batchId, String productCategory, Long id) {
+        runWithBatch(batchId, () -> confirmDrawing(orderId, packageId, productCategory, id));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void confirmInstruction(Long orderId, Long packageId, Long batchId, Long id) {
+        runWithBatch(batchId, () -> confirmInstruction(orderId, packageId, id));
+    }
 
     /**
      * 批量查询数据包最新版指令单，返回 packageId → DesignDocVersionVO 映射
@@ -1004,7 +1095,44 @@ public class DesignDocServiceImpl implements DesignDocService {
      * 校验订单存在且处于可操作的设计阶段（委托 DesignQueryHelper）
      */
     private OrderMainEntity checkDesignPhase(Long orderId) {
-        return designQueryHelper.checkDesignPhase(orderId);
+        Long batchId = activeBatchId.get();
+        if (batchId != null) {
+            OrderMainEntity order = orderMainService.getById(orderId);
+            var batch = packageBatchService.getById(batchId);
+            if (order == null || batch == null || !orderId.equals(batch.getOrderId())
+                    || "CANCELLED".equals(batch.getStatus())
+                    || !Set.of(2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020, 5030, 5040, 5050,
+                    6010, 6020, 6030, 8010).contains(order.getStatus())) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+            }
+            return order;
+        }
+        designQueryHelper.checkOrderReadable(orderId);
+        OrderMainEntity order = orderMainService.getById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        return order;
+    }
+
+    private OrderMainEntity checkDesignMutationPhase(Long orderId) {
+        if (activeBatchId.get() != null) {
+            var order = checkDesignPhase(orderId);
+            var batchQuery = new LambdaQueryWrapper<com.yigongbao.module.design.entity.DesignPackageBatchEntity>()
+                    .eq(com.yigongbao.module.design.entity.DesignPackageBatchEntity::getId, activeBatchId.get())
+                    .eq(com.yigongbao.module.design.entity.DesignPackageBatchEntity::getOrderId, orderId)
+                    .last("FOR UPDATE");
+            var batch = packageBatchService.getOne(batchQuery, false);
+            if (batch == null || "COMPLETED".equals(batch.getStatus()) || "CANCELLED".equals(batch.getStatus())) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+            }
+            return order;
+        }
+        OrderMainEntity order = designQueryHelper.checkDesignPhase(orderId);
+        if (order == null || !Set.of(1030, 2010, 2020).contains(order.getStatus())) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+        }
+        return order;
     }
 
     /**
@@ -1022,7 +1150,30 @@ public class DesignDocServiceImpl implements DesignDocService {
         if (pkg == null || !pkg.getOrderId().equals(orderId)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
         }
+        if (activeBatchId.get() != null && !activeBatchId.get().equals(pkg.getBatchId())) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
+        }
         return pkg;
+    }
+
+    private void runWithBatch(Long batchId, Runnable action) {
+        Long previous = activeBatchId.get();
+        activeBatchId.set(batchId);
+        try {
+            action.run();
+        } finally {
+            if (previous == null) activeBatchId.remove(); else activeBatchId.set(previous);
+        }
+    }
+
+    private <T> T callWithBatch(Long batchId, Supplier<T> action) {
+        Long previous = activeBatchId.get();
+        activeBatchId.set(batchId);
+        try {
+            return action.get();
+        } finally {
+            if (previous == null) activeBatchId.remove(); else activeBatchId.set(previous);
+        }
     }
 
     /**

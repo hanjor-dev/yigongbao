@@ -66,6 +66,11 @@ public enum FlowActionEnum {
     COMPLETE_DESIGN("COMPLETE_DESIGN", "完成设计"),
 
     /**
+     * 完成追加设计批次并回到设计完成
+     */
+    COMPLETE_ADDITIONAL_DESIGN_BATCH("COMPLETE_ADDITIONAL_DESIGN_BATCH", "完成追加设计批次"),
+
+    /**
      * 下载数据包（设计完成后，生产员下载数据包触发推进到打印阶段）
      */
     DOWNLOAD_DATA_PACKAGE("DOWNLOAD_DATA_PACKAGE", "下载数据包"),

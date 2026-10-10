@@ -185,11 +185,14 @@ public class ProductionPackServiceImpl implements IProductionPackService {
             recordId, record.getRecordNo(), FlowStatusEnum.PENDING_WAREHOUSE_IN.getName());
 
         // 通过 Flow 触发订单级别阶段推进：PACKING(5050) → PENDING_WAREHOUSE_IN(6010)
-        recordService.triggerFlowIfAllReach(
-            record.getOrderId(),
-            FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(),
-            FlowActionEnum.COMPLETE_PACKING
-        );
-        recordService.reconcileOrderProductionStatus(record.getOrderId());
+        if (record.getBatchId() == null) {
+            recordService.triggerFlowIfAllReach(record.getOrderId(),
+                FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(), FlowActionEnum.COMPLETE_PACKING);
+            recordService.reconcileOrderProductionStatus(record.getOrderId());
+        } else {
+            recordService.triggerFlowIfAllReach(record.getOrderId(), record.getBatchId(),
+                FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(), FlowActionEnum.COMPLETE_PACKING);
+            recordService.reconcileOrderProductionStatus(record.getOrderId(), record.getBatchId());
+        }
     }
 }

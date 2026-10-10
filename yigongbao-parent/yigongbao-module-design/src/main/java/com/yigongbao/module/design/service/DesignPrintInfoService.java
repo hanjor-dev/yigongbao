@@ -21,6 +21,8 @@ public interface DesignPrintInfoService {
      */
     PrintInfoOptionsVO getOptions(Long orderId, Long packageId);
 
+    PrintInfoOptionsVO getOptions(Long orderId, Long packageId, Long batchId);
+
     /**
      * 查询数据包打印信息列表
      *
@@ -29,6 +31,8 @@ public interface DesignPrintInfoService {
      * @return 打印信息列表（包含数据包级别字段和产品列表），按 sort_order 升序
      */
     PrintInfoListVO listPrintInfo(Long orderId, Long packageId);
+
+    PrintInfoListVO listPrintInfo(Long orderId, Long packageId, Long batchId);
 
     /**
      * 保存打印信息（整包替换）
@@ -40,6 +44,8 @@ public interface DesignPrintInfoService {
      */
     void savePrintInfo(Long orderId, Long packageId, SavePrintInfoDTO dto);
 
+    void savePrintInfo(Long orderId, Long packageId, Long batchId, SavePrintInfoDTO dto);
+
     /**
      * 删除单条打印信息
      *
@@ -48,4 +54,6 @@ public interface DesignPrintInfoService {
      * @param printInfoId  打印信息ID
      */
     void deletePrintInfo(Long orderId, Long packageId, Long printInfoId);
+
+    void deletePrintInfo(Long orderId, Long packageId, Long batchId, Long printInfoId);
 }

@@ -102,9 +102,15 @@ public class ProductionPrintLifecycleServiceImpl implements ProductionPrintLifec
         }
 
         if (record.getOrderId() != null) {
-            recordService.triggerFlowIfAllReach(record.getOrderId(),
-                    FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
-            recordService.reconcileOrderProductionStatus(record.getOrderId());
+            if (record.getBatchId() == null) {
+                recordService.triggerFlowIfAllReach(record.getOrderId(),
+                        FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
+                recordService.reconcileOrderProductionStatus(record.getOrderId());
+            } else {
+                recordService.triggerFlowIfAllReach(record.getOrderId(), record.getBatchId(),
+                        FlowStatusEnum.PRINT_COMPLETED.getValue(), FlowActionEnum.COMPLETE_PRINT);
+                recordService.reconcileOrderProductionStatus(record.getOrderId(), record.getBatchId());
+            }
         }
         log.info("打印完成: recordId={}, recordNo={}, orderId={}, source={}",
                 recordId, record.getRecordNo(), record.getOrderId(), source);

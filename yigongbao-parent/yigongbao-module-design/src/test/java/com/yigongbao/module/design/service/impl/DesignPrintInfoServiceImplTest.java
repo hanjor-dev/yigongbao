@@ -436,6 +436,7 @@ class DesignPrintInfoServiceImplTest {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(DESIGNER_ID);
                 when(orderMainService.getById(ORDER_ID)).thenReturn(designInProgressOrder);
+                when(packageService.getById(PACKAGE_ID)).thenReturn(testPackage);
 
                 DesignProductEntity entity = new DesignProductEntity();
                 entity.setId(1L);
@@ -461,6 +462,7 @@ class DesignPrintInfoServiceImplTest {
             try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
                 stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(DESIGNER_ID);
                 when(orderMainService.getById(ORDER_ID)).thenReturn(designInProgressOrder);
+                when(packageService.getById(PACKAGE_ID)).thenReturn(testPackage);
 
                 DesignProductEntity entity = new DesignProductEntity();
                 entity.setId(2L);

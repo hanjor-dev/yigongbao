@@ -9,6 +9,9 @@ import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.flow.result.TransitionResult;
 import com.yigongbao.flow.service.FlowOrderService;
 import com.yigongbao.flow.service.FlowStateMachineService;
+import com.yigongbao.flow.service.FlowStatusHistoryService;
+import com.yigongbao.flow.enums.FlowPhaseEnum;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +33,7 @@ public class FlowFacadeImpl implements FlowFacade {
 
     private final FlowStateMachineService flowStateMachineService;
     private final FlowOrderService flowOrderService;
+    private final FlowStatusHistoryService flowStatusHistoryService;
 
     private static final Set<FlowActionEnum> AUDIT_ACTIONS = Set.of(
             FlowActionEnum.DATA_AUDIT_PASS,
@@ -76,5 +80,36 @@ public class FlowFacadeImpl implements FlowFacade {
         log.info("FlowFacade 执行流程动作（带版本校验），orderId={}, action={}, expectedVersion={}",
                 orderId, action.getCode(), expectedVersion);
         return flowStateMachineService.executeTransition(orderId, action, operator);
+    }
+
+    @Override
+    public TransitionResult executeAdditionalDesignBatchComplete(Long orderId, FlowOperator operator,
+                                                                 Integer expectedVersion) {
+        OrderMainEntity order = flowOrderService.getById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        if (operator == null) {
+            operator = new FlowOperator();
+        }
+        Integer fromStatus = order.getStatus();
+        Integer expected = expectedVersion != null ? expectedVersion
+                : (order.getVersion() != null ? order.getVersion() : 0);
+        FlowActionEnum action = FlowActionEnum.COMPLETE_ADDITIONAL_DESIGN_BATCH;
+
+        flowStatusHistoryService.recordTransition(
+                order.getId(), order.getOrderCode(), FlowPhaseEnum.DESIGN.getValue(),
+                fromStatus, FlowStatusEnum.DESIGN_COMPLETED.getValue(),
+                action.getCode(), action.getName(), operator);
+
+        int updated = flowOrderService.updatePhaseAndStatusWithHandlerIfVersion(
+                orderId, expected, FlowPhaseEnum.DESIGN.getValue(),
+                FlowStatusEnum.DESIGN_COMPLETED.getValue(),
+                operator.getOperatorId(), operator.getOperatorName());
+        if (updated != 1) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
+        }
+        return TransitionResult.of(FlowPhaseEnum.DESIGN.getValue(),
+                FlowStatusEnum.DESIGN_COMPLETED.getValue());
     }
 }

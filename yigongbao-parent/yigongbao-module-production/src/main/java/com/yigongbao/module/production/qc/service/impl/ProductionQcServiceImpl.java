@@ -206,9 +206,15 @@ public class ProductionQcServiceImpl implements IProductionQcService {
         record.setStatus(FlowStatusEnum.PACKING.getValue());
         recordMapper.updateById(record);
 
-        recordService.triggerFlowIfAllReach(record.getOrderId(),
-                FlowStatusEnum.PACKING.getValue(), FlowActionEnum.QC_PASS);
-        recordService.reconcileOrderProductionStatus(record.getOrderId());
+        if (record.getBatchId() == null) {
+            recordService.triggerFlowIfAllReach(record.getOrderId(),
+                    FlowStatusEnum.PACKING.getValue(), FlowActionEnum.QC_PASS);
+            recordService.reconcileOrderProductionStatus(record.getOrderId());
+        } else {
+            recordService.triggerFlowIfAllReach(record.getOrderId(), record.getBatchId(),
+                    FlowStatusEnum.PACKING.getValue(), FlowActionEnum.QC_PASS);
+            recordService.reconcileOrderProductionStatus(record.getOrderId(), record.getBatchId());
+        }
         log.info("质检完成，流转到包装: recordId={}, recordNo={}, qcId={}, qcName={}, orderId={}",
                 recordId, record.getRecordNo(), userId, realName, record.getOrderId());
     }

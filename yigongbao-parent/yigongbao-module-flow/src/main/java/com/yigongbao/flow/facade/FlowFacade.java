@@ -50,4 +50,11 @@ public interface FlowFacade {
      */
     TransitionResult executeFlow(Long orderId, FlowActionEnum action, FlowOperator operator, Integer expectedVersion);
 
+    /**
+     * 受控完成追加设计批次。该动作允许从生产后续状态回到设计完成，
+     * 同时记录流程历史并按订单版本防止并发覆盖。
+     */
+    TransitionResult executeAdditionalDesignBatchComplete(Long orderId, FlowOperator operator,
+                                                          Integer expectedVersion);
+
 }

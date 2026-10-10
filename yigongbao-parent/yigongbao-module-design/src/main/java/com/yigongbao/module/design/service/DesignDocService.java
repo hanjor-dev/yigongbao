@@ -34,6 +34,7 @@ public interface DesignDocService {
      * @param response  HttpServletResponse，用于流式返回文件
      */
     void downloadInstruction(Long orderId, Long packageId, HttpServletResponse response);
+    void downloadInstruction(Long orderId, Long packageId, Long batchId, HttpServletResponse response);
 
     /**
      * 下载图纸模板（线下模式）
@@ -47,8 +48,10 @@ public interface DesignDocService {
      * @param response  HttpServletResponse，用于流式返回文件
      */
     void downloadDrawing(Long orderId, Long packageId, HttpServletResponse response);
+    void downloadDrawing(Long orderId, Long packageId, Long batchId, HttpServletResponse response);
 
     void downloadDrawing(Long orderId, Long packageId, String productCategory, HttpServletResponse response);
+    void downloadDrawing(Long orderId, Long packageId, Long batchId, String productCategory, HttpServletResponse response);
 
     /**
      * 获取指令单预览 URL（在线模式）
@@ -62,6 +65,7 @@ public interface DesignDocService {
      * @return DocItemVO（含 id、version、fileId、templateFileUrl、isConfirmed）
      */
     DocItemVO getInstructionPreviewUrl(Long orderId, Long packageId);
+    DocItemVO getInstructionPreviewUrl(Long orderId, Long packageId, Long batchId);
 
     /**
      * 获取图纸预览 URL（在线模式）
@@ -75,8 +79,10 @@ public interface DesignDocService {
      * @return DocItemVO（含 id、version、fileId、templateFileUrl、isConfirmed）
      */
     DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId);
+    DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId, Long batchId);
 
     DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId, String productCategory);
+    DocItemVO getDrawingPreviewUrl(Long orderId, Long packageId, Long batchId, String productCategory);
 
     /**
      * 查询指令单版本历史列表
@@ -86,6 +92,7 @@ public interface DesignDocService {
      * @return 版本列表（按 versionSeq 倒序）
      */
     List<DesignDocVersionVO> listInstructionVersions(Long orderId, Long packageId);
+    List<DesignDocVersionVO> listInstructionVersions(Long orderId, Long packageId, Long batchId);
 
     /**
      * 查询图纸版本历史列表
@@ -95,8 +102,10 @@ public interface DesignDocService {
      * @return 版本列表（按 versionSeq 倒序）
      */
     List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId);
+    List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId, Long batchId);
 
     List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId, String productCategory);
+    List<DesignDocVersionVO> listDrawingVersions(Long orderId, Long packageId, Long batchId, String productCategory);
 
     /**
      * 上传修订版指令单
@@ -110,6 +119,7 @@ public interface DesignDocService {
      * @param file      修订版文件
      */
     void uploadRevisedInstruction(Long orderId, Long packageId, Long id, MultipartFile file);
+    void uploadRevisedInstruction(Long orderId, Long packageId, Long batchId, Long id, MultipartFile file);
 
     /**
      * 上传修订版图纸
@@ -123,8 +133,10 @@ public interface DesignDocService {
      * @param file      修订版文件
      */
     void uploadRevisedDrawing(Long orderId, Long packageId, Long id, MultipartFile file);
+    void uploadRevisedDrawing(Long orderId, Long packageId, Long batchId, Long id, MultipartFile file);
 
     void uploadRevisedDrawing(Long orderId, Long packageId, String productCategory, Long id, MultipartFile file);
+    void uploadRevisedDrawing(Long orderId, Long packageId, Long batchId, String productCategory, Long id, MultipartFile file);
 
     /**
      * 确认图纸（在线模式）
@@ -138,8 +150,10 @@ public interface DesignDocService {
      * @param id        图纸记录ID
      */
     void confirmDrawing(Long orderId, Long packageId, Long id);
+    void confirmDrawing(Long orderId, Long packageId, Long batchId, Long id);
 
     void confirmDrawing(Long orderId, Long packageId, String productCategory, Long id);
+    void confirmDrawing(Long orderId, Long packageId, Long batchId, String productCategory, Long id);
 
     /**
      * 确认指令单（在线模式）
@@ -153,6 +167,7 @@ public interface DesignDocService {
      * @param id        指令单记录ID
      */
     void confirmInstruction(Long orderId, Long packageId, Long id);
+    void confirmInstruction(Long orderId, Long packageId, Long batchId, Long id);
 
     /**
      * 批量查询数据包最新版指令单（packageId → DesignDocVersionVO）

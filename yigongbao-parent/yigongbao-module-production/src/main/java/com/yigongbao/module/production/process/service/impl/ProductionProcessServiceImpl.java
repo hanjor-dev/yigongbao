@@ -197,9 +197,15 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
             recordMapper.updateById(record);
 
             if (isFirstPostProcess) {
-                recordService.triggerFlowIfAllReach(record.getOrderId(),
-                        FlowStatusEnum.POST_PROCESSING.getValue(), FlowActionEnum.START_POST_PROCESSING);
-                recordService.reconcileOrderProductionStatus(record.getOrderId());
+                if (record.getBatchId() == null) {
+                    recordService.triggerFlowIfAllReach(record.getOrderId(),
+                            FlowStatusEnum.POST_PROCESSING.getValue(), FlowActionEnum.START_POST_PROCESSING);
+                    recordService.reconcileOrderProductionStatus(record.getOrderId());
+                } else {
+                    recordService.triggerFlowIfAllReach(record.getOrderId(), record.getBatchId(),
+                            FlowStatusEnum.POST_PROCESSING.getValue(), FlowActionEnum.START_POST_PROCESSING);
+                    recordService.reconcileOrderProductionStatus(record.getOrderId(), record.getBatchId());
+                }
             }
         }
         log.info("开始工序: recordId={}, processType={}, deviceId={}", recordId, dto.getProcessType(), dto.getPrimaryDeviceId());
@@ -278,10 +284,16 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
                             .set(ProductionRecordEntity::getCurrentProcess, null)
                             .set(ProductionRecordEntity::getPostProcessingEndTime, now)
                             .set(ProductionRecordEntity::getContentUpdateTime, now));
-            updateOrderProductionEndTimeIfAllFinished(record.getOrderId());
-            recordService.triggerFlowIfAllReach(record.getOrderId(),
-                    FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
-            recordService.reconcileOrderProductionStatus(record.getOrderId());
+            updateOrderProductionEndTimeIfAllFinished(record.getOrderId(), record.getBatchId());
+            if (record.getBatchId() == null) {
+                recordService.triggerFlowIfAllReach(record.getOrderId(),
+                        FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
+                recordService.reconcileOrderProductionStatus(record.getOrderId());
+            } else {
+                recordService.triggerFlowIfAllReach(record.getOrderId(), record.getBatchId(),
+                        FlowStatusEnum.QC_IN_PROGRESS.getValue(), FlowActionEnum.COMPLETE_POST_PROCESSING);
+                recordService.reconcileOrderProductionStatus(record.getOrderId(), record.getBatchId());
+            }
         }
         log.info("完成工序: recordId={}, processType={}", recordId, processType);
     }
@@ -329,13 +341,25 @@ public class ProductionProcessServiceImpl extends ServiceImpl<ProductionProcessM
     }
 
     /** 检查订单下所有流转卡是否都完成后处理，如果是则更新订单生产结束时间 */
-    private void updateOrderProductionEndTimeIfAllFinished(Long orderId) {
+    private void updateOrderProductionEndTimeIfAllFinished(Long orderId, Long batchId) {
+        LambdaQueryWrapper<ProductionRecordEntity> scope = new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getOrderId, orderId);
+        if (batchId == null) {
+            scope.isNull(ProductionRecordEntity::getBatchId);
+        } else {
+            scope.eq(ProductionRecordEntity::getBatchId, batchId);
+        }
         long totalRecords = recordMapper.selectCount(
-            new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getOrderId, orderId));
+            scope);
+        LambdaQueryWrapper<ProductionRecordEntity> finishedScope = new LambdaQueryWrapper<ProductionRecordEntity>()
+                .eq(ProductionRecordEntity::getOrderId, orderId);
+        if (batchId == null) {
+            finishedScope.isNull(ProductionRecordEntity::getBatchId);
+        } else {
+            finishedScope.eq(ProductionRecordEntity::getBatchId, batchId);
+        }
         long finishedRecords = recordMapper.selectCount(
-            new LambdaQueryWrapper<ProductionRecordEntity>()
-                .eq(ProductionRecordEntity::getOrderId, orderId)
+            finishedScope
                 .isNotNull(ProductionRecordEntity::getPostProcessingEndTime));
         if (totalRecords == finishedRecords && finishedRecords > 0) {
             int updated = orderMainMapper.update(null,
