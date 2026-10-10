@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS design_package_batch (
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     completed_time DATETIME NULL COMMENT '完成时间',
     version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本号',
+    create_by BIGINT NULL COMMENT '创建人ID（通用审计字段）',
+    update_by BIGINT NULL COMMENT '更新人ID（通用审计字段）',
     is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除（0=否，1=是）',
     PRIMARY KEY (id),
     UNIQUE KEY uk_design_package_batch_no (batch_no),
@@ -43,6 +45,34 @@ SET @sql_add_design_package_batch_version := IF(
 PREPARE stmt_add_design_package_batch_version FROM @sql_add_design_package_batch_version;
 EXECUTE stmt_add_design_package_batch_version;
 DEALLOCATE PREPARE stmt_add_design_package_batch_version;
+
+SET @sql_add_design_package_batch_create_by := IF(
+    EXISTS (
+        SELECT 1 FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'design_package_batch'
+          AND COLUMN_NAME = 'create_by'
+    ),
+    'SELECT 1',
+    'ALTER TABLE design_package_batch ADD COLUMN create_by BIGINT NULL COMMENT ''创建人ID（通用审计字段）'''
+);
+PREPARE stmt_add_design_package_batch_create_by FROM @sql_add_design_package_batch_create_by;
+EXECUTE stmt_add_design_package_batch_create_by;
+DEALLOCATE PREPARE stmt_add_design_package_batch_create_by;
+
+SET @sql_add_design_package_batch_update_by := IF(
+    EXISTS (
+        SELECT 1 FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'design_package_batch'
+          AND COLUMN_NAME = 'update_by'
+    ),
+    'SELECT 1',
+    'ALTER TABLE design_package_batch ADD COLUMN update_by BIGINT NULL COMMENT ''更新人ID（通用审计字段）'''
+);
+PREPARE stmt_add_design_package_batch_update_by FROM @sql_add_design_package_batch_update_by;
+EXECUTE stmt_add_design_package_batch_update_by;
+DEALLOCATE PREPARE stmt_add_design_package_batch_update_by;
 
 -- 为原有设计数据包增加批次关联。历史数据保留 NULL，新增追加数据包写入对应 batch_id。
 SET @sql_add_design_package_batch_id := IF(
