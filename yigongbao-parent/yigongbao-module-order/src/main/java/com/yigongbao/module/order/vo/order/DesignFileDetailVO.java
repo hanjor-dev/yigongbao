@@ -14,7 +14,7 @@ import java.util.List;
 public class DesignFileDetailVO implements Serializable {
 
     private List<DesignPackageVO> packageList;
-    private FileVO report;
+    private List<FileVO> reports;
 
     @Data
     public static class DesignPackageVO implements Serializable {

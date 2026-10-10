@@ -553,7 +553,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
         vo.setModelList(designFileService.listModels(orderId));
 
         // 设计报告
-        vo.setReport(designFileService.getReport(orderId));
+        vo.setReports(designFileService.getReports(orderId));
     }
 
     /**

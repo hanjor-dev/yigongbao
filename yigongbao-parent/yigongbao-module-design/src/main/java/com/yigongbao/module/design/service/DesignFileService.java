@@ -100,7 +100,7 @@ public interface DesignFileService {
      * @param fileId  文件ID
      * @return 文件信息
      */
-    FileVO linkReport(Long orderId, String fileId);
+    List<FileVO> linkReport(Long orderId, List<String> fileIds);
 
     /**
      * 删除设计报告
@@ -111,10 +111,10 @@ public interface DesignFileService {
     void deleteReport(Long orderId, String fileId);
 
     /**
-     * 获取订单的设计报告
+     * 获取订单的设计报告列表
      *
      * @param orderId 订单ID
-     * @return 文件信息，无报告返回 null
+     * @return 文件信息列表，无报告返回空列表
      */
-    FileVO getReport(Long orderId);
+    List<FileVO> getReports(Long orderId);
 }

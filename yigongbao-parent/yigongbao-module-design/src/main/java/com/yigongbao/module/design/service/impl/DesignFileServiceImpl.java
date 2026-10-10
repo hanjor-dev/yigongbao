@@ -37,6 +37,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -394,19 +396,21 @@ public class DesignFileServiceImpl implements DesignFileService {
     @Transactional(rollbackFor = Exception.class)
     public List<DesignModelVO> linkModels(Long orderId, List<String> fileIds) {
         log.info("批量关联可视化模型, orderId={}, fileIds={}", orderId, fileIds);
+        List<String> requestedFileIds = fileIds.stream().distinct().toList();
 
         // 1. 校验工单状态和操作权限
         // 经典案例保护：经典案例订单不允许关联新的STL模型文件
         orderMainService.checkNotClassicCase(orderId, "关联STL模型");
-        checkIsAssignedDesigner(checkDesignPhase(orderId));
+        checkIsAssignedDesigner(checkDesignAttachmentMutation(orderId));
 
         // 2. 批量校验文件是否存在（类型和大小已在上传时由 FileService/Provider 校验）
         List<FileVO> fileVOs = fileService.listByIds(fileIds);
-        if (fileVOs.size() != fileIds.size()) {
+        if (fileVOs.size() != requestedFileIds.size()) {
             // 找出不存在的 fileId
             Set<String> foundIds = fileVOs.stream().map(FileVO::getId).collect(Collectors.toSet());
-            List<String> notFoundIds = fileIds.stream().filter(id -> !foundIds.contains(id)).toList();
+            List<String> notFoundIds = requestedFileIds.stream().filter(id -> !foundIds.contains(id)).toList();
             log.warn("部分文件不存在, notFoundIds={}", notFoundIds);
+            cleanupOrphanFiles(fileVOs, requestedFileIds);
             throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
         }
 
@@ -419,7 +423,7 @@ public class DesignFileServiceImpl implements DesignFileService {
                 .collect(Collectors.toSet());
 
         // 过滤掉已关联的文件
-        List<String> newFileIds = fileIds.stream()
+        List<String> newFileIds = requestedFileIds.stream()
                 .filter(fileId -> !existingFileIds.contains(fileId))
                 .collect(Collectors.toList());
 
@@ -428,36 +432,47 @@ public class DesignFileServiceImpl implements DesignFileService {
             throw new BusinessException(ErrorCodeEnum.DESIGN_MODEL_ALREADY_EXISTS);
         }
 
-        if (newFileIds.size() < fileIds.size()) {
-            List<String> duplicateIds = fileIds.stream()
+        if (newFileIds.size() < requestedFileIds.size()) {
+            List<String> duplicateIds = requestedFileIds.stream()
                     .filter(existingFileIds::contains)
                     .collect(Collectors.toList());
             log.warn("部分文件已关联将被忽略, orderId={}, duplicateIds={}", orderId, duplicateIds);
         }
 
+        try {
+            validateFilesForAttachment(fileVOs, newFileIds, FileBizTypeEnum.VISUAL_MODEL.getDictCode());
+        } catch (RuntimeException ex) {
+            cleanupOrphanFiles(fileVOs, newFileIds);
+            throw ex;
+        }
+
         // 4. 批量关联文件到业务，并保存模型记录
         Map<String, FileVO> fileMap = fileVOs.stream()
                 .collect(Collectors.toMap(FileVO::getId, f -> f));
+        try {
+            newFileIds.forEach(fileId ->
+                    fileService.linkFile(fileId, FileBizTypeEnum.VISUAL_MODEL.getDictCode(), orderId));
 
-        newFileIds.forEach(fileId ->
-                fileService.linkFile(fileId, FileBizTypeEnum.VISUAL_MODEL.getDictCode(), orderId));
+            List<DesignModelEntity> modelEntities = newFileIds.stream()
+                    .map(fileId -> {
+                        DesignModelEntity entity = new DesignModelEntity();
+                        entity.setOrderId(orderId);
+                        entity.setFileId(fileId);
+                        return entity;
+                    })
+                    .collect(Collectors.toList());
+            modelService.saveBatch(modelEntities);
 
-        List<DesignModelEntity> modelEntities = newFileIds.stream()
-                .map(fileId -> {
-                    DesignModelEntity entity = new DesignModelEntity();
-                    entity.setOrderId(orderId);
-                    entity.setFileId(fileId);
-                    return entity;
-                })
-                .collect(Collectors.toList());
-        modelService.saveBatch(modelEntities);
+            List<DesignModelVO> results = modelEntities.stream()
+                    .map(entity -> buildModelVO(entity, fileMap.get(entity.getFileId())))
+                    .collect(Collectors.toList());
 
-        List<DesignModelVO> results = modelEntities.stream()
-                .map(entity -> buildModelVO(entity, fileMap.get(entity.getFileId())))
-                .collect(Collectors.toList());
-
-        log.info("批量关联可视化模型: orderId={}, count={}", orderId, results.size());
-        return results;
+            log.info("批量关联可视化模型: orderId={}, count={}", orderId, results.size());
+            return results;
+        } catch (RuntimeException ex) {
+            cleanupOrphanFiles(fileVOs, newFileIds);
+            throw ex;
+        }
     }
 
     @Override
@@ -466,7 +481,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         // 1. 校验工单状态和操作权限
         // 经典案例保护：经典案例订单不允许删除STL模型文件
         orderMainService.checkNotClassicCase(orderId, "删除STL模型");
-        checkIsAssignedDesigner(checkDesignPhase(orderId));
+        checkIsAssignedDesigner(checkDesignAttachmentMutation(orderId));
 
         // 2. 查询模型
         DesignModelEntity modelEntity = modelService.getById(modelId);
@@ -513,26 +528,51 @@ public class DesignFileServiceImpl implements DesignFileService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public FileVO linkReport(Long orderId, String fileId) {
+    public List<FileVO> linkReport(Long orderId, List<String> fileIds) {
         // 1. 校验工单状态和操作权限
         // 经典案例保护：经典案例订单不允许关联新的设计报告文件
         orderMainService.checkNotClassicCase(orderId, "关联设计报告");
-        checkIsAssignedDesigner(checkDesignPhase(orderId));
+        checkIsAssignedDesigner(checkDesignAttachmentMutation(orderId));
 
-        // 2. 校验文件是否存在（类型和大小已在上传时由 FileService/Provider 校验）
-        FileVO fileVO = fileService.getById(fileId);
-        if (fileVO == null) {
+        // 2. 批量校验文件是否存在、类型和现有关联
+        List<String> requestedFileIds = fileIds.stream().distinct().toList();
+        List<FileVO> fileVOs = fileService.listByIds(requestedFileIds);
+        if (fileVOs.size() != requestedFileIds.size()) {
+            cleanupOrphanFiles(fileVOs, requestedFileIds);
             throw new BusinessException(ErrorCodeEnum.ATTACHMENT_NOT_FOUND);
         }
 
-        // 3. 删除旧报告（每工单仅一份）
         List<FileVO> existingReports = fileService.listByBiz(FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId);
-        for (FileVO existing : existingReports) {
-            fileService.deleteById(existing.getId());
+        Set<String> existingFileIds = existingReports.stream()
+                .map(FileVO::getId)
+                .collect(Collectors.toSet());
+        List<String> newFileIds = requestedFileIds.stream()
+                .filter(fileId -> !existingFileIds.contains(fileId))
+                .collect(Collectors.toList());
+        if (newFileIds.isEmpty()) {
+            return Collections.emptyList();
         }
 
-        // 5. 关联新文件到业务
-        return fileService.linkFile(fileId, FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId);
+        try {
+            validateFilesForAttachment(fileVOs, newFileIds, FileBizTypeEnum.DESIGN_REPORT.getDictCode());
+        } catch (RuntimeException ex) {
+            cleanupOrphanFiles(fileVOs, newFileIds);
+            throw ex;
+        }
+
+        // 3. 追加关联新报告，不删除既有报告
+        try {
+            List<FileVO> results = new ArrayList<>();
+            for (String newFileId : newFileIds) {
+                results.add(fileService.linkFile(
+                        newFileId, FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId));
+            }
+            log.info("批量关联设计报告: orderId={}, count={}", orderId, results.size());
+            return results;
+        } catch (RuntimeException ex) {
+            cleanupOrphanFiles(fileVOs, newFileIds);
+            throw ex;
+        }
     }
 
     @Override
@@ -541,7 +581,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         // 1. 校验工单状态和操作权限
         // 经典案例保护：经典案例订单不允许删除设计报告文件
         orderMainService.checkNotClassicCase(orderId, "删除设计报告");
-        checkIsAssignedDesigner(checkDesignPhase(orderId));
+        checkIsAssignedDesigner(checkDesignAttachmentMutation(orderId));
 
         // 2. 校验文件归属
         FileVO fileVO = fileService.getById(fileId);
@@ -557,9 +597,9 @@ public class DesignFileServiceImpl implements DesignFileService {
     }
 
     @Override
-    public FileVO getReport(Long orderId) {
+    public List<FileVO> getReports(Long orderId) {
         List<FileVO> reports = fileService.listByBiz(FileBizTypeEnum.DESIGN_REPORT.getDictCode(), orderId);
-        return CollUtil.isEmpty(reports) ? null : reports.get(0);
+        return CollUtil.isEmpty(reports) ? Collections.emptyList() : reports;
     }
 
     // ==================== 私有方法 ====================
@@ -568,8 +608,72 @@ public class DesignFileServiceImpl implements DesignFileService {
         return designQueryHelper.checkDesignPhase(orderId);
     }
 
+    private OrderMainEntity checkDesignAttachmentMutation(Long orderId) {
+        return designQueryHelper.checkDesignAttachmentMutation(orderId);
+    }
+
     private void checkIsAssignedDesigner(OrderMainEntity order) {
         designQueryHelper.checkIsAssignedDesigner(order);
+    }
+
+    private void validateFilesForAttachment(List<FileVO> files, List<String> fileIds, String expectedBizType) {
+        Map<String, FileVO> fileMap = files.stream()
+                .collect(Collectors.toMap(FileVO::getId, file -> file, (first, ignored) -> first));
+        for (String fileId : fileIds) {
+            FileVO file = fileMap.get(fileId);
+            if (file == null || !expectedBizType.equals(file.getBizType()) || file.getBizId() != null) {
+                log.warn("文件业务类型或归属不合法, fileId={}, expectedBizType={}, actualBizType={}, bizId={}",
+                        fileId, expectedBizType, file == null ? null : file.getBizType(),
+                        file == null ? null : file.getBizId());
+                throw new BusinessException(ErrorCodeEnum.ATTACHMENT_TYPE_NOT_ALLOWED);
+            }
+        }
+    }
+
+    /**
+     * 关联阶段失败时清理本次上传且尚未关联业务的文件，避免遗留孤儿文件。
+     * 已归属其他业务的文件不在清理范围内。
+     */
+    private void cleanupOrphanFiles(List<FileVO> files, List<String> fileIds) {
+        Map<String, FileVO> fileMap = files.stream()
+                .collect(Collectors.toMap(FileVO::getId, file -> file, (first, ignored) -> first));
+        List<String> orphanFileIds = fileIds.stream()
+                .map(fileMap::get)
+                .filter(Objects::nonNull)
+                .filter(file -> file.getBizId() == null)
+                .map(FileVO::getId)
+                .distinct()
+                .collect(Collectors.toList());
+        if (orphanFileIds.isEmpty()) {
+            return;
+        }
+
+        // 关联失败时外层事务可能已经更新了文件归属并持有行锁，必须等外层回滚释放锁后，
+        // 再通过独立事务删除文件，否则 REQUIRES_NEW 可能与外层事务互相等待。
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    if (status == STATUS_ROLLED_BACK) {
+                        deleteOrphanFiles(orphanFileIds);
+                    }
+                }
+            });
+            return;
+        }
+
+        // 无事务场景（例如单元测试或非事务调用）直接清理。
+        deleteOrphanFiles(orphanFileIds);
+    }
+
+    private void deleteOrphanFiles(List<String> fileIds) {
+        fileIds.forEach(fileId -> {
+            try {
+                fileService.deleteByIdAfterAssociationFailure(fileId);
+            } catch (RuntimeException cleanupEx) {
+                log.warn("清理附件孤儿文件失败, fileId={}", fileId, cleanupEx);
+            }
+        });
     }
 
     /**

@@ -73,13 +73,13 @@ public class DesignAttachmentController {
     // ==================== 设计报告 ====================
 
     /**
-     * 关联设计报告（每订单仅保留一份，重复关联自动覆盖）
+     * 批量追加关联设计报告
      */
     @Operation(summary = "关联设计报告")
     @OperationLog(module = "设计管理", businessType = OperationTypeEnum.UPLOAD, operation = "关联设计报告")
     @PostMapping("/report/link")
-    public Result<FileVO> linkReport(@Valid @RequestBody LinkFilesDTO dto) {
-        return Result.success(designFileService.linkReport(dto.getOrderId(), dto.getFileIds().get(0)));
+    public Result<List<FileVO>> linkReport(@Valid @RequestBody LinkFilesDTO dto) {
+        return Result.success(designFileService.linkReport(dto.getOrderId(), dto.getFileIds()));
     }
 
     /**
@@ -100,8 +100,8 @@ public class DesignAttachmentController {
      */
     @Operation(summary = "获取设计报告")
     @GetMapping("/report")
-    public Result<FileVO> getReport(
+    public Result<List<FileVO>> getReports(
             @Parameter(description = "订单ID") @RequestParam Long orderId) {
-        return Result.success(designFileService.getReport(orderId));
+        return Result.success(designFileService.getReports(orderId));
     }
 }

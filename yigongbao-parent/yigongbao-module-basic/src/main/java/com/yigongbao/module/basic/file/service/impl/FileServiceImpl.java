@@ -18,6 +18,8 @@ import org.dromara.x.file.storage.core.FileInfo;
 import org.dromara.x.file.storage.core.FileStorageService;
 import org.dromara.x.file.storage.core.Downloader;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import cn.hutool.core.collection.CollUtil;
@@ -297,6 +299,12 @@ public class FileServiceImpl implements FileService {
         fileRecorderService.removeById(id);
         fileStorageService.delete(detail.getUrl());
         log.info("删除文件: id={}", id);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public void deleteByIdAfterAssociationFailure(String id) {
+        deleteById(id);
     }
 
     // ==================== 校验工具方法 ====================

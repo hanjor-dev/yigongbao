@@ -111,6 +111,14 @@ class DesignFileServiceImplTest {
             return current;
         }).when(designQueryHelper).checkDesignPhase(anyLong());
         doAnswer(invocation -> {
+            OrderMainEntity current = orderMainService.getById(invocation.getArgument(0));
+            if (current == null) throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+            if (FlowStatusEnum.CANCELLED.getValue().equals(current.getStatus())) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+            }
+            return current;
+        }).when(designQueryHelper).checkDesignAttachmentMutation(anyLong());
+        doAnswer(invocation -> {
             OrderMainEntity current = invocation.getArgument(0);
             if (!designerId.equals(StpUtil.getLoginIdAsLong())) {
                 throw new BusinessException(ErrorCodeEnum.DESIGN_OPERATOR_NOT_ALLOWED);
@@ -176,11 +184,13 @@ class DesignFileServiceImplTest {
 
                 FileVO fileVO1 = new FileVO();
                 fileVO1.setId("file-1");
+                fileVO1.setBizType("10.6");
                 fileVO1.setFileName("model1.stl");
                 fileVO1.setFileExt("stl");
 
                 FileVO fileVO2 = new FileVO();
                 fileVO2.setId("file-2");
+                fileVO2.setBizType("10.6");
                 fileVO2.setFileName("model2.stl");
                 fileVO2.setFileExt("stl");
 
@@ -202,6 +212,45 @@ class DesignFileServiceImplTest {
                 assertEquals(2, results.size());
                 verify(modelService).saveBatch(anyList());
                 verify(fileService, times(2)).linkFile(anyString(), eq("10.6"), eq(orderId));
+            }
+        }
+
+        @Test
+        @DisplayName("设计完成后的生产状态仍可增量关联模型")
+        void shouldLinkModelsAfterDesignCompleted() {
+            try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+                stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
+                designingOrder.setStatus(FlowStatusEnum.PENDING_PRINT.getValue());
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
+
+                FileVO fileVO = new FileVO();
+                fileVO.setId("late-model");
+                fileVO.setBizType("10.6");
+                when(fileService.listByIds(List.of("late-model"))).thenReturn(List.of(fileVO));
+                when(fileService.linkFile(eq("late-model"), eq("10.6"), eq(orderId))).thenReturn(fileVO);
+                when(modelService.saveBatch(anyList())).thenReturn(true);
+
+                assertEquals(1, designFileService.linkModels(orderId, List.of("late-model")).size());
+                verify(fileService).linkFile("late-model", "10.6", orderId);
+            }
+        }
+
+        @Test
+        @DisplayName("模型文件类型不匹配时拒绝关联")
+        void shouldRejectWrongModelBizType() {
+            try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+                stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
+                FileVO fileVO = new FileVO();
+                fileVO.setId("report-file");
+                fileVO.setBizType("10.5");
+                when(fileService.listByIds(List.of("report-file"))).thenReturn(List.of(fileVO));
+
+                BusinessException exception = assertThrows(BusinessException.class,
+                        () -> designFileService.linkModels(orderId, List.of("report-file")));
+
+                assertEquals(ErrorCodeEnum.ATTACHMENT_TYPE_NOT_ALLOWED.getCode(), exception.getCode());
+                verify(fileService, never()).linkFile(anyString(), anyString(), anyLong());
             }
         }
 
@@ -281,11 +330,13 @@ class DesignFileServiceImplTest {
 
                 FileVO fileVO = new FileVO();
                 fileVO.setId("file-789");
+                fileVO.setBizType("10.5");
                 fileVO.setFileName("report.pdf");
                 when(fileService.getById("file-789")).thenReturn(fileVO);
                 when(fileService.linkFile(eq("file-789"), eq("10.5"), eq(orderId))).thenReturn(fileVO);
 
-                FileVO result = designFileService.linkReport(orderId, "file-789");
+                when(fileService.listByIds(List.of("file-789"))).thenReturn(List.of(fileVO));
+                FileVO result = designFileService.linkReport(orderId, List.of("file-789")).get(0);
 
                 assertNotNull(result);
                 assertEquals("file-789", result.getId());
@@ -294,24 +345,82 @@ class DesignFileServiceImplTest {
         }
 
         @Test
-        @DisplayName("关联新报告时删除旧报告")
-        void shouldDeleteOldReportWhenLinkNew() {
+        @DisplayName("一次追加多个报告且不删除既有报告")
+        void shouldAppendMultipleReports() {
+            try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+                stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
+
+                FileVO report1 = new FileVO();
+                report1.setId("report-1");
+                report1.setBizType("10.5");
+                FileVO report2 = new FileVO();
+                report2.setId("report-2");
+                report2.setBizType("10.5");
+                when(fileService.listByIds(List.of("report-1", "report-2")))
+                        .thenReturn(List.of(report1, report2));
+                when(fileService.listByBiz("10.5", orderId)).thenReturn(Collections.emptyList());
+                when(fileService.linkFile(anyString(), eq("10.5"), eq(orderId)))
+                        .thenAnswer(invocation -> "report-1".equals(invocation.getArgument(0)) ? report1 : report2);
+
+                List<FileVO> result = designFileService.linkReport(orderId, List.of("report-1", "report-2"));
+
+                assertEquals(List.of("report-1", "report-2"), result.stream().map(FileVO::getId).toList());
+                verify(fileService, times(2)).linkFile(anyString(), eq("10.5"), eq(orderId));
+                verify(fileService, never()).deleteById(anyString());
+            }
+        }
+
+        @Test
+        @DisplayName("报告关联失败时清理未关联孤儿文件")
+        void shouldCleanupOrphanReportsWhenLinkFails() {
+            try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
+                stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
+                when(orderMainService.getById(orderId)).thenReturn(designingOrder);
+                FileVO report1 = new FileVO();
+                report1.setId("report-1");
+                report1.setBizType("10.5");
+                FileVO report2 = new FileVO();
+                report2.setId("report-2");
+                report2.setBizType("10.5");
+                when(fileService.listByIds(List.of("report-1", "report-2")))
+                        .thenReturn(List.of(report1, report2));
+                when(fileService.listByBiz("10.5", orderId)).thenReturn(Collections.emptyList());
+                when(fileService.linkFile("report-1", "10.5", orderId)).thenReturn(report1);
+                when(fileService.linkFile("report-2", "10.5", orderId))
+                        .thenThrow(new BusinessException(ErrorCodeEnum.ATTACHMENT_UPLOAD_FAILED));
+
+                assertThrows(BusinessException.class,
+                        () -> designFileService.linkReport(orderId, List.of("report-1", "report-2")));
+
+                verify(fileService).deleteByIdAfterAssociationFailure("report-1");
+                verify(fileService).deleteByIdAfterAssociationFailure("report-2");
+            }
+        }
+
+        @Test
+        @DisplayName("关联新报告时保留旧报告")
+        void shouldKeepOldReportWhenLinkNew() {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
                 when(orderMainService.getById(orderId)).thenReturn(designingOrder);
 
                 FileVO oldReport = new FileVO();
                 oldReport.setId("old-file");
+                oldReport.setBizType("10.5");
+                oldReport.setBizId(orderId);
                 when(fileService.listByBiz("10.5", orderId)).thenReturn(List.of(oldReport));
 
                 FileVO newFileVO = new FileVO();
                 newFileVO.setId("new-file");
+                newFileVO.setBizType("10.5");
                 when(fileService.getById("new-file")).thenReturn(newFileVO);
+                when(fileService.listByIds(List.of("new-file"))).thenReturn(List.of(newFileVO));
                 when(fileService.linkFile(eq("new-file"), eq("10.5"), eq(orderId))).thenReturn(newFileVO);
 
-                designFileService.linkReport(orderId, "new-file");
+                designFileService.linkReport(orderId, List.of("new-file"));
 
-                verify(fileService).deleteById("old-file");
+                verify(fileService, never()).deleteById("old-file");
                 verify(fileService).linkFile(eq("new-file"), eq("10.5"), eq(orderId));
             }
         }
@@ -322,10 +431,10 @@ class DesignFileServiceImplTest {
             try (MockedStatic<StpUtil> stpUtilMock = mockStatic(StpUtil.class)) {
                 stpUtilMock.when(StpUtil::getLoginIdAsLong).thenReturn(designerId);
                 when(orderMainService.getById(orderId)).thenReturn(designingOrder);
-                when(fileService.getById("not-exist")).thenReturn(null);
+                when(fileService.listByIds(List.of("not-exist"))).thenReturn(Collections.emptyList());
 
                 BusinessException exception = assertThrows(BusinessException.class,
-                        () -> designFileService.linkReport(orderId, "not-exist"));
+                        () -> designFileService.linkReport(orderId, List.of("not-exist")));
 
                 assertEquals(ErrorCodeEnum.ATTACHMENT_NOT_FOUND.getCode(), exception.getCode());
             }

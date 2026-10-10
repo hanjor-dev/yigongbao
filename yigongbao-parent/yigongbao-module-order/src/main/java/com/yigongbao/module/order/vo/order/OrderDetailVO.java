@@ -360,8 +360,8 @@ public class OrderDetailVO implements Serializable {
     /** 设计阶段打印文件数据包列表 */
     private List<DesignFileDetailVO.DesignPackageVO> packageList;
 
-    /** 设计报告，无报告时为 null */
-    private FileVO report;
+    /** 设计报告列表，无报告时为空列表 */
+    private List<FileVO> reports;
 
     /**
      * 订单明细 VO
