@@ -136,9 +136,10 @@ class DesignWorkorderServiceImplTest {
         when(orderFileMapper.selectList(any())).thenReturn(Collections.emptyList());
         when(designFileService.listPackages(anyLong())).thenReturn(Collections.emptyList());
         when(designFileService.listModels(anyLong())).thenReturn(Collections.emptyList());
-        when(designFileService.getReport(anyLong())).thenReturn(null);
+        when(designFileService.getReports(anyLong())).thenReturn(Collections.emptyList());
         when(designDocService.getLatestInstructionMap(anySet())).thenReturn(Collections.emptyMap());
         when(designDocService.getLatestDrawingMap(anySet())).thenReturn(Collections.emptyMap());
+        when(designQueryHelper.mergeWithDefault(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private OrderMainEntity buildOrder(Long id) {

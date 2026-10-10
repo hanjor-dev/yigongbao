@@ -138,8 +138,8 @@ public class DesignWorkorderDetailVO {
     /** 可视化模型列表 */
     private List<DesignModelVO> modelList;
 
-    /** 设计报告（无则为 null） */
-    private FileVO report;
+    /** 设计报告列表（无则为空列表） */
+    private List<FileVO> reports;
 
     @Data
     public static class RebuildProjectItemVO {

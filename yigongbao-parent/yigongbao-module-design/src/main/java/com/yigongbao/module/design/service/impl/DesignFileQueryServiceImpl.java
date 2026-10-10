@@ -40,7 +40,7 @@ public class DesignFileQueryServiceImpl implements DesignFileQueryService {
         result.setPackageList(packages.stream()
                 .map(this::toOrderPackage)
                 .collect(Collectors.toList()));
-        result.setReport(designFileService.getReport(orderId));
+        result.setReports(designFileService.getReports(orderId));
         return result;
     }
 

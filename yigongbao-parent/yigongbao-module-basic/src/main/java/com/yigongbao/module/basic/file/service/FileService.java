@@ -170,6 +170,14 @@ public interface FileService {
      */
     void deleteById(String id);
 
+    /**
+     * 在业务关联事务失败后，以独立事务清理尚未关联业务的文件。
+     * 用于避免外层关联事务回滚时把孤儿文件清理一并回滚。
+     *
+     * @param id 文件ID
+     */
+    void deleteByIdAfterAssociationFailure(String id);
+
     // ==================== 文件类型校验工具方法 ====================
 
     /**

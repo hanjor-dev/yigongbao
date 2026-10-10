@@ -5,11 +5,15 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
+import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.design.vo.DesignColumnConfigVO;
 import com.yigongbao.module.system.config.service.ConfigService;
 import com.yigongbao.module.system.dict.service.DictService;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.module.system.user.service.UserService;
+import com.yigongbao.module.order.service.OrderMainService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -43,6 +47,7 @@ class DesignQueryHelperTest {
     @Mock private ConfigService configService;
     @Mock private DictService dictService;
     @Mock private ObjectMapper objectMapper;
+    @Mock private OrderMainService orderMainService;
 
     @InjectMocks
     private DesignQueryHelper helper;
@@ -224,6 +229,34 @@ class DesignQueryHelperTest {
         @DisplayName("getGenderName — 女")
         void getGenderName_female() {
             assertEquals("女", helper.getGenderName("12.2"));
+        }
+    }
+
+    @Nested
+    @DisplayName("设计附件状态校验")
+    class DesignAttachmentMutation {
+
+        @Test
+        @DisplayName("生产后正常状态允许维护附件")
+        void allowsNormalPostDesignStatus() {
+            OrderMainEntity order = new OrderMainEntity();
+            order.setStatus(FlowStatusEnum.WAREHOUSE_OUT.getValue());
+            when(orderMainService.getById(1L)).thenReturn(order);
+
+            assertSame(order, helper.checkDesignAttachmentMutation(1L));
+        }
+
+        @Test
+        @DisplayName("取消状态禁止维护附件")
+        void rejectsCancelledStatus() {
+            OrderMainEntity order = new OrderMainEntity();
+            order.setStatus(FlowStatusEnum.CANCELLED.getValue());
+            when(orderMainService.getById(1L)).thenReturn(order);
+
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> helper.checkDesignAttachmentMutation(1L));
+
+            assertEquals(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED.getCode(), exception.getCode());
         }
     }
 

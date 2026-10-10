@@ -86,6 +86,32 @@ public class DesignQueryHelper {
             FlowStatusEnum.DESIGN_COMPLETED
     );
 
+    /**
+     * 设计附件允许增量维护的状态。附件维护的状态范围不能直接复用
+     * {@link #ALLOWED_DESIGN_STATUSES}，否则会把数据包、图纸、指令单等
+     * 设计阶段操作一并放开到生产后阶段。
+     */
+    private static final Set<FlowStatusEnum> ALLOWED_DESIGN_ATTACHMENT_STATUSES = Set.of(
+            FlowStatusEnum.DATA_AUDIT_PASSED,
+            FlowStatusEnum.PENDING_DESIGN,
+            FlowStatusEnum.DESIGN_IN_PROGRESS,
+            FlowStatusEnum.DESIGN_COMPLETED,
+            FlowStatusEnum.PENDING_PRINT,
+            FlowStatusEnum.PRINTING,
+            FlowStatusEnum.PRINT_COMPLETED,
+            FlowStatusEnum.PRINT_FAILED,
+            FlowStatusEnum.POST_PROCESSING,
+            FlowStatusEnum.QC_IN_PROGRESS,
+            FlowStatusEnum.QC_PASSED,
+            FlowStatusEnum.QC_FAILED,
+            FlowStatusEnum.REWORK,
+            FlowStatusEnum.PACKING,
+            FlowStatusEnum.PENDING_WAREHOUSE_IN,
+            FlowStatusEnum.WAREHOUSED,
+            FlowStatusEnum.WAREHOUSE_OUT,
+            FlowStatusEnum.COMPLETED
+    );
+
     private final UserService userService;
     private final ConfigService configService;
     private final DictService dictService;
@@ -449,6 +475,22 @@ public class DesignQueryHelper {
         }
         FlowStatusEnum status = FlowStatusEnum.getByValue(order.getStatus());
         if (status == null || !ALLOWED_DESIGN_STATUSES.contains(status)) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+        }
+        return order;
+    }
+
+    /**
+     * 校验订单处于允许增量维护设计模型和设计报告的状态。
+     * 已取消订单不在白名单内；其他设计完成后的流程状态仍允许附件维护。
+     */
+    public OrderMainEntity checkDesignAttachmentMutation(Long orderId) {
+        OrderMainEntity order = orderMainService.getById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
+        }
+        FlowStatusEnum status = FlowStatusEnum.getByValue(order.getStatus());
+        if (status == null || !ALLOWED_DESIGN_ATTACHMENT_STATUSES.contains(status)) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
         }
         return order;

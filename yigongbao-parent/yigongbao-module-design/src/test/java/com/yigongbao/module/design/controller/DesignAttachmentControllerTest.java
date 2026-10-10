@@ -77,10 +77,10 @@ class DesignAttachmentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isOk());
-        verify(designFileService).linkReport(1L, "report-1");
+        verify(designFileService).linkReport(1L, java.util.List.of("report-1"));
 
         mockMvc.perform(get("/design/report").param("orderId", "1"))
                 .andExpect(status().isOk());
-        verify(designFileService).getReport(1L);
+        verify(designFileService).getReports(1L);
     }
 }
