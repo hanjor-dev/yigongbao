@@ -115,6 +115,7 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     private final com.yigongbao.module.order.service.OrderCancelApplyService cancelApplyService;
     private final FlowStatusColorResolver flowStatusColorResolver;
+    private final com.yigongbao.module.design.service.DesignPackageBatchService packageBatchService;
 
     @Override
     public DesignWorkorderStatisticsVO getStatistics(DesignWorkorderStatisticsQueryDTO dto) {
@@ -1001,8 +1002,11 @@ public class DesignWorkorderServiceImpl implements DesignWorkorderService {
             throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
         }
 
-        // 发布设计完成事件，触发生产流转卡创建
-        eventPublisher.publishEvent(new com.yigongbao.common.event.DesignCompletedEvent(this, orderId));
+        // 追加批次只有在用户完成全部设计校验后才收口，并只为新增数据包生成生产数据。
+        java.util.List<Long> appendedPackageIds = packageBatchService.completeUnfinishedBatches(orderId);
+        eventPublisher.publishEvent(appendedPackageIds.isEmpty()
+                ? new com.yigongbao.common.event.DesignCompletedEvent(this, orderId)
+                : new com.yigongbao.common.event.DesignCompletedEvent(this, orderId, appendedPackageIds));
 
         log.info("完成设计: orderId={}, needsPhysicalDelivery={}, {} -> {}, userId={}",
                 orderId, order.getNeedsPhysicalDelivery(),

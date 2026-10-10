@@ -19,7 +19,7 @@ import static org.mockito.Mockito.*;
 class FlowFacadeImplTest {
 
     @Test
-    void completesAdditionalDesignBatchWithHistoryAndVersionGuard() {
+    void startsAdditionalDesignWithHistoryAndVersionGuard() {
         FlowStateMachineService stateMachine = mock(FlowStateMachineService.class);
         FlowOrderService orderService = mock(FlowOrderService.class);
         FlowStatusHistoryService historyService = mock(FlowStatusHistoryService.class);
@@ -33,20 +33,20 @@ class FlowFacadeImplTest {
         order.setVersion(7);
         when(orderService.getById(10L)).thenReturn(order);
         when(orderService.updatePhaseAndStatusWithHandlerIfVersion(
-                10L, 7, 20, 2030, 3L, "设计师")).thenReturn(1);
+                10L, 7, 20, 2020, 3L, "设计师")).thenReturn(1);
 
-        var result = facade.executeAdditionalDesignBatchComplete(
+        var result = facade.executeAdditionalDesignStart(
                 10L, new FlowOperator(3L, "设计师", "批次=AD-10-1"), 7);
 
         assertEquals(20, result.getTargetPhase());
-        assertEquals(FlowStatusEnum.DESIGN_COMPLETED.getValue(), result.getTargetStatus());
+        assertEquals(FlowStatusEnum.DESIGN_IN_PROGRESS.getValue(), result.getTargetStatus());
         verify(historyService).recordTransition(
-                10L, "ORD-10", FlowPhaseEnum.DESIGN.getValue(), 6010, 2030,
-                FlowActionEnum.COMPLETE_ADDITIONAL_DESIGN_BATCH.getCode(),
-                FlowActionEnum.COMPLETE_ADDITIONAL_DESIGN_BATCH.getName(),
+                10L, "ORD-10", FlowPhaseEnum.DESIGN.getValue(), 6010, 2020,
+                FlowActionEnum.START_ADDITIONAL_DESIGN.getCode(),
+                FlowActionEnum.START_ADDITIONAL_DESIGN.getName(),
                 new FlowOperator(3L, "设计师", "批次=AD-10-1"));
         verify(orderService).updatePhaseAndStatusWithHandlerIfVersion(
-                10L, 7, 20, 2030, 3L, "设计师");
+                10L, 7, 20, 2020, 3L, "设计师");
     }
 
     @Test
@@ -64,11 +64,11 @@ class FlowFacadeImplTest {
         order.setVersion(2);
         when(orderService.getById(10L)).thenReturn(order);
         when(orderService.updatePhaseAndStatusWithHandlerIfVersion(
-                10L, 2, 20, 2030, 3L, "设计师")).thenReturn(0);
+                10L, 2, 20, 2020, 3L, "设计师")).thenReturn(0);
 
-        assertThrows(RuntimeException.class, () -> facade.executeAdditionalDesignBatchComplete(
+        assertThrows(RuntimeException.class, () -> facade.executeAdditionalDesignStart(
                 10L, new FlowOperator(3L, "设计师", null), 2));
         verify(orderService).updatePhaseAndStatusWithHandlerIfVersion(
-                10L, 2, 20, 2030, 3L, "设计师");
+                10L, 2, 20, 2020, 3L, "设计师");
     }
 }

@@ -18,6 +18,7 @@ import com.yigongbao.module.basic.product.vo.ProductVO;
 import com.yigongbao.module.design.dto.SavePrintInfoDTO;
 import com.yigongbao.module.design.dto.SavePrintInfoItemDTO;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
+import com.yigongbao.module.design.entity.DesignPackageBatchEntity;
 import com.yigongbao.module.design.entity.DesignPackageFileEntity;
 import com.yigongbao.module.design.entity.DesignDrawingEntity;
 import com.yigongbao.module.design.entity.DesignInstructionEntity;
@@ -28,6 +29,7 @@ import com.yigongbao.module.design.mapper.DesignInstructionMapper;
 import com.yigongbao.module.design.helper.DesignQueryHelper;
 import com.yigongbao.module.design.service.DesignPackageFileService;
 import com.yigongbao.module.design.service.DesignPackageService;
+import com.yigongbao.module.design.service.DesignPackageBatchService;
 import com.yigongbao.module.design.service.DesignProductFileService;
 import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.vo.ColorGroupVO;
@@ -82,6 +84,7 @@ class DesignPrintInfoServiceImplTest {
     @Mock private DesignInstructionMapper instructionMapper;
     @Mock private DesignDrawingMapper drawingMapper;
     @Mock private DesignQueryHelper designQueryHelper;
+    @Mock private DesignPackageBatchService packageBatchService;
 
     @InjectMocks
     private DesignPrintInfoServiceImpl printInfoService;
@@ -284,6 +287,26 @@ class DesignPrintInfoServiceImplTest {
     @Nested
     @DisplayName("savePrintInfo 测试")
     class SavePrintInfoTest {
+
+        @Test
+        @DisplayName("追加批次进行中时拒绝不带批次ID的旧打印信息接口")
+        void savePrintInfo_legacyEndpointRejectedWhenAppendBatchUnfinished() {
+            designInProgressOrder.setStatus(2020);
+            DesignPackageBatchEntity batch = new DesignPackageBatchEntity();
+            batch.setId(99L);
+            when(orderMainService.getById(ORDER_ID)).thenReturn(designInProgressOrder);
+            when(designQueryHelper.checkDesignPhase(ORDER_ID)).thenReturn(designInProgressOrder);
+            when(packageService.getById(PACKAGE_ID)).thenReturn(testPackage);
+            when(packageBatchService.findUnfinished(ORDER_ID)).thenReturn(batch);
+
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(DESIGNER_ID);
+
+                assertThrows(BusinessException.class,
+                        () -> printInfoService.savePrintInfo(ORDER_ID, PACKAGE_ID, buildSavePrintInfoDTO()));
+            }
+            verifyNoInteractions(designProductService, productFileService);
+        }
 
         @Test
         @DisplayName("保存打印信息成功（整包替换：旧记录删除、新记录插入）")

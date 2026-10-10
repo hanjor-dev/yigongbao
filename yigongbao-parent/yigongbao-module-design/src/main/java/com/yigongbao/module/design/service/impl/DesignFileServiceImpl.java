@@ -34,6 +34,9 @@ import com.yigongbao.module.design.vo.DesignModelVO;
 import com.yigongbao.module.design.vo.DesignPackageFileVO;
 import com.yigongbao.module.design.vo.DesignPackageVO;
 import com.yigongbao.module.order.service.OrderMainService;
+import com.yigongbao.flow.facade.FlowFacade;
+import com.yigongbao.flow.operator.FlowOperator;
+import cn.dev33.satoken.stp.StpUtil;
 import com.yigongbao.module.system.config.service.ConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,6 +78,7 @@ public class DesignFileServiceImpl implements DesignFileService {
     private final ConfigService configService;
     private final com.yigongbao.module.design.helper.DesignQueryHelper designQueryHelper;
     private final com.yigongbao.module.design.service.DesignPackageBatchService batchService;
+    private final FlowFacade flowFacade;
 
     // ==================== 数据包 ====================
 
@@ -224,6 +228,12 @@ public class DesignFileServiceImpl implements DesignFileService {
             }
             // 批量插入
             packageFileService.saveBatch(fileEntities);
+
+            // 首次成功上传追加数据包后，订单进入设计中；仅打开追加页面不改变订单状态。
+            if (batchId != null && !Objects.equals(order.getStatus(), 2020)) {
+                flowFacade.executeAdditionalDesignStart(orderId,
+                        FlowOperator.of(StpUtil.getLoginIdAsLong(), null), order.getVersion());
+            }
 
             // 12. 构建返回结果
             log.info("上传数据包: orderId={}, packageCode={}, fileCount={}", orderId, packageCode, archiveFiles.size());
@@ -873,7 +883,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
         }
-        Set<Integer> allowed = Set.of(2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020,
+        Set<Integer> allowed = Set.of(2020, 2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020,
                 5030, 5040, 5050, 6010, 6020, 6030, 8010);
         if (!allowed.contains(order.getStatus())) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);

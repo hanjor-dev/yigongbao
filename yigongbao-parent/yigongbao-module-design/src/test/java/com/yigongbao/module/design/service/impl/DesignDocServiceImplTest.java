@@ -13,6 +13,7 @@ import com.yigongbao.module.basic.file.vo.FileVO;
 import com.yigongbao.module.design.entity.DesignDrawingEntity;
 import com.yigongbao.module.design.entity.DesignInstructionEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
+import com.yigongbao.module.design.entity.DesignPackageBatchEntity;
 import com.yigongbao.module.design.entity.DesignProductEntity;
 import com.yigongbao.module.design.entity.DesignProductFileEntity;
 import com.yigongbao.module.design.helper.DrawingExcelBuilder;
@@ -23,6 +24,7 @@ import com.yigongbao.module.design.mapper.DesignPackageFileScreenshotMapper;
 import com.yigongbao.module.design.service.DesignDrawingService;
 import com.yigongbao.module.design.service.DesignInstructionService;
 import com.yigongbao.module.design.service.DesignPackageService;
+import com.yigongbao.module.design.service.DesignPackageBatchService;
 import com.yigongbao.module.design.service.DesignProductFileService;
 import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.service.DesignScreenshotService;
@@ -93,6 +95,7 @@ class DesignDocServiceImplTest {
 
     @Mock private OrderMainService orderMainService;
     @Mock private DesignPackageService packageService;
+    @Mock private DesignPackageBatchService packageBatchService;
     @Mock private DesignProductService productService;
     @Mock private DesignProductMapper designProductMapper;
     @Mock private DesignInstructionService instructionService;
@@ -875,6 +878,25 @@ class DesignDocServiceImplTest {
     @Nested
     @DisplayName("uploadRevisedInstruction")
     class UploadRevisedInstruction {
+
+        @Test
+        @DisplayName("追加批次进行中时拒绝不带批次ID的旧指令单接口")
+        void legacyEndpointRejectedWhenAppendBatchUnfinished() {
+            order.setStatus(2020);
+            DesignPackageBatchEntity batch = new DesignPackageBatchEntity();
+            batch.setId(99L);
+            when(packageBatchService.findUnfinished(ORDER_ID)).thenReturn(batch);
+            when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+
+                assertThrows(BusinessException.class,
+                        () -> docService.uploadRevisedInstruction(ORDER_ID, PACKAGE_ID, 1L,
+                                mock(MultipartFile.class)));
+            }
+            verifyNoInteractions(instructionService, fileService);
+        }
 
         @Test
         @DisplayName("上传修订版指令单后自动确认（isConfirmed=1）")

@@ -29,7 +29,7 @@ import java.util.List;
 public class DesignPackageBatchController {
 
     private static final List<Integer> ALLOWED_STATUSES = List.of(
-            2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020, 5030, 5040,
+            2020, 2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020, 5030, 5040,
             5050, 6010, 6020, 6030, 8010);
 
     private final OrderMainService orderMainService;
@@ -63,14 +63,6 @@ public class DesignPackageBatchController {
                         .eq(DesignPackageBatchEntity::getOrderId, orderId)
                         .orderByDesc(DesignPackageBatchEntity::getCreateTime))
                 .stream().map(this::toVO).toList());
-    }
-
-    @Operation(summary = "完成追加设计批次")
-    @PostMapping("/{batchId}/complete")
-    public Result<Void> complete(@PathVariable Long batchId, @RequestParam Long orderId) {
-        designQueryHelper.checkIsAssignedDesigner(checkAllowedOrder(orderId));
-        batchService.complete(orderId, batchId);
-        return Result.success();
     }
 
     private OrderMainEntity checkAllowedOrder(Long orderId) {

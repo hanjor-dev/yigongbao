@@ -265,7 +265,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         log.info("上传修订版指令单，orderId={}, packageId={}, id={}", orderId, packageId, id);
         // 经典案例保护：经典案例订单不允许上传新的指令单文件
         orderMainService.checkNotClassicCase(orderId, "上传指令单");
-        checkDesignMutationPhase(orderId);
+        checkDesignMutationPhase(orderId, packageId);
         validatePackage(orderId, packageId);
 
         // 查询当前最新版本
@@ -320,7 +320,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         lockPackageForDrawingMutation(orderId, packageId);
         // 经典案例保护：经典案例订单不允许上传新的图纸文件
         orderMainService.checkNotClassicCase(orderId, "上传图纸");
-        checkDesignMutationPhase(orderId);
+        checkDesignMutationPhase(orderId, packageId);
 
         // 查询当前最新版本
         String category = resolveCategory(packageId, productCategory);
@@ -378,7 +378,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         log.info("确认图纸，orderId={}, packageId={}, id={}", orderId, packageId, id);
         // 必须在事务内其他数据库读取之前加锁，等待后再建立一致性读快照。
         lockPackageForDrawingMutation(orderId, packageId);
-        checkDesignMutationPhase(orderId);
+        checkDesignMutationPhase(orderId, packageId);
         String category = resolveCategory(packageId, productCategory);
         DesignDrawingEntity latest = category == null ? drawingService.getLatestVersion(packageId)
                 : drawingService.getLatestVersion(packageId, category);
@@ -404,7 +404,7 @@ public class DesignDocServiceImpl implements DesignDocService {
     @Transactional(rollbackFor = Exception.class)
     public void confirmInstruction(Long orderId, Long packageId, Long id) {
         log.info("确认指令单，orderId={}, packageId={}, id={}", orderId, packageId, id);
-        checkDesignMutationPhase(orderId);
+        checkDesignMutationPhase(orderId, packageId);
         validatePackage(orderId, packageId);
         DesignInstructionEntity entity = instructionService.getById(id);
         if (entity == null || !entity.getPackageId().equals(packageId)) {
@@ -1101,7 +1101,7 @@ public class DesignDocServiceImpl implements DesignDocService {
             var batch = packageBatchService.getById(batchId);
             if (order == null || batch == null || !orderId.equals(batch.getOrderId())
                     || "CANCELLED".equals(batch.getStatus())
-                    || !Set.of(2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020, 5030, 5040, 5050,
+                    || !Set.of(2020, 2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020, 5030, 5040, 5050,
                     6010, 6020, 6030, 8010).contains(order.getStatus())) {
                 throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
             }
@@ -1115,7 +1115,7 @@ public class DesignDocServiceImpl implements DesignDocService {
         return order;
     }
 
-    private OrderMainEntity checkDesignMutationPhase(Long orderId) {
+    private OrderMainEntity checkDesignMutationPhase(Long orderId, Long packageId) {
         if (activeBatchId.get() != null) {
             var order = checkDesignPhase(orderId);
             var batchQuery = new LambdaQueryWrapper<com.yigongbao.module.design.entity.DesignPackageBatchEntity>()
@@ -1126,10 +1126,19 @@ public class DesignDocServiceImpl implements DesignDocService {
             if (batch == null || "COMPLETED".equals(batch.getStatus()) || "CANCELLED".equals(batch.getStatus())) {
                 throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
             }
+            DesignPackageEntity pkg = packageService.getById(packageId);
+            if (pkg == null || !orderId.equals(pkg.getOrderId())
+                    || !activeBatchId.get().equals(pkg.getBatchId())) {
+                throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
+            }
             return order;
         }
         OrderMainEntity order = designQueryHelper.checkDesignPhase(orderId);
         if (order == null || !Set.of(1030, 2010, 2020).contains(order.getStatus())) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+        }
+        if (packageBatchService.findUnfinished(orderId) != null) {
+            // 追加设计进行中时，文档修改必须携带追加批次上下文。
             throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
         }
         return order;

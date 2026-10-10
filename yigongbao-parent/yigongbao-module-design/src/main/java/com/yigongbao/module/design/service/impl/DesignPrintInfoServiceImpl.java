@@ -495,10 +495,14 @@ public class DesignPrintInfoServiceImpl implements DesignPrintInfoService {
                 throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
             }
             OrderMainEntity currentOrder = orderMainService.getById(orderId);
-            if (mutation && !Set.of(2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020, 5030, 5040, 5050, 6010, 6020, 6030, 8010)
+            if (mutation && !Set.of(2020, 2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020, 5030, 5040, 5050, 6010, 6020, 6030, 8010)
                     .contains(currentOrder.getStatus())) {
                 throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
             }
+        }
+        if (mutation && batchId == null && packageBatchService.findUnfinished(orderId) != null) {
+            // 追加设计进行中时，所有打印信息修改必须走带 batchId 的追加接口。
+            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
         }
         return pkg;
     }

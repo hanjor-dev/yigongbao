@@ -83,8 +83,8 @@ public class FlowFacadeImpl implements FlowFacade {
     }
 
     @Override
-    public TransitionResult executeAdditionalDesignBatchComplete(Long orderId, FlowOperator operator,
-                                                                 Integer expectedVersion) {
+    public TransitionResult executeAdditionalDesignStart(Long orderId, FlowOperator operator,
+                                                         Integer expectedVersion) {
         OrderMainEntity order = flowOrderService.getById(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
@@ -93,23 +93,44 @@ public class FlowFacadeImpl implements FlowFacade {
             operator = new FlowOperator();
         }
         Integer fromStatus = order.getStatus();
+        if (FlowStatusEnum.DESIGN_IN_PROGRESS.getValue().equals(fromStatus)) {
+            return TransitionResult.of(FlowPhaseEnum.DESIGN.getValue(), fromStatus);
+        }
+        Set<Integer> allowedSourceStatuses = Set.of(
+                FlowStatusEnum.DESIGN_COMPLETED.getValue(),
+                FlowStatusEnum.PENDING_PRINT.getValue(),
+                FlowStatusEnum.PRINTING.getValue(),
+                FlowStatusEnum.PRINT_COMPLETED.getValue(),
+                FlowStatusEnum.POST_PROCESSING.getValue(),
+                FlowStatusEnum.QC_IN_PROGRESS.getValue(),
+                FlowStatusEnum.QC_FAILED.getValue(),
+                FlowStatusEnum.REWORK.getValue(),
+                FlowStatusEnum.QC_PASSED.getValue(),
+                FlowStatusEnum.PACKING.getValue(),
+                FlowStatusEnum.PENDING_WAREHOUSE_IN.getValue(),
+                FlowStatusEnum.WAREHOUSED.getValue(),
+                FlowStatusEnum.WAREHOUSE_OUT.getValue(),
+                FlowStatusEnum.COMPLETED.getValue());
+        if (!allowedSourceStatuses.contains(fromStatus)) {
+            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
+        }
         Integer expected = expectedVersion != null ? expectedVersion
                 : (order.getVersion() != null ? order.getVersion() : 0);
-        FlowActionEnum action = FlowActionEnum.COMPLETE_ADDITIONAL_DESIGN_BATCH;
+        FlowActionEnum action = FlowActionEnum.START_ADDITIONAL_DESIGN;
 
         flowStatusHistoryService.recordTransition(
                 order.getId(), order.getOrderCode(), FlowPhaseEnum.DESIGN.getValue(),
-                fromStatus, FlowStatusEnum.DESIGN_COMPLETED.getValue(),
+                fromStatus, FlowStatusEnum.DESIGN_IN_PROGRESS.getValue(),
                 action.getCode(), action.getName(), operator);
 
         int updated = flowOrderService.updatePhaseAndStatusWithHandlerIfVersion(
                 orderId, expected, FlowPhaseEnum.DESIGN.getValue(),
-                FlowStatusEnum.DESIGN_COMPLETED.getValue(),
+                FlowStatusEnum.DESIGN_IN_PROGRESS.getValue(),
                 operator.getOperatorId(), operator.getOperatorName());
         if (updated != 1) {
             throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
         }
         return TransitionResult.of(FlowPhaseEnum.DESIGN.getValue(),
-                FlowStatusEnum.DESIGN_COMPLETED.getValue());
+                FlowStatusEnum.DESIGN_IN_PROGRESS.getValue());
     }
 }

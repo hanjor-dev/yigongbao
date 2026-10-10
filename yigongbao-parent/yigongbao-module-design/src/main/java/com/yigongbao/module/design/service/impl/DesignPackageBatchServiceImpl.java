@@ -4,23 +4,16 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
-import com.yigongbao.common.event.DesignCompletedEvent;
 import com.yigongbao.common.exception.BusinessException;
-import com.yigongbao.flow.facade.FlowFacade;
-import com.yigongbao.flow.operator.FlowOperator;
 import com.yigongbao.module.design.entity.DesignPackageBatchEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.enums.DesignPackageBatchStatus;
 import com.yigongbao.module.design.mapper.DesignPackageBatchMapper;
 import com.yigongbao.module.design.service.DesignPackageService;
-import com.yigongbao.module.design.service.DesignProductService;
 import com.yigongbao.module.design.service.DesignPackageBatchService;
 import com.yigongbao.module.order.service.OrderMainService;
-import com.yigongbao.module.system.user.entity.UserEntity;
-import com.yigongbao.module.system.user.service.UserService;
 import cn.dev33.satoken.stp.StpUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,15 +27,11 @@ public class DesignPackageBatchServiceImpl
         implements DesignPackageBatchService {
 
     private static final List<Integer> ALLOWED_ORDER_STATUSES = List.of(
-            2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020, 5030, 5040,
+            2020, 2030, 3010, 3020, 3030, 3040, 4010, 5010, 5020, 5030, 5040,
             5050, 6010, 6020, 6030, 8010);
 
     private final OrderMainService orderMainService;
     private final DesignPackageService packageService;
-    private final DesignProductService productService;
-    private final ApplicationEventPublisher eventPublisher;
-    private final FlowFacade flowFacade;
-    private final UserService userService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -57,12 +46,7 @@ public class DesignPackageBatchServiceImpl
         if (!ALLOWED_ORDER_STATUSES.contains(order.getStatus())) {
             throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
         }
-        DesignPackageBatchEntity unfinished = getOne(new LambdaQueryWrapper<DesignPackageBatchEntity>()
-                .eq(DesignPackageBatchEntity::getOrderId, orderId)
-                .in(DesignPackageBatchEntity::getStatus,
-                        DesignPackageBatchStatus.UPLOADING.name(), DesignPackageBatchStatus.PRINT_INFO_EDITING.name())
-                .orderByDesc(DesignPackageBatchEntity::getCreateTime)
-                .last("LIMIT 1"), false);
+        DesignPackageBatchEntity unfinished = findUnfinished(orderId);
         if (unfinished != null) {
             return unfinished;
         }
@@ -79,57 +63,36 @@ public class DesignPackageBatchServiceImpl
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void complete(Long orderId, Long batchId) {
-        DesignPackageBatchEntity batch = getOwnedBatch(orderId, batchId);
-        if (DesignPackageBatchStatus.COMPLETED.name().equals(batch.getStatus())
-                || DesignPackageBatchStatus.CANCELLED.name().equals(batch.getStatus())) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
-        }
-
-        List<DesignPackageEntity> packages = packageService.list(new LambdaQueryWrapper<DesignPackageEntity>()
-                .eq(DesignPackageEntity::getOrderId, orderId)
-                .eq(DesignPackageEntity::getBatchId, batchId)
-                .orderByAsc(DesignPackageEntity::getPackageSeq));
-        if (packages.isEmpty() || packages.stream()
-                .anyMatch(pkg -> productService.countByPackageId(pkg.getId()) <= 0)) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED,
-                    "追加批次中的所有数据包必须完成打印信息填写");
-        }
-
-        OrderMainEntity order = orderMainService.getById(orderId);
-        if (order == null) {
-            throw new BusinessException(ErrorCodeEnum.ORDER_NOT_FOUND);
-        }
-        if (!ALLOWED_ORDER_STATUSES.contains(order.getStatus())) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_ORDER_STATUS_NOT_ALLOWED);
-        }
-        Long operatorId = StpUtil.getLoginIdAsLong();
-        UserEntity operatorUser = userService.getById(operatorId);
-        String operatorName = operatorUser == null ? null : operatorUser.getRealName();
-
-        // 先锁定批次；订单版本条件更新仍是最终并发闸门，失败时整个事务回滚。
-        batch.setStatus(DesignPackageBatchStatus.COMPLETED.name());
-        batch.setCompletedTime(LocalDateTime.now());
-        batchServiceUpdate(batch);
-
-        flowFacade.executeAdditionalDesignBatchComplete(
-                orderId,
-                new FlowOperator(operatorId, operatorName, "批次=" + batch.getBatchNo()),
-                order.getVersion());
-        eventPublisher.publishEvent(new DesignCompletedEvent(this, orderId,
-                packages.stream().map(DesignPackageEntity::getId).toList()));
+    public DesignPackageBatchEntity findUnfinished(Long orderId) {
+        return getOne(new LambdaQueryWrapper<DesignPackageBatchEntity>()
+                .eq(DesignPackageBatchEntity::getOrderId, orderId)
+                .in(DesignPackageBatchEntity::getStatus,
+                        DesignPackageBatchStatus.UPLOADING.name(), DesignPackageBatchStatus.PRINT_INFO_EDITING.name())
+                .orderByDesc(DesignPackageBatchEntity::getCreateTime)
+                .last("LIMIT 1"), false);
     }
 
-    private DesignPackageBatchEntity getOwnedBatch(Long orderId, Long batchId) {
-        DesignPackageBatchEntity batch = getOne(new LambdaQueryWrapper<DesignPackageBatchEntity>()
-                .eq(DesignPackageBatchEntity::getId, batchId)
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public List<Long> completeUnfinishedBatches(Long orderId) {
+        List<DesignPackageBatchEntity> batches = list(new LambdaQueryWrapper<DesignPackageBatchEntity>()
                 .eq(DesignPackageBatchEntity::getOrderId, orderId)
-                .last("FOR UPDATE"), false);
-        if (batch == null || !orderId.equals(batch.getOrderId())) {
-            throw new BusinessException(ErrorCodeEnum.DESIGN_PACKAGE_NOT_FOUND);
+                .in(DesignPackageBatchEntity::getStatus,
+                        DesignPackageBatchStatus.UPLOADING.name(), DesignPackageBatchStatus.PRINT_INFO_EDITING.name())
+                .orderByAsc(DesignPackageBatchEntity::getCreateTime)
+                .last("FOR UPDATE"));
+        List<Long> packageIds = new java.util.ArrayList<>();
+        for (DesignPackageBatchEntity batch : batches) {
+            List<DesignPackageEntity> packages = packageService.list(new LambdaQueryWrapper<DesignPackageEntity>()
+                    .eq(DesignPackageEntity::getOrderId, orderId)
+                    .eq(DesignPackageEntity::getBatchId, batch.getId())
+                    .orderByAsc(DesignPackageEntity::getPackageSeq));
+            packageIds.addAll(packages.stream().map(DesignPackageEntity::getId).toList());
+            batch.setStatus(DesignPackageBatchStatus.COMPLETED.name());
+            batch.setCompletedTime(LocalDateTime.now());
+            batchServiceUpdate(batch);
         }
-        return batch;
+        return packageIds;
     }
 
     private void batchServiceUpdate(DesignPackageBatchEntity batch) {

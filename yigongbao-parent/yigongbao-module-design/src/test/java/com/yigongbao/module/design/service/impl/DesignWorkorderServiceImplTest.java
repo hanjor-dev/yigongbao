@@ -125,6 +125,7 @@ class DesignWorkorderServiceImplTest {
     @Mock private OrderModificationApplyMapper orderModificationApplyMapper;
     @Mock private DesignFileService designFileService;
     @Mock private DesignDocService designDocService;
+    @Mock private com.yigongbao.module.design.service.DesignPackageBatchService packageBatchService;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
@@ -139,6 +140,7 @@ class DesignWorkorderServiceImplTest {
         when(designFileService.getReports(anyLong())).thenReturn(Collections.emptyList());
         when(designDocService.getLatestInstructionMap(anySet())).thenReturn(Collections.emptyMap());
         when(designDocService.getLatestDrawingMap(anySet())).thenReturn(Collections.emptyMap());
+        when(packageBatchService.completeUnfinishedBatches(anyLong())).thenReturn(Collections.emptyList());
         when(designQueryHelper.mergeWithDefault(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
