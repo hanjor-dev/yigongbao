@@ -3,8 +3,7 @@
 -- 本脚本包含：
 -- 1. 新增 design_package_batch 追加设计批次表；
 -- 2. design_package、production_record 增加批次关联字段和索引；
--- 3. 新增“追加设计批次”按钮资源；
--- 4. 将资源授权给当前拥有“上传设计文件”（design:Upload）权限的有效角色。
+-- 3. 补充 design_package_batch 所需的通用审计字段。
 --
 -- 说明：
 -- - 本脚本只负责结构和权限初始化，不回填历史数据的 batch_id；历史数据保持 NULL，原有按 order_id/package_id 的查询不受影响。
@@ -132,67 +131,6 @@ PREPARE stmt_add_production_record_batch_index FROM @sql_add_production_record_b
 EXECUTE stmt_add_production_record_batch_index;
 DEALLOCATE PREPARE stmt_add_production_record_batch_index;
 
--- 新增设计工单操作列按钮资源。使用 design:Upload 的 parent_id，避免硬编码菜单ID。
-INSERT INTO sys_resource
-(
-    parent_id,
-    resource_name,
-    resource_code,
-    resource_type,
-    sort,
-    visible,
-    status,
-    create_time,
-    update_time,
-    is_deleted
-)
-SELECT upload_resource.parent_id,
-       '追加设计批次',
-       'design:AppendBatch',
-       3,
-       upload_resource.sort + 1,
-       1,
-       1,
-       NOW(),
-       NOW(),
-       0
-FROM sys_resource upload_resource
-WHERE upload_resource.resource_code = 'design:Upload'
-  AND upload_resource.is_deleted = 0
-  AND NOT EXISTS (
-      SELECT 1
-      FROM sys_resource existing_resource
-      WHERE existing_resource.resource_code = 'design:AppendBatch'
-        AND existing_resource.is_deleted = 0
-  );
-
--- 权限角色集合动态复制当前 design:Upload 的有效角色集合。
-INSERT INTO sys_role_resource (role_id, resource_id)
-SELECT DISTINCT upload_role.role_id, append_resource.id
-FROM sys_role_resource upload_role
-INNER JOIN sys_role upload_role_def
-        ON upload_role_def.id = upload_role.role_id
-       AND upload_role_def.status = 1
-       AND upload_role_def.is_deleted = 0
-INNER JOIN sys_resource upload_resource
-        ON upload_resource.id = upload_role.resource_id
-       AND upload_resource.resource_code = 'design:Upload'
-       AND upload_resource.is_deleted = 0
-INNER JOIN sys_resource append_resource
-        ON append_resource.resource_code = 'design:AppendBatch'
-       AND append_resource.is_deleted = 0
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM sys_role_resource existing_role_resource
-    WHERE existing_role_resource.role_id = upload_role.role_id
-      AND existing_role_resource.resource_id = append_resource.id
-);
-
 -- 发布后建议执行以下只读校验：
--- SELECT id, resource_name, resource_code, parent_id FROM sys_resource WHERE resource_code IN ('design:Upload', 'design:AppendBatch');
--- SELECT r.role_code, r.role_name, res.resource_code
--- FROM sys_role_resource rr
--- JOIN sys_role r ON r.id = rr.role_id
--- JOIN sys_resource res ON res.id = rr.resource_id
--- WHERE res.resource_code IN ('design:Upload', 'design:AppendBatch')
--- ORDER BY r.id, res.resource_code;
+-- SELECT COUNT(*) FROM design_package_batch;
+-- SHOW COLUMNS FROM design_package_batch;
