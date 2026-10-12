@@ -14,6 +14,7 @@ import com.yigongbao.module.order.service.legacy.LegacyOrderMigrationService;
 import com.yigongbao.module.order.service.legacy.LegacyOrderQueryService;
 import com.yigongbao.module.order.vo.legacy.LegacyOrderListVO;
 import com.yigongbao.module.order.vo.legacy.LegacyOrderFilterOptionsVO;
+import com.yigongbao.module.order.vo.legacy.LegacyOrderDetailVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -41,6 +42,14 @@ public class LegacyOrderController {
     @Operation(summary = "查询历史订单筛选项")
     public Result<LegacyOrderFilterOptionsVO> filterOptions() {
         return Result.success(queryService.filterOptions());
+    }
+
+    @GetMapping("/detail/{sourceOrderId}")
+    @RequirePermission("LegacyOrder")
+    @Operation(summary = "查询历史订单详情")
+    public Result<LegacyOrderDetailVO> detail(@PathVariable Long sourceOrderId) {
+        LegacyOrderDetailVO detail = queryService.detail(sourceOrderId);
+        return detail == null ? Result.error("历史订单不存在或尚未迁移") : Result.success(detail);
     }
 
     @PostMapping("/migration/incremental")

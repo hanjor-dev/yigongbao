@@ -7,6 +7,7 @@ import com.yigongbao.module.order.dto.legacy.LegacyOrderPageDTO;
 import com.yigongbao.module.order.entity.legacy.LegacyOrderListEntity;
 import com.yigongbao.module.order.mapper.legacy.LegacyOrderListMapper;
 import com.yigongbao.module.order.vo.legacy.LegacyOrderListVO;
+import com.yigongbao.module.order.vo.legacy.LegacyOrderDetailVO;
 import com.yigongbao.module.order.vo.legacy.LegacyOrderFilterOptionsVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
@@ -70,6 +71,45 @@ public class LegacyOrderQueryService {
                         .orderByAsc(LegacyOrderListEntity::getBusinessTypeRaw))
                 .stream().map(String::valueOf).toList();
         return new LegacyOrderFilterOptionsVO(statuses, businessTypes);
+    }
+
+    /**
+     * 按旧系统订单主键查询详情。列表对外的 id 是 source_order_id，不是归档表自增主键。
+     */
+    public LegacyOrderDetailVO detail(Long sourceOrderId) {
+        LegacyOrderListEntity entity = mapper.selectOne(new LambdaQueryWrapper<LegacyOrderListEntity>()
+                .eq(LegacyOrderListEntity::getIsDeleted, 0)
+                .eq(LegacyOrderListEntity::getSourceSystem, "OLD_YIGONGBAO")
+                .eq(LegacyOrderListEntity::getSourceOrderId, sourceOrderId)
+                .last("LIMIT 1"));
+        if (entity == null) return null;
+
+        LegacyOrderListVO list = toVO(entity);
+        LegacyOrderDetailVO detail = new LegacyOrderDetailVO();
+        BeanUtils.copyProperties(list, detail);
+        detail.setSourceSystem(entity.getSourceSystem());
+        detail.setStatusRaw(entity.getStatusRaw());
+        detail.setBusinessTypeRaw(entity.getBusinessTypeRaw());
+        detail.setPrintRaw(entity.getPrintRaw());
+        detail.setExpectedDeliveryRaw(entity.getExpectedDeliveryRaw());
+        detail.setDeliveryRaw(entity.getDeliveryRaw());
+        detail.setEstimatedCostRaw(entity.getEstimatedCostRaw());
+        detail.setEstimatedCostNumber(entity.getEstimatedCostNumber());
+        detail.setPatientAgeRaw(entity.getPatientAgeRaw());
+        detail.setPatientGenderRaw(entity.getPatientGenderRaw());
+        detail.setDesignStartRaw(entity.getDesignStartRaw());
+        detail.setDesignSubmitRaw(entity.getDesignSubmitRaw());
+        detail.setProductionStartRaw(entity.getProductionStartRaw());
+        detail.setProductionEndRaw(entity.getProductionEndRaw());
+        detail.setCreateTimeRaw(entity.getCreateTimeRaw());
+        detail.setPostalSource("jy_instruct.inst_mail / jy_instruct.inst_mailaddress");
+        detail.setRebuildProjectJson(entity.getRebuildProjectJson());
+        detail.setSourceRowHash(entity.getSourceRowHash());
+        detail.setSourceSnapshotAt(format(entity.getSourceSnapshotAt(), null));
+        detail.setMappingVersion(entity.getMappingVersion());
+        detail.setArchiveCreatedAt(format(entity.getCreateTime(), null));
+        detail.setArchiveUpdatedAt(format(entity.getUpdateTime(), null));
+        return detail;
     }
 
     private void applySort(LambdaQueryWrapper<LegacyOrderListEntity> q, String field, String order) {
