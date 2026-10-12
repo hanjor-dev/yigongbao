@@ -3,6 +3,7 @@ package com.yigongbao.module.design.service.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.enums.ErrorCodeEnum;
 import com.yigongbao.common.enums.SystemConfigKeyEnum;
 import com.yigongbao.common.exception.BusinessException;
@@ -613,6 +614,41 @@ class DesignDocServiceImplTest {
 
                 verify(drawingService).updateById(argThat(e -> "qr-file-001".equals(e.getQrFileId())));
                 verify(fileService).downloadToBytes("qr-file-001");
+            }
+        }
+
+        @Test
+        @DisplayName("当前二维码替换后，已确认的自动图纸保持原版本")
+        void qrChanged_keepsConfirmedAutoDrawing() throws Exception {
+            try (MockedStatic<StpUtil> stpMock = mockStatic(StpUtil.class)) {
+                stpMock.when(StpUtil::getLoginIdAsLong).thenReturn(USER_ID);
+
+                LocalDateTime generateTime = LocalDateTime.now().minusMinutes(10);
+                LocalDateTime dataTime = generateTime.minusMinutes(5);
+                DesignDrawingEntity latest = new DesignDrawingEntity();
+                latest.setId(1L);
+                latest.setVersionSeq(1);
+                latest.setVersion("A/1");
+                latest.setGenerateTime(generateTime);
+                latest.setTemplateFileId("confirmed-file");
+                latest.setQrFileId("old-qr-file");
+                latest.setIsConfirmed(StatusConstants.CONFIRMED);
+
+                when(orderMainService.getById(ORDER_ID)).thenReturn(order);
+                when(packageService.getById(PACKAGE_ID)).thenReturn(pkg);
+                when(productService.count(any())).thenReturn(1L);
+                when(drawingService.getLatestVersion(PACKAGE_ID)).thenReturn(latest);
+                when(designProductMapper.getLatestUpdateTime(PACKAGE_ID)).thenReturn(dataTime);
+                pkg.setUpdateTime(dataTime);
+
+                DocItemVO result = docService.getDrawingPreviewUrl(ORDER_ID, PACKAGE_ID);
+
+                assertNotNull(result);
+                assertEquals("confirmed-file", result.getFileId());
+                assertEquals(StatusConstants.CONFIRMED, result.getIsConfirmed());
+                verify(drawingService, never()).updateById(any());
+                verify(drawingService, never()).save(any());
+                verify(drawingBuilder, never()).build(any());
             }
         }
 

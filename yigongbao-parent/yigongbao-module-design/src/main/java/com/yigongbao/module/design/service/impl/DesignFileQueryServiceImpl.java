@@ -6,6 +6,7 @@ import com.yigongbao.module.design.mapper.DesignProductMapper;
 import com.yigongbao.module.design.service.DesignDocService;
 import com.yigongbao.module.design.service.DesignFileService;
 import com.yigongbao.module.design.vo.DesignDocVersionVO;
+import com.yigongbao.module.design.vo.DesignModelVO;
 import com.yigongbao.module.design.vo.DesignPackageFileVO;
 import com.yigongbao.module.design.vo.DesignPackageVO;
 import com.yigongbao.module.order.service.DesignFileQueryService;
@@ -40,6 +41,9 @@ public class DesignFileQueryServiceImpl implements DesignFileQueryService {
         result.setPackageList(packages.stream()
                 .map(this::toOrderPackage)
                 .collect(Collectors.toList()));
+        result.setModelList(designFileService.listModels(orderId).stream()
+                .map(this::toOrderModel)
+                .collect(Collectors.toList()));
         result.setReports(designFileService.getReports(orderId));
         return result;
     }
@@ -48,6 +52,8 @@ public class DesignFileQueryServiceImpl implements DesignFileQueryService {
         DesignFileDetailVO.DesignPackageVO target = new DesignFileDetailVO.DesignPackageVO();
         target.setId(source.getId());
         target.setOrderId(source.getOrderId());
+        target.setBatchId(source.getBatchId());
+        target.setBatchNo(source.getBatchNo());
         target.setOrderCode(source.getOrderCode());
         target.setPublicOrderCode(source.getPublicOrderCode());
         target.setPackageCode(source.getPackageCode());
@@ -81,6 +87,20 @@ public class DesignFileQueryServiceImpl implements DesignFileQueryService {
         target.setHasPrintInfo(source.getHasPrintInfo());
         target.setFileUrl(source.getFileUrl());
         target.setDownloadUrl(source.getDownloadUrl());
+        return target;
+    }
+
+    private DesignFileDetailVO.DesignModelVO toOrderModel(DesignModelVO source) {
+        DesignFileDetailVO.DesignModelVO target = new DesignFileDetailVO.DesignModelVO();
+        target.setId(source.getId());
+        target.setOrderId(source.getOrderId());
+        target.setFileId(source.getFileId());
+        target.setFileName(source.getFileName());
+        target.setFileUrl(source.getFileUrl());
+        target.setDownloadUrl(source.getDownloadUrl());
+        target.setFileSize(source.getFileSize());
+        target.setFileExt(source.getFileExt());
+        target.setCreateTime(source.getCreateTime());
         return target;
     }
 

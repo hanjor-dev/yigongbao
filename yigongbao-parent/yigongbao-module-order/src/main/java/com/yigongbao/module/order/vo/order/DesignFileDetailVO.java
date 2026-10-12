@@ -14,12 +14,28 @@ import java.util.List;
 public class DesignFileDetailVO implements Serializable {
 
     private List<DesignPackageVO> packageList;
+    private List<DesignModelVO> modelList;
     private List<FileVO> reports;
+
+    @Data
+    public static class DesignModelVO implements Serializable {
+        private Long id;
+        private Long orderId;
+        private String fileId;
+        private String fileName;
+        private String fileUrl;
+        private String downloadUrl;
+        private Long fileSize;
+        private String fileExt;
+        private LocalDateTime createTime;
+    }
 
     @Data
     public static class DesignPackageVO implements Serializable {
         private Long id;
         private Long orderId;
+        private Long batchId;
+        private String batchNo;
         private String orderCode;
         private String publicOrderCode;
         private String packageCode;

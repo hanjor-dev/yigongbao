@@ -18,6 +18,7 @@ import com.yigongbao.module.design.entity.DesignModelEntity;
 import com.yigongbao.module.design.entity.DesignPackageEntity;
 import com.yigongbao.module.design.entity.DesignPackageFileEntity;
 import com.yigongbao.module.design.service.DesignFileService;
+import com.yigongbao.module.design.service.DesignDocService;
 import com.yigongbao.module.design.service.DesignInstructionService;
 import com.yigongbao.module.design.service.DesignDrawingService;
 import com.yigongbao.module.design.service.DesignModelService;
@@ -73,6 +74,7 @@ public class DesignFileServiceImpl implements DesignFileService {
     private final DesignScreenshotService screenshotService;
     private final DesignInstructionService instructionService;
     private final DesignDrawingService drawingService;
+    private final DesignDocService designDocService;
     private final FileService fileService;
     private final CodeGeneratorService codeGeneratorService;
     private final ConfigService configService;
@@ -394,7 +396,7 @@ public class DesignFileServiceImpl implements DesignFileService {
         Set<Long> filledFileIds = getFilledFileIds(packageIds);
 
         // 5. 构建返回结果
-        return packages.stream()
+        List<DesignPackageVO> result = packages.stream()
                 .map(pkg -> {
                     DesignPackageVO vo = buildPackageVO(pkg, fileMap.getOrDefault(pkg.getId(), Collections.emptyList()), filledFileIds,
                             order == null ? null : order.getPublicOrderCode());
@@ -418,6 +420,20 @@ public class DesignFileServiceImpl implements DesignFileService {
                     return vo;
                 })
                 .collect(Collectors.toList());
+
+        // 数据包列表需要携带包级最新指令单/图纸状态，供前端正确选择默认包和图纸分类。
+        Map<Long, com.yigongbao.module.design.vo.DesignDocVersionVO> latestInstructions =
+                designDocService.getLatestInstructionMap(packageIds);
+        Map<Long, List<com.yigongbao.module.design.vo.DesignDocVersionVO>> latestDrawings =
+                designDocService.getLatestDrawingGroups(packageIds);
+        result.forEach(vo -> {
+            vo.setLatestInstruction(latestInstructions.get(vo.getId()));
+            List<com.yigongbao.module.design.vo.DesignDocVersionVO> drawings = latestDrawings.getOrDefault(
+                    vo.getId(), Collections.emptyList());
+            vo.setLatestDrawings(drawings);
+            vo.setLatestDrawing(drawings.size() == 1 ? drawings.get(0) : null);
+        });
+        return result;
     }
 
     /**

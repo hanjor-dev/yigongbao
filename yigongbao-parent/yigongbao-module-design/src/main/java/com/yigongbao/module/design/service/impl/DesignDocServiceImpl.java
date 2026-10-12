@@ -708,6 +708,16 @@ public class DesignDocServiceImpl implements DesignDocService {
                 currentQrFile == null ? null : currentQrFile.getId(), latest.getQrFileId(),
                 dataChanged, qrChanged);
 
+        // 已确认的自动图纸属于已完成的设计结果。二维码文件是订单级资源，
+        // 页面打开或其他操作导致二维码关联变化时，不应覆盖历史图纸并清空其确认状态。
+        // 未确认图纸仍允许按需刷新二维码快照，保持首次生成/待确认流程不变。
+        if (!dataChanged && qrChanged && !manual
+                && Objects.equals(StatusConstants.CONFIRMED, latest.getIsConfirmed())) {
+            log.info("二维码发生变化但图纸已确认，复用当前图纸，packageId={}, version={}, drawingId={}",
+                    packageId, latest.getVersion(), latest.getId());
+            return latest;
+        }
+
         if (!dataChanged && !qrChanged) {
             // 场景4：打印信息未变，直接复用
             log.info("打印信息和二维码均未触发重新生成，复用已有图纸，packageId={}, version={}, qrFileId={}",
@@ -715,10 +725,11 @@ public class DesignDocServiceImpl implements DesignDocService {
             return latest;
         }
 
-        // 打印信息已变化
+        // 打印信息或二维码已变化
         if (!manual) {
             // 场景2：未封版（自动生成的版本），覆盖当前版本
-            log.info("打印信息已变化，覆盖当前图纸版本，packageId={}, version={}", packageId, latest.getVersion());
+            log.info("打印信息或二维码已变化，覆盖当前图纸版本，packageId={}, version={}, dataChanged={}, qrChanged={}",
+                    packageId, latest.getVersion(), dataChanged, qrChanged);
             return doGenerateDrawing(order, pkg, productCategory, latest, latest.getVersionSeq(), currentQrFile);
         } else {
             // 场景3：已封版（手动上传的版本），新建下一版本

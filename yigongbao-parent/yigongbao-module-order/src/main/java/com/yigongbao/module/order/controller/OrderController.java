@@ -117,10 +117,13 @@ public class OrderController {
         DesignFileDetailVO designFiles = designFileQueryService.getDesignFiles(id);
         if (designFiles == null) {
             detail.setPackageList(java.util.Collections.emptyList());
+            detail.setModelList(java.util.Collections.emptyList());
             detail.setReports(java.util.Collections.emptyList());
         } else {
             detail.setPackageList(designFiles.getPackageList() == null
                     ? java.util.Collections.emptyList() : designFiles.getPackageList());
+            detail.setModelList(designFiles.getModelList() == null
+                    ? java.util.Collections.emptyList() : designFiles.getModelList());
             detail.setReports(designFiles.getReports());
         }
         return Result.success(detail);
