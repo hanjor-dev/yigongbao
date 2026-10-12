@@ -8,6 +8,7 @@ import com.yigongbao.module.notification.announcement.dto.AnnouncementCreateDTO;
 import com.yigongbao.module.notification.announcement.dto.AnnouncementPageDTO;
 import com.yigongbao.module.notification.announcement.dto.AnnouncementRecipientPageDTO;
 import com.yigongbao.module.notification.announcement.dto.AnnouncementTargetDTO;
+import com.yigongbao.module.notification.announcement.dto.AnnouncementHistoryPageDTO;
 import com.yigongbao.module.notification.announcement.entity.SystemAnnouncementEntity;
 import com.yigongbao.module.notification.announcement.entity.SystemAnnouncementAuditLogEntity;
 import com.yigongbao.module.notification.announcement.service.ISystemAnnouncementService;
@@ -16,6 +17,7 @@ import com.yigongbao.module.notification.announcement.vo.AnnouncementPreviewVO;
 import com.yigongbao.module.notification.announcement.vo.AnnouncementRecipientVO;
 import com.yigongbao.module.notification.announcement.vo.AnnouncementStatisticsVO;
 import com.yigongbao.module.notification.announcement.vo.AnnouncementDetailVO;
+import com.yigongbao.module.notification.announcement.vo.AnnouncementHistoryVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -126,6 +128,18 @@ public class SystemAnnouncementController {
     @GetMapping("/pending/{id}")
     public Result<AnnouncementPendingVO> pendingDetail(@PathVariable Long id) {
         return Result.success(announcementService.getPending(id, StpUtil.getLoginIdAsLong()));
+    }
+
+    @Operation(summary = "分页查询当前用户公告历史")
+    @PostMapping("/received/page")
+    public Result<IPage<AnnouncementHistoryVO>> receivedPage(@RequestBody AnnouncementHistoryPageDTO query) {
+        return Result.success(announcementService.history(query, StpUtil.getLoginIdAsLong()));
+    }
+
+    @Operation(summary = "查询当前用户公告历史详情")
+    @GetMapping("/received/{id}")
+    public Result<AnnouncementHistoryVO> receivedDetail(@PathVariable Long id) {
+        return Result.success(announcementService.getHistory(id, StpUtil.getLoginIdAsLong()));
     }
 
     @Operation(summary = "确认系统公告")

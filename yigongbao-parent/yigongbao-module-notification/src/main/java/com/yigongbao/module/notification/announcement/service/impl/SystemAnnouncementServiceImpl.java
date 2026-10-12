@@ -12,6 +12,7 @@ import com.yigongbao.module.notification.announcement.dto.AnnouncementCreateDTO;
 import com.yigongbao.module.notification.announcement.dto.AnnouncementPageDTO;
 import com.yigongbao.module.notification.announcement.dto.AnnouncementTargetDTO;
 import com.yigongbao.module.notification.announcement.dto.AnnouncementRecipientPageDTO;
+import com.yigongbao.module.notification.announcement.dto.AnnouncementHistoryPageDTO;
 import com.yigongbao.module.notification.announcement.entity.SystemAnnouncementAttachmentEntity;
 import com.yigongbao.module.notification.announcement.entity.SystemAnnouncementAuditLogEntity;
 import com.yigongbao.module.notification.announcement.entity.SystemAnnouncementEntity;
@@ -33,6 +34,7 @@ import com.yigongbao.module.notification.announcement.vo.AnnouncementAttachmentV
 import com.yigongbao.module.notification.announcement.vo.AnnouncementRecipientVO;
 import com.yigongbao.module.notification.announcement.vo.AnnouncementStatisticsVO;
 import com.yigongbao.module.notification.announcement.vo.AnnouncementDetailVO;
+import com.yigongbao.module.notification.announcement.vo.AnnouncementHistoryVO;
 import com.yigongbao.module.notification.service.impl.NotificationPushService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -314,6 +316,61 @@ public class SystemAnnouncementServiceImpl implements ISystemAnnouncementService
                 .filter(item -> announcementId.equals(item.getId()))
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "公告不存在或当前用户无权查看"));
+    }
+
+    /**
+     * 分页查询当前用户收到的公告历史。
+     * <p>只返回接收人快照中属于当前用户的已发布或已撤回公告，待确认公告优先，避免通过历史接口绕过强制确认队列。</p>
+     *
+     * @param query 分页和接收状态条件
+     * @param userId 当前登录用户 ID
+     * @return 当前用户公告历史分页结果
+     */
+    @Override
+    public IPage<AnnouncementHistoryVO> history(AnnouncementHistoryPageDTO query, Long userId) {
+        int pageNum = query.getPageNum() == null || query.getPageNum() < 1 ? 1 : query.getPageNum();
+        int pageSize = query.getPageSize() == null || query.getPageSize() < 1 ? 10 : Math.min(query.getPageSize(), 50);
+        IPage<AnnouncementHistoryVO> page = recipientMapper.selectHistoryPage(
+                new Page<>(pageNum, pageSize), userId, query.getDeliveryStatus());
+        fillHistoryAttachments(page.getRecords());
+        return page;
+    }
+
+    /**
+     * 查询当前用户收到的单条公告历史详情。
+     *
+     * @param announcementId 公告主键
+     * @param userId 当前登录用户 ID
+     * @return 当前用户可见的公告详情
+     */
+    @Override
+    public AnnouncementHistoryVO getHistory(Long announcementId, Long userId) {
+        AnnouncementHistoryVO history = recipientMapper.selectHistoryByUserId(announcementId, userId);
+        if (history == null) {
+            throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND, "公告不存在或当前用户无权查看");
+        }
+        fillHistoryAttachments(List.of(history));
+        return history;
+    }
+
+    /**
+     * 批量加载历史公告附件，避免公告列表逐行查询附件。
+     *
+     * @param records 当前页公告记录
+     */
+    private void fillHistoryAttachments(List<AnnouncementHistoryVO> records) {
+        if (CollectionUtils.isEmpty(records)) return;
+        List<Long> announcementIds = records.stream().map(AnnouncementHistoryVO::getId).toList();
+        var attachmentsByAnnouncement = attachmentMapper.selectList(new LambdaQueryWrapper<SystemAnnouncementAttachmentEntity>()
+                        .in(SystemAnnouncementAttachmentEntity::getAnnouncementId, announcementIds)
+                        .orderByAsc(SystemAnnouncementAttachmentEntity::getSort)
+                        .orderByAsc(SystemAnnouncementAttachmentEntity::getId))
+                .stream().collect(java.util.stream.Collectors.groupingBy(
+                        SystemAnnouncementAttachmentEntity::getAnnouncementId,
+                        java.util.LinkedHashMap::new,
+                        java.util.stream.Collectors.mapping(this::toAttachmentVO, java.util.stream.Collectors.toList())));
+        records.forEach(item -> item.setAttachments(
+                attachmentsByAnnouncement.getOrDefault(item.getId(), List.of())));
     }
 
     /**

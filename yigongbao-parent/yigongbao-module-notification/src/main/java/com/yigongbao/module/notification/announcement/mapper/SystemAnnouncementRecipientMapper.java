@@ -11,6 +11,7 @@ import org.apache.ibatis.annotations.Update;
 
 import com.yigongbao.module.notification.announcement.vo.AnnouncementPendingVO;
 import com.yigongbao.module.notification.announcement.vo.AnnouncementRecipientVO;
+import com.yigongbao.module.notification.announcement.vo.AnnouncementHistoryVO;
 
 import java.util.List;
 
@@ -25,6 +26,43 @@ public interface SystemAnnouncementRecipientMapper extends BaseMapper<SystemAnno
             "ORDER BY a.published_at DESC, a.id DESC"
     })
     List<AnnouncementPendingVO> selectPendingByUserId(@Param("userId") Long userId);
+
+    @Select({
+            "<script>",
+            "SELECT a.id, a.title, a.content_html AS contentHtml, a.content_text AS contentText,",
+            "       a.force_confirm AS forceConfirm, a.status, a.published_at AS publishedAt,",
+            "       r.delivery_status AS deliveryStatus, r.acknowledged_at AS acknowledgedAt,",
+            "       r.revoked_at AS revokedAt",
+            "FROM system_announcement_recipient r INNER JOIN system_announcement a ON a.id = r.announcement_id",
+            "WHERE r.user_id = #{userId} AND r.is_deleted = 0 AND a.is_deleted = 0",
+            "  AND a.status = 'PUBLISHED'",
+            "<if test=\"deliveryStatus != null and deliveryStatus != ''\">",
+            "  AND r.delivery_status = #{deliveryStatus}",
+            "</if>",
+            "ORDER BY CASE r.delivery_status",
+            "             WHEN 'PENDING' THEN 0",
+            "             WHEN 'ACKNOWLEDGED' THEN 1",
+            "             WHEN 'REVOKED' THEN 2",
+            "             ELSE 3",
+            "         END, a.published_at DESC, a.id DESC",
+            "</script>"
+    })
+    IPage<AnnouncementHistoryVO> selectHistoryPage(IPage<?> page,
+                                                     @Param("userId") Long userId,
+                                                     @Param("deliveryStatus") String deliveryStatus);
+
+    @Select({
+            "SELECT a.id, a.title, a.content_html AS contentHtml, a.content_text AS contentText,",
+            "       a.force_confirm AS forceConfirm, a.status, a.published_at AS publishedAt,",
+            "       r.delivery_status AS deliveryStatus, r.acknowledged_at AS acknowledgedAt,",
+            "       r.revoked_at AS revokedAt",
+            "FROM system_announcement_recipient r INNER JOIN system_announcement a ON a.id = r.announcement_id",
+            "WHERE r.user_id = #{userId} AND r.announcement_id = #{announcementId}",
+            "  AND r.is_deleted = 0 AND a.is_deleted = 0",
+            "  AND a.status = 'PUBLISHED'"
+    })
+    AnnouncementHistoryVO selectHistoryByUserId(@Param("announcementId") Long announcementId,
+                                                  @Param("userId") Long userId);
 
     @Select({
             "<script>",

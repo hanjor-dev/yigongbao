@@ -9,9 +9,11 @@ import com.yigongbao.module.notification.announcement.entity.SystemAnnouncementE
 import com.yigongbao.module.notification.announcement.entity.SystemAnnouncementAuditLogEntity;
 import com.yigongbao.module.notification.announcement.dto.AnnouncementRecipientPageDTO;
 import com.yigongbao.module.notification.announcement.dto.AnnouncementTargetDTO;
+import com.yigongbao.module.notification.announcement.dto.AnnouncementHistoryPageDTO;
 import com.yigongbao.module.notification.announcement.vo.AnnouncementRecipientVO;
 import com.yigongbao.module.notification.announcement.vo.AnnouncementStatisticsVO;
 import com.yigongbao.module.notification.announcement.vo.AnnouncementDetailVO;
+import com.yigongbao.module.notification.announcement.vo.AnnouncementHistoryVO;
 
 import java.util.List;
 
@@ -33,6 +35,10 @@ public interface ISystemAnnouncementService {
     List<AnnouncementPendingVO> listPending(Long userId);
 
     AnnouncementPendingVO getPending(Long announcementId, Long userId);
+
+    IPage<AnnouncementHistoryVO> history(AnnouncementHistoryPageDTO query, Long userId);
+
+    AnnouncementHistoryVO getHistory(Long announcementId, Long userId);
 
     int estimateTarget(AnnouncementTargetDTO target);
 
