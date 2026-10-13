@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.yigongbao</groupId>
+        <artifactId>yigongbao-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>yigongbao-module-imaging</artifactId>
+    <packaging>jar</packaging>
+    <description>影像阅览通用模块——提供DCM影像、3D模型文件查询接口</description>
+
+    <dependencies>
+        <!-- 设计模块：通过 design 传递引入 order 及其他基础模块 -->
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-design</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- 测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

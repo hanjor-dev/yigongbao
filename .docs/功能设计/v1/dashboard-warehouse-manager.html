@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>库管工作台 - 医工宝</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            background: #fafafa;
+            color: #1a1a1a;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+        .header {
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        .header .subtitle {
+            font-size: 14px;
+            color: #666;
+        }
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 32px;
+            padding: 16px;
+            background: white;
+            border: 1px solid #e5e5e5;
+        }
+        .toolbar select, .toolbar button {
+            padding: 8px 16px;
+            border: 1px solid #e5e5e5;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .toolbar select:hover, .toolbar button:hover {
+            border-color: #1a1a1a;
+        }
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+            transition: box-shadow 0.2s;
+        }
+        .card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card-title {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .card-value {
+            font-size: 36px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+        .card-change {
+            font-size: 13px;
+            color: #666;
+        }
+        .card-change.positive { color: #16a34a; }
+        .card-change.negative { color: #dc2626; }
+        .charts-section {
+            margin-bottom: 40px;
+        }
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        .chart-container {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+        }
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .chart {
+            width: 100%;
+            height: 320px;
+        }
+        .actions-section {
+            background: white;
+            border: 1px solid #e5e5e5;
+            padding: 24px;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .todo-list {
+            list-style: none;
+        }
+        .todo-item {
+            padding: 16px 0;
+            border-bottom: 1px solid #f5f5f5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .todo-item:last-child {
+            border-bottom: none;
+        }
+        .todo-text {
+            font-size: 14px;
+        }
+        .todo-badge {
+            padding: 4px 12px;
+            background: #f5f5f5;
+            font-size: 12px;
+            color: #666;
+        }
+        .todo-badge.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: 1px solid #1a1a1a;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: #1a1a1a;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="header">
+                <h1>库管工作台</h1>
+                <p class="subtitle">{{ currentDate }} · 最后更新: {{ lastUpdate }}</p>
+            </div>
+
+            <div class="toolbar">
+                <select v-model="timeRange">
+                    <option value="today">今日</option>
+                    <option value="week">本周</option>
+                    <option value="month">本月</option>
+                    <option value="quarter">本季度</option>
+                    <option value="year">本年</option>
+                </select>
+                <button @click="refresh">刷新数据</button>
+            </div>
+
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-title">待入库任务</div>
+                    <div class="card-value">{{ stats.pendingIn }}</div>
+                    <div class="card-change">质检通过待入库</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">今日入库数</div>
+                    <div class="card-value">{{ stats.todayIn }}</div>
+                    <div class="card-change" :class="stats.inChange >= 0 ? 'positive' : 'negative'">
+                        {{ stats.inChange >= 0 ? '+' : '' }}{{ stats.inChange }}% 环比
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">当前库存总量</div>
+                    <div class="card-value">{{ stats.currentStock }}</div>
+                    <div class="card-change">按产品类型分组</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">待出库任务</div>
+                    <div class="card-value">{{ stats.pendingOut }}</div>
+                    <div class="card-change">客户已确认</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">今日出库数</div>
+                    <div class="card-value">{{ stats.todayOut }}</div>
+                    <div class="card-change" :class="stats.outChange >= 0 ? 'positive' : 'negative'">
+                        {{ stats.outChange >= 0 ? '+' : '' }}{{ stats.outChange }}% 环比
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-section">
+                <div class="charts-row">
+                    <div class="chart-container">
+                        <div class="chart-title">出入库趋势</div>
+                        <div id="trendChart" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">库存产品分布</div>
+                        <div id="stockChart" class="chart"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions-section">
+                <div class="section-title">待办任务</div>
+                <ul class="todo-list">
+                    <li class="todo-item" v-for="todo in todos" :key="todo.id">
+                        <span class="todo-text">{{ todo.text }}</span>
+                        <span class="todo-badge" :class="todo.priority">{{ todo.count }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    timeRange: 'month',
+                    currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),
+                    lastUpdate: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                    stats: {
+                        pendingIn: 38,
+                        todayIn: 26,
+                        inChange: 4.2,
+                        currentStock: 142,
+                        pendingOut: 52,
+                        todayOut: 31,
+                        outChange: 6.8
+                    },
+                    todos: [
+                        { id: 1, text: '待入库任务 38 个，按质检完成时间排序', count: '38', priority: '' },
+                        { id: 2, text: '待出库任务 52 个，按客户确认时间排序', count: '52', priority: '' },
+                        { id: 3, text: '库存预警 5 个，超过30天未出库', count: '5', priority: 'warning' }
+                    ]
+                };
+            },
+            mounted() {
+                this.initCharts();
+            },
+            methods: {
+                refresh() {
+                    this.lastUpdate = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                },
+                initCharts() {
+                    const trendChart = echarts.init(document.getElementById('trendChart'));
+                    trendChart.setOption({
+                        grid: { left: 60, right: 40, top: 40, bottom: 40 },
+                        xAxis: {
+                            type: 'category',
+                            data: ['5/12', '5/13', '5/14', '5/15', '5/16', '5/17', '5/18'],
+                            axisLine: { lineStyle: { color: '#e5e5e5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        yAxis: {
+                            type: 'value',
+                            axisLine: { show: false },
+                            splitLine: { lineStyle: { color: '#f5f5f5' } },
+                            axisLabel: { color: '#666' }
+                        },
+                        series: [
+                            {
+                                name: '入库数量',
+                                type: 'line',
+                                data: [22, 25, 24, 28, 26, 29, 26],
+                                smooth: true,
+                                lineStyle: { color: '#10b981', width: 2 },
+                                itemStyle: { color: '#10b981' }
+                            },
+                            {
+                                name: '出库数量',
+                                type: 'line',
+                                data: [26, 28, 27, 30, 29, 32, 31],
+                                smooth: true,
+                                lineStyle: { color: '#3b82f6', width: 2 },
+                                itemStyle: { color: '#3b82f6' }
+                            }
+                        ],
+                        legend: {
+                            bottom: 0,
+                            textStyle: { color: '#666' }
+                        }
+                    });
+
+                    const stockChart = echarts.init(document.getElementById('stockChart'));
+                    stockChart.setOption({
+                        series: [{
+                            type: 'pie',
+                            radius: ['40%', '70%'],
+                            avoidLabelOverlap: false,
+                            itemStyle: {
+                                borderColor: '#fff',
+                                borderWidth: 2
+                            },
+                            label: {
+                                show: true,
+                                formatter: '{b}: {c}',
+                                color: '#666'
+                            },
+                            data: [
+                                { value: 45, name: '膝关节假体', itemStyle: { color: '#3b82f6' } },
+                                { value: 38, name: '髋关节假体', itemStyle: { color: '#10b981' } },
+                                { value: 32, name: '脊柱植入物', itemStyle: { color: '#8b5cf6' } },
+                                { value: 27, name: '其他产品', itemStyle: { color: '#f59e0b' } }
+                            ]
+                        }]
+                    });
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

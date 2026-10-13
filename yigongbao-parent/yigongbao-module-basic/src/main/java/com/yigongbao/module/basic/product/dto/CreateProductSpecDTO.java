@@ -1,0 +1,50 @@
+package com.yigongbao.module.basic.product.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+import java.io.Serializable;
+
+/**
+ * 创建产品规格 DTO
+ *
+ * @author hanjor
+ * @date 2026-04-15
+ */
+@Data
+public class CreateProductSpecDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 规格名称（必填）
+     */
+    @NotBlank(message = "规格名称不能为空")
+    private String specName;
+
+    /**
+     * 关联注册证ID（可空）
+     */
+    private Long certId;
+
+    /**
+     * 注册证号（冗余，可空）
+     */
+    private String certNo;
+
+    /**
+     * 排序
+     */
+    private Integer sort;
+
+    /**
+     * 状态（0=禁用，1=正常）
+     */
+    private Integer status;
+
+    /**
+     * 备注
+     */
+    private String remark;
+}

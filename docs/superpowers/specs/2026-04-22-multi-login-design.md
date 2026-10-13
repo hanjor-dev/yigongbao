@@ -1,0 +1,384 @@
+# 多登录方式 + 忘记密码重置 设计文档
+
+**日期**：2026-04-22
+**作者**：hanjor
+**状态**：已确认，待实现
+
+---
+
+## 一、背景与目标
+
+当前系统仅支持 `username + password` 单一登录方式。本次扩展支持：
+
+1. **手机号 + 短信验证码** 登录
+2. **邮箱 + 邮件验证码** 登录
+3. **忘记密码**：通过手机或邮箱验证码校验后重设密码
+4. **图形验证码**：PASSWORD 类型登录时额外校验，防机器人暴力攻击
+
+前提：手机号、邮箱在用户创建/更新时严格校验唯一性（email 补建唯一索引）。
+
+---
+
+## 二、接口清单
+
+| 方法 | 路径 | 说明 | 需登录 |
+|---|---|---|---|
+| `GET` | `/system/auth/graphic-captcha` | 获取图形验证码（返回 captchaId + Base64 图片） | 否 |
+| `POST` | `/system/auth/captcha` | 发送登录验证码 | 否 |
+| `POST` | `/system/auth/login` | 统一登录（PASSWORD/PHONE/EMAIL） | 否 |
+| `POST` | `/system/auth/forgot-password/captcha` | 忘记密码：发送验证码 | 否 |
+| `POST` | `/system/auth/forgot-password/reset` | 忘记密码：验证码校验 + 设置新密码 | 否 |
+
+现有 `PUT /system/auth/password`（已登录修改密码）保持不变。
+
+---
+
+## 三、DTO 结构
+
+### LoginDTO（重构）
+
+```json
+{
+  "loginType": "PASSWORD",
+  "principal": "admin",
+  "credential": "123456",
+  "captchaId": "uuid-xxx",
+  "captchaCode": "A3K9"
+}
+```
+
+- `loginType`：`@NotNull`，合法值为 `LoginTypeEnum`（`PASSWORD` / `PHONE` / `EMAIL`），Jackson 枚举反序列化，非法值返回 400
+- `principal`：`@NotBlank`，用户名 / 手机号 / 邮箱
+- `credential`：`@NotBlank`，密码 / 验证码
+- `captchaId`：无注解约束，Service 层在 PASSWORD 路径校验是否存在
+- `captchaCode`：无注解约束，Service 层在 PASSWORD 路径校验是否匹配
+
+> `captchaId` / `captchaCode` 仅 PASSWORD 类型需要，PHONE/EMAIL 类型传空或不传均可。
+
+### SendCaptchaDTO
+
+```json
+{
+  "captchaType": "PHONE",
+  "target": "13800138000"
+}
+```
+
+- `captchaType`：合法值为 `CaptchaTypeEnum`（`PHONE` / `EMAIL`），使用 `@NotNull` + Jackson 枚举反序列化校验，非法值直接返回 400
+- `target`：`@NotBlank`，手机号格式或邮箱格式由 Service 层按 captchaType 二次校验
+
+### ForgotPasswordResetDTO
+
+```json
+{
+  "captchaType": "PHONE",
+  "target": "13800138000",
+  "captcha": "123456",
+  "newPassword": "abc123"
+}
+```
+
+---
+
+## 四、枚举
+
+### LoginTypeEnum
+
+```java
+PASSWORD, PHONE, EMAIL
+```
+
+### CaptchaTypeEnum（独立枚举，不含 PASSWORD）
+
+```java
+PHONE, EMAIL
+```
+
+用于 `SendCaptchaDTO.captchaType`、`ForgotPasswordResetDTO.captchaType` 的合法值约束。与 `LoginTypeEnum` 分离，语义更清晰，避免将 `PASSWORD` 误传为验证码类型。
+
+### CaptchaSceneEnum
+
+```java
+LOGIN("login"),
+FORGOT("forgot")
+```
+
+用于隔离 Redis key 前缀，防止登录验证码与忘记密码验证码跨场景复用。
+
+### GraphicCaptchaVO
+
+```java
+String captchaId;   // UUID，前端登录时随 LoginDTO 回传
+String imageBase64; // "data:image/png;base64,..." 格式
+```
+
+---
+
+## 五、数据层变更
+
+### 5.1 DDL 变更（sql/ddl.sql）
+
+**sys_user 补充唯一索引：**
+
+```sql
+-- email 唯一（逻辑删除兼容，函数索引）
+CREATE UNIQUE INDEX uk_email
+    ON sys_user ((CASE WHEN is_deleted = 0 THEN email ELSE NULL END));
+
+-- employee_no 唯一（本期不作登录凭据，但同步补上约束）
+CREATE UNIQUE INDEX uk_employee_no
+    ON sys_user ((CASE WHEN is_deleted = 0 THEN employee_no ELSE NULL END));
+```
+
+**sys_login_log 新增字段：**
+
+```sql
+ALTER TABLE sys_login_log
+    ADD COLUMN login_type VARCHAR(16) COMMENT '登录方式（PASSWORD/PHONE/EMAIL）' AFTER username;
+```
+
+### 5.2 sys_config 新增配置项（sql/init.sql）
+
+在 `security` 组追加：
+
+| config_key | 默认值 | 说明 |
+|---|---|---|
+| `captcha.expire.seconds` | `300` | 验证码有效期（秒） |
+| `captcha.cooldown.seconds` | `60` | 同一目标发送冷却（秒） |
+| `captcha.daily.limit` | `10` | 同一目标每日最大发送次数 |
+| `mail.from` | — | 发件人邮箱地址（必填，启动时 `SpringMailServiceImpl` 读取，若为空则抛 `BusinessException` fail-fast） |
+
+> `sms.send.interval` 保留向后兼容，新代码统一读 `captcha.cooldown.seconds`。
+
+### 5.3 SystemConfigKeyEnum 新增键
+
+```java
+CAPTCHA_EXPIRE_SECONDS("captcha.expire.seconds"),
+CAPTCHA_COOLDOWN_SECONDS("captcha.cooldown.seconds"),
+CAPTCHA_DAILY_LIMIT("captcha.daily.limit"),
+MAIL_FROM("mail.from")
+```
+
+---
+
+## 六、Redis 存储结构
+
+| Key 模式 | TTL | 说明 |
+|---|---|---|
+| `captcha:{scene}:{type}:{target}` | `captcha.expire.seconds`（默认 300s） | 验证码值 |
+| `captcha:cooldown:{scene}:{type}:{target}` | `captcha.cooldown.seconds`（默认 60s） | 冷却标志 |
+| `captcha:daily:{scene}:{type}:{target}:{date}` | 当天剩余秒数 | 每日发送计数 |
+| `graphic:captcha:{uuid}` | 300s（硬编码） | 图形验证码值（忽略大小写存小写） |
+
+示例：
+- `captcha:login:PHONE:13800138000` → `"123456"`，TTL 300s
+- `captcha:cooldown:login:PHONE:13800138000` → `"1"`，TTL 60s
+- `captcha:daily:login:PHONE:13800138000:20260422` → `"3"`，TTL 至当天结束
+- `graphic:captcha:f8a3-...` → `"a3k9"`，TTL 300s
+
+---
+
+## 七、新增服务
+
+### 7.1 CaptchaService
+
+位置：`auth/service/CaptchaService.java` + `impl/CaptchaServiceImpl.java`
+
+```java
+// 发送验证码
+void sendCaptcha(String captchaType, String target, String scene);
+
+// 校验验证码（匹配后立即删除，防重放）
+void verifyCaptcha(String captchaType, String target, String scene, String code);
+```
+
+**sendCaptcha 流程：**
+1. 冷却检查：Redis `captcha:cooldown:*` 存在 → 抛 `CAPTCHA_TOO_FREQUENT`
+2. 每日次数检查：计数 ≥ `captcha.daily.limit` → 抛 `CAPTCHA_DAILY_LIMIT`
+3. 生成 6 位数字验证码（`RandomUtil.randomNumbers(6)`）
+4. 写入 Redis：验证码 key（TTL=有效期）+ 冷却 key（TTL=冷却时间）+ 每日计数原子自增（`redisTemplate.opsForValue().increment()`，首次写入后立即设置 TTL 至当天结束）
+5. 分发：`PHONE` → `SmsService.send()`，`EMAIL` → `MailService.send()`
+
+**verifyCaptcha 流程：**
+1. 读取 Redis 验证码 key，不存在 → 抛 `CAPTCHA_EXPIRED`
+2. 读取错误次数 key `captcha:attempts:{scene}:{type}:{target}`，≥ 5 次 → 删除验证码 key，抛 `CAPTCHA_EXPIRED`（强制重新发送）
+3. 不匹配 → 错误次数原子自增（`INCR`，TTL 与验证码 key 保持一致），抛 `CAPTCHA_ERROR`
+4. 匹配 → 删除验证码 key + 错误次数 key（一次性消费）
+
+### 7.2 SmsService / MailService
+
+```
+auth/service/SmsService.java             ← void send(String phone, String content)
+auth/service/MailService.java            ← void send(String to, String subject, String content)
+auth/service/impl/MockSmsServiceImpl.java    ← log.info 模拟，@Primary
+auth/service/impl/SpringMailServiceImpl.java ← JavaMailSender 真实发送
+```
+
+**短信 Mock**：`log.info("【短信模拟】手机号={}，验证码={}", phone, content)`。标注 `@Profile("!prod")`（仅非生产环境生效），后续接入服务商只需新增实现类并切换，无需改动调用方。生产环境未配置真实实现时启动会因无 Bean 而 fail-fast，强迫显式配置。
+
+**邮件实现**：注入 `JavaMailSender`，发件人从 `ConfigService.getConfigValue(MAIL_FROM)` 读取。
+
+---
+
+## 八、图形验证码
+
+### GET /system/auth/graphic-captcha
+
+1. 生成 UUID 作为 `captchaId`
+2. 用 Hutool `CaptchaUtil.createLineCaptcha(120, 40, 4, 20)` 生成图形验证码
+3. 将验证码文字（转小写）写入 Redis：`graphic:captcha:{uuid}`，TTL 300s
+4. 将图片转 Base64（`captcha.getImageBase64()`），拼前缀 `data:image/png;base64,...`
+5. 返回 `GraphicCaptchaVO { captchaId, imageBase64 }`
+
+### PASSWORD 登录时的图形验证码校验（在 resolveByPassword 入口）
+
+1. `captchaId` 为空 → 抛 `CAPTCHA_GRAPHIC_EXPIRED`（视为未获取验证码）
+2. Redis `graphic:captcha:{captchaId}` 不存在 → 抛 `CAPTCHA_GRAPHIC_EXPIRED`（已过期）
+3. 读取存储值，与 `captchaCode.toLowerCase()` 比较，不匹配 → 删除 Redis key → 抛 `CAPTCHA_GRAPHIC_ERROR`（删除保证一次性，防止暴力枚举）
+4. 匹配 → 删除 Redis key，继续后续密码校验
+
+---
+
+## 九、登录逻辑重构
+
+### AuthServiceImpl.login() 分发逻辑
+
+```
+loginType == PASSWORD → 图形验证码校验 → selectByUsername + BCrypt 校验 + 锁定机制
+loginType == PHONE    → selectByPhone(phone) + captchaService.verifyCaptcha(PHONE, phone, "login", code)
+loginType == EMAIL    → selectByEmail(email) + captchaService.verifyCaptcha(EMAIL, email, "login", code)
+```
+
+三条路径**共用后置逻辑**（提取私有方法）：
+1. 用户存在性检查 → `USER_NOT_FOUND` / `USERNAME_OR_PASSWORD_ERROR`
+2. 用户状态检查（禁用）→ `USER_DISABLED`
+3. `StpUtil.login(userId)`
+4. Session 写入 `username` / `realName`
+5. `saveLoginLog`（含 `loginType` 字段）
+
+**锁定机制仅作用于 PASSWORD 路径**（验证码路径无失败计数）。
+
+### UserMapper 新增
+
+```java
+@Select("SELECT * FROM sys_user WHERE phone = #{phone} AND is_deleted = 0 LIMIT 1")
+UserEntity selectByPhone(String phone);
+
+@Select("SELECT * FROM sys_user WHERE email = #{email} AND is_deleted = 0 LIMIT 1")
+UserEntity selectByEmail(String email);
+```
+
+---
+
+## 十、忘记密码流程
+
+### POST /forgot-password/captcha
+
+1. 按 `captchaType` 查找用户（`selectByPhone` / `selectByEmail`）
+2. 用户不存在或已禁用 → **统一静默处理**，返回成功响应（不暴露账号注册状态，防止用户枚举攻击），但内部不发送验证码
+3. 用户正常 → `captchaService.sendCaptcha(type, target, "forgot")`
+
+### POST /forgot-password/reset
+
+1. `captchaService.verifyCaptcha(type, target, "forgot", captcha)`
+2. 按 `captchaType` 查找用户
+3. 新密码强度校验（`isPasswordStrong`，复用现有方法）
+4. `passwordEncoder.encode(newPassword)` 更新密码
+5. `StpUtil.logoutByLoginId(userId)` 踢出所有在线 Session
+
+> 密码重置后强制踢出，防止密码泄露后攻击者仍持有有效 Token。
+
+---
+
+## 十一、UserService 唯一性校验补充
+
+`createUser`：新增 `isEmailExists(email)` → 抛 `USER_EMAIL_EXISTS`
+`updateUser`：新增 `isEmailExistsExcludingId(email, id)` → 抛 `USER_EMAIL_EXISTS`
+
+---
+
+## 十二、新增错误码
+
+| 错误码 | 枚举值 | 说明 |
+|---|---|---|
+| 636 | `USER_EMAIL_EXISTS` | 邮箱已存在 |
+| 637 | `CAPTCHA_TOO_FREQUENT` | 发送过于频繁，请稍后再试 |
+| 638 | `CAPTCHA_DAILY_LIMIT` | 今日发送次数已达上限 |
+| 639 | `CAPTCHA_EXPIRED` | 验证码已过期或不存在 |
+| 640 | `CAPTCHA_ERROR` | 验证码错误 |
+| 641 | `CAPTCHA_TYPE_INVALID` | 不支持的验证码类型 |
+| 773 | `CAPTCHA_GRAPHIC_EXPIRED` | 图形验证码已过期，请刷新 |
+| 774 | `CAPTCHA_GRAPHIC_ERROR` | 图形验证码错误 |
+
+---
+
+## 十三、Spring Mail 配置
+
+```yaml
+spring:
+  mail:
+    host: smtp.example.com
+    port: 465
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail.smtp.ssl.enable: true
+```
+
+发件人地址通过 `sys_config.mail.from` 配置，运行时读取，不硬编码。
+
+---
+
+## 十四、测试策略
+
+| 测试类 | 覆盖点 |
+|---|---|
+| `CaptchaServiceImplTest` | 冷却拦截、每日上限、验证码过期、验证码错误、正常发送、正常校验（含 key 删除） |
+| `AuthServiceImplTest` | PASSWORD/PHONE/EMAIL 三条登录路径成功+失败、图形验证码过期/错误/正确、用户禁用 |
+| `AuthControllerTest` | 参数校验（principal/credential 为空、loginType 非法枚举）、统一响应格式 |
+| `UserServiceImplTest` | createUser email 重复、updateUser email 排除自身 |
+
+> `CaptchaServiceImplTest` 中 `RedisTemplate` 使用 Mockito Mock，不依赖真实 Redis。
+> `AuthControllerTest`（`@SpringBootTest`）需用 `@MockBean` 替换 `SmsService`、`MailService`、`JavaMailSender`，避免发送真实短信/邮件或因 SMTP 配置缺失启动失败。
+
+---
+
+## 十五、改动文件清单
+
+### 新增（12 个）
+
+| 文件 | 说明 |
+|---|---|
+| `auth/dto/SendCaptchaDTO` | 发送验证码请求 |
+| `auth/dto/ForgotPasswordResetDTO` | 忘记密码重置请求 |
+| `auth/vo/GraphicCaptchaVO` | 图形验证码响应 |
+| `auth/enums/LoginTypeEnum` | PASSWORD / PHONE / EMAIL |
+| `auth/enums/CaptchaTypeEnum` | PHONE / EMAIL（与 LoginTypeEnum 分离） |
+| `auth/enums/CaptchaSceneEnum` | LOGIN / FORGOT |
+| `auth/service/CaptchaService` | 验证码服务接口 |
+| `auth/service/impl/CaptchaServiceImpl` | 验证码服务实现 |
+| `auth/service/SmsService` | 短信服务接口 |
+| `auth/service/MailService` | 邮件服务接口 |
+| `auth/service/impl/MockSmsServiceImpl` | 短信 Mock（@Profile("!prod")） |
+| `auth/service/impl/SpringMailServiceImpl` | 邮件真实实现 |
+
+### 修改（10 个）
+
+| 文件 | 改动 |
+|---|---|
+| `auth/dto/LoginDTO` | 重构为 loginType + principal + credential + captchaId + captchaCode |
+| `auth/entity/LoginLogEntity` | 新增 loginType 字段 |
+| `auth/service/AuthService` | 新增 sendLoginCaptcha、sendForgotPasswordCaptcha、resetPassword 接口方法 |
+| `auth/service/impl/AuthServiceImpl` | login 分发 + 图形验证码校验 + 忘记密码实现 |
+| `auth/controller/AuthController` | 新增 5 个端点（含图形验证码） |
+| `user/mapper/UserMapper` | 新增 selectByPhone、selectByEmail |
+| `user/service/impl/UserServiceImpl` | email 唯一性校验 |
+| `common/enums/ErrorCodeEnum` | 新增 636-641, 773-774 |
+| `common/enums/SystemConfigKeyEnum` | 新增 4 个配置键 |
+
+### SQL 变更（2 个）
+
+| 文件 | 改动 |
+|---|---|
+| `sql/ddl.sql` | email/employee_no 唯一索引 + login_log 新增 login_type 字段 |
+| `sql/init.sql` | sys_config 新增 4 个配置项 |

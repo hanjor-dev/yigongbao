@@ -1,0 +1,314 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.yigongbao</groupId>
+    <artifactId>yigongbao-parent</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>yigongbao-common</module>
+        <module>yigongbao-framework</module>
+        <module>yigongbao-module-basic</module>
+        <module>yigongbao-module-system</module>
+        <module>yigongbao-module-flow</module>
+        <module>yigongbao-module-order</module>
+        <module>yigongbao-module-design</module>
+        <module>yigongbao-module-imaging</module>
+        <module>yigongbao-module-production</module>
+        <module>yigongbao-module-notification</module>
+        <module>yigongbao-module-dashboard</module>
+        <module>yigongbao-boot</module>
+    </modules>
+
+    <properties>
+
+        <java.version>21</java.version>
+        <spring.boot.version>3.2.5</spring.boot.version>
+        <mybatis.plus.version>3.5.8</mybatis.plus.version>
+        <hutool.version>5.8.26</hutool.version>
+        <satoken.version>1.37.0</satoken.version>
+        <lombok.version>1.18.30</lombok.version>
+        <jackson.version>2.18.3</jackson.version>
+        <file.storage.version>2.3.0</file.storage.version>
+        <poi.version>5.2.5</poi.version>
+        <mysql-connector.version>8.3.0</mysql-connector.version>
+        <spring-security-crypto.version>6.2.4</spring-security-crypto.version>
+        <openapi.version>2.3.0</openapi.version>
+        <ip2region.version>2.7.0</ip2region.version>
+        <tianai-captcha.version>1.5.5</tianai-captcha.version>
+        <junrar.version>7.5.5</junrar.version>
+        <sevenzipjbinding.version>16.02-2.01</sevenzipjbinding.version>
+        <commons-compress.version>1.26.1</commons-compress.version>
+        <jsoup.version>1.17.2</jsoup.version>
+        <xz.version>1.9</xz.version>
+        <zxing.version>3.5.3</zxing.version>
+
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    </properties>
+
+    <dependencyManagement>
+
+        <dependencies>
+
+            <!-- 内部模块版本管理 -->
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-framework</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-module-basic</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-module-system</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-module-order</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-module-flow</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-module-design</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-module-imaging</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-module-production</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-module-notification</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.yigongbao</groupId>
+                <artifactId>yigongbao-module-dashboard</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- SpringBoot依赖管理 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring.boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Mybatis Plus (Spring Boot 3.x 需要使用 spring-boot3-starter) -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>${mybatis.plus.version}</version>
+            </dependency>
+
+            <!-- SaToken -->
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-spring-boot3-starter</artifactId>
+                <version>${satoken.version}</version>
+            </dependency>
+
+            <!-- Hutool -->
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
+            </dependency>
+
+            <!-- Lombok -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+            </dependency>
+
+            <!-- Jackson -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+
+            <!-- AOP -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-aop</artifactId>
+                <version>${spring.boot.version}</version>
+            </dependency>
+
+            <!-- Test -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-test</artifactId>
+                <version>${spring.boot.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <!-- Redis -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-data-redis</artifactId>
+                <version>${spring.boot.version}</version>
+            </dependency>
+
+            <!-- MySQL Driver -->
+            <dependency>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>${mysql-connector.version}</version>
+            </dependency>
+
+            <!-- Spring Security Crypto（仅引入密码加密能力，不引入完整安全框架） -->
+            <dependency>
+                <groupId>org.springframework.security</groupId>
+                <artifactId>spring-security-crypto</artifactId>
+                <version>${spring-security-crypto.version}</version>
+            </dependency>
+
+            <!-- x-file-storage（统一文件存储） -->
+            <dependency>
+                <groupId>org.dromara.x-file-storage</groupId>
+                <artifactId>x-file-storage-spring</artifactId>
+                <version>${file.storage.version}</version>
+            </dependency>
+
+            <!-- Apache POI（Excel导出） -->
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi-ooxml</artifactId>
+                <version>${poi.version}</version>
+            </dependency>
+
+            <!-- springdoc-openapi：生成 OpenAPI 3.0 文档，导入 Apifox 使用 -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${openapi.version}</version>
+            </dependency>
+
+            <!-- tianai-captcha 滑动验证码（支持 Spring Boot 3） -->
+            <dependency>
+                <groupId>cloud.tianai.captcha</groupId>
+                <artifactId>tianai-captcha-springboot-starter</artifactId>
+                <version>${tianai-captcha.version}</version>
+            </dependency>
+
+            <!-- ip2region 离线 IP 归属地解析 -->
+            <dependency>
+                <groupId>org.lionsoul</groupId>
+                <artifactId>ip2region</artifactId>
+                <version>${ip2region.version}</version>
+            </dependency>
+
+            <!-- junrar：RAR 压缩包解析（仅支持 RAR 4.x） -->
+            <dependency>
+                <groupId>com.github.junrar</groupId>
+                <artifactId>junrar</artifactId>
+                <version>${junrar.version}</version>
+            </dependency>
+
+            <!-- sevenzipjbinding：RAR 5.0 支持（7-Zip Java 绑定） -->
+            <dependency>
+                <groupId>net.sf.sevenzipjbinding</groupId>
+                <artifactId>sevenzipjbinding</artifactId>
+                <version>${sevenzipjbinding.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.sf.sevenzipjbinding</groupId>
+                <artifactId>sevenzipjbinding-all-platforms</artifactId>
+                <version>${sevenzipjbinding.version}</version>
+            </dependency>
+
+            <!-- commons-compress：7Z/TAR 等压缩包解析 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-compress</artifactId>
+                <version>${commons-compress.version}</version>
+            </dependency>
+
+            <!-- 富文本白名单清洗 -->
+            <dependency>
+                <groupId>org.jsoup</groupId>
+                <artifactId>jsoup</artifactId>
+                <version>${jsoup.version}</version>
+            </dependency>
+
+            <!-- xz：commons-compress 解析 7Z 格式的运行时依赖（optional，需显式声明） -->
+            <dependency>
+                <groupId>org.tukaani</groupId>
+                <artifactId>xz</artifactId>
+                <version>${xz.version}</version>
+            </dependency>
+
+            <!-- ZXing：二维码生成 -->
+            <dependency>
+                <groupId>com.google.zxing</groupId>
+                <artifactId>core</artifactId>
+                <version>${zxing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.zxing</groupId>
+                <artifactId>javase</artifactId>
+                <version>${zxing.version}</version>
+            </dependency>
+        </dependencies>
+
+    </dependencyManagement>
+
+    <build>
+        <!-- 插件版本管理 -->
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring.boot.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
+        <!-- 编译配置 -->
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <!-- 保留方法参数名，使 Spring 可以通过反射获取参数名 -->
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

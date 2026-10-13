@@ -1,0 +1,126 @@
+package com.yigongbao.module.design.service;
+
+import com.yigongbao.module.design.vo.DesignModelVO;
+import com.yigongbao.module.design.vo.DesignPackageFileVO;
+import com.yigongbao.module.design.vo.DesignPackageVO;
+import com.yigongbao.module.basic.file.vo.FileVO;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+
+/**
+ * 设计文件服务接口
+ * 数据包：直接上传（需解析压缩包）
+ * 模型/报告：关联已上传的文件（通过 FileController 上传）
+ *
+ * @author hanjor
+ * @date 2026-04-15
+ */
+public interface DesignFileService {
+
+    // ==================== 数据包 ====================
+
+    /**
+     * 上传打印文件数据包
+     *
+     * @param orderId 订单ID
+     * @param file    压缩包文件（支持 ZIP/RAR/7Z）
+     * @return 数据包信息
+     */
+    DesignPackageVO uploadPackage(Long orderId, MultipartFile file);
+
+    DesignPackageVO uploadPackage(Long orderId, Long batchId, MultipartFile file);
+
+    /**
+     * 删除数据包
+     *
+     * @param orderId   订单ID
+     * @param packageId 数据包ID
+     */
+    void deletePackage(Long orderId, Long packageId);
+
+    void deletePackage(Long orderId, Long batchId, Long packageId);
+
+    /**
+     * 获取订单的数据包列表
+     *
+     * @param orderId 订单ID
+     * @return 数据包列表
+     */
+    List<DesignPackageVO> listPackages(Long orderId);
+
+    List<DesignPackageVO> listPackages(Long orderId, Long batchId);
+
+    /**
+     * 供已完成订单权限校验的订单详情聚合查询数据包列表。
+     *
+     * @param orderId 订单ID
+     * @return 数据包列表
+     */
+    List<DesignPackageVO> listPackagesForOrderDetail(Long orderId);
+
+    /**
+     * 获取数据包的包内文件列表
+     *
+     * @param orderId   订单ID（校验数据包归属）
+     * @param packageId 数据包ID
+     * @return 包内文件列表
+     */
+    List<DesignPackageFileVO> listPackageFiles(Long orderId, Long packageId);
+
+    // ==================== 可视化模型 ====================
+
+    /**
+     * 批量关联可视化模型文件
+     * 文件需先通过 FileController 上传
+     *
+     * @param orderId 订单ID
+     * @param fileIds 文件ID列表
+     * @return 模型信息列表
+     */
+    List<DesignModelVO> linkModels(Long orderId, List<String> fileIds);
+
+    /**
+     * 删除可视化模型
+     *
+     * @param orderId 订单ID
+     * @param modelId 模型ID
+     */
+    void deleteModel(Long orderId, Long modelId);
+
+    /**
+     * 获取订单的可视化模型列表
+     *
+     * @param orderId 订单ID
+     * @return 模型列表
+     */
+    List<DesignModelVO> listModels(Long orderId);
+
+    // ==================== 设计报告 ====================
+
+    /**
+     * 关联设计报告
+     * 文件需先通过 FileController 上传
+     *
+     * @param orderId 订单ID
+     * @param fileId  文件ID
+     * @return 文件信息
+     */
+    List<FileVO> linkReport(Long orderId, List<String> fileIds);
+
+    /**
+     * 删除设计报告
+     *
+     * @param orderId 订单ID
+     * @param fileId  文件ID
+     */
+    void deleteReport(Long orderId, String fileId);
+
+    /**
+     * 获取订单的设计报告列表
+     *
+     * @param orderId 订单ID
+     * @return 文件信息列表，无报告返回空列表
+     */
+    List<FileVO> getReports(Long orderId);
+}

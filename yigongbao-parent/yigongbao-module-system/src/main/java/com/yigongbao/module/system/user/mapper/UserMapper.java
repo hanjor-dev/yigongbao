@@ -1,0 +1,173 @@
+package com.yigongbao.module.system.user.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.toolkit.Constants;
+import com.yigongbao.module.system.user.entity.UserEntity;
+import com.yigongbao.module.system.user.vo.UserStatisticsVO;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
+
+/**
+ * 用户 Mapper
+ *
+ * @author hanjor
+ * @date 2026-03-17
+ */
+@Mapper
+public interface UserMapper extends BaseMapper<UserEntity> {
+
+    @Select("""
+        SELECT COUNT(*) AS total,
+               COALESCE(SUM(CASE WHEN account_type = '6.1' THEN 1 ELSE 0 END), 0) AS enterprise,
+               COALESCE(SUM(CASE WHEN account_type = '6.2' THEN 1 ELSE 0 END), 0) AS business
+        FROM sys_user ${ew.customSqlSegment}
+        """)
+    UserStatisticsVO selectStatistics(@Param(Constants.WRAPPER) Wrapper<UserEntity> wrapper);
+
+    /**
+     * 统计部门下的用户数量
+     *
+     * @param deptId 部门ID
+     * @return 用户数量
+     */
+    @Select("SELECT COUNT(*) FROM sys_user WHERE dept_id = #{deptId} AND is_deleted = 0")
+    Long countByDeptId(Long deptId);
+
+    /**
+     * 统计角色下的用户数量
+     *
+     * @param roleId 角色ID
+     * @return 用户数量
+     */
+    @Select("SELECT COUNT(*) FROM sys_user WHERE role_id = #{roleId} AND is_deleted = 0")
+    Long countByRoleId(Long roleId);
+
+    /**
+     * 查询角色下所有用户ID
+     *
+     * @param roleId 角色ID
+     * @return 用户ID列表
+     */
+    @Select("SELECT id FROM sys_user WHERE role_id = #{roleId} AND is_deleted = 0")
+    List<Long> selectIdsByRoleId(Long roleId);
+
+    /**
+     * 根据用户名查询用户
+     *
+     * @param username 用户名
+     * @return 用户实体
+     */
+    @Select("SELECT * FROM sys_user WHERE username = #{username} AND is_deleted = 0 LIMIT 1")
+    UserEntity selectByUsername(String username);
+
+    /**
+     * 根据手机号查询用户（手机号不再唯一，返回列表）
+     *
+     * @param phone 手机号
+     * @return 用户列表
+     */
+    @Select("SELECT * FROM sys_user WHERE phone = #{phone} AND is_deleted = 0")
+    List<UserEntity> selectListByPhone(String phone);
+
+    /**
+     * 根据邮箱查询用户
+     *
+     * @param email 邮箱
+     * @return 用户实体
+     */
+    @Select("SELECT * FROM sys_user WHERE email = #{email} AND is_deleted = 0 LIMIT 1")
+    UserEntity selectByEmail(String email);
+
+    /**
+     *
+     * @param orgId 机构ID
+     * @return 用户数量
+     */
+    @Select("SELECT COUNT(*) FROM sys_user WHERE org_id = #{orgId} AND is_deleted = 0")
+    Long countByOrgId(Long orgId);
+
+    /**
+     * 查询符合专业方向的设计师候选列表（按当前在手工单数升序）
+     * 用于自动分配：取负载最低的第一位
+     * 仅查询设计师角色，不包含设计师管理员
+     *
+     * @param specialty 项目专业方向（单值，如 "7.1"）
+     * @return 设计师列表，已按 current_load ASC 排序
+     */
+    @Select("""
+        SELECT u.*,
+               (SELECT COUNT(*) FROM order_main om
+                WHERE om.designer_id = u.id
+                  AND om.status IN (2010, 2020)
+                  AND om.is_deleted = 0) AS current_load
+        FROM sys_user u
+        WHERE u.role_code = 'designer'
+          AND u.status = 1
+          AND u.is_deleted = 0
+          AND FIND_IN_SET(#{specialty}, u.specialty) > 0
+        ORDER BY current_load ASC
+        """)
+    List<UserEntity> selectAvailableDesigners(@Param("specialty") String specialty);
+
+    /**
+     * 查询符合任意一个专业方向的设计师列表（用于手动分配时的候选展示）
+     * 注意：specialtyCondition 由 Service 层使用严格正则校验后拼接，防止注入
+     * 仅查询设计师角色，不包含设计师管理员
+     *
+     * @param specialtyCondition 已校验的 FIND_IN_SET 条件串，如
+     *        "FIND_IN_SET('7.1', specialty) > 0 OR FIND_IN_SET('7.2', specialty) > 0"
+     * @return 设计师列表，已按 current_load ASC 排序
+     */
+    @Select("""
+        SELECT u.*,
+               (SELECT COUNT(*) FROM order_main om
+                WHERE om.designer_id = u.id
+                  AND om.status IN (2010, 2020)
+                  AND om.is_deleted = 0) AS current_load
+        FROM sys_user u
+        WHERE u.role_code = 'designer'
+          AND u.status = 1
+          AND u.is_deleted = 0
+          AND (${specialtyCondition})
+        ORDER BY current_load ASC
+        """)
+    List<UserEntity> selectDesignersBySpecialties(
+            @Param("specialtyCondition") String specialtyCondition);
+
+    /**
+     * 查询所有拥有设计权限的用户（通过权限点判断，不硬编码角色）
+     * 使用 design:StartDesign 权限（开始设计操作权限，只有设计师才有）
+     * 支持按姓名模糊搜索
+     *
+     * @param nameKeyword 姓名关键字（可选，为空时不过滤）
+     * @return 设计师列表，已按 current_load ASC 排序
+     */
+    @Select("""
+        <script>
+        SELECT DISTINCT u.*,
+               (SELECT COUNT(*) FROM order_main om
+                WHERE om.designer_id = u.id
+                  AND om.status IN (2010, 2020)
+                  AND om.is_deleted = 0) AS current_load
+        FROM sys_user u
+        INNER JOIN sys_role r ON u.role_id = r.id AND r.is_deleted = 0
+        INNER JOIN sys_role_resource rr ON r.id = rr.role_id
+        INNER JOIN sys_resource res ON rr.resource_id = res.id
+            AND res.resource_code = 'design:Start'
+            AND res.is_deleted = 0
+        WHERE u.status = 1
+          AND u.is_deleted = 0
+          AND u.specialty IS NOT NULL
+          AND u.specialty != ''
+        <if test="nameKeyword != null and nameKeyword != ''">
+          AND u.real_name LIKE CONCAT('%', #{nameKeyword}, '%')
+        </if>
+        ORDER BY current_load ASC
+        </script>
+        """)
+    List<UserEntity> selectAllDesignersByPermission(@Param("nameKeyword") String nameKeyword);
+}

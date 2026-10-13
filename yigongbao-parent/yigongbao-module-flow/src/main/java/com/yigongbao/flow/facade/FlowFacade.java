@@ -1,0 +1,60 @@
+package com.yigongbao.flow.facade;
+
+import com.yigongbao.flow.enums.FlowActionEnum;
+import com.yigongbao.flow.operator.FlowOperator;
+import com.yigongbao.flow.result.TransitionResult;
+
+import java.util.List;
+
+/**
+ * 流程 Facade
+ * flow 模块的唯一对外入口，封装状态机和历史记录的完整操作
+ *
+ * 【设计原则】
+ * - 对外只暴露 Facade，避免外部直接依赖内部 Service
+ * - 内部组合 FlowStateMachineService 和 FlowStatusHistoryService
+ * - 后续新增功能（如通知、审计等）可在 Facade 层统一编排
+ *
+ * @author hanjor
+ * @date 2026-04-01
+ */
+public interface FlowFacade {
+
+    /**
+     * 查询当前可执行的动作列表
+     *
+     * @param orderId 业务实体ID（订单ID）
+     * @return 可执行的动作编码列表
+     */
+    List<String> getAvailableActions(Long orderId);
+
+    /**
+     * 执行流程动作
+     *
+     * @param orderId  业务实体ID（订单ID）
+     * @param action   动作枚举
+     * @param operator 操作人信息
+     * @return 转换结果（包含 phase 和 status）
+     */
+    TransitionResult executeFlow(Long orderId, FlowActionEnum action, FlowOperator operator);
+
+    /**
+     * 执行流程动作（带乐观锁版本校验）
+     * 用于审核类动作，防止基于过期数据的错误审核
+     *
+     * @param orderId         订单ID
+     * @param action          动作枚举
+     * @param operator        操作人信息
+     * @param expectedVersion 调用方加载订单时的版本号，与当前 DB 版本不一致时抛出 ORDER_VERSION_CONFLICT
+     * @return 转换结果
+     */
+    TransitionResult executeFlow(Long orderId, FlowActionEnum action, FlowOperator operator, Integer expectedVersion);
+
+    /**
+     * 受控完成追加设计批次。该动作允许从生产后续状态回到设计完成，
+     * 同时记录流程历史并按订单版本防止并发覆盖。
+     */
+    TransitionResult executeAdditionalDesignStart(Long orderId, FlowOperator operator,
+                                                  Integer expectedVersion);
+
+}

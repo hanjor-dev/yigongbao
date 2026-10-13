@@ -1,0 +1,2377 @@
+---
+alwaysApply: true
+---
+
+# 医工宝 Java 编码规范
+
+## 概述
+
+本文档定义了医工宝项目的 Java 编码标准和最佳实践。所有开发人员必须遵循此规范，以保证代码质量、可维护性和团队协作效率。
+
+本规范适用于 `yigongbao-parent` 下的所有模块，包括：
+- `yigongbao-boot` 启动入口
+- `yigongbao-common` 通用层
+- `yigongbao-framework` 基础框架能力层
+- `yigongbao-module-*` 业务模块层
+
+---
+
+## 一、命名规范
+
+### 1.1 包命名
+
+| 类型 | 规范 | 示例 |
+|------|------|------|
+| 包名 | 全部小写，英文单词用单数形式 | `com.yigongbao.common.enums` |
+| 层级分隔 | 使用 `.` 分隔，禁止下划线 | `com.yigongbao.module.system` |
+| 业务模块 | 按功能模块划分 | `module.system`, `module.erp` |
+
+### 1.2 类命名
+
+| 类型 | 规范 | 示例 |
+|------|------|------|
+| 普通类 | 帕斯卡命名法（PascalCase） | `UserService`, `OrderController` |
+| Controller | 以 `Controller` 结尾 | `UserController`, `ProductController` |
+| Service | 以 `Service` 结尾 | `UserService`, `OrderService` |
+| ServiceImpl | 以 `ServiceImpl` 结尾 | `UserServiceImpl` |
+| Mapper | 以 `Mapper` 结尾 | `UserMapper`, `OrderMapper` |
+| Entity | 以 `Entity` 结尾 | `UserEntity`, `OrderEntity` |
+| VO | 以 `VO` 结尾 | `UserVO`, `OrderVO` |
+| DTO | 以 `DTO` 结尾 | `CreateUserDTO`, `UpdateUserDTO` |
+| Config | 以 `Config` 结尾 | `MybatisPlusConfig`, `RedisConfig` |
+| Handler | 以 `Handler` 结尾 | `GlobalExceptionHandler` |
+| Enum | 以 `Enum` 结尾 | `YesNoEnum`, `OrderStatusEnum` |
+| Exception | 以 `Exception` 结尾 | `BusinessException`, `ResourceNotFoundException` |
+| Util | 以 `Util` 结尾 | `StringUtil`, `DateUtil` |
+
+### 1.3 方法命名
+
+| 类型 | 规范 | 示例 |
+|------|------|------|
+| 查询 | `get` 开头 | `getUserById()`, `listUsers()` |
+| 新增 | `save` 或 `create` 开头 | `saveUser()`, `createOrder()` |
+| 更新 | `update` 开头 | `updateUser()`, `updatePassword()` |
+| 删除 | `remove` 或 `delete` 开头 | `removeUser()`, `deleteById()` |
+| 条件判断 | `is`, `has`, `can` 开头 | `isEmpty()`, `hasPermission()`, `canAccess()` |
+| 内部方法 | 驼峰命名，小写开头 | `convertToEntity()`, `buildPageParams()` |
+
+### 1.4 变量命名
+
+| 类型 | 规范 | 示例 |
+|------|------|------|
+| 普通变量 | 驼峰命名 | `userName`, `orderList` |
+| 常量 | 全大写，下划线分隔 | `MAX_RETRY_COUNT`, `DEFAULT_PAGE_SIZE` |
+| 静态常量 | 同常量规范 | `SUCCESS_CODE = 200` |
+| 循环变量 | 短小明确 | `i`, `j`, `index` |
+| 布尔变量 | `is`, `has`, `can` 开头 | `isValid`, `hasError`, `canEdit` |
+| 集合变量 | 复数形式或明确类型 | `userList`, `userSet`, `userMap` |
+
+### 1.5 常量定义
+
+```java
+// 状态码常量
+public class StatusConstants {
+    // 禁用 public static final 风格，优先使用枚举或配置类
+    public static final int SUCCESS = 200;
+    public static final int ERROR = 400;
+}
+
+// 推荐：使用枚举
+public enum StatusEnum {
+    SUCCESS(200, "成功"),
+    ERROR(400, "失败");
+
+    private final int code;
+    private final String message;
+}
+```
+
+### 1.6 状态值常量
+
+项目中所有状态字段（0和1）必须使用统一的状态常量，禁止直接使用魔法值。
+
+```java
+// ✅ 正确：使用 StatusConstants 常量
+import com.yigongbao.common.constant.StatusConstants;
+
+entity.setStatus(StatusConstants.NORMAL);  // 设置为正常状态
+if (user.getStatus() == StatusConstants.DISABLED) {  // 判断是否禁用
+    // ...
+}
+
+// ❌ 错误：直接使用魔法值
+entity.setStatus(1);  // 魔法值，可读性差
+if (user.getStatus() == 0) {  // 难以理解含义
+    // ...
+}
+```
+
+**提供的状态常量**：
+
+| 常量 | 值 | 说明 |
+|-----|---|---|
+| `StatusConstants.NORMAL` / `STATUS_ENABLED` | 1 | 正常/启用 |
+| `StatusConstants.DISABLED` / `STATUS_DISABLED` | 0 | 禁用/停用 |
+| `StatusConstants.NOT_DELETED` | 0 | 未删除 |
+| `StatusConstants.DELETED` | 1 | 已删除 |
+| `StatusConstants.YES` | 1 | 是 |
+| `StatusConstants.NO` | 0 | 否 |
+
+**推荐使用方法**：
+
+```java
+// 获取状态显示名称
+String statusName = StatusConstants.getStatusName(user.getStatus());
+// 返回 "正常" 或 "禁用"
+```
+
+### 1.6 编码规则常量（CodeRuleConstants）
+
+业务模块调用编码生成器时，**禁止直接使用硬编码字符串**，必须使用 `CodeRuleConstants` 常量类。
+
+**常量类位置**：`com.yigongbao.common.constant.CodeRuleConstants`
+
+```java
+// ✅ 正确：使用 CodeRuleConstants 常量
+import com.yigongbao.common.constant.CodeRuleConstants;
+
+String hospitalCode = codeGeneratorService.generate(CodeRuleConstants.HOSPITAL_NO);
+String productCode = codeGeneratorService.generate(CodeRuleConstants.PRODUCT_CODE);
+
+// ❌ 错误：直接使用硬编码字符串
+String hospitalCode = codeGeneratorService.generate("HOSPITAL_NO");
+String productCode = codeGeneratorService.generate("PRODUCT_CODE");
+```
+
+**提供的编码规则常量**：
+
+| 常量 | 值 | 说明 |
+|-----|---|------|
+| `HOSPITAL_NO` | `HOSPITAL_NO` | 医院编码 |
+| `HDEPT_NO` | `HDEPT_NO` | 机构部门编码 |
+| `PROJECT_NO` | `PROJECT_NO` | 重建项目编码 |
+| `PRODUCT_CODE` | `PRODUCT_CODE` | 产品型号编码 |
+| `BODYPART_NO` | `BODYPART_NO` | 部位编码 |
+| `TEMPLATE_NO` | `TEMPLATE_NO` | 模板编码 |
+| `DOCTOR_NO` | `DOCTOR_NO` | 医生编码 |
+| `ORDER_NO` | `ORDER_NO` | 订单编码 |
+| `ORDER_ITEM_NO` | `ORDER_ITEM_NO` | 订单明细编码 |
+| `DATA_PACKAGE_NO` | `DATA_PACKAGE_NO` | 数据包编码 |
+| `INSTRUCTION_NO` | `INSTRUCTION_NO` | 指令单编码 |
+| `FILE_NO` | `FILE_NO` | 文件编码 |
+
+**扩展方式**：当需要新增编码规则时，先在 `CodeRuleConstants` 中添加常量，再在数据库中插入对应规则数据。
+
+### 1.7 编码生成器使用规范
+
+项目中统一使用 `CodeGeneratorService` 生成各类编码，提供四种生成方式：
+
+| 方法 | 适用场景 | 示例 |
+|------|---------|------|
+| `generate(ruleCode)` | 通用编码生成 | `HOS-0001` |
+| `generateWithBizPrefix(ruleCode, bizPrefix)` | 带业务前缀的编码 | `ZL-ORD-000001-0001` |
+| `generateWithCustomPrefix(ruleCode, prefix)` | 带自定义前缀的编码 | `ORG-P-0001` |
+| `generateWithSeqSuffix(ruleCode, bizKey)` | 带序号后缀的编码（按业务标识隔离序号池） | `202603250001-1` |
+
+**典型使用场景**：
+
+```java
+// 场景1：创建医院时生成编码
+@Service
+@RequiredArgsConstructor
+public class HospitalServiceImpl {
+    private final CodeGeneratorService codeGeneratorService;
+
+    public void createHospital(CreateHospitalDTO dto) {
+        HospitalEntity entity = new HospitalEntity();
+        // 使用常量 + generate 生成
+        entity.setHospitalCode(codeGeneratorService.generate(CodeRuleConstants.HOSPITAL_NO));
+        // ... 其他逻辑
+    }
+}
+
+// 场景2：创建数据包时生成编码（同一订单下的多个数据包）
+@Service
+@RequiredArgsConstructor
+public class DataPackageServiceImpl {
+    private final CodeGeneratorService codeGeneratorService;
+
+    public void createDataPackage(CreateDataPackageDTO dto) {
+        // 第一个数据包
+        String code1 = codeGeneratorService.generateWithSeqSuffix(
+            CodeRuleConstants.DATA_PACKAGE_NO,
+            dto.getOrderCode()  // 传入订单编号作为 bizKey
+        );
+        // 结果：202603250001-1
+
+        // 第二个数据包（同一个订单）
+        String code2 = codeGeneratorService.generateWithSeqSuffix(
+            CodeRuleConstants.DATA_PACKAGE_NO,
+            dto.getOrderCode()
+        );
+        // 结果：202603250001-2
+    }
+}
+```
+
+> **注意**：
+> - `generateWithSeqSuffix` 的 `bizKey` 用于隔离序号池，相同 `bizKey` 共享序号，不同 `bizKey` 各自独立
+> - 如果不需要按业务隔离，直接使用 `generate(ruleCode)` 即可
+> - 前缀字段可置空（数据库中 prefix 为 NULL），系统会自动跳过前缀拼接
+
+---
+
+## 二、代码格式
+
+### 2.1 缩进与空格
+
+| 规范项 | 要求 |
+|--------|------|
+| 缩进 | 4 个空格，禁止使用 Tab |
+| 行长度 | 最大 120 字符 |
+| 方法参数逗号后 | 1 个空格 |
+| 运算符前后 | 各 1 个空格 |
+| 大括号 | 左大括号不换行，右大括号单独一行 |
+
+```java
+// ✅ 正确示例
+public UserVO getUserById(Long id) {
+    if (id == null || id <= 0) {
+        throw new BusinessException("用户ID无效");
+    }
+    return userMapper.selectById(id);
+}
+
+// ❌ 错误示例
+public UserVO getUserById(Long id){
+    if(id==null||id<=0){
+        throw new BusinessException("用户ID无效");
+    }
+    return userMapper.selectById(id);
+}
+```
+
+### 2.2 空行规则
+
+- 类内方法之间：1 个空行
+- 不同逻辑块之间：可增加空行增强可读性
+- 连续变量声明之间：不加空行
+- import 语句之后：1 个空行
+
+### 2.3 import 规范
+
+```java
+// 1. 先 import 非 * 的具体类
+import com.yigongbao.common.exception.BusinessException;
+import com.yigongbao.common.enums.ErrorCodeEnum;
+import com.yigongbao.common.result.Result;
+
+// 2. 再 import * 的包
+import com.yigongbao.module.system.entity.*;
+import org.springframework.stereotype.*;
+
+// 3. 最后 import java/javax 和其他第三方
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+```
+
+### 2.4 大括号使用
+
+```java
+// ✅ 正确
+if (condition) {
+    doSomething();
+}
+
+// ❌ 错误
+if (condition)
+    doSomething();
+
+// ❌ 错误（除非方法体只有一行且不复杂）
+if (condition) doSomething();
+```
+
+---
+
+## 三、注释规范
+
+### 3.1 类注释
+
+所有类必须添加类注释，包含：功能说明、作者、创建时间。
+
+```java
+/**
+ * 用户 Service 类
+ * 提供用户相关的业务逻辑处理，包括用户CRUD、权限校验等功能
+ *
+ * @author hanjor
+ * @date 2026-03-14 14:30:00
+ */
+public class UserService {
+    // ...
+}
+```
+
+### 3.2 方法注释
+
+公共方法必须添加 Javadoc 注释，说明：功能、参数、返回值、异常。
+
+```java
+/**
+ * 根据用户ID查询用户信息
+ *
+ * @param id 用户ID
+ * @return 用户信息（包含基本信息、角色列表）
+ * @throws BusinessException 当用户不存在时抛出
+ */
+public UserVO getUserById(Long id) {
+    // ...
+}
+```
+
+### 3.3 行内注释
+
+使用 `//` 注释，注释内容与代码之间 1 个空格。
+
+```java
+// 设置默认密码
+user.setPassword(defaultPassword);
+// 判断用户是否激活
+if (user.getStatus() == 1) {
+    // ...
+}
+```
+
+### 3.4 注释原则
+
+| 原则 | 说明 |
+|------|------|
+| 必要原则 | 只注释必要的、非常规的逻辑，不注释显而易见的代码 |
+| 及时原则 | 修改代码时同步更新注释 |
+| 完整原则 | 注释应完整表达意图，避免误导 |
+| 中文原则 | 注释使用中文，标点使用中文全角 |
+
+---
+
+## 四、类结构规范
+
+### 4.1 Controller 层
+
+```java
+/**
+ * 用户管理 Controller
+ * 处理用户相关的 HTTP 请求
+ *
+ * @author hanjor
+ * @date 2026-03-14 14:30:00
+ */
+@RestController
+@RequestMapping("/api/system/user")
+@RequiredArgsConstructor
+public class UserController {
+
+    private final UserService userService;
+
+    /**
+     * 分页查询用户列表
+     *
+     * @param pageNum  页码（默认1）
+     * @param pageSize 每页条数（默认10）
+     * @param username 用户名（模糊查询）
+     * @return 分页后的用户列表
+     */
+    @GetMapping("/list")
+    public Result<IPage<UserVO>> list(
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(required = false) String username) {
+        IPage<UserVO> page = userService.listUsers(pageNum, pageSize, username);
+        return Result.success(page);
+    }
+
+    /**
+     * 根据ID查询用户详情
+     *
+     * @param id 用户ID
+     * @return 用户详情
+     */
+    @GetMapping("/{id}")
+    public Result<UserVO> getById(@PathVariable Long id) {
+        return Result.success(userService.getUserById(id));
+    }
+
+    /**
+     * 创建用户
+     *
+     * @param dto 创建用户请求参数
+     * @return 创建结果
+     */
+    @PostMapping
+    public Result<Void> create(@Validated @RequestBody CreateUserDTO dto) {
+        userService.createUser(dto);
+        return Result.success();
+    }
+
+    /**
+     * 更新用户信息
+     *
+     * @param id  用户ID
+     * @param dto 更新用户请求参数
+     * @return 更新结果
+     */
+    @PutMapping("/{id}")
+    public Result<Void> update(@PathVariable Long id, @Validated @RequestBody UpdateUserDTO dto) {
+        userService.updateUser(id, dto);
+        return Result.success();
+    }
+
+    /**
+     * 删除用户
+     *
+     * @param id 用户ID
+     * @return 删除结果
+     */
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        userService.removeUser(id);
+        return Result.success();
+    }
+}
+```
+
+### 4.2 Service 层
+
+Service 接口定义业务方法，ServiceImpl 实现类实现具体业务逻辑。
+
+```java
+/**
+ * 用户 Service
+ *
+ * @author hanjor
+ * @date 2026-03-14 14:30:00
+ */
+public interface UserService extends IService<UserEntity> {
+
+    /**
+     * 分页查询用户列表
+     *
+     * @param pageNum  页码（默认1）
+     * @param pageSize 每页条数（默认10）
+     * @param username 用户名（模糊查询）
+     * @return 分页后的用户列表
+     */
+    IPage<UserVO> listUsers(Integer pageNum, Integer pageSize, String username);
+
+    /**
+     * 根据ID查询用户
+     *
+     * @param id 用户ID
+     * @return 用户信息
+     * @throws BusinessException 用户不存在
+     */
+    UserVO getUserById(Long id);
+
+    /**
+     * 创建用户
+     *
+     * @param dto 创建参数
+     * @throws BusinessException 用户名已存在
+     */
+    void createUser(CreateUserDTO dto);
+
+    /**
+     * 更新用户信息
+     *
+     * @param id  用户ID
+     * @param dto 更新参数
+     * @throws BusinessException 用户不存在
+     */
+    void updateUser(Long id, UpdateUserDTO dto);
+
+    /**
+     * 删除用户
+     *
+     * @param id 用户ID
+     * @throws BusinessException 用户不存在
+     */
+    void removeUser(Long id);
+}
+```
+
+#### 4.2.1 ServiceImpl 方法注释规范
+
+ServiceImpl 实现类必须添加详细的方法级注释和行级注释：
+
+```java
+/**
+ * 用户 Service 实现类
+ * 处理用户相关的业务逻辑，包括用户CRUD、权限校验等
+ *
+ * @author hanjor
+ * @date 2026-03-14 14:30:00
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> implements UserService {
+
+    private final PasswordEncoder passwordEncoder;
+
+    /**
+     * 分页查询用户列表
+     *
+     * @param pageNum  分页参数-页码
+     * @param pageSize 分页参数-每页大小
+     * @param username 用户名（模糊查询）
+     * @return 分页后的用户列表
+     */
+    @Override
+    public IPage<UserVO> listUsers(Integer pageNum, Integer pageSize, String username) {
+        // 构建分页对象
+        Page<User> page = new Page<>(pageNum, pageSize);
+        // 构建查询条件
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        // 用户名模糊查询（非空时生效）
+        wrapper.like(StringUtils.isNotBlank(username), User::getUsername, username)
+               // 按创建时间倒序
+               .orderByDesc(User::getCreateTime);
+        // 执行分页查询
+        return userMapper.selectPage(page, wrapper);
+    }
+
+    /**
+     * 根据ID查询用户
+     *
+     * @param id 用户ID
+     * @return 用户信息
+     * @throws BusinessException 用户不存在
+     */
+    @Override
+    public UserVO getUserById(Long id) {
+        // 根据ID查询用户实体
+        UserEntity entity = userMapper.selectById(id);
+        // 校验用户是否存在
+        if (entity == null) {
+            // ✅ 优先使用 ErrorCodeEnum
+            throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+        }
+        // 转换为VO返回
+        return ConvertUtils.toVO(entity);
+    }
+
+    /**
+     * 创建用户
+     *
+     * @param dto 创建参数
+     * @throws BusinessException 用户名已存在
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void createUser(CreateUserDTO dto) {
+        // 检查用户名是否已存在
+        if (isUsernameExists(dto.getUsername())) {
+            // ✅ 优先使用 ErrorCodeEnum
+            throw new BusinessException(ErrorCodeEnum.USERNAME_EXISTS);
+        }
+        // DTO转换为实体对象
+        UserEntity entity = ConvertUtils.toEntity(dto);
+        // 密码加密存储
+        entity.setPassword(passwordEncoder.encode(dto.getPassword()));
+        // 插入数据库
+        userMapper.insert(entity);
+    }
+
+    /**
+     * 判断用户名是否存在
+     *
+     * @param username 用户名
+     * @return true-存在，false-不存在
+     */
+    private boolean isUsernameExists(String username) {
+        return userMapper.selectCount(
+            new LambdaQueryWrapper<User>().eq(User::getUsername, username)
+        ) > 0;
+    }
+
+    /**
+     * 更新用户信息
+     *
+     * @param id  用户ID
+     * @param dto 更新参数
+     * @throws BusinessException 用户不存在
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateUser(Long id, UpdateUserDTO dto) {
+        // 根据ID查询用户实体
+        UserEntity entity = userMapper.selectById(id);
+        // 校验用户是否存在
+        if (entity == null) {
+            throw new BusinessException(404, "用户不存在");
+        }
+        // 更新用户信息
+        BeanUtils.copyProperties(dto, entity);
+        // 更新数据库
+        userMapper.updateById(entity);
+    }
+
+    /**
+     * 删除用户
+     *
+     * @param id 用户ID
+     * @throws BusinessException 用户不存在
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removeUser(Long id) {
+        // 校验用户是否存在
+        if (!removeById(id)) {
+            throw new BusinessException(404, "用户不存在");
+        }
+    }
+
+    /**
+     * 实体转换为VO
+     *
+     * @param entity 用户实体
+     * @return 用户VO
+     */
+    private UserVO toVO(UserEntity entity) {
+        UserVO vo = new UserVO();
+        vo.setId(entity.getId());
+        vo.setUsername(entity.getUsername());
+        vo.setRealName(entity.getRealName());
+        // ... 其他字段映射
+        return vo;
+    }
+}
+```
+
+#### 4.2.2 ServiceImpl 日志规范
+
+ServiceImpl 方法中必须在关键位置添加详细日志输出：
+
+```java
+/**
+ * 用户 Service 实现类
+ *
+ * @author hanjor
+ * @date 2026-03-14 14:30:00
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> implements UserService {
+
+    /**
+     * 根据ID查询用户
+     *
+     * @param id 用户ID
+     * @return 用户信息
+     * @throws BusinessException 用户不存在
+     */
+    @Override
+    public UserVO getUserById(Long id) {
+        // 记录查询入参
+        log.info("根据ID查询用户信息，id={}", id);
+        try {
+            // 执行数据库查询
+            UserEntity entity = userMapper.selectById(id);
+            // 校验用户是否存在
+            if (entity == null) {
+                log.warn("用户不存在，id={}", id);
+                // ✅ 优先使用 ErrorCodeEnum
+                throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+            }
+            // 转换为VO对象
+            UserVO vo = toVO(entity);
+            // 记录查询成功
+            log.info("查询用户信息成功，id={}", id);
+            return vo;
+        } catch (BusinessException e) {
+            // 业务异常直接抛出
+            throw e;
+        } catch (Exception e) {
+            // 记录系统异常
+            log.error("查询用户信息异常，id={}", id, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 创建用户
+     *
+     * @param dto 创建参数
+     * @throws BusinessException 用户名已存在
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void createUser(CreateUserDTO dto) {
+        // 记录创建入参
+        log.info("创建用户，username={}", dto.getUsername());
+        try {
+            // 检查用户名是否已存在
+            if (isUsernameExists(dto.getUsername())) {
+                log.warn("用户名已存在，username={}", dto.getUsername());
+                // ✅ 优先使用 ErrorCodeEnum
+                throw new BusinessException(ErrorCodeEnum.USERNAME_EXISTS);
+            }
+            // DTO转换为实体对象
+            UserEntity entity = ConvertUtils.toEntity(dto);
+            // 密码加密存储
+            entity.setPassword(passwordEncoder.encode(dto.getPassword()));
+            // 插入数据库
+            userMapper.insert(entity);
+            // 记录创建成功
+            log.info("创建用户成功，id={}, username={}", entity.getId(), dto.getUsername());
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("创建用户异常，username={}", dto.getUsername(), e);
+            throw e;
+        }
+    }
+}
+```
+
+**日志输出原则**：
+- 方法入参必须记录（注意脱敏处理）
+- 关键业务节点必须记录
+- 异常必须记录，包含完整堆栈信息
+- 记录成功/失败的明确标识
+
+### 4.3 Mapper 层
+
+禁止在resource下创建XML的形式操作sql，所有数据库操作都禁止写自定义sql内容，必须全部基于Mybatis-plus通过代码方式操作。
+
+
+```java
+/**
+ * 用户 Mapper
+ *
+ * @author hanjor
+ * @date 2026-03-14 14:30:00
+ */
+public interface UserMapper extends BaseMapper<User> {
+}
+```
+
+### 4.4 Entity 层
+
+```java
+/**
+ * 用户 Entity
+ *
+ * @author hanjor
+ * @date 2026-03-14 14:30:00
+ */
+@Data
+@TableName("sys_user")
+@EqualsAndHashCode(callSuper = false)
+public class UserEntity extends BaseEntity {
+
+    /**
+     * 用户名
+     */
+    private String username;
+
+    /**
+     * 密码
+     */
+    private String password;
+
+    /**
+     * 真实姓名
+     */
+    private String realName;
+
+    /**
+     * 手机号
+     */
+    private String phone;
+
+    /**
+     * 邮箱
+     */
+    private String email;
+
+    /**
+     * 状态：0-禁用，1-正常
+     */
+    private Integer status;
+}
+```
+
+> **注意**：所有 Entity 应继承 `BaseEntity`，公共字段（id、createTime、updateTime、createBy、updateBy、isDeleted）已在基类中定义，无需重复定义。
+
+### 4.5 VO / DTO 层
+
+```java
+/**
+ * 用户 VO（视图对象）
+ * 用于返回给前端的用户数据
+ *
+ * @author hanjor
+ * @date 2026-03-14 14:30:00
+ */
+@Data
+public class UserVO {
+
+    /**
+     * 用户ID
+     */
+    private Long id;
+
+    /**
+     * 用户名
+     */
+    private String username;
+
+    /**
+     * 真实姓名
+     */
+    private String realName;
+
+    /**
+     * 手机号
+     */
+    private String phone;
+
+    /**
+     * 邮箱
+     */
+    private String email;
+
+    /**
+     * 状态：0-禁用，1-正常
+     */
+    private Integer status;
+}
+
+/**
+ * 创建用户 DTO
+ *
+ * @author hanjor
+ * @date 2026-03-14 14:30:00
+ */
+@Data
+public class CreateUserDTO {
+
+    /**
+     * 用户名
+     */
+    @NotBlank(message = "用户名不能为空")
+    @Size(min = 3, max = 20, message = "用户名长度必须在3-20之间")
+    private String username;
+
+    /**
+     * 密码
+     */
+    @NotBlank(message = "密码不能为空")
+    @Size(min = 6, max = 20, message = "密码长度必须在6-20之间")
+    private String password;
+
+    /**
+     * 真实姓名
+     */
+    @NotBlank(message = "真实姓名不能为空")
+    private String realName;
+
+    /**
+     * 手机号
+     */
+    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
+    private String phone;
+
+    /**
+     * 邮箱
+     */
+    @Email(message = "邮箱格式不正确")
+    private String email;
+}
+```
+
+---
+
+## 五、分层架构规范
+
+### 5.1 分层结构
+
+```
+yigongbao-module-xxx/
+└── src/main/java/com/yigongbao/module/xxx/
+    ├── controller/     # 控制层：接收请求、参数校验、调用 Service、返回结果
+    ├── service/        # 业务层：处理业务逻辑、事务控制
+    │   └── impl/       # Service 实现类
+    ├── mapper/         # 持久层：数据库操作
+    ├── entity/         # 实体层：数据库表映射对象
+    ├── vo/             # 视图对象：返回给前端的数据
+    ├── dto/            # 数据传输对象：接收前端传入的数据
+    ├── convert/        # 转换器：Entity/VO/DTO 之间的转换
+    └── enums/          # 枚举：业务相关的枚举值
+```
+
+### 5.2 各层职责
+
+| 层级 | 职责 | 禁止事项 |
+|------|------|----------|
+| Controller | 参数校验、调用 Service、返回 Result | 禁止直接操作数据库 |
+| Service | 业务逻辑、事务管理 | 禁止处理 HTTP 请求/响应 |
+| Mapper | 数据库 CRUD 操作 | 禁止业务逻辑 |
+| Entity | 数据模型 | 禁止业务逻辑 |
+
+### 5.3 层间调用规则
+
+```java
+// ✅ 正确：Controller -> Service -> Mapper
+@RestController
+public class UserController {
+    private final UserService userService;  // 注入 Service
+    
+    @GetMapping("/{id}")
+    public Result<UserVO> getById(@PathVariable Long id) {
+        return Result.success(userService.getUserById(id));
+    }
+}
+
+@Service
+public class UserService {
+    private final UserMapper userMapper;  // 注入 Mapper
+    
+    public UserVO getUserById(Long id) {
+        UserEntity entity = userMapper.selectById(id);
+        return ConvertUtil.toVO(entity);
+    }
+}
+```
+
+---
+
+## 六、异常处理规范
+
+### 6.1 业务异常
+
+使用 `BusinessException` 抛出业务异常，指定明确的错误码。
+
+```java
+// ✅ 正确：带错误码
+throw new BusinessException(404, "用户不存在");
+throw new BusinessException(400, "用户名已存在");
+throw new BusinessException("参数错误");  // 默认 400
+
+// ❌ 错误：使用运行时异常
+throw new RuntimeException("用户不存在");
+
+// ❌ 错误：抛出未知异常
+throw new Exception("未知错误");
+```
+
+### 6.2 全局异常处理
+
+统一使用 `GlobalExceptionHandler` 处理异常，禁止在 Controller 中 try-catch。
+
+```java
+// ✅ 正确：Controller 不处理异常
+@PostMapping
+public Result<Void> create(@Validated @RequestBody CreateUserDTO dto) {
+    userService.createUser(dto);  // 异常由 GlobalExceptionHandler 捕获
+    return Result.success();
+}
+
+// ❌ 错误：Controller 中 try-catch
+@PostMapping
+public Result<Void> create(@Validated @RequestBody CreateUserDTO dto) {
+    try {
+        userService.createUser(dto);
+        return Result.success();
+    } catch (BusinessException e) {
+        return Result.error(e.getCode(), e.getMessage());
+    }
+}
+```
+
+### 6.3 错误码规范
+
+| 错误码范围 | 说明 |
+|-----------|------|
+| 200 | 成功 |
+| 400 | 客户端请求错误（参数错误、业务规则不满足） |
+| 401 | 未授权（未登录） |
+| 403 | 禁止访问（无权限） |
+| 404 | 资源不存在 |
+| 405 | 请求方法不支持 |
+| 500 | 服务器内部错误（兜底） |
+
+### 6.4 错误码枚举（ErrorCodeEnum）
+
+项目提供了全局统一错误码枚举 `ErrorCodeEnum`，位于 `com.yigongbao.common.enums` 包下。**抛出业务异常时，优先使用 ErrorCodeEnum**，如果现有枚举值不满足需求，允许新建对应的枚举值。
+
+#### 6.4.1 ErrorCodeEnum 使用规范
+
+```java
+// ✅ 优先使用：直接使用 ErrorCodeEnum 枚举值
+throw new BusinessException(ErrorCodeEnum.DATA_NOT_FOUND);
+throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+throw new BusinessException(ErrorCodeEnum.USERNAME_EXISTS);
+
+// ✅ 支持格式化：带参数的错误描述
+throw new BusinessException(ErrorCodeEnum.MISSING_PARAMETER, "username");
+throw new BusinessException(ErrorCodeEnum.INVALID_PARAMETER, "email");
+
+// ⚠️ 备选方案：如果没有找到合适的 ErrorCodeEnum，允许新建枚举值或使用字符串
+throw new BusinessException(400, "自定义错误信息");
+throw new BusinessException("自定义错误信息");
+```
+
+#### 6.4.2 ErrorCodeEnum 枚举值范围
+
+| 枚举值前缀 | 错误码范围 | 说明 |
+|-----------|-----------|------|
+| SUCCESS | 200 | 成功 |
+| PARAM_* | 400 | 参数相关错误 |
+| DATA_* | 400/404 | 数据相关错误 |
+| UNAUTHORIZED | 401 | 未授权 |
+| FORBIDDEN | 403 | 禁止访问 |
+| METHOD_NOT_ALLOWED | 405 | 请求方法不支持 |
+| REQUEST_NOT_FOUND | 404 | 请求路径不存在 |
+| SERVER_ERROR | 500 | 服务器错误 |
+| SERVICE_UNAVAILABLE | 503 | 服务不可用 |
+| *_NOT_FOUND | 600+ | 业务自定义-不存在 |
+| *_DISABLED | 600+ | 业务自定义-已禁用 |
+| *_EXISTS | 600+ | 业务自定义-已存在 |
+| *_ERROR | 600+ | 业务自定义-错误 |
+
+#### 6.4.3 如何扩展 ErrorCodeEnum
+
+当需要新的错误码时，在 `ErrorCodeEnum` 枚举类中添加新值：
+
+```java
+// 在 ErrorCodeEnum 中添加新的枚举值
+// 格式：枚举名(错误码, "错误描述")
+ORDER_NOT_FOUND(605, "订单不存在"),
+ORDER_CANCELLED(606, "订单已取消"),
+ORDER_COMPLETED(607, "订单已完成，无法操作");
+```
+
+#### 6.4.4 完整示例
+
+```java
+// ServiceImpl 中的正确用法
+@Override
+public UserVO getUserById(Long id) {
+    log.info("根据ID查询用户信息，id={}", id);
+    try {
+        UserEntity entity = userMapper.selectById(id);
+        if (entity == null) {
+            log.warn("用户不存在，id={}", id);
+            // ✅ 优先使用 ErrorCodeEnum
+            throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+        }
+        return toVO(entity);
+    } catch (BusinessException e) {
+        throw e;
+    } catch (Exception e) {
+        log.error("查询用户信息异常，id={}", id, e);
+        throw e;
+    }
+}
+
+@Override
+@Transactional(rollbackFor = Exception.class)
+public void createUser(CreateUserDTO dto) {
+    log.info("创建用户，username={}", dto.getUsername());
+    try {
+        // 检查用户名是否存在
+        if (isUsernameExists(dto.getUsername())) {
+            log.warn("用户名已存在，username={}", dto.getUsername());
+            // ✅ 使用 ErrorCodeEnum
+            throw new BusinessException(ErrorCodeEnum.USERNAME_EXISTS);
+        }
+        // ... 其他逻辑
+    } catch (BusinessException e) {
+        throw e;
+    } catch (Exception e) {
+        log.error("创建用户异常，username={}", dto.getUsername(), e);
+        throw e;
+    }
+}
+```
+
+> **重要**：ErrorCodeEnum 是全局统一错误码，添加新枚举值时应遵循错误码规范，确保不与现有错误码冲突。业务模块特有的错误码使用 600+ 段位。
+
+---
+
+## 七、日志规范
+
+### 7.1 日志使用原则
+
+**【重要】Controller 层禁止输出日志**
+
+日志记录应遵循"谁调用谁记录"的原则：
+- **Controller 层**：禁止记录日志，仅负责接收请求、参数校验、调用 Service、返回结果
+- **ServiceImpl 层**：负责记录业务逻辑日志，包括方法入参、关键节点、异常信息
+
+```java
+// ✅ 正确：Controller 不记录日志
+@Slf4j
+@RestController
+@RequiredArgsConstructor
+public class UserController {
+
+    private final UserService userService;
+
+    @GetMapping("/{id}")
+    public Result<UserVO> getById(@PathVariable Long id) {
+        // 不记录日志，由 ServiceImpl 记录
+        return Result.success(userService.getUserById(id));
+    }
+}
+
+// ✅ 正确：ServiceImpl 记录日志
+@Slf4j
+@Service
+public class UserServiceImpl implements UserService {
+
+    @Override
+    public UserVO getUserById(Long id) {
+        log.info("根据ID查询用户信息，id={}", id);
+        // ... 业务逻辑
+    }
+}
+
+// ❌ 错误：Controller 记录日志
+@Slf4j
+@RestController
+public class UserController {
+
+    @GetMapping("/{id}")
+    public Result<UserVO> getById(@PathVariable Long id) {
+        log.info("查询用户详情，id={}", id);  // 禁止在 Controller 中记录日志
+        // ...
+    }
+}
+```
+
+### 7.2 日志级别
+
+| 级别 | 使用场景 |
+|------|----------|
+| DEBUG | 开发调试信息，生产环境不输出 |
+| INFO | 正常业务流程日志 |
+| WARN | 可恢复的异常或需要关注的信息 |
+| ERROR | 系统异常或错误 |
+
+### 7.3 日志原则
+
+- **【强制】Controller 层禁止输出日志**，日志记录由 ServiceImpl 负责
+- 关键业务节点记录 INFO 日志
+- 异常必须记录日志，包含堆栈信息
+- 禁止记录敏感信息（密码、身份证号、银行卡号等）
+- 日志内容使用中文，清晰表达含义
+
+---
+
+## 八、配置规范
+
+### 8.1 配置文件
+
+```yaml
+# application-dev.yml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/yigongbao?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: ${DB_PASSWORD}  # 使用环境变量，不要硬编码
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+# 自定义配置
+yigongbao:
+  system:
+    max-upload-size: 10485760  # 10MB
+    default-password: "123456"
+```
+
+### 8.2 配置类
+
+```java
+/**
+ * 系统配置属性
+ * 读取 yigongbao.system.* 配置项
+ *
+ * @author hanjor
+ * @date 2026-03-14 14:30:00
+ */
+@Data
+@Configuration
+@ConfigurationProperties(prefix = "yigongbao.system")
+public class SystemProperties {
+
+    /**
+     * 文件上传最大大小（字节）
+     */
+    private long maxUploadSize = 10485760;
+
+    /**
+     * 默认密码
+     */
+    private String defaultPassword = "123456";
+}
+```
+
+---
+
+## 九、数据库规范
+
+### 9.1 表名规范
+
+| 类型 | 规范 | 示例 |
+|------|------|------|
+| 表名前缀 | 按模块添加前缀 | `sys_user`, `erp_order` |
+| 单词分隔 | 使用下划线 | `user_address` |
+| 全部小写 | 不使用大写 | `user_info` |
+| 表注释 | 必须添加 | `COMMENT '用户表'` |
+
+### 9.2 字段规范
+
+| 类型 | 规范 | 示例 |
+|------|------|------|
+| 通用字段 | id, create_time, update_time, create_by, update_by, is_deleted | 所有表必须有 |
+| 状态字段 | status，使用数值型 | 0-禁用，1-正常 |
+| 外键字段 | xxx_id | user_id, role_id |
+| 布尔字段 | 使用数值型 | 0-否，1-是 |
+
+### 9.3 公共字段（通用字段）
+
+所有业务表必须包含以下公共字段，由 `BaseEntity` 和 MyBatis-Plus 自动处理：
+
+| 字段名 | 类型 | 说明 | 自动填充 |
+|--------|------|------|----------|
+| id | Long | 主键ID | 是（需配置） |
+| create_time | LocalDateTime | 创建时间 | 插入时 |
+| update_time | LocalDateTime | 更新时间 | 插入/更新时 |
+| create_by | Long | 创建人ID（用户ID） | 插入时 |
+| update_by | Long | 更新人ID（用户ID） | 插入/更新时 |
+| is_deleted | Integer | 是否删除：0-否，1-是 | 插入时 |
+
+**关键说明**：
+
+- **createBy/updateBy 存储用户ID（Long）**，而非用户名
+- 未登录时，createBy/updateBy 为 `null`（非空字符串）
+- Sa-Token 登录时需将用户ID作为 `loginId` 存入：`StpUtil.login(userId)`
+- 自动填充逻辑在 `MybatisPlusConfig` 中配置
+
+### 9.4 索引规范
+
+- 主键：`pk_xxx`
+- 唯一索引：`uk_xxx`
+- 普通索引：`idx_xxx`
+- **【重要】索引名必须使用表名前缀区分**，避免多表索引名重复，例如：
+  - `idx_sys_org_status` 而非 `idx_status`
+  - `idx_sys_dept_org_id` 而非 `idx_org_id`
+- **禁止在 schema.sql 中手动定义 `is_deleted` 字段的索引**（MyBatis-Plus 会自动创建）
+
+---
+
+## 十、接口规范
+
+### 10.1 RESTful 风格
+
+| 方法 | URL | 说明 |
+|------|-----|------|
+| GET | /api/xxx/users | 查询用户列表 |
+| GET | /api/xxx/users/{id} | 查询单个用户 |
+| POST | /api/xxx/users | 创建用户 |
+| PUT | /api/xxx/users/{id} | 更新用户 |
+| DELETE | /api/xxx/users/{id} | 删除用户 |
+
+### 10.2 统一响应格式
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    // 业务数据
+  },
+  "timestamp": 1710392800000
+}
+```
+
+### 10.3 分页响应格式
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "records": [],
+    "total": 100,
+    "size": 10,
+    "current": 1,
+    "pages": 10
+  }
+}
+```
+
+---
+
+## 十一、安全规范
+
+### 11.1 敏感信息
+
+- 禁止在代码中硬编码密码、密钥、Token
+- 禁止在日志中记录敏感信息
+- 使用环境变量或配置中心管理敏感配置
+
+### 11.2 接口安全
+
+- 敏感接口需要登录认证
+- 接口参数需要校验
+- 接口需要防重复提交
+
+---
+
+## 十二、性能规范
+
+### 12.1 查询优化
+
+- 禁止 `SELECT *`，只查询需要的字段
+- 使用分页查询，避免一次查询大量数据
+- 合理使用索引
+
+### 12.2 代码性能
+
+- 避免在循环中查询数据库
+- 使用缓存减少数据库访问
+- 合理使用线程池
+
+---
+
+## 十三、代码审查清单
+
+提交代码前自查：
+
+- [ ] 代码格式符合规范
+- [ ] 类和方法有必要的注释（ServiceImpl 必须有方法级注释和行级注释）
+- [ ] 命名符合规范
+- [ ] 分层清晰，无跨层调用
+- [ ] 异常处理规范
+- [ ] 日志记录完整（ServiceImpl 关键位置必须有日志）
+- [ ] 无硬编码敏感信息
+- [ ] 参数校验完整
+- [ ] 事务控制合理
+- [ ] 已通过单元测试
+
+---
+
+## 十四、BaseEntity 公共实体基类
+
+所有业务 Entity 必须继承 `BaseEntity`，继承后自动拥有以下公共字段：
+
+```java
+/**
+ * 公共实体基类
+ * 所有业务实体类都应继承此类
+ *
+ * @author hanjor
+ * @date 2026-03-14 15:00:00
+ */
+@Data
+public class BaseEntity implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 主键ID
+     */
+    private Long id;
+
+    /**
+     * 创建时间
+     */
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
+
+    /**
+     * 更新时间
+     */
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updateTime;
+
+    /**
+     * 创建人ID（用户ID）
+     */
+    @TableField(fill = FieldFill.INSERT)
+    private Long createBy;
+
+    /**
+     * 更新人ID（用户ID）
+     */
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private Long updateBy;
+
+    /**
+     * 是否删除：0-否，1-是
+     */
+    @TableLogic
+    @TableField(fill = FieldFill.INSERT)
+    private Integer isDeleted;
+}
+```
+
+> **重要**：
+> - 所有字段的自动填充由 `MybatisPlusConfig` 中的 `MetaObjectHandler` 处理
+> - 无需在业务 Entity 中重复定义这些字段
+> - 逻辑删除由 `@TableLogic` 注解自动处理
+
+---
+
+## 十五、单元测试规范
+
+### 15.1 测试目录结构
+
+测试代码位于 `src/test/java` 目录下，与主代码保持相同的包结构。
+
+**【重要】每个功能模块必须包含两种单元测试：**
+
+1. **ServiceImpl 单元测试**：验证业务逻辑
+2. **Controller 接口测试**：验证接口参数绑定、参数校验、统一响应格式
+
+```
+yigongbao-module-xxx/
+├── src/main/java/com/yigongbao/module/xxx/     # 主代码
+│   └── ...
+└── src/test/java/com/yigongbao/module/xxx/    # 测试代码
+    ├── service/
+    │   └── impl/
+    │       └── UserServiceImplTest.java        # ServiceImpl 单元测试（必须）
+    └── controller/
+        └── UserControllerTest.java            # Controller 接口测试（必须）
+```
+
+### 15.2 测试类命名
+
+| 类型 | 规范 | 示例 |
+|------|------|------|
+| ServiceImpl测试类 | 以 `Test` 结尾 | `UserServiceImplTest` |
+| Controller测试类 | 以 `Test` 结尾 | `UserControllerTest` |
+| 测试方法 | 以 `should` 开头，描述测试场景 | `create_shouldSuccess` |
+| 边界场景 | 使用 `when` 描述条件 | `getById_whenNotExists_shouldThrowException` |
+
+### 15.3 测试框架
+
+本项目使用 JUnit 5 + Mockito 进行单元测试：
+
+```java
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import lombok.extern.slf4j.Slf4j;
+```
+
+### 15.4 ServiceImpl 单元测试
+
+#### 15.4.1 基本结构
+
+```java
+/**
+ * 用户 Service 单元测试
+ *
+ * @author hanjor
+ * @date 2026-03-16
+ */
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+@Slf4j
+@DisplayName("UserService 单元测试")
+class UserServiceImplTest {
+
+    @Mock
+    private UserMapper userMapper;
+
+    @InjectMocks
+    private UserServiceImpl userService;
+
+    private UserEntity testEntity;
+    private CreateUserDTO createDTO;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        // 通过反射将 mock 的 userMapper 注入到 ServiceImpl 的 baseMapper 字段中
+        // 这是解决 MyBatis-Plus ServiceImpl 继承类单元测试的关键步骤
+        Field baseMapperField = ServiceImpl.class.getDeclaredField("baseMapper");
+        baseMapperField.setAccessible(true);
+        baseMapperField.set(userService, userMapper);
+
+        // 初始化测试数据
+        testEntity = new UserEntity();
+        testEntity.setId(1L);
+        testEntity.setUsername("testuser");
+        testEntity.setRealName("测试用户");
+    }
+}
+```
+
+#### 15.4.2 反射注入 baseMapper
+
+**关键点**：当 ServiceImpl 继承 MyBatis-Plus 的 `ServiceImpl` 时，需要通过反射将 Mock 的 Mapper 注入到 `baseMapper` 字段中：
+
+```java
+@BeforeEach
+void setUp() throws Exception {
+    Field baseMapperField = ServiceImpl.class.getDeclaredField("baseMapper");
+    baseMapperField.setAccessible(true);
+    baseMapperField.set(userService, userMapper);
+}
+```
+
+> **重要**：这一步是必须的，否则调用 `list()`、`getById()`、`save()` 等继承自 `ServiceImpl` 的方法时会抛出 `MybatisPlusException: baseMapper can not be null`。
+
+#### 15.4.3 Mock 参数匹配器
+
+**查询方法**：使用 `any()` 匹配任意参数
+
+```java
+// ✅ 正确：list() 在无查询条件时使用 EmptyWrapper，不是 LambdaQueryWrapper
+when(userMapper.selectList(any())).thenReturn(entities);
+
+// ❌ 错误：any(LambdaQueryWrapper.class) 无法匹配 EmptyWrapper
+when(userMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(entities);
+```
+
+**按 ID 查询**：使用具体参数值
+
+```java
+when(userMapper.selectById(1L)).thenReturn(testEntity);
+when(userMapper.deleteById(999L)).thenReturn(0);
+```
+
+**插入/更新/删除**：使用 `any()` 匹配实体对象
+
+```java
+when(userMapper.insert(any(UserEntity.class))).thenReturn(1);
+when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
+```
+
+### 15.5 测试用例设计
+
+#### 15.5.1 成功场景 + 失败场景
+
+每个业务方法至少覆盖两个测试场景：
+
+```java
+// 查询 - 成功
+@Test
+@DisplayName("getById: 存在数据时返回VO")
+void getById_whenExists_shouldReturnData() {
+    when(userMapper.selectById(1L)).thenReturn(testEntity);
+    UserVO result = userService.getVoById(1L);
+    assertNotNull(result);
+    assertEquals(1L, result.getId());
+}
+
+// 查询 - 数据不存在
+@Test
+@DisplayName("getById: 数据不存在时抛出异常")
+void getById_whenNotExists_shouldThrowException() {
+    when(userMapper.selectById(999L)).thenReturn(null);
+    BusinessException exception = assertThrows(
+        BusinessException.class,
+        () -> userService.getVoById(999L)
+    );
+    assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+}
+```
+
+#### 15.5.2 测试分组
+
+使用注释或空行分隔不同方法的测试用例：
+
+```java
+// ==================== listVo 测试 ====================
+
+@Test
+void listVo_shouldReturnAllData() { ... }
+
+@Test
+void listVo_whenNoData_shouldReturnEmptyList() { ... }
+
+// ==================== getVoById 测试 ====================
+
+@Test
+void getVoById_whenExists_shouldReturnData() { ... }
+
+@Test
+void getVoById_whenNotExists_shouldThrowException() { ... }
+
+// ==================== create 测试 ====================
+```
+
+### 15.6 断言规范
+
+#### 15.6.1 基本断言
+
+```java
+// 断言不为空
+assertNotNull(result);
+
+// 断言相等
+assertEquals(1, result.size());
+assertEquals("test_key", result.get(0).getKey1());
+
+// 断言为真/为假
+assertTrue(result.isEmpty());
+assertFalse(user.getDeleted());
+```
+
+#### 15.6.2 异常断言
+
+```java
+BusinessException exception = assertThrows(
+    BusinessException.class,
+    () -> userService.getVoById(999L),
+    "应抛出BusinessException"
+);
+assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getCode(), exception.getCode());
+assertEquals(ErrorCodeEnum.DATA_NOT_FOUND.getMessage(), exception.getMessage());
+```
+
+#### 15.6.3 验证 Mock 调用
+
+```java
+// 验证方法被调用一次
+verify(userMapper, times(1)).selectById(1L);
+
+// 验证方法从未被调用
+verify(userMapper, never()).updateById(any(UserEntity.class));
+```
+
+### 15.7 测试数据准备
+
+#### 15.7.1 使用 @BeforeEach 初始化通用数据
+
+```java
+private UserEntity testEntity;
+private CreateUserDTO createDTO;
+
+@BeforeEach
+void setUp() {
+    LocalDateTime now = LocalDateTime.now();
+
+    // 准备实体
+    testEntity = new UserEntity();
+    testEntity.setId(1L);
+    testEntity.setUsername("testuser");
+    testEntity.setRealName("测试用户");
+    testEntity.setCreateTime(now);
+    testEntity.setUpdateTime(now);
+
+    // 准备 DTO
+    createDTO = new CreateUserDTO();
+    createDTO.setUsername("newuser");
+    createDTO.setPassword("123456");
+    createDTO.setRealName("新用户");
+}
+```
+
+#### 15.7.2 每个测试方法独立准备数据
+
+如果测试方法需要不同的数据，在方法内部单独准备：
+
+```java
+@Test
+void create_shouldSuccess() {
+    // 准备：当前测试需要的数据
+    when(userMapper.insert(any(UserEntity.class))).thenReturn(1);
+
+    // 执行
+    userService.create(createDTO);
+
+    // 断言
+    verify(userMapper, times(1)).insert(any(UserEntity.class));
+}
+```
+
+### 15.8 测试方法命名规范
+
+| 场景 | 命名模式 | 示例 |
+|------|----------|------|
+| 成功场景 | `{方法名}_should{预期结果}` | `create_shouldSuccess` |
+| 失败场景 | `{方法名}_when{条件}_should{预期结果}` | `getById_whenNotExists_shouldThrowException` |
+| 边界场景 | `{方法名}_when{边界条件}_should{预期结果}` | `listVo_whenNoData_shouldReturnEmptyList` |
+
+### 15.9 常见问题处理
+
+#### 15.9.1 MyBatis-Plus ServiceImpl 继承类测试
+
+**问题**：`baseMapper can not be null`
+
+**解决**：通过反射注入 baseMapper（参见 15.4.2）
+
+#### 15.9.2 EmptyWrapper 匹配问题
+
+**问题**：使用 `any(LambdaQueryWrapper.class)` 无法匹配无查询条件的 `list()` 调用
+
+**解决**：使用 `any()` 或 `any(Object.class)` 匹配任意参数
+
+#### 15.9.3 自定义 Mapper 方法测试
+
+**问题**：ServiceImpl 中调用了 Mapper 的自定义方法
+
+**解决**：同样使用 `@Mock` 创建 Mock 对象，测试时会被自动拦截
+
+```java
+@Mock
+private UserMapper userMapper;
+
+@InjectMocks
+private UserServiceImpl userService;
+
+// 测试自定义方法
+when(userMapper.selectCustomMethod(any())).thenReturn(customResult);
+```
+
+### 15.10 代码审查清单（单元测试）
+
+- [ ] 测试类命名符合规范
+- [ ] 测试方法命名清晰，描述测试场景
+- [ ] 已正确注入 baseMapper（继承 ServiceImpl 的情况）
+- [ ] 使用正确的参数匹配器（any() 而非 any(具体类)）
+- [ ] 每个业务方法覆盖成功和失败场景
+- [ ] 断言完整，包含异常断言
+- [ ] 已验证 Mock 方法调用次数
+- [ ] 测试数据准备完整
+- [ ] 测试之间相互独立，无依赖
+
+### 15.11 Controller 接口测试（MockMvc）
+
+当完成某一功能开发时，除 ServiceImpl 单元测试外，**必须补充 Controller 接口测试**，用于验证：
+
+- 请求路径、PathVariable/RequestParam/RequestBody 参数绑定是否正确
+- 参数校验（`@Validated`）是否生效
+- 统一响应格式 `Result` 是否符合预期（成功/失败的 code、message、data）
+- 全局异常处理是否按 ErrorCodeEnum 返回
+
+#### 15.11.1 推荐目录结构
+
+```
+yigongbao-module-xxx/
+└── src/test/java/com/yigongbao/module/xxx/
+    └── controller/
+        └── XxxControllerTest.java
+```
+
+#### 15.11.2 推荐测试方式
+
+使用 Spring Boot Test + MockMvc（不依赖真实端口）：
+
+```java
+/**
+ * 字典管理 Controller 接口测试
+ *
+ * @author hanjor
+ * @date 2026-03-16
+ */
+@SpringBootTest(classes = SystemTestApplication.class)
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Transactional
+@DisplayName("DictController 接口测试")
+class DictControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+}
+```
+
+**测试启动类说明**：
+
+- 建议在模块的 `src/test/java` 下创建专用的测试启动类（如 `SystemTestApplication`）
+- 排除 test 包，避免 TestController/TestService 的 Mapper 依赖问题
+- 示例：
+
+```java
+@SpringBootApplication(scanBasePackages = "com.yigongbao")
+@ComponentScan(
+    basePackages = "com.yigongbao",
+    excludeFilters = @ComponentScan.Filter(
+        type = FilterType.REGEX,
+        pattern = "com\\.yigongbao\\.module\\.system\\.test\\..*"
+    )
+)
+public class SystemTestApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(SystemTestApplication.class, args);
+    }
+}
+```
+
+#### 15.11.3 测试环境配置
+
+**【重要】为确保 Controller 接口测试正常运行，必须配置以下两项：**
+
+##### 15.11.3.1 测试配置文件（application-test.yml）
+
+在 `yigongbao-boot/src/test/resources/application-test.yml` 中配置：
+
+```yaml
+spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath*:schema.sql
+
+# 【关键】禁用 SaToken 拦截器，避免测试时需要登录认证
+satoken:
+  interceptor:
+    enable: false
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+```
+
+**配置说明**：
+- 使用 H2 内存库（`jdbc:h2:mem:`），避免依赖本地 MySQL/Redis
+- schema.sql 至少包含当前模块所需表结构
+- **禁用 SaToken 拦截器**：通过 `satoken.interceptor.enable: false` 控制，避免测试时返回 401 未登录错误
+
+##### 15.11.3.2 编译配置（pom.xml）
+
+在父 pom.xml 中添加 `-parameters` 编译参数，使 Spring 可以通过反射获取方法参数名：
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.13.0</version>
+            <configuration>
+                <!-- 保留方法参数名，使 Spring 可以通过反射获取参数名 -->
+                <parameters>true</parameters>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+```
+
+**配置说明**：
+- 添加 `<parameters>true</parameters>` 后，Java 编译器会保留方法参数名
+- 否则 Spring 无法通过反射获取 `@PathVariable String typeCode` 的参数名，导致 500 错误：
+  ```
+  Name for argument of type [java.lang.String] not specified, 
+  and parameter name information not available via reflection.
+  ```
+
+##### 15.11.3.3 Schema SQL 示例
+
+```sql
+-- 字典表
+CREATE TABLE sys_dict (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    parent_id BIGINT DEFAULT 0,
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(100),
+    value VARCHAR(500),
+    sort_order INT DEFAULT 0,
+    status INT DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_deleted INT DEFAULT 0
+);
+
+-- 初始化种子数据
+INSERT INTO sys_dict (id, parent_id, name, code, value, sort_order, status) VALUES
+(1, 0, '用户状态', 'user_status', NULL, 1, 1),
+(2, 1, '正常', 'user_status', '1', 1, 1),
+(3, 1, '禁用', 'user_status', '0', 2, 1);
+```
+
+#### 15.11.4 测试用例编写规范
+
+对每个 Controller 方法至少覆盖：
+
+- 成功场景（200）
+- 失败场景（参数校验失败/数据不存在/业务规则不满足等）
+- 边界场景（空列表、无子节点/有子节点、状态切换等）
+
+接口测试断言建议包含：
+
+- `status().isOk()`（项目统一响应通常返回 200 HTTP，业务码在 body 中）
+- `jsonPath("$.code")`、`jsonPath("$.message")`、`jsonPath("$.data")`
+- 需要时通过 Mapper 校验数据库落库/更新/删除结果（避免只断言返回值）
+
+##### 15.11.5.1 测试用例示例
+
+```java
+/**
+ * 字典管理 Controller 接口测试
+ *
+ * @author hanjor
+ * @date 2026-03-16
+ */
+@SpringBootTest(classes = SystemTestApplication.class)
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Transactional
+@DisplayName("DictController 接口测试")
+class DictControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    // ==================== listTreeByTypeCode 测试 ====================
+
+    /**
+     * 测试用例：根据类型编码获取树形结构 - 成功场景
+     */
+    @Test
+    @DisplayName("listTreeByTypeCode: 存在数据时返回树形结构")
+    void listTreeByTypeCode_shouldReturnTreeStructure() throws Exception {
+        // 执行 GET 请求
+        mockMvc.perform(get("/api/system/dict/tree/user_status"))
+                // 断言 HTTP 状态码为 200
+                .andExpect(status().isOk())
+                // 断言响应 code 为 200
+                .andExpect(jsonPath("$.code").value(200))
+                // 断言响应 message 为"操作成功"
+                .andExpect(jsonPath("$.message").value("操作成功"))
+                // 断言 data 不为空
+                .andExpect(jsonPath("$.data").isArray())
+                // 断言第一条数据的 name
+                .andExpect(jsonPath("$.data[0].name").value("用户状态"));
+    }
+
+    /**
+     * 测试用例：根据类型编码获取树形结构 - 成功场景（带子节点）
+     */
+    @Test
+    @DisplayName("listTreeByTypeCode: 有子节点时正确返回层级结构")
+    void listTreeByTypeCode_withChildren_shouldReturnHierarchy() throws Exception {
+        mockMvc.perform(get("/api/system/dict/tree/user_status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                // 验证树形结构：父节点
+                .andExpect(jsonPath("$.data[0].name").value("用户状态"))
+                // 验证 children 字段存在且为数组
+                .andExpect(jsonPath("$.data[0].children").isArray())
+                // 验证子节点
+                .andExpect(jsonPath("$.data[0].children[0].name").exists());
+    }
+
+    /**
+     * 测试用例：根据类型编码获取树形结构 - 类型不存在
+     */
+    @Test
+    @DisplayName("listTreeByTypeCode: 类型不存在时返回空数组")
+    void listTreeByTypeCode_whenNotExists_shouldReturnEmptyArray() throws Exception {
+        mockMvc.perform(get("/api/system/dict/tree/not_exists_type"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    // ==================== getById 测试 ====================
+
+    /**
+     * 测试用例：根据ID查询字典 - 成功场景
+     */
+    @Test
+    @DisplayName("getById: 存在数据时返回字典详情")
+    void getById_whenExists_shouldReturnData() throws Exception {
+        mockMvc.perform(get("/api/system/dict/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.name").exists());
+    }
+
+    /**
+     * 测试用例：根据ID查询字典 - 数据不存在
+     */
+    @Test
+    @DisplayName("getById: 数据不存在时返回错误码")
+    void getById_whenNotExists_shouldReturnError() throws Exception {
+        mockMvc.perform(get("/api/system/dict/999999"))
+                .andExpect(status().isOk())
+                // 业务错误码在 body 中
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("数据不存在"));
+    }
+
+    // ==================== create 测试 ====================
+
+    /**
+     * 测试用例：创建字典 - 成功场景
+     */
+    @Test
+    @DisplayName("create: 创建成功返回success")
+    void create_shouldSuccess() throws Exception {
+        // 准备请求体
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("parentId", 0);
+        requestBody.put("name", "测试字典");
+        requestBody.put("code", "test_dict");
+        requestBody.put("value", "test_value");
+        requestBody.put("sortOrder", 1);
+
+        mockMvc.perform(post("/api/system/dict")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestBody)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("success"));
+    }
+
+    /**
+     * 测试用例：创建字典 - 参数校验失败
+     */
+    @Test
+    @DisplayName("create: 参数校验失败时返回错误码")
+    void create_whenValidationFailed_shouldReturnError() throws Exception {
+        // 缺少必填字段 name
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("parentId", 0);
+
+        mockMvc.perform(post("/api/system/dict")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestBody)))
+                .andExpect(status().isBadRequest())
+                // 参数校验失败返回 400
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").exists());
+    }
+}
+```
+
+##### 15.11.5.2 常见问题处理
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| 返回 401 未登录 | SaToken 拦截器生效 | 在 `application-test.yml` 中添加 `satoken.interceptor.enable: false` |
+| 返回 500 参数名错误 | 编译器未保留参数名 | 在 pom.xml 中添加 `<parameters>true</parameters>` |
+| 测试数据相互影响 | 未使用事务回滚 | 添加 `@Transactional` 注解 |
+| H2 数据库未初始化 | schema.sql 路径或内容错误 | 检查 `spring.sql.init.schema-locations` 配置 |
+| 参数校验返回 500 | GlobalExceptionHandler 未处理 `HandlerMethodValidationException` | 添加 Spring 6 新增的异常处理方法 |
+| H2 索引冲突 | 多个表使用相同索引名，或与 MyBatis-Plus @TableLogic 自动创建的索引冲突 | 移除 schema.sql 中 is_deleted 字段的索引定义 |
+| message 断言失败 | 接口实际返回"操作成功"而非"success" | 使用实际返回值进行断言 |
+
+##### 15.11.5.3 参数校验异常处理（Spring 6 新增）
+
+**问题描述**：当 Controller 方法参数使用 `@Min`、`@Max`、`@Size` 等校验注解（如 `@RequestParam @Min(0) @Max(1) Integer status`）校验失败时，Spring 6 会抛出 `HandlerMethodValidationException`，而非传统的 `ConstraintViolationException`。
+
+**解决**：在 `GlobalExceptionHandler` 中添加处理方法：
+
+```java
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+
+/**
+ * 处理方法参数校验异常（Spring 6 新增）
+ * 当 Controller 方法参数使用 @Min/@Max/@Size 等校验注解且校验失败时触发
+ *
+ * @param e 方法参数校验异常实例
+ * @return 统一返回结果
+ */
+@ExceptionHandler(HandlerMethodValidationException.class)
+@ResponseStatus(HttpStatus.BAD_REQUEST)
+public Result<Void> handleHandlerMethodValidationException(HandlerMethodValidationException e) {
+    String errorMessage = e.getAllErrors().stream()
+        .map(error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : error.toString())
+        .collect(Collectors.joining(", "));
+    log.warn("参数校验失败：{}", errorMessage);
+    return Result.error(400, errorMessage);
+}
+```
+
+##### 15.11.5.4 Schema SQL 索引规范
+
+**问题描述**：在 H2 测试数据库中，手动定义的索引可能与 MyBatis-Plus `@TableLogic` 注解自动创建的逻辑删除索引产生冲突，导致测试启动失败。
+
+**原因分析**：
+1. 多个表使用相同的索引名（如 `idx_is_deleted`）
+2. MyBatis-Plus 的 `@TableLogic` 注解会自动为 `is_deleted` 字段创建索引
+
+**解决**：
+1. **禁止在 schema.sql 中手动定义 `is_deleted` 字段的索引**
+2. **索引名必须使用表名前缀区分**，避免多表索引名重复，如：
+   - `idx_sys_org_status` 而非 `idx_status`
+   - `idx_sys_dept_org_id` 而非 `idx_org_id`
+3. 同一测试数据库中，索引名必须全局唯一
+
+```sql
+-- ✅ 正确：使用表名前缀区分索引名
+CREATE TABLE sys_dept (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    dept_name VARCHAR(128) NOT NULL,
+    org_id BIGINT NOT NULL,
+    status TINYINT DEFAULT 1,
+    is_deleted TINYINT DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_dept_code (dept_code),
+    KEY idx_dept_org_id (org_id),        -- 使用表名前缀
+    KEY idx_dept_status (status)          -- 使用表名前缀
+);
+
+-- ❌ 错误：索引名与其他表重复
+CREATE TABLE sys_dept (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    -- ...
+    status TINYINT DEFAULT 1,
+    KEY idx_status (status)  -- 与 sys_org 表的 idx_status 冲突
+);
+```
+
+##### 15.11.5.5 统一响应 message 规范
+
+**问题描述**：测试用例中断言 message 时使用 `success`，但实际接口返回的是 `操作成功`，导致断言失败。
+
+**项目统一规范**：
+- 本项目统一响应格式中 message 字段返回**中文描述**，如 `"操作成功"`、`"参数校验失败"` 等
+- 测试用例中断言 message 时应使用实际返回的中文值，而非英文 `"success"`
+
+```java
+// ✅ 正确：使用实际返回值
+.andExpect(jsonPath("$.message").value("操作成功"))
+.andExpect(jsonPath("$.message").value("机构不存在"))
+
+// ❌ 错误：使用英文 success
+.andExpect(jsonPath("$.message").value("success"))
+```
+
+#### 15.11.6 代码审查清单（Controller 接口测试）
+
+- [ ] 每个 Controller 接口均有 MockMvc 测试覆盖
+- [ ] 覆盖成功/失败场景，且断言包含 `Result.code/message/data`
+- [ ] 失败场景覆盖参数校验与业务异常（ErrorCodeEnum）
+- [ ] 使用 test profile + H2 初始化，不依赖本地环境
+- [ ] 测试可重复执行、彼此独立（推荐 @Transactional 回滚）
+- [ ] message 断言使用中文实际返回值（如"操作成功"）
+- [ ] schema.sql 中未手动定义 is_deleted 字段索引
+- [ ] GlobalExceptionHandler 已处理 `HandlerMethodValidationException`（Spring 6 参数校验）
+
+---
+
+## 十六、系统配置使用规范
+
+### 16.1 系统配置概述
+
+项目提供了一套完整的系统配置管理机制，支持通过数据库动态配置业务参数，无需重启服务即可生效。
+
+**核心组件**：
+- `SystemConfigKeyEnum`：系统配置键名枚举，集中管理所有配置键，避免魔法值
+- `ConfigService.getConfigValue(configKey)`：获取配置值方法
+
+### 16.2 配置键定义（SystemConfigKeyEnum）
+
+所有系统配置键必须在 `SystemConfigKeyEnum` 枚举类中定义：
+
+```java
+package com.yigongbao.common.enums;
+
+/**
+ * 系统配置键枚举
+ * 集中管理系统配置键名，避免魔法值和键名不一致问题
+ *
+ * @author hanjor
+ * @date 2026-03-18
+ */
+@Getter
+@AllArgsConstructor
+public enum SystemConfigKeyEnum {
+
+    // ==================== 安全配置 ====================
+    /**
+     * 默认密码
+     * 新用户初始密码
+     */
+    DEFAULT_PASSWORD("default.password", "默认密码"),
+
+    /**
+     * 最大连续登录失败次数
+     * 连续失败后锁定账号
+     */
+    LOGIN_MAX_FAILURES("login.max.failures", "最大连续登录失败次数"),
+
+    // ==================== 系统配置 ====================
+    /**
+     * 系统名称
+     */
+    SYSTEM_NAME("system.name", "系统名称"),
+
+    /**
+     * 文件上传最大大小（字节）
+     */
+    MAX_UPLOAD_SIZE("max.upload.size", "文件上传最大大小");
+
+    /**
+     * 配置键
+     */
+    private final String key;
+
+    /**
+     * 配置名称（用于日志和错误提示）
+     */
+    private final String name;
+}
+```
+
+### 16.3 配置使用方式
+
+在业务代码中获取系统配置值：
+
+```java
+/**
+ * 用户 Service 实现类
+ *
+ * @author hanjor
+ * @date 2026-03-14
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> implements UserService {
+
+    private final ConfigService configService;
+    private final PasswordEncoder passwordEncoder;
+
+    /**
+     * 创建用户
+     *
+     * @param dto 创建参数
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void createUser(CreateUserDTO dto) {
+        // 从系统配置中获取默认密码
+        String configPassword = configService.getConfigValue(SystemConfigKeyEnum.DEFAULT_PASSWORD.getKey());
+        // 如果未配置，则使用默认值
+        String rawPassword = StringUtils.isBlank(configPassword) ? "123456" : configPassword;
+        // 加密密码
+        entity.setPassword(passwordEncoder.encode(rawPassword));
+        // ... 其他逻辑
+    }
+}
+```
+
+### 16.4 配置层级说明
+
+项目中存在两套配置体系，适用于不同场景：
+
+| 配置类型 | 定义位置 | 适用场景 | 示例 |
+|---------|---------|---------|------|
+| 静态配置 | `application.yml` / `@ConfigurationProperties` | 几乎不会变更的配置 | 数据库连接、Redis连接 |
+| 动态配置 | `sys_config` 表 + `SystemConfigKeyEnum` | 需要动态调整的参数 | 默认密码、登录锁定次数、上传文件大小限制 |
+
+**选择原则**：
+- 大多数场景使用静态配置（启动时加载，性能好）
+- 只有需要运行时动态调整的参数才使用动态配置（数据库查询，有性能开销）
+
+---
+
+## 十七、工具类使用规范
+
+### 17.1 Hutool 优先原则
+
+**【强制】项目中默认使用 Hutool 工具库**，Hutool 是 Java 工具库中的首选，只有当 Hutool 无法满足需求时才考虑使用其他工具库。
+
+**为什么选择 Hutool**：
+- 国产开源，中文文档友好
+- 组件丰富，覆盖大多数常用场景
+- 兼容性好，API 设计简洁
+
+### 17.2 常用工具类一览
+
+以下是项目中常用的 Hutool 工具类：
+
+| 工具类 | 用途 | 示例 |
+|-------|------|------|
+| `StrUtil` | 字符串操作 | `StrUtil.isBlank()`, `StrUtil.isNotBlank()` |
+| `CollUtil` | 集合操作 | `CollUtil.isEmpty()`, `CollUtil.isNotEmpty()` |
+| `DateUtil` | 日期操作 | `DateUtil.format()`, `DateUtil.parse()` |
+| `SecureUtil` | 加密解密 | `SecureUtil.md5()`, `SecureUtil.aes()` |
+| `IdUtil` | ID生成 | `IdUtil.fastSimpleUUID()` |
+| `BeanUtil` | Bean转换 | `BeanUtil.copyProperties()` |
+| `Convert` | 类型转换 | `Convert.toInt()`, `Convert.toStr()` |
+| `JSONUtil` | JSON操作 | `JSONUtil.toJsonStr()`, `JSONUtil.parseObj()` |
+| `HttpUtil` | HTTP请求 | `HttpUtil.get()`, `HttpUtil.post()` |
+| `ReUtil` | 正则操作 | `ReUtil.isMatch()`, `ReUtil.get()` |
+
+### 17.3 正确使用示例
+
+```java
+// ✅ 正确：使用 Hutool 工具类
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.date.DateUtil;
+
+// 字符串判空
+if (StrUtil.isBlank(username)) {
+    throw new BusinessException("用户名不能为空");
+}
+
+// 生成UUID
+String uuid = IdUtil.fastSimpleUUID();
+
+// 日期格式化
+String dateStr = DateUtil.format(new Date(), "yyyy-MM-dd HH:mm:ss");
+
+// ❌ 错误：使用 Apache Commons 或其他工具类
+import org.apache.commons.lang3.StringUtils;
+if (StringUtils.isBlank(username)) {
+    // ...
+}
+```
+
+### 17.4 何时使用其他工具库
+
+只有当 Hutool 无法满足需求时，才考虑使用其他工具库：
+
+| 场景 | 推荐工具 | 说明 |
+|-----|---------|------|
+| JSON序列化（特殊场景） | Jackson / Fastjson2 | Hutool JSON 适用于简单场景，复杂序列化使用专用库 |
+| Excel操作 | EasyExcel | Hutool Excel 功能有限，复杂Excel使用 EasyExcel |
+| PDF生成 | iText / Apache PDFBox | 复杂PDF使用专用库 |
+| 模板引擎 | Freemarker / Thymeleaf | 页面渲染使用模板引擎 |
+
+### 17.5 禁止重复造轮子
+
+**【强制】禁止在项目中创建与 Hutool 功能重复的工具类**。
+
+```java
+// ❌ 错误：创建重复的工具类
+public class StringUtil {
+    public static boolean isBlank(String str) {
+        return str == null || str.trim().isEmpty();
+    }
+}
+
+// ✅ 正确：直接使用 Hutool
+import cn.hutool.core.util.StrUtil;
+// 使用 StrUtil.isBlank()
+```
+
+---
+
+**文档版本**：1.8
+**创建日期**：2026-03-14
+**作者**：hanjor
+**最后更新**：2026-03-25

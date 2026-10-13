@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.yigongbao</groupId>
+        <artifactId>yigongbao-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    <artifactId>yigongbao-boot</artifactId>
+
+    <dependencies>
+        <!-- 业务模块 -->
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-framework</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-basic</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-system</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-order</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-design</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-imaging</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-production</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-notification</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-dashboard</artifactId>
+        </dependency>
+
+        <!-- spring boot -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <!-- spring boot web -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- x-file-storage（文件存储，自动配置 FileStorageService） -->
+        <dependency>
+            <groupId>org.dromara.x-file-storage</groupId>
+            <artifactId>x-file-storage-spring</artifactId>
+        </dependency>
+
+        <!-- commons-pool2：Lettuce 连接池 & x-file-storage 依赖 -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-pool2</artifactId>
+        </dependency>
+
+        <!-- spring-dotenv：自动加载 .env 文件中的环境变量 -->
+        <dependency>
+            <groupId>me.paulschwarz</groupId>
+            <artifactId>spring-dotenv</artifactId>
+            <version>4.0.0</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

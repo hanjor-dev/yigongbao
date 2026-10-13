@@ -47,3 +47,41 @@ out/
 
 ### Upload ###
 uploads/
+
+/git仓库管理
+
+/.cursor
+
+/yigongbao-parent/.idea/
+/yigongbao-parent/.mvn/
+/yigongbao-parent/logs/
+
+/findings.md
+/implementation_checklist.md
+/progress.md
+/task_plan.md
+
+### Environment Variables（敏感配置，不提交到代码库）###
+.env
+.env.local
+.env.*.local
+.env.test
+.env.prod
+env.test.text
+env.prod.text
+
+### Docker ###
+.dockerignore
+docker-compose.override.yml
+*.log
+
+### Deployment Docs（部署文档，可选忽略）###
+DEPLOYMENT_CHECKLIST.md
+
+/frontend
+
+# 本地旧系统数据库导出文件，不提交到代码仓库
+/sql/old/
+
+# Git worktrees
+/.worktrees/

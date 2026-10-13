@@ -1,0 +1,84 @@
+package com.yigongbao.module.system.role.vo;
+
+import lombok.Data;
+
+import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * 角色 VO（视图对象）
+ *
+ * @author hanjor
+ * @date 2026-03-17
+ */
+@Data
+public class RoleVO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 角色ID
+     */
+    private Long id;
+
+    /**
+     * 角色名称
+     */
+    private String roleName;
+
+    /**
+     * 角色编码
+     */
+    private String roleCode;
+
+    /**
+     * 角色描述
+     */
+    private String roleDesc;
+
+    /**
+     * 账户分类（6.1=企业账户，6.2=业务账户）
+     */
+    private String accountType;
+
+    /**
+     * 账户分类名称
+     */
+    private String accountTypeName;
+
+    /**
+     * 数据权限范围（self/hospitals/org/all）
+     */
+    private String dataScopeType;
+
+    /**
+     * 数据权限范围名称（如：仅自己、医院范围、本机构、全部）
+     */
+    private String dataScopeTypeName;
+
+    /**
+     * 状态（0=禁用，1=正常）
+     */
+    private Integer status;
+
+    /**
+     * 状态名称
+     */
+    private String statusName;
+
+    /**
+     * 备注说明
+     */
+    private String remark;
+
+    /**
+     * 创建时间
+     */
+    private LocalDateTime createTime;
+
+    /**
+     * 已分配的资源ID列表
+     */
+    private List<Long> resourceIds;
+}
