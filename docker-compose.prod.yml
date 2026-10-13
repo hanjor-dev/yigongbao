@@ -62,7 +62,7 @@ services:
 
   # 医工宝应用服务（使用阿里云自动构建的镜像）
   app:
-    image: crpi-ie9dcy6o6rjohsiv.cn-hangzhou.personal.cr.aliyuncs.com/yigongbao/yigongbao-app:latest
+    image: crpi-ie9dcy6o6rjohsiv.cn-hangzhou.personal.cr.aliyuncs.com/yigongbao/yigongbao-app:${APP_VERSION:?APP_VERSION must be set}
     container_name: yigongbao-app
     env_file:
       - .env
