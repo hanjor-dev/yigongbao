@@ -6,6 +6,9 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.core.toolkit.GlobalConfigUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.common.entity.OrderMainEntity;
+import com.yigongbao.common.event.OrderCancelledEvent;
+import com.yigongbao.common.event.OrderEligibilityChangedEvent;
+import com.yigongbao.common.event.OrderSubmittedEvent;
 import com.yigongbao.common.enums.DataScopeTypeEnum;
 import com.yigongbao.module.system.user.entity.UserEntity;
 import com.yigongbao.common.enums.ErrorCodeEnum;
@@ -249,7 +252,8 @@ class OrderMainServiceImplStateTransitionTest {
 
             verify(service).update(any(LambdaUpdateWrapper.class));
             verify(service, never()).updateById(any(OrderMainEntity.class));
-            verify(eventPublisher).publishEvent(any());
+            verify(eventPublisher).publishEvent(any(OrderCancelledEvent.class));
+            verify(eventPublisher).publishEvent(any(OrderEligibilityChangedEvent.class));
         }
     }
 
@@ -274,7 +278,8 @@ class OrderMainServiceImplStateTransitionTest {
         }
 
         verify(service).updateById(order);
-        verify(eventPublisher).publishEvent(any());
+        verify(eventPublisher).publishEvent(any(OrderSubmittedEvent.class));
+        verify(eventPublisher).publishEvent(any(OrderEligibilityChangedEvent.class));
         org.junit.jupiter.api.Assertions.assertEquals(FlowStatusEnum.PENDING_DATA_AUDIT.getValue(), order.getStatus());
     }
 
@@ -642,6 +647,7 @@ class OrderMainServiceImplStateTransitionTest {
         service.resubmit(orderId, 3);
 
         verify(eventPublisher).publishEvent(any(com.yigongbao.common.event.OrderSubmittedEvent.class));
+        verify(eventPublisher).publishEvent(any(OrderEligibilityChangedEvent.class));
     }
 
     @Test
@@ -725,7 +731,8 @@ class OrderMainServiceImplStateTransitionTest {
         verify(orderDataValidator).validateAndFillMasterForOrder(any(), eq(101L), eq(201L), eq(301L),
                 isNull(), isNull(), isNull(), eq(userId), eq(OrderDataValidator.ValidateMode.DIRECT));
         verify(flowFacade).executeFlow(eq(100L), eq(FlowActionEnum.CREATE), any());
-        verify(eventPublisher).publishEvent(any());
+        verify(eventPublisher).publishEvent(any(OrderSubmittedEvent.class));
+        verify(eventPublisher).publishEvent(any(OrderEligibilityChangedEvent.class));
     }
 
     @Test
@@ -827,6 +834,7 @@ class OrderMainServiceImplStateTransitionTest {
         assertThat(savedOrder.getDesignAuditStatus()).isEqualTo(0);
         assertThat(savedOrder.getRegionalAuditStatus()).isNull();
         verify(flowFacade).executeFlow(eq(101L), eq(FlowActionEnum.CREATE), any());
-        verify(eventPublisher).publishEvent(any());
+        verify(eventPublisher).publishEvent(any(OrderSubmittedEvent.class));
+        verify(eventPublisher).publishEvent(any(OrderEligibilityChangedEvent.class));
     }
 }

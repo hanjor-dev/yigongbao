@@ -13,6 +13,7 @@ import com.yigongbao.common.constant.AuditStatusConstants;
 import com.yigongbao.common.event.AuditRejectedEvent;
 import com.yigongbao.common.event.NotificationRemarkUpdateEvent;
 import com.yigongbao.common.event.OrderCancelledEvent;
+import com.yigongbao.common.event.OrderEligibilityChangedEvent;
 import com.yigongbao.common.event.OrderSubmittedEvent;
 import com.yigongbao.common.constant.CodeRuleConstants;
 import com.yigongbao.common.constant.DictCodeConstants;
@@ -601,6 +602,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         orderFileMapper.delete(new LambdaQueryWrapper<OrderFileEntity>().eq(OrderFileEntity::getOrderId, id));
         // 清理修改留痕日志（硬删除，不继承 BaseEntity）
         orderModificationLogMapper.delete(new LambdaQueryWrapper<OrderModificationLogEntity>().eq(OrderModificationLogEntity::getOrderId, id));
+        publishEligibilityChanged(id, OrderEligibilityChangedEvent.DELETED);
         // TODO: 流程历史记录清理需 FlowFacade 提供接口支持
         log.info("删除订单: orderId={}", id);
     }
@@ -640,6 +642,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         entity.setPhase(result.getTargetPhase());
         entity.setStatus(result.getFinalStatus());
         updateById(entity);
+        publishEligibilityChanged(id, OrderEligibilityChangedEvent.FORMAL);
         eventPublisher.publishEvent(new OrderSubmittedEvent(this, entity.getId(), entity.getOrderCode(),
                 entity.getBusinessType(), entity.getPatientName(), entity.getOrgName(), entity.getOperatorName(),
                 entity.getHospitalId(), entity.getOrgId(), entity.getOperatorDeptId(), entity.getCreateBy()));
@@ -866,6 +869,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         if (!updated) {
             throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
         }
+        publishEligibilityChanged(id, OrderEligibilityChangedEvent.FORMAL);
         eventPublisher.publishEvent(new OrderSubmittedEvent(this, entity.getId(), entity.getOrderCode(),
                 entity.getBusinessType(), entity.getPatientName(), entity.getOrgName(), entity.getOperatorName(),
                 entity.getHospitalId(), entity.getOrgId(), entity.getOperatorDeptId(), entity.getCreateBy()));
@@ -926,6 +930,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
         }
         eventPublisher.publishEvent(new OrderCancelledEvent(this, id));
+        publishEligibilityChanged(id, OrderEligibilityChangedEvent.CANCELLED);
         log.info("直接取消订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
     }
 
@@ -1093,6 +1098,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
 
             // Step 5：记录状态历史（CREATE 动作仅记录历史，不改变 phase/status）
             flowFacade.executeFlow(orderId, FlowActionEnum.CREATE, new FlowOperator(draft.getOperatorId(), operatorName, "从草稿创建"));
+            publishEligibilityChanged(orderId, OrderEligibilityChangedEvent.FORMAL);
             log.info("从草稿创建订单: orderId={}, orderCode={}, itemCount={}", orderId, orderCode, draftItems.size());
             return orderId;
         } catch (Exception e) {
@@ -1220,6 +1226,7 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         eventPublisher.publishEvent(new OrderSubmittedEvent(this, orderId, order.getOrderCode(),
                 order.getBusinessType(), order.getPatientName(), order.getOrgName(), order.getOperatorName(),
                 order.getHospitalId(), order.getOrgId(), order.getOperatorDeptId(), currentUserId));
+        publishEligibilityChanged(orderId, OrderEligibilityChangedEvent.FORMAL);
 
         log.info("创建订单: orderId={}, orderCode={}, userId={}, itemCount={}",
                 orderId, orderCode, currentUserId, dto.getItems() != null ? dto.getItems().size() : 0);
@@ -1313,6 +1320,12 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
             orderFile.setFileCategory(fileCategory);
             orderFileMapper.insert(orderFile);
         }
+    }
+
+    /** 发布订单备份资格变更；事件只依赖 common，避免订单模块依赖备份模块。 */
+    private void publishEligibilityChanged(Long orderId, String targetState) {
+        eventPublisher.publishEvent(new OrderEligibilityChangedEvent(
+                this, orderId, targetState, LocalDateTime.now()));
     }
 
     /**

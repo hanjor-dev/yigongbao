@@ -23,6 +23,7 @@ import com.yigongbao.module.order.dto.order.CancelOrderApplyDTO;
 import com.yigongbao.module.order.entity.OrderCancelApplyEntity;
 import com.yigongbao.module.order.enums.ApplyStatusEnum;
 import com.yigongbao.common.event.CancelApplyApprovedEvent;
+import com.yigongbao.common.event.OrderEligibilityChangedEvent;
 import com.yigongbao.common.event.CancelApplyRejectedEvent;
 import com.yigongbao.common.event.CancelApplySubmittedEvent;
 import com.yigongbao.module.order.mapper.OrderCancelApplyMapper;
@@ -211,6 +212,9 @@ public class OrderCancelApplyServiceImpl extends ServiceImpl<OrderCancelApplyMap
                 if (!orderUpdated) {
                     throw new BusinessException(ErrorCodeEnum.ORDER_VERSION_CONFLICT);
                 }
+
+                eventPublisher.publishEvent(new OrderEligibilityChangedEvent(
+                        this, orderId, OrderEligibilityChangedEvent.CANCELLED, LocalDateTime.now()));
 
                 // 发布审核通过事件
                 eventPublisher.publishEvent(new CancelApplyApprovedEvent(
