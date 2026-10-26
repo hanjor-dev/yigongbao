@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS cos_object_reference (
  source_updated_at DATETIME(3) NULL COMMENT '源关系更新时间', version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
  create_time DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间', update_time DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
  create_by BIGINT NULL COMMENT '创建人ID', update_by BIGINT NULL COMMENT '更新人ID', is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
- identity_hash CHAR(64) NOT NULL COMMENT '完整对象身份哈希：platform、bucket、object_key、version_identity、relation_kind、relation_id',
+ identity_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '完整对象身份 SHA-256：platform、bucket、object_key、version_identity、relation_kind、relation_id',
  PRIMARY KEY(id), UNIQUE KEY uk_cos_reference_identity(identity_hash),
  KEY idx_cos_reference_lookup (platform,bucket,object_key(191),version_identity,active,is_deleted), KEY idx_cos_reference_file (file_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='COS 规范化业务引用索引';
@@ -82,7 +82,11 @@ CREATE TABLE IF NOT EXISTS cos_delete_permit (
  KEY idx_delete_permit_expiry(permit_status,expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='短期 COS 删除授权';
 
--- 执行后验证：应返回 8；ACTUAL 功能开关仍须保持关闭。
+-- 执行后验证：第一条应返回 8；第二条应返回 1，且仅包含 identity_hash；ACTUAL 功能开关仍须保持关闭。
 SELECT COUNT(*) AS created_table_count FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN
 ('cos_object_reference','cos_cleanup_policy','cos_cleanup_snapshot','cos_cleanup_task','cos_cleanup_item','cos_cleanup_reservation','cos_cleanup_protection','cos_delete_permit');
+SELECT COUNT(*) AS bounded_identity_index_count
+FROM information_schema.statistics
+WHERE table_schema=DATABASE() AND table_name='cos_object_reference'
+  AND index_name='uk_cos_reference_identity' AND column_name='identity_hash' AND sub_part IS NULL;
 -- 人工回滚：已有快照、任务、隔离或 permit 时禁止 DROP；仅关闭 ACTUAL 模式并保留全部安全证据。
