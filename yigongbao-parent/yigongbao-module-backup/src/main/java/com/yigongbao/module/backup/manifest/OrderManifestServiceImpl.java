@@ -14,6 +14,7 @@ import com.yigongbao.module.backup.manifest.model.OrderManifest;
 import com.yigongbao.module.order.service.OrderMainService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -51,6 +52,7 @@ public class OrderManifestServiceImpl implements OrderManifestService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public OrderManifest createManifest(Long orderId) {
         if (orderId == null) {
             throw new ManifestResolutionException("订单 ID 不能为空");
@@ -83,6 +85,7 @@ public class OrderManifestServiceImpl implements OrderManifestService {
                     deduplicated.put(asset.assetId(), asset);
                 } else if (!previous.objectKey().equals(asset.objectKey())
                         || !previous.assetType().equals(asset.assetType())
+                        || !java.util.Objects.equals(previous.originalFilename(), asset.originalFilename())
                         || !java.util.Objects.equals(previous.contentSha256(), asset.contentSha256())
                         || previous.size() != asset.size()) {
                     throw new ManifestResolutionException("同一资产存在冲突关系: " + asset.assetId());
@@ -91,7 +94,7 @@ public class OrderManifestServiceImpl implements OrderManifestService {
                             new java.util.LinkedHashSet<>(previous.relations());
                     relations.addAll(asset.relations());
                     deduplicated.put(asset.assetId(), new ManifestAsset(previous.assetId(), previous.assetType(),
-                            previous.objectKey(), previous.contentSha256(), previous.size(),
+                            previous.objectKey(), previous.originalFilename(), previous.contentSha256(), previous.size(),
                             new java.util.ArrayList<>(relations)));
                 }
             }
@@ -105,6 +108,7 @@ public class OrderManifestServiceImpl implements OrderManifestService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ManifestConfirmation confirmManifest(Long orderId, String revision, String identityDigest) {
         if (revision == null || identityDigest == null || !MessageDigest.isEqual(
                 revision.getBytes(StandardCharsets.UTF_8), identityDigest.getBytes(StandardCharsets.UTF_8))) {
