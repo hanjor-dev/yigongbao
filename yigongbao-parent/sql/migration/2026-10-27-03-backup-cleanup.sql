@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS cos_object_reference (
  source_updated_at DATETIME(3) NULL COMMENT '源关系更新时间', version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
  create_time DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间', update_time DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
  create_by BIGINT NULL COMMENT '创建人ID', update_by BIGINT NULL COMMENT '更新人ID', is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
- PRIMARY KEY(id), UNIQUE KEY uk_cos_reference (platform,bucket,object_key(191),version_identity,relation_kind,relation_id),
+ identity_hash CHAR(64) NOT NULL COMMENT '完整对象身份哈希：platform、bucket、object_key、version_identity、relation_kind、relation_id',
+ PRIMARY KEY(id), UNIQUE KEY uk_cos_reference_identity(identity_hash),
  KEY idx_cos_reference_lookup (platform,bucket,object_key(191),version_identity,active,is_deleted), KEY idx_cos_reference_file (file_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='COS 规范化业务引用索引';
 

@@ -16,13 +16,20 @@ CREATE TABLE IF NOT EXISTS backup_migration_watermark (
 SET @reference_before := (SELECT COUNT(*) FROM cos_object_reference WHERE relation_kind='FILE_DETAIL' AND is_deleted=0);
 
 INSERT INTO cos_object_reference
-    (platform,bucket,object_key,version_identity,file_id,relation_kind,relation_id,active,source_updated_at,
+    (platform,bucket,object_key,version_identity,file_id,relation_kind,relation_id,identity_hash,active,source_updated_at,
      create_time,update_time,create_by,update_by,is_deleted)
 SELECT COALESCE(NULLIF(fd.platform,''),'UNKNOWN'),
        COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(fd.metadata) THEN fd.metadata ELSE '{}' END,'$.bucket')),''),'UNKNOWN'),
        COALESCE(NULLIF(CONCAT(COALESCE(fd.base_path,''),COALESCE(fd.path,''),COALESCE(fd.filename,'')),''),fd.url),
        COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(fd.metadata) THEN fd.metadata ELSE '{}' END,'$.versionId')),''),'null'),
-       CAST(fd.id AS UNSIGNED),'FILE_DETAIL',CAST(fd.id AS UNSIGNED),1,fd.update_time,
+       CAST(fd.id AS UNSIGNED),'FILE_DETAIL',CAST(fd.id AS UNSIGNED),
+       SHA2(CONCAT_WS(CHAR(0),
+           COALESCE(NULLIF(fd.platform,''),'UNKNOWN'),
+           COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(fd.metadata) THEN fd.metadata ELSE '{}' END,'$.bucket')),''),'UNKNOWN'),
+           COALESCE(NULLIF(CONCAT(COALESCE(fd.base_path,''),COALESCE(fd.path,''),COALESCE(fd.filename,'')),''),fd.url),
+           COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(fd.metadata) THEN fd.metadata ELSE '{}' END,'$.versionId')),''),'null'),
+           'FILE_DETAIL',CAST(fd.id AS UNSIGNED)),256),
+       1,fd.update_time,
        CURRENT_TIMESTAMP(3),CURRENT_TIMESTAMP(3),NULL,NULL,0
 FROM file_detail fd
 WHERE fd.is_deleted=0 AND fd.id REGEXP '^[0-9]+$'
