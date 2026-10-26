@@ -13,6 +13,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -40,8 +41,14 @@ public class DatabaseMachineCredentialResolver implements MachineCredentialResol
         if (keyMapper == null || identityMapper == null) {
             return null;
         }
-        MachineKeyEntity key = keyMapper.selectByKeyId(keyId);
-        if (key == null || key.getMachineId() == null || !keyId.equals(key.getKeyId())) {
+        List<MachineKeyEntity> keys = keyMapper.selectByKeyId(keyId);
+        // key_id 必须在全局范围内唯一。即使数据表当前仅有 (machine_id,key_id)
+        // 联合唯一索引，发现重复也必须 fail-closed，不能由 LIMIT 1 随机放行。
+        if (keys == null || keys.size() != 1) {
+            return null;
+        }
+        MachineKeyEntity key = keys.getFirst();
+        if (key.getMachineId() == null || !keyId.equals(key.getKeyId())) {
             return null;
         }
         MachineIdentityEntity machine = identityMapper.selectByMachineId(key.getMachineId());

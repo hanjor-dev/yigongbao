@@ -17,6 +17,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -123,6 +124,28 @@ class MachineHmacAuthenticationFilterTest {
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(verifiedBody.get()).isEqualTo(payload);
         assertThat(controllerBody.get()).isEqualTo(payload);
+    }
+
+    @Test
+    void rejectsRequestBodyBeforeAllocatingBeyondConfiguredLimit() throws ServletException, IOException {
+        BackupProperties properties = new BackupProperties();
+        properties.getSecurity().setMaxBodyBytes(4);
+        AtomicBoolean verifierCalled = new AtomicBoolean();
+        MachineRequestVerifier verifier = (request, body) -> {
+            verifierCalled.set(true);
+            return new VerifiedMachine("machine-01", "key-v1", MachineScope.MANIFEST);
+        };
+        MachineHmacAuthenticationFilter filter = filter(
+                properties, new MockEnvironment(), verifier);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST", "/internal/backup/v1/candidates/reconcile");
+        request.setContent("12345".getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(verifierCalled).isFalse();
     }
 
     private MachineHmacAuthenticationFilter filter(BackupProperties properties, MockEnvironment environment) {

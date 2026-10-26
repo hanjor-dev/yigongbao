@@ -22,3 +22,11 @@
 ## 注意事项
 
 生产部署仍需先执行既有 `2026-10-27-04-backup-security.sql` 并配置 `secret_ref` 指向外部密钥存储；未配置 Mapper/数据库时实现保持 fail-closed，不会放行请求。
+
+## 审查修复
+
+- 修复 `key_id` 跨机器重复时由 `LIMIT 1` 随机选取凭证的问题：认证查询现在必须恰好返回一条未删除记录，否则 fail-closed；并补充重复 key 的单元测试。
+- 为请求体缓存增加 `yigongbao.backup.security.max-body-bytes` 配置，默认 10 MiB；先检查 Content-Length，再分块读取未知长度请求，超过上限在验签前拒绝，避免无界内存分配。
+- 修正内部 OpenAPI 的 HMAC 头说明、认证时间格式和 `Idempotency-Key` 约束，使契约与实现（X-Key-Id、X-Nonce、X-Timestamp、X-Scope、X-Signature，写请求追加幂等键）一致。
+
+审查修复后的聚焦测试：27 tests，0 failures，0 errors；`mvn -pl yigongbao-module-backup -am -DskipTests compile` 通过。

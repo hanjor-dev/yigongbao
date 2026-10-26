@@ -7,3 +7,5 @@ yigongbao:
       allow-unverified-requests-for-tests: false
       # 签名时间允许偏差，默认 5 分钟。
       clock-skew-seconds: 300
+      # 内部机器请求体最大 10 MiB；超过上限的请求在验签前拒绝。
+      max-body-bytes: 10485760

@@ -40,6 +40,9 @@ public class BackupProperties {
         /** 验证请求时间允许偏差（秒）。 */
         private long clockSkewSeconds = 300;
 
+        /** 内部机器请求体最大字节数，超过后在验签前拒绝，避免无界内存分配。 */
+        private long maxBodyBytes = 10 * 1024 * 1024;
+
         public boolean isAllowUnverifiedRequestsForTests() {
             return allowUnverifiedRequestsForTests;
         }
@@ -54,6 +57,14 @@ public class BackupProperties {
 
         public void setClockSkewSeconds(long clockSkewSeconds) {
             this.clockSkewSeconds = clockSkewSeconds;
+        }
+
+        public long getMaxBodyBytes() {
+            return maxBodyBytes;
+        }
+
+        public void setMaxBodyBytes(long maxBodyBytes) {
+            this.maxBodyBytes = maxBodyBytes;
         }
     }
 }

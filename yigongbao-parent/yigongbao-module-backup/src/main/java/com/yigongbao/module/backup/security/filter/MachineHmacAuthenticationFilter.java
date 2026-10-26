@@ -21,10 +21,12 @@ import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.io.InputStream;
 import java.util.UUID;
 
 /**
@@ -89,7 +91,7 @@ public class MachineHmacAuthenticationFilter extends OncePerRequestFilter {
         String requestId = resolveRequestId(request);
         CachedBodyRequest cachedRequest;
         try {
-            byte[] body = request.getInputStream().readAllBytes();
+            byte[] body = readBody(request, properties.getSecurity().getMaxBodyBytes());
             cachedRequest = new CachedBodyRequest(request, body);
             requestId = resolveRequestId(cachedRequest);
             VerifiedMachine machine = verifier.verify(cachedRequest, body);
@@ -103,6 +105,34 @@ public class MachineHmacAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
         filterChain.doFilter(cachedRequest, response);
+    }
+
+    /**
+     * 在读取请求体前执行 Content-Length 检查，并按固定大小分块读取。
+     * 未知 Content-Length 的请求也不会分配超过配置上限的缓存空间。
+     */
+    private byte[] readBody(HttpServletRequest request, long maxBodyBytes) throws IOException {
+        if (maxBodyBytes <= 0 || maxBodyBytes > Integer.MAX_VALUE) {
+            throw new IOException("invalid request body limit");
+        }
+        long contentLength = request.getContentLengthLong();
+        if (contentLength > maxBodyBytes) {
+            throw new IOException("request body too large");
+        }
+        int initialCapacity = (int) Math.min(contentLength >= 0 ? contentLength : 8192, maxBodyBytes);
+        ByteArrayOutputStream body = new ByteArrayOutputStream(initialCapacity);
+        byte[] buffer = new byte[8192];
+        long total = 0;
+        InputStream input = request.getInputStream();
+        int read;
+        while ((read = input.read(buffer)) != -1) {
+            if (total > maxBodyBytes - read) {
+                throw new IOException("request body too large");
+            }
+            body.write(buffer, 0, read);
+            total += read;
+        }
+        return body.toByteArray();
     }
 
     private boolean isExplicitTestBypass() {
