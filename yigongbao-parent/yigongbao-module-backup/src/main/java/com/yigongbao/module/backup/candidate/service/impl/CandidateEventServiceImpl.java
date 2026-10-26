@@ -158,7 +158,8 @@ public class CandidateEventServiceImpl implements CandidateEventService {
             if (eligible) {
                 if (latest == null || !CandidateEventStatus.ACTIVE.name().equals(latest.getEventStatus())) {
                     recordEligibilityChange(order.getId(), OrderEligibility.FORMAL.value,
-                            order.getCreateTime() == null ? LocalDateTime.now() : order.getCreateTime());
+                            // 对账是新的发现事件；使用当前时间作为游标，避免旧订单落在已消费高水位之前。
+                            LocalDateTime.now());
                     repaired++;
                 }
                 continue;

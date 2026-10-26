@@ -86,6 +86,26 @@ class CandidateEventServiceImplTest {
     }
 
     @Test
+    void reconcileRepairUsesCurrentEventTimeSoOldOrderPassesFutureHighWatermark() {
+        OrderMainEntity oldOrder = formalOrder(13L);
+        when(provider.getIfAvailable()).thenReturn(orderService);
+        when(orderService.getById(13L)).thenReturn(oldOrder);
+        when(orderMapper.selectRangeIncludingDeleted(13L, 13L)).thenReturn(List.of(oldOrder));
+        when(mapper.selectLatestByOrder(13L)).thenReturn(null);
+        when(mapper.selectMaxGeneration(13L)).thenReturn(0);
+        when(mapper.allocateEventId()).thenReturn(1);
+        when(mapper.selectAllocatedEventId()).thenReturn(99L);
+
+        LocalDateTime before = LocalDateTime.now().minusSeconds(1);
+        service.reconcile(13L, 13L);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(OrderBackupCandidateEntity.class);
+        verify(mapper).insert(captor.capture());
+        assertThat(captor.getValue().getOrderCreatedAt()).isEqualTo(oldOrder.getCreateTime());
+        assertThat(captor.getValue().getEligibleAt()).isAfter(before);
+    }
+
+    @Test
     void databaseAllocatorContractKeepsEventIdsUniqueAcrossConcurrentInstances() throws Exception {
         when(provider.getIfAvailable()).thenReturn(orderService);
         when(orderService.getById(anyLong())).thenAnswer(invocation -> formalOrder(invocation.getArgument(0)));
