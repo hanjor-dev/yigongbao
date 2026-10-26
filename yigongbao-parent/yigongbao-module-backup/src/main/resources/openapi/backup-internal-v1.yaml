@@ -21,6 +21,32 @@ tags:
   - name: Restore
   - name: Cleanup
 paths:
+  /internal/backup/v1/accounts:
+    get:
+      tags: [Identity]
+      operationId: listAccountChanges
+      parameters:
+        - name: updateTime
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/Rfc3339Time'}
+        - name: id
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/DecimalId'}
+        - name: pageSize
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 500, default: 100}
+      responses:
+        '200':
+          description: 账号增量数据
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccountSyncEnvelope'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
   /internal/backup/v1/candidates/search:
     post:
       tags: [Candidate]
@@ -597,6 +623,36 @@ components:
           required: [data]
           properties:
             data: {$ref: '#/components/schemas/CandidateReconcileResult'}
+    AccountSyncRecord:
+      type: object
+      required: [id, username, passwordHash, status, updateTime]
+      properties:
+        id: {$ref: '#/components/schemas/DecimalId'}
+        username: {type: string}
+        passwordHash: {type: string, minLength: 20}
+        status: {type: integer, enum: [0, 1]}
+        realName: {type: [string, 'null']}
+        roleCode: {type: [string, 'null']}
+        updateTime: {$ref: '#/components/schemas/Rfc3339Time'}
+    AccountSyncPage:
+      type: object
+      required: [items, nextCursor, hasMore]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/AccountSyncRecord'}}
+        nextCursor:
+          type: object
+          required: [updateTime, id]
+          properties:
+            updateTime: {$ref: '#/components/schemas/Rfc3339Time'}
+            id: {$ref: '#/components/schemas/DecimalId'}
+        hasMore: {type: boolean}
+    AccountSyncEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          required: [data]
+          properties:
+            data: {$ref: '#/components/schemas/AccountSyncPage'}
     AssetRelation:
       type: object
       required: [relationKind, sourceRecordId, relationVersion, relationHash, originalFileId, originalUrl]
