@@ -1,0 +1,3 @@
+package com.yigongbao.module.backup.cleanup;
+import org.junit.jupiter.api.Test; import java.util.List; import static org.assertj.core.api.Assertions.*;
+class CleanupTaskServiceTest { @Test void permitLifecycleIsGatedByTaskState(){var s=new CleanupTaskService();var t=s.create(180,List.of("k"));var p=s.issuePermit(t.id());assertThat(p.status).isEqualTo("ACTIVE");assertThat(s.revoke(p.id).status).isEqualTo("REVOKED");} @Test void pausedTaskCannotIssuePermit(){var s=new CleanupTaskService();var t=s.create(1,List.of("k"));s.pause(t.id());assertThatThrownBy(()->s.issuePermit(t.id())).isInstanceOf(IllegalStateException.class);s.resume(t.id());assertThat(s.issuePermit(t.id()).status).isEqualTo("ACTIVE");}}
