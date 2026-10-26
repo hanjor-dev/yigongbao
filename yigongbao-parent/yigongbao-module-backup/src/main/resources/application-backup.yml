@@ -1,0 +1,7 @@
+yigongbao:
+  backup:
+    # 危险能力默认关闭；Task 20 的全部硬闸门完成前不得开启。
+    cos-deletion-enabled: false
+    security:
+      # 只在 test profile 生效，生产环境即使误配也不会旁路认证。
+      allow-unverified-requests-for-tests: false

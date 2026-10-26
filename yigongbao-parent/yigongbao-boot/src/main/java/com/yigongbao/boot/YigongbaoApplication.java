@@ -1,6 +1,7 @@
 package com.yigongbao.boot;
 
 import com.yigongbao.common.config.DefaultConfigProperties;
+import com.yigongbao.module.backup.config.BackupModuleConfiguration;
 import org.dromara.x.file.storage.spring.EnableFileStorage;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
@@ -9,6 +10,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
@@ -26,6 +28,7 @@ import java.util.concurrent.Executor;
 @EnableFileStorage
 @EnableScheduling
 @EnableAsync
+@Import(BackupModuleConfiguration.class)
 public class YigongbaoApplication {
 
     /** 通用异步执行器，供操作日志等非业务异步任务使用。 */

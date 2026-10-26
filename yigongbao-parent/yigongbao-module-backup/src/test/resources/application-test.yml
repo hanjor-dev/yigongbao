@@ -1,0 +1,4 @@
+yigongbao:
+  backup:
+    security:
+      allow-unverified-requests-for-tests: true
