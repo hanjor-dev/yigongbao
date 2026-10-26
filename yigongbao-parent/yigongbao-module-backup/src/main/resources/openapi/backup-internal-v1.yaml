@@ -1,0 +1,865 @@
+openapi: 3.1.0
+info:
+  title: 医工宝备份、恢复与清理内部接口
+  version: 1.0.0
+  description: >-
+    线上医工宝与本地备份服务之间的机器接口契约。所有请求必须使用 HTTPS 和
+    HMAC 认证；所有 ID、字节数均以十进制字符串传输，时间使用 RFC 3339。
+servers:
+  - url: https://{host}
+    variables:
+      host:
+        default: yigongbao.example.com
+security:
+  - MachineHmac: []
+tags:
+  - name: Candidate
+  - name: Manifest
+  - name: Receipt
+  - name: Identity
+  - name: Restore
+  - name: Cleanup
+paths:
+  /internal/backup/v1/candidates/search:
+    post:
+      tags: [Candidate]
+      operationId: searchBackupCandidates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CandidateSearchRequest'}
+      responses:
+        '200':
+          description: 候选事件页
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CandidatePageEnvelope'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /internal/backup/v1/candidates/reconcile:
+    post:
+      tags: [Candidate]
+      operationId: reconcileBackupCandidates
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CandidateReconcileRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/CommandAccepted'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /internal/backup/v1/orders/{orderId}/manifest:
+    get:
+      tags: [Manifest]
+      operationId: getOrderManifest
+      parameters:
+        - {$ref: '#/components/parameters/OrderId'}
+      responses:
+        '200':
+          description: 不可变订单清单及短期只读授权
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ManifestEnvelope'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /internal/backup/v1/orders/{orderId}/manifest/{revision}/confirm:
+    post:
+      tags: [Manifest]
+      operationId: confirmOrderManifest
+      parameters:
+        - {$ref: '#/components/parameters/OrderId'}
+        - {$ref: '#/components/parameters/ManifestRevision'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ManifestConfirmRequest'}
+      responses:
+        '200':
+          description: 确认结果
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ManifestConfirmEnvelope'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+  /internal/backup/v1/receipts/{orderId}:
+    put:
+      tags: [Receipt]
+      operationId: putBackupReceipt
+      parameters:
+        - {$ref: '#/components/parameters/OrderId'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReceiptPutRequest'}
+      responses:
+        '200':
+          description: 已存在或新建的凭证
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReceiptEnvelope'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+  /internal/backup/v1/receipts/{receiptId}:
+    get:
+      tags: [Receipt]
+      operationId: getBackupReceipt
+      parameters:
+        - {$ref: '#/components/parameters/ReceiptId'}
+      responses:
+        '200':
+          description: 权威凭证状态
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReceiptEnvelope'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /internal/backup/v1/receipts/{receiptId}/suspend:
+    post:
+      tags: [Receipt]
+      operationId: suspendBackupReceipt
+      parameters:
+        - {$ref: '#/components/parameters/ReceiptId'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {$ref: '#/components/requestBodies/ReceiptStateChange'}
+      responses:
+        '200': {$ref: '#/components/responses/ReceiptStateChanged'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /internal/backup/v1/receipts/{receiptId}/invalidate:
+    post:
+      tags: [Receipt]
+      operationId: invalidateBackupReceipt
+      parameters:
+        - {$ref: '#/components/parameters/ReceiptId'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {$ref: '#/components/requestBodies/ReceiptStateChange'}
+      responses:
+        '200': {$ref: '#/components/responses/ReceiptStateChanged'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /internal/backup/v1/receipts/{receiptId}/reactivate:
+    post:
+      tags: [Receipt]
+      operationId: reactivateBackupReceipt
+      parameters:
+        - {$ref: '#/components/parameters/ReceiptId'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReceiptReactivateRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/ReceiptStateChanged'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+  /internal/backup/v1/users:
+    get:
+      tags: [Identity]
+      operationId: listChangedUsers
+      parameters:
+        - name: updatedAfter
+          in: query
+          required: true
+          schema: {$ref: '#/components/schemas/Rfc3339Time'}
+        - name: afterId
+          in: query
+          required: true
+          schema: {$ref: '#/components/schemas/DecimalId'}
+        - name: limit
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 500}
+      responses:
+        '200':
+          description: 增量账号页
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserPageEnvelope'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /internal/restore/v1/orders/{orderId}/prepare:
+    post:
+      tags: [Restore]
+      operationId: prepareOrderRestore
+      parameters:
+        - {$ref: '#/components/parameters/OrderId'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RestorePrepareRequest'}
+      responses:
+        '200':
+          description: 已签名的不可变恢复计划
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RestorePrepareEnvelope'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+  /internal/restore/v1/sessions/{sessionId}:
+    get:
+      tags: [Restore]
+      operationId: getRestoreSession
+      parameters:
+        - {$ref: '#/components/parameters/SessionId'}
+      responses:
+        '200':
+          description: 权威会话状态
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RestoreSessionEnvelope'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /internal/restore/v1/sessions/{sessionId}/commit:
+    post:
+      tags: [Restore]
+      operationId: commitRestoreSession
+      parameters:
+        - {$ref: '#/components/parameters/SessionId'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RestoreCommitRequest'}
+      responses:
+        '200':
+          description: 原子提交结果
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RestoreCommitEnvelope'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+  /internal/restore/v1/sessions/{sessionId}/abort:
+    post:
+      tags: [Restore]
+      operationId: abortRestoreSession
+      parameters:
+        - {$ref: '#/components/parameters/SessionId'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {$ref: '#/components/requestBodies/ReasonCommand'}
+      responses:
+        '200': {$ref: '#/components/responses/CommandAccepted'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /internal/cleanup/v1/evaluate:
+    post:
+      tags: [Cleanup]
+      operationId: evaluateCleanup
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CleanupEvaluateRequest'}
+      responses:
+        '200':
+          description: 固化候选对象集合
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CleanupEvaluationEnvelope'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+  /internal/cleanup/v1/tasks:
+    post:
+      tags: [Cleanup]
+      operationId: createCleanupTask
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CleanupTaskCreateRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/CommandAccepted'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+  /internal/cleanup/v1/tasks/{taskId}:
+    get:
+      tags: [Cleanup]
+      operationId: getCleanupTask
+      parameters:
+        - {$ref: '#/components/parameters/TaskId'}
+      responses:
+        '200':
+          description: 任务、快照、对象明细和阻断原因
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CleanupTaskEnvelope'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /internal/cleanup/v1/tasks/{taskId}/pause:
+    post:
+      tags: [Cleanup]
+      operationId: pauseCleanupTask
+      parameters:
+        - {$ref: '#/components/parameters/TaskId'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {$ref: '#/components/requestBodies/ReasonCommand'}
+      responses:
+        '200': {$ref: '#/components/responses/CommandAccepted'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /internal/cleanup/v1/tasks/{taskId}/resume:
+    post:
+      tags: [Cleanup]
+      operationId: resumeCleanupTask
+      parameters:
+        - {$ref: '#/components/parameters/TaskId'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses:
+        '200': {$ref: '#/components/responses/CommandAccepted'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /internal/cleanup/v1/permit-requests:
+    get:
+      tags: [Cleanup]
+      operationId: listCleanupPermitRequests
+      parameters:
+        - name: cursor
+          in: query
+          required: true
+          schema: {$ref: '#/components/schemas/Cursor'}
+        - name: pageSize
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 200}
+        - name: highWatermark
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/Cursor'}
+      responses:
+        '200':
+          description: 待授权任务页
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PermitRequestPageEnvelope'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+  /internal/cleanup/v1/tasks/{taskId}/permits:
+    post:
+      tags: [Cleanup]
+      operationId: issueCleanupPermit
+      parameters:
+        - {$ref: '#/components/parameters/TaskId'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PermitIssueRequest'}
+      responses:
+        '200':
+          description: 删除授权
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PermitEnvelope'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+  /internal/cleanup/v1/tasks/{taskId}/permits/{permitId}/revoke:
+    post:
+      tags: [Cleanup]
+      operationId: revokeCleanupPermit
+      parameters:
+        - {$ref: '#/components/parameters/TaskId'}
+        - {$ref: '#/components/parameters/PermitId'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {$ref: '#/components/requestBodies/ReasonCommand'}
+      responses:
+        '200': {$ref: '#/components/responses/CommandAccepted'}
+        '409': {$ref: '#/components/responses/Conflict'}
+components:
+  securitySchemes:
+    MachineHmac:
+      type: apiKey
+      in: header
+      name: X-Signature
+      description: 同时要求 X-Machine-Id、X-Key-Id、X-Nonce、X-Timestamp 和 X-Content-SHA256。
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 16, maxLength: 128}
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/DecimalId'}
+    ReceiptId:
+      name: receiptId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/DecimalId'}
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/DecimalId'}
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/DecimalId'}
+    PermitId:
+      name: permitId
+      in: path
+      required: true
+      schema: {type: string, minLength: 16, maxLength: 128}
+    ManifestRevision:
+      name: revision
+      in: path
+      required: true
+      schema: {type: string, minLength: 1, maxLength: 128}
+  requestBodies:
+    ReceiptStateChange:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ReceiptStateChangeRequest'}
+    ReasonCommand:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ReasonCommand'}
+  responses:
+    CommandAccepted:
+      description: 命令结果
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/CommandEnvelope'}
+    ReceiptStateChanged:
+      description: 凭证状态已 CAS 更新
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ReceiptEnvelope'}
+    BadRequest: {$ref: '#/components/responses/ErrorResponse'}
+    Unauthorized: {$ref: '#/components/responses/ErrorResponse'}
+    Forbidden: {$ref: '#/components/responses/ErrorResponse'}
+    NotFound: {$ref: '#/components/responses/ErrorResponse'}
+    Conflict: {$ref: '#/components/responses/ErrorResponse'}
+    PreconditionFailed: {$ref: '#/components/responses/ErrorResponse'}
+    RateLimited: {$ref: '#/components/responses/ErrorResponse'}
+    DependencyUnavailable: {$ref: '#/components/responses/ErrorResponse'}
+    ErrorResponse:
+      description: 稳定错误码；客户端只依据 code 和 retryable 决策
+      headers:
+        Retry-After:
+          required: false
+          schema: {type: integer, minimum: 1}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  schemas:
+    DecimalId:
+      type: string
+      pattern: '^[0-9]+$'
+      examples: ['1234567890123456789']
+    ByteCount:
+      type: string
+      pattern: '^[0-9]+$'
+    Sha256:
+      type: string
+      pattern: '^[0-9a-f]{64}$'
+    Rfc3339Time:
+      type: string
+      format: date-time
+    Cursor:
+      type: string
+      description: 不透明 Base64URL 游标；首屏使用空字符串。
+      pattern: '^[A-Za-z0-9_-]*$'
+    ErrorDetail:
+      type: object
+      required: [field, reason]
+      properties:
+        field: {type: string}
+        reason: {type: string}
+    ErrorEnvelope:
+      type: object
+      required: [code, message, requestId, data, retryable, retryAfterSeconds, details]
+      properties:
+        code:
+          type: string
+          enum: [CURSOR_INVALID, IDEMPOTENCY_KEY_REUSED, ORDER_NOT_ELIGIBLE, RELATION_BROKEN, MANIFEST_CHANGED, STATE_CONFLICT, VERIFICATION_REJECTED, ORDER_MISSING, RESTORE_CONFLICT, PLAN_CHANGED, OBJECT_EVIDENCE_INVALID, SESSION_NOT_FOUND, CLEANUP_DISABLED, LOCAL_COPY_UNSAFE, SAFETY_EVENT_PENDING, VERSIONING_REQUIRED, REFERENCE_INDEX_UNREADY, DELETE_PERMIT_REQUIRED, CLASSIC_CASE_BLOCKED, REMOTE_TIMEOUT, RATE_LIMITED, STORAGE_TEMPORARY_UNAVAILABLE, REMOTE_COMMIT_UNKNOWN]
+        message: {type: string}
+        requestId: {type: string}
+        data: {type: 'null'}
+        retryable: {type: boolean}
+        retryAfterSeconds:
+          type: [integer, 'null']
+          minimum: 1
+        details:
+          type: array
+          items: {$ref: '#/components/schemas/ErrorDetail'}
+    SuccessBase:
+      type: object
+      required: [code, message, requestId, data]
+      properties:
+        code: {const: OK}
+        message: {type: string}
+        requestId: {type: string}
+    CommandEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [id, status]
+              properties:
+                id: {$ref: '#/components/schemas/DecimalId'}
+                status: {type: string}
+    CandidateSearchRequest:
+      type: object
+      additionalProperties: false
+      required: [cursor, pageSize]
+      properties:
+        cursor: {$ref: '#/components/schemas/Cursor'}
+        pageSize: {type: integer, minimum: 1, maximum: 500}
+        highWatermark: {$ref: '#/components/schemas/Cursor'}
+        eligibleFrom: {$ref: '#/components/schemas/Rfc3339Time'}
+        eligibleTo: {$ref: '#/components/schemas/Rfc3339Time'}
+    CandidateReconcileRequest:
+      type: object
+      additionalProperties: false
+      required: [orderIdFrom, orderIdTo]
+      properties:
+        orderIdFrom: {$ref: '#/components/schemas/DecimalId'}
+        orderIdTo: {$ref: '#/components/schemas/DecimalId'}
+    CandidateItem:
+      type: object
+      required: [eventId, orderId, generation, eligibleAt, eventStatus, orderCreatedAt]
+      properties:
+        eventId: {$ref: '#/components/schemas/DecimalId'}
+        orderId: {$ref: '#/components/schemas/DecimalId'}
+        generation: {type: integer, minimum: 1}
+        eligibleAt: {$ref: '#/components/schemas/Rfc3339Time'}
+        orderCreatedAt: {$ref: '#/components/schemas/Rfc3339Time'}
+        eventStatus: {type: string, enum: [ACTIVE, CANCELLED, DELETED]}
+    PageData:
+      type: object
+      required: [items, nextCursor, hasMore, highWatermark]
+      properties:
+        items: {type: array, items: {}}
+        nextCursor: {$ref: '#/components/schemas/Cursor'}
+        hasMore: {type: boolean}
+        highWatermark: {$ref: '#/components/schemas/Cursor'}
+    CandidatePageEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              allOf:
+                - {$ref: '#/components/schemas/PageData'}
+                - type: object
+                  properties:
+                    items: {type: array, items: {$ref: '#/components/schemas/CandidateItem'}}
+    AssetRelation:
+      type: object
+      required: [relationKind, sourceRecordId, relationVersion, relationHash, originalFileId, originalUrl]
+      properties:
+        relationKind: {type: string}
+        sourceRecordId: {$ref: '#/components/schemas/DecimalId'}
+        relationVersion: {type: string}
+        relationHash: {$ref: '#/components/schemas/Sha256'}
+        originalFileId: {$ref: '#/components/schemas/DecimalId'}
+        originalUrl: {type: string, format: uri}
+    ManifestAsset:
+      type: object
+      required: [assetIdentity, assetType, originalFilename, size, sourceObject, relations]
+      properties:
+        assetIdentity: {type: string}
+        sourceFileId: {$ref: '#/components/schemas/DecimalId'}
+        assetType: {type: string}
+        originalFilename: {type: string}
+        size: {$ref: '#/components/schemas/ByteCount'}
+        sha256: {$ref: '#/components/schemas/Sha256'}
+        sourceObject:
+          type: object
+          required: [platform, bucket, objectKey, versionIdentity, url]
+          properties:
+            platform: {type: string}
+            bucket: {type: string}
+            objectKey: {type: string}
+            versionIdentity: {type: string, description: 精确版本、字面值 null 或通配符 *}
+            url: {type: string, format: uri}
+            etag: {type: [string, 'null']}
+            lastModified: {$ref: '#/components/schemas/Rfc3339Time'}
+        relations: {type: array, minItems: 1, items: {$ref: '#/components/schemas/AssetRelation'}}
+    ManifestEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [manifestRevision, manifestJcsSha256, order, assets, downloadGrant]
+              properties:
+                manifestRevision: {type: string}
+                manifestJcsSha256: {$ref: '#/components/schemas/Sha256'}
+                order: {type: object, additionalProperties: true}
+                assets: {type: array, items: {$ref: '#/components/schemas/ManifestAsset'}}
+                downloadGrant: {type: object, additionalProperties: true}
+    ManifestConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [manifestJcsSha256, objectIdentityDigest]
+      properties:
+        manifestJcsSha256: {$ref: '#/components/schemas/Sha256'}
+        objectIdentityDigest: {$ref: '#/components/schemas/Sha256'}
+    ManifestConfirmEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [confirmedRevision]
+              properties: {confirmedRevision: {type: string}}
+    ReceiptPutRequest:
+      type: object
+      additionalProperties: false
+      required: [manifestRevision, manifestSha256, packageSha256, fileCount, totalSize, completedAt]
+      properties:
+        manifestRevision: {type: string}
+        manifestSha256: {$ref: '#/components/schemas/Sha256'}
+        packageSha256: {$ref: '#/components/schemas/Sha256'}
+        fileCount: {type: integer, minimum: 0}
+        totalSize: {$ref: '#/components/schemas/ByteCount'}
+        completedAt: {$ref: '#/components/schemas/Rfc3339Time'}
+    ReceiptStateChangeRequest:
+      type: object
+      additionalProperties: false
+      required: [stateVersion, reason, evidenceDigest]
+      properties:
+        stateVersion: {type: integer, minimum: 0}
+        reason: {type: string, minLength: 1, maxLength: 512}
+        evidenceDigest: {$ref: '#/components/schemas/Sha256'}
+    ReceiptReactivateRequest:
+      type: object
+      additionalProperties: false
+      required: [stateVersion, packageSha256, verificationDigest, verifiedAt]
+      properties:
+        stateVersion: {type: integer, minimum: 0}
+        packageSha256: {$ref: '#/components/schemas/Sha256'}
+        verificationDigest: {$ref: '#/components/schemas/Sha256'}
+        verifiedAt: {$ref: '#/components/schemas/Rfc3339Time'}
+    ReceiptEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [receiptId, receiptVersion, status, stateVersion]
+              properties:
+                receiptId: {$ref: '#/components/schemas/DecimalId'}
+                receiptVersion: {type: integer, minimum: 1}
+                status: {type: string, enum: [ACTIVE, SUSPENDED, INVALIDATED]}
+                stateVersion: {type: integer, minimum: 0}
+    UserPageEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [items, nextUpdatedAfter, nextAfterId, hasMore]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [id, username, passwordHash, enabled, updatedAt, deleted]
+                    properties:
+                      id: {$ref: '#/components/schemas/DecimalId'}
+                      username: {type: string}
+                      passwordHash: {type: string}
+                      realName: {type: [string, 'null']}
+                      phone: {type: [string, 'null']}
+                      email: {type: [string, 'null']}
+                      enabled: {type: boolean}
+                      updatedAt: {$ref: '#/components/schemas/Rfc3339Time'}
+                      deleted: {type: boolean}
+                nextUpdatedAfter: {$ref: '#/components/schemas/Rfc3339Time'}
+                nextAfterId: {$ref: '#/components/schemas/DecimalId'}
+                hasMore: {type: boolean}
+    RestorePrepareRequest:
+      type: object
+      additionalProperties: false
+      required: [manifestRevision, manifestSha256, conflictPolicy, requestDigest, assetSetDigest, relationSetHash]
+      properties:
+        manifestRevision: {type: string}
+        manifestSha256: {$ref: '#/components/schemas/Sha256'}
+        conflictPolicy: {type: string, enum: [REJECT, CONFIRM_OVERWRITE, FORCE_OVERWRITE]}
+        requestDigest: {$ref: '#/components/schemas/Sha256'}
+        assetSetDigest: {$ref: '#/components/schemas/Sha256'}
+        relationSetHash: {$ref: '#/components/schemas/Sha256'}
+    RestorePrepareEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [sessionId, signedPlanDigest, relationSetHash, versionTokens, uploadTargets, grant]
+              properties:
+                sessionId: {$ref: '#/components/schemas/DecimalId'}
+                signedPlanDigest: {$ref: '#/components/schemas/Sha256'}
+                relationSetHash: {$ref: '#/components/schemas/Sha256'}
+                versionTokens: {type: object, additionalProperties: {type: string}}
+                uploadTargets: {type: array, items: {type: object, additionalProperties: true}}
+                grant: {type: object, additionalProperties: true}
+    RestoreUploadEvidence:
+      type: object
+      additionalProperties: false
+      required: [assetIdentity, objectKey, versionId, etag, size, sha256]
+      properties:
+        assetIdentity: {type: string}
+        objectKey: {type: string}
+        versionId: {type: string}
+        etag: {type: string}
+        size: {$ref: '#/components/schemas/ByteCount'}
+        sha256: {$ref: '#/components/schemas/Sha256'}
+    RestoreCommitRequest:
+      type: object
+      additionalProperties: false
+      required: [signedPlanDigest, uploads]
+      properties:
+        signedPlanDigest: {$ref: '#/components/schemas/Sha256'}
+        uploads: {type: array, minItems: 1, items: {$ref: '#/components/schemas/RestoreUploadEvidence'}}
+    RestoreCommitEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [commitId, idMappings, protectionUntil]
+              properties:
+                commitId: {$ref: '#/components/schemas/DecimalId'}
+                idMappings: {type: object, additionalProperties: {$ref: '#/components/schemas/DecimalId'}}
+                protectionUntil: {$ref: '#/components/schemas/Rfc3339Time'}
+    RestoreSessionEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [sessionId, status]
+              properties:
+                sessionId: {$ref: '#/components/schemas/DecimalId'}
+                status: {type: string, enum: [PREPARED, COMMITTING, COMMITTED, ABORTED, FAILED, RESULT_UNKNOWN]}
+                commit: {$ref: '#/components/schemas/RestoreCommitEnvelope'}
+    CleanupEvaluateRequest:
+      type: object
+      additionalProperties: false
+      required: [policyVersion, mode]
+      properties:
+        policyVersion: {type: integer, minimum: 1}
+        mode: {type: string, enum: [DRY_RUN, ACTUAL]}
+    CleanupTaskCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [snapshotHash, objectSetHash, mode]
+      properties:
+        snapshotHash: {$ref: '#/components/schemas/Sha256'}
+        objectSetHash: {$ref: '#/components/schemas/Sha256'}
+        mode: {type: string, enum: [DRY_RUN, ACTUAL]}
+    CleanupEvaluationEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [taskId, snapshotHash, objectSetHash, estimatedVersionBytes]
+              properties:
+                taskId: {$ref: '#/components/schemas/DecimalId'}
+                snapshotHash: {$ref: '#/components/schemas/Sha256'}
+                objectSetHash: {$ref: '#/components/schemas/Sha256'}
+                estimatedVersionBytes: {$ref: '#/components/schemas/ByteCount'}
+    CleanupTaskEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [taskId, status, mode, blockers, items]
+              properties:
+                taskId: {$ref: '#/components/schemas/DecimalId'}
+                status: {type: string}
+                mode: {type: string, enum: [DRY_RUN, ACTUAL]}
+                blockers: {type: array, items: {type: string}}
+                items: {type: array, items: {type: object, additionalProperties: true}}
+    PermitRequestPageEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              allOf:
+                - {$ref: '#/components/schemas/PageData'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        required: [taskId, snapshotHash, objectSetHash, attemptNo, receiptId, receiptVersion]
+                        properties:
+                          taskId: {$ref: '#/components/schemas/DecimalId'}
+                          snapshotHash: {$ref: '#/components/schemas/Sha256'}
+                          objectSetHash: {$ref: '#/components/schemas/Sha256'}
+                          attemptNo: {type: integer, minimum: 1}
+                          receiptId: {$ref: '#/components/schemas/DecimalId'}
+                          receiptVersion: {type: integer, minimum: 1}
+    PermitIssueRequest:
+      type: object
+      additionalProperties: false
+      required: [attemptNo, snapshotHash, objectSetHash, fencingToken, receiptId, receiptVersion, verificationDigest]
+      properties:
+        attemptNo: {type: integer, minimum: 1}
+        snapshotHash: {$ref: '#/components/schemas/Sha256'}
+        objectSetHash: {$ref: '#/components/schemas/Sha256'}
+        fencingToken: {type: string, pattern: '^[0-9]+$'}
+        receiptId: {$ref: '#/components/schemas/DecimalId'}
+        receiptVersion: {type: integer, minimum: 1}
+        verificationDigest: {$ref: '#/components/schemas/Sha256'}
+    PermitEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/SuccessBase'}
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [permitId, status, expiresAt, nonce]
+              properties:
+                permitId: {type: string}
+                status: {type: string, enum: [ISSUED]}
+                expiresAt: {$ref: '#/components/schemas/Rfc3339Time'}
+                nonce: {type: string}
+    ReasonCommand:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 1, maxLength: 512}
