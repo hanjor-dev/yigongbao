@@ -37,6 +37,23 @@ class MachineHmacAuthenticationFilterTest {
     }
 
     @Test
+    void rejectsInternalWriteRouteWhenApplicationHasContextPath() throws ServletException, IOException {
+        MachineHmacAuthenticationFilter filter = filter(new BackupProperties(), new MockEnvironment());
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST", "/api/internal/backup/v1/candidates/reconcile");
+        request.setContextPath("/api");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(chain.getRequest()).isNull();
+        JsonNode body = objectMapper.readTree(response.getContentAsByteArray());
+        assertThat(body.path("code").asText()).isEqualTo("VERIFICATION_REJECTED");
+    }
+
+    @Test
     void doesNotInterceptNonInternalApi() throws ServletException, IOException {
         MachineHmacAuthenticationFilter filter = filter(new BackupProperties(), new MockEnvironment());
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/orders");

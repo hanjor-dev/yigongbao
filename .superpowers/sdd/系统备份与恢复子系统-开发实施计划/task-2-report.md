@@ -66,3 +66,19 @@ mvn -pl yigongbao-module-backup -am test
 - Task 3 必须用真实 `MachineRequestVerifier` 替换当前 fail-closed 占位行为，并继续保持 nonce、时间窗、scope 和密钥轮换验证；在此之前内部接口不可用是有意的安全默认值。
 - COS 实际删除仍保持默认关闭；Task 20 完成全部硬闸门前不得启用。
 - 若验收必须要求原样 `-am test` 全绿，需要单独修复 `yigongbao-module-basic` 的 52 个既有测试失败，这不属于 Task 2 范围。
+
+## 评审修复：context path 下的内部接口鉴权
+
+- 根因：`shouldNotFilter` 直接用包含 context path 的 `request.getRequestURI()` 匹配 `/internal/`；当应用配置 context path `/api` 时，请求 URI 为 `/api/internal/...`，因此误判为非内部路由并跳过过滤器。
+- 修复：匹配前从 request URI 中剔除 `request.getContextPath()`，再以 context-relative path 判断 `/internal/` 前缀；默认 fail-closed 行为和“`test` profile + 显式属性”双条件旁路语义保持不变。
+- 回归测试：新增 context path 为 `/api` 的 `/internal/backup/**` 请求用例。RED 阶段稳定复现返回 200 且进入 filter chain；GREEN 阶段确认返回 401 `VERIFICATION_REJECTED` 且未进入 filter chain。
+
+验证结果：
+
+```powershell
+mvn -pl yigongbao-module-backup -am "-Dtest=com.yigongbao.module.backup.**" "-Dsurefire.failIfNoSpecifiedTests=false" test
+mvn -pl yigongbao-boot -am -DskipTests compile
+```
+
+- 备份模块聚焦测试：`Tests run: 9, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- boot reactor 编译：14 个项目全部 `SUCCESS`，`BUILD SUCCESS`。

@@ -46,7 +46,12 @@ public class MachineHmacAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith(INTERNAL_PREFIX);
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        String contextRelativePath = contextPath.isEmpty()
+                ? requestUri
+                : requestUri.substring(contextPath.length());
+        return !contextRelativePath.startsWith(INTERNAL_PREFIX);
     }
 
     @Override
