@@ -2,6 +2,7 @@ package com.yigongbao.module.backup.manifest.controller;
 
 import com.yigongbao.module.backup.common.response.InternalApiResponse;
 import com.yigongbao.module.backup.manifest.OrderManifestService;
+import com.yigongbao.module.backup.manifest.model.ManifestAsset;
 import com.yigongbao.module.backup.manifest.model.ManifestConfirmation;
 import com.yigongbao.module.backup.manifest.model.OrderManifest;
 import org.springframework.http.ResponseEntity;
@@ -45,10 +46,19 @@ public class OrderManifestController {
     private static ManifestResponse toResponse(OrderManifest manifest) {
         List<AssetResponse> assets = manifest.assets().stream().map(asset -> new AssetResponse(
                 asset.assetId(), null, asset.assetType(), asset.originalFilename(), asset.size(),
-                asset.contentSha256(), new SourceObject("COS", "", asset.objectKey(), "*", asset.objectKey()),
+                asset.contentSha256(), new SourceObject("COS", "", asset.objectKey(), "*", sourceUrl(asset)),
                 asset.relations())).toList();
         return new ManifestResponse(manifest.revision(), manifest.identityDigest(), manifest.orderId(),
                 manifest.order(), assets, Map.of());
+    }
+
+    /** 优先使用 file_detail 保存的原始 COS URL；旧数据缺失时回退对象键并由部署适配器补齐。 */
+    private static String sourceUrl(ManifestAsset asset) {
+        for (Map<String, Object> relation : asset.relations()) {
+            Object value = relation.get("originalUrl");
+            if (value != null && !String.valueOf(value).isBlank()) return String.valueOf(value);
+        }
+        return asset.objectKey();
     }
 
     public record ConfirmCommand(String manifestJcsSha256, String objectIdentityDigest) {}
@@ -63,4 +73,5 @@ public class OrderManifestController {
 
     public record SourceObject(String platform, String bucket, String objectKey,
                                String versionIdentity, String url) {}
+
 }
