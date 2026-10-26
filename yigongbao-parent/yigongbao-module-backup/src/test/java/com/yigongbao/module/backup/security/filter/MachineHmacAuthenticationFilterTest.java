@@ -3,7 +3,11 @@ package com.yigongbao.module.backup.security.filter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yigongbao.module.backup.config.BackupProperties;
+import com.yigongbao.module.backup.security.model.MachineScope;
+import com.yigongbao.module.backup.security.verifier.MachineRequestVerifier;
+import com.yigongbao.module.backup.security.verifier.VerifiedMachine;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockFilterChain;
@@ -11,6 +15,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -95,7 +101,39 @@ class MachineHmacAuthenticationFilterTest {
         assertThat(response.getStatus()).isEqualTo(401);
     }
 
+    @Test
+    void verifiedRequestBodyIsCachedForVerifierAndReplayedToController() throws Exception {
+        byte[] payload = "{\"marker\":\"cached-once\"}".getBytes(StandardCharsets.UTF_8);
+        AtomicReference<byte[]> verifiedBody = new AtomicReference<>();
+        MachineRequestVerifier verifier = (request, body) -> {
+            verifiedBody.set(body);
+            return new VerifiedMachine("machine-01", "key-v1", MachineScope.MANIFEST);
+        };
+        MachineHmacAuthenticationFilter filter = filter(
+                new BackupProperties(), new MockEnvironment(), verifier);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST", "/internal/backup/v1/candidates/reconcile");
+        request.setContent(payload);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        AtomicReference<byte[]> controllerBody = new AtomicReference<>();
+
+        filter.doFilter(request, response, (servletRequest, servletResponse) ->
+                controllerBody.set(((HttpServletRequest) servletRequest).getInputStream().readAllBytes()));
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(verifiedBody.get()).isEqualTo(payload);
+        assertThat(controllerBody.get()).isEqualTo(payload);
+    }
+
     private MachineHmacAuthenticationFilter filter(BackupProperties properties, MockEnvironment environment) {
         return new MachineHmacAuthenticationFilter(properties, environment, objectMapper);
+    }
+
+    private MachineHmacAuthenticationFilter filter(
+            BackupProperties properties,
+            MockEnvironment environment,
+            MachineRequestVerifier verifier
+    ) {
+        return new MachineHmacAuthenticationFilter(properties, environment, objectMapper, verifier);
     }
 }

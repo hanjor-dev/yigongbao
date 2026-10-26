@@ -37,12 +37,23 @@ public class BackupProperties {
          */
         private boolean allowUnverifiedRequestsForTests;
 
+        /** 验证请求时间允许偏差（秒）。 */
+        private long clockSkewSeconds = 300;
+
         public boolean isAllowUnverifiedRequestsForTests() {
             return allowUnverifiedRequestsForTests;
         }
 
         public void setAllowUnverifiedRequestsForTests(boolean allowUnverifiedRequestsForTests) {
             this.allowUnverifiedRequestsForTests = allowUnverifiedRequestsForTests;
+        }
+
+        public long getClockSkewSeconds() {
+            return clockSkewSeconds;
+        }
+
+        public void setClockSkewSeconds(long clockSkewSeconds) {
+            this.clockSkewSeconds = clockSkewSeconds;
         }
     }
 }

@@ -5,3 +5,5 @@ yigongbao:
     security:
       # 只在 test profile 生效，生产环境即使误配也不会旁路认证。
       allow-unverified-requests-for-tests: false
+      # 签名时间允许偏差，默认 5 分钟。
+      clock-skew-seconds: 300
