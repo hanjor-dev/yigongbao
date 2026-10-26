@@ -35,6 +35,35 @@ class OrderManifestServiceImplTest {
         assertThat(first.canonicalJson()).isEqualTo(second.canonicalJson());
         assertThat(first.identityDigest()).isEqualTo(second.identityDigest());
         assertThat(first.order()).containsKeys("id", "status", "createTime");
+        assertThat(first.assets().get(0).relations()).hasSize(1);
+    }
+
+    @Test
+    void refusesToCreateManifestWhenNoAssetResolverIsRegistered() {
+        when(orderService.getById(7L)).thenReturn(formalOrder());
+        var service = new OrderManifestServiceImpl(orderService, List.of(), new ObjectMapper());
+
+        assertThatThrownBy(() -> service.createManifest(7L))
+                .isInstanceOf(ManifestResolutionException.class)
+                .hasMessageContaining("解析器");
+    }
+
+    @Test
+    void preservesDistinctBusinessRelationsWhenObjectIsDeduplicated() {
+        OrderMainEntity order = formalOrder();
+        when(orderService.getById(7L)).thenReturn(order);
+        when(resolver.assetType()).thenReturn("attachment");
+        ManifestAsset first = new ManifestAsset("f-1", "attachment", "orders/7/a.bin", "abc", 3,
+                Map.of("relationId", 11L));
+        ManifestAsset second = new ManifestAsset("f-1", "attachment", "orders/7/a.bin", "abc", 3,
+                Map.of("relationId", 12L));
+        when(resolver.resolve(order)).thenReturn(List.of(first, second));
+
+        var manifest = new OrderManifestServiceImpl(orderService, List.of(resolver), new ObjectMapper())
+                .createManifest(7L);
+
+        assertThat(manifest.assets()).hasSize(1);
+        assertThat(manifest.assets().getFirst().relations()).hasSize(2);
     }
 
     @Test

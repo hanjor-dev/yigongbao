@@ -57,6 +57,10 @@ public class OrderManifestServiceImpl implements OrderManifestService {
         }
         OrderMainEntity order = orderService.getById(orderId);
         assertEligible(order);
+        if (resolvers.isEmpty()) {
+            // 未注册任何资产解析器时不能生成“空文件清单”，否则会被误认为整单已备份成功。
+            throw new ManifestResolutionException("未注册订单资产解析器");
+        }
         Map<String, Object> orderSnapshot = snapshotAllBusinessFields(order);
         Map<String, ManifestAsset> deduplicated = new LinkedHashMap<>();
         for (ManifestAssetResolver resolver : resolvers) {
@@ -74,10 +78,21 @@ public class OrderManifestServiceImpl implements OrderManifestService {
                 if (asset == null) {
                     throw new ManifestResolutionException("资产解析器返回空资产: " + resolver.assetType());
                 }
-                ManifestAsset previous = deduplicated.putIfAbsent(asset.assetId(), asset);
-                if (previous != null && (!previous.objectKey().equals(asset.objectKey())
-                        || !previous.assetType().equals(asset.assetType()))) {
+                ManifestAsset previous = deduplicated.get(asset.assetId());
+                if (previous == null) {
+                    deduplicated.put(asset.assetId(), asset);
+                } else if (!previous.objectKey().equals(asset.objectKey())
+                        || !previous.assetType().equals(asset.assetType())
+                        || !java.util.Objects.equals(previous.contentSha256(), asset.contentSha256())
+                        || previous.size() != asset.size()) {
                     throw new ManifestResolutionException("同一资产存在冲突关系: " + asset.assetId());
+                } else {
+                    java.util.LinkedHashSet<java.util.Map<String, Object>> relations =
+                            new java.util.LinkedHashSet<>(previous.relations());
+                    relations.addAll(asset.relations());
+                    deduplicated.put(asset.assetId(), new ManifestAsset(previous.assetId(), previous.assetType(),
+                            previous.objectKey(), previous.contentSha256(), previous.size(),
+                            new java.util.ArrayList<>(relations)));
                 }
             }
         }

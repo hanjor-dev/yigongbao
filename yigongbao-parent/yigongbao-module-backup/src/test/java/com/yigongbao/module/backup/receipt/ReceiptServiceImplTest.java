@@ -47,4 +47,33 @@ class ReceiptServiceImplTest {
         assertThatThrownBy(() -> service.changeStatus(3L, 1, "SUSPENDED"))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void newReceiptClosesPreviousCurrentReceiptBeforeInsert() {
+        OrderBackupReceiptEntity previous = new OrderBackupReceiptEntity();
+        previous.setId(8L);
+        previous.setReceiptVersion(1);
+        when(mapper.selectCurrent(1L)).thenReturn(previous);
+
+        ReceiptCommand next = new ReceiptCommand(command.orderId(), command.manifestRevision(),
+                command.manifestSha256(), command.packageSha256(), command.fileCount(),
+                command.sourceTotalSize(), "idem-2", 2, command.backupCompletedAt());
+        service.put(next);
+
+        verify(mapper).clearCurrent(1L);
+        verify(mapper).insert(any(OrderBackupReceiptEntity.class));
+    }
+
+    @Test
+    void receiptVersionMustIncreaseBeyondCurrentVersion() {
+        OrderBackupReceiptEntity previous = new OrderBackupReceiptEntity();
+        previous.setReceiptVersion(1);
+        when(mapper.selectCurrent(1L)).thenReturn(previous);
+
+        assertThatThrownBy(() -> service.put(command))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("版本");
+        verify(mapper, never()).clearCurrent(1L);
+        verify(mapper, never()).insert(any(OrderBackupReceiptEntity.class));
+    }
 }

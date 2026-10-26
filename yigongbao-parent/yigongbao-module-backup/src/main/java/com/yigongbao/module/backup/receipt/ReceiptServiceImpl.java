@@ -29,6 +29,11 @@ public class ReceiptServiceImpl implements ReceiptService {
             return existing;
         }
         OrderBackupReceiptEntity previous = mapper.selectCurrent(command.orderId());
+        if (previous != null && command.receiptVersion() <= previous.getReceiptVersion()) {
+            throw new IllegalStateException("凭证版本必须大于当前凭证版本");
+        }
+        // current_order_id 具有唯一约束；先在同一事务内关闭旧当前凭证，再写入新版本。
+        mapper.clearCurrent(command.orderId());
         OrderBackupReceiptEntity entity = new OrderBackupReceiptEntity();
         entity.setOrderId(command.orderId());
         entity.setManifestRevision(command.manifestRevision());
@@ -69,7 +74,10 @@ public class ReceiptServiceImpl implements ReceiptService {
 
     private void validate(ReceiptCommand command) {
         if (command == null || command.orderId() == null || command.receiptVersion() < 1
+                || command.manifestRevision() == null || command.manifestRevision().isBlank()
                 || command.idempotencyKey() == null || command.idempotencyKey().isBlank()
+                || command.fileCount() < 0 || command.sourceTotalSize() < 0
+                || command.backupCompletedAt() == null
                 || command.manifestSha256() == null || !command.manifestSha256().matches("[0-9a-f]{64}")
                 || command.packageSha256() == null || !command.packageSha256().matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("凭证摘要参数无效");
