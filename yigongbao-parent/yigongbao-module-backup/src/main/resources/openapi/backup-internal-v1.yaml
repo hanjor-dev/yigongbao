@@ -25,6 +25,8 @@ paths:
     post:
       tags: [Candidate]
       operationId: searchBackupCandidates
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
         required: true
         content:

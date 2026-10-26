@@ -21,12 +21,12 @@ import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.UUID;
 
 /**
@@ -120,7 +120,7 @@ public class MachineHmacAuthenticationFilter extends OncePerRequestFilter {
             throw new IOException("request body too large");
         }
         int initialCapacity = (int) Math.min(contentLength >= 0 ? contentLength : 8192, maxBodyBytes);
-        ByteArrayOutputStream body = new ByteArrayOutputStream(initialCapacity);
+        BoundedBodyBuffer body = new BoundedBodyBuffer(initialCapacity, (int) maxBodyBytes);
         byte[] buffer = new byte[8192];
         long total = 0;
         InputStream input = request.getInputStream();
@@ -129,10 +129,10 @@ public class MachineHmacAuthenticationFilter extends OncePerRequestFilter {
             if (total > maxBodyBytes - read) {
                 throw new IOException("request body too large");
             }
-            body.write(buffer, 0, read);
+            body.append(buffer, 0, read);
             total += read;
         }
-        return body.toByteArray();
+        return body.finish();
     }
 
     private boolean isExplicitTestBypass() {
@@ -160,6 +160,46 @@ public class MachineHmacAuthenticationFilter extends OncePerRequestFilter {
                 InternalApiResponse.error(BackupErrorCode.VERIFICATION_REJECTED, requestId));
     }
 
+    /**
+     * 有界、线性扩容的请求体缓存。未知 Content-Length 的请求不会触发
+     * ByteArrayOutputStream 的几何扩容，从而避免容量短时超过配置上限。
+     */
+    private static final class BoundedBodyBuffer {
+
+        private static final int GROWTH_STEP_BYTES = 8192;
+
+        private final int maxBytes;
+        private byte[] data;
+        private int size;
+
+        private BoundedBodyBuffer(int initialCapacity, int maxBytes) {
+            this.maxBytes = maxBytes;
+            this.data = new byte[Math.min(initialCapacity, maxBytes)];
+        }
+
+        private void append(byte[] source, int offset, int length) throws IOException {
+            if (length < 0 || size > maxBytes - length) {
+                throw new IOException("request body too large");
+            }
+            ensureCapacity(size + length);
+            System.arraycopy(source, offset, data, size, length);
+            size += length;
+        }
+
+        private void ensureCapacity(int requiredCapacity) {
+            if (requiredCapacity <= data.length) {
+                return;
+            }
+            int nextCapacity = Math.min(maxBytes,
+                    Math.max(requiredCapacity, data.length + GROWTH_STEP_BYTES));
+            data = Arrays.copyOf(data, nextCapacity);
+        }
+
+        private byte[] finish() {
+            return size == data.length ? data : Arrays.copyOf(data, size);
+        }
+    }
+
     /** Servlet request wrapper that returns a fresh stream over the cached bytes on every call. */
     private static final class CachedBodyRequest extends HttpServletRequestWrapper {
 
@@ -167,7 +207,7 @@ public class MachineHmacAuthenticationFilter extends OncePerRequestFilter {
 
         private CachedBodyRequest(HttpServletRequest request, byte[] body) {
             super(request);
-            this.body = body.clone();
+            this.body = body;
         }
 
         @Override

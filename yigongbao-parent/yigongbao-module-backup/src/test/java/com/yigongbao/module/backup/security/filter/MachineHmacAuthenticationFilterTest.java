@@ -148,6 +148,74 @@ class MachineHmacAuthenticationFilterTest {
         assertThat(verifierCalled).isFalse();
     }
 
+    @Test
+    void rejectsUnknownLengthBodyWhenItExceedsConfiguredLimit() throws ServletException, IOException {
+        BackupProperties properties = new BackupProperties();
+        properties.getSecurity().setMaxBodyBytes(4);
+        AtomicBoolean verifierCalled = new AtomicBoolean();
+        MachineRequestVerifier verifier = (request, body) -> {
+            verifierCalled.set(true);
+            return new VerifiedMachine("machine-01", "key-v1", MachineScope.MANIFEST);
+        };
+        MachineHmacAuthenticationFilter filter = filter(
+                properties, new MockEnvironment(), verifier);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST", "/internal/backup/v1/candidates/reconcile") {
+            @Override
+            public int getContentLength() {
+                return -1;
+            }
+
+            @Override
+            public long getContentLengthLong() {
+                return -1;
+            }
+        };
+        request.setContent("12345".getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(verifierCalled).isFalse();
+    }
+
+    @Test
+    void replaysUnknownLengthBodyWithinConfiguredLimit() throws Exception {
+        byte[] payload = "1234".getBytes(StandardCharsets.UTF_8);
+        AtomicReference<byte[]> verifiedBody = new AtomicReference<>();
+        MachineRequestVerifier verifier = (request, body) -> {
+            verifiedBody.set(body);
+            return new VerifiedMachine("machine-01", "key-v1", MachineScope.MANIFEST);
+        };
+        BackupProperties properties = new BackupProperties();
+        properties.getSecurity().setMaxBodyBytes(payload.length);
+        MachineHmacAuthenticationFilter filter = filter(
+                properties, new MockEnvironment(), verifier);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST", "/internal/backup/v1/candidates/reconcile") {
+            @Override
+            public int getContentLength() {
+                return -1;
+            }
+
+            @Override
+            public long getContentLengthLong() {
+                return -1;
+            }
+        };
+        request.setContent(payload);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        AtomicReference<byte[]> controllerBody = new AtomicReference<>();
+
+        filter.doFilter(request, response, (servletRequest, servletResponse) ->
+                controllerBody.set(((HttpServletRequest) servletRequest).getInputStream().readAllBytes()));
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(verifiedBody.get()).isEqualTo(payload);
+        assertThat(controllerBody.get()).isEqualTo(payload);
+    }
+
     private MachineHmacAuthenticationFilter filter(BackupProperties properties, MockEnvironment environment) {
         return new MachineHmacAuthenticationFilter(properties, environment, objectMapper);
     }

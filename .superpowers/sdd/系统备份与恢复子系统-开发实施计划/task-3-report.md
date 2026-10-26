@@ -28,5 +28,6 @@
 - 修复 `key_id` 跨机器重复时由 `LIMIT 1` 随机选取凭证的问题：认证查询现在必须恰好返回一条未删除记录，否则 fail-closed；并补充重复 key 的单元测试。
 - 为请求体缓存增加 `yigongbao.backup.security.max-body-bytes` 配置，默认 10 MiB；先检查 Content-Length，再分块读取未知长度请求，超过上限在验签前拒绝，避免无界内存分配。
 - 修正内部 OpenAPI 的 HMAC 头说明、认证时间格式和 `Idempotency-Key` 约束，使契约与实现（X-Key-Id、X-Nonce、X-Timestamp、X-Scope、X-Signature，写请求追加幂等键）一致。
+- 为 `POST /internal/backup/v1/candidates/search` 补充 `Idempotency-Key` 契约声明；请求体缓存改为有界线性扩容，未知 `Content-Length` 时不会发生几何扩容或缓存对象二次克隆，超过 `max-body-bytes` 在验签前拒绝，并补充未知长度请求的超限/正常回放测试。
 
-审查修复后的聚焦测试：27 tests，0 failures，0 errors；`mvn -pl yigongbao-module-backup -am -DskipTests compile` 通过。
+审查修复后的聚焦测试：30 tests，0 failures，0 errors；`mvn -pl yigongbao-module-backup -DskipTests compile` 通过。
