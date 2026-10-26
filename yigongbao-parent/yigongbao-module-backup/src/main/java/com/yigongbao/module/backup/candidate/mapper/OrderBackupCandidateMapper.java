@@ -21,6 +21,14 @@ public interface OrderBackupCandidateMapper extends BaseMapper<OrderBackupCandid
     @Select("SELECT COALESCE(MAX(event_id), 0) FROM order_backup_candidate WHERE is_deleted = 0")
     Long selectMaxEventId();
 
+    /** 在数据库行锁保护下分配全局事件号；禁止使用 MAX(event_id)+1。 */
+    @Update("UPDATE backup_candidate_event_sequence "
+            + "SET next_event_id = LAST_INSERT_ID(next_event_id + 1) WHERE id = 1")
+    int allocateEventId();
+
+    @Select("SELECT LAST_INSERT_ID()")
+    Long selectAllocatedEventId();
+
     @Select("SELECT * FROM order_backup_candidate WHERE is_deleted = 0 "
             + "ORDER BY eligible_at DESC, event_id DESC LIMIT 1")
     OrderBackupCandidateEntity selectHighWatermark();

@@ -682,6 +682,8 @@ public class OrderMainServiceImpl extends ServiceImpl<OrderMainMapper, OrderMain
         entity.setStatus(result.getFinalStatus());
         entity.setCurrentHandlerId(currentUserId);
         updateById(entity);
+        // 撤回到草稿后不再具备正式订单备份资格，候选模块在 BEFORE_COMMIT 阶段关闭当前候选。
+        publishEligibilityChanged(id, OrderEligibilityChangedEvent.DRAFT);
         log.info("撤回订单: orderId={}, phase={}, status={}", id, result.getTargetPhase(), result.getFinalStatus());
     }
 

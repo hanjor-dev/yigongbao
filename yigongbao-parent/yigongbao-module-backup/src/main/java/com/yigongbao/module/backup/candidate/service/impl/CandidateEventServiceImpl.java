@@ -1,12 +1,12 @@
 package com.yigongbao.module.backup.candidate.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yigongbao.common.entity.OrderMainEntity;
 import com.yigongbao.common.constant.StatusConstants;
 import com.yigongbao.common.event.OrderEligibilityChangedEvent;
 import com.yigongbao.flow.enums.FlowStatusEnum;
 import com.yigongbao.module.backup.candidate.entity.OrderBackupCandidateEntity;
 import com.yigongbao.module.backup.candidate.mapper.OrderBackupCandidateMapper;
+import com.yigongbao.module.backup.candidate.mapper.OrderBackupOrderMapper;
 import com.yigongbao.module.backup.candidate.model.CandidateCursor;
 import com.yigongbao.module.backup.candidate.model.CandidateEventStatus;
 import com.yigongbao.module.backup.candidate.model.CandidatePage;
@@ -36,11 +36,14 @@ import java.util.List;
 public class CandidateEventServiceImpl implements CandidateEventService {
 
     private final OrderBackupCandidateMapper candidateMapper;
+    private final OrderBackupOrderMapper orderMapper;
     private final ObjectProvider<OrderMainService> orderServices;
 
     public CandidateEventServiceImpl(OrderBackupCandidateMapper candidateMapper,
+                                    OrderBackupOrderMapper orderMapper,
                                     ObjectProvider<OrderMainService> orderServices) {
         this.candidateMapper = candidateMapper;
+        this.orderMapper = orderMapper;
         this.orderServices = orderServices;
     }
 
@@ -51,6 +54,7 @@ public class CandidateEventServiceImpl implements CandidateEventService {
     }
 
     /** 保留事件发生时间，供 BEFORE_COMMIT 监听器写入稳定分页游标。 */
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void recordEligibilityChange(Long orderId, String targetState, LocalDateTime occurredAt) {
         requireState(targetState);
@@ -67,8 +71,11 @@ public class CandidateEventServiceImpl implements CandidateEventService {
         }
 
         if (!isFormalState(targetState)) {
-            int changed = candidateMapper.updateActiveStatus(orderId, targetState);
-            log.info("关闭订单备份候选: orderId={}, targetState={}, changed={}", orderId, targetState, changed);
+            String terminalState = OrderEligibilityChangedEvent.DELETED.equals(targetState)
+                    ? CandidateEventStatus.DELETED.name() : CandidateEventStatus.CANCELLED.name();
+            int changed = candidateMapper.updateActiveStatus(orderId, terminalState);
+            log.info("关闭订单备份候选: orderId={}, targetState={}, candidateState={}, changed={}",
+                    orderId, targetState, terminalState, changed);
             return;
         }
 
@@ -140,13 +147,8 @@ public class CandidateEventServiceImpl implements CandidateEventService {
         if (orderIdFrom == null || orderIdTo == null || orderIdFrom > orderIdTo) {
             throw new IllegalArgumentException("订单范围无效");
         }
-        OrderMainService orderService = orderServices.getIfAvailable();
-        if (orderService == null) {
-            return new CandidateReconcileResult(0, 0, 0, 0);
-        }
-        List<OrderMainEntity> orders = orderService.list(new LambdaQueryWrapper<OrderMainEntity>()
-                .ge(OrderMainEntity::getId, orderIdFrom)
-                .le(OrderMainEntity::getId, orderIdTo));
+        // 必须使用显式含逻辑删除的查询，否则已删除订单永远无法关闭 ACTIVE 候选。
+        List<OrderMainEntity> orders = orderMapper.selectRangeIncludingDeleted(orderIdFrom, orderIdTo);
         int repaired = 0;
         int cancelled = 0;
         int deleted = 0;
@@ -185,9 +187,15 @@ public class CandidateEventServiceImpl implements CandidateEventService {
         return (max == null ? 0 : max) + 1;
     }
 
-    private synchronized long nextEventId() {
-        Long max = candidateMapper.selectMaxEventId();
-        return (max == null ? 0L : max) + 1L;
+    private long nextEventId() {
+        if (candidateMapper.allocateEventId() != 1) {
+            throw new IllegalStateException("备份候选事件号分配器不可用");
+        }
+        Long allocated = candidateMapper.selectAllocatedEventId();
+        if (allocated == null || allocated <= 0) {
+            throw new IllegalStateException("备份候选事件号分配失败");
+        }
+        return allocated;
     }
 
     private CandidateCursor toCursor(OrderBackupCandidateEntity candidate) {
@@ -197,7 +205,8 @@ public class CandidateEventServiceImpl implements CandidateEventService {
     private void requireState(String targetState) {
         if (!isFormalState(targetState)
                 && !CandidateEventStatus.CANCELLED.name().equals(targetState)
-                && !CandidateEventStatus.DELETED.name().equals(targetState)) {
+                && !CandidateEventStatus.DELETED.name().equals(targetState)
+                && !OrderEligibilityChangedEvent.DRAFT.equals(targetState)) {
             throw new IllegalArgumentException("不支持的订单资格状态: " + targetState);
         }
     }

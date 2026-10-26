@@ -304,6 +304,11 @@ class OrderMainServiceImplStateTransitionTest {
 
         verify(service).updateById(order);
         org.junit.jupiter.api.Assertions.assertEquals(userId, order.getCurrentHandlerId());
+        ArgumentCaptor<OrderEligibilityChangedEvent> eventCaptor =
+                ArgumentCaptor.forClass(OrderEligibilityChangedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(OrderEligibilityChangedEvent.DRAFT,
+                eventCaptor.getValue().getTargetState());
     }
 
     @Test

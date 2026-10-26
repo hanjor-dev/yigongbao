@@ -16,6 +16,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 /** 供本地备份系统发现候选和执行漏单对账的内部接口。 */
@@ -49,13 +50,13 @@ public class BackupCandidateController {
     }
 
     @PostMapping("/reconcile")
-    public ResponseEntity<InternalApiResponse<CandidateReconcileResult>> reconcile(
+    public ResponseEntity<InternalApiResponse<CandidateReconcileData>> reconcile(
             @RequestBody CandidateReconcileRequest request, HttpServletRequest servletRequest) {
         String requestId = requestId(servletRequest);
         try {
             CandidateReconcileResult result = candidateEventService.reconcile(
                     request.orderIdFrom, request.orderIdTo);
-            return ResponseEntity.ok(InternalApiResponse.success(result, requestId));
+            return ResponseEntity.ok(InternalApiResponse.success(CandidateReconcileData.from(result), requestId));
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.status(BackupErrorCode.CURSOR_INVALID.getHttpStatus())
                     .body(InternalApiResponse.error(BackupErrorCode.CURSOR_INVALID, requestId));
@@ -63,7 +64,11 @@ public class BackupCandidateController {
     }
 
     private LocalDateTime parseTime(String value) {
-        return value == null || value.isBlank() ? null : OffsetDateTime.parse(value).toLocalDateTime();
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        // 数据库存储 UTC 的无时区时间；先按输入偏移换算瞬时值，不能直接丢弃 offset。
+        return OffsetDateTime.parse(value).withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime();
     }
 
     private String requestId(HttpServletRequest request) {
@@ -90,11 +95,23 @@ public class BackupCandidateController {
     }
 
     public record CandidateItem(Long eventId, Long orderId, Integer generation,
-                                 LocalDateTime eligibleAt, LocalDateTime orderCreatedAt,
+                                 OffsetDateTime eligibleAt, OffsetDateTime orderCreatedAt,
                                  String eventStatus) {
         static CandidateItem from(OrderBackupCandidateEntity entity) {
             return new CandidateItem(entity.getEventId(), entity.getOrderId(), entity.getGeneration(),
-                    entity.getEligibleAt(), entity.getOrderCreatedAt(), entity.getEventStatus());
+                    toUtc(entity.getEligibleAt()), toUtc(entity.getOrderCreatedAt()), entity.getEventStatus());
+        }
+
+        private static OffsetDateTime toUtc(LocalDateTime value) {
+            return value == null ? null : value.atOffset(ZoneOffset.UTC);
+        }
+    }
+
+    /** 对账响应数据，与统一 InternalApiResponse 信封保持一致。 */
+    public record CandidateReconcileData(int scanned, int repaired, int cancelled, int deleted) {
+        static CandidateReconcileData from(CandidateReconcileResult result) {
+            return new CandidateReconcileData(result.scanned(), result.repaired(),
+                    result.cancelled(), result.deleted());
         }
     }
 }

@@ -19,6 +19,8 @@ public class OrderEligibilityChangedEvent extends ApplicationEvent {
     public static final String FORMAL = "FORMAL";
     /** 兼容候选表中的状态命名；FORMAL 与 ACTIVE 表示相同资格状态。 */
     public static final String ACTIVE = "ACTIVE";
+    /** 订单撤回到草稿，当前备份候选关闭。 */
+    public static final String DRAFT = "DRAFT";
     /** 订单取消，当前备份候选不再启动新的备份任务。 */
     public static final String CANCELLED = "CANCELLED";
     /** 订单逻辑删除，当前备份候选进入删除终态。 */

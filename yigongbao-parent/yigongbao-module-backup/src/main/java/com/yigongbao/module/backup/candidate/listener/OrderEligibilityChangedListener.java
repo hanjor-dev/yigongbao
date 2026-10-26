@@ -1,7 +1,7 @@
 package com.yigongbao.module.backup.candidate.listener;
 
 import com.yigongbao.common.event.OrderEligibilityChangedEvent;
-import com.yigongbao.module.backup.candidate.service.impl.CandidateEventServiceImpl;
+import com.yigongbao.module.backup.candidate.service.CandidateEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,7 +17,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Slf4j
 public class OrderEligibilityChangedListener {
 
-    private final CandidateEventServiceImpl candidateEventService;
+    private final CandidateEventService candidateEventService;
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void onEligibilityChanged(OrderEligibilityChangedEvent event) {
