@@ -84,3 +84,68 @@ JSON_OK required=schemaVersion,snapshotId,orderSnapshot,source,assets,summary
 - `D:/01_Project/02_Personal/医工宝备份子系统/yigongbao-backup-server/sql/init/00-create-database.sql`
 - `D:/01_Project/02_Personal/医工宝备份子系统/yigongbao-backup-server/sql/init/01-schema.sql`
 - `D:/01_Project/02_Personal/医工宝备份子系统/yigongbao-backup-server/sql/init/02-indexes.sql`
+
+## 追加验证记录：OpenAPI 结构与本地契约完整性（2026-10-26）
+
+以下命令在本工作树执行，使用 `yaml.safe_load` 解析 OpenAPI，遍历 `paths` 统计操作，解析并检查文档内 `$ref`，检查每个操作是否同时声明 2xx 成功响应和 4xx/5xx（或 `default`）错误响应；同时使用 `Draft202012Validator.check_schema` 校验 manifest Schema，并检查 Task 1 全部 13 个必需产物：
+
+```powershell
+@'
+import json, pathlib, re
+import yaml
+from jsonschema import Draft202012Validator
+
+files = {
+  'online': pathlib.Path(r'yigongbao-parent/yigongbao-module-backup/src/main/resources/openapi/backup-internal-v1.yaml'),
+  'local': pathlib.Path(r'D:/01_Project/02_Personal/医工宝备份子系统/yigongbao-backup-server/src/main/resources/openapi/local-backup-v1.yaml'),
+}
+for name, path in files.items():
+    text = path.read_text(encoding='utf-8')
+    doc = yaml.safe_load(text)
+    ops = [(route, method.lower(), op or {}) for route, item in doc.get('paths', {}).items() for method, op in item.items() if method.lower() in {'get','post','put','patch','delete','head','options','trace'}]
+    unresolved=[]
+    for ref in sorted(set(re.findall(r"\$ref:\s*['\"]?([^'\"\s]+)", text))):
+        if ref.startswith('#/'):
+            node=doc
+            try:
+                for part in ref[2:].split('/'):
+                    node=node[part.replace('~1','/').replace('~0','~')]
+            except (KeyError,TypeError): unresolved.append(ref)
+    missing=[]
+    for route, method, op in ops:
+        responses=op.get('responses',{})
+        if not any(str(k).startswith('2') for k in responses) or not any(str(k).startswith(('4','5')) or str(k).lower() == 'default' for k in responses):
+            missing.append(f'{method.upper()} {route}')
+    print(f'{name}: OPENAPI_STRUCTURAL_VALID operations={len(ops)} unresolved_refs={len(unresolved)} missing_success_error_responses={len(missing)}')
+
+manifest_path=pathlib.Path(r'D:/01_Project/02_Personal/医工宝备份子系统/yigongbao-backup-server/src/main/resources/schema/manifest-v1.schema.json')
+schema=json.loads(manifest_path.read_text(encoding='utf-8'))
+Draft202012Validator.check_schema(schema)
+print('manifest: DRAFT_2020_12_VALID required=' + ','.join(schema.get('required', [])))
+required=[
+'yigongbao-parent/yigongbao-module-backup/src/main/resources/openapi/backup-internal-v1.yaml',
+'yigongbao-parent/sql/migration/2026-10-27-01-backup-candidate-receipt.sql',
+'yigongbao-parent/sql/migration/2026-10-27-02-backup-restore.sql',
+'yigongbao-parent/sql/migration/2026-10-27-03-backup-cleanup.sql',
+'yigongbao-parent/sql/migration/2026-10-27-04-backup-security.sql',
+'yigongbao-parent/sql/migration/2026-10-27-05-backup-reference-backfill.sql',
+'yigongbao-parent/sql/migration/2026-10-27-06-backup-candidate-backfill.sql',
+'yigongbao-parent/sql/migration/2026-10-27-07-backup-cleanup-resource.sql',
+'D:/01_Project/02_Personal/医工宝备份子系统/yigongbao-backup-server/src/main/resources/openapi/local-backup-v1.yaml',
+'D:/01_Project/02_Personal/医工宝备份子系统/yigongbao-backup-server/src/main/resources/schema/manifest-v1.schema.json',
+'D:/01_Project/02_Personal/医工宝备份子系统/yigongbao-backup-server/sql/init/00-create-database.sql',
+'D:/01_Project/02_Personal/医工宝备份子系统/yigongbao-backup-server/sql/init/01-schema.sql',
+'D:/01_Project/02_Personal/医工宝备份子系统/yigongbao-backup-server/sql/init/02-indexes.sql']
+missing=[p for p in required if not pathlib.Path(p).exists()]
+print(f'local_artifacts: missing={len(missing)} total={len(required)}')
+'@ | python -
+```
+
+实际输出：
+
+```text
+online: OPENAPI_STRUCTURAL_VALID operations=22 unresolved_refs=0 missing_success_error_responses=0
+local: OPENAPI_STRUCTURAL_VALID operations=40 unresolved_refs=0 missing_success_error_responses=0
+manifest: DRAFT_2020_12_VALID required=schemaVersion,snapshotId,orderSnapshot,source,assets,summary
+local_artifacts: missing=0 total=13
+```
