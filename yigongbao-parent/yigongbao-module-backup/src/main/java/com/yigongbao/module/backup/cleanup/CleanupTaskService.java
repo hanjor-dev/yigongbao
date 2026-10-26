@@ -10,6 +10,7 @@ public class CleanupTaskService {
  public Evaluation evaluate(int olderThanDays){if(olderThanDays<0)throw new IllegalArgumentException("清理天数不能为负");return new Evaluation(UUID.randomUUID().toString(),"DRY_RUN",List.of(),0L);}
  public synchronized Task create(int olderThanDays,List<String> keys){if(olderThanDays<0||keys==null)throw new IllegalArgumentException("参数非法");String id=UUID.randomUUID().toString();Task t=new Task(id,olderThanDays,"RUNNING",List.copyOf(keys));tasks.put(id,t);return t;}
  public Task get(String id){Task t=tasks.get(id);if(t==null)throw new IllegalArgumentException("任务不存在");return t;}
+ public List<Task> list(){return tasks.values().stream().sorted(Comparator.comparing(Task::id).reversed()).toList();}
  public synchronized Task pause(String id){Task t=get(id);if(!"RUNNING".equals(t.status))throw new IllegalStateException("任务不可暂停");t.status="PAUSED";return t;}
  public synchronized Task resume(String id){Task t=get(id);if(!"PAUSED".equals(t.status))throw new IllegalStateException("任务不可恢复");t.status="RUNNING";return t;}
  public synchronized Permit issuePermit(String id){Task t=get(id);if(!"RUNNING".equals(t.status)||t.keys.isEmpty())throw new IllegalStateException("任务尚未满足授权条件");Permit p=new Permit(UUID.randomUUID().toString(),id,List.copyOf(t.keys),"ACTIVE");permits.put(p.id,p);return p;}
