@@ -34,6 +34,10 @@ public class CleanupManagementController {
     @GetMapping("/tasks/{id}")
     @RequirePermission("backup-cleanup:View")
     public ResponseEntity<Result<?>> get(@PathVariable String id) { admin(); return ResponseEntity.ok(Result.success(service.get(id))); }
+    /** 返回任务对象级删除结果，便于管理页定位失败对象。 */
+    @GetMapping("/tasks/{id}/items")
+    @RequirePermission("backup-cleanup:View")
+    public ResponseEntity<Result<?>> items(@PathVariable String id) { admin(); return ResponseEntity.ok(Result.success(service.items(id))); }
     @PostMapping("/tasks/{id}/pause")
     @RequirePermission("backup-cleanup:Pause")
     public ResponseEntity<Result<?>> pause(@PathVariable String id) { admin(); return ResponseEntity.ok(Result.success(service.pause(id))); }
