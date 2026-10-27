@@ -71,7 +71,11 @@ BEGIN
         UNION ALL SELECT '恢复清理任务','backup-cleanup:Resume',5,'恢复任务'
         UNION ALL SELECT '管理清理保护名单','backup-cleanup:Protection',6,'保护名单查询、新增和移除'
       ) v
-     WHERE NOT EXISTS (SELECT 1 FROM sys_resource x WHERE x.resource_code=v.resource_code);
+     WHERE NOT EXISTS (
+         SELECT 1 FROM sys_resource x
+          WHERE (CONVERT(x.resource_code USING utf8mb4) COLLATE utf8mb4_0900_ai_ci)
+              = (CONVERT(v.resource_code USING utf8mb4) COLLATE utf8mb4_0900_ai_ci)
+     );
 
     INSERT INTO sys_role_resource (role_id,resource_id)
     SELECT role_row.id,resource_row.id

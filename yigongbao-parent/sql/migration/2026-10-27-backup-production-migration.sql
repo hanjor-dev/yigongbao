@@ -388,7 +388,9 @@ WHERE fd.is_deleted=0 AND fd.id REGEXP '^[0-9]+$'
   AND NOT EXISTS (
       SELECT 1 FROM cos_object_reference r
       WHERE r.relation_kind='FILE_DETAIL' AND r.relation_id=CAST(fd.id AS UNSIGNED)
-        AND r.platform=COALESCE(NULLIF(fd.platform,''),'UNKNOWN') AND r.is_deleted=0
+        AND (CONVERT(r.platform USING utf8mb4) COLLATE utf8mb4_0900_ai_ci)
+            = (CONVERT(COALESCE(NULLIF(fd.platform,''),'UNKNOWN') USING utf8mb4) COLLATE utf8mb4_0900_ai_ci)
+        AND r.is_deleted=0
   );
 
 SET @reference_after := (SELECT COUNT(*) FROM cos_object_reference WHERE relation_kind='FILE_DETAIL' AND is_deleted=0);
@@ -543,7 +545,11 @@ BEGIN
         UNION ALL SELECT '恢复清理任务','backup-cleanup:Resume',5,'恢复任务'
         UNION ALL SELECT '管理清理保护名单','backup-cleanup:Protection',6,'保护名单查询、新增和移除'
       ) v
-     WHERE NOT EXISTS (SELECT 1 FROM sys_resource x WHERE x.resource_code=v.resource_code);
+     WHERE NOT EXISTS (
+         SELECT 1 FROM sys_resource x
+          WHERE (CONVERT(x.resource_code USING utf8mb4) COLLATE utf8mb4_0900_ai_ci)
+              = (CONVERT(v.resource_code USING utf8mb4) COLLATE utf8mb4_0900_ai_ci)
+     );
 
     INSERT INTO sys_role_resource (role_id,resource_id)
     SELECT role_row.id,resource_row.id
@@ -607,4 +613,3 @@ JOIN sys_resource res ON res.id=rr.resource_id WHERE res.resource_code IN
 ('BackupCleanup','backup-cleanup:List','backup-cleanup:View','backup-cleanup:DryRun','backup-cleanup:Pause','backup-cleanup:Resume','backup-cleanup:Protection')
 AND role_row.role_code NOT IN ('admin','company-admin');
 -- 人工回滚：先确认七个资源未被其他功能复用；仅删除对应 sys_role_resource 关系并逻辑删除七个新资源，绝不修改 Backup 父资源。
-

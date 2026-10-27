@@ -36,7 +36,9 @@ WHERE fd.is_deleted=0 AND fd.id REGEXP '^[0-9]+$'
   AND NOT EXISTS (
       SELECT 1 FROM cos_object_reference r
       WHERE r.relation_kind='FILE_DETAIL' AND r.relation_id=CAST(fd.id AS UNSIGNED)
-        AND r.platform=COALESCE(NULLIF(fd.platform,''),'UNKNOWN') AND r.is_deleted=0
+        AND (CONVERT(r.platform USING utf8mb4) COLLATE utf8mb4_0900_ai_ci)
+            = (CONVERT(COALESCE(NULLIF(fd.platform,''),'UNKNOWN') USING utf8mb4) COLLATE utf8mb4_0900_ai_ci)
+        AND r.is_deleted=0
   );
 
 SET @reference_after := (SELECT COUNT(*) FROM cos_object_reference WHERE relation_kind='FILE_DETAIL' AND is_deleted=0);
