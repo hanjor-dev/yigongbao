@@ -28,7 +28,7 @@ public class CleanupManagementController {
     @GetMapping("/tasks")
     @RequirePermission("backup-cleanup:List")
     public ResponseEntity<Result<?>> list() { admin(); return ResponseEntity.ok(Result.success(service.list())); }
-    @PostMapping("/evaluate")
+    @PostMapping({"/dry-runs", "/evaluate"})
     @RequirePermission("backup-cleanup:DryRun")
     public ResponseEntity<Result<?>> evaluate(@RequestBody CleanupTaskController.Days body) { admin(); return ResponseEntity.ok(Result.success(service.evaluate(body.olderThanDays()))); }
     @GetMapping("/tasks/{id}")

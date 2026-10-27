@@ -48,7 +48,7 @@ class CleanupManagementControllerTest {
     @Test
     void companyAdminCanAccessFrontendEndpoint() throws Exception {
         try (MockedStatic<StpUtil> ignored = role("company-admin")) {
-            mockMvc.perform(post("/api/backup/cleanup/v1/evaluate")
+            mockMvc.perform(post("/api/backup/cleanup/v1/dry-runs")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"olderThanDays\":180}"))
                     .andExpect(status().isOk())
@@ -74,7 +74,7 @@ class CleanupManagementControllerTest {
         try (MockedStatic<StpUtil> ignored = role("admin")) {
             mockMvc.perform(get("/api/backup/cleanup/v1/tasks"))
                     .andExpect(status().isOk());
-            mockMvc.perform(post("/api/backup/cleanup/v1/evaluate")
+            mockMvc.perform(post("/api/backup/cleanup/v1/dry-runs")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"olderThanDays\":30}"))
                     .andExpect(status().isOk());
