@@ -53,6 +53,10 @@
             <groupId>com.yigongbao</groupId>
             <artifactId>yigongbao-module-dashboard</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.yigongbao</groupId>
+            <artifactId>yigongbao-module-backup</artifactId>
+        </dependency>
 
         <!-- spring boot -->
         <dependency>
